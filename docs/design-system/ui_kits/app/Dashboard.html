@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cogni — Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'DM Sans', system-ui, sans-serif; background: #EDEAE4; min-height: 100vh; display: flex; -webkit-font-smoothing: antialiased; }
+
+/* SIDEBAR */
+.sidebar { width: 240px; min-height: 100vh; background: #FAFAF8; border-right: 1px solid rgba(229,226,220,0.7); display: flex; flex-direction: column; padding: 16px 12px; gap: 2px; flex-shrink: 0; position: sticky; top: 0; height: 100vh; }
+.logo-row { display: flex; align-items: center; gap: 8px; padding: 4px 8px 16px; border-bottom: 1px solid rgba(229,226,220,0.5); margin-bottom: 4px; }
+.logo-mark { width: 34px; height: 34px; background: #1C1917; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.logo-name { font-size: 14px; font-weight: 700; color: #1C1917; }
+.section-label { font-size: 11px; font-weight: 500; color: #A8A29E; padding: 12px 10px 4px; }
+.nav-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; font-size: 13.5px; color: #57534E; cursor: pointer; transition: all 150ms; }
+.nav-item:hover { background: rgba(245,243,239,0.9); color: #1C1917; }
+.nav-item.active { background: rgba(237,233,254,0.9); color: #6D28D9; font-weight: 500; }
+.nav-icon { width: 16px; height: 16px; flex-shrink: 0; opacity: 0.7; }
+.nav-item.active .nav-icon { opacity: 1; }
+.sidebar-bottom { margin-top: auto; padding-top: 12px; border-top: 1px solid rgba(229,226,220,0.5); }
+.account { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 10px; cursor: pointer; }
+.account:hover { background: rgba(245,243,239,0.9); }
+.avatar { width: 32px; height: 32px; border-radius: 9999px; background: linear-gradient(135deg, #C4B5FD, #7C3AED); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: white; flex-shrink: 0; }
+
+/* MAIN */
+.main { flex: 1; display: flex; flex-direction: column; overflow-y: auto; }
+.topbar { background: #EDEAE4; display: flex; align-items: center; justify-content: space-between; padding: 10px 32px; border-bottom: 1px solid rgba(229,226,220,0.5); position: sticky; top: 0; z-index: 10; }
+.breadcrumb { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #A8A29E; }
+.breadcrumb .current { color: #1C1917; font-weight: 500; }
+.topbar-right { display: flex; align-items: center; gap: 8px; }
+.period-tabs { display: flex; background: rgba(255,255,255,0.8); border: 1px solid rgba(229,226,220,0.7); border-radius: 9px; padding: 3px; gap: 2px; }
+.period-tab { padding: 5px 12px; border-radius: 7px; font-size: 12px; font-weight: 500; color: #78716C; cursor: pointer; transition: all 150ms; }
+.period-tab.active { background: white; color: #1C1917; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+
+.page-content { padding: 28px 32px; display: flex; flex-direction: column; gap: 24px; }
+.page-header { display: flex; align-items: center; justify-content: space-between; }
+.page-title { font-size: 24px; font-weight: 700; color: #1C1917; }
+.page-sub { font-size: 13px; color: #A8A29E; margin-top: 3px; }
+
+/* STAT CARDS */
+.stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.stat-card { background: #FFFFFF; border: 1px solid rgba(229,226,220,0.7); border-radius: 16px; padding: 18px; box-shadow: 0 1px 4px rgba(0,0,0,0.04); }
+.stat-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.stat-icon { width: 30px; height: 30px; border-radius: 9px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.stat-lbl { font-size: 12px; color: #A8A29E; font-weight: 500; margin-left: 8px; }
+.stat-badge { font-size: 10.5px; font-weight: 600; padding: 2px 8px; border-radius: 9999px; }
+.stat-val { font-size: 28px; font-weight: 700; color: #1C1917; line-height: 1.1; }
+.stat-val sup { font-size: 14px; font-weight: 500; color: #A8A29E; }
+.stat-hint { font-size: 11.5px; color: #A8A29E; margin-top: 4px; display: flex; align-items: center; gap: 4px; }
+.trend-up { color: #10B981; }
+.trend-down { color: #EF4444; }
+.prog-bar { height: 5px; background: rgba(229,226,220,0.6); border-radius: 9999px; overflow: hidden; margin-top: 12px; }
+.prog-fill { height: 100%; border-radius: 9999px; }
+
+/* TABS */
+.dash-tabs { display: flex; gap: 4px; border-bottom: 1px solid rgba(229,226,220,0.5); }
+.dash-tab { padding: 10px 16px; font-size: 13.5px; font-weight: 500; color: #A8A29E; cursor: pointer; border-bottom: 2px solid transparent; transition: all 150ms; margin-bottom: -1px; }
+.dash-tab:hover { color: #57534E; }
+.dash-tab.active { color: #7C3AED; border-bottom-color: #7C3AED; }
+
+/* TAB CONTENT */
+.tab-pane { display: none; }
+.tab-pane.active { display: flex; flex-direction: column; gap: 20px; }
+
+/* TWO COL */
+.two-col { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
+.three-col { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+
+/* PANEL */
+.panel { background: #FFFFFF; border: 1px solid rgba(229,226,220,0.7); border-radius: 16px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.04); }
+.panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.panel-title { font-size: 14px; font-weight: 600; color: #1C1917; }
+.panel-action { font-size: 12px; color: #A8A29E; cursor: pointer; }
+.panel-action:hover { color: #7C3AED; }
+
+/* CHART (pure CSS bar chart) */
+.bar-chart { display: flex; align-items: flex-end; gap: 8px; height: 140px; }
+.bar-col { display: flex; flex-direction: column; align-items: center; gap: 6px; flex: 1; }
+.bar-stack { display: flex; flex-direction: column-reverse; align-items: center; gap: 1px; flex: 1; width: 100%; justify-content: flex-end; }
+.bar { width: 100%; border-radius: 4px 4px 0 0; min-height: 4px; transition: height 0.6s ease; }
+.bar-lbl { font-size: 10px; color: #A8A29E; white-space: nowrap; }
+.bar-val { font-size: 10px; font-weight: 600; color: #57534E; }
+.chart-wrap { position: relative; }
+.chart-grid { position: absolute; top: 0; left: 0; right: 0; bottom: 28px; display: flex; flex-direction: column; justify-content: space-between; pointer-events: none; }
+.grid-line { border-top: 1px dashed rgba(229,226,220,0.5); display: flex; align-items: center; }
+.grid-lbl { font-size: 9px; color: #D4D0C8; padding-right: 6px; min-width: 24px; text-align: right; }
+
+/* MINI STATS */
+.mini-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
+.mini-stat-card { background: #F5F3EF; border-radius: 12px; padding: 12px 14px; }
+.ms-val { font-size: 20px; font-weight: 700; color: #1C1917; }
+.ms-lbl { font-size: 11px; color: #A8A29E; margin-top: 2px; }
+
+/* RECENT TABLE */
+.recent-table { width: 100%; border-collapse: collapse; }
+.recent-table th { font-size: 11px; font-weight: 500; color: #A8A29E; text-align: left; padding: 0 0 10px; border-bottom: 1px solid rgba(229,226,220,0.5); }
+.recent-table td { font-size: 13px; color: #44403C; padding: 10px 0; border-bottom: 1px solid rgba(229,226,220,0.3); vertical-align: middle; }
+.recent-table tr:last-child td { border-bottom: none; }
+.technique-pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 9999px; font-size: 11.5px; font-weight: 500; }
+
+/* ACHIEVEMENTS */
+.achievements-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.achievement-card { background: #FFFFFF; border: 1px solid rgba(229,226,220,0.7); border-radius: 14px; padding: 16px; text-align: center; transition: all 200ms; }
+.achievement-card:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,0.08); }
+.achievement-card.locked { opacity: 0.5; }
+.ach-icon { width: 48px; height: 48px; border-radius: 14px; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; }
+.ach-name { font-size: 12.5px; font-weight: 600; color: #1C1917; margin-bottom: 4px; }
+.ach-desc { font-size: 11px; color: #A8A29E; line-height: 1.4; }
+.ach-date { font-size: 10px; color: #D4D0C8; margin-top: 6px; }
+.ach-prog { margin-top: 8px; }
+.ach-prog-bar { height: 4px; background: rgba(229,226,220,0.6); border-radius: 9999px; overflow: hidden; }
+.ach-prog-fill { height: 100%; border-radius: 9999px; }
+.ach-prog-lbl { font-size: 10px; color: #A8A29E; margin-top: 4px; }
+
+/* Next achievement feature */
+.next-achievement { background: linear-gradient(135deg, #F5F3FF, #EDE9FE); border: 1px solid rgba(196,181,253,0.4); border-radius: 16px; padding: 20px; display: flex; align-items: center; gap: 16px; }
+.next-ach-icon { width: 56px; height: 56px; border-radius: 16px; background: rgba(124,58,237,0.15); border: 2px solid rgba(124,58,237,0.2); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.next-ach-info { flex: 1; }
+.next-ach-label { font-size: 11px; font-weight: 500; color: #7C3AED; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+.next-ach-name { font-size: 16px; font-weight: 700; color: #1C1917; margin-bottom: 4px; }
+.next-ach-desc { font-size: 13px; color: #78716C; }
+.next-ach-prog { flex: 1; }
+.next-prog-bar { height: 8px; background: rgba(196,181,253,0.3); border-radius: 9999px; overflow: hidden; margin-bottom: 6px; }
+.next-prog-fill { height: 100%; background: linear-gradient(90deg, #A78BFA, #7C3AED); border-radius: 9999px; }
+.next-prog-lbl { font-size: 12px; color: #7C3AED; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <div class="logo-row">
+    <div class="logo-mark"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="8" cy="14" r="3" fill="rgba(255,255,255,0.9)"/><circle cx="12" cy="9.5" r="2.5" fill="rgba(255,255,255,0.65)"/><circle cx="16" cy="14" r="3" fill="rgba(255,255,255,0.9)"/></svg></div>
+    <span class="logo-name">Cogni</span>
+  </div>
+  <div class="section-label">Menú principal</div>
+  <div class="nav-item"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>Inicio</div>
+  <div class="nav-item"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>Workspaces</div>
+  <div class="nav-item active"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Dashboard</div>
+  <div class="nav-item"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Horarios</div>
+  <div class="section-label">Técnicas</div>
+  <div class="nav-item"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>Flashcards</div>
+  <div class="nav-item"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.46 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2Z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.46 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2Z"/></svg>Active Recall</div>
+  <div class="nav-item"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>Exámenes</div>
+  <div class="sidebar-bottom">
+    <div class="account">
+      <div class="avatar">ES</div>
+      <div><div style="font-size:13px;font-weight:600;color:#1C1917">Estudiante</div><div style="font-size:11px;color:#A8A29E">Plan gratuito</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+  <div class="topbar">
+    <div class="breadcrumb">
+      <span>Cogni</span><span style="font-size:11px">›</span>
+      <span class="current">Dashboard</span>
+    </div>
+    <div class="topbar-right">
+      <div class="period-tabs">
+        <div class="period-tab" onclick="setPeriod(this,'7d')">7 días</div>
+        <div class="period-tab active" onclick="setPeriod(this,'30d')">30 días</div>
+        <div class="period-tab" onclick="setPeriod(this,'90d')">90 días</div>
+      </div>
+      <div class="avatar" style="width:28px;height:28px;font-size:11px;cursor:pointer">ES</div>
+    </div>
+  </div>
+
+  <div class="page-content">
+    <!-- Header -->
+    <div class="page-header">
+      <div>
+        <div class="page-title">Tu progreso</div>
+        <div class="page-sub">Resumen de los últimos 30 días</div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-head">
+          <div style="display:flex;align-items:center">
+            <div class="stat-icon" style="background:#FEF3C7"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#D97706" stroke-width="2"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2z"/><path d="M8.56 2.75c4.37 6.03 6.02 9.42 8.03 17.72m2.54-15.38c-3.72 4.35-8.94 5.66-16.88 5.85m19.5 1.9c-3.5-.93-6.63-.82-8.94 0-2.58.92-5.01 2.86-7.44 6.32"/></svg></div>
+            <span class="stat-lbl">Racha actual</span>
+          </div>
+          <span class="stat-badge" style="background:#FEF3C7;color:#D97706">🔥 Activa</span>
+        </div>
+        <div class="stat-val">12 <sup>días</sup></div>
+        <div class="stat-hint">Mejor racha: 15 días</div>
+        <div class="prog-bar"><div class="prog-fill" style="width:80%;background:linear-gradient(90deg,#F59E0B,#EF4444)"></div></div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-head">
+          <div style="display:flex;align-items:center">
+            <div class="stat-icon" style="background:#D5F5E3"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+            <span class="stat-lbl">Tiempo de estudio</span>
+          </div>
+          <span class="stat-badge trend-up" style="background:#ECFDF5">↑ 18%</span>
+        </div>
+        <div class="stat-val">24h <sup>35m</sup></div>
+        <div class="stat-hint">vs 20h 50m mes anterior</div>
+        <div class="prog-bar"><div class="prog-fill" style="width:55%;background:#10B981"></div></div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-head">
+          <div style="display:flex;align-items:center">
+            <div class="stat-icon" style="background:#EDE9FE"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7C3AED" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg></div>
+            <span class="stat-lbl">Tarjetas revisadas</span>
+          </div>
+          <span class="stat-badge" style="background:#EDE9FE;color:#7C3AED">72% retención</span>
+        </div>
+        <div class="stat-val">156</div>
+        <div class="stat-hint">24 nuevas · 132 de repaso</div>
+        <div class="prog-bar"><div class="prog-fill" style="width:72%;background:#7C3AED"></div></div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-head">
+          <div style="display:flex;align-items:center">
+            <div class="stat-icon" style="background:#DBEAFE"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg></div>
+            <span class="stat-lbl">Sesiones totales</span>
+          </div>
+          <span class="stat-badge trend-up" style="background:#EFF6FF">↑ 12%</span>
+        </div>
+        <div class="stat-val">45</div>
+        <div class="stat-hint">FC: 28 · AR: 10 · Ex: 7</div>
+        <div class="prog-bar"><div class="prog-fill" style="width:65%;background:#3B82F6"></div></div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="dash-tabs">
+      <div class="dash-tab active" onclick="showTab('overview',this)">Vista general</div>
+      <div class="dash-tab" onclick="showTab('flashcards',this)">Flashcards</div>
+      <div class="dash-tab" onclick="showTab('recall',this)">Active Recall</div>
+      <div class="dash-tab" onclick="showTab('achievements',this)">Logros</div>
+    </div>
+
+    <!-- OVERVIEW TAB -->
+    <div class="tab-pane active" id="tab-overview">
+      <div class="two-col">
+        <!-- Chart -->
+        <div class="panel">
+          <div class="panel-head">
+            <div class="panel-title">Actividad de estudio</div>
+            <span class="panel-action">Ver detalle</span>
+          </div>
+          <div class="bar-chart">
+            <div class="bar-col"><div class="bar-stack"><div class="bar" style="height:60px;background:#C4B5FD"></div></div><span class="bar-lbl">Sem 1</span></div>
+            <div class="bar-col"><div class="bar-stack"><div class="bar" style="height:90px;background:#A78BFA"></div></div><span class="bar-lbl">Sem 2</span></div>
+            <div class="bar-col"><div class="bar-stack"><div class="bar" style="height:75px;background:#8B5CF6"></div></div><span class="bar-lbl">Sem 3</span></div>
+            <div class="bar-col"><div class="bar-stack"><div class="bar" style="height:110px;background:#7C3AED"></div></div><span class="bar-lbl">Sem 4</span></div>
+            <div class="bar-col"><div class="bar-stack"><div class="bar" style="height:95px;background:#8B5CF6"></div></div><span class="bar-lbl">Sem 5</span></div>
+            <div class="bar-col"><div class="bar-stack"><div class="bar" style="height:130px;background:#7C3AED"></div></div><span class="bar-lbl">Sem 6</span></div>
+          </div>
+          <div style="display:flex;gap:16px;margin-top:14px">
+            <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#A8A29E"><span style="width:10px;height:10px;border-radius:3px;background:#7C3AED;display:inline-block"></span>Minutos estudiados</div>
+          </div>
+        </div>
+
+        <!-- Recent sessions -->
+        <div class="panel">
+          <div class="panel-head"><div class="panel-title">Sesiones recientes</div><span class="panel-action">Ver todas</span></div>
+          <table class="recent-table">
+            <tr><th>Técnica</th><th>Duración</th><th>Resultado</th></tr>
+            <tr>
+              <td><span class="technique-pill" style="background:#EDE9FE;color:#7C3AED"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>Flashcards</span></td>
+              <td style="color:#A8A29E">45 min</td><td><span style="color:#10B981;font-weight:500">35 cartas</span></td>
+            </tr>
+            <tr>
+              <td><span class="technique-pill" style="background:#DBEAFE;color:#2563EB"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg>Examen</span></td>
+              <td style="color:#A8A29E">25 min</td><td><span style="color:#2563EB;font-weight:500">85%</span></td>
+            </tr>
+            <tr>
+              <td><span class="technique-pill" style="background:#D5F5E3;color:#059669"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.46"/></svg>Active Recall</span></td>
+              <td style="color:#A8A29E">20 min</td><td><span style="color:#059669;font-weight:500">8/10</span></td>
+            </tr>
+            <tr>
+              <td><span class="technique-pill" style="background:#EDE9FE;color:#7C3AED"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>Flashcards</span></td>
+              <td style="color:#A8A29E">30 min</td><td><span style="color:#10B981;font-weight:500">28 cartas</span></td>
+            </tr>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- FLASHCARDS TAB -->
+    <div class="tab-pane" id="tab-flashcards">
+      <div class="mini-stats">
+        <div class="mini-stat-card"><div class="ms-val" style="color:#7C3AED">156</div><div class="ms-lbl">Tarjetas revisadas</div></div>
+        <div class="mini-stat-card"><div class="ms-val" style="color:#10B981">72%</div><div class="ms-lbl">Tasa de retención</div></div>
+        <div class="mini-stat-card"><div class="ms-val" style="color:#F59E0B">12</div><div class="ms-lbl">Pendientes hoy</div></div>
+      </div>
+      <div class="two-col">
+        <div class="panel">
+          <div class="panel-head"><div class="panel-title">Distribución de calificaciones</div></div>
+          <div style="display:flex;gap:8px;align-items:flex-end;height:120px;margin-bottom:12px">
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px">
+              <span style="font-size:11px;font-weight:600;color:#EF4444">18%</span>
+              <div style="width:100%;background:#FEE2E2;border-radius:6px 6px 0 0;height:22px"></div>
+              <span style="font-size:10px;color:#A8A29E">Again</span>
+            </div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px">
+              <span style="font-size:11px;font-weight:600;color:#D97706">10%</span>
+              <div style="width:100%;background:#FEF3C7;border-radius:6px 6px 0 0;height:12px"></div>
+              <span style="font-size:10px;color:#A8A29E">Hard</span>
+            </div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px">
+              <span style="font-size:11px;font-weight:600;color:#16A34A">52%</span>
+              <div style="width:100%;background:#D5F5E3;border-radius:6px 6px 0 0;height:62px"></div>
+              <span style="font-size:10px;color:#A8A29E">Good</span>
+            </div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px">
+              <span style="font-size:11px;font-weight:600;color:#7C3AED">20%</span>
+              <div style="width:100%;background:#EDE9FE;border-radius:6px 6px 0 0;height:24px"></div>
+              <span style="font-size:10px;color:#A8A29E">Easy</span>
+            </div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><div class="panel-title">Mazos activos</div></div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;align-items:center;gap:10px;padding:8px;border-radius:10px;background:#F5F3EF">
+              <div style="width:8px;height:8px;border-radius:9999px;background:#7C3AED"></div>
+              <div style="flex:1"><div style="font-size:13px;font-weight:500;color:#1C1917">Biología Celular</div><div style="font-size:11px;color:#A8A29E">24 cartas · 8 pendientes</div></div>
+              <span style="font-size:12px;font-weight:600;color:#7C3AED">73%</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;padding:8px;border-radius:10px;background:#F5F3EF">
+              <div style="width:8px;height:8px;border-radius:9999px;background:#2563EB"></div>
+              <div style="flex:1"><div style="font-size:13px;font-weight:500;color:#1C1917">Cálculo III</div><div style="font-size:11px;color:#A8A29E">18 cartas · 4 pendientes</div></div>
+              <span style="font-size:12px;font-weight:600;color:#2563EB">68%</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;padding:8px;border-radius:10px;background:#F5F3EF">
+              <div style="width:8px;height:8px;border-radius:9999px;background:#059669"></div>
+              <div style="flex:1"><div style="font-size:13px;font-weight:500;color:#1C1917">Química Orgánica</div><div style="font-size:11px;color:#A8A29E">14 cartas · 0 pendientes</div></div>
+              <span style="font-size:12px;font-weight:600;color:#059669">85%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ACTIVE RECALL TAB -->
+    <div class="tab-pane" id="tab-recall">
+      <div class="mini-stats">
+        <div class="mini-stat-card"><div class="ms-val" style="color:#059669">18</div><div class="ms-lbl">Sesiones completadas</div></div>
+        <div class="mini-stat-card"><div class="ms-val" style="color:#10B981">74%</div><div class="ms-lbl">Precisión promedio</div></div>
+        <div class="mini-stat-card"><div class="ms-val" style="color:#2563EB">180</div><div class="ms-lbl">Preguntas respondidas</div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><div class="panel-title">Historial de sesiones</div></div>
+        <table class="recent-table">
+          <tr><th>Fecha</th><th>Fuente</th><th>Preguntas</th><th>Correctas</th><th>Precisión</th></tr>
+          <tr><td style="color:#A8A29E">Hoy</td><td>Mitocondria</td><td>10</td><td style="color:#10B981">8</td><td><span style="font-weight:600;color:#059669">80%</span></td></tr>
+          <tr><td style="color:#A8A29E">Ayer</td><td>Cálculo III</td><td>8</td><td style="color:#10B981">5</td><td><span style="font-weight:600;color:#D97706">62%</span></td></tr>
+          <tr><td style="color:#A8A29E">Hace 3d</td><td>Química Orgánica</td><td>12</td><td style="color:#10B981">10</td><td><span style="font-weight:600;color:#059669">83%</span></td></tr>
+          <tr><td style="color:#A8A29E">Hace 5d</td><td>Historia Universal</td><td>10</td><td style="color:#10B981">6</td><td><span style="font-weight:600;color:#D97706">60%</span></td></tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- ACHIEVEMENTS TAB -->
+    <div class="tab-pane" id="tab-achievements">
+      <!-- Next achievement -->
+      <div class="next-achievement">
+        <div class="next-ach-icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#7C3AED" stroke-width="1.5"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2z"/><path d="M8.56 2.75c4.37 6.03 6.02 9.42 8.03 17.72"/></svg>
+        </div>
+        <div class="next-ach-info">
+          <div class="next-ach-label">Próximo logro</div>
+          <div class="next-ach-name">Racha de 30 días</div>
+          <div class="next-ach-desc">Estudia 30 días consecutivos</div>
+        </div>
+        <div class="next-ach-prog" style="min-width:140px">
+          <div class="next-prog-bar"><div class="next-prog-fill" style="width:40%"></div></div>
+          <div class="next-prog-lbl">12 / 30 días</div>
+        </div>
+      </div>
+
+      <!-- Achievements grid -->
+      <div class="achievements-grid">
+        <div class="achievement-card">
+          <div class="ach-icon" style="background:#D5F5E3"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="1.75"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
+          <div class="ach-name">Primera sesión</div>
+          <div class="ach-desc">Completaste tu primera sesión de estudio</div>
+          <div class="ach-date">hace 2 semanas</div>
+        </div>
+        <div class="achievement-card">
+          <div class="ach-icon" style="background:#FEF3C7"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#D97706" stroke-width="1.75"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2z"/></svg></div>
+          <div class="ach-name">Racha de 7 días</div>
+          <div class="ach-desc">Estudiaste 7 días consecutivos</div>
+          <div class="ach-date">hace 5 días</div>
+        </div>
+        <div class="achievement-card">
+          <div class="ach-icon" style="background:#EDE9FE"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#7C3AED" stroke-width="1.75"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg></div>
+          <div class="ach-name">100 flashcards</div>
+          <div class="ach-desc">Revisaste 100 tarjetas de flashcards</div>
+          <div class="ach-date">hace 3 días</div>
+        </div>
+        <div class="achievement-card locked">
+          <div class="ach-icon" style="background:#F5F3EF"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#A8A29E" stroke-width="1.75"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+          <div class="ach-name">Examen perfecto</div>
+          <div class="ach-desc">Obtén 100% en un examen de práctica</div>
+          <div class="ach-prog">
+            <div class="ach-prog-bar"><div class="ach-prog-fill" style="width:70%;background:#A8A29E"></div></div>
+            <div class="ach-prog-lbl">Mejor: 85%</div>
+          </div>
+        </div>
+        <div class="achievement-card locked">
+          <div class="ach-icon" style="background:#F5F3EF"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#A8A29E" stroke-width="1.75"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+          <div class="ach-name">30 días de estudio</div>
+          <div class="ach-desc">Estudia durante 30 días en un mes</div>
+          <div class="ach-prog">
+            <div class="ach-prog-bar"><div class="ach-prog-fill" style="width:40%;background:#A8A29E"></div></div>
+            <div class="ach-prog-lbl">12 / 30 días</div>
+          </div>
+        </div>
+        <div class="achievement-card locked">
+          <div class="ach-icon" style="background:#F5F3EF"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#A8A29E" stroke-width="1.75"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+          <div class="ach-name">500 flashcards</div>
+          <div class="ach-desc">Revisa 500 tarjetas de flashcards</div>
+          <div class="ach-prog">
+            <div class="ach-prog-bar"><div class="ach-prog-fill" style="width:31%;background:#A8A29E"></div></div>
+            <div class="ach-prog-lbl">156 / 500</div>
+          </div>
+        </div>
+        <div class="achievement-card locked">
+          <div class="ach-icon" style="background:#F5F3EF"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#A8A29E" stroke-width="1.75"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+          <div class="ach-name">Maestro del recall</div>
+          <div class="ach-desc">Alcanza 90% de precisión en Active Recall</div>
+          <div class="ach-prog">
+            <div class="ach-prog-bar"><div class="ach-prog-fill" style="width:82%;background:#A8A29E"></div></div>
+            <div class="ach-prog-lbl">74% / 90%</div>
+          </div>
+        </div>
+        <div class="achievement-card locked">
+          <div class="ach-icon" style="background:#F5F3EF"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#A8A29E" stroke-width="1.75"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+          <div class="ach-name">Racha de 30 días</div>
+          <div class="ach-desc">Estudia 30 días consecutivos</div>
+          <div class="ach-prog">
+            <div class="ach-prog-bar"><div class="ach-prog-fill" style="width:40%;background:#A8A29E"></div></div>
+            <div class="ach-prog-lbl">12 / 30 días</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+function showTab(id, el) {
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.dash-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  el.classList.add('active');
+}
+function setPeriod(el) {
+  document.querySelectorAll('.period-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+}
+</script>
+</body>
+</html>

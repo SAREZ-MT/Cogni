@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cogni — Inicio</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  background: #EDEAE4;
+  min-height: 100vh;
+  display: flex;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ===== SIDEBAR ===== */
+.sidebar {
+  width: 240px;
+  min-height: 100vh;
+  background: #FAFAF8;
+  border-right: 1px solid rgba(229,226,220,0.6);
+  display: flex;
+  flex-direction: column;
+  padding: 16px 12px;
+  gap: 2px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  box-shadow: 1px 0 0 rgba(229,226,220,0.4);
+}
+
+.logo-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px 16px;
+  border-bottom: 1px solid rgba(229,226,220,0.5);
+  margin-bottom: 4px;
+}
+.logo-mark {
+  width: 34px; height: 34px;
+  background: #1C1917;
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+}
+.logo-name {
+  font-size: 14px; font-weight: 700; color: #1C1917;
+  margin-left: 8px; flex: 1;
+}
+.collapse-btn {
+  width: 26px; height: 26px;
+  border-radius: 7px;
+  border: 1px solid rgba(229,226,220,0.8);
+  background: rgba(255,255,255,0.5);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: #A8A29E;
+  transition: all 150ms;
+}
+.collapse-btn:hover { background: rgba(255,255,255,0.9); color: #57534E; }
+
+.section-label {
+  font-size: 11px; font-weight: 500; color: #A8A29E;
+  padding: 12px 10px 4px;
+  letter-spacing: 0.01em;
+}
+
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-size: 13.5px; font-weight: 400; color: #57534E;
+  cursor: pointer; transition: all 150ms;
+  text-decoration: none; user-select: none;
+}
+.nav-item:hover { background: rgba(245,243,239,0.9); color: #1C1917; }
+.nav-item.active { background: rgba(237,233,254,0.9); color: #6D28D9; font-weight: 500; }
+.nav-icon { width: 16px; height: 16px; flex-shrink: 0; opacity: 0.75; }
+.nav-item.active .nav-icon { opacity: 1; }
+.nav-badge {
+  margin-left: auto;
+  background: #7C3AED; color: white;
+  font-size: 10px; font-weight: 600;
+  padding: 2px 7px; border-radius: 9999px;
+}
+
+.sidebar-bottom {
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid rgba(229,226,220,0.5);
+}
+.account {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 8px;
+  border-radius: 10px;
+  cursor: pointer; transition: all 150ms;
+}
+.account:hover { background: rgba(245,243,239,0.9); }
+.avatar {
+  width: 32px; height: 32px; border-radius: 9999px;
+  background: linear-gradient(135deg, #C4B5FD, #7C3AED);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 600; color: white; flex-shrink: 0;
+}
+.account-name { font-size: 13px; font-weight: 600; color: #1C1917; }
+.account-role { font-size: 11px; color: #A8A29E; }
+
+/* ===== MAIN CONTENT ===== */
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  overflow-y: auto;
+}
+
+/* Topbar */
+.topbar {
+  position: sticky; top: 0; z-index: 10;
+  background: rgba(237,234,228,0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 32px;
+  border-bottom: 1px solid rgba(229,226,220,0.5);
+}
+.breadcrumb {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 13px; color: #A8A29E;
+}
+.breadcrumb .sep { font-size: 11px; }
+.breadcrumb .current { color: #1C1917; font-weight: 500; }
+.topbar-right { display: flex; align-items: center; gap: 6px; }
+.icon-btn {
+  width: 34px; height: 34px; border-radius: 9px;
+  border: none; background: transparent; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: #A8A29E; transition: all 150ms; position: relative;
+}
+.icon-btn:hover { background: rgba(255,255,255,0.7); color: #57534E; }
+.icon-btn.has-dot::after {
+  content: ''; width: 6px; height: 6px;
+  background: #F59E0B; border-radius: 9999px;
+  position: absolute; top: 7px; right: 7px;
+  border: 1.5px solid #EDEAE4;
+}
+
+/* ===== PAGE CONTENT ===== */
+.page-content {
+  padding: 32px;
+  display: flex; flex-direction: column; gap: 28px;
+}
+
+/* Page header */
+.page-header { display: flex; align-items: flex-start; justify-content: space-between; }
+.page-title { font-size: 28px; font-weight: 700; color: #1C1917; }
+.page-sub { font-size: 14px; color: #A8A29E; margin-top: 4px; }
+.btn-primary {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 9px 18px; border-radius: 10px;
+  background: #1C1917; color: white;
+  font-family: 'DM Sans', sans-serif; font-size: 13.5px; font-weight: 500;
+  border: none; cursor: pointer; transition: all 150ms;
+  text-decoration: none;
+}
+.btn-primary:hover { background: #292524; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+
+/* ===== STATS ROW ===== */
+.stats-row { display: flex; gap: 14px; }
+.stat-card {
+  flex: 1;
+  background: #FFFFFF;
+  border: 1px solid rgba(229,226,220,0.7);
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+}
+.stat-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.stat-icon-wrap { display: flex; align-items: center; gap: 8px; }
+.stat-icon {
+  width: 30px; height: 30px; border-radius: 9px;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.stat-lbl { font-size: 12px; color: #A8A29E; font-weight: 500; }
+.stat-action { font-size: 11.5px; color: #A8A29E; cursor: pointer; transition: color 150ms; }
+.stat-action:hover { color: #7C3AED; }
+.stat-val { font-size: 26px; font-weight: 700; color: #1C1917; line-height: 1.1; }
+.stat-val span { font-size: 13px; font-weight: 400; color: #A8A29E; }
+.stat-hint { font-size: 11.5px; color: #A8A29E; margin-top: 4px; }
+.prog-bar { height: 5px; background: rgba(229,226,220,0.6); border-radius: 9999px; overflow: hidden; margin-top: 12px; }
+.prog-fill { height: 100%; border-radius: 9999px; transition: width 0.6s ease; }
+
+/* ===== SECTION TITLE ===== */
+.section-head { display: flex; align-items: center; justify-content: space-between; }
+.section-title { font-size: 16px; font-weight: 600; color: #1C1917; }
+.see-all { font-size: 12.5px; color: #A8A29E; cursor: pointer; transition: color 150ms; }
+.see-all:hover { color: #7C3AED; }
+
+/* ===== WORKSPACES GRID ===== */
+.workspaces-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.workspace-card {
+  background: #FFFFFF;
+  border: 1px solid rgba(229,226,220,0.7);
+  border-radius: 16px;
+  padding: 20px;
+  cursor: pointer;
+  transition: all 200ms;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  text-decoration: none;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.workspace-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+  border-color: rgba(196,181,253,0.5);
+}
+.ws-icon { font-size: 24px; width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; }
+.ws-name { font-size: 14px; font-weight: 600; color: #1C1917; }
+.ws-meta { font-size: 11.5px; color: #A8A29E; }
+.ws-footer { display: flex; align-items: center; justify-content: space-between; }
+.ws-pages {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11.5px; color: #A8A29E;
+}
+.ws-date { font-size: 11px; color: #D4D0C8; }
+
+/* New workspace card */
+.workspace-card.new {
+  border: 1.5px dashed rgba(212,208,200,0.8);
+  background: rgba(255,255,255,0.4);
+  align-items: center; justify-content: center;
+  min-height: 140px; color: #A8A29E;
+  flex-direction: column; gap: 8px;
+}
+.workspace-card.new:hover { background: rgba(255,255,255,0.7); color: #57534E; border-color: rgba(196,181,253,0.6); }
+.new-plus {
+  width: 36px; height: 36px; border-radius: 10px;
+  background: rgba(229,226,220,0.5);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; color: #A8A29E;
+}
+
+/* ===== RECENT + DUE ===== */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.glass-panel {
+  background: #FFFFFF;
+  border: 1px solid rgba(229,226,220,0.7);
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+.panel-title { font-size: 14px; font-weight: 600; color: #1C1917; margin-bottom: 14px; }
+
+/* Recent pages list */
+.page-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 0; border-bottom: 1px solid rgba(229,226,220,0.4);
+  cursor: pointer; transition: all 150ms; border-radius: 8px;
+}
+.page-row:last-child { border-bottom: none; }
+.page-row:hover { padding: 8px 8px; margin: 0 -8px; background: rgba(245,243,239,0.7); }
+.page-dot { width: 8px; height: 8px; border-radius: 9999px; flex-shrink: 0; }
+.page-name { font-size: 13px; font-weight: 500; color: #44403C; flex: 1; }
+.page-ws { font-size: 11px; color: #A8A29E; }
+.page-time { font-size: 11px; color: #D4D0C8; margin-left: auto; white-space: nowrap; }
+
+/* Cards due row */
+.due-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px; border-radius: 10px;
+  background: rgba(237,233,254,0.5); margin-bottom: 8px;
+  cursor: pointer; transition: all 150ms;
+}
+.due-row:hover { background: rgba(237,233,254,0.8); }
+.due-row:last-child { margin-bottom: 0; }
+.due-count {
+  width: 28px; height: 28px; border-radius: 8px;
+  background: #7C3AED; color: white;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; flex-shrink: 0;
+}
+.due-deck { font-size: 13px; font-weight: 500; color: #44403C; flex: 1; }
+.due-action {
+  font-size: 12px; font-weight: 500; color: #7C3AED;
+  display: flex; align-items: center; gap: 2px;
+}
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <div class="logo-row">
+    <div class="logo-mark">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+        <circle cx="8" cy="14" r="3" fill="rgba(255,255,255,0.9)"/>
+        <circle cx="12" cy="9.5" r="2.5" fill="rgba(255,255,255,0.65)"/>
+        <circle cx="16" cy="14" r="3" fill="rgba(255,255,255,0.9)"/>
+      </svg>
+    </div>
+    <span class="logo-name">Cogni</span>
+    <button class="collapse-btn">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg>
+    </button>
+  </div>
+
+  <div class="section-label">Menú principal</div>
+
+  <a class="nav-item active" href="#">
+    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>
+    Inicio
+  </a>
+  <a class="nav-item" href="#">
+    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+    Workspaces
+  </a>
+  <a class="nav-item" href="#">
+    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+    Dashboard
+  </a>
+  <a class="nav-item" href="#">
+    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+    Horarios
+  </a>
+  <a class="nav-item" href="#">
+    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+    Mensajes
+    <span class="nav-badge">2</span>
+  </a>
+
+  <div class="section-label">Técnicas</div>
+
+  <a class="nav-item" href="#">
+    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+    Flashcards
+  </a>
+  <a class="nav-item" href="#">
+    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.46 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2Z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.46 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2Z"/></svg>
+    Active Recall
+  </a>
+  <a class="nav-item" href="#">
+    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+    Exámenes
+  </a>
+
+  <div class="section-label">Cuenta</div>
+  <a class="nav-item" href="#">
+    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    Configuración
+  </a>
+
+  <div class="sidebar-bottom">
+    <div class="account">
+      <div class="avatar">ES</div>
+      <div>
+        <div class="account-name">Estudiante</div>
+        <div class="account-role">Plan gratuito</div>
+      </div>
+      <svg style="margin-left:auto;color:#D4D0C8" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+  <!-- Topbar -->
+  <div class="topbar">
+    <div class="breadcrumb">
+      <span>Cogni</span>
+      <span class="sep">›</span>
+      <span class="current">Inicio</span>
+    </div>
+    <div class="topbar-right">
+      <button class="icon-btn has-dot">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      </button>
+      <button class="icon-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      </button>
+      <div class="avatar" style="width:30px;height:30px;font-size:11px;cursor:pointer">ES</div>
+    </div>
+  </div>
+
+  <!-- Page content -->
+  <div class="page-content">
+
+    <!-- Header -->
+    <div class="page-header">
+      <div>
+        <div class="page-title">Buenos días, Estudiante</div>
+        <div class="page-sub">Aquí está tu resumen de hoy — ¡sigue así!</div>
+      </div>
+      <button class="btn-primary">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Nuevo workspace
+      </button>
+    </div>
+
+    <!-- Stats row -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-head">
+          <div class="stat-icon-wrap">
+            <div class="stat-icon" style="background:#FEF3C7">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#D97706" stroke-width="2"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2z"/><path d="M8.56 2.75c4.37 6.03 6.02 9.42 8.03 17.72m2.54-15.38c-3.72 4.35-8.94 5.66-16.88 5.85m19.5 1.9c-3.5-.93-6.63-.82-8.94 0-2.58.92-5.01 2.86-7.44 6.32"/></svg>
+            </div>
+            <span class="stat-lbl">Racha actual</span>
+          </div>
+          <span class="stat-action">Ver logros</span>
+        </div>
+        <div class="stat-val">12 <span>días</span></div>
+        <div class="stat-hint">🏆 Mejor racha: 15 días</div>
+        <div class="prog-bar"><div class="prog-fill" style="width:80%;background:linear-gradient(90deg,#F59E0B,#EF4444)"></div></div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-head">
+          <div class="stat-icon-wrap">
+            <div class="stat-icon" style="background:#EDE9FE">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7C3AED" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+            </div>
+            <span class="stat-lbl">Flashcards</span>
+          </div>
+          <span class="stat-action">Estudiar →</span>
+        </div>
+        <div class="stat-val">12 <span>pendientes</span></div>
+        <div class="stat-hint">156 revisadas este mes · 72% retención</div>
+        <div class="prog-bar"><div class="prog-fill" style="width:72%;background:#7C3AED"></div></div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-head">
+          <div class="stat-icon-wrap">
+            <div class="stat-icon" style="background:#D5F5E3">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+            <span class="stat-lbl">Tiempo total</span>
+          </div>
+          <span class="stat-action">Ver dashboard</span>
+        </div>
+        <div class="stat-val">24h <span>35m</span></div>
+        <div class="stat-hint">Este mes · 45 sesiones</div>
+        <div class="prog-bar"><div class="prog-fill" style="width:55%;background:#10B981"></div></div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-head">
+          <div class="stat-icon-wrap">
+            <div class="stat-icon" style="background:#FDDEE6">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9B2C4A" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
+            </div>
+            <span class="stat-lbl">Temas débiles</span>
+          </div>
+          <span class="stat-action">Repasar →</span>
+        </div>
+        <div class="stat-val">8 <span>pendientes</span></div>
+        <div class="stat-hint">De exámenes anteriores</div>
+        <div class="prog-bar"><div class="prog-fill" style="width:40%;background:#F43F5E"></div></div>
+      </div>
+    </div>
+
+    <!-- Workspaces -->
+    <div>
+      <div class="section-head" style="margin-bottom:14px">
+        <span class="section-title">Mis workspaces</span>
+        <span class="see-all">Ver todos →</span>
+      </div>
+      <div class="workspaces-grid">
+        <div class="workspace-card">
+          <div class="ws-icon" style="background:#EDE9FE">🧬</div>
+          <div>
+            <div class="ws-name">Biología Celular</div>
+            <div class="ws-meta">Semestre 2 · 8 páginas</div>
+          </div>
+          <div class="ws-footer">
+            <span class="ws-pages">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg>
+              8 páginas
+            </span>
+            <span class="ws-date">hace 2h</span>
+          </div>
+        </div>
+
+        <div class="workspace-card">
+          <div class="ws-icon" style="background:#DBEAFE">📐</div>
+          <div>
+            <div class="ws-name">Cálculo III</div>
+            <div class="ws-meta">Semestre 3 · 12 páginas</div>
+          </div>
+          <div class="ws-footer">
+            <span class="ws-pages">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg>
+              12 páginas
+            </span>
+            <span class="ws-date">ayer</span>
+          </div>
+        </div>
+
+        <div class="workspace-card">
+          <div class="ws-icon" style="background:#D5F5E3">⚗️</div>
+          <div>
+            <div class="ws-name">Química Orgánica</div>
+            <div class="ws-meta">Semestre 2 · 6 páginas</div>
+          </div>
+          <div class="ws-footer">
+            <span class="ws-pages">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg>
+              6 páginas
+            </span>
+            <span class="ws-date">hace 3 días</span>
+          </div>
+        </div>
+
+        <div class="workspace-card">
+          <div class="ws-icon" style="background:#FEF3C7">🌐</div>
+          <div>
+            <div class="ws-name">Historia Universal</div>
+            <div class="ws-meta">Semestre 1 · 15 páginas</div>
+          </div>
+          <div class="ws-footer">
+            <span class="ws-pages">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg>
+              15 páginas
+            </span>
+            <span class="ws-date">hace 5 días</span>
+          </div>
+        </div>
+
+        <div class="workspace-card">
+          <div class="ws-icon" style="background:#FFE4D6">💻</div>
+          <div>
+            <div class="ws-name">Programación Web</div>
+            <div class="ws-meta">Semestre 3 · 4 páginas</div>
+          </div>
+          <div class="ws-footer">
+            <span class="ws-pages">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg>
+              4 páginas
+            </span>
+            <span class="ws-date">hace 1 sem</span>
+          </div>
+        </div>
+
+        <div class="workspace-card new">
+          <div class="new-plus">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </div>
+          <span style="font-size:13px;font-weight:500">Nuevo workspace</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom two cols -->
+    <div class="two-col">
+      <!-- Recent pages -->
+      <div class="glass-panel">
+        <div class="panel-title">Páginas recientes</div>
+        <div class="page-row">
+          <div class="page-dot" style="background:#7C3AED"></div>
+          <div style="flex:1"><div class="page-name">Mitocondria y respiración</div><div class="page-ws">Biología Celular</div></div>
+          <span class="page-time">hace 2h</span>
+        </div>
+        <div class="page-row">
+          <div class="page-dot" style="background:#2563EB"></div>
+          <div style="flex:1"><div class="page-name">Integrales dobles</div><div class="page-ws">Cálculo III</div></div>
+          <span class="page-time">ayer</span>
+        </div>
+        <div class="page-row">
+          <div class="page-dot" style="background:#059669"></div>
+          <div style="flex:1"><div class="page-name">Alcanos y alquenos</div><div class="page-ws">Química Orgánica</div></div>
+          <span class="page-time">hace 3 días</span>
+        </div>
+        <div class="page-row">
+          <div class="page-dot" style="background:#D97706"></div>
+          <div style="flex:1"><div class="page-name">Segunda Guerra Mundial</div><div class="page-ws">Historia Universal</div></div>
+          <span class="page-time">hace 5 días</span>
+        </div>
+      </div>
+
+      <!-- Cards due -->
+      <div class="glass-panel">
+        <div class="panel-title">Flashcards pendientes hoy</div>
+        <div class="due-row">
+          <div class="due-count">8</div>
+          <div class="due-deck">Biología Celular · Semana 3</div>
+          <span class="due-action">Estudiar <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg></span>
+        </div>
+        <div class="due-row">
+          <div class="due-count">4</div>
+          <div class="due-deck">Cálculo III · Derivadas</div>
+          <span class="due-action">Estudiar <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg></span>
+        </div>
+        <div style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(229,226,220,0.4)">
+          <div style="font-size:12px;color:#A8A29E;font-weight:500;margin-bottom:8px">Temas débiles para repasar</div>
+          <div class="due-row" style="background:rgba(254,242,242,0.5)">
+            <div class="due-count" style="background:#EF4444">3</div>
+            <div class="due-deck">Química · Reacciones</div>
+            <span class="due-action" style="color:#EF4444">Repasar <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>

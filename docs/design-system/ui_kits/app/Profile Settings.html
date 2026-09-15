@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cogni — Configuración</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'DM Sans', system-ui, sans-serif; background: #EDEAE4; min-height: 100vh; display: flex; -webkit-font-smoothing: antialiased; }
+
+/* SIDEBAR */
+.sidebar { width: 240px; min-height: 100vh; background: #FAFAF8; border-right: 1px solid rgba(229,226,220,0.7); display: flex; flex-direction: column; padding: 16px 12px; gap: 2px; flex-shrink: 0; position: sticky; top: 0; height: 100vh; }
+.logo-row { display: flex; align-items: center; gap: 8px; padding: 4px 8px 16px; border-bottom: 1px solid rgba(229,226,220,0.5); margin-bottom: 4px; }
+.logo-mark { width: 34px; height: 34px; background: #1C1917; border-radius: 10px; display: flex; align-items: center; justify-content: center; }
+.logo-name { font-size: 14px; font-weight: 700; color: #1C1917; }
+.section-label { font-size: 11px; font-weight: 500; color: #A8A29E; padding: 12px 10px 4px; }
+.nav-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; font-size: 13.5px; color: #57534E; cursor: pointer; transition: all 150ms; }
+.nav-item:hover { background: rgba(245,243,239,0.9); color: #1C1917; }
+.nav-item.active { background: rgba(245,243,239,0.9); color: #1C1917; font-weight: 500; }
+.nav-icon { width: 16px; height: 16px; flex-shrink: 0; opacity: 0.7; }
+.sidebar-bottom { margin-top: auto; padding-top: 12px; border-top: 1px solid rgba(229,226,220,0.5); }
+.account { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 10px; cursor: pointer; }
+.account:hover { background: rgba(245,243,239,0.9); }
+.avatar { width: 32px; height: 32px; border-radius: 9999px; background: linear-gradient(135deg, #C4B5FD, #7C3AED); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: white; flex-shrink: 0; }
+
+/* MAIN */
+.main { flex: 1; display: flex; flex-direction: column; overflow-y: auto; }
+.topbar { background: #EDEAE4; display: flex; align-items: center; justify-content: space-between; padding: 10px 32px; border-bottom: 1px solid rgba(229,226,220,0.5); }
+.breadcrumb { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #A8A29E; }
+.breadcrumb .current { color: #1C1917; font-weight: 500; }
+
+.page-content { padding: 28px 32px; display: flex; gap: 24px; max-width: 1100px; }
+
+/* SETTINGS NAV */
+.settings-nav { width: 200px; flex-shrink: 0; display: flex; flex-direction: column; gap: 2px; }
+.settings-nav-title { font-size: 11px; font-weight: 500; color: #A8A29E; padding: 0 10px 8px; text-transform: uppercase; letter-spacing: 0.04em; }
+.snav-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 10px; font-size: 13.5px; color: #57534E; cursor: pointer; transition: all 150ms; }
+.snav-item:hover { background: rgba(255,255,255,0.7); color: #1C1917; }
+.snav-item.active { background: #FFFFFF; color: #1C1917; font-weight: 500; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+
+/* SETTINGS CONTENT */
+.settings-content { flex: 1; display: flex; flex-direction: column; gap: 16px; }
+
+/* SECTION PANELS */
+.settings-panel { background: #FFFFFF; border: 1px solid rgba(229,226,220,0.7); border-radius: 16px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.04); }
+.sp-header { padding: 18px 22px; border-bottom: 1px solid rgba(229,226,220,0.5); }
+.sp-title { font-size: 14px; font-weight: 600; color: #1C1917; }
+.sp-sub { font-size: 12px; color: #A8A29E; margin-top: 2px; }
+
+/* PROFILE AVATAR */
+.profile-avatar-section { padding: 22px; display: flex; align-items: center; gap: 20px; border-bottom: 1px solid rgba(229,226,220,0.4); }
+.profile-avatar-large { width: 72px; height: 72px; border-radius: 9999px; background: linear-gradient(135deg, #C4B5FD, #7C3AED); display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 700; color: white; flex-shrink: 0; position: relative; }
+.avatar-change-btn { position: absolute; bottom: 0; right: 0; width: 24px; height: 24px; border-radius: 9999px; background: #1C1917; border: 2px solid white; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.profile-info { }
+.profile-name { font-size: 18px; font-weight: 700; color: #1C1917; }
+.profile-email { font-size: 13px; color: #A8A29E; margin-top: 3px; }
+.profile-plan { display: inline-flex; align-items: center; gap: 5px; margin-top: 8px; padding: 4px 10px; background: #F5F3EF; border-radius: 9999px; font-size: 11.5px; font-weight: 500; color: #57534E; }
+.profile-plan .plan-dot { width: 6px; height: 6px; border-radius: 9999px; background: #10B981; }
+
+/* FORM ROWS */
+.form-row { padding: 16px 22px; border-bottom: 1px solid rgba(229,226,220,0.4); display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.form-row:last-child { border-bottom: none; }
+.form-row-label { font-size: 13px; font-weight: 500; color: #44403C; flex-shrink: 0; min-width: 140px; }
+.form-row-sub { font-size: 11.5px; color: #A8A29E; margin-top: 2px; }
+.form-input { font-family: 'DM Sans', sans-serif; font-size: 13.5px; padding: 9px 12px; border: 1.5px solid rgba(229,226,220,0.8); border-radius: 10px; background: #FAFAF8; color: #1C1917; outline: none; width: 280px; transition: all 150ms; }
+.form-input:focus { border-color: #7C3AED; box-shadow: 0 0 0 3px rgba(124,58,237,0.1); background: white; }
+.form-input:read-only { color: #A8A29E; cursor: default; }
+.form-input:read-only:focus { border-color: rgba(229,226,220,0.8); box-shadow: none; }
+
+/* TOGGLE */
+.toggle { width: 40px; height: 22px; border-radius: 9999px; cursor: pointer; position: relative; transition: background 200ms; flex-shrink: 0; }
+.toggle.on { background: #7C3AED; }
+.toggle.off { background: rgba(229,226,220,0.8); }
+.toggle::after { content: ''; position: absolute; width: 18px; height: 18px; border-radius: 9999px; background: white; top: 2px; transition: left 200ms; box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
+.toggle.on::after { left: 20px; }
+.toggle.off::after { left: 2px; }
+
+/* SAVE BUTTON */
+.save-row { padding: 16px 22px; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid rgba(229,226,220,0.5); }
+.btn-cancel { padding: 9px 18px; background: transparent; border: 1px solid rgba(229,226,220,0.8); border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 13.5px; color: #57534E; cursor: pointer; }
+.btn-save { padding: 9px 20px; background: #1C1917; border: none; border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 13.5px; font-weight: 500; color: white; cursor: pointer; transition: all 150ms; }
+.btn-save:hover { background: #292524; }
+
+/* DANGER ZONE */
+.danger-row { padding: 16px 22px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(229,226,220,0.4); }
+.danger-row:last-child { border-bottom: none; }
+.danger-title { font-size: 13px; font-weight: 500; color: #DC2626; }
+.danger-sub { font-size: 11.5px; color: #A8A29E; margin-top: 2px; }
+.btn-danger { padding: 8px 16px; background: #FEE2E2; border: 1px solid rgba(239,68,68,0.3); border-radius: 9px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; color: #DC2626; cursor: pointer; transition: all 150ms; }
+.btn-danger:hover { background: #FECACA; }
+
+/* CONNECTED ACCOUNTS */
+.connected-row { padding: 14px 22px; display: flex; align-items: center; gap: 14px; border-bottom: 1px solid rgba(229,226,220,0.4); }
+.connected-row:last-child { border-bottom: none; }
+.conn-logo { width: 36px; height: 36px; border-radius: 10px; border: 1px solid rgba(229,226,220,0.7); background: white; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.conn-name { font-size: 13px; font-weight: 600; color: #1C1917; }
+.conn-status { font-size: 11.5px; color: #A8A29E; margin-top: 2px; }
+.conn-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 9999px; font-size: 11px; font-weight: 500; }
+
+/* LOGOUT BTN */
+.logout-row { padding: 22px; }
+.btn-logout { width: 100%; padding: 12px; background: transparent; border: 1.5px solid rgba(229,226,220,0.8); border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 500; color: #DC2626; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 150ms; }
+.btn-logout:hover { background: #FEE2E2; border-color: rgba(239,68,68,0.3); }
+
+/* SUCCESS TOAST */
+.toast { position: fixed; bottom: 24px; right: 24px; background: #1C1917; color: white; border-radius: 12px; padding: 12px 18px; font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.2); transform: translateY(80px); opacity: 0; transition: all 300ms ease; z-index: 1000; }
+.toast.show { transform: translateY(0); opacity: 1; }
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <div class="logo-row">
+    <div class="logo-mark"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="8" cy="14" r="3" fill="rgba(255,255,255,0.9)"/><circle cx="12" cy="9.5" r="2.5" fill="rgba(255,255,255,0.65)"/><circle cx="16" cy="14" r="3" fill="rgba(255,255,255,0.9)"/></svg></div>
+    <span class="logo-name">Cogni</span>
+  </div>
+  <div class="section-label">Menú principal</div>
+  <div class="nav-item"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>Inicio</div>
+  <div class="nav-item"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>Workspaces</div>
+  <div class="nav-item"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Dashboard</div>
+  <div class="section-label">Cuenta</div>
+  <div class="nav-item active"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Configuración</div>
+  <div class="sidebar-bottom">
+    <div class="account"><div class="avatar">ES</div><div><div style="font-size:13px;font-weight:600;color:#1C1917">Estudiante</div><div style="font-size:11px;color:#A8A29E">Plan gratuito</div></div></div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+  <div class="topbar">
+    <div class="breadcrumb">
+      <span>Cogni</span><span style="font-size:11px">›</span>
+      <span class="current">Configuración</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px">
+      <div class="avatar" style="width:28px;height:28px;font-size:11px;cursor:pointer">ES</div>
+    </div>
+  </div>
+
+  <div class="page-content">
+
+    <!-- Settings nav -->
+    <div class="settings-nav">
+      <div class="settings-nav-title">Configuración</div>
+      <div class="snav-item active" onclick="showSection('profile', this)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        Perfil
+      </div>
+      <div class="snav-item" onclick="showSection('account', this)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        Cuenta y seguridad
+      </div>
+      <div class="snav-item" onclick="showSection('notifications', this)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        Notificaciones
+      </div>
+      <div class="snav-item" onclick="showSection('integrations', this)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+        Integraciones
+      </div>
+      <div class="snav-item" onclick="showSection('danger', this)" style="margin-top:8px;color:#DC2626">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Zona de peligro
+      </div>
+    </div>
+
+    <!-- Settings content -->
+    <div class="settings-content">
+
+      <!-- PROFILE SECTION -->
+      <div id="section-profile">
+        <div class="settings-panel">
+          <div class="sp-header">
+            <div class="sp-title">Información del perfil</div>
+            <div class="sp-sub">Actualiza tu nombre y foto de perfil</div>
+          </div>
+          <div class="profile-avatar-section">
+            <div class="profile-avatar-large">
+              ES
+              <div class="avatar-change-btn">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              </div>
+            </div>
+            <div class="profile-info">
+              <div class="profile-name">Estudiante</div>
+              <div class="profile-email">estudiante@email.com</div>
+              <div class="profile-plan"><span class="plan-dot"></span>Plan gratuito</div>
+            </div>
+          </div>
+          <div class="form-row">
+            <div><div class="form-row-label">Nombre completo</div></div>
+            <input class="form-input" type="text" value="Estudiante">
+          </div>
+          <div class="form-row">
+            <div><div class="form-row-label">Email</div><div class="form-row-sub">No se puede cambiar (vinculado a Google)</div></div>
+            <input class="form-input" type="email" value="estudiante@email.com" readonly>
+          </div>
+          <div class="save-row">
+            <button class="btn-cancel">Cancelar</button>
+            <button class="btn-save" onclick="showToast('Perfil actualizado correctamente')">Guardar cambios</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ACCOUNT SECTION -->
+      <div id="section-account" style="display:none">
+        <div class="settings-panel">
+          <div class="sp-header">
+            <div class="sp-title">Cuenta y seguridad</div>
+            <div class="sp-sub">Gestiona tu contraseña y sesiones activas</div>
+          </div>
+          <div class="form-row">
+            <div><div class="form-row-label">Contraseña</div><div class="form-row-sub">Última actualización: hace 30 días</div></div>
+            <button onclick="showToast('Enlace de cambio de contraseña enviado')" style="padding:9px 16px;background:white;border:1.5px solid rgba(229,226,220,0.8);border-radius:10px;font-family:'DM Sans',sans-serif;font-size:13px;color:#57534E;cursor:pointer">Cambiar contraseña</button>
+          </div>
+          <div class="form-row">
+            <div><div class="form-row-label">Sesiones activas</div><div class="form-row-sub">Estás conectado en 1 dispositivo</div></div>
+            <button onclick="showToast('Sesiones cerradas en otros dispositivos')" style="padding:9px 16px;background:white;border:1.5px solid rgba(229,226,220,0.8);border-radius:10px;font-family:'DM Sans',sans-serif;font-size:13px;color:#57534E;cursor:pointer">Cerrar otras sesiones</button>
+          </div>
+          <div class="logout-row">
+            <button class="btn-logout">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+              Cerrar sesión
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- NOTIFICATIONS SECTION -->
+      <div id="section-notifications" style="display:none">
+        <div class="settings-panel">
+          <div class="sp-header">
+            <div class="sp-title">Notificaciones</div>
+            <div class="sp-sub">Controla cuándo y cómo te avisamos</div>
+          </div>
+          <div class="form-row">
+            <div><div class="form-row-label">Flashcards pendientes</div><div class="form-row-sub">Avisar cuando haya tarjetas para revisar hoy</div></div>
+            <div class="toggle on" onclick="toggleSwitch(this)"></div>
+          </div>
+          <div class="form-row">
+            <div><div class="form-row-label">Recordatorio de estudio</div><div class="form-row-sub">Recordatorio diario para mantener tu racha</div></div>
+            <div class="toggle on" onclick="toggleSwitch(this)"></div>
+          </div>
+          <div class="form-row">
+            <div><div class="form-row-label">Logros desbloqueados</div><div class="form-row-sub">Avisar cuando desbloquees un nuevo logro</div></div>
+            <div class="toggle on" onclick="toggleSwitch(this)"></div>
+          </div>
+          <div class="form-row">
+            <div><div class="form-row-label">Emails de resumen</div><div class="form-row-sub">Resumen semanal de tu progreso por email</div></div>
+            <div class="toggle off" onclick="toggleSwitch(this)"></div>
+          </div>
+          <div class="form-row">
+            <div><div class="form-row-label">Temas débiles</div><div class="form-row-sub">Avisar cuando haya temas de examen para repasar</div></div>
+            <div class="toggle on" onclick="toggleSwitch(this)"></div>
+          </div>
+          <div class="save-row">
+            <button class="btn-save" onclick="showToast('Preferencias guardadas')">Guardar preferencias</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- INTEGRATIONS SECTION -->
+      <div id="section-integrations" style="display:none">
+        <div class="settings-panel">
+          <div class="sp-header">
+            <div class="sp-title">Integraciones</div>
+            <div class="sp-sub">Conecta tus cuentas externas</div>
+          </div>
+          <div class="connected-row">
+            <div class="conn-logo">
+              <svg width="18" height="18" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+            </div>
+            <div style="flex:1">
+              <div class="conn-name">Google</div>
+              <div class="conn-status">Cuenta principal de acceso</div>
+            </div>
+            <span class="conn-badge" style="background:#ECFDF5;color:#059669"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>Conectado</span>
+          </div>
+          <div class="connected-row">
+            <div class="conn-logo">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="#4285F4"><rect x="3" y="4" width="18" height="18" rx="2" fill="#4285F4"/><line x1="16" y1="2" x2="16" y2="6" stroke="white" stroke-width="2"/><line x1="8" y1="2" x2="8" y2="6" stroke="white" stroke-width="2"/><line x1="3" y1="10" x2="21" y2="10" stroke="white" stroke-width="2"/></svg>
+            </div>
+            <div style="flex:1">
+              <div class="conn-name">Google Calendar</div>
+              <div class="conn-status" id="gcal-status">No conectado — necesario para sincronizar horarios</div>
+            </div>
+            <button class="conn-badge" id="gcal-btn" onclick="connectCalendar()" style="background:#EDE9FE;color:#7C3AED;border:none;cursor:pointer;padding:5px 12px;border-radius:9999px;font-size:11px;font-weight:500;font-family:'DM Sans',sans-serif">Conectar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- DANGER ZONE -->
+      <div id="section-danger" style="display:none">
+        <div class="settings-panel">
+          <div class="sp-header">
+            <div class="sp-title" style="color:#DC2626">Zona de peligro</div>
+            <div class="sp-sub">Acciones permanentes e irreversibles</div>
+          </div>
+          <div class="danger-row">
+            <div>
+              <div class="danger-title">Eliminar todos los datos de estudio</div>
+              <div class="danger-sub">Elimina todas tus flashcards, sesiones y métricas. No se puede deshacer.</div>
+            </div>
+            <button class="btn-danger">Eliminar datos</button>
+          </div>
+          <div class="danger-row">
+            <div>
+              <div class="danger-title">Eliminar cuenta</div>
+              <div class="danger-sub">Elimina tu cuenta y todos los datos asociados permanentemente.</div>
+            </div>
+            <button class="btn-danger">Eliminar cuenta</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+  <span id="toast-msg">Guardado</span>
+</div>
+
+<script>
+function showSection(id, el) {
+  document.querySelectorAll('[id^="section-"]').forEach(s => s.style.display = 'none');
+  document.getElementById('section-' + id).style.display = 'block';
+  document.querySelectorAll('.snav-item').forEach(i => i.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function toggleSwitch(el) {
+  el.classList.toggle('on');
+  el.classList.toggle('off');
+}
+
+function showToast(msg) {
+  document.getElementById('toast-msg').textContent = msg;
+  const t = document.getElementById('toast');
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+function connectCalendar() {
+  document.getElementById('gcal-status').textContent = 'Conectado — estudiante@gmail.com';
+  const btn = document.getElementById('gcal-btn');
+  btn.textContent = '✓ Conectado';
+  btn.style.background = '#ECFDF5';
+  btn.style.color = '#059669';
+  btn.onclick = null;
+  showToast('Google Calendar conectado correctamente');
+}
+</script>
+</body>
+</html>

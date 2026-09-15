@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cogni — Examen</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'DM Sans', system-ui, sans-serif; background: #EDEAE4; min-height: 100vh; display: flex; -webkit-font-smoothing: antialiased; }
+
+/* SIDEBAR */
+.sidebar { width: 240px; min-height: 100vh; background: #FAFAF8; border-right: 1px solid rgba(229,226,220,0.7); display: flex; flex-direction: column; padding: 16px 12px; gap: 2px; flex-shrink: 0; position: sticky; top: 0; height: 100vh; }
+.logo-row { display: flex; align-items: center; gap: 8px; padding: 4px 8px 16px; border-bottom: 1px solid rgba(229,226,220,0.5); margin-bottom: 4px; }
+.logo-mark { width: 34px; height: 34px; background: #1C1917; border-radius: 10px; display: flex; align-items: center; justify-content: center; }
+.logo-name { font-size: 14px; font-weight: 700; color: #1C1917; }
+.section-label { font-size: 11px; font-weight: 500; color: #A8A29E; padding: 12px 10px 4px; }
+.nav-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; font-size: 13.5px; color: #57534E; cursor: pointer; transition: all 150ms; }
+.nav-item:hover { background: rgba(245,243,239,0.9); color: #1C1917; }
+.nav-item.active { background: rgba(253,222,230,0.7); color: #9B2C4A; font-weight: 500; }
+.nav-icon { width: 16px; height: 16px; flex-shrink: 0; opacity: 0.7; }
+.nav-item.active .nav-icon { opacity: 1; }
+.sidebar-bottom { margin-top: auto; padding-top: 12px; border-top: 1px solid rgba(229,226,220,0.5); }
+.account { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 10px; cursor: pointer; }
+.account:hover { background: rgba(245,243,239,0.9); }
+.avatar { width: 32px; height: 32px; border-radius: 9999px; background: linear-gradient(135deg, #C4B5FD, #7C3AED); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: white; flex-shrink: 0; }
+
+/* MAIN */
+.main { flex: 1; display: flex; flex-direction: column; overflow-y: auto; }
+.topbar { background: #EDEAE4; display: flex; align-items: center; justify-content: space-between; padding: 10px 24px; border-bottom: 1px solid rgba(229,226,220,0.5); }
+.breadcrumb { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #A8A29E; }
+.breadcrumb .current { color: #1C1917; font-weight: 500; }
+
+/* EXAM WRAP */
+.exam-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 32px 24px; gap: 20px; }
+
+/* HEADER */
+.exam-header { width: 100%; max-width: 720px; display: flex; align-items: flex-start; justify-content: space-between; }
+.exam-title { font-size: 18px; font-weight: 700; color: #1C1917; }
+.exam-sub { font-size: 12px; color: #A8A29E; margin-top: 3px; }
+.exam-timer { display: flex; align-items: center; gap: 6px; background: white; border: 1px solid rgba(229,226,220,0.7); border-radius: 10px; padding: 8px 14px; font-size: 14px; font-weight: 600; color: #1C1917; }
+
+/* PROGRESS */
+.exam-progress { width: 100%; max-width: 720px; }
+.progress-row { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 12px; }
+.progress-count { font-weight: 500; color: #57534E; }
+.progress-pct { color: #A8A29E; }
+.progress-dots { display: flex; gap: 4px; flex-wrap: wrap; }
+.progress-dot { width: 24px; height: 6px; border-radius: 9999px; background: rgba(229,226,220,0.6); transition: all 200ms; }
+.progress-dot.answered { background: #9B2C4A; }
+.progress-dot.current { background: #F43F5E; }
+
+/* QUESTION */
+.question-box { width: 100%; max-width: 720px; background: white; border: 1px solid rgba(229,226,220,0.7); border-radius: 20px; padding: 32px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); }
+.q-num { font-size: 11px; font-weight: 500; color: #A8A29E; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; }
+.q-text { font-size: 18px; font-weight: 600; color: #1C1917; line-height: 1.5; margin-bottom: 24px; }
+
+/* OPTIONS */
+.options { display: flex; flex-direction: column; gap: 10px; }
+.option { display: flex; align-items: center; gap: 14px; padding: 14px 18px; border: 1.5px solid rgba(229,226,220,0.8); border-radius: 12px; cursor: pointer; transition: all 150ms; user-select: none; }
+.option:hover { border-color: rgba(244,63,94,0.4); background: rgba(253,222,230,0.2); }
+.option.selected { border-color: #F43F5E; background: rgba(253,222,230,0.3); }
+.option.correct { border-color: #10B981; background: rgba(209,250,229,0.4); }
+.option.wrong { border-color: #EF4444; background: rgba(254,226,226,0.4); }
+.option-letter { width: 28px; height: 28px; border-radius: 8px; background: rgba(229,226,220,0.5); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #78716C; flex-shrink: 0; transition: all 150ms; }
+.option.selected .option-letter { background: #F43F5E; color: white; }
+.option.correct .option-letter { background: #10B981; color: white; }
+.option.wrong .option-letter { background: #EF4444; color: white; }
+.option-text { font-size: 14px; color: #44403C; line-height: 1.5; }
+
+/* EXPLANATION */
+.explanation { margin-top: 16px; background: rgba(236,253,245,0.6); border: 1px solid rgba(16,185,129,0.3); border-radius: 12px; padding: 14px 16px; display: none; }
+.explanation.show { display: block; }
+.exp-label { font-size: 11px; font-weight: 600; color: #059669; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+.exp-text { font-size: 13px; color: #065F46; line-height: 1.6; }
+
+/* NAV BUTTONS */
+.nav-row { width: 100%; max-width: 720px; display: flex; justify-content: space-between; align-items: center; }
+.nav-btn { padding: 11px 24px; border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 150ms; display: flex; align-items: center; gap: 6px; }
+.btn-prev { background: white; color: #57534E; border: 1.5px solid rgba(229,226,220,0.8); }
+.btn-prev:hover { background: #F5F3EF; }
+.btn-next { background: #1C1917; color: white; border: none; }
+.btn-next:hover { background: #292524; }
+.btn-submit-exam { background: #9B2C4A; color: white; border: none; }
+.btn-submit-exam:hover { background: #7A2238; }
+
+/* RESULTS */
+.results-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 32px 24px; gap: 20px; display: none; }
+.results-header { width: 100%; max-width: 720px; background: white; border: 1px solid rgba(229,226,220,0.7); border-radius: 20px; padding: 28px 32px; display: flex; align-items: center; gap: 28px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); }
+.score-circle { width: 100px; height: 100px; border-radius: 9999px; display: flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0; }
+.score-number { font-size: 32px; font-weight: 800; line-height: 1; }
+.score-label { font-size: 12px; font-weight: 500; margin-top: 2px; }
+.results-info { flex: 1; }
+.results-title { font-size: 22px; font-weight: 700; color: #1C1917; margin-bottom: 6px; }
+.results-sub { font-size: 13px; color: #A8A29E; margin-bottom: 14px; }
+.results-stats { display: flex; gap: 20px; }
+.rs { font-size: 13px; }
+.rs strong { color: #1C1917; font-weight: 600; }
+
+/* REVIEW LIST */
+.review-list { width: 100%; max-width: 720px; display: flex; flex-direction: column; gap: 12px; }
+.review-item { background: white; border: 1px solid rgba(229,226,220,0.7); border-radius: 14px; padding: 18px 20px; }
+.ri-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.ri-badge { width: 24px; height: 24px; border-radius: 7px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.ri-q { font-size: 14px; font-weight: 500; color: #1C1917; flex: 1; }
+.ri-result { font-size: 12px; font-weight: 600; }
+.ri-answer { font-size: 13px; color: #A8A29E; }
+.ri-correct { font-size: 13px; color: #059669; margin-top: 4px; display: flex; align-items: center; gap: 5px; }
+.ri-exp { font-size: 12px; color: #57534E; background: #F5F3EF; border-radius: 8px; padding: 8px 10px; margin-top: 8px; line-height: 1.5; }
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <div class="logo-row">
+    <div class="logo-mark"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="8" cy="14" r="3" fill="rgba(255,255,255,0.9)"/><circle cx="12" cy="9.5" r="2.5" fill="rgba(255,255,255,0.65)"/><circle cx="16" cy="14" r="3" fill="rgba(255,255,255,0.9)"/></svg></div>
+    <span class="logo-name">Cogni</span>
+  </div>
+  <div class="section-label">Menú principal</div>
+  <div class="nav-item"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>Inicio</div>
+  <div class="nav-item"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>Workspaces</div>
+  <div class="section-label">Técnicas</div>
+  <div class="nav-item"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>Flashcards</div>
+  <div class="nav-item"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.46 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2Z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.46 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2Z"/></svg>Active Recall</div>
+  <div class="nav-item active"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>Exámenes</div>
+  <div class="sidebar-bottom">
+    <div class="account"><div class="avatar">ES</div><div><div style="font-size:13px;font-weight:600;color:#1C1917">Estudiante</div><div style="font-size:11px;color:#A8A29E">Plan gratuito</div></div></div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+  <div class="topbar">
+    <div class="breadcrumb">
+      <span>Biología Celular</span><span style="font-size:11px">›</span>
+      <span>Exámenes</span><span style="font-size:11px">›</span>
+      <span class="current">Examen: Mitocondria y Respiración</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px">
+      <div class="avatar" style="width:28px;height:28px;font-size:11px;cursor:pointer">ES</div>
+    </div>
+  </div>
+
+  <!-- EXAM -->
+  <div class="exam-wrap" id="exam-section">
+    <div class="exam-header">
+      <div>
+        <div class="exam-title">Examen: Mitocondria y Respiración Celular</div>
+        <div class="exam-sub">Biología Celular · 8 preguntas de opción múltiple</div>
+      </div>
+      <div class="exam-timer">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <span id="timer">12:00</span>
+      </div>
+    </div>
+
+    <!-- Progress dots -->
+    <div class="exam-progress">
+      <div class="progress-row">
+        <span class="progress-count" id="ex-progress">Pregunta 1 de 8</span>
+        <span class="progress-pct" id="ex-answered">0 respondidas</span>
+      </div>
+      <div class="progress-dots" id="progress-dots"></div>
+    </div>
+
+    <!-- Question -->
+    <div class="question-box">
+      <div class="q-num" id="q-num">Pregunta 1 de 8</div>
+      <div class="q-text" id="q-text">¿Cuál es la función principal de la mitocondria en la célula eucariota?</div>
+      <div class="options" id="options-container"></div>
+      <div class="explanation" id="explanation">
+        <div class="exp-label">Explicación</div>
+        <div class="exp-text" id="exp-text"></div>
+      </div>
+    </div>
+
+    <!-- Navigation -->
+    <div class="nav-row">
+      <button class="nav-btn btn-prev" id="btn-prev" onclick="prevQuestion()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+        Anterior
+      </button>
+      <button class="nav-btn btn-next" id="btn-next" onclick="nextQuestion()">
+        Siguiente
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+      <button class="nav-btn btn-submit-exam" id="btn-submit" style="display:none" onclick="submitExam()">
+        Entregar examen
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- RESULTS -->
+  <div class="results-wrap" id="results-section">
+    <div class="results-header">
+      <div class="score-circle" id="score-circle">
+        <div class="score-number" id="score-number">75%</div>
+        <div class="score-label" id="score-label">6 / 8</div>
+      </div>
+      <div class="results-info">
+        <div class="results-title" id="results-title">¡Buen trabajo!</div>
+        <div class="results-sub">Examen: Mitocondria y Respiración Celular · Biología Celular</div>
+        <div class="results-stats">
+          <div class="rs"><strong id="rs-correct">0</strong> <span style="color:#A8A29E">correctas</span></div>
+          <div class="rs"><strong id="rs-wrong">0</strong> <span style="color:#A8A29E">incorrectas</span></div>
+          <div class="rs"><span style="color:#A8A29E">Tiempo: </span><strong id="rs-time">--:--</strong></div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <button onclick="showExam()" style="padding:10px 20px;background:white;border:1.5px solid rgba(229,226,220,0.8);border-radius:10px;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;color:#57534E">Revisar respuestas</button>
+        <button onclick="resetExam()" style="padding:10px 20px;background:#1C1917;border:none;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;color:white">Nuevo intento</button>
+      </div>
+    </div>
+
+    <div style="width:100%;max-width:720px">
+      <div style="font-size:14px;font-weight:600;color:#1C1917;margin-bottom:12px">Revisión pregunta por pregunta</div>
+    </div>
+    <div class="review-list" id="review-list"></div>
+  </div>
+</div>
+
+<script>
+const questions = [
+  { q: "¿Cuál es la función principal de la mitocondria en la célula eucariota?", opts: ["Síntesis de proteínas","Producción de ATP mediante respiración celular","Almacenamiento del ADN nuclear","Digestión de nutrientes"], correct: 1, exp: "La mitocondria es la 'central energética' de la célula. Su función principal es producir ATP a través de la respiración celular aeróbica, específicamente en la cadena transportadora de electrones y el ciclo de Krebs." },
+  { q: "¿Dónde ocurre el ciclo de Krebs dentro de la mitocondria?", opts: ["Membrana externa","Membrana interna","Matriz mitocondrial","Espacio intermembrana"], correct: 2, exp: "El ciclo de Krebs ocurre en la matriz mitocondrial, el espacio interior rodeado por la membrana interna. Aquí el Acetil-CoA se oxida para producir NADH, FADH₂ y CO₂." },
+  { q: "¿Cómo se llaman los pliegues de la membrana interna mitocondrial?", opts: ["Grana","Crestas mitocondriales","Ribosomas mitocondriales","Tilacoides"], correct: 1, exp: "Los pliegues de la membrana interna se llaman crestas mitocondriales. Aumentan significativamente la superficie disponible para los complejos de la cadena respiratoria y la ATP sintasa." },
+  { q: "¿Cuántas moléculas de ATP produce la respiración celular completa de una glucosa?", opts: ["2 ATP","8 ATP","18 ATP","36-38 ATP"], correct: 3, exp: "La glucólisis produce 2 ATP directamente, el ciclo de Krebs 2 ATP, y la cadena transportadora de electrones ~32-34 ATP. El total es aproximadamente 36-38 ATP por molécula de glucosa." },
+  { q: "¿Qué es la fosforilación oxidativa?", opts: ["La glucólisis en el citoplasma","La síntesis de ATP usando el gradiente de protones en la membrana interna","La importación de proteínas a la mitocondria","La duplicación del ADN mitocondrial"], correct: 1, exp: "La fosforilación oxidativa es el proceso en la membrana interna donde la ATP sintasa usa el gradiente electroquímico de protones (generado por la cadena respiratoria) para sintetizar ATP a partir de ADP y Pi." },
+  { q: "¿Cuál es el aceptor final de electrones en la respiración aeróbica?", opts: ["NAD+","CO₂","H₂O","O₂"], correct: 3, exp: "El O₂ (oxígeno molecular) es el aceptor final de electrones. Al final de la cadena transportadora, los electrones se combinan con O₂ y H⁺ para formar agua (H₂O). Sin O₂, la cadena se detiene." },
+  { q: "¿Qué evidencia apoya el origen bacteriano de las mitocondrias (teoría endosimbiótica)?", opts: ["Su membrana externa es igual a la del retículo endoplásmico","Tienen ADN circular propio y se dividen por fisión binaria","No tienen ribosomas propios","Dependen completamente del núcleo para replicarse"], correct: 1, exp: "Las mitocondrias tienen ADN circular (similar al bacteriano), ribosomas 70S (bacterianos), y se dividen por fisión binaria, no mitosis. Esto sugiere que fueron bacterias aeróbicas englobadas por células eucariotas ancestrales." },
+  { q: "¿Qué produce la glucólisis además de piruvato?", opts: ["Solo CO₂","2 ATP y 2 NADH","O₂ y H₂O","Acetil-CoA y FADH₂"], correct: 1, exp: "La glucólisis convierte glucosa (6C) en 2 moléculas de piruvato (3C) produciendo neto 2 ATP y 2 NADH. Ocurre en el citoplasma y no requiere oxígeno." }
+];
+
+let current = 0;
+const answers = new Array(questions.length).fill(-1);
+let timerInterval;
+let seconds = 720;
+let submitted = false;
+
+function startTimer() {
+  timerInterval = setInterval(() => {
+    seconds--;
+    const m = Math.floor(seconds / 60).toString().padStart(2,'0');
+    const s = (seconds % 60).toString().padStart(2,'0');
+    document.getElementById('timer').textContent = m + ':' + s;
+    if (seconds <= 0) { clearInterval(timerInterval); submitExam(); }
+  }, 1000);
+}
+
+function renderDots() {
+  const c = document.getElementById('progress-dots');
+  c.innerHTML = '';
+  questions.forEach((_, i) => {
+    const d = document.createElement('div');
+    d.className = 'progress-dot' + (answers[i] !== -1 ? ' answered' : '') + (i === current ? ' current' : '');
+    c.appendChild(d);
+  });
+}
+
+function renderQuestion() {
+  document.getElementById('q-num').textContent = `Pregunta ${current + 1} de ${questions.length}`;
+  document.getElementById('ex-progress').textContent = `Pregunta ${current + 1} de ${questions.length}`;
+  document.getElementById('q-text').textContent = questions[current].q;
+  const answered = answers.filter(a => a !== -1).length;
+  document.getElementById('ex-answered').textContent = answered + ' respondidas';
+
+  const container = document.getElementById('options-container');
+  container.innerHTML = '';
+  const letters = ['A','B','C','D'];
+  questions[current].opts.forEach((opt, i) => {
+    const div = document.createElement('div');
+    div.className = 'option' + (answers[current] === i ? ' selected' : '');
+    if (submitted) {
+      if (i === questions[current].correct) div.className = 'option correct';
+      else if (answers[current] === i && i !== questions[current].correct) div.className = 'option wrong';
+    }
+    div.innerHTML = `<span class="option-letter">${letters[i]}</span><span class="option-text">${opt}</span>`;
+    if (!submitted) div.onclick = () => selectOption(i);
+    container.appendChild(div);
+  });
+
+  const exp = document.getElementById('explanation');
+  if (submitted) {
+    exp.classList.add('show');
+    document.getElementById('exp-text').textContent = questions[current].exp;
+  } else {
+    exp.classList.remove('show');
+  }
+
+  document.getElementById('btn-prev').style.opacity = current === 0 ? '0.4' : '1';
+  document.getElementById('btn-prev').style.pointerEvents = current === 0 ? 'none' : '';
+
+  const isLast = current === questions.length - 1;
+  document.getElementById('btn-next').style.display = isLast ? 'none' : 'flex';
+  document.getElementById('btn-submit').style.display = isLast && !submitted ? 'flex' : 'none';
+
+  renderDots();
+}
+
+function selectOption(i) {
+  answers[current] = i;
+  renderQuestion();
+}
+
+function prevQuestion() { if (current > 0) { current--; renderQuestion(); } }
+function nextQuestion() { if (current < questions.length - 1) { current++; renderQuestion(); } }
+
+function submitExam() {
+  clearInterval(timerInterval);
+  submitted = true;
+  const timeUsed = 720 - seconds;
+  const m = Math.floor(timeUsed / 60).toString().padStart(2,'0');
+  const s = (timeUsed % 60).toString().padStart(2,'0');
+
+  const correct = answers.filter((a, i) => a === questions[i].correct).length;
+  const pct = Math.round((correct / questions.length) * 100);
+
+  document.getElementById('score-number').textContent = pct + '%';
+  document.getElementById('score-label').textContent = correct + ' / ' + questions.length;
+  document.getElementById('rs-correct').textContent = correct;
+  document.getElementById('rs-wrong').textContent = questions.length - correct;
+  document.getElementById('rs-time').textContent = m + ':' + s;
+
+  const circle = document.getElementById('score-circle');
+  if (pct >= 80) { circle.style.background = '#D5F5E3'; circle.style.border = '3px solid #10B981'; document.getElementById('score-number').style.color = '#059669'; document.getElementById('score-label').style.color = '#059669'; document.getElementById('results-title').textContent = '¡Excelente trabajo!'; }
+  else if (pct >= 60) { circle.style.background = '#FEF3C7'; circle.style.border = '3px solid #F59E0B'; document.getElementById('score-number').style.color = '#D97706'; document.getElementById('score-label').style.color = '#D97706'; document.getElementById('results-title').textContent = '¡Buen trabajo!'; }
+  else { circle.style.background = '#FEE2E2'; circle.style.border = '3px solid #EF4444'; document.getElementById('score-number').style.color = '#DC2626'; document.getElementById('score-label').style.color = '#DC2626'; document.getElementById('results-title').textContent = 'Sigue practicando'; }
+
+  const reviewList = document.getElementById('review-list');
+  reviewList.innerHTML = '';
+  const letters = ['A','B','C','D'];
+  questions.forEach((q, i) => {
+    const isCorrect = answers[i] === q.correct;
+    const div = document.createElement('div');
+    div.className = 'review-item';
+    div.innerHTML = `
+      <div class="ri-header">
+        <div class="ri-badge" style="background:${isCorrect ? '#D5F5E3' : '#FEE2E2'}">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="${isCorrect ? '#059669' : '#DC2626'}" stroke-width="2.5">${isCorrect ? '<polyline points="20 6 9 17 4 12"/>' : '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>'}</svg>
+        </div>
+        <div class="ri-q">${q.q}</div>
+        <span class="ri-result" style="color:${isCorrect ? '#059669' : '#DC2626'}">${isCorrect ? 'Correcta' : 'Incorrecta'}</span>
+      </div>
+      ${!isCorrect ? `<div class="ri-answer">Tu respuesta: <strong style="color:#DC2626">${answers[i] >= 0 ? letters[answers[i]] + ') ' + q.opts[answers[i]] : 'Sin respuesta'}</strong></div>` : ''}
+      <div class="ri-correct"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>Respuesta correcta: <strong>${letters[q.correct]}) ${q.opts[q.correct]}</strong></div>
+      <div class="ri-exp">${q.exp}</div>
+    `;
+    reviewList.appendChild(div);
+  });
+
+  document.getElementById('exam-section').style.display = 'none';
+  document.getElementById('results-section').style.display = 'flex';
+}
+
+function showExam() {
+  renderQuestion();
+  document.getElementById('exam-section').style.display = 'flex';
+  document.getElementById('results-section').style.display = 'none';
+}
+
+function resetExam() {
+  answers.fill(-1); current = 0; submitted = false; seconds = 720;
+  document.getElementById('timer').textContent = '12:00';
+  document.getElementById('exam-section').style.display = 'flex';
+  document.getElementById('results-section').style.display = 'none';
+  renderQuestion();
+  startTimer();
+}
+
+renderQuestion();
+startTimer();
+</script>
+</body>
+</html>

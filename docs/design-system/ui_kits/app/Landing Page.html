@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cogni — Estudia de forma inteligente</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'DM Sans', system-ui, sans-serif; background: #FAFAF8; color: #1C1917; -webkit-font-smoothing: antialiased; }
+
+/* NAV */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  background: rgba(250,250,248,0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(229,226,220,0.5);
+  padding: 0 48px;
+  height: 60px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.nav-logo { display: flex; align-items: center; gap: 10px; }
+.nav-mark { width: 34px; height: 34px; background: #1C1917; border-radius: 10px; display: flex; align-items: center; justify-content: center; }
+.nav-name { font-size: 15px; font-weight: 700; color: #1C1917; }
+.nav-links { display: flex; align-items: center; gap: 8px; }
+.nav-link { font-size: 14px; color: #78716C; padding: 6px 12px; border-radius: 8px; cursor: pointer; transition: all 150ms; }
+.nav-link:hover { color: #1C1917; background: rgba(229,226,220,0.4); }
+.nav-cta { display: flex; align-items: center; gap: 8px; }
+.btn-ghost { font-size: 14px; font-weight: 500; color: #57534E; padding: 8px 16px; border-radius: 9px; border: none; background: transparent; cursor: pointer; transition: all 150ms; }
+.btn-ghost:hover { background: rgba(229,226,220,0.5); }
+.btn-primary { font-size: 14px; font-weight: 500; color: white; padding: 8px 20px; border-radius: 9px; border: none; background: #1C1917; cursor: pointer; transition: all 150ms; font-family: 'DM Sans', sans-serif; }
+.btn-primary:hover { background: #292524; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+
+/* HERO */
+.hero {
+  padding: 140px 48px 80px;
+  max-width: 1200px;
+  margin: 0 auto;
+  text-align: center;
+}
+.hero-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(237,233,254,0.8); border: 1px solid rgba(196,181,253,0.5);
+  border-radius: 9999px; padding: 5px 14px;
+  font-size: 12.5px; font-weight: 500; color: #6D28D9;
+  margin-bottom: 28px;
+}
+.hero-badge .dot { width: 6px; height: 6px; border-radius: 9999px; background: #7C3AED; }
+.hero-title {
+  font-size: 60px; font-weight: 700; line-height: 1.1;
+  color: #1C1917; margin-bottom: 20px;
+  letter-spacing: -0.02em;
+}
+.hero-title span { color: #7C3AED; }
+.hero-sub {
+  font-size: 18px; color: #78716C; line-height: 1.6;
+  max-width: 580px; margin: 0 auto 36px;
+}
+.hero-actions { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 64px; }
+.hero-cta-primary {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 15px; font-weight: 600; color: white;
+  padding: 13px 28px; border-radius: 12px; border: none;
+  background: #1C1917; cursor: pointer; transition: all 200ms;
+  display: flex; align-items: center; gap: 8px;
+}
+.hero-cta-primary:hover { background: #292524; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.2); }
+.hero-cta-secondary {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 15px; font-weight: 500; color: #57534E;
+  padding: 13px 24px; border-radius: 12px;
+  border: 1.5px solid rgba(229,226,220,0.8);
+  background: white; cursor: pointer; transition: all 200ms;
+  display: flex; align-items: center; gap: 8px;
+}
+.hero-cta-secondary:hover { background: #F5F3EF; border-color: rgba(212,208,200,0.9); }
+.hero-social { font-size: 13px; color: #A8A29E; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.hero-avatars { display: flex; margin-left: 4px; }
+.hero-avatar { width: 28px; height: 28px; border-radius: 9999px; border: 2px solid white; margin-left: -8px; first-child:margin-left:0; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 600; color: white; }
+
+/* PRODUCT SCREENSHOT */
+.hero-screenshot {
+  max-width: 1100px; margin: 0 auto;
+  background: white;
+  border: 1px solid rgba(229,226,220,0.7);
+  border-radius: 20px;
+  box-shadow: 0 32px 80px rgba(0,0,0,0.12), 0 8px 24px rgba(0,0,0,0.06);
+  overflow: hidden;
+  position: relative;
+}
+.screenshot-bar {
+  background: #F5F3EF;
+  padding: 12px 16px;
+  display: flex; align-items: center; gap: 8px;
+  border-bottom: 1px solid rgba(229,226,220,0.6);
+}
+.traffic-lights { display: flex; gap: 6px; }
+.tl { width: 10px; height: 10px; border-radius: 9999px; }
+.screenshot-url {
+  flex: 1; background: white; border: 1px solid rgba(229,226,220,0.6);
+  border-radius: 7px; padding: 5px 12px;
+  font-size: 12px; color: #A8A29E; text-align: center;
+}
+.screenshot-body {
+  display: grid; grid-template-columns: 200px 1fr;
+  min-height: 400px;
+}
+.ss-sidebar { background: #FAFAF8; border-right: 1px solid rgba(229,226,220,0.5); padding: 16px 12px; }
+.ss-logo { display: flex; align-items: center; gap: 8px; padding: 4px 8px 14px; border-bottom: 1px solid rgba(229,226,220,0.4); margin-bottom: 8px; }
+.ss-logo-mark { width: 28px; height: 28px; background: #1C1917; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+.ss-logo-name { font-size: 13px; font-weight: 700; color: #1C1917; }
+.ss-nav-lbl { font-size: 10px; font-weight: 500; color: #A8A29E; padding: 10px 8px 3px; }
+.ss-nav { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px; font-size: 12px; color: #57534E; }
+.ss-nav.active { background: rgba(237,233,254,0.9); color: #6D28D9; font-weight: 500; }
+.ss-nav-dot { width: 14px; height: 14px; display: flex; align-items: center; justify-content: center; }
+
+.ss-content { padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+.ss-title { font-size: 22px; font-weight: 700; color: #1C1917; }
+.ss-stats { display: flex; gap: 10px; }
+.ss-stat { flex: 1; background: white; border: 1px solid rgba(229,226,220,0.6); border-radius: 12px; padding: 14px; }
+.ss-stat-val { font-size: 20px; font-weight: 700; color: #1C1917; }
+.ss-stat-lbl { font-size: 10px; color: #A8A29E; margin-top: 2px; }
+.ss-stat-bar { height: 4px; background: rgba(229,226,220,0.6); border-radius: 9999px; overflow: hidden; margin-top: 10px; }
+.ss-stat-fill { height: 100%; border-radius: 9999px; }
+.ss-ws-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.ss-ws { background: white; border: 1px solid rgba(229,226,220,0.6); border-radius: 12px; padding: 12px; }
+.ss-ws-icon { font-size: 18px; width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-bottom: 8px; }
+.ss-ws-name { font-size: 12px; font-weight: 600; color: #1C1917; }
+.ss-ws-meta { font-size: 10px; color: #A8A29E; margin-top: 2px; }
+
+/* SECTIONS */
+section { padding: 80px 48px; }
+.section-inner { max-width: 1100px; margin: 0 auto; }
+.section-badge { display: inline-flex; align-items: center; gap: 6px; background: #F5F3EF; border: 1px solid rgba(229,226,220,0.7); border-radius: 9999px; padding: 4px 12px; font-size: 12px; font-weight: 500; color: #78716C; margin-bottom: 16px; }
+.section-title { font-size: 40px; font-weight: 700; color: #1C1917; line-height: 1.15; margin-bottom: 14px; letter-spacing: -0.01em; }
+.section-sub { font-size: 16px; color: #78716C; line-height: 1.6; max-width: 520px; }
+
+/* FEATURES GRID */
+.features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 48px; }
+.feature-card {
+  background: white; border: 1px solid rgba(229,226,220,0.7);
+  border-radius: 20px; padding: 28px;
+  transition: all 200ms;
+}
+.feature-card:hover { transform: translateY(-3px); box-shadow: 0 12px 32px rgba(0,0,0,0.08); border-color: rgba(196,181,253,0.4); }
+.feature-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-bottom: 16px; }
+.feature-name { font-size: 16px; font-weight: 600; color: #1C1917; margin-bottom: 8px; }
+.feature-desc { font-size: 14px; color: #78716C; line-height: 1.6; }
+
+/* HOW IT WORKS */
+.how-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: center; margin-top: 48px; }
+.step-list { display: flex; flex-direction: column; gap: 24px; }
+.step { display: flex; gap: 16px; }
+.step-num { width: 32px; height: 32px; border-radius: 9999px; background: #1C1917; color: white; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; margin-top: 2px; }
+.step-title { font-size: 16px; font-weight: 600; color: #1C1917; margin-bottom: 4px; }
+.step-desc { font-size: 14px; color: #78716C; line-height: 1.6; }
+.how-visual { background: #F5F3EF; border-radius: 20px; padding: 24px; border: 1px solid rgba(229,226,220,0.6); }
+
+/* STATS SECTION */
+.stats-section { background: #1C1917; border-radius: 24px; padding: 60px 48px; }
+.stats-inner { max-width: 900px; margin: 0 auto; text-align: center; }
+.stats-title { font-size: 36px; font-weight: 700; color: white; margin-bottom: 8px; }
+.stats-sub { font-size: 16px; color: rgba(255,255,255,0.5); margin-bottom: 48px; }
+.stats-numbers { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; }
+.stat-num { }
+.stat-number { font-size: 48px; font-weight: 700; color: white; line-height: 1; }
+.stat-number span { color: #A78BFA; }
+.stat-num-lbl { font-size: 14px; color: rgba(255,255,255,0.5); margin-top: 6px; }
+
+/* CTA SECTION */
+.cta-section { text-align: center; padding: 80px 48px; }
+.cta-inner { max-width: 600px; margin: 0 auto; }
+.cta-title { font-size: 44px; font-weight: 700; color: #1C1917; line-height: 1.15; margin-bottom: 16px; letter-spacing: -0.01em; }
+.cta-sub { font-size: 16px; color: #78716C; margin-bottom: 32px; }
+.cta-actions { display: flex; align-items: center; justify-content: center; gap: 12px; }
+
+/* FOOTER */
+footer { background: #F5F3EF; border-top: 1px solid rgba(229,226,220,0.6); padding: 32px 48px; display: flex; align-items: center; justify-content: space-between; }
+.footer-logo { display: flex; align-items: center; gap: 8px; }
+.footer-mark { width: 28px; height: 28px; background: #1C1917; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+.footer-name { font-size: 14px; font-weight: 600; color: #1C1917; }
+.footer-links { display: flex; gap: 24px; }
+.footer-link { font-size: 13px; color: #A8A29E; cursor: pointer; transition: color 150ms; }
+.footer-link:hover { color: #57534E; }
+.footer-copy { font-size: 12px; color: #D4D0C8; }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">
+    <div class="nav-mark"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="8" cy="14" r="3" fill="rgba(255,255,255,0.9)"/><circle cx="12" cy="9.5" r="2.5" fill="rgba(255,255,255,0.65)"/><circle cx="16" cy="14" r="3" fill="rgba(255,255,255,0.9)"/></svg></div>
+    <span class="nav-name">Cogni</span>
+  </div>
+  <div class="nav-links">
+    <div class="nav-link">Características</div>
+    <div class="nav-link">Cómo funciona</div>
+    <div class="nav-link">Precios</div>
+  </div>
+  <div class="nav-cta">
+    <button class="btn-ghost">Iniciar sesión</button>
+    <button class="btn-primary">Comenzar gratis →</button>
+  </div>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-badge">
+    <span class="dot"></span>
+    Potenciado por IA — Gemini, DeepSeek & más
+  </div>
+  <h1 class="hero-title">
+    Estudia de forma<br><span>inteligente</span>,<br>no más difícil
+  </h1>
+  <p class="hero-sub">
+    Combina notas tipo Notion, flashcards con repetición espaciada, active recall y exámenes de práctica — todo potenciado por IA.
+  </p>
+  <div class="hero-actions">
+    <button class="hero-cta-primary">
+      Comenzar gratis
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+    </button>
+    <button class="hero-cta-secondary">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+      Ver demo
+    </button>
+  </div>
+  <div class="hero-social">
+    <div class="hero-avatars">
+      <div class="hero-avatar" style="background:linear-gradient(135deg,#A78BFA,#7C3AED)">JW</div>
+      <div class="hero-avatar" style="background:linear-gradient(135deg,#6EE7B7,#059669)">EC</div>
+      <div class="hero-avatar" style="background:linear-gradient(135deg,#FCD34D,#D97706)">SA</div>
+      <div class="hero-avatar" style="background:linear-gradient(135deg,#93C5FD,#2563EB)">DR</div>
+    </div>
+    Más de <strong style="color:#1C1917">2,400 estudiantes</strong> ya estudian más inteligente
+  </div>
+</div>
+
+<!-- PRODUCT SCREENSHOT -->
+<div style="padding: 0 48px 80px; max-width: 1200px; margin: 0 auto;">
+  <div class="hero-screenshot">
+    <div class="screenshot-bar">
+      <div class="traffic-lights">
+        <div class="tl" style="background:#EF4444"></div>
+        <div class="tl" style="background:#F59E0B"></div>
+        <div class="tl" style="background:#10B981"></div>
+      </div>
+      <div class="screenshot-url">app.cogni.com/home</div>
+    </div>
+    <div class="screenshot-body">
+      <div class="ss-sidebar">
+        <div class="ss-logo">
+          <div class="ss-logo-mark"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="8" cy="14" r="3" fill="rgba(255,255,255,0.9)"/><circle cx="12" cy="9.5" r="2.5" fill="rgba(255,255,255,0.65)"/><circle cx="16" cy="14" r="3" fill="rgba(255,255,255,0.9)"/></svg></div>
+          <span class="ss-logo-name">Cogni</span>
+        </div>
+        <div class="ss-nav-lbl">Menú</div>
+        <div class="ss-nav active">
+          <div class="ss-nav-dot"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></div>Inicio
+        </div>
+        <div class="ss-nav">
+          <div class="ss-nav-dot"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></div>Workspaces
+        </div>
+        <div class="ss-nav">
+          <div class="ss-nav-dot"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div>Dashboard
+        </div>
+        <div class="ss-nav-lbl">Técnicas</div>
+        <div class="ss-nav">
+          <div class="ss-nav-dot"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg></div>Flashcards
+        </div>
+      </div>
+      <div class="ss-content">
+        <div class="ss-title">Buenos días, Estudiante</div>
+        <div class="ss-stats">
+          <div class="ss-stat">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px"><div style="width:22px;height:22px;border-radius:7px;background:#FEF3C7;display:flex;align-items:center;justify-content:center"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#D97706" stroke-width="2"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2z"/></svg></div><span class="ss-stat-lbl">Racha</span></div>
+            <div class="ss-stat-val">12 días</div>
+            <div class="ss-stat-bar"><div class="ss-stat-fill" style="width:80%;background:linear-gradient(90deg,#F59E0B,#EF4444)"></div></div>
+          </div>
+          <div class="ss-stat">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px"><div style="width:22px;height:22px;border-radius:7px;background:#EDE9FE;display:flex;align-items:center;justify-content:center"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#7C3AED" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg></div><span class="ss-stat-lbl">Flashcards</span></div>
+            <div class="ss-stat-val">12 pend.</div>
+            <div class="ss-stat-bar"><div class="ss-stat-fill" style="width:72%;background:#7C3AED"></div></div>
+          </div>
+          <div class="ss-stat">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px"><div style="width:22px;height:22px;border-radius:7px;background:#D5F5E3;display:flex;align-items:center;justify-content:center"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg></div><span class="ss-stat-lbl">Tiempo</span></div>
+            <div class="ss-stat-val">24h 35m</div>
+            <div class="ss-stat-bar"><div class="ss-stat-fill" style="width:55%;background:#10B981"></div></div>
+          </div>
+        </div>
+        <div style="font-size:13px;font-weight:600;color:#1C1917;margin-bottom:8px">Mis workspaces</div>
+        <div class="ss-ws-grid">
+          <div class="ss-ws"><div class="ss-ws-icon" style="background:#EDE9FE">🧬</div><div class="ss-ws-name">Biología Celular</div><div class="ss-ws-meta">8 páginas</div></div>
+          <div class="ss-ws"><div class="ss-ws-icon" style="background:#DBEAFE">📐</div><div class="ss-ws-name">Cálculo III</div><div class="ss-ws-meta">12 páginas</div></div>
+          <div class="ss-ws"><div class="ss-ws-icon" style="background:#D5F5E3">⚗️</div><div class="ss-ws-name">Química</div><div class="ss-ws-meta">6 páginas</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FEATURES -->
+<section style="background:#F5F3EF">
+  <div class="section-inner">
+    <div style="text-align:center;max-width:600px;margin:0 auto 0">
+      <div class="section-badge">Características</div>
+      <div class="section-title">Todo lo que necesitas<br>para estudiar mejor</div>
+      <div class="section-sub" style="margin:0 auto">Cinco módulos integrados que trabajan juntos para maximizar tu retención y eficiencia de estudio.</div>
+    </div>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon" style="background:#EDE9FE"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7C3AED" stroke-width="1.75"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></div>
+        <div class="feature-name">Editor tipo Notion</div>
+        <div class="feature-desc">Crea apuntes ricos con bloques, imágenes, tablas y código. Guardado automático sin interrupciones.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background:#FEF3C7"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#D97706" stroke-width="1.75"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg></div>
+        <div class="feature-name">Flashcards con SM-2</div>
+        <div class="feature-desc">La IA genera tarjetas desde tus apuntes. El algoritmo SM-2 programa las revisiones en el momento óptimo.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background:#D5F5E3"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="1.75"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.46 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2Z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.46 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2Z"/></svg></div>
+        <div class="feature-name">Active Recall</div>
+        <div class="feature-desc">Responde preguntas abiertas generadas por IA sin ver tus apuntes. La técnica más efectiva según la ciencia cognitiva.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background:#FDDEE6"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#9B2C4A" stroke-width="1.75"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/></svg></div>
+        <div class="feature-name">Exámenes de práctica</div>
+        <div class="feature-desc">La IA genera exámenes de opción múltiple con explicaciones detalladas. Los temas difíciles se programan para repaso.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background:#DBEAFE"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="1.75"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div>
+        <div class="feature-name">Dashboard de progreso</div>
+        <div class="feature-desc">Métricas detalladas, rachas de estudio, logros desbloqueables y gráficos de retención a lo largo del tiempo.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background:#FFE4D6"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#C2410C" stroke-width="1.75"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
+        <div class="feature-name">Generador de horarios</div>
+        <div class="feature-desc">Ingresa tus horas ocupadas y la plataforma genera un horario optimizado. Sincroniza con Google Calendar.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section>
+  <div class="section-inner">
+    <div>
+      <div class="section-badge">Cómo funciona</div>
+      <div class="section-title">De tus apuntes<br>a la retención</div>
+      <div class="section-sub">En tres pasos simples, convierte tu material de estudio en sesiones altamente efectivas.</div>
+    </div>
+    <div class="how-grid">
+      <div class="step-list">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div>
+            <div class="step-title">Crea tus apuntes</div>
+            <div class="step-desc">Usa el editor de bloques para organizar tu material de estudio. Escribe, importa o pega tu contenido existente.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div>
+            <div class="step-title">La IA genera tu material de estudio</div>
+            <div class="step-desc">Con un clic, la IA analiza tus apuntes y genera flashcards, preguntas de active recall o un examen de práctica.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div>
+            <div class="step-title">Estudia y mide tu progreso</div>
+            <div class="step-desc">El sistema programa tus revisiones automáticamente. El dashboard muestra tu retención y áreas de mejora en tiempo real.</div>
+          </div>
+        </div>
+      </div>
+      <div class="how-visual">
+        <!-- Mini editor mockup -->
+        <div style="background:white;border-radius:14px;padding:18px;border:1px solid rgba(229,226,220,0.6);margin-bottom:12px">
+          <div style="font-size:15px;font-weight:700;color:#1C1917;margin-bottom:8px">Mitocondria y respiración</div>
+          <div style="font-size:12px;color:#57534E;line-height:1.6;margin-bottom:12px">La <strong>mitocondria</strong> es el orgánulo responsable de producir <strong>ATP</strong> mediante la respiración celular aeróbica...</div>
+          <div style="background:#EDE9FE;border-radius:8px;padding:10px 12px;display:flex;align-items:center;gap:8px">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7C3AED" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/></svg>
+            <span style="font-size:12px;font-weight:500;color:#6D28D9">IA generando 8 flashcards...</span>
+          </div>
+        </div>
+        <!-- Mini flashcard -->
+        <div style="background:white;border:1px solid rgba(229,226,220,0.6);border-radius:14px;padding:16px;text-align:center">
+          <div style="font-size:10px;font-weight:500;color:#A8A29E;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px">Flashcard generada</div>
+          <div style="font-size:13px;font-weight:600;color:#1C1917;margin-bottom:12px">¿Cuál es la función principal de la mitocondria?</div>
+          <div style="display:flex;gap:6px;justify-content:center">
+            <div style="padding:5px 10px;border-radius:7px;background:#FEE2E2;color:#DC2626;font-size:11px;font-weight:600">Again</div>
+            <div style="padding:5px 10px;border-radius:7px;background:#D5F5E3;color:#16A34A;font-size:11px;font-weight:600">Good</div>
+            <div style="padding:5px 10px;border-radius:7px;background:#EDE9FE;color:#7C3AED;font-size:11px;font-weight:600">Easy</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- STATS -->
+<section style="padding: 0 48px 80px">
+  <div class="section-inner">
+    <div class="stats-section">
+      <div class="stats-inner">
+        <div class="stats-title">Diseñado para resultados reales</div>
+        <div class="stats-sub">Basado en décadas de investigación en ciencia cognitiva</div>
+        <div class="stats-numbers">
+          <div class="stat-num">
+            <div class="stat-number">2<span>×</span></div>
+            <div class="stat-num-lbl">más retención vs lectura pasiva</div>
+          </div>
+          <div class="stat-num">
+            <div class="stat-number">85<span>%</span></div>
+            <div class="stat-num-lbl">de usuarios mejoran sus calificaciones</div>
+          </div>
+          <div class="stat-num">
+            <div class="stat-number">30<span>%</span></div>
+            <div class="stat-num-lbl">menos tiempo estudiando</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section">
+  <div class="cta-inner">
+    <div class="cta-title">Empieza a estudiar<br>inteligente hoy</div>
+    <div class="cta-sub">Gratis para siempre. Sin tarjeta de crédito. Listo en 2 minutos.</div>
+    <div class="cta-actions">
+      <button class="hero-cta-primary">
+        Crear cuenta gratis
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-logo">
+    <div class="footer-mark"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="8" cy="14" r="3" fill="rgba(255,255,255,0.9)"/><circle cx="12" cy="9.5" r="2.5" fill="rgba(255,255,255,0.65)"/><circle cx="16" cy="14" r="3" fill="rgba(255,255,255,0.9)"/></svg></div>
+    <span class="footer-name">Cogni</span>
+  </div>
+  <div class="footer-links">
+    <div class="footer-link">Características</div>
+    <div class="footer-link">Privacidad</div>
+    <div class="footer-link">Términos</div>
+    <div class="footer-link">Contacto</div>
+  </div>
+  <div class="footer-copy">© 2026 Cogni. Todos los derechos reservados.</div>
+</footer>
+
+</body>
+</html>
