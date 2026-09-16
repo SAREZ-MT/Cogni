@@ -1,0 +1,71 @@
+schema: spec-driven
+
+# Cogni — configuración SDD (generada por sdd-init el 2026-09-14)
+# Fuente de verdad de producto y arquitectura: docs/documento-maestro.md
+# Cualquier cambio a decisiones cerradas requiere un ADR en docs/adr/
+
+context: |
+  Producto: Cogni, plataforma web de estudio con editor de bloques (Tiptap) y tres técnicas de estudio (flashcards SM-2, exámenes, recordación activa) unificadas por un motor de repetición espaciada transversal.
+  Stack declarado (sin código aún): pnpm, Next.js App Router + TypeScript estricto, Tailwind + shadcn/ui, Tiptap, TanStack Query, Zustand, Zod, Drizzle, Biome, unpdf, Vercel AI SDK.
+  Infraestructura: Vercel Hobby, Supabase (Postgres/Auth/Storage), Cloudflare DNS, Upstash Redis, Trigger.dev, Sentry, PostHog.
+  Arquitectura: monolito modular con hexagonal por módulo en src/modules/{identity,notebooks,editor,ingestion,ai,study-engine,flashcards,exams,active-recall,scheduling,analytics}; solo study-engine calcula repasos.
+  Testing objetivo: Vitest + Testing Library + Playwright; SM-2 y dominio con cobertura 100 %.
+  Convenciones: código e identificadores en inglés, comentarios en inglés simple (B1), UI en español "tú", documentación técnica y artefactos SDD en español neutro, Conventional Commits sin atribución a IA, PRs de máximo 400 líneas.
+  Plan: fases 0 a 8 según sección 13 del documento maestro; la Fase 0 (cimientos) es el primer change.
+
+# Strict TDD queda en false porque todavía no existe ningún proyecto con runner de tests
+# en el workspace (no hay package.json). Debe pasar a true en cuanto la Fase 0 deje
+# `pnpm test` funcionando; ese cambio forma parte de las tareas de la Fase 0.
+strict_tdd: false
+
+projects: []
+# Proyecto esperado tras la Fase 0:
+#   - path: .
+#     stack: Next.js + TypeScript (pnpm)
+#     test_command: pnpm test
+#     framework: Vitest
+#     layers: { unit: Vitest, integration: Testing Library, e2e: Playwright }
+#     coverage_command: pnpm test -- --coverage
+#     linter: pnpm biome check .
+#     type_checker: pnpm tsc --noEmit
+#     formatter: pnpm biome format --write .
+
+testing:
+  strict_tdd: false
+  detected_at: "2026-09-14"
+  workspace_test_command: ""
+  note: "Sin runner detectado. Registrar Vitest como comando de workspace al cerrar la Fase 0."
+
+rules:
+  proposal:
+    - Leer docs/documento-maestro.md antes de proponer; la propuesta no puede contradecirlo sin un ADR previo.
+    - Indicar a qué fase (0–8) pertenece el change y qué criterio de "hecho" de esa fase cubre.
+    - Incluir plan de reversión para cambios que toquen migraciones, autenticación o la capa de IA.
+  specs:
+    - Escenarios en formato Given/When/Then.
+    - Palabras clave RFC 2119 (MUST, SHALL, SHOULD, MAY).
+    - Escribir en español neutro; nombres de entidades, campos y comandos en inglés.
+  design:
+    - Respetar la arquitectura hexagonal por módulo y las reglas de dependencia de la sección 5.3 del documento maestro.
+    - Documentar cada decisión de arquitectura con su justificación; si cambia una decisión cerrada, crear ADR.
+    - Incluir diagramas de secuencia para flujos que crucen módulos o usen Trigger.dev.
+  tasks:
+    - Agrupar por fase con numeración jerárquica.
+    - Cada tarea completable en una sesión; toda tarea de dominio empieza por su test.
+    - Pronosticar líneas cambiadas; por encima de 400 líneas, planear PRs encadenadas (delivery_strategy auto-chain).
+  apply:
+    guidelines:
+      - Código e identificadores en inglés; comentarios en inglés simple (nivel B1).
+      - Textos de interfaz en español con tratamiento de "tú".
+      - Nunca importar infraestructura desde domain o application; nunca importar rutas internas de otro módulo.
+      - Toda salida de IA pasa por esquema Zod; nunca texto libre sin validar.
+      - Conventional Commits sin líneas de atribución a IA.
+    tdd: false
+    test_command: ""
+  verify:
+    test_command: ""
+    build_command: ""
+    coverage_threshold: 0
+  archive:
+    - Advertir antes de fusionar deltas destructivos.
+    - Registrar en docs/adr/ cualquier decisión de arquitectura tomada durante el change.
