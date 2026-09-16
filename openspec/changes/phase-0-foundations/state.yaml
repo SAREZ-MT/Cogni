@@ -1,0 +1,75 @@
+change: phase-0-foundations
+phase: apply
+artifact_store: hybrid
+artifacts:
+  explore: true
+  research: false
+  proposal: true
+  specs: true
+  design: true
+  tasks: true
+  apply_progress: true
+tasks_progress:
+  completed:
+    - "1.1"
+    - "1.2"
+    - "1.3"
+    - "1.4"
+    - "1.5"
+    - "1.6"
+    - "1.7"
+    - "1.8"
+    - "1.9"
+  pending:
+    - "2.1"
+    - "2.2"
+    - "2.3"
+    - "2.4"
+    - "2.5"
+    - "2.6"
+    - "2.7"
+    - "3.1"
+    - "3.2"
+    - "3.3"
+    - "3.4"
+    - "3.5"
+    - "3.6"
+    - "3.7"
+    - "3.8"
+    - "3.9"
+    - "3.10"
+    - "3.11"
+    - "4.1"
+    - "4.2"
+    - "4.3"
+    - "4.4"
+    - "4.5"
+    - "4.6"
+    - "4.7"
+    - "4.8"
+    - "4.9"
+    - "4.10"
+preflight:
+  pace: interactive
+  delivery_strategy: auto-chain
+product_decisions: confirmed
+decisions:
+  research: not_selected
+  landing_in_phase_0: false
+  google_oauth_required_for_done: true
+  email_sender: supabase_default_smtp
+  supabase_projects: [cogni-dev, cogni-prod]
+  keep_alive: vercel_cron_daily_route_handler
+  domain_name: to_be_provided_by_user_before_pr_4
+  chain_strategy: stacked-to-main
+  pr1_size_exception: accepted_by_user_2026-09-15
+last_updated: 2026-09-15T20:21:00-05:00
+gates:
+  design: passed_after_correction_round_1
+apply:
+  pr1_tooling:
+    status: complete
+    branch: feat/phase-0-pr1-tooling
+    committed: false
+    gate_1_9: green
+    review_budget_note: "authored ~843 lines vs ~350-500 forecast; size:exception recommended (see apply-progress.md)"
