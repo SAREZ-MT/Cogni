@@ -78,6 +78,7 @@ apply:
   pr2_design_shell:
     status: complete
     branch: feat/phase-0-pr2-design-shell
-    committed: false
+    committed: true
+    pushed: true
     gate_2_7: green
     review_budget_note: "822 insertions / 113 deletions (excl. lockfile) vs ~250-350 forecast; size:exception accepted by maintainer 2026-09-16; ledger objective reset"
