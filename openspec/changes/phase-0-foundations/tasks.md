@@ -39,13 +39,13 @@ Chain strategy: pending
 
 ## Phase 2: Tokens y shell (PR 2)
 
-- [ ] 2.1 Tokens en `src/app/globals.css` `@theme` (sin `tailwind.config.js`) desde `docs/design-system/colors_and_type.css`; DM Sans/JetBrains Mono vía `next/font/google`.
-- [ ] 2.2 `shadcn init` sin `--defaults`, variables CSS, `tailwind.config` vacío; `Button` primario en `#1C1917`.
-- [ ] 2.3 Shell `(app)`: sidebar 240/64px colapsable persistido, topbar 52px + menú/logout, contenido en estado vacío.
-- [ ] 2.4 Layout `(public)` panel partido (oscuro/`#FAFAF8`); responsive <768px sin scroll horizontal.
-- [ ] 2.5 WCAG 2.1 AA + `prefers-reduced-motion`; copy español "tú" sentence-case, sin emoji.
-- [ ] 2.6 RED `tests/e2e/shell-empty-state.spec.ts` → implementar; sin hex en línea.
-- [ ] 2.7 Gate PR2: navegable sin auth; `test`/`test:e2e`/`depcruise` verdes.
+- [x] 2.1 Tokens en `src/app/globals.css` `@theme` (sin `tailwind.config.js`) desde `docs/design-system/colors_and_type.css`; DM Sans/JetBrains Mono vía `next/font/google`.
+- [x] 2.2 `shadcn init` sin `--defaults`, variables CSS, `tailwind.config` vacío; `Button` primario en `#1C1917`.
+- [x] 2.3 Shell `(app)`: sidebar 240/64px colapsable persistido, topbar 52px + menú/logout, contenido en estado vacío.
+- [x] 2.4 Layout `(public)` panel partido (oscuro/`#FAFAF8`); responsive <768px sin scroll horizontal.
+- [x] 2.5 WCAG 2.1 AA + `prefers-reduced-motion`; copy español "tú" sentence-case, sin emoji.
+- [x] 2.6 RED `tests/e2e/shell-empty-state.spec.ts` → implementar; sin hex en línea.
+- [x] 2.7 Gate PR2: navegable sin auth; `test`/`test:e2e`/`depcruise` verdes.
 
 ## Phase 3: Auth y Drizzle (PR 3)
 
