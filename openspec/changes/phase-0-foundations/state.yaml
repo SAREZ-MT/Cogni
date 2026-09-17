@@ -20,7 +20,6 @@ tasks_progress:
     - "1.7"
     - "1.8"
     - "1.9"
-  pending:
     - "2.1"
     - "2.2"
     - "2.3"
@@ -28,6 +27,7 @@ tasks_progress:
     - "2.5"
     - "2.6"
     - "2.7"
+  pending:
     - "3.1"
     - "3.2"
     - "3.3"
@@ -63,13 +63,22 @@ decisions:
   domain_name: to_be_provided_by_user_before_pr_4
   chain_strategy: stacked-to-main
   pr1_size_exception: accepted_by_user_2026-09-15
-last_updated: 2026-09-15T20:21:00-05:00
+  pr2_size_exception: accepted_by_user_2026-09-16
+last_updated: 2026-09-16T22:45:00-05:00
 gates:
   design: passed_after_correction_round_1
 apply:
   pr1_tooling:
     status: complete
     branch: feat/phase-0-pr1-tooling
-    committed: false
+    committed: true
+    merged: "main via PR #1 (43f8757), 2026-09-16"
     gate_1_9: green
     review_budget_note: "authored ~843 lines vs ~350-500 forecast; size:exception recommended (see apply-progress.md)"
+  pr2_design_shell:
+    status: complete
+    branch: feat/phase-0-pr2-design-shell
+    committed: true
+    pushed: true
+    gate_2_7: green
+    review_budget_note: "822 insertions / 113 deletions (excl. lockfile) vs ~250-350 forecast; size:exception accepted by maintainer 2026-09-16; ledger objective reset"

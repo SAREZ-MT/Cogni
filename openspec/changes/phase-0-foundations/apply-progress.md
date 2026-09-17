@@ -1,6 +1,6 @@
 # Apply Progress: Fase 0 — Cimientos de Cogni
 
-## Batch actual: PR1 — Tooling (Phase 1, tasks 1.1–1.9)
+## Batch PR1 — Tooling (Phase 1, tasks 1.1–1.9) — mergeado en `main` (PR #1, 43f8757)
 
 Rama: `feat/phase-0-pr1-tooling` (creada desde `main`). Sin commits creados en
 este batch; el árbol de trabajo queda con todos los cambios sin confirmar
@@ -96,9 +96,8 @@ Verificación adicional (no parte del gate pero relevante para spec.md):
 | Comando/escenario de runtime y resultado exacto | `pnpm test:e2e` → 1 test de Playwright/Chromium contra `next build && next start` real → "1 passed (4.6s)" |
 | Rollback boundary | Revertir el scaffold completo: todo el contenido de este batch es nuevo (`git status --short` solo muestra `??` salvo `.gitignore` modificado). Revertir equivale a `git clean -fdx` sobre los paths listados más restaurar `.gitignore` a su versión anterior (solo tenía `.atl/`). No toca `docs/` ni el resto de `openspec/` (pre-existentes). |
 
-## Trabajo restante (PR2–PR4)
+## Trabajo restante (PR3–PR4)
 
-- PR2 (Phase 2, tasks 2.1–2.7): tokens de diseño vía `@theme`, `shadcn init`, shell `(app)`/`(public)`, accesibilidad, e2e de shell.
 - PR3 (Phase 3, tasks 3.1–3.11): dominio `Profile`, migración Drizzle, `EnsureProfile`, Supabase Auth (registro/login/logout/reset/Google OAuth), middleware de sesión.
 - PR4 (Phase 4, tasks 4.1–4.10): env con Zod, Sentry, PostHog, GitHub Actions, cabeceras de seguridad, keep-alive cron, cierre con `strict_tdd: true`.
 
@@ -127,7 +126,116 @@ medias (p. ej. Biome sin Vitest, o dependency-cruiser sin los módulos que
 verifica). Se reporta el número real honestamente y se recomienda
 **`size:exception`** para PR1 en vez de fragmentar el work unit.
 
+## Batch actual: PR2 — Tokens y shell (Phase 2, tasks 2.1–2.7)
+
+Rama: `feat/phase-0-pr2-design-shell`, creada desde `main` ya con PR1
+mergeado (`stacked-to-main`). Sin commits creados en este batch; el árbol de
+trabajo queda sin confirmar para el review nativo y la entrega humana.
+
+### Tareas completadas
+
+| Tarea | Evidencia |
+|---|---|
+| 2.1 Tokens `@theme` + fuentes | `src/app/globals.css` (primitivas, pastel, semánticos, radios, layout 240/64/52) y `src/app/layout.tsx` con `DM_Sans`/`JetBrains_Mono` de `next/font/google`, `lang="es"` |
+| 2.2 shadcn sin preset | `components.json` escrito a mano (`tailwind.config: ""`, `cssVariables: true`, `iconLibrary: lucide`, alias `@/shared/ui`); `pnpm dlx shadcn add button`; `--primary` mapeado a `#1C1917` |
+| 2.3 Shell `(app)` | `layout.tsx` (lee cookie en servidor), `_components/{sidebar,topbar,user-menu,sidebar-cookie}` |
+| 2.4 Layout `(public)` | `(public)/layout.tsx` panel partido + `(public)/login/page.tsx` placeholder visual |
+| 2.5 A11y | objetivos ≥ 44 px (Button default `h-11`, toggle `size-11`), `:focus-visible` con ring, `prefers-reduced-motion` sin `!important` fuera de capa, `aria-*` en nav/menú, copy "tú" sin emoji |
+| 2.6 RED → GREEN | `tests/e2e/shell-empty-state.spec.ts` (6 casos) + `sidebar.test.tsx`, `user-menu.test.tsx`, `(app)/page.test.tsx`, `no-inline-hex.test.ts` |
+| 2.7 Gate | ver tabla de verificación |
+
+### Tabla de verificación (gate PR2 / tarea 2.7)
+
+| Comando | Resultado observado |
+|---|---|
+| `pnpm biome ci .` | 50 archivos, 0 errores, 2 warnings documentados (`noDocumentCookie`, cookieStore ausente en jsdom) |
+| `pnpm typecheck` | sin errores |
+| `pnpm test` | 9 archivos, 28 tests en verde |
+| `pnpm test:e2e` | 7/7 en Chromium contra `next build && next start` |
+| `pnpm depcruise` | 0 violaciones (55 módulos) |
+| Navegable sin auth | `/` renderiza el shell vacío; `/login` el layout público (middleware llega en PR3) |
+
+### Evidencia TDD (Strict TDD)
+
+RED: `pnpm test` con 3 archivos fallando por módulos inexistentes; `pnpm test:e2e`
+no arrancó el `webServer` porque `next build` falló el typecheck sobre los tests.
+GREEN: los cinco comandos anteriores en verde. Un fallo intermedio real
+(cookie vacía por un `sd` que interpretó `${}` como grupos de captura) lo
+detectó el e2e de persistencia, no el unit test: jsdom había pasado antes de
+la regresión.
+
+### Decisiones tomadas
+
+- `style: "radix-nova"` en `components.json` es la variante de código de los
+  componentes (Radix + Lucide); no se importó ningún preset de tema, que era
+  el objetivo de la spec. Los nombres `--background/--primary/...` de shadcn
+  se alimentan de los tokens Cogni en `:root`.
+- Persistencia del sidebar por cookie `cogni-sidebar` (`collapsed|expanded`,
+  1 año, `samesite=lax`): el layout servidor la lee con `cookies()` y evita el
+  parpadeo que daría `localStorage`. Esto hace `/` dinámica, que de todos
+  modos lo será por la sesión en PR3.
+- `SIDEBAR_COOKIE` vive en `sidebar-cookie.ts` sin directiva: un export de
+  string desde un módulo `"use client"` llega al servidor como referencia de
+  cliente, no como valor.
+- Tamaños de `Button` subidos (`default h-11`, `lg h-12`, `icon size-11`)
+  para cumplir los 44 px de la spec; el resto del componente generado queda
+  intacto.
+- Menú de usuario propio (60 líneas, `role="menu"`, Escape, click fuera) en
+  vez de `dropdown-menu` de shadcn (~250 líneas generadas) por presupuesto.
+- "Cerrar sesión" es un `Link` a `/login` hasta que PR3 lo convierta en
+  Server Action (tarea 3.6).
+- El `e2e` verifica bg/radio del contenedor `data-testid="content-area"` y no
+  de `main`: el `header` debe quedar fuera de `main` para exponer `role=banner`.
+
+### Corrección del review nativo (lineage `review-712ba2d8377e865b`)
+
+Hallazgo CRÍTICO `R3-login-form-get-leak` (lente reliability): el `<form>` de
+`/login` no tenía `action`, así que un submit hacía GET y ponía la contraseña
+en la URL, el historial y los logs. Corrección acotada (plan: 40 líneas):
+Server Action stub `signInPlaceholder` (`"use server"`, no-op) como `action`
+del formulario, más `login/page.test.tsx` y un e2e que envía credenciales y
+comprueba método POST y URL sin query string. PR3 reemplaza el stub por la
+acción real (tarea 3.10).
+
+Resultado: **approved**, autoridad quemada (`gentle-ai.review-acknowledged/v1`,
+revision `sha256:5a2283ef…`). Advisories no bloqueantes, para trabajo posterior:
+
+- `R3-login-page-no-unit-test`: `login/page.test.tsx` ya existe en el árbol
+  pero quedó fuera del alcance congelado del review (archivo nuevo tras el
+  START); entra con este mismo PR.
+- `R3-usermenu-outside-click-untested`: falta un unit test del cierre por
+  click fuera del menú. Follow-up en PR3 al tocar el menú para el logout real.
+
+### Desviaciones del diseño
+
+- La spec pide `shadcn init sin --defaults`; el CLI actual (v3) obliga a elegir
+  un preset (Nova/Vega/...) de forma interactiva. Se escribió `components.json`
+  a mano siguiendo la instalación manual de la documentación oficial.
+- El CLI resolvió mal el alias `utils` (`@/shared/ui/utils`): instaló un
+  paquete npm `cn` en vez de crear el archivo. Se eliminó `cn`, se creó
+  `src/shared/ui/utils.ts` y se instalaron `radix-ui`,
+  `class-variance-authority`, `clsx`, `tailwind-merge`, `lucide-react`.
+- El smoke `tests/e2e/smoke.spec.ts` y `src/app/page.tsx` de PR1 se eliminan:
+  la raíz `/` pasa a `(app)/page.tsx` como marca el diseño.
+
+### Impacto en el presupuesto de revisión (400 líneas)
+
+| Métrica | Valor |
+|---|---|
+| Archivos tocados (sin lockfile) | 25 (22 nuevos/modificados, 3 eliminados) |
+| Líneas insertadas / eliminadas (sin lockfile) | 822 / 113 |
+| De las insertadas: `globals.css` | 200 (tokens mecánicos) |
+| De las insertadas: tests (e2e + unit) | 229 |
+| De las insertadas: `button.tsx` generado | 66 |
+
+Pronóstico de `sdd-tasks`: ~250–350. Real: 822. El excedente es tokens
+(200), tests que Strict TDD no permite recortar (229) y el componente
+generado (66). Decisión del maintainer (2026-09-16): **una sola PR con
+`size:exception`**, tras rechazar la alternativa de dos PRs apiladas
+(2a tokens ~335 / 2b shell ~490). El ledger nativo se reseteó con esa razón.
+
 ## Estado
 
-9/9 tareas de la Phase 1 completas. Gate PR1 (tarea 1.9) verde. Listo para
-`sdd-verify`.
+16/37 tareas completas (Phase 1 y Phase 2). Gate PR2 (tarea 2.7) verde.
+Review nativo aprobado. Siguiente: commit, push y PR en la web (con
+`size:exception`); luego PR3 (Phase 3).

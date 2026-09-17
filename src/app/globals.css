@@ -1,26 +1,214 @@
 @import "tailwindcss";
 
+/*
+ * Cogni design tokens (docs/design-system/colors_and_type.css) exposed to
+ * Tailwind v4 through @theme. No tailwind.config.js. Hex values live only
+ * here; components consume them through utilities or CSS variables.
+ * Dark mode is intentionally omitted in phase 0 (design.md).
+ */
+@theme {
+  /* Primary: violet accent */
+  --color-primary-50: #f5f3ff;
+  --color-primary-100: #ede9fe;
+  --color-primary-200: #ddd6fe;
+  --color-primary-300: #c4b5fd;
+  --color-primary-400: #a78bfa;
+  --color-primary-500: #8b5cf6;
+  --color-primary-600: #7c3aed;
+  --color-primary-700: #6d28d9;
+  --color-primary-800: #5b21b6;
+  --color-primary-900: #4c1d95;
+
+  /* Neutral: warm gray */
+  --color-neutral-0: #ffffff;
+  --color-neutral-50: #fafaf8;
+  --color-neutral-100: #f5f3ef;
+  --color-neutral-150: #edeae4;
+  --color-neutral-200: #e5e2dc;
+  --color-neutral-300: #d4d0c8;
+  --color-neutral-400: #a8a29e;
+  --color-neutral-500: #78716c;
+  --color-neutral-600: #57534e;
+  --color-neutral-700: #44403c;
+  --color-neutral-800: #292524;
+  --color-neutral-900: #1c1917;
+  --color-neutral-950: #0c0a09;
+
+  /* Pastel highlight palette with accessible foreground pairs */
+  --color-pastel-pink: #fddee6;
+  --color-pastel-pink-fg: #9b2c4a;
+  --color-pastel-green: #d5f5e3;
+  --color-pastel-green-fg: #1b7a43;
+  --color-pastel-yellow: #fef3c7;
+  --color-pastel-yellow-fg: #92400e;
+  --color-pastel-purple: #e9e0fd;
+  --color-pastel-purple-fg: #5b21b6;
+  --color-pastel-orange: #ffe4d6;
+  --color-pastel-orange-fg: #c2410c;
+  --color-pastel-blue: #dbeafe;
+  --color-pastel-blue-fg: #1e40af;
+  --color-pastel-mint: #d1fae5;
+  --color-pastel-mint-fg: #065f46;
+
+  /* Semantic status */
+  --color-success-50: #ecfdf5;
+  --color-success-500: #10b981;
+  --color-success-600: #059669;
+  --color-warning-50: #fffbeb;
+  --color-warning-500: #f59e0b;
+  --color-warning-600: #d97706;
+  --color-error-50: #fef2f2;
+  --color-error-500: #ef4444;
+  --color-error-600: #dc2626;
+  --color-info-50: #eff6ff;
+  --color-info-500: #3b82f6;
+  --color-info-600: #2563eb;
+
+  /* Typography: families come from next/font in the root layout */
+  --font-sans:
+    var(--font-dm-sans), -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  --font-mono: var(--font-jetbrains-mono), "Fira Code", monospace;
+
+  /* Radii */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-input: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 20px;
+  --radius-3xl: 24px;
+  --radius-pill: 9999px;
+  --radius-content: 20px;
+
+  /* Shadows: very subtle */
+  --shadow-xs: 0 1px 2px rgb(0 0 0 / 0.04);
+  --shadow-sm: 0 1px 3px rgb(0 0 0 / 0.06);
+  --shadow-md: 0 4px 12px rgb(0 0 0 / 0.08);
+  --shadow-lg: 0 8px 24px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 16px 48px rgb(0 0 0 / 0.12);
+
+  /* Motion */
+  --ease-default: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+
+  /* Layout */
+  --sidebar-width: 240px;
+  --sidebar-collapsed: 64px;
+  --topbar-height: 52px;
+  --content-padding: 32px;
+}
+
+/* Semantic tokens (light) feed both Cogni utilities and shadcn names. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg-app: var(--color-neutral-150);
+  --bg-page: var(--color-neutral-0);
+  --bg-card: var(--color-neutral-0);
+  --bg-sidebar: var(--color-neutral-50);
+  --bg-hover: var(--color-neutral-50);
+  --bg-active: var(--color-primary-50);
+  --bg-muted: var(--color-neutral-100);
+  --bg-glass: rgb(255 255 255 / 0.8);
+
+  --fg-default: var(--color-neutral-900);
+  --fg-secondary: var(--color-neutral-500);
+  --fg-muted: var(--color-neutral-400);
+  --fg-on-primary: var(--color-neutral-0);
+  --fg-active: var(--color-primary-700);
+
+  --border-default: var(--color-neutral-200);
+  --border-subtle: var(--color-neutral-150);
+  --border-focus: var(--color-primary-500);
+
+  /* shadcn/ui variable names mapped onto Cogni tokens */
+  --background: var(--bg-page);
+  --foreground: var(--fg-default);
+  --card: var(--bg-card);
+  --card-foreground: var(--fg-default);
+  --primary: var(--color-neutral-900);
+  --primary-foreground: var(--color-neutral-0);
+  --secondary: var(--color-neutral-100);
+  --secondary-foreground: var(--color-neutral-700);
+  --muted: var(--color-neutral-100);
+  --muted-foreground: var(--fg-secondary);
+  --accent: var(--color-primary-50);
+  --accent-foreground: var(--color-primary-700);
+  --destructive: var(--color-error-600);
+  --border: var(--border-default);
+  --input: var(--border-default);
+  --ring: var(--color-primary-400);
+  --radius: var(--radius-lg);
 }
 
 @theme inline {
+  --color-canvas: var(--bg-app);
+  --color-page: var(--bg-page);
+  --color-sidebar: var(--bg-sidebar);
+  --color-hover: var(--bg-hover);
+  --color-active: var(--bg-active);
+  --color-glass: var(--bg-glass);
+  --color-fg: var(--fg-default);
+  --color-fg-secondary: var(--fg-secondary);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-active: var(--fg-active);
+  --color-border-default: var(--border-default);
+  --color-border-subtle: var(--border-subtle);
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* Violet glows for the public auth brand panel. */
+@utility brand-glow {
+  background-image:
+    radial-gradient(
+      60% 50% at 15% 20%,
+      color-mix(in oklch, var(--color-primary-600) 45%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      50% 40% at 85% 85%,
+      color-mix(in oklch, var(--color-primary-500) 35%, transparent),
+      transparent 70%
+    );
+}
+
+@layer base {
+  body {
+    background-color: var(--bg-app);
+    color: var(--fg-default);
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Unlayered on purpose: beats utility transitions without !important. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms;
+    animation-iteration-count: 1;
+    transition-duration: 0.01ms;
+    scroll-behavior: auto;
+  }
 }
