@@ -7,7 +7,8 @@ module.exports = {
       comment:
         "domain must not import from other layers or other modules; only shared/kernel is allowed.",
       severity: "error",
-      from: { path: "^src/modules/[^/]+/domain" },
+      // Domain tests may import the test runner; production code may not.
+      from: { path: "^src/modules/[^/]+/domain", pathNot: "\\.test\\.ts$" },
       to: {
         pathNot: "^(src/modules/[^/]+/domain|src/shared/kernel)",
       },
@@ -17,7 +18,7 @@ module.exports = {
       comment:
         "domain must not depend on external npm packages (Next.js, Drizzle, AI SDK, React, etc). Zod is the only allowed exception.",
       severity: "error",
-      from: { path: "^src/modules/[^/]+/domain" },
+      from: { path: "^src/modules/[^/]+/domain", pathNot: "\\.test\\.ts$" },
       to: { dependencyTypes: ["npm"], pathNot: "node_modules/zod" },
     },
     {

@@ -15,6 +15,7 @@
       "!build",
       "!docs",
       "!openspec",
+      "!drizzle/meta",
       "!.agents",
       "!.atl",
       "!pnpm-lock.yaml"
