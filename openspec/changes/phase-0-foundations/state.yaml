@@ -88,6 +88,8 @@ apply:
   pr3_auth_drizzle:
     status: complete
     branch: feat/phase-0-pr3-auth-drizzle
-    committed: false
+    committed: true
+    pushed: true
+    review: "native review approved after RLS correction (lineage review-1c970253b392c7ca-r1, authority burned 2026-09-18)"
     gate_3_11: "green except e2e register (Supabase email rate limit) -> task 4.11"
     review_budget_note: "1951 insertions / 99 deletions (excl. lockfile and drizzle/meta) vs ~350-450 forecast; 706 are tests; size:exception recommended (see apply-progress.md)"

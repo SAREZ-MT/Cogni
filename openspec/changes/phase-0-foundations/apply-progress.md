@@ -320,8 +320,59 @@ trabajo (dominio+DB, auth gateway y actions, OAuth+proxy, formularios y
 e2e) para que la PR se lea por capas. Se recomienda **`size:exception`**
 para PR3, pendiente de aceptación del maintainer.
 
+### Review nativo (lineage `review-1c970253b392c7ca` → `-r1`)
+
+Candidato: commits `c893fc6..6f71df6` sobre `main` (2e59810), proyección
+`committed-only`, riesgo `high`, cuatro lentes (risk, resilience,
+readability, reliability). Consentimiento otorgado por el maintainer el
+2026-09-18.
+
+**Hallazgo CRITICAL R1-001 (risk)**: `profiles` se creó en `public` sin
+Row Level Security. Con la clave publicable, que va al navegador por
+diseño, PostgREST exponía lectura y escritura de todos los perfiles; el
+filtro por `ownerId` solo cubre el camino Drizzle. Plan de corrección de
+130 líneas aceptado (presupuesto 200).
+
+Corrección (commit `ba7d890`, Strict TDD): RED `src/shared/db/schema.test.ts`
+(`getTableConfig(profiles).enableRLS === true`) → `pgTable(...).enableRLS()`
+en `schema.ts` → migración generada `drizzle/0001_profiles_rls.sql`
+(`ALTER TABLE "profiles" ENABLE ROW LEVEL SECURITY`) → GREEN. Sin políticas
+a propósito: solo la conexión de servidor (que omite RLS) toca la tabla.
+Aplicada en `cogni-dev`; sonda `GET /rest/v1/profiles` con la clave
+publicable devuelve `[]`. Gate completo verde tras la corrección: lint 98
+archivos, typecheck, unit 59/59, e2e 14/15 (mismo caso del rate limit).
+
+Como la proyección es `committed-only`, el commit de corrección cambió la
+identidad del candidato; `gentle-ai review recover --disposition
+scope_changed` creó la lineage sucesora `review-1c970253b392c7ca-r1`, que
+volvió a capturar las cuatro lentes: **approved**, autoridad quemada con
+`acknowledge-approved`.
+
+35 hallazgos advisory (16 WARNING, 19 SUGGESTION), todos informativos y
+fuera de esta PR. Los WARNING que merecen seguimiento en PR4 o después:
+
+- Enumeración de cuentas en `/register` (`El email ya está registrado`), en
+  contraste con el sign-in y el reset, que son neutros. Decisión de producto
+  de la tarea 3.5; revisar si conviene un mensaje único.
+- `siteUrl()` cae en silencio a `localhost` sin `NEXT_PUBLIC_SITE_URL`; en
+  producción rompería los enlaces de correo y el `redirectTo` de Google.
+  Se resuelve con el env tipado de la tarea 4.1.
+- El callback `/auth/callback` mapea todo fallo a `error=google`, aunque el
+  enlace sea de verificación o de reset; falta copy por flujo.
+- `signOutAction` ignora el `Result` del gateway: un logout fallido rebota
+  al usuario a `/`.
+- `ensureProfileForUser` en el layout `(app)` convierte cualquier caída de
+  la base en un 500 de toda la app; y `updateSession` en el proxy trata un
+  error de `getUser()` como "sin usuario".
+- `DrizzleProfileRepository.upsert` es insert-or-ignore; el nombre y el
+  doble en memoria prometen upsert real.
+- `profiles.id` no tiene FK a `auth.users`, así que borrar un usuario deja
+  perfiles huérfanos (los fixtures e2e lo hacen).
+- Mínimo de contraseña duplicado en literales en vez de `PASSWORD_MIN_LENGTH`.
+
 ## Estado
 
 27/38 tareas completas (Phases 1–3). Gate PR3 (tarea 3.11) verde salvo el
-e2e de registro, diferido a 4.11. Siguiente: commits por work unit, push y
-PR en la web (con `size:exception`); luego PR4 (Phase 4).
+e2e de registro, diferido a 4.11. Review nativo aprobado tras una
+corrección (RLS). Siguiente: push y PR en la web (con `size:exception`);
+luego PR4 (Phase 4).
