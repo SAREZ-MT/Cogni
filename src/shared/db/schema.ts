@@ -2,6 +2,8 @@ import { pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
 // profiles mirrors auth.users (same id). Rows are created by the
 // EnsureProfile use case, never by a database trigger (design.md).
+// RLS is on with no policies: only the server connection (which bypasses
+// RLS) reaches the table, so PostgREST with the publishable key sees nothing.
 export const profiles = pgTable("profiles", {
   id: uuid("id").primaryKey(),
   displayName: text("display_name"),
@@ -16,6 +18,6 @@ export const profiles = pgTable("profiles", {
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
-});
+}).enableRLS();
 
 export type ProfileRow = typeof profiles.$inferSelect;
