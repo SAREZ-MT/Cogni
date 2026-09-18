@@ -370,9 +370,86 @@ fuera de esta PR. Los WARNING que merecen seguimiento en PR4 o después:
   perfiles huérfanos (los fixtures e2e lo hacen).
 - Mínimo de contraseña duplicado en literales en vez de `PASSWORD_MIN_LENGTH`.
 
+## Batch PR4 — Observabilidad y entrega (Phase 4, tasks 4.1–4.11)
+
+Rama `feat/phase-0-pr4-observability-delivery` desde `main` (443d16d, merge
+de PR3). Sesión 2026-09-18. Strict TDD: cada pieza testeable arrancó en RED.
+
+### Tareas completadas (código)
+
+- 4.1 `src/shared/config/{env.schema,env.client,env.server}.ts`: schemas
+  Zod puros (8 tests), `clientEnv()`/`serverEnv()` lazy, `server-only` en el
+  servidor. La URL de Supabase debe ser la raíz del proyecto (rechaza
+  `/rest/v1/`, el error real de la sesión anterior); `NEXT_PUBLIC_SITE_URL`
+  ya no cae a localhost. `supabase-env.ts`, `db/client.ts` y las actions
+  leen del config validado. `.env.example` pasa a estar trackeado
+  (`!.env.example` en `.gitignore`; antes era ignorado por `.env*`).
+- 4.2 Sentry: `sentry-options.ts` (3 tests; deshabilitado sin DSN,
+  `environment` y `release` desde Vercel, tracing 0), `sentry.{server,edge}.config.ts`,
+  `src/instrumentation.ts` con `captureRequestError`, `src/instrumentation-client.ts`,
+  `src/app/global-error.tsx` (1 test: captura una vez y ofrece reintentar),
+  `withSentryConfig` con `tunnelRoute: /monitoring` y source maps solo con
+  `SENTRY_AUTH_TOKEN`.
+- 4.3 PostHog: `src/shared/observability/analytics.ts` (2 tests), cliente
+  `posthog-node` por llamada con `flushAt:1, flushInterval:0` y `shutdown()`;
+  unión cerrada `user_signed_up | user_signed_in`; cliente browser con
+  `autocapture:false` y sin pageviews. El puerto `signUp` devuelve
+  `{ outcome, userId }` para atribuir el evento (tests de `sign-up` y del
+  gateway actualizados en RED primero).
+- 4.4 `.github/workflows/pr.yml`: install → `biome ci` → `tsc` → `vitest run`
+  → `depcruise` → `pnpm audit --audit-level=high`, sin secretos.
+- 4.5 `.github/workflows/main.yml`: gate de PR + job `e2e` (`pnpm test:db`
+  y Playwright contra `cogni-dev`, secretos `DEV_*`) + job `migrate` con
+  `environment: production` y `PROD_DATABASE_URL`. `tests/db/connection.smoke.test.ts`
+  con `vitest.db.config.ts` y script `test:db` (verde contra cogni-dev).
+- 4.7 `src/shared/config/security-headers.ts` (3 tests) importado por
+  `next.config.ts`; e2e comprueba las cabeceras en `/login`.
+- 4.8 `src/app/api/keep-alive/route.ts` (4 tests: sin bearer, bearer
+  erróneo, prefijo del secreto y válido) con `timingSafeEqual` tras comparar
+  longitud; `vercel.json` con cron diario `0 6 * * *`.
+
+### Verificación (2026-09-18, local)
+
+| Check | Resultado |
+|---|---|
+| `pnpm lint` | 119 archivos, 0 errores |
+| `pnpm typecheck` | limpio |
+| `pnpm test` | 24 archivos, 80/80 |
+| `pnpm depcruise` | 0 violaciones (130 módulos) |
+| `pnpm test:db` (cogni-dev) | 1/1 |
+| `pnpm audit --audit-level=high` | pasa (1 moderada) |
+| `pnpm build` | OK; `/api/keep-alive` y `/auth/callback` dinámicos |
+| `pnpm test:e2e` (cogni-dev) | 15/16; registro por rate limit (4.11) |
+
+### Decisiones y desviaciones
+
+1. La spec nombra `NEXT_PUBLIC_SUPABASE_ANON_KEY`; el proyecto usa la clave
+   `sb_publishable_` de Supabase (`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`),
+   como en PR3. `SENTRY_AUTH_TOKEN` no entra al schema: solo lo lee el
+   plugin de build.
+2. CSP estática sin nonces (guía oficial de Next): `'unsafe-inline'` en
+   script y style; `connect-src` limitado a Supabase, Sentry y PostHog.
+3. Vercel despliega por su integración Git; `main.yml` es el gate previo y
+   aplica `drizzle migrate` a `cogni-prod` bajo el environment `production`.
+   El deploy en sí no lo dispara Actions.
+4. El evento `user_signed_in` se emite en `signInAction`; el sign-in vía
+   Google (callback OAuth) todavía no lo emite. Follow-up.
+5. `CRON_SECRET` es obligatorio en `env.server`: hay que añadirlo a
+   `.env.local` (`openssl rand -hex 32`).
+
+### Pendiente (requiere cuentas del maintainer)
+
+- 4.6 Proyecto Vercel conectado al repo, variables `cogni-dev` en preview y
+  `cogni-prod` en producción, dominio de Cloudflare.
+- 4.9 Secretos de GitHub (`DEV_SUPABASE_URL`, `DEV_SUPABASE_PUBLISHABLE_KEY`,
+  `DEV_SUPABASE_SERVICE_ROLE_KEY`, `DEV_DATABASE_URL`, `DEV_CRON_SECRET`,
+  `PROD_DATABASE_URL` en el environment `production`), push, PR y workflows
+  verdes; cron respondiendo 200 en producción.
+- 4.10 Cierre de `openspec/config.yaml` tras CI verde.
+- 4.11 SMTP propio (Resend) en ambos proyectos Supabase.
+
 ## Estado
 
-27/38 tareas completas (Phases 1–3). Gate PR3 (tarea 3.11) verde salvo el
-e2e de registro, diferido a 4.11. Review nativo aprobado tras una
-corrección (RLS). Siguiente: push y PR en la web (con `size:exception`);
-luego PR4 (Phase 4).
+34/38 tareas completas. PR4 con el código listo y verificado en local;
+faltan Vercel, secretos de CI, SMTP y el cierre de configuración, que
+dependen de cuentas del maintainer.
