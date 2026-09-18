@@ -49,17 +49,17 @@ Chain strategy: pending
 
 ## Phase 3: Auth y Drizzle (PR 3)
 
-- [ ] 3.1 RED `domain/profile.test.ts` → `profile.ts` + puerto `profile-repository.ts`.
-- [ ] 3.2 Migración `drizzle/0000_*_profiles.sql`; `src/shared/db/{schema,client}.ts` (`prepare:false,max:1`).
-- [ ] 3.3 RED `application/ensure-profile.test.ts` (repo en memoria) → `EnsureProfile` idempotente desde layout `(app)`.
-- [ ] 3.4 `infrastructure/drizzle-profile-repository.ts` + `supabase-{server,browser}-client.ts`.
-- [ ] 3.5 RED `sign-up.test.ts`/`sign-in.test.ts` → Actions (verificación obligatoria; rechazo si no verificado).
-- [ ] 3.6 `sign-out` Action; RED `request-password-reset.test.ts` → flujo de reset.
-- [ ] 3.7 Google OAuth (`skipBrowserRedirect:true`) + `src/app/auth/callback/route.ts`.
-- [ ] 3.8 RED `safeNext.test.ts` (rechaza URLs externas) → `safeNext` en el callback.
-- [ ] 3.9 `src/middleware.ts`: refresca sesión, protege `(app)`, redirige autenticados fuera de auth.
-- [ ] 3.10 Formularios `(public)` conectados a las Actions; verificar `SERVICE_ROLE_KEY` fuera del bundle cliente y aislamiento por `ownerId`.
-- [ ] 3.11 Gate PR3: `test`+e2e registro→login+Google verdes; `cogni-dev`/`cogni-prod` listos.
+- [x] 3.1 RED `domain/profile.test.ts` → `profile.ts` + puerto `profile-repository.ts`.
+- [x] 3.2 Migración `drizzle/0000_*_profiles.sql`; `src/shared/db/{schema,client}.ts` (`prepare:false,max:1`).
+- [x] 3.3 RED `application/ensure-profile.test.ts` (repo en memoria) → `EnsureProfile` idempotente desde layout `(app)`.
+- [x] 3.4 `infrastructure/drizzle-profile-repository.ts` + `supabase-{server,browser}-client.ts`.
+- [x] 3.5 RED `sign-up.test.ts`/`sign-in.test.ts` → Actions (verificación obligatoria; rechazo si no verificado).
+- [x] 3.6 `sign-out` Action; RED `request-password-reset.test.ts` → flujo de reset.
+- [x] 3.7 Google OAuth (`skipBrowserRedirect:true`) + `src/app/auth/callback/route.ts`.
+- [x] 3.8 RED `safeNext.test.ts` (rechaza URLs externas) → `safeNext` en el callback.
+- [x] 3.9 `src/middleware.ts`: refresca sesión, protege `(app)`, redirige autenticados fuera de auth.
+- [x] 3.10 Formularios `(public)` conectados a las Actions; verificar `SERVICE_ROLE_KEY` fuera del bundle cliente y aislamiento por `ownerId`.
+- [x] 3.11 Gate PR3: `test`+e2e registro→login+Google verdes; `cogni-dev`/`cogni-prod` listos. (2026-09-18: unit 58/58, e2e 14/15 contra `cogni-dev`; el e2e de registro depende del SMTP de Supabase y se cierra en 4.11.)
 
 ## Phase 4: Observabilidad y entrega (PR 4)
 
@@ -73,3 +73,4 @@ Chain strategy: pending
 - [ ] 4.8 RED `api/keep-alive/route.test.ts` (bearer inválido→401; válido→200+`select 1`) → implementar con comparación constante; cron diario en `vercel.json`.
 - [ ] 4.9 Verificar sin `${{ secrets.* }}` en logs de CI; gate PR4: `pr.yml`/`main.yml` verdes, cron responde 200.
 - [ ] 4.10 Cierre de fase: `openspec/config.yaml` `strict_tdd: true` + completar `projects` — solo tras `pnpm test` verde en local y en CI.
+- [ ] 4.11 SMTP propio en `cogni-dev`/`cogni-prod` (p. ej. Resend) + subir el rate limit de correo; e2e "registers, asks for verification" verde de forma estable.

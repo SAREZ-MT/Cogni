@@ -234,8 +234,145 @@ generado (66). Decisión del maintainer (2026-09-16): **una sola PR con
 `size:exception`**, tras rechazar la alternativa de dos PRs apiladas
 (2a tokens ~335 / 2b shell ~490). El ledger nativo se reseteó con esa razón.
 
+## Batch PR3 — Auth y Drizzle (Phase 3, tasks 3.1–3.11)
+
+Rama `feat/phase-0-pr3-auth-drizzle` desde `main` (2e59810, merge de PR2).
+Implementado en sesiones del 2026-09-16/17; gate cerrado el 2026-09-18 al
+existir por fin los proyectos Supabase `cogni-dev` y `cogni-prod`.
+
+### Tareas completadas
+
+- 3.1 `domain/profile.ts` + puerto `profile-repository.ts` (RED→GREEN en `profile.test.ts`).
+- 3.2 `drizzle/0000_profiles.sql`, `drizzle.config.ts`, `src/shared/db/{schema,client}.ts` con `prepare:false, max:1`. Migración aplicada en `cogni-dev` con `pnpm db:migrate` (2026-09-18).
+- 3.3 `EnsureProfile` idempotente (`onConflictDoNothing`), invocado desde `src/app/(app)/layout.tsx`.
+- 3.4 `DrizzleProfileRepository` y clientes Supabase `server`/`browser`/`proxy` sobre `@supabase/ssr`.
+- 3.5 `signUp`/`signIn` + `SupabaseAuthGateway`: `email_not_confirmed` → `EMAIL_NOT_VERIFIED`.
+- 3.6 `signOutAction`, `requestPasswordReset`, `updatePassword`.
+- 3.7 Google OAuth con `skipBrowserRedirect: true` + `src/app/auth/callback/route.ts`.
+- 3.8 `safeNext` rechaza URLs externas y protocol-relative; usado en el callback.
+- 3.9 Sesión y protección de `(app)` en `src/proxy.ts` (ver desviaciones).
+- 3.10 Formularios `(public)` (`login`, `register`, `forgot-password`, `reset-password`) sobre Server Actions; `SUPABASE_SERVICE_ROLE_KEY` ausente de `src/`; `getProfile` rechaza `ownerId` ajeno.
+- 3.11 Gate: ver tabla.
+
+### Tabla de verificación (gate PR3 / tarea 3.11, 2026-09-18)
+
+| Check | Comando | Resultado |
+|---|---|---|
+| Lint | `pnpm lint` | 97 archivos, 0 errores |
+| Tipos | `pnpm typecheck` | limpio |
+| Unit | `pnpm test` | 17 archivos, 58/58 |
+| Migración | `pnpm db:migrate` (cogni-dev) | aplicada |
+| E2E | `pnpm test:e2e` (cogni-dev) | 14/15; falla "registers, asks for verification" |
+
+El único e2e rojo hace un sign-up real y `cogni-dev` responde
+`429 over_email_send_rate_limit`: el SMTP integrado de Supabase permite
+muy pocos correos por hora. No es defecto del código. Decisión del
+maintainer (2026-09-18): diferir el SMTP propio a PR4 como tarea 4.11.
+`cogni-prod` existe pero no se verificó contra la app (llega con Vercel en 4.6).
+
+### Evidencia TDD (Strict TDD)
+
+Ocho suites unitarias de identity (`profile`, `ensure-profile`,
+`get-profile`, `sign-in`, `sign-up`, `request-password-reset`, `safe-next`,
+`supabase-auth-gateway`) más `login/page.test.tsx` y `user-menu.test.tsx`
+actualizados. Los e2e (`tests/e2e/auth.spec.ts`) crean usuarios verificados
+por la API admin, como el "verification stub" del design.
+
+### Decisiones tomadas
+
+1. **`src/proxy.ts` en vez de `src/middleware.ts`**: Next 16 renombró la
+   convención `middleware` a `proxy` (deprecation notice en
+   `node_modules/next/dist/docs/.../proxy.md`). La tarea 3.9 conserva el
+   nombre viejo; el comportamiento es el especificado.
+2. **Zod para validar credenciales** (`credentials-schema.ts`) y
+   `server-only` en el cliente de servidor, ambos añadidos a `package.json`.
+3. **Playwright carga `.env.local` con `@next/env`** para que los fixtures
+   alcancen la API admin; el readiness del webServer apunta a
+   `/favicon.ico` porque el proxy redirige `/` sin sesión.
+4. **`formAlert(page)` en los fixtures e2e**: Next renderiza su route
+   announcer con `role="alert"`, y `getByRole("alert")` a secas viola el
+   strict mode de Playwright.
+5. **dependency-cruiser**: los tests de dominio pueden importar `vitest`
+   (`pathNot: \.test\.ts$`); el código de producción del dominio sigue
+   sin dependencias externas. `drizzle/meta` excluido de Biome.
+
+### Desviaciones del diseño
+
+- Ninguna funcional. Nombre de archivo `proxy.ts` (decisión 1).
+- El gate 3.11 pedía "e2e registro→login verdes": registro queda
+  condicionado al SMTP (4.11); login, logout, reset, Google start y
+  `next` inseguro sí están verdes.
+
+### Impacto en el presupuesto de revisión (400 líneas)
+
+| Métrica | Valor |
+|---|---|
+| Archivos tocados (sin lockfile ni `drizzle/meta`) | 64 |
+| Líneas insertadas / eliminadas | 1951 / 99 |
+| De las insertadas: tests (unit + e2e + fixtures) | 706 |
+| De las insertadas: migración SQL | ~40 |
+
+Pronóstico de `sdd-tasks`: ~350–450. Real: 1951. Un tercio son tests que
+Strict TDD no permite recortar; el resto es el módulo identity completo
+(dominio, aplicación, infraestructura, UI y rutas), que el design define
+como un solo work unit de PR3. Los commits se separan por unidad de
+trabajo (dominio+DB, auth gateway y actions, OAuth+proxy, formularios y
+e2e) para que la PR se lea por capas. Se recomienda **`size:exception`**
+para PR3, pendiente de aceptación del maintainer.
+
+### Review nativo (lineage `review-1c970253b392c7ca` → `-r1`)
+
+Candidato: commits `c893fc6..6f71df6` sobre `main` (2e59810), proyección
+`committed-only`, riesgo `high`, cuatro lentes (risk, resilience,
+readability, reliability). Consentimiento otorgado por el maintainer el
+2026-09-18.
+
+**Hallazgo CRITICAL R1-001 (risk)**: `profiles` se creó en `public` sin
+Row Level Security. Con la clave publicable, que va al navegador por
+diseño, PostgREST exponía lectura y escritura de todos los perfiles; el
+filtro por `ownerId` solo cubre el camino Drizzle. Plan de corrección de
+130 líneas aceptado (presupuesto 200).
+
+Corrección (commit `ba7d890`, Strict TDD): RED `src/shared/db/schema.test.ts`
+(`getTableConfig(profiles).enableRLS === true`) → `pgTable(...).enableRLS()`
+en `schema.ts` → migración generada `drizzle/0001_profiles_rls.sql`
+(`ALTER TABLE "profiles" ENABLE ROW LEVEL SECURITY`) → GREEN. Sin políticas
+a propósito: solo la conexión de servidor (que omite RLS) toca la tabla.
+Aplicada en `cogni-dev`; sonda `GET /rest/v1/profiles` con la clave
+publicable devuelve `[]`. Gate completo verde tras la corrección: lint 98
+archivos, typecheck, unit 59/59, e2e 14/15 (mismo caso del rate limit).
+
+Como la proyección es `committed-only`, el commit de corrección cambió la
+identidad del candidato; `gentle-ai review recover --disposition
+scope_changed` creó la lineage sucesora `review-1c970253b392c7ca-r1`, que
+volvió a capturar las cuatro lentes: **approved**, autoridad quemada con
+`acknowledge-approved`.
+
+35 hallazgos advisory (16 WARNING, 19 SUGGESTION), todos informativos y
+fuera de esta PR. Los WARNING que merecen seguimiento en PR4 o después:
+
+- Enumeración de cuentas en `/register` (`El email ya está registrado`), en
+  contraste con el sign-in y el reset, que son neutros. Decisión de producto
+  de la tarea 3.5; revisar si conviene un mensaje único.
+- `siteUrl()` cae en silencio a `localhost` sin `NEXT_PUBLIC_SITE_URL`; en
+  producción rompería los enlaces de correo y el `redirectTo` de Google.
+  Se resuelve con el env tipado de la tarea 4.1.
+- El callback `/auth/callback` mapea todo fallo a `error=google`, aunque el
+  enlace sea de verificación o de reset; falta copy por flujo.
+- `signOutAction` ignora el `Result` del gateway: un logout fallido rebota
+  al usuario a `/`.
+- `ensureProfileForUser` en el layout `(app)` convierte cualquier caída de
+  la base en un 500 de toda la app; y `updateSession` en el proxy trata un
+  error de `getUser()` como "sin usuario".
+- `DrizzleProfileRepository.upsert` es insert-or-ignore; el nombre y el
+  doble en memoria prometen upsert real.
+- `profiles.id` no tiene FK a `auth.users`, así que borrar un usuario deja
+  perfiles huérfanos (los fixtures e2e lo hacen).
+- Mínimo de contraseña duplicado en literales en vez de `PASSWORD_MIN_LENGTH`.
+
 ## Estado
 
-16/37 tareas completas (Phase 1 y Phase 2). Gate PR2 (tarea 2.7) verde.
-Review nativo aprobado. Siguiente: commit, push y PR en la web (con
-`size:exception`); luego PR3 (Phase 3).
+27/38 tareas completas (Phases 1–3). Gate PR3 (tarea 3.11) verde salvo el
+e2e de registro, diferido a 4.11. Review nativo aprobado tras una
+corrección (RLS). Siguiente: push y PR en la web (con `size:exception`);
+luego PR4 (Phase 4).

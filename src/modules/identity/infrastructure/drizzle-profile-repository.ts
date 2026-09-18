@@ -1,0 +1,45 @@
+import { eq } from "drizzle-orm";
+import type { Db } from "@/shared/db/client";
+import { type ProfileRow, profiles } from "@/shared/db/schema";
+import type { Profile } from "../domain/profile";
+import type { ProfileRepository } from "../domain/profile-repository";
+
+function toProfile(row: ProfileRow): Profile {
+  return {
+    id: row.id,
+    displayName: row.displayName,
+    locale: row.locale,
+    timezone: row.timezone,
+    onboardingCompletedAt: row.onboardingCompletedAt,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+export class DrizzleProfileRepository implements ProfileRepository {
+  constructor(private readonly db: Db) {}
+
+  async findById(id: string): Promise<Profile | null> {
+    const row = await this.db.query.profiles.findFirst({
+      where: eq(profiles.id, id),
+    });
+    return row ? toProfile(row) : null;
+  }
+
+  // Insert-or-ignore keeps EnsureProfile idempotent under concurrent
+  // first requests (two tabs after verification).
+  async upsert(profile: Profile): Promise<void> {
+    await this.db
+      .insert(profiles)
+      .values({
+        id: profile.id,
+        displayName: profile.displayName,
+        locale: profile.locale,
+        timezone: profile.timezone,
+        onboardingCompletedAt: profile.onboardingCompletedAt,
+        createdAt: profile.createdAt,
+        updatedAt: profile.updatedAt,
+      })
+      .onConflictDoNothing({ target: profiles.id });
+  }
+}

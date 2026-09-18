@@ -1,0 +1,126 @@
+import {
+  createVerifiedUser,
+  deleteUserByEmail,
+  expect,
+  formAlert,
+  hasSupabaseEnv,
+  signIn,
+  test,
+  uniqueEmail,
+} from "./fixtures/auth";
+
+test.describe("authentication", () => {
+  test.skip(!hasSupabaseEnv, "Supabase env (cogni-dev) is not configured");
+
+  test("sends an anonymous visitor from the shell to /login", async ({
+    page,
+  }) => {
+    await page.goto("/");
+
+    await expect(page).toHaveURL("/login");
+  });
+
+  test("registers, asks for verification and refuses login until verified", async ({
+    page,
+  }) => {
+    const email = uniqueEmail("unverified");
+    try {
+      await page.goto("/register");
+      await page.getByLabel("Correo electrónico").fill(email);
+      await page.getByLabel("Contraseña").fill("Secreta-123");
+      await page.getByRole("button", { name: "Crear cuenta" }).click();
+      await expect(page.getByRole("status")).toContainText(
+        "Te enviamos un correo de verificación",
+      );
+
+      await page.goto("/login");
+      await page.getByLabel("Correo electrónico").fill(email);
+      await page.getByLabel("Contraseña").fill("Secreta-123");
+      await page.getByRole("button", { name: "Iniciar sesión" }).click();
+      await expect(formAlert(page)).toContainText(
+        "Aún no has verificado tu correo",
+      );
+    } finally {
+      await deleteUserByEmail(email);
+    }
+  });
+
+  test("offers sign-in for an email that already exists", async ({
+    page,
+    verifiedUser,
+  }) => {
+    await page.goto("/register");
+    await page.getByLabel("Correo electrónico").fill(verifiedUser.email);
+    await page.getByLabel("Contraseña").fill("Otra-clave-123");
+    await page.getByRole("button", { name: "Crear cuenta" }).click();
+
+    await expect(formAlert(page)).toContainText("El email ya está registrado");
+  });
+
+  test("rejects a wrong password without revealing whether the email exists", async ({
+    page,
+  }) => {
+    await page.goto("/login");
+    await page.getByLabel("Correo electrónico").fill("nadie@cogni-e2e.test");
+    await page.getByLabel("Contraseña").fill("Secreta-123");
+    await page.getByRole("button", { name: "Iniciar sesión" }).click();
+
+    await expect(formAlert(page)).toContainText(
+      "El correo o la contraseña no son correctos",
+    );
+  });
+
+  test("logs a verified user in, keeps them out of /login, and signs out", async ({
+    page,
+  }) => {
+    const user = await createVerifiedUser();
+    try {
+      await signIn(page, user);
+      await expect(
+        page.getByText("Aún no tienes cuadernos. Crea uno para empezar."),
+      ).toBeVisible();
+
+      await page.goto("/login");
+      await expect(page).toHaveURL("/");
+
+      await page.getByRole("button", { name: "Menú de usuario" }).click();
+      await page.getByRole("menuitem", { name: "Cerrar sesión" }).click();
+      await expect(page).toHaveURL("/login");
+
+      await page.goto("/");
+      await expect(page).toHaveURL("/login");
+    } finally {
+      await deleteUserByEmail(user.email);
+    }
+  });
+
+  test("starts the Google OAuth flow from the login screen", async ({
+    page,
+  }) => {
+    await page.goto("/login");
+    await page.getByRole("button", { name: "Continuar con Google" }).click();
+
+    await page.waitForURL(/provider=google|accounts\.google\.com/);
+  });
+
+  test("answers a password reset request without revealing the account", async ({
+    page,
+  }) => {
+    await page.goto("/forgot-password");
+    await page.getByLabel("Correo electrónico").fill("nadie@cogni-e2e.test");
+    await page.getByRole("button", { name: "Enviar enlace" }).click();
+
+    await expect(page.getByRole("status")).toContainText("Si el correo existe");
+  });
+
+  test("sends a callback without code back to login with a neutral message", async ({
+    page,
+  }) => {
+    await page.goto("/auth/callback?next=//evil.tld");
+
+    await expect(page).toHaveURL(/\/login\?error=google$/);
+    await expect(
+      page.getByText("No se completó el acceso con Google"),
+    ).toBeVisible();
+  });
+});

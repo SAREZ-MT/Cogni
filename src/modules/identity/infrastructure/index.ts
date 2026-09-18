@@ -1,3 +1,8 @@
-// Placeholder for the "infrastructure" layer of the identity module.
-// Real content lands in PR3 (Fase 0, Auth y Drizzle — tasks 3.x).
-export {};
+export { DrizzleProfileRepository } from "./drizzle-profile-repository";
+export { SupabaseAuthGateway } from "./supabase-auth-gateway";
+export { createSupabaseBrowserClient } from "./supabase-browser-client";
+export { type SessionUser, updateSession } from "./supabase-proxy-client";
+export {
+  createSupabaseServerClient,
+  type SupabaseServerClient,
+} from "./supabase-server-client";

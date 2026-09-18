@@ -1,4 +1,9 @@
+import nextEnv from "@next/env";
 import { defineConfig, devices } from "@playwright/test";
+
+// Same .env.local Next.js reads, so fixtures can reach the Supabase admin API.
+// @next/env is CommonJS, hence the default import.
+nextEnv.loadEnvConfig(process.cwd());
 
 const PORT = 3000;
 const baseURL = `http://localhost:${PORT}`;
@@ -25,7 +30,8 @@ export default defineConfig({
   ],
   webServer: {
     command: `pnpm exec next build && pnpm exec next start -p ${PORT}`,
-    url: baseURL,
+    // favicon.ico bypasses the proxy, so readiness never depends on Supabase env.
+    url: `${baseURL}/favicon.ico`,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },

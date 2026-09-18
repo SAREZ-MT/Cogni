@@ -1,10 +1,10 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import LoginPage from "./page";
+import { SignInForm } from "@/modules/identity/ui";
 
-describe("LoginPage", () => {
+describe("SignInForm", () => {
   it("renders labelled email and password fields with a submit button", () => {
-    render(<LoginPage />);
+    render(<SignInForm />);
 
     expect(screen.getByLabelText("Correo electrónico")).toHaveAttribute(
       "type",
@@ -19,12 +19,11 @@ describe("LoginPage", () => {
     ).toHaveAttribute("type", "submit");
   });
 
-  it("never falls back to a GET submission", () => {
-    const { container } = render(<LoginPage />);
+  it("binds the form to a Server Action so it never submits with GET", () => {
+    const { container } = render(<SignInForm />);
     const form = container.querySelector("form");
 
-    expect(form).not.toBeNull();
     expect(form?.getAttribute("method")).not.toBe("get");
-    expect(form?.getAttribute("action")).not.toBeNull();
+    expect(form?.getAttribute("action")).toBeTruthy();
   });
 });
