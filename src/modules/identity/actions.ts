@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { clientEnv } from "@/shared/config/env.client";
 import { createServerAnalytics } from "@/shared/observability/analytics";
 import {
@@ -53,9 +54,9 @@ export async function signUpAction(
   if (result.value.outcome === "already_registered") {
     return { status: "error", message: AUTH_COPY.alreadyRegistered };
   }
-  if (result.value.userId) {
-    await analytics().track("user_signed_up", result.value.userId);
-  }
+  // Deferred past the response: analytics never delays or fails auth.
+  const userId = result.value.userId;
+  if (userId) after(() => analytics().track("user_signed_up", userId));
   return { status: "success", message: AUTH_COPY.verificationSent };
 }
 
@@ -71,7 +72,7 @@ export async function signInAction(
   const {
     data: { user },
   } = await (await createSupabaseServerClient()).auth.getUser();
-  if (user) await analytics().track("user_signed_in", user.id);
+  if (user) after(() => analytics().track("user_signed_in", user.id));
   redirect("/");
 }
 

@@ -10,35 +10,38 @@ const { capture, shutdown, PostHog } = vi.hoisted(() => {
 });
 vi.mock("posthog-node", () => ({ PostHog }));
 
-import { createServerAnalytics } from "./analytics";
+const config = { key: "phc_x", host: "https://us.i.posthog.com" };
 
 describe("createServerAnalytics", () => {
   beforeEach(() => {
     capture.mockReset();
-    shutdown.mockClear();
+    shutdown.mockReset().mockResolvedValue(undefined);
     PostHog.mockClear();
   });
 
   it("creates a short-lived client that flushes every event immediately", async () => {
-    const analytics = createServerAnalytics({
-      key: "phc_x",
-      host: "https://us.i.posthog.com",
-    });
+    const { createServerAnalytics } = await import("./analytics");
+    const analytics = createServerAnalytics(config);
     await analytics.track("user_signed_in", "user-1");
 
-    expect(PostHog).toHaveBeenCalledWith("phc_x", {
-      host: "https://us.i.posthog.com",
-      flushAt: 1,
-      flushInterval: 0,
-    });
+    expect(PostHog).toHaveBeenCalledWith(
+      "phc_x",
+      expect.objectContaining({
+        host: "https://us.i.posthog.com",
+        flushAt: 1,
+        flushInterval: 0,
+      }),
+    );
     expect(capture).toHaveBeenCalledWith({
       distinctId: "user-1",
       event: "user_signed_in",
     });
-    expect(shutdown).toHaveBeenCalledTimes(1);
+    // Short shutdown: the SDK's default 30 s timer must never hold a request.
+    expect(shutdown).toHaveBeenCalledWith(2000);
   });
 
   it("is a no-op without a key so local runs send nothing", async () => {
+    const { createServerAnalytics } = await import("./analytics");
     const analytics = createServerAnalytics({
       key: undefined,
       host: undefined,
@@ -47,5 +50,25 @@ describe("createServerAnalytics", () => {
 
     expect(PostHog).not.toHaveBeenCalled();
     expect(capture).not.toHaveBeenCalled();
+  });
+
+  it("never throws: an ingest failure degrades silently", async () => {
+    const { createServerAnalytics } = await import("./analytics");
+    shutdown.mockRejectedValueOnce(new Error("posthog down"));
+
+    await expect(
+      createServerAnalytics(config).track("user_signed_in", "user-1"),
+    ).resolves.toBeUndefined();
+  });
+
+  it("never throws when capture itself fails", async () => {
+    const { createServerAnalytics } = await import("./analytics");
+    capture.mockImplementationOnce(() => {
+      throw new Error("bad payload");
+    });
+
+    await expect(
+      createServerAnalytics(config).track("user_signed_up", "user-1"),
+    ).resolves.toBeUndefined();
   });
 });
