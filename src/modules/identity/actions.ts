@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { clientEnv } from "@/shared/config/env.client";
 import {
   AUTH_CALLBACK_PATH,
   requestPasswordReset,
@@ -24,8 +25,10 @@ async function gateway(): Promise<SupabaseAuthGateway> {
   return new SupabaseAuthGateway(supabase.auth);
 }
 
+// Validated at boot: a deploy without NEXT_PUBLIC_SITE_URL fails loudly
+// instead of sending verification links that point at localhost.
 function siteUrl(): string {
-  return process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  return clientEnv().NEXT_PUBLIC_SITE_URL;
 }
 
 export async function signUpAction(
