@@ -3,6 +3,12 @@ import type { Result } from "@/shared/kernel/result";
 
 export type SignUpOutcome = "verification_sent" | "already_registered";
 
+// userId is null for already_registered: no id to correlate, none to leak.
+export interface SignUpResult {
+  outcome: SignUpOutcome;
+  userId: string | null;
+}
+
 // Port over the identity provider (Supabase Auth in infrastructure).
 // Every method translates provider failures into a DomainError with an
 // AUTH_ERROR code; nothing provider-specific crosses this boundary.
@@ -11,7 +17,7 @@ export interface AuthGateway {
     email: string;
     password: string;
     emailRedirectTo: string;
-  }): Promise<Result<SignUpOutcome, DomainError>>;
+  }): Promise<Result<SignUpResult, DomainError>>;
   signInWithPassword(input: {
     email: string;
     password: string;

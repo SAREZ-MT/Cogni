@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { clientEnv } from "@/shared/config/env.client";
+import { createServerAnalytics } from "@/shared/observability/analytics";
 import {
   AUTH_CALLBACK_PATH,
   requestPasswordReset,
@@ -31,6 +32,14 @@ function siteUrl(): string {
   return clientEnv().NEXT_PUBLIC_SITE_URL;
 }
 
+function analytics() {
+  const env = clientEnv();
+  return createServerAnalytics({
+    key: env.NEXT_PUBLIC_POSTHOG_KEY,
+    host: env.NEXT_PUBLIC_POSTHOG_HOST,
+  });
+}
+
 export async function signUpAction(
   _previous: AuthFormState,
   formData: FormData,
@@ -41,8 +50,11 @@ export async function signUpAction(
   });
   if (!result.ok)
     return { status: "error", message: messageForCode(result.error.code) };
-  if (result.value === "already_registered") {
+  if (result.value.outcome === "already_registered") {
     return { status: "error", message: AUTH_COPY.alreadyRegistered };
+  }
+  if (result.value.userId) {
+    await analytics().track("user_signed_up", result.value.userId);
   }
   return { status: "success", message: AUTH_COPY.verificationSent };
 }
@@ -56,6 +68,10 @@ export async function signInAction(
   });
   if (!result.ok)
     return { status: "error", message: messageForCode(result.error.code) };
+  const {
+    data: { user },
+  } = await (await createSupabaseServerClient()).auth.getUser();
+  if (user) await analytics().track("user_signed_in", user.id);
   redirect("/");
 }
 

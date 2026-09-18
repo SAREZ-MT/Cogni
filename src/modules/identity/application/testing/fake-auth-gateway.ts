@@ -1,7 +1,7 @@
 import { DomainError } from "@/shared/kernel/domain-error";
 import { err, ok, type Result } from "@/shared/kernel/result";
 import { AUTH_ERROR } from "../../domain/auth-errors";
-import type { AuthGateway, SignUpOutcome } from "../../domain/auth-gateway";
+import type { AuthGateway, SignUpResult } from "../../domain/auth-gateway";
 
 type FakeUser = { email: string; password: string; verified: boolean };
 
@@ -22,17 +22,20 @@ export class FakeAuthGateway implements AuthGateway {
     email: string;
     password: string;
     emailRedirectTo: string;
-  }): Promise<Result<SignUpOutcome, DomainError>> {
+  }): Promise<Result<SignUpResult, DomainError>> {
     this.calls.push({ method: "signUp", input });
     if (this.users.some((user) => user.email === input.email)) {
-      return ok("already_registered");
+      return ok({ outcome: "already_registered", userId: null });
     }
     this.users.push({
       email: input.email,
       password: input.password,
       verified: false,
     });
-    return ok("verification_sent");
+    return ok({
+      outcome: "verification_sent",
+      userId: `fake-user-${this.users.length}`,
+    });
   }
 
   async signInWithPassword(input: {
