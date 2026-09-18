@@ -1,9 +1,15 @@
-import { expect, test } from "@playwright/test";
+import { expect, hasSupabaseEnv, signIn, test } from "./fixtures/auth";
 
 // Task 2.6: the authenticated shell renders an empty state, the sidebar
-// collapses and the choice survives navigation. Auth arrives in PR3, so
-// the shell is reachable without a session for now.
+// collapses and the choice survives navigation. Since PR3 the shell needs
+// a session, so each test signs in with the worker's verified user.
 test.describe("app shell", () => {
+  test.skip(!hasSupabaseEnv, "Supabase env (cogni-dev) is not configured");
+
+  test.beforeEach(async ({ page, verifiedUser }) => {
+    await signIn(page, verifiedUser);
+  });
+
   test("renders canvas, content area, sidebar and topbar with the declared sizes", async ({
     page,
   }) => {
@@ -61,6 +67,8 @@ test.describe("app shell", () => {
 });
 
 test.describe("public auth layout", () => {
+  test.skip(!hasSupabaseEnv, "Supabase env (cogni-dev) is not configured");
+
   test("renders the split panel with the declared backgrounds on desktop", async ({
     page,
   }) => {

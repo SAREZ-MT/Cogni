@@ -1,11 +1,9 @@
 "use client";
 
-import { CircleUser, LogOut } from "lucide-react";
-import Link from "next/link";
+import { CircleUser } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { SignOutButton } from "@/modules/identity/ui";
 
-// Sign-out becomes a Server Action in PR3 (task 3.6). Until then the item
-// only leads to the login screen.
 export function UserMenu() {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -47,15 +45,7 @@ export function UserMenu() {
           aria-label="Menú de usuario"
           className="absolute top-full right-0 mt-2 min-w-44 rounded-lg border border-border-default bg-card p-1 shadow-md"
         >
-          <Link
-            role="menuitem"
-            href="/login"
-            onClick={() => setOpen(false)}
-            className="flex min-h-11 items-center gap-2 rounded-input px-3 text-fg text-sm hover:bg-hover"
-          >
-            <LogOut aria-hidden="true" size={16} strokeWidth={1.75} />
-            Cerrar sesión
-          </Link>
+          <SignOutButton className="flex min-h-11 w-full items-center gap-2 rounded-input px-3 text-fg text-sm hover:bg-hover" />
         </div>
       )}
     </div>

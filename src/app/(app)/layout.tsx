@@ -1,5 +1,7 @@
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
+import { ensureProfileForUser, getCurrentUser } from "@/modules/identity";
 import { Sidebar } from "./_components/sidebar";
 import {
   SIDEBAR_COLLAPSED,
@@ -7,8 +9,13 @@ import {
 } from "./_components/sidebar-cookie";
 import { Topbar } from "./_components/topbar";
 
-// Authenticated shell. Session protection arrives with the middleware in PR3.
+// Authenticated shell. The proxy already redirects anonymous visitors; the
+// check here is defence in depth for Server Functions and prefetches.
 export default async function AppLayout({ children }: { children: ReactNode }) {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+  await ensureProfileForUser(user.id);
+
   const cookieStore = await cookies();
   const collapsed =
     cookieStore.get(SIDEBAR_COOKIE)?.value === SIDEBAR_COLLAPSED;
