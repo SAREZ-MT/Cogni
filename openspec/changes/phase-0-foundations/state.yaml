@@ -98,5 +98,6 @@ apply:
     branch: feat/phase-0-pr4-observability-delivery
     committed: true
     pushed: false
+    review: "native review approved after analytics correction (lineage review-8050c980878d6451, burned 2026-09-18); 1fce21d assessed medium, deferred to PR slice"
     done: ["4.1", "4.2", "4.3", "4.4", "4.5", "4.7", "4.8"]
     pending: ["4.6 vercel", "4.9 ci gate", "4.10 config close", "4.11 smtp"]

@@ -448,8 +448,41 @@ de PR3). Sesión 2026-09-18. Strict TDD: cada pieza testeable arrancó en RED.
 - 4.10 Cierre de `openspec/config.yaml` tras CI verde.
 - 4.11 SMTP propio (Resend) en ambos proyectos Supabase.
 
+### Review nativo (lineage `review-8050c980878d6451`)
+
+Candidato: commits `45a1a0a..4f73641` sobre `main` (443d16d), `committed-only`,
+riesgo `high`, cuatro lentes. Consentimiento otorgado el 2026-09-18.
+
+**Hallazgo CRITICAL R4-analytics-blocks-auth-path (resilience)**: las
+actions esperaban `track()` de PostHog en el camino crítico, sin try/catch
+y con el `shutdown()` de 30 s por defecto; un PostHog caído retrasaba el
+login y luego lanzaba con la sesión ya creada. Plan de 60 líneas aceptado.
+Corrección (commit `1e8e1ea`, RED primero en `analytics.test.ts`): `track()`
+traga cualquier fallo y apaga con timeout de 2 s; las actions difieren el
+evento con `after()` de `next/server`. El validador dirigido aprobó;
+autoridad quemada con `acknowledge-approved`.
+
+25 advisory (10 WARNING). Atendidos o resueltos tras el cierre:
+
+- Optionals vacíos (`SENTRY_DSN=`) rompían el boot: commit `1fce21d`
+  normaliza cadena vacía a unset (assess: medium, diferido al slice de PR).
+- `global-error` con prop `retry`: verificado contra la doc de Next 16.3.5
+  en `node_modules/next/dist/docs` (la convención pasó de `reset` a
+  `retry`); se mantiene.
+
+Follow-ups fuera de esta PR:
+
+- **Migración vs. deploy**: Vercel despliega `main` al push, y `main.yml`
+  migra después de e2e; hay ventana de drift. Al cablear Vercel (4.6) mover
+  la migración al build command (`pnpm db:migrate && pnpm build`) o pausar el
+  auto-deploy y dispararlo desde el workflow.
+- CSP con `'unsafe-inline'` en `script-src`: pasar a nonces vía `proxy.ts`
+  cuando haya presupuesto; hoy sigue la guía estática oficial de Next.
+- `signInAction` construye un segundo cliente Supabase para leer el id;
+  exponer el id desde el gateway como en sign-up.
+
 ## Estado
 
-34/38 tareas completas. PR4 con el código listo y verificado en local;
-faltan Vercel, secretos de CI, SMTP y el cierre de configuración, que
-dependen de cuentas del maintainer.
+34/38 tareas completas. PR4 con el código listo, verificado en local y
+con review nativo aprobado; faltan Vercel, secretos de CI, SMTP y el
+cierre de configuración, que dependen de cuentas del maintainer.
