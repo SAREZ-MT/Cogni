@@ -65,6 +65,17 @@ describe("parseServerEnv", () => {
     );
   });
 
+  it("treats an empty optional variable as unset (.env.example ships blanks)", () => {
+    const parsed = parseServerEnv({
+      ...server,
+      SENTRY_DSN: "",
+      NEXT_PUBLIC_SENTRY_DSN: "",
+      NEXT_PUBLIC_POSTHOG_KEY: "",
+    });
+    expect(parsed.SENTRY_DSN).toBeUndefined();
+    expect(parsed.NEXT_PUBLIC_POSTHOG_KEY).toBeUndefined();
+  });
+
   it("keeps observability keys optional", () => {
     expect(parseServerEnv(server).SENTRY_DSN).toBeUndefined();
     expect(

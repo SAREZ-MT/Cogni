@@ -42,10 +42,17 @@ function parseOrThrow<T>(schema: z.ZodType<T>, raw: RawEnv, scope: string): T {
   throw new Error(`Invalid ${scope} environment: ${problems}`);
 }
 
+// `.env.example` ships optional keys as `KEY=`; an empty value means unset.
+function blankToUndefined(raw: RawEnv): RawEnv {
+  return Object.fromEntries(
+    Object.entries(raw).map(([k, v]) => [k, v === "" ? undefined : v]),
+  );
+}
+
 export function parseClientEnv(raw: RawEnv): ClientEnv {
-  return parseOrThrow(clientSchema, raw, "client");
+  return parseOrThrow(clientSchema, blankToUndefined(raw), "client");
 }
 
 export function parseServerEnv(raw: RawEnv): ServerEnv {
-  return parseOrThrow(serverSchema, raw, "server");
+  return parseOrThrow(serverSchema, blankToUndefined(raw), "server");
 }
