@@ -1,3 +1,10 @@
-// Placeholder for the "domain" layer of the identity module.
-// Real content lands in PR3 (Fase 0, Auth y Drizzle — tasks 3.x).
-export {};
+export { AUTH_ERROR, type AuthErrorCode } from "./auth-errors";
+export type { AuthGateway, SignUpOutcome } from "./auth-gateway";
+export {
+  createProfile,
+  DEFAULT_LOCALE,
+  DEFAULT_TIMEZONE,
+  type NewProfile,
+  type Profile,
+} from "./profile";
+export type { ProfileRepository } from "./profile-repository";

@@ -1,0 +1,99 @@
+import { describe, expect, it } from "vitest";
+import { AUTH_ERROR } from "../domain/auth-errors";
+import { SupabaseAuthGateway } from "./supabase-auth-gateway";
+
+type Script = Record<string, unknown>;
+
+// Minimal stand-in for supabase.auth: each method resolves the scripted value.
+function fakeAuth(script: Script) {
+  const auth = {
+    signUp: async () => script.signUp,
+    signInWithPassword: async () => script.signInWithPassword,
+    signOut: async () => script.signOut ?? { error: null },
+    resetPasswordForEmail: async () =>
+      script.resetPasswordForEmail ?? { error: null },
+    updateUser: async () => script.updateUser ?? { error: null },
+    signInWithOAuth: async () => script.signInWithOAuth,
+  };
+  return new SupabaseAuthGateway(
+    auth as unknown as ConstructorParameters<typeof SupabaseAuthGateway>[0],
+  );
+}
+
+const INPUT = {
+  email: "ana@example.com",
+  password: "secreta123",
+  emailRedirectTo: "x",
+};
+
+describe("SupabaseAuthGateway", () => {
+  it("reports verification_sent for a brand new user", async () => {
+    const gateway = fakeAuth({
+      signUp: { data: { user: { identities: [{}] } }, error: null },
+    });
+
+    expect(await gateway.signUp(INPUT)).toEqual({
+      ok: true,
+      value: "verification_sent",
+    });
+  });
+
+  it("detects the obfuscated user Supabase returns for an existing email", async () => {
+    const gateway = fakeAuth({
+      signUp: { data: { user: { identities: [] } }, error: null },
+    });
+
+    expect(await gateway.signUp(INPUT)).toEqual({
+      ok: true,
+      value: "already_registered",
+    });
+  });
+
+  it("maps email_not_confirmed and invalid_credentials to domain codes", async () => {
+    const unverified = fakeAuth({
+      signInWithPassword: {
+        error: { code: "email_not_confirmed", message: "x" },
+      },
+    });
+    const wrong = fakeAuth({
+      signInWithPassword: {
+        error: { code: "invalid_credentials", message: "x" },
+      },
+    });
+
+    const a = await unverified.signInWithPassword(INPUT);
+    const b = await wrong.signInWithPassword(INPUT);
+
+    expect(!a.ok && a.error.code).toBe(AUTH_ERROR.EMAIL_NOT_VERIFIED);
+    expect(!b.ok && b.error.code).toBe(AUTH_ERROR.INVALID_CREDENTIALS);
+  });
+
+  it("hides unknown provider failures behind PROVIDER_UNAVAILABLE", async () => {
+    const gateway = fakeAuth({
+      signInWithPassword: {
+        error: { code: "over_request_rate_limit", message: "slow down" },
+      },
+    });
+
+    const result = await gateway.signInWithPassword(INPUT);
+
+    expect(!result.ok && result.error.code).toBe(
+      AUTH_ERROR.PROVIDER_UNAVAILABLE,
+    );
+  });
+
+  it("returns the Google authorization url without redirecting", async () => {
+    const gateway = fakeAuth({
+      signInWithOAuth: {
+        data: { url: "https://accounts.google.com/x" },
+        error: null,
+      },
+    });
+
+    const result = await gateway.startGoogleSignIn({
+      redirectTo: "https://cogni.test/auth/callback",
+    });
+
+    expect(result.ok && result.value.url).toBe("https://accounts.google.com/x");
+  });
+});
