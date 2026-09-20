@@ -5,12 +5,13 @@ const isDev = process.env.NODE_ENV === "development";
 // are the only remote origins the browser talks to. HSTS is added by Vercel.
 const contentSecurityPolicy = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
+  // posthog-js fetches its remote config and lazy modules as scripts.
+  `script-src 'self' 'unsafe-inline' https://*.posthog.com${isDev ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' blob: data: https://*.googleusercontent.com",
   "font-src 'self'",
   "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://*.posthog.com https://*.i.posthog.com",
-  "worker-src 'self' blob:",
+  "worker-src 'self' blob: data:",
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self' https://*.supabase.co https://accounts.google.com",

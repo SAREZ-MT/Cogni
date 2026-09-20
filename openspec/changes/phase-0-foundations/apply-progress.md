@@ -481,8 +481,41 @@ Follow-ups fuera de esta PR:
 - `signInAction` construye un segundo cliente Supabase para leer el id;
   exponer el id desde el gateway como en sign-up.
 
+### Incidente post-merge de PR4 (2026-09-20) y fix `fix/phase-0-prod-proxy-csp`
+
+PR4 mergeada (#4, `6f10621`). Síntomas: workflow **Main** rojo, "login no
+carga bien", tabla `profiles` ausente en `cogni-prod`. Causas raíz, en
+cadena:
+
+1. **Secreto `DEV_DATABASE_URL` inválido** (log de `pnpm test:db`:
+   `TypeError: Invalid URL`). El job `e2e` falló y `migrate` se saltó, de
+   ahí la tabla ausente. Responsable: configuración del maintainer.
+   Formatos que rompen al driver `postgres`: contraseña con `#` sin
+   codificar, valor entre comillas, comando `psql …` pegado como URI.
+2. **Matcher del proxy demasiado amplio** (código): `GET /api/keep-alive`
+   y `POST /monitoring` respondían `307 → /login` en producción, así que el
+   cron nunca llegaba al handler y el túnel de Sentry perdía los reportes.
+   Fix `bc2530c`: el matcher excluye `api/` y `monitoring`;
+   `src/proxy.test.ts` fija el comportamiento; e2e exige 401 en keep-alive.
+3. **PostHog**: clave `phs_…` (secreta) en vez de la Project API key
+   `phc_…` (404 en `config`), y CSP sin `script-src` para
+   `*.posthog.com`. La CSP está corregida en el mismo fix; la clave la
+   cambia el maintainer en Vercel y `.env.local`.
+
+Verificación del fix en local: unit 88/88, lint, typecheck, depcruise;
+e2e: keep-alive 401 verde. Los e2e de auth fallan en local porque la
+`SUPABASE_SERVICE_ROLE_KEY` de `.env.local` devuelve 401 (clave rotada o
+mal pegada); no es del código.
+
+Review nativo del fix: lineage `review-ad1d5466b82da787`, 4 lentes,
+**approved** sin corrección, autoridad quemada. Advisories a seguir:
+`monitoring` en el matcher es prefijo sin anclar (`/monitoring-x` también
+quedaría fuera) y `api/` excluye todo handler futuro, que deberá
+autenticar por su cuenta. Follow-up: anclar `monitoring(?:/|$)`.
+
 ## Estado
 
-34/38 tareas completas. PR4 con el código listo, verificado en local y
-con review nativo aprobado; faltan Vercel, secretos de CI, SMTP y el
-cierre de configuración, que dependen de cuentas del maintainer.
+34/38 tareas completas. PR4 mergeada; fix de producción en
+`fix/phase-0-prod-proxy-csp` pendiente de PR. Faltan: secretos de CI
+corregidos por el maintainer, migración de prod (la aplica `main.yml`),
+verificación del cron (4.9), cierre de config (4.10) y SMTP (4.11).

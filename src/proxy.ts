@@ -29,8 +29,11 @@ export async function proxy(request: NextRequest) {
   return response;
 }
 
+// Route handlers under /api authenticate on their own (the cron bearer is
+// not a browser session) and /monitoring is the Sentry tunnel: redirecting
+// either to /login silently drops cron pings and error reports.
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    "/((?!api/|monitoring|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };
