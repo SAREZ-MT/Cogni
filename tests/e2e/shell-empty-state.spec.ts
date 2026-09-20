@@ -138,3 +138,14 @@ test.describe("security headers", () => {
     expect(headers["permissions-policy"]).toContain("camera=()");
   });
 });
+
+test.describe("keep-alive", () => {
+  test("is not redirected by the session proxy and rejects a missing bearer", async ({
+    request,
+  }) => {
+    const response = await request.get("/api/keep-alive", {
+      maxRedirects: 0,
+    });
+    expect(response.status()).toBe(401);
+  });
+});

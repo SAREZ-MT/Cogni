@@ -28,6 +28,16 @@ describe("securityHeaders", () => {
     expect(csp).not.toContain("\n");
   });
 
+  it("lets posthog-js load its remote config and lazy modules", () => {
+    const csp = header("Content-Security-Policy") ?? "";
+    const script =
+      csp.split("; ").find((d) => d.startsWith("script-src")) ?? "";
+    const worker =
+      csp.split("; ").find((d) => d.startsWith("worker-src")) ?? "";
+    expect(script).toContain("https://*.posthog.com");
+    expect(worker).toContain("data:");
+  });
+
   it("lets the browser reach Supabase, Sentry and PostHog only", () => {
     const connect =
       header("Content-Security-Policy")
