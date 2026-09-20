@@ -1,5 +1,6 @@
 change: phase-0-foundations
 phase: apply
+ready_for_archive: true
 artifact_store: hybrid
 artifacts:
   explore: true
@@ -47,9 +48,9 @@ tasks_progress:
     - "4.8"
     - "4.10"
     - "4.11"
-  pending:
     - "4.6"
     - "4.9"
+  pending: []
 preflight:
   pace: interactive
   delivery_strategy: auto-chain
@@ -94,12 +95,12 @@ apply:
     gate_3_11: "green except e2e register (Supabase email rate limit) -> task 4.11"
     review_budget_note: "1951 insertions / 99 deletions (excl. lockfile and drizzle/meta) vs ~350-450 forecast; 706 are tests; size:exception recommended (see apply-progress.md)"
   pr4_observability_delivery:
-    status: in_progress
+    status: complete
     branch: feat/phase-0-pr4-observability-delivery
     committed: true
     pushed: true
     review: "native review approved after analytics correction (lineage review-8050c980878d6451, burned 2026-09-18); 1fce21d assessed medium, deferred to PR slice"
-    done: ["4.1", "4.2", "4.3", "4.4", "4.5", "4.7", "4.8", "4.10", "4.11"]
-    pending: ["4.6 vercel env fix + verify", "4.9 cron 200"]
+    done: ["4.1", "4.2", "4.3", "4.4", "4.5", "4.6", "4.7", "4.8", "4.9", "4.10", "4.11"]
+    pending: []
     merged: "main via PR #4 (6f10621) + fix PR #5 (0dddb76), 2026-09-20"
     ci: "Main run 35495269739 green after secrets fix: verify, e2e, migrate"
