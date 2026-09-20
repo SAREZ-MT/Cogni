@@ -539,12 +539,14 @@ contra su proyecto, aplicó `pnpm db:migrate` a cogni-prod (`profiles` con
 el registro (SMTP de Resend operativo).
 
 Cierre de fase (4.10): `openspec/config.yaml` con `strict_tdd: true`,
-`projects` completo y comandos de apply/verify. 4.11 verificado por el
-e2e de registro.
+`projects` completo y comandos de apply/verify. 4.11: SMTP de Resend
+verificado en cogni-dev por el e2e de registro; en cogni-prod queda
+configurado por el maintainer pero sin verificación propia todavía (se
+confirma con el primer registro real en producción).
 
 ## Estado
 
-37/38 tareas completas. Pendiente 4.9 parcial y 4.6: el maintainer debe
+36/38 tareas completas. Pendiente 4.9 parcial y 4.6: el maintainer debe
 corregir `DATABASE_URL` en Vercel (Production = pooler de prod, Preview =
 pooler de dev) y redesplegar; después se confirma el cron 200 y el flujo
 de login en producción.
