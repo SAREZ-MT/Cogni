@@ -38,15 +38,15 @@ tasks_progress:
     - "3.9"
     - "3.10"
     - "3.11"
-  pending:
     - "4.1"
     - "4.2"
     - "4.3"
     - "4.4"
     - "4.5"
-    - "4.6"
     - "4.7"
     - "4.8"
+  pending:
+    - "4.6"
     - "4.9"
     - "4.10"
     - "4.11"
@@ -67,7 +67,7 @@ decisions:
   pr2_size_exception: accepted_by_user_2026-09-16
   pr3_size_exception: recommended_2026-09-18_pending_user_acceptance
   smtp_deferred_to_pr4: decided_by_user_2026-09-18
-last_updated: 2026-09-18T11:30:00-05:00
+last_updated: 2026-09-18T13:30:00-05:00
 gates:
   design: passed_after_correction_round_1
 apply:
@@ -93,3 +93,11 @@ apply:
     review: "native review approved after RLS correction (lineage review-1c970253b392c7ca-r1, authority burned 2026-09-18)"
     gate_3_11: "green except e2e register (Supabase email rate limit) -> task 4.11"
     review_budget_note: "1951 insertions / 99 deletions (excl. lockfile and drizzle/meta) vs ~350-450 forecast; 706 are tests; size:exception recommended (see apply-progress.md)"
+  pr4_observability_delivery:
+    status: in_progress
+    branch: feat/phase-0-pr4-observability-delivery
+    committed: true
+    pushed: true
+    review: "native review approved after analytics correction (lineage review-8050c980878d6451, burned 2026-09-18); 1fce21d assessed medium, deferred to PR slice"
+    done: ["4.1", "4.2", "4.3", "4.4", "4.5", "4.7", "4.8"]
+    pending: ["4.6 vercel", "4.9 ci gate", "4.10 config close", "4.11 smtp"]

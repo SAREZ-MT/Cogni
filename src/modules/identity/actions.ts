@@ -1,6 +1,9 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { after } from "next/server";
+import { clientEnv } from "@/shared/config/env.client";
+import { createServerAnalytics } from "@/shared/observability/analytics";
 import {
   AUTH_CALLBACK_PATH,
   requestPasswordReset,
@@ -24,8 +27,18 @@ async function gateway(): Promise<SupabaseAuthGateway> {
   return new SupabaseAuthGateway(supabase.auth);
 }
 
+// Validated at boot: a deploy without NEXT_PUBLIC_SITE_URL fails loudly
+// instead of sending verification links that point at localhost.
 function siteUrl(): string {
-  return process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  return clientEnv().NEXT_PUBLIC_SITE_URL;
+}
+
+function analytics() {
+  const env = clientEnv();
+  return createServerAnalytics({
+    key: env.NEXT_PUBLIC_POSTHOG_KEY,
+    host: env.NEXT_PUBLIC_POSTHOG_HOST,
+  });
 }
 
 export async function signUpAction(
@@ -38,9 +51,12 @@ export async function signUpAction(
   });
   if (!result.ok)
     return { status: "error", message: messageForCode(result.error.code) };
-  if (result.value === "already_registered") {
+  if (result.value.outcome === "already_registered") {
     return { status: "error", message: AUTH_COPY.alreadyRegistered };
   }
+  // Deferred past the response: analytics never delays or fails auth.
+  const userId = result.value.userId;
+  if (userId) after(() => analytics().track("user_signed_up", userId));
   return { status: "success", message: AUTH_COPY.verificationSent };
 }
 
@@ -53,6 +69,10 @@ export async function signInAction(
   });
   if (!result.ok)
     return { status: "error", message: messageForCode(result.error.code) };
+  const {
+    data: { user },
+  } = await (await createSupabaseServerClient()).auth.getUser();
+  if (user) after(() => analytics().track("user_signed_in", user.id));
   redirect("/");
 }
 

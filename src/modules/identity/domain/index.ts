@@ -1,5 +1,9 @@
 export { AUTH_ERROR, type AuthErrorCode } from "./auth-errors";
-export type { AuthGateway, SignUpOutcome } from "./auth-gateway";
+export type {
+  AuthGateway,
+  SignUpOutcome,
+  SignUpResult,
+} from "./auth-gateway";
 export {
   createProfile,
   DEFAULT_LOCALE,

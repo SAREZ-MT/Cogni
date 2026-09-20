@@ -29,23 +29,29 @@ const INPUT = {
 describe("SupabaseAuthGateway", () => {
   it("reports verification_sent for a brand new user", async () => {
     const gateway = fakeAuth({
-      signUp: { data: { user: { identities: [{}] } }, error: null },
+      signUp: {
+        data: { user: { id: "u-1", identities: [{}] } },
+        error: null,
+      },
     });
 
     expect(await gateway.signUp(INPUT)).toEqual({
       ok: true,
-      value: "verification_sent",
+      value: { outcome: "verification_sent", userId: "u-1" },
     });
   });
 
   it("detects the obfuscated user Supabase returns for an existing email", async () => {
     const gateway = fakeAuth({
-      signUp: { data: { user: { identities: [] } }, error: null },
+      signUp: {
+        data: { user: { id: "u-fake", identities: [] } },
+        error: null,
+      },
     });
 
     expect(await gateway.signUp(INPUT)).toEqual({
       ok: true,
-      value: "already_registered",
+      value: { outcome: "already_registered", userId: null },
     });
   });
 

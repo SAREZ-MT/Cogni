@@ -14,7 +14,10 @@ describe("signUp", () => {
       { auth, siteUrl: SITE_URL },
     );
 
-    expect(result.ok && result.value).toBe("verification_sent");
+    expect(result.ok && result.value).toEqual({
+      outcome: "verification_sent",
+      userId: expect.any(String),
+    });
     expect(auth.calls[0]).toMatchObject({
       method: "signUp",
       input: { emailRedirectTo: `${SITE_URL}/auth/callback` },
@@ -30,7 +33,11 @@ describe("signUp", () => {
       { auth, siteUrl: SITE_URL },
     );
 
-    expect(result.ok && result.value).toBe("already_registered");
+    // No id for an existing email: nothing to correlate, nothing to leak.
+    expect(result.ok && result.value).toEqual({
+      outcome: "already_registered",
+      userId: null,
+    });
   });
 
   it("rejects an invalid email before reaching the gateway", async () => {

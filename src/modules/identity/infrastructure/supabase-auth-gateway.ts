@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { DomainError } from "@/shared/kernel/domain-error";
 import { err, ok, type Result } from "@/shared/kernel/result";
 import { AUTH_ERROR } from "../domain/auth-errors";
-import type { AuthGateway, SignUpOutcome } from "../domain/auth-gateway";
+import type { AuthGateway, SignUpResult } from "../domain/auth-gateway";
 
 type AuthApi = Pick<
   SupabaseClient["auth"],
@@ -27,21 +27,22 @@ export class SupabaseAuthGateway implements AuthGateway {
     email: string;
     password: string;
     emailRedirectTo: string;
-  }): Promise<Result<SignUpOutcome, DomainError>> {
+  }): Promise<Result<SignUpResult, DomainError>> {
     const { data, error } = await this.auth.signUp({
       email: input.email,
       password: input.password,
       options: { emailRedirectTo: input.emailRedirectTo },
     });
     if (error) {
-      if (error.code === "user_already_exists") return ok("already_registered");
+      if (error.code === "user_already_exists")
+        return ok({ outcome: "already_registered", userId: null });
       return err(providerError(error.message));
     }
     // With email confirmation on, an existing email yields an obfuscated
     // user whose identities array is empty (Supabase docs).
     if (data.user && data.user.identities?.length === 0)
-      return ok("already_registered");
-    return ok("verification_sent");
+      return ok({ outcome: "already_registered", userId: null });
+    return ok({ outcome: "verification_sent", userId: data.user?.id ?? null });
   }
 
   async signInWithPassword(input: {
