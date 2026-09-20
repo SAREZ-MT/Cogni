@@ -544,9 +544,16 @@ verificado en cogni-dev por el e2e de registro; en cogni-prod queda
 configurado por el maintainer pero sin verificación propia todavía (se
 confirma con el primer registro real en producción).
 
+### Cierre de 4.6 y 4.9 (2026-09-20)
+
+El maintainer corrigió las variables de Vercel por entorno y redesplegó.
+Verificación: registro real en `www.cogni-dev.com` → verificación por
+correo → login → shell con barra lateral (4.6). Cron: `GET
+/api/keep-alive` con el bearer de producción responde 200 en `www`; el
+apex `cogni-dev.com` sigue redirigiendo 308 a `www`, y Vercel muestra el
+cron en verde (4.9). PR #6 mergeada (`34fef0d`), workflow Main verde.
+
 ## Estado
 
-36/38 tareas completas. Pendiente 4.9 parcial y 4.6: el maintainer debe
-corregir `DATABASE_URL` en Vercel (Production = pooler de prod, Preview =
-pooler de dev) y redesplegar; después se confirma el cron 200 y el flujo
-de login en producción.
+38/38 tareas completas. Fase 0 cerrada; el change queda listo para
+archivar.

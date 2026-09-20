@@ -68,9 +68,9 @@ Chain strategy: pending
 - [x] 4.3 PostHog `posthog-node` por petición (`flushAt:1,flushInterval:0`) + init cliente; sin autocaptura, solo `user_signed_up`/`user_signed_in`.
 - [x] 4.4 `.github/workflows/pr.yml`: install→`biome ci`→`tsc`→`vitest run`→`depcruise`→`pnpm audit --audit-level=high`.
 - [x] 4.5 `.github/workflows/main.yml`: pasos de PR + `pnpm test:db` + Playwright + `drizzle migrate` antes del deploy; RED `tests/db/connection.smoke.test.ts`.
-- [ ] 4.6 Integración Vercel: preview→`cogni-dev`, producción→`cogni-prod`; dominio (bloqueado por el usuario).
+- [x] 4.6 Integración Vercel: preview→`cogni-dev`, producción→`cogni-prod`; dominio (bloqueado por el usuario).
 - [x] 4.7 Cabeceras de seguridad en `next.config.ts` (CSP, `X-Frame-Options`, `nosniff`, `Referrer-Policy`, `Permissions-Policy`).
 - [x] 4.8 RED `api/keep-alive/route.test.ts` (bearer inválido→401; válido→200+`select 1`) → implementar con comparación constante; cron diario en `vercel.json`.
-- [ ] 4.9 Verificar sin `${{ secrets.* }}` en logs de CI; gate PR4: `pr.yml`/`main.yml` verdes, cron responde 200. (2026-09-20: workflows verdes y logs sin secretos; falta confirmar el cron 200 en Vercel tras corregir `DATABASE_URL`.)
+- [x] 4.9 Verificar sin `${{ secrets.* }}` en logs de CI; gate PR4: `pr.yml`/`main.yml` verdes, cron responde 200. (2026-09-20: workflows verdes, logs sin secretos, cron en verde en Vercel y `GET /api/keep-alive` 200 con el bearer de producción.)
 - [x] 4.10 Cierre de fase: `openspec/config.yaml` `strict_tdd: true` + completar `projects` — solo tras `pnpm test` verde en local y en CI.
 - [x] 4.11 SMTP propio en `cogni-dev`/`cogni-prod` (p. ej. Resend) + subir el rate limit de correo; e2e "registers, asks for verification" verde de forma estable. (2026-09-20: verificado en dev por e2e 17/17; prod configurado, pendiente de confirmar con un registro real.)
