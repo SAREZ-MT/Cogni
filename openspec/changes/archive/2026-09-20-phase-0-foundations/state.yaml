@@ -50,7 +50,7 @@ tasks_progress:
     - "4.11"
     - "4.6"
     - "4.9"
-  pending:
+  pending: []
 preflight:
   pace: interactive
   delivery_strategy: auto-chain

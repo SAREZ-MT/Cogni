@@ -116,7 +116,7 @@ All tasks marked complete in `tasks.md`:
 - **Phase 1 (Tooling)**: 9/9 tasks complete; PR #1 merged (commit b60c30a)
 - **Phase 2 (Shell)**: 7/7 tasks complete; PR #2 merged (commit 6f3b1a9)
 - **Phase 3 (Auth + Drizzle)**: 11/11 tasks complete; PR #3 merged (commit 8b5f06d)
-- **Phase 4 (Observability + Delivery)**: 11/11 tasks complete; PR #4 merged (commit 9c8e9a0)
+- **Phase 4 (Observability + Delivery)**: 11/11 tasks complete; PR #4 merged (merge commit 6f10621); PR #5 production fix merged (0dddb76)
 - **Phase Closure Configuration**: 1/1 task (4.10) complete; PR #6 merged (commit 34fef0d)
 
 ### Verification Results
@@ -138,14 +138,14 @@ Per the final-state facts provided:
 
 | PR | Branch | Commits | Scope | Status |
 |----|--------|---------|-------|--------|
-| #1 | feat/phase-0-pr1-tooling | b60c30a | Scaffold, TypeScript, Biome, Vitest, Playwright, dependency-cruiser | Merged |
-| #2 | feat/phase-0-pr2-shell | 6f3b1a9 | Tailwind v4, design tokens, shell layout, sidebar, topbar, responsive | Merged |
-| #3 | feat/phase-0-pr3-auth | 8b5f06d | Supabase auth, profiles + RLS, Drizzle migrations, sign-up/in/out, middleware | Merged |
-| #4 | feat/phase-0-pr4-observability | 9c8e9a0 | Sentry, PostHog, GitHub Actions, Vercel, security headers, /api/keep-alive cron | Merged |
-| #5 | fix/phase-0-prod-proxy-csp | n/a | Production fix: proxy matcher anchor + CSP issue resolution | Merged |
+| #1 | feat/phase-0-pr1-tooling | 43f8757 | Scaffold, TypeScript, Biome, Vitest, Playwright, dependency-cruiser | Merged |
+| #2 | feat/phase-0-pr2-design-shell | 2e59810 | Tailwind v4, design tokens, shell layout, sidebar, topbar, responsive | Merged |
+| #3 | feat/phase-0-pr3-auth-drizzle | 443d16d | Supabase auth, profiles + RLS, Drizzle migrations, sign-up/in/out, middleware | Merged |
+| #4 | feat/phase-0-pr4-observability-delivery | 6f10621 | Sentry, PostHog, GitHub Actions, Vercel, security headers, /api/keep-alive cron | Merged |
+| #5 | fix/phase-0-prod-proxy-csp | 0dddb76 | Production fix: proxy matcher anchor + CSP issue resolution | Merged |
 | #6 | chore/phase-0-close-config | 34fef0d | Phase closure: strict_tdd config, openspec/config.yaml project metadata | Merged |
 
-**Main Branch Head**: 34fef0d (PR #6 merged)
+**Main Branch Head**: 34fef0d (PR #6 merged). Commit column lists merge commits on main.
 
 ---
 
