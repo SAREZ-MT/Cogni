@@ -13,28 +13,29 @@ context: |
   Convenciones: código e identificadores en inglés, comentarios en inglés simple (B1), UI en español "tú", documentación técnica y artefactos SDD en español neutro, Conventional Commits sin atribución a IA, PRs de máximo 400 líneas.
   Plan: fases 0 a 8 según sección 13 del documento maestro; la Fase 0 (cimientos) es el primer change.
 
-# Strict TDD queda en false porque todavía no existe ningún proyecto con runner de tests
-# en el workspace (no hay package.json). Debe pasar a true en cuanto la Fase 0 deje
-# `pnpm test` funcionando; ese cambio forma parte de las tareas de la Fase 0.
-strict_tdd: false
+# Strict TDD activo desde el cierre de la Fase 0 (2026-09-20): `pnpm test`
+# verde en local (88 unit) y en CI (workflows PR y Main).
+strict_tdd: true
 
-projects: []
-# Proyecto esperado tras la Fase 0:
-#   - path: .
-#     stack: Next.js + TypeScript (pnpm)
-#     test_command: pnpm test
-#     framework: Vitest
-#     layers: { unit: Vitest, integration: Testing Library, e2e: Playwright }
-#     coverage_command: pnpm test -- --coverage
-#     linter: pnpm biome check .
-#     type_checker: pnpm tsc --noEmit
-#     formatter: pnpm biome format --write .
+projects:
+  - path: .
+    stack: Next.js 16 + TypeScript (pnpm)
+    test_command: pnpm test
+    framework: Vitest
+    layers: { unit: Vitest, integration: Testing Library, e2e: Playwright }
+    e2e_command: pnpm test:e2e
+    db_smoke_command: pnpm test:db
+    coverage_command: pnpm test -- --coverage
+    linter: pnpm lint
+    type_checker: pnpm typecheck
+    formatter: pnpm exec biome format --write .
+    architecture_check: pnpm depcruise
 
 testing:
-  strict_tdd: false
-  detected_at: "2026-09-14"
-  workspace_test_command: ""
-  note: "Sin runner detectado. Registrar Vitest como comando de workspace al cerrar la Fase 0."
+  strict_tdd: true
+  detected_at: "2026-09-20"
+  workspace_test_command: "pnpm test"
+  note: "Vitest (unit + Testing Library), Playwright (e2e contra cogni-dev), vitest.db.config.ts (smoke del pooler)."
 
 rules:
   proposal:
@@ -60,11 +61,11 @@ rules:
       - Nunca importar infraestructura desde domain o application; nunca importar rutas internas de otro módulo.
       - Toda salida de IA pasa por esquema Zod; nunca texto libre sin validar.
       - Conventional Commits sin líneas de atribución a IA.
-    tdd: false
-    test_command: ""
+    tdd: true
+    test_command: "pnpm test"
   verify:
-    test_command: ""
-    build_command: ""
+    test_command: "pnpm test"
+    build_command: "pnpm build"
     coverage_threshold: 0
   archive:
     - Advertir antes de fusionar deltas destructivos.

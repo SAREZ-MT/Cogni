@@ -45,11 +45,11 @@ tasks_progress:
     - "4.5"
     - "4.7"
     - "4.8"
+    - "4.10"
+    - "4.11"
   pending:
     - "4.6"
     - "4.9"
-    - "4.10"
-    - "4.11"
 preflight:
   pace: interactive
   delivery_strategy: auto-chain
@@ -67,7 +67,7 @@ decisions:
   pr2_size_exception: accepted_by_user_2026-09-16
   pr3_size_exception: recommended_2026-09-18_pending_user_acceptance
   smtp_deferred_to_pr4: decided_by_user_2026-09-18
-last_updated: 2026-09-18T13:30:00-05:00
+last_updated: 2026-09-20T02:30:00-05:00
 gates:
   design: passed_after_correction_round_1
 apply:
@@ -99,5 +99,7 @@ apply:
     committed: true
     pushed: true
     review: "native review approved after analytics correction (lineage review-8050c980878d6451, burned 2026-09-18); 1fce21d assessed medium, deferred to PR slice"
-    done: ["4.1", "4.2", "4.3", "4.4", "4.5", "4.7", "4.8"]
-    pending: ["4.6 vercel", "4.9 ci gate", "4.10 config close", "4.11 smtp"]
+    done: ["4.1", "4.2", "4.3", "4.4", "4.5", "4.7", "4.8", "4.10", "4.11"]
+    pending: ["4.6 vercel env fix + verify", "4.9 cron 200"]
+    merged: "main via PR #4 (6f10621) + fix PR #5 (0dddb76), 2026-09-20"
+    ci: "Main run 35495269739 green after secrets fix: verify, e2e, migrate"

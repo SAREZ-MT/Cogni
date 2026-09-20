@@ -513,9 +513,40 @@ Review nativo del fix: lineage `review-ad1d5466b82da787`, 4 lentes,
 quedaría fuera) y `api/` excluye todo handler futuro, que deberá
 autenticar por su cuenta. Follow-up: anclar `monitoring(?:/|$)`.
 
+### Resolución del incidente (2026-09-20, continuación)
+
+Tras el fix (PR #5, `0dddb76`) el CI volvió a fallar: primero
+`ENETUNREACH` a una IPv6 `:5432` (URI directa `db.<ref>.supabase.co`,
+IPv6-only según la doc de Supabase; GitHub Actions y Vercel son IPv4) y
+después `password authentication failed`. La causa de fondo era un
+`.env.local` con las variables de **los dos proyectos** duplicadas; Next
+toma la última repetida, así que la URL era de un proyecto y las claves de
+otro, y todo lo copiado a GitHub y Vercel heredó la mezcla.
+
+Identidad verificada de los proyectos:
+
+| Proyecto | ref | pooler |
+|---|---|---|
+| cogni-dev | `ctzjuudglcqxniakhvol` | `aws-0-us-east-1.pooler.supabase.com:6543` |
+| cogni-prod | `mtsrpbqxsqhnfwjwskdn` | `aws-0-us-west-2.pooler.supabase.com:6543` |
+
+Acciones: el maintainer limpió `.env.local` (una línea por variable,
+todas de dev, más `PROD_DATABASE_URL`); el agente validó cada valor
+contra su proyecto, aplicó `pnpm db:migrate` a cogni-prod (`profiles` con
+`relrowsecurity = true`), reescribió por API los secretos `DEV_*` y
+`production/PROD_DATABASE_URL`, y relanzó el run `35495269739`:
+**verify, e2e y migrate verdes**. E2E local contra dev: 17/17, incluido
+el registro (SMTP de Resend operativo).
+
+Cierre de fase (4.10): `openspec/config.yaml` con `strict_tdd: true`,
+`projects` completo y comandos de apply/verify. 4.11: SMTP de Resend
+verificado en cogni-dev por el e2e de registro; en cogni-prod queda
+configurado por el maintainer pero sin verificación propia todavía (se
+confirma con el primer registro real en producción).
+
 ## Estado
 
-34/38 tareas completas. PR4 mergeada; fix de producción en
-`fix/phase-0-prod-proxy-csp` pendiente de PR. Faltan: secretos de CI
-corregidos por el maintainer, migración de prod (la aplica `main.yml`),
-verificación del cron (4.9), cierre de config (4.10) y SMTP (4.11).
+36/38 tareas completas. Pendiente 4.9 parcial y 4.6: el maintainer debe
+corregir `DATABASE_URL` en Vercel (Production = pooler de prod, Preview =
+pooler de dev) y redesplegar; después se confirma el cron 200 y el flujo
+de login en producción.
