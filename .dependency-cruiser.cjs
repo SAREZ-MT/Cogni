@@ -49,6 +49,14 @@ module.exports = {
       },
     },
     {
+      name: "editor-tiptap-only-in-ui",
+      comment:
+        "Tiptap and ProseMirror packages may only be imported from editor/ui; editor/domain and editor/application must stay framework-agnostic.",
+      severity: "error",
+      from: { path: "^src/modules/editor/(?!ui/)", pathNot: "\\.test\\.ts$" },
+      to: { path: "^(node_modules/)?(@tiptap|prosemirror-)" },
+    },
+    {
       name: "study-engine-knows-no-technique",
       comment:
         "study-engine is technique-agnostic; flashcards, exams and active-recall must talk to it through its ports, never the reverse.",
