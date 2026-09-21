@@ -70,9 +70,6 @@ function ImageNodeView({
   const [url, setUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
-  // Bumped by the retry control of a registered image whose read URL could
-  // not be resolved; re-runs the getReadUrl effect below.
-  const [readAttempt, setReadAttempt] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const startedPendingRef = useRef(false);
 
@@ -154,11 +151,13 @@ function ImageNodeView({
 
   // A missing port, a non-ok Result or a rejected promise all end in a
   // visible error with a retry, never in an indefinite "cargando imagen…".
-  useEffect(() => {
-    if (!assetId) return;
+  // Shared by the mount effect and the retry control so a retry is the
+  // exact same load, not a second code path.
+  const loadReadUrl = useCallback(() => {
+    if (!assetId) return () => {};
     if (!imagePort) {
       setError(IMAGE_COPY.readFailed);
-      return;
+      return () => {};
     }
     let cancelled = false;
     setError(null);
@@ -175,7 +174,9 @@ function ImageNodeView({
     return () => {
       cancelled = true;
     };
-  }, [assetId, imagePort, readAttempt]);
+  }, [assetId, imagePort]);
+
+  useEffect(() => loadReadUrl(), [loadReadUrl]);
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -203,7 +204,7 @@ function ImageNodeView({
               type="button"
               data-testid="image-node-retry"
               className="underline"
-              onClick={() => setReadAttempt((attempt) => attempt + 1)}
+              onClick={() => loadReadUrl()}
             >
               {IMAGE_COPY.retry}
             </button>
