@@ -71,6 +71,33 @@ describe("toPlainTiptapDoc", () => {
     });
   });
 
+  // Table cells carry their own default-valued attrs (colspan, rowspan,
+  // colwidth) once inserted via editor.commands.insertTable() — the same
+  // null-prototype shape as heading/codeBlock, confirmed against the real
+  // table extension so a future save doesn't regress into
+  // NOTEBOOKS_INVALID_INPUT for any document containing a table.
+  it("strips the null-prototype attrs on table cells too", () => {
+    const editor = new Editor({
+      extensions: createEditorExtensions(),
+      content: "<p></p>",
+    });
+    editor.commands.insertTable({ rows: 1, cols: 1, withHeaderRow: false });
+
+    const raw = editor.getJSON();
+    const table = raw.content?.find((node) => node.type === "table") as
+      | { content?: Array<{ content?: Array<{ attrs?: object }> }> }
+      | undefined;
+    const rawCellAttrs = table?.content?.[0]?.content?.[0]?.attrs;
+    expect(Object.getPrototypeOf(rawCellAttrs)).not.toBe(Object.prototype);
+
+    const plain = toPlainTiptapDoc(raw);
+    const plainTable = plain.content?.find((node) => node.type === "table") as
+      | { content?: Array<{ content?: Array<{ attrs?: object }> }> }
+      | undefined;
+    const plainCellAttrs = plainTable?.content?.[0]?.content?.[0]?.attrs;
+    expect(Object.getPrototypeOf(plainCellAttrs)).toBe(Object.prototype);
+  });
+
   it("is a no-op for a document that is already plain JSON", () => {
     const doc = {
       type: "doc" as const,

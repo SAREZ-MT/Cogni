@@ -1011,3 +1011,59 @@ Verificación final (gate completo, ver tabla `## Verification` del reporte de e
 ### Corrección del orquestador: aislamiento del e2e del estado vacío (2026-09-21)
 
 En la corrida combinada con un worker (como en CI), el escenario "sidebar shows the notebooks empty state" fallaba porque el usuario verificado tiene alcance de worker y ya poseía cuadernos creados por `notebooks-acceptance.spec.ts`. Se agregó el fixture `freshUser` (alcance de test) en `tests/e2e/fixtures/auth.ts`; el escenario limpia las cookies de la sesión previa (el proxy mantiene fuera de `/login` a un usuario autenticado) y entra con un owner nuevo. Evidencia: `notebooks-acceptance` + `shell-empty-state` con `--workers=1`: 13 de 13.
+
+## Fase 5a: Bloques restantes — tabla, callouts, paleta de resaltado (PR5a)
+
+Traceability: `specs/editor/spec.md` → "Conjunto completo de bloques de §3.2" (tabla, callouts), "Paleta de resaltado de Cogni y callouts".
+
+### TDD Cycle Evidence
+
+| Unidad | Test file(s) | RED | GREEN | REFACTOR |
+|---|---|---|---|---|
+| `extensions/table.ts` | `extensions/table.test.tsx` | ✅ Observado: `Failed to resolve import "./table"` (archivo movido temporalmente, disciplina RED honesta) | ✅ Observado: `2 passed` tras el `TableKit.configure({ table: { resizable: false } })` | ➖ No aplica |
+| `highlight-palette.tsx` (`CogniHighlight`) | `highlight.test.tsx` | ✅ Observado: `Failed to resolve import "./highlight-palette"` | ✅ Observado: `3 passed` | ➖ No aplica |
+| `callout-node.tsx` (`Callout`, `ReactNodeViewRenderer`) | `callout.test.tsx` | ✅ Observado: `Unable to find an element by: [data-testid="callout"]` (nodo aún no registrado en `extensions/index.ts`) | ✅ Observado: `2 passed` tras registrar `Callout` y cambiar las aserciones a `findByTestId` (el node view de `@tiptap/react` monta en un root de React aparte, se confirma con el warning real de React `act(...)` observado en la primera corrida) | ➖ No aplica |
+| `slash-command-items.ts` (entradas tabla/callouts) | `slash-command-items.test.ts` (nuevo) | ✅ Observado: `missing slash command item: table` / `missing slash command item: callout-idea` | ✅ Observado: `2 passed` — el callout se inserta con `insertContent({...})`, no `setNode()` (Tiptap rechaza `setNode` para nodos que no son textblock: `[tiptap warn]: Currently "setNode()" only supports text block nodes`, confirmado en la primera corrida) | ➖ No aplica |
+| `plain-text.ts` (cobertura callout/highlight) | `plain-text.test.ts` (2 casos nuevos) | ➖ No aplica — el recorrido genérico de AST ya cubre un nodo `callout` (no listado en `NO_CONTRIBUTION`, hijos no-inline) y las marcas (incluida `highlight`) ya se ignoraban; se agregaron los 2 tests para fijar esta cobertura sin cambiar producción | ✅ Observado: `13/13` sin tocar `plain-text.ts` | ➖ No aplica |
+| `to-plain-tiptap-doc.ts` (cobertura celdas de tabla) | `to-plain-tiptap-doc.test.ts` (1 caso nuevo) | ➖ No aplica — `toPlainTiptapDoc()` ya normaliza cualquier `attrs` de prototipo nulo vía `JSON.parse(JSON.stringify(...))`, sin importar el tipo de nodo; se agregó el test para confirmarlo contra la extensión de tabla real | ✅ Observado: `3/3` sin tocar `to-plain-tiptap-doc.ts` | ➖ No aplica |
+| `tests/e2e/slash-command.spec.ts` (casos "/tabla" y "/advertencia") | e2e | ✅ Observado (manual, antes de escribir la extensión): los bloques no existían, el caso no podía pasar | ✅ Observado: `3/3` en aislado, `7/7` combinado con `notebooks-acceptance.spec.ts` | ➖ Ver Advisories plegados abajo (aislamiento de "Sin título" entre notebooks) |
+
+### Advisories plegados (descubiertos en este batch)
+
+| Advisory | Archivo | Evidencia |
+|---|---|---|
+| `sidebar.getByRole("link", { name: "Sin título" })` sin acotar ambiguo cuando el usuario verificado ya tiene otros cuadernos con página "Sin título" en el mismo worker | `tests/e2e/slash-command.spec.ts` (los 3 casos, incluido el preexistente "/cita") | Corrida combinada `slash-command.spec.ts` + `notebooks-acceptance.spec.ts` con `--workers=1`: `strict mode violation ... resolved to 4 elements`. Corregido acotando cada caso a `sidebar.getByRole("listitem").filter({ hasText: "<nombre del cuaderno>" }).getByRole("link", { name: "Sin título" })`, mismo patrón que el advisory de `shell-empty-state` documentado en PR4. Verificado: `7/7` en la corrida combinada tras el fix. |
+
+### Verificación ejecutada en este batch
+
+| Comando | Resultado observado |
+|---|---|
+| `pnpm test` | `57 archivos / 241 tests` GREEN (+12 tests nuevos sobre el estado post-PR4) |
+| `pnpm exec next typegen && pnpm typecheck` | Sin errores (2 errores de tipos en `table.test.tsx` encontrados y corregidos con una interfaz `TableNodeJSON` local, en vez de `as any`) |
+| `pnpm lint` (`biome check`) | 3 hallazgos (`organizeImports` en `extensions/index.ts` y `callout-node.tsx`, formato en 3 archivos) → corregidos con `pnpm format` + `biome check --write`; `0` hallazgos en la reejecución |
+| `pnpm depcruise` | `no dependency violations found (244 modules, 613 dependencies cruised)` |
+| `pnpm build` (`next build`, Turbopack) | Verde, sin errores |
+| `pnpm exec playwright test tests/e2e/slash-command.spec.ts --workers=1` | `3/3` GREEN |
+| `pnpm exec playwright test tests/e2e/slash-command.spec.ts tests/e2e/notebooks-acceptance.spec.ts --workers=1` | `7/7` GREEN (expone y corrige el advisory de aislamiento de "Sin título" de arriba) |
+
+### Deviations from Design
+
+- `extensions/table.ts` usa `TableKit` (un solo `Extension` que agrupa `Table`+`TableRow`+`TableCell`+`TableHeader`) en vez de las cuatro extensiones separadas nombradas en tasks.md 5a.1 y en el prompt del orquestador: `@tiptap/extension-table@3.31.3` solo exporta `Table`/`TableRow`/`TableCell`/`TableHeader`/`TableKit` como named exports (no hay export `default`, confirmado contra `node_modules/@tiptap/extension-table/dist/index.d.ts`), y `TableKit.configure({ table: { resizable: false } })` es la forma soportada por la librería para fijar `resizable: false` sobre el conjunto completo con una sola extensión. Se desinstalaron `@tiptap/extension-table-row`/`-cell`/`-header` de `package.json` (no se necesitan como paquetes separados; `TableKit` los agrupa internamente). Mismo resultado funcional que pedía la tarea (tabla no-resizable con filas/columnas/celdas/encabezado editables).
+- 5a.8 pedía actualizar `command-menu.tsx`; las entradas de tabla y callouts se agregaron en `slash-command-items.ts` (donde ya viven encabezados, párrafo, listas, cita, código y divisor) — `command-menu.tsx` es el componente presentacional genérico del popup y no tiene una lista de bloques propia. Se siguió el patrón ya establecido en el código, no el nombre de archivo literal de la tarea.
+- La paleta de resaltado (5a.4/5a.5) se implementó solo como extensión de Tiptap (`CogniHighlight`), sin un componente de selector (Popover) ni entradas `/resaltar <color>` en el menú `/`: el Scenario "Resaltado por nombre" del spec es a nivel unit (`GIVEN texto seleccionado, WHEN el usuario elige el resaltado purple`) y tasks.md 5a.4/5a.5 no piden una UI específica para elegirlo; el prompt del orquestador sí sugería un Popover o entradas slash como alternativa, pero como alternativa, no como requisito de tasks.md. No se agregó ninguna UI de selección en este batch — queda pendiente decidir en un batch posterior (bubble menu vs. entradas `/resaltar <color>`) si el equipo lo considera necesario antes de fase 5b. Reportado explícitamente como remaining gap, no como desviación silenciosa.
+
+### Impacto en el presupuesto de revisión (400 líneas)
+
+`git diff --numstat` de este batch (archivos modificados + nuevos, sin `pnpm-lock.yaml`): **678 líneas agregadas / 1 eliminada = 679 líneas de autoría totales**, por encima del presupuesto de ~400. `tasks.md` ya declara esta fase con `400-line budget risk: High` y `Chain strategy: stacked-to-main` (confirmado por el usuario el 2026-09-20) a nivel de todo el cambio — cada fase (PR0…PR8) es su propia PR apuntando a `main`. Fase 5a es en sí misma la unidad ya acordada (tabla + paleta de resaltado + callouts + menú `/` + e2e), y son piezas fuertemente acopladas (el nodo callout necesita su extensión + su test + su entrada de menú + su cobertura e2e para ser una unidad coherente y verificable; lo mismo para tabla). Partirla en múltiples PRs más pequeños dentro de esta misma fase fragmentaría unidades TDD atómicas sin reducir el acoplamiento real. Se recomienda **`size:exception`** para PR5a tal como está — no se intentó recortar código, comentarios o tests para ajustar el número.
+
+### Work Unit Evidence
+
+| Evidencia | Valor |
+|---|---|
+| Comando de test enfocado y resultado exacto | `pnpm test` → `57 archivos / 241 tests` GREEN |
+| Comando/escenario de runtime y resultado exacto | `pnpm build` (`next build`, Turbopack) GREEN; `pnpm exec playwright test tests/e2e/slash-command.spec.ts tests/e2e/notebooks-acceptance.spec.ts --workers=1` → `7/7` GREEN |
+| Rollback boundary | Revertir esta fase: borrar `extensions/table.ts`+test, `highlight-palette.tsx`+test, `callout-node.tsx`+test, `slash-command-items.test.ts`; revertir `extensions/index.ts` (quitar los 3 imports y las 3 líneas agregadas al array), `slash-command-items.ts` (quitar las 4 entradas nuevas), `plain-text.test.ts` y `to-plain-tiptap-doc.test.ts` (quitar los 3 casos nuevos, sin cambios de producción que revertir en esos dos archivos), `tests/e2e/slash-command.spec.ts` (quitar los 2 casos nuevos y el acotamiento de `pageLink` en el caso "/cita"), `package.json`/`pnpm-lock.yaml` (quitar `@tiptap/extension-table` y `@tiptap/extension-highlight`). Ningún archivo de PR0–PR4 fuera de estos se tocó. |
+
+### Estado
+
+Fase 5a: 5a.1–5a.9 completas. Gate completo en verde (`pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm depcruise`, `pnpm build`, e2e combinado `slash-command` + `notebooks-acceptance` 7/7). No se creó commit de trabajo en este batch (lo decide el orquestador, junto con el presupuesto de revisión — ver arriba, recomendación `size:exception`). Pendiente abierto no bloqueante: decidir la UI de selección de resaltado (bubble menu vs. entradas `/resaltar <color>`) antes de que la Fase 5b dependa de ella.

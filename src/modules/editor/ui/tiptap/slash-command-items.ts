@@ -95,4 +95,64 @@ export const SLASH_COMMAND_ITEMS: SlashCommandItem[] = [
     run: (editor, range) =>
       editor.chain().focus().deleteRange(range).setHorizontalRule().run(),
   },
+  {
+    id: "table",
+    label: "tabla",
+    keywords: ["table", "filas", "columnas"],
+    run: (editor, range) =>
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertTable({ rows: 2, cols: 2, withHeaderRow: true })
+        .run(),
+  },
+  {
+    id: "callout-idea",
+    label: "callout de idea",
+    keywords: ["idea", "callout"],
+    run: (editor, range) =>
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertContent({
+          type: "callout",
+          attrs: { kind: "idea" },
+          content: [{ type: "paragraph" }],
+        })
+        .run(),
+  },
+  {
+    id: "callout-note",
+    label: "callout de nota",
+    keywords: ["nota", "note", "callout"],
+    run: (editor, range) =>
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertContent({
+          type: "callout",
+          attrs: { kind: "note" },
+          content: [{ type: "paragraph" }],
+        })
+        .run(),
+  },
+  {
+    id: "callout-warning",
+    label: "callout de advertencia",
+    keywords: ["advertencia", "warning", "callout"],
+    run: (editor, range) =>
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertContent({
+          type: "callout",
+          attrs: { kind: "warning" },
+          content: [{ type: "paragraph" }],
+        })
+        .run(),
+  },
 ];

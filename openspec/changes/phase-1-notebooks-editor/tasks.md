@@ -135,15 +135,15 @@ Traceability: `specs/editor/spec.md` → "Autosave con debounce y actualización
 
 Traceability: `specs/editor/spec.md` → "Conjunto completo de bloques de §3.2" (tabla, callouts), "Paleta de resaltado de Cogni y callouts".
 
-- [ ] 5a.1 Crear `src/modules/editor/ui/tiptap/extensions/table.ts` con `@tiptap/extension-table`, `@tiptap/extension-table-row`, `@tiptap/extension-table-cell`, `@tiptap/extension-table-header`; agregar al `editor.tsx` y al `command-menu.tsx`.
-- [ ] 5a.2 RED test de componente `table.test.tsx`: insertar tabla, agregar fila y columna, escribir en una celda, verificar persistencia de dimensiones y texto tras serializar (Scenario "Tabla editable", validar con Testing Library el estado serializado, no solo el DOM).
-- [ ] 5a.3 Actualizar `tests/e2e/slash-command.spec.ts`: agregar el caso "/tabla" completo ahora que la extensión existe.
-- [ ] 5a.4 Crear `src/modules/editor/ui/tiptap/highlight-palette.tsx`: extiende `@tiptap/extension-highlight` para almacenar el nombre de color de la paleta (`pink`,`green`,`yellow`,`purple`,`orange`,`blue`,`mint`) en vez de hex; renderiza con los tokens `-fg` del sistema de diseño.
-- [ ] 5a.5 RED test de componente `highlight.test.tsx`: elegir resaltado `purple` produce `{ color: "purple" }` en el JSON, sin hex, y el render usa el token `purple`/`purple-fg` (Scenario "Resaltado por nombre").
-- [ ] 5a.6 Crear `src/modules/editor/ui/tiptap/callout-node.tsx`: nodo de callout con tipos `idea`/`note`/`warning` mapeados a `yellow`/`blue`/`orange`, ícono de Lucide por tipo, sin códigos hex en línea.
-- [ ] 5a.7 RED test de componente `callout.test.tsx`: callout `warning` usa los tokens del color `orange` y su ícono de Lucide (Scenario "Callout de advertencia").
-- [ ] 5a.8 Actualizar `command-menu.tsx`: agregar entradas para tabla y los tres callouts.
-- [ ] 5a.9 Gate PR5a: `pnpm test -- editor`, `pnpm typecheck`, `pnpm depcruise`, `pnpm test:e2e -- slash-command` en verde. Commit de trabajo (`feat(editor): add table, callouts and Cogni highlight palette`).
+- [x] 5a.1 Crear `src/modules/editor/ui/tiptap/extensions/table.ts` con `@tiptap/extension-table` (`TableKit.configure({ table: { resizable: false } })`, que agrupa row/cell/header — ver Deviations); agregar a `extensions/index.ts`, consumido por `editor.tsx`.
+- [x] 5a.2 RED test de componente `table.test.tsx`: insertar tabla, agregar fila y columna, escribir en una celda, verificar persistencia de dimensiones y texto tras serializar (Scenario "Tabla editable", validado sobre `editor.getJSON()`, no solo el DOM).
+- [x] 5a.3 Actualizar `tests/e2e/slash-command.spec.ts`: agregar el caso "/tabla" completo ahora que la extensión existe (y "/advertencia" para el callout).
+- [x] 5a.4 Crear `src/modules/editor/ui/tiptap/highlight-palette.tsx`: extiende `@tiptap/extension-highlight` para almacenar el nombre de color de la paleta (`pink`,`green`,`yellow`,`purple`,`orange`,`blue`,`mint`) en vez de hex; renderiza con los tokens `-fg` del sistema de diseño.
+- [x] 5a.5 RED test de componente `highlight.test.tsx`: elegir resaltado `purple` produce `{ color: "purple" }` en el JSON, sin hex, y el render usa el token `purple`/`purple-fg` (Scenario "Resaltado por nombre").
+- [x] 5a.6 Crear `src/modules/editor/ui/tiptap/callout-node.tsx`: nodo de callout con tipos `idea`/`note`/`warning` mapeados a `yellow`/`blue`/`orange`, ícono de Lucide por tipo, sin códigos hex en línea.
+- [x] 5a.7 RED test de componente `callout.test.tsx`: callout `warning` usa los tokens del color `orange` y su ícono de Lucide (Scenario "Callout de advertencia").
+- [x] 5a.8 Actualizar `slash-command-items.ts` (ver Deviations): agregar entradas para tabla y los tres callouts.
+- [x] 5a.9 Gate PR5a: `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm depcruise`, `pnpm build`, `pnpm exec playwright test tests/e2e/slash-command.spec.ts tests/e2e/notebooks-acceptance.spec.ts --workers=1` en verde. Commit de trabajo pendiente (lo decide el orquestador, junto con el presupuesto de revisión — ver apply-progress.md).
 
 ## Phase 5b: Resaltado de sintaxis y estilos finales (PR5b)
 
@@ -155,6 +155,7 @@ Open Question resuelta: se usa `lowlight` (no `shiki`) porque `design.md` ya fij
 - [ ] 5b.2 Crear `src/modules/editor/ui/tiptap/extensions/code-block.ts`: configura `CodeBlockLowlight` con el registro de lenguajes de 5b.1 y un selector de lenguaje en la UI del bloque.
 - [ ] 5b.3 RED test de componente `code-block.test.tsx`: bloque de código con lenguaje `typescript` renderiza con resaltado y persiste el atributo de lenguaje (Scenario "Bloque de código con lenguaje").
 - [ ] 5b.4 Aplicar el tema de resaltado de sintaxis con los tokens de `docs/design-system/colors_and_type.css` (JetBrains Mono ya vigente desde la Fase 0), sin introducir un tema de terceros con colores propios.
+- [ ] 5b.4b Crear el selector de resaltado: un control inline (menú burbuja sobre la selección o entradas `/resaltar <color>` del menú de comandos) que aplique la marca `CogniHighlight` con un nombre de la paleta; RED test de componente que verifica que elegir un color desde el control produce `{ color: "<nombre>" }` en el JSON (cierra el hueco dejado en 5a.4: la marca existe pero no era alcanzable desde la UI).
 - [ ] 5b.5 RED test `no-inline-hex.test.tsx` sobre `src/modules/editor/ui/**`: inspecciona clases/estilos de los componentes del editor y falla si encuentra un código hexadecimal en línea (Scenario "Ausencia de valores literales").
 - [ ] 5b.6 Revisión manual de copy: todo texto visible del editor y el menú "/" en español "tú", oración con minúscula inicial, sin emoji, foco visible y respeto de `prefers-reduced-motion` (Scenario "Revisión de textos del editor", e2e manual o Playwright con `prefers-reduced-motion: reduce` emulado).
 - [ ] 5b.7 Gate PR5b: `pnpm test -- editor`, `pnpm typecheck`, `pnpm depcruise` en verde. Commit de trabajo (`feat(editor): add syntax-highlighted code blocks and finish design-system pass`).
