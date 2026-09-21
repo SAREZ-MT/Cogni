@@ -201,6 +201,50 @@
   }
 }
 
+/* Syntax highlighting for the editor's code block (design.md, "Aplicar
+   el tema de resaltado de sintaxis"): `.hljs-*` classes come from
+   `lowlight`/`highlight.js` (src/modules/editor/ui/tiptap/extensions/
+   code-block.tsx) and are mapped onto the existing design tokens above,
+   never a third-party theme's own hex palette. JetBrains Mono already
+   applies to `pre code` via the shared `font-mono` utility. */
+.hljs-comment,
+.hljs-quote {
+  color: var(--fg-muted);
+  font-style: italic;
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-literal {
+  color: var(--color-pastel-blue-fg);
+}
+
+.hljs-string,
+.hljs-regexp {
+  color: var(--color-pastel-green-fg);
+}
+
+.hljs-number {
+  color: var(--color-pastel-orange-fg);
+}
+
+.hljs-title,
+.hljs-title.function_,
+.hljs-function .hljs-title {
+  color: var(--color-pastel-purple-fg);
+}
+
+.hljs-attr,
+.hljs-attribute,
+.hljs-variable {
+  color: var(--color-pastel-pink-fg);
+}
+
+.hljs-built_in,
+.hljs-type {
+  color: var(--color-pastel-mint-fg);
+}
+
 /* Unlayered on purpose: beats utility transitions without !important. */
 @media (prefers-reduced-motion: reduce) {
   *,
