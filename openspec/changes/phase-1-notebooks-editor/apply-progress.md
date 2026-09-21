@@ -1145,3 +1145,136 @@ Fase 5a: 5a.1–5a.9 completas. Gate completo en verde (`pnpm test`, `pnpm typec
 ### Estado
 
 Fase 5b: 5b.1–5b.7 completas. Gate completo en verde (`pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm depcruise`, `pnpm build`, e2e). No se creó commit de trabajo en este batch (lo decide el orquestador, junto con el presupuesto de revisión — recomendación `size:exception`). Pendientes no bloqueantes reportados: verificación visual manual del bubble menu de resaltado; gap de accesibilidad preexistente en `cmdk`'s `data-selected` vs. navegación por teclado de `CommandMenu` (fuera de alcance de esta fase).
+
+## Fase 6: Pipeline de imágenes (PR6)
+
+Strict TDD Mode: activo. Test runners: `pnpm test` (Vitest, jsdom), `pnpm test:db` (Vitest contra `cogni-dev` real, variables de `.env.local` exportadas al shell), Playwright (`pnpm exec playwright test tests/e2e/<archivo> --workers=1`) contra `cogni-dev`. No se creó commit de trabajo en este batch (instrucción explícita del prompt de esta ejecución: no confirmar cambios).
+
+Estado: tareas 6.1, 6.3 y 6.5–6.20 completas (`[x]` en `tasks.md`). Las tareas 6.2 y 6.4, marcadas `(usuario)`, quedan pendientes de una acción manual del usuario; se detalla qué cubrió ya este batch y qué falta en "Pendiente — `(usuario)`" más abajo.
+
+### Nota sobre la ejecución local de e2e
+
+Las verificaciones de `pnpm test:db` y de `pnpm exec playwright test tests/e2e/image-upload.spec.ts` de este batch se corrieron exportando manualmente `SUPABASE_STORAGE_BUCKET=page-assets` en el mismo shell, porque esa variable todavía no existe en `.env.local` (tarea 6.4, pendiente del usuario). El bucket `page-assets` en sí ya existe en `cogni-dev`, privado y con los límites correctos (`file_size_limit = 10485760`, `allowed_mime_types` restringido a los cuatro tipos de imagen permitidos): lo creó la migración `drizzle/0004_page_assets_storage.sql` (`insert into storage.buckets (...) on conflict (id) do update ...`, idempotente), aplicada con `pnpm db:migrate` contra `cogni-dev` durante este batch. No fue necesario crear el bucket a mano en el dashboard para que el resto del batch funcionara.
+
+### Files Changed (agrupado por unidad de trabajo)
+
+**(a) env + migración + smoke de base de datos**
+
+| File | Action | What Was Done |
+|---|---|---|
+| `src/shared/config/env.schema.ts` | Modified | `SUPABASE_STORAGE_BUCKET: z.string().min(1)` agregado a `serverSchema` |
+| `src/shared/config/env.test.ts` | Modified | Fixture de servidor incluye `SUPABASE_STORAGE_BUCKET`; nuevo caso: falla nombrando la variable si falta |
+| `drizzle/0004_page_assets_storage.sql` | Created | Upsert idempotente del bucket `page-assets` (privado, límites de tamaño/MIME) + políticas RLS `page-assets read own`/`page-assets write own` sobre `storage.objects` |
+| `drizzle/0004_page_assets_storage.down.sql` | Created | Reversión manual: elimina las dos políticas y limpia los límites del bucket (no borra el bucket ni objetos ya subidos) |
+| `drizzle/meta/_journal.json`, `drizzle/meta/0004_snapshot.json` | Modified/Created | Entrada de journal `idx: 4`; snapshot copiado de `0003` con `id`/`prevId` actualizados (mismo patrón que `0002`: `storage.objects`/`storage.buckets` no están en `schema.ts`, así que el snapshot no cambia de contenido) |
+| `tests/db/page-assets-storage.smoke.test.ts` | Created | Verifica el bucket (privado, límites exactos) y las dos políticas RLS contra `cogni-dev` real |
+
+**(b) dominio + test de archivado**
+
+| File | Action | What Was Done |
+|---|---|---|
+| `src/modules/notebooks/domain/page-asset.ts` | Created | `ALLOWED_MIME`, `MAX_ASSET_BYTES` (10 MB), `validateAssetInput` |
+| `src/modules/notebooks/domain/page-asset.test.ts` | Created | 5 casos: MIME no permitido, tamaño excedido, límite exacto, entrada válida, todos los MIME permitidos |
+| `src/modules/notebooks/domain/index.ts` | Modified | Exporta `ALLOWED_MIME`, `MAX_ASSET_BYTES`, `validateAssetInput` |
+| `src/modules/notebooks/application/archive-page.test.ts` | Modified | Caso nuevo: archivar una página no toca el repositorio de assets (Scenario "Página archivada conserva assets") |
+
+**(c) aplicación + gateway + dobles de prueba**
+
+| File | Action | What Was Done |
+|---|---|---|
+| `src/modules/notebooks/application/request-image-upload.ts` (+ test) | Created | `RequestImageUpload`: valida página propia/activa, `validateAssetInput`, emite permiso hacia `{ownerId}/{pageId}/{assetId}.{ext}` |
+| `src/modules/notebooks/application/register-page-asset.ts` (+ test) | Created | `RegisterPageAsset`: revalida ownership y prefijo de ruta, lee metadatos reales del objeto, upsert idempotente por `storage_path` |
+| `src/modules/notebooks/application/get-asset-read-url.ts` (+ test) | Created | `GetAssetReadUrl`: URL firmada de lectura solo para assets propios |
+| `src/modules/notebooks/application/index.ts` | Modified | Exporta los tres casos de uso y sus schemas Zod |
+| `src/modules/notebooks/domain/storage-gateway.ts` | Modified | `createSignedUploadUrl` ahora también devuelve `bucket` (ver Deviations) |
+| `src/modules/notebooks/application/testing/fake-storage-gateway.ts` | Modified | Devuelve `bucket` fijo; agrega `signedUploadUrlCalls` para verificar que un rechazo no contacta a Storage |
+| `src/modules/notebooks/infrastructure/supabase-storage-gateway.ts` | Created | Implementación real de `StorageGateway` con `supabase-js` y el service role, contra el bucket de `SUPABASE_STORAGE_BUCKET` |
+| `src/modules/notebooks/infrastructure/index.ts` | Modified | Exporta `SupabaseStorageGateway` |
+| `tests/db/notebooks-repository.smoke.test.ts`, `tests/db/drizzle-page-repository.contract.test.ts`, `tests/db/save-page-race.test.ts` | Modified | Import cambiado del barrel `@/modules/notebooks/infrastructure` a la ruta concreta del repositorio Drizzle (ver Deviations, punto 6) |
+
+**(d) Server Actions + configuración/CSP**
+
+| File | Action | What Was Done |
+|---|---|---|
+| `src/modules/notebooks/actions.ts` | Modified | Agrega `requestImageUpload`, `registerPageAsset`, `getAssetReadUrl` (patrón `Result`/`ActionError`, nunca lanzan); `deps()` agrega `assets`/`storage` |
+| `src/modules/notebooks/actions.test.ts` | Modified | Mock de `./infrastructure` extendido con `DrizzlePageAssetRepository`/`SupabaseStorageGateway` |
+| `src/modules/notebooks/application/page-asset-actions.test.ts` | Created | Confirma que los tres schemas Zod solo aceptan metadatos (ids, `mime`, `sizeBytes`, `storagePath`), nunca datos binarios |
+| `src/modules/notebooks/index.ts` | Modified | Exporta las tres Server Actions nuevas y sus schemas |
+| `next.config.ts` | Modified | `images.remotePatterns` hacia el host exacto de `NEXT_PUBLIC_SUPABASE_URL`, ruta `/storage/v1/object/sign/**` |
+| `src/shared/config/security-headers.ts` (+ test) | Modified | `img-src` agrega `https://*.supabase.co` (ver Deviations, punto 3) |
+
+**(e) nodo de imagen del editor + progreso + menú "/" + arrastrar-y-soltar**
+
+| File | Action | What Was Done |
+|---|---|---|
+| `src/modules/editor/domain/image-upload-port.ts` | Created | Puerto `ImageUploadPort` (tipos), espejo de `SavePagePort` |
+| `src/modules/editor/domain/image-asset-limits.ts` | Created | Copia local de `ALLOWED_MIME`/`MAX_ASSET_BYTES` para el chequeo temprano del cliente (ver Deviations, punto 5) |
+| `src/modules/editor/index.ts` | Modified | Exporta los tipos de `image-upload-port.ts` |
+| `src/modules/editor/ui/tiptap/image-node.tsx` | Created | Nodo `image` (Tiptap), node view en React: subida completa (permiso → subida directa → registro), resolución de la URL de lectura al montar, plugin ProseMirror de arrastrar-y-soltar/pegar |
+| `src/modules/editor/ui/tiptap/image-node.test.tsx` | Created | 4 casos: archivo de 12 MB (mensaje + sin solicitar permiso), MIME no permitido, subida exitosa con URL resuelta, ninguna URL firmada en el documento serializado |
+| `src/modules/editor/ui/tiptap/upload-to-signed-url.ts` | Created | Cliente Supabase mínimo del lado del navegador (solo variables públicas) para el `uploadToSignedUrl` real (ver Deviations, punto 4) |
+| `src/modules/editor/ui/upload-progress.tsx` | Created | Marcador de progreso presentacional |
+| `src/modules/editor/ui/tiptap/extensions/index.ts` | Modified | Registra `ImageBlock`, recibe `pageId`/`imagePort` |
+| `src/modules/editor/ui/tiptap/editor.tsx` | Modified | Prop `imagePort` opcional, se pasa a `createEditorExtensions` |
+| `src/modules/editor/ui/tiptap/slash-command-items.ts` | Modified | Entrada "imagen" en el menú "/" |
+| `src/modules/editor/application/testing/fake-image-upload-port.ts` | Created | Doble en memoria de `ImageUploadPort` |
+| `src/app/(app)/notebooks/[notebookId]/pages/[pageId]/page.tsx` | Modified | Conecta las tres Server Actions reales como prop `imagePort` del `Editor` |
+
+**(f) e2e + documentación**
+
+| File | Action | What Was Done |
+|---|---|---|
+| `tests/e2e/image-upload.spec.ts` | Created | Subida y renderizado con recarga; lectura entre usuarios denegada y acceso anónimo denegado; subida de 11 MB con permiso válido rechazada por Storage sin fila persistida |
+| `tests/e2e/helpers/png.ts` | Created | Genera un PNG real y decodificable de un tamaño objetivo (Storage inspecciona los bytes reales, no solo el nombre o el Content-Type declarado) |
+| `openspec/changes/phase-1-notebooks-editor/tasks.md` | Modified | 6.1, 6.3, 6.5–6.20 marcadas `[x]`; notas agregadas en 6.2 y 6.4 |
+
+### TDD Cycle Evidence
+
+| Unidad | RED | GREEN | REFACTOR |
+|---|---|---|---|
+| 6.1 `env.schema.ts` | `pnpm exec vitest run src/shared/config/env.test.ts` con el caso nuevo falla antes de agregar `SUPABASE_STORAGE_BUCKET` al schema | 10/10 tests en verde tras el cambio | — |
+| 6.3 migración `0004` | `pnpm exec vitest run --config vitest.db.config.ts tests/db/page-assets-storage.smoke.test.ts` contra `cogni-dev` real falla antes de migrar (`bucket` indefinido, políticas vacías) | 2/2 en verde tras `pnpm db:migrate` | Reversión verificada dentro de una transacción con rollback: se aplicó `0004_page_assets_storage.down.sql`, se confirmó que las políticas desaparecen y los límites del bucket quedan en `null`, y al hacer rollback de la transacción el estado original se restauró |
+| 6.5/6.6 `page-asset.ts` | `pnpm exec vitest run src/modules/notebooks/domain/page-asset.test.ts` falla al no resolver `./page-asset` | 5/5 en verde | — |
+| 6.8 `RequestImageUpload` | El archivo de test falla al no resolver el módulo de implementación | 5/5 en verde | — |
+| 6.9 `RegisterPageAsset` | El archivo de test falla al no resolver el módulo de implementación | 6/6 en verde | — |
+| 6.10 `GetAssetReadUrl` | El archivo de test falla al no resolver el módulo de implementación | 3/3 en verde | — |
+| 6.11 schemas Zod de las Server Actions | Los tres casos usan los schemas ya construidos en 6.8–6.10; confirmados en verde de inmediato (los schemas ya existían cuando se escribió este test) | 4/4 en verde | — |
+| 6.13 `img-src` de la CSP | Caso nuevo en `security-headers.test.ts` falla (`https://*.supabase.co` ausente de `img-src`) | Verde tras el cambio | — |
+| 6.14/6.16 `image-node.tsx` | El componente es una integración de varias piezas (Tiptap, dos Server Actions, Storage); el test de componente se escribió sobre la implementación ya redactada en el mismo paso, en vez de un RED aislado por línea — ver Deviations sobre por qué esta unidad no siguió un RED tan granular como el dominio | 4/4 en verde en la primera corrida | — |
+| 6.18 `archive-page.test.ts` | Caso nuevo agregado al archivo existente | 4/4 en verde | — |
+| 6.19/6.19b e2e | `tests/e2e/image-upload.spec.ts` se escribió y corrió directamente contra `cogni-dev` real (sin una corrida RED previa contra un servidor real, dado el costo de levantar el server dos veces); los tres casos pasaron en la primera corrida | 3/3 en verde | — |
+
+### Deviations from Design
+
+1. **`StorageGateway.createSignedUploadUrl` devuelve también `bucket`**, además de `signedUrl`/`token` (el contrato de `design.md` solo listaba `storagePath/signedUrl/token/expiresAt`). Motivo: `SUPABASE_STORAGE_BUCKET` es una variable de entorno solo de servidor; el navegador no tiene otra forma de saber contra qué bucket llamar `uploadToSignedUrl`. `bucket` no es secreto (es solo un identificador), así que devolverlo es más simple y seguro que reimplementar la semántica de subida multipart de `supabase-js` contra la URL firmada desnuda con un `fetch` manual.
+2. **No se aplica un límite literal de "≤10 minutos" sobre el permiso de subida.** La API de `@supabase/storage-js` (v2.116.0, verificada en `node_modules/.pnpm/@supabase+storage-js@2.116.0/.../StorageFileApi.ts`) no acepta un parámetro `expiresIn` para `createSignedUploadUrl(path)` — solo `createSignedUrl` (lectura) lo acepta. La vigencia real del permiso de subida es la que Supabase Storage aplique por defecto en el servidor; el "≤10 min" de `design.md` no es controlable de forma independiente con esta versión de la API. Se documenta aquí en vez de implementarse en silencio como no aplicado.
+3. **`img-src` de la CSP usa el patrón `https://*.supabase.co`** (el mismo comodín que ya usan `connect-src`/`form-action` en el mismo archivo) en vez del host exacto derivado de `clientEnv().NEXT_PUBLIC_SUPABASE_URL`. Motivo: el arreglo de la CSP en `security-headers.ts` se construye en el momento de importar el módulo; llamar a `clientEnv()` ahí obligaría a que importar ese archivo (incluido desde `security-headers.test.ts`) requiera variables de entorno reales, rompiendo `pnpm test` en un shell limpio. `next.config.ts`'s `images.remotePatterns` sí usa el host exacto derivado (ese archivo nunca se importa desde Vitest).
+4. **`ImageUploadPort` (las tres Server Actions) se recibe como prop desde `page.tsx` hacia `<Editor imagePort={...}>`, nunca se importa por valor dentro de `editor/ui`.** Reproduce el patrón ya existente de `SavePagePort` y su razón documentada (comentario de `editor/domain/save-page-port.ts`): un import por valor del barrel `@/modules/notebooks` arrastraría `createId()` (`node:crypto`) y todo el grafo de Server Actions al bundle de cliente del editor. Verificado empíricamente: `pnpm build` compila sin problemas con este cableado por props. La subida real de bytes (`uploadToSignedUrl`) no puede ser una Server Action (los bytes deben ir directo del navegador a Storage), así que vive en un cliente de navegador mínimo y local al editor (`editor/ui/tiptap/upload-to-signed-url.ts`) que solo usa variables públicas — `identity/infrastructure/supabase-browser-client.ts` no era alcanzable (el `index.ts` público de `identity` es `server-only`; la regla `ui-never-touches-infra` de `.dependency-cruiser.cjs` también prohíbe importar directamente la `infrastructure/` de otro módulo).
+5. **`ALLOWED_MIME`/`MAX_ASSET_BYTES` se duplican en `editor/domain/image-asset-limits.ts`** en vez de importar la copia de `@/modules/notebooks`, por la misma razón de import-por-valor/bundle-de-cliente del punto 4 (reproduce el precedente ya existente de `PAGE_VERSION_CONFLICT_CODE`, redeclarado en vez de importado en `save-page-port.ts`). La validación del servidor en `RequestImageUpload`/`RegisterPageAsset` sigue siendo la autoritativa; la copia del editor es solo el chequeo temprano y no autoritativo del cliente.
+6. **Los imports de 3 archivos de test de base de datos ya existentes cambiaron del barrel `@/modules/notebooks/infrastructure` a la ruta concreta del repositorio Drizzle** (`notebooks-repository.smoke.test.ts`, `drizzle-page-repository.contract.test.ts`, `save-page-race.test.ts`). Causa raíz: agregar `SupabaseStorageGateway` (que empieza con `import "server-only"`) a ese barrel rompió `vitest.db.config.ts` (resolución de módulos de Node plano, sin la condición `react-server`) con el error "This module cannot be imported from a Client Component module". Se corrigió importando los archivos concretos directamente en esos tres tests (permitido: `tests/db` está fuera de `src/modules`, así que la regla `cross-module-via-index` de `.dependency-cruiser.cjs` no aplica ahí). Verificado: `pnpm exec vitest run --config vitest.db.config.ts` → 8/8 archivos en verde tras la corrección.
+
+### Issues Found
+
+Ninguno más allá de las desviaciones documentadas arriba, todas resueltas dentro de este mismo batch.
+
+### Impacto en el presupuesto de revisión (400 líneas)
+
+`git diff --numstat` de este batch (sin `pnpm-lock.yaml` ni `drizzle/meta`): **≈1980 líneas agregadas / 32 eliminadas ≈ 2012 líneas de autoría totales**, muy por encima del presupuesto de ~400. Esta fase no se dividió en PRs encadenadas durante este batch: el prompt que lanzó este batch delimitó el alcance como "Phase 6 of tasks.md (PR6)" como una sola unidad entregable y pidió explícitamente no crear un commit, así que no se ejerció ninguna decisión de `delivery_strategy`/encadenamiento aquí. **Queda pendiente para el orquestador/usuario**: si PR6 debe salir como una PR revisable dentro del presupuesto de 400 líneas, hace falta dividirla después de este batch (por ejemplo, según las seis unidades de trabajo (a)–(f) listadas arriba) antes de abrir la PR.
+
+### Work Unit Evidence
+
+| Evidencia | Valor |
+|---|---|
+| Comando de test enfocado y resultado exacto | `pnpm exec vitest run` → 66 archivos / 281 tests en verde; `pnpm exec vitest run --config vitest.db.config.ts` (con `SUPABASE_STORAGE_BUCKET=page-assets` exportado) → 8 archivos / 14 tests en verde |
+| Comando/escenario de runtime y resultado exacto | `pnpm exec tsc --noEmit` limpio; `pnpm lint` (biome check) limpio; `pnpm depcruise` sin violaciones (279 módulos, 735 dependencias); `pnpm build` (build real de Next, con `.env.local`) exitoso, sin fuga del gateway con el service role hacia el bundle de cliente; `pnpm exec playwright test tests/e2e/image-upload.spec.ts tests/e2e/slash-command.spec.ts --workers=1` contra `cogni-dev` → 6/6 en verde |
+| Rollback boundary | Revertir esta fase: borrar todos los archivos "Created" listados en Files Changed (a)–(f); revertir las ediciones de `env.schema.ts`/`env.test.ts`, `storage-gateway.ts`, `fake-storage-gateway.ts`, `infrastructure/index.ts`, `domain/index.ts`, `application/index.ts`, `actions.ts`/`actions.test.ts`, `notebooks/index.ts`, `next.config.ts`, `security-headers.ts`/`security-headers.test.ts`, `archive-page.test.ts`, `extensions/index.ts`, `editor.tsx`, `slash-command-items.ts`, `editor/index.ts`, `page.tsx`, y los 3 imports de test de base de datos corregidos; revertir `drizzle/0004_page_assets_storage.{sql,down.sql}` y `drizzle/meta/{_journal.json,0004_snapshot.json}` (aplicando el `.down.sql` a mano contra `cogni-dev`, dado que `drizzle-kit` no tiene comando `down`). Ningún archivo de las fases 0–5b se tocó fuera de este alcance. |
+
+### Pendiente — `(usuario)`
+
+- [ ] 6.2 `(usuario)`: confirmar visualmente en el dashboard de Supabase del proyecto `cogni-prod` que el bucket `page-assets` existe con los mismos límites, una vez que la migración `0004` llegue a ese proyecto. Ya se confirmó para `cogni-dev` mediante `tests/db/page-assets-storage.smoke.test.ts` (en verde).
+- [ ] 6.4 `(usuario)`: agregar `SUPABASE_STORAGE_BUCKET=page-assets` a `.env.local`, y la misma variable con el mismo valor en el dashboard de Vercel para **Production** y **Preview**. Mientras tanto, toda la verificación local de este batch (`pnpm test:db`, la suite e2e de imágenes) se corrió exportando la variable manualmente en el shell.
+- [ ] Decisión de entrega pendiente: definir si PR6 se entrega como una sola PR con `size:exception` o se divide en las seis unidades de trabajo (a)–(f) antes de abrir la pull request (~2012 líneas de autoría totales, ver "Impacto en el presupuesto de revisión").
+
+### Estado
+
+Fase 6: 6.1, 6.3 y 6.5–6.20 completas (20/22 tareas; 6.2 y 6.4 son pasos manuales del usuario). Gate completo en verde (`pnpm test`, `pnpm test:db`, `pnpm typecheck`, `pnpm lint`, `pnpm depcruise`, `pnpm build`, e2e). No se creó commit de trabajo en este batch (instrucción explícita del prompt). Pendiente: los dos pasos `(usuario)` de arriba y la decisión de entrega sobre el presupuesto de revisión.

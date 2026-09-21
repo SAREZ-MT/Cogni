@@ -17,6 +17,11 @@ export {
   type NewPage,
   type Page,
 } from "./page";
+export {
+  ALLOWED_MIME,
+  MAX_ASSET_BYTES,
+  validateAssetInput,
+} from "./page-asset";
 export type { PageAsset, PageAssetRepository } from "./page-asset-repository";
 export type {
   PageRepository,

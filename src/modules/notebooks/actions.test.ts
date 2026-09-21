@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { FakeStorageGateway } from "./application/testing/fake-storage-gateway";
 import { InMemoryNotebookRepository } from "./application/testing/in-memory-notebook-repository";
+import { InMemoryPageAssetRepository } from "./application/testing/in-memory-page-asset-repository";
 import { InMemoryPageRepository } from "./application/testing/in-memory-page-repository";
 
 // Session and repositories are mocked so this test proves the two Server
@@ -14,6 +16,8 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 const notebooks = new InMemoryNotebookRepository();
 const pages = new InMemoryPageRepository();
+const assets = new InMemoryPageAssetRepository();
+const storage = new FakeStorageGateway();
 vi.mock("@/shared/db/client", () => ({ getDb: () => ({}) }));
 vi.mock("./infrastructure", () => ({
   DrizzleNotebookRepository: vi.fn(function DrizzleNotebookRepository() {
@@ -21,6 +25,12 @@ vi.mock("./infrastructure", () => ({
   }),
   DrizzlePageRepository: vi.fn(function DrizzlePageRepository() {
     return pages;
+  }),
+  DrizzlePageAssetRepository: vi.fn(function DrizzlePageAssetRepository() {
+    return assets;
+  }),
+  SupabaseStorageGateway: vi.fn(function SupabaseStorageGateway() {
+    return storage;
   }),
 }));
 

@@ -29,6 +29,13 @@
       "when": 1789964406049,
       "tag": "0003_notebooks_pages_assets",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790026435234,
+      "tag": "0004_page_assets_storage",
+      "breakpoints": true
     }
   ]
 }

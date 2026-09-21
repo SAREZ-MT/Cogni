@@ -11,6 +11,11 @@ export type {
 export { useAutosave } from "./application/use-autosave";
 export type { AutosaveState, AutosaveStatus } from "./domain/autosave-state";
 export type {
+  ImageUploadGrant,
+  ImageUploadPort,
+  PageAssetSummary,
+} from "./domain/image-upload-port";
+export type {
   SavePagePort,
   TiptapDoc,
   TiptapNode,

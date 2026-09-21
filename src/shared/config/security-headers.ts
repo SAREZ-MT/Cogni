@@ -8,7 +8,11 @@ const contentSecurityPolicy = [
   // posthog-js fetches its remote config and lazy modules as scripts.
   `script-src 'self' 'unsafe-inline' https://*.posthog.com${isDev ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' blob: data: https://*.googleusercontent.com",
+  // https://*.supabase.co matches connect-src's existing pattern for "the
+  // configured Supabase project" (design.md, "images.remotePatterns y
+  // img-src de CSP en el mismo pase"): getAssetReadUrl's signed read URLs
+  // are served from that same host.
+  "img-src 'self' blob: data: https://*.googleusercontent.com https://*.supabase.co",
   "font-src 'self'",
   "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://*.posthog.com https://*.i.posthog.com",
   "worker-src 'self' blob: data:",

@@ -3,6 +3,7 @@
 import { EditorContent, useEditor } from "@tiptap/react";
 import { useEffect, useRef } from "react";
 import { useAutosave } from "../../application/use-autosave";
+import type { ImageUploadPort } from "../../domain/image-upload-port";
 import type { SavePagePort, TiptapDoc } from "../../domain/save-page-port";
 import { ConflictBanner } from "../conflict-banner";
 import { SaveStatus } from "../save-status";
@@ -15,6 +16,10 @@ export interface EditorProps {
   initialContent: TiptapDoc;
   initialVersion: number;
   port: SavePagePort;
+  // Optional: pages composed without image support (e.g. a future
+  // read-only view) can omit it; the image block then shows a friendly
+  // error instead of throwing (image-node.tsx).
+  imagePort?: ImageUploadPort;
 }
 
 // The Tiptap-backed block editor (design.md, "Tiptap y ProseMirror solo en
@@ -27,6 +32,7 @@ export function Editor({
   initialContent,
   initialVersion,
   port,
+  imagePort,
 }: EditorProps) {
   const {
     status,
@@ -45,7 +51,10 @@ export function Editor({
   });
 
   const editor = useEditor({
-    extensions: createEditorExtensions(),
+    extensions: createEditorExtensions({
+      pageId,
+      imagePort: imagePort ?? null,
+    }),
     content: initialContent as unknown as Record<string, unknown>,
     immediatelyRender: false,
     onUpdate: ({ editor: current }) => {

@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { createFixedClock } from "@/shared/kernel/clock";
+import { createId } from "@/shared/kernel/id";
 import { archivePage } from "./archive-page";
 import { createNotebook } from "./create-notebook";
 import { createPage } from "./create-page";
 import { InMemoryNotebookRepository } from "./testing/in-memory-notebook-repository";
+import { InMemoryPageAssetRepository } from "./testing/in-memory-page-asset-repository";
 import { InMemoryPageRepository } from "./testing/in-memory-page-repository";
 
 const NOW = new Date("2026-09-20T10:00:00.000Z");
@@ -64,5 +66,30 @@ describe("archivePage use case", () => {
     expect(result.ok).toBe(false);
     const stored = await deps.pages.findById(page.id);
     expect(stored?.archivedAt).toBeNull();
+  });
+
+  // specs/page-assets/spec.md, "Assets de páginas archivadas" (Scenario:
+  // "Página archivada conserva assets"): archiving a page MUST NOT touch
+  // its page_assets rows or Storage objects.
+  it("does not delete the page's assets (Scenario: Página archivada conserva assets)", async () => {
+    const deps = makeDeps();
+    const page = await setupPage(deps);
+    const assets = new InMemoryPageAssetRepository();
+    const now = NOW;
+    await assets.upsert({
+      id: createId(),
+      ownerId: OWNER_ID,
+      pageId: page.id,
+      storagePath: `${OWNER_ID}/${page.id}/${createId()}.png`,
+      mime: "image/png",
+      sizeBytes: 1024,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const result = await archivePage({ pageId: page.id }, deps, OWNER_ID);
+
+    expect(result.ok).toBe(true);
+    expect(assets.count()).toBe(1);
   });
 });

@@ -38,6 +38,16 @@ describe("securityHeaders", () => {
     expect(worker).toContain("data:");
   });
 
+  it("lets images load from Supabase Storage, blob and data URLs (design.md, page-assets)", () => {
+    const img =
+      header("Content-Security-Policy")
+        ?.split("; ")
+        .find((d) => d.startsWith("img-src")) ?? "";
+    expect(img).toContain("https://*.supabase.co");
+    expect(img).toContain("blob:");
+    expect(img).toContain("data:");
+  });
+
   it("lets the browser reach Supabase, Sentry and PostHog only", () => {
     const connect =
       header("Content-Security-Policy")
