@@ -16,10 +16,14 @@ import {
   archivePage as archivePageUseCase,
   createNotebook as createNotebookUseCase,
   createPage as createPageUseCase,
+  getAssetReadUrl as getAssetReadUrlUseCase,
   getPage as getPageUseCase,
+  type ImageUploadGrant,
   listSidebar,
+  registerPageAsset as registerPageAssetUseCase,
   renameNotebook as renameNotebookUseCase,
   renamePage as renamePageUseCase,
+  requestImageUpload as requestImageUploadUseCase,
   type SidebarNotebook,
   savePage as savePageUseCase,
   setNotebookAppearance as setNotebookAppearanceUseCase,
@@ -27,10 +31,13 @@ import {
 import { NOTEBOOKS_ERROR } from "./domain/errors";
 import type { Notebook } from "./domain/notebook";
 import type { Page } from "./domain/page";
+import type { PageAsset } from "./domain/page-asset-repository";
 import type { TiptapDoc } from "./domain/plain-text";
 import {
   DrizzleNotebookRepository,
+  DrizzlePageAssetRepository,
   DrizzlePageRepository,
+  SupabaseStorageGateway,
 } from "./infrastructure";
 import {
   messageForNotebooksErrorCode,
@@ -84,6 +91,8 @@ function deps() {
   return {
     notebooks: new DrizzleNotebookRepository(db),
     pages: new DrizzlePageRepository(db),
+    assets: new DrizzlePageAssetRepository(db),
+    storage: new SupabaseStorageGateway(),
     clock: systemClock,
   };
 }
@@ -221,6 +230,41 @@ export async function getNotebookForRoute(
     return null;
   }
   return { notebook, pages: await pages.listActiveByNotebook(notebook.id) };
+}
+
+// design.md, "Subida de imagen firmada": the image node view (editor/ui)
+// treats every failure as a friendly Spanish message, never a thrown
+// exception, so these three follow saveContent/getCurrentContent's
+// Result-returning pattern instead of unwrap().
+
+export async function requestImageUpload(
+  input: unknown,
+): Promise<Result<ImageUploadGrant, ActionError>> {
+  const ownerId = await requireOwnerIdResult();
+  if (!ownerId.ok) return ownerId;
+  const result = await requestImageUploadUseCase(input, deps(), ownerId.value);
+  if (!result.ok) return err(toActionError(result.error));
+  return result;
+}
+
+export async function registerPageAsset(
+  input: unknown,
+): Promise<Result<PageAsset, ActionError>> {
+  const ownerId = await requireOwnerIdResult();
+  if (!ownerId.ok) return ownerId;
+  const result = await registerPageAssetUseCase(input, deps(), ownerId.value);
+  if (!result.ok) return err(toActionError(result.error));
+  return result;
+}
+
+export async function getAssetReadUrl(
+  input: unknown,
+): Promise<Result<{ url: string }, ActionError>> {
+  const ownerId = await requireOwnerIdResult();
+  if (!ownerId.ok) return ownerId;
+  const result = await getAssetReadUrlUseCase(input, deps(), ownerId.value);
+  if (!result.ok) return err(toActionError(result.error));
+  return result;
 }
 
 export async function getPageForRoute(
