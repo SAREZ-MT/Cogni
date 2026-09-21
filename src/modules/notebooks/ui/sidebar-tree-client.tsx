@@ -48,11 +48,14 @@ export function SidebarTreeClient({
     const previous = queryClient.getQueryData<SidebarNotebook[]>(
       SIDEBAR_TREE_QUERY_KEY,
     );
-    const applied = updater(previous ?? []);
-    queryClient.setQueryData<SidebarNotebook[]>(
-      SIDEBAR_TREE_QUERY_KEY,
-      applied,
-    );
+    // Keep the reference TanStack actually stored: structural sharing may
+    // replace the array we pass in with a fresh copy, and rollbackOn compares
+    // the cache against this exact reference.
+    const applied =
+      queryClient.setQueryData<SidebarNotebook[]>(
+        SIDEBAR_TREE_QUERY_KEY,
+        updater(previous ?? []),
+      ) ?? [];
     return { previous, applied };
   }
 

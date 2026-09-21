@@ -92,6 +92,34 @@ describe("SidebarTreeClient", () => {
   // A failed mutation's rollback must never clobber a sibling mutation's
   // own optimistic update that landed on the tree afterward (the rollback
   // snapshot goes stale the moment another mutation touches the tree).
+  it("rolls back a lone failed rename to the previous title", async () => {
+    renameNotebook.mockRejectedValue(new Error("network error"));
+    // Never resolves: the rollback itself must restore the title, not the
+    // refetch triggered by onSettled.
+    getSidebarTree.mockReturnValue(new Promise(() => {}));
+
+    const initialNotebooks: SidebarNotebook[] = [
+      { id: "n1", title: "Cuaderno 1", icon: null, color: null, pages: [] },
+    ];
+    const user = userEvent.setup();
+    render(<SidebarTreeClient initialNotebooks={initialNotebooks} />, {
+      wrapper: Wrapper,
+    });
+
+    await user.dblClick(screen.getByRole("button", { name: "Cuaderno 1" }));
+    await user.clear(screen.getByDisplayValue("Cuaderno 1"));
+    await user.type(screen.getByRole("textbox"), "Cuaderno renombrado{Enter}");
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+
+    expect(renameNotebook).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("Cuaderno renombrado")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Cuaderno 1" }),
+    ).toBeInTheDocument();
+  });
+
   it("keeps a sibling mutation's optimistic update after a concurrent mutation's rollback", async () => {
     let rejectRenameNotebook!: (error: Error) => void;
     renameNotebook.mockReturnValue(
