@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import { getCurrentUser } from "@/modules/identity";
 import { getDb } from "@/shared/db/client";
 import { systemClock } from "@/shared/kernel/clock";
@@ -29,6 +30,13 @@ import {
   messageForNotebooksErrorCode,
   NOTEBOOKS_COPY,
 } from "./ui/notebooks-copy";
+
+// Same shape as the other actions' Zod schemas (application/*.ts): plain
+// `z.string()` ids, rejecting malformed shapes before touching the repos.
+const routePageParamsSchema = z.object({
+  notebookId: z.string(),
+  pageId: z.string(),
+});
 
 // Server Actions are the only client-reachable entry point of this module
 // (specs/notebooks/spec.md, "Puntos de entrada mediante Server Actions
@@ -156,12 +164,25 @@ export async function getNotebookForRoute(
   return { notebook, pages: await pages.listActiveByNotebook(notebook.id) };
 }
 
-export async function getPageForRoute(pageId: string): Promise<Page | null> {
+export async function getPageForRoute(
+  notebookId: string,
+  pageId: string,
+): Promise<Page | null> {
+  const parsed = routePageParamsSchema.safeParse({ notebookId, pageId });
+  if (!parsed.success) return null;
+
   const ownerId = await requireOwnerId();
   const result = await getPageUseCase(
-    { pageId },
+    { pageId: parsed.data.pageId },
     { pages: deps().pages },
     ownerId,
   );
-  return result.ok ? result.value : null;
+  // ownerId/archived_at are already enforced by getPageUseCase; a page that
+  // resolves but belongs to a different notebook than the route param is
+  // still not a match for this route (a foreign notebookId must not leak
+  // that the pageId exists under some other notebook it does own).
+  if (!result.ok || result.value.notebookId !== parsed.data.notebookId) {
+    return null;
+  }
+  return result.value;
 }

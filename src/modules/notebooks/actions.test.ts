@@ -77,4 +77,37 @@ describe("notebooks Server Actions", () => {
       );
     });
   });
+
+  describe("getPageForRoute", () => {
+    beforeEach(() => {
+      getCurrentUser.mockResolvedValue({ id: OWNER_ID, email: "a@b.com" });
+    });
+
+    it("returns null when the page belongs to a different notebook than the route param", async () => {
+      const { createNotebook, createPage, getPageForRoute } = await import(
+        "./actions"
+      );
+      const notebookA = await createNotebook({ title: "Cuaderno A" });
+      const notebookB = await createNotebook({ title: "Cuaderno B" });
+      const page = await createPage({ notebookId: notebookA.id });
+
+      // The route param says notebookB, but the page actually lives under
+      // notebookA: this must not resolve, even though pageId/ownerId match.
+      const result = await getPageForRoute(notebookB.id, page.id);
+
+      expect(result).toBeNull();
+    });
+
+    it("returns the page when it belongs to the notebook in the route param", async () => {
+      const { createNotebook, createPage, getPageForRoute } = await import(
+        "./actions"
+      );
+      const notebook = await createNotebook({ title: "Cuaderno" });
+      const page = await createPage({ notebookId: notebook.id });
+
+      const result = await getPageForRoute(notebook.id, page.id);
+
+      expect(result?.id).toBe(page.id);
+    });
+  });
 });

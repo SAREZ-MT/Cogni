@@ -37,21 +37,39 @@ export function SidebarTreeClient({
     initialData: initialNotebooks,
   });
 
+  interface OptimisticContext {
+    previous: SidebarNotebook[] | undefined;
+    applied: SidebarNotebook[];
+  }
+
   function optimisticUpdate(
     updater: (previous: SidebarNotebook[]) => SidebarNotebook[],
-  ): { previous: SidebarNotebook[] | undefined } {
+  ): OptimisticContext {
     const previous = queryClient.getQueryData<SidebarNotebook[]>(
       SIDEBAR_TREE_QUERY_KEY,
     );
+    const applied = updater(previous ?? []);
     queryClient.setQueryData<SidebarNotebook[]>(
       SIDEBAR_TREE_QUERY_KEY,
-      (current) => updater(current ?? []),
+      applied,
     );
-    return { previous };
+    return { previous, applied };
   }
 
-  function rollbackOn(previous: SidebarNotebook[] | undefined) {
-    if (previous) queryClient.setQueryData(SIDEBAR_TREE_QUERY_KEY, previous);
+  // A wholesale rollback to `context.previous` is only safe when nothing
+  // else has touched the tree since this mutation applied its own
+  // optimistic update: two mutations can be in flight at once (each with
+  // its own onMutate snapshot), and restoring an older snapshot after a
+  // sibling mutation already applied its own change would silently discard
+  // that sibling's still-pending update.
+  function rollbackOn(context: OptimisticContext | undefined) {
+    if (!context?.previous) return;
+    const current = queryClient.getQueryData<SidebarNotebook[]>(
+      SIDEBAR_TREE_QUERY_KEY,
+    );
+    if (current === context.applied) {
+      queryClient.setQueryData(SIDEBAR_TREE_QUERY_KEY, context.previous);
+    }
   }
 
   function invalidate() {
@@ -62,11 +80,11 @@ export function SidebarTreeClient({
     mutationFn: (title: string) => createNotebookAction({ title }),
     onMutate: (title) => {
       const tempId = createId();
-      const { previous } = optimisticUpdate((current) => [
+      const context = optimisticUpdate((current) => [
         ...current,
         { id: tempId, title, icon: null, color: null, pages: [] },
       ]);
-      return { previous, tempId };
+      return { ...context, tempId };
     },
     // Patches the real id in immediately instead of waiting for the
     // background refetch (onSettled): otherwise a user who acts on the
@@ -85,7 +103,7 @@ export function SidebarTreeClient({
           ),
       );
     },
-    onError: (_error, _title, context) => rollbackOn(context?.previous),
+    onError: (_error, _title, context) => rollbackOn(context),
     onSettled: invalidate,
   });
 
@@ -98,7 +116,7 @@ export function SidebarTreeClient({
           notebook.id === notebookId ? { ...notebook, title } : notebook,
         ),
       ),
-    onError: (_error, _input, context) => rollbackOn(context?.previous),
+    onError: (_error, _input, context) => rollbackOn(context),
     onSettled: invalidate,
   });
 
@@ -114,7 +132,7 @@ export function SidebarTreeClient({
           notebook.id === notebookId ? { ...notebook, icon, color } : notebook,
         ),
       ),
-    onError: (_error, _input, context) => rollbackOn(context?.previous),
+    onError: (_error, _input, context) => rollbackOn(context),
     onSettled: invalidate,
   });
 
@@ -124,7 +142,7 @@ export function SidebarTreeClient({
       optimisticUpdate((previous) =>
         previous.filter((notebook) => notebook.id !== notebookId),
       ),
-    onError: (_error, _notebookId, context) => rollbackOn(context?.previous),
+    onError: (_error, _notebookId, context) => rollbackOn(context),
     onSettled: invalidate,
   });
 
@@ -132,7 +150,7 @@ export function SidebarTreeClient({
     mutationFn: (notebookId: string) => createPageAction({ notebookId }),
     onMutate: (notebookId) => {
       const tempId = createId();
-      const { previous } = optimisticUpdate((current) =>
+      const context = optimisticUpdate((current) =>
         current.map((notebook) =>
           notebook.id === notebookId
             ? {
@@ -142,7 +160,7 @@ export function SidebarTreeClient({
             : notebook,
         ),
       );
-      return { previous, tempId };
+      return { ...context, tempId };
     },
     // Same reasoning as createNotebook.onSuccess: replace the temporary
     // page id with the real one right away so an immediate follow-up click
@@ -165,7 +183,7 @@ export function SidebarTreeClient({
           ),
       );
     },
-    onError: (_error, _notebookId, context) => rollbackOn(context?.previous),
+    onError: (_error, _notebookId, context) => rollbackOn(context),
     onSettled: invalidate,
   });
 
@@ -181,7 +199,7 @@ export function SidebarTreeClient({
           ),
         })),
       ),
-    onError: (_error, _input, context) => rollbackOn(context?.previous),
+    onError: (_error, _input, context) => rollbackOn(context),
     onSettled: invalidate,
   });
 
@@ -194,7 +212,7 @@ export function SidebarTreeClient({
           pages: notebook.pages.filter((page) => page.id !== pageId),
         })),
       ),
-    onError: (_error, _pageId, context) => rollbackOn(context?.previous),
+    onError: (_error, _pageId, context) => rollbackOn(context),
     onSettled: invalidate,
   });
 

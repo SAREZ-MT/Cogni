@@ -111,8 +111,15 @@ export class DrizzlePageRepository implements PageRepository {
       return { updated: true, version: updated[0].contentVersion };
     }
 
+    // Scoped exactly like the conditional UPDATE above: a page owned by
+    // someone else (or archived) must report as not-found, never leak its
+    // real content_version to a caller probing with the wrong owner_id.
     const current = await this.db.query.pages.findFirst({
-      where: eq(pages.id, input.pageId),
+      where: and(
+        eq(pages.id, input.pageId),
+        eq(pages.ownerId, input.ownerId),
+        isNull(pages.archivedAt),
+      ),
     });
     return { updated: false, currentVersion: current?.contentVersion ?? 0 };
   }

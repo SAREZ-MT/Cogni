@@ -112,5 +112,26 @@ export function runPageRepositoryContract(
       const stored = await repository.findById(ids.pageId);
       expect(stored?.contentVersion).toBe(1);
     });
+
+    it("does not leak the real content_version to a different owner's stale write", async () => {
+      const repository = createRepository();
+      await repository.create(makePage(ids, { contentVersion: 5 }));
+
+      // A caller who does not own the page can never distinguish "this
+      // version is stale" from "this page does not exist for you": the
+      // fallback re-read after a zero-row update MUST be scoped by
+      // owner_id, exactly like the conditional UPDATE itself, instead of
+      // re-reading the row unscoped and reporting the owner's real version.
+      const result = await repository.updateIfVersion({
+        pageId: ids.pageId,
+        ownerId: ids.otherOwnerId,
+        expectedVersion: 5,
+        content: { type: "doc", content: [] },
+        plainText: "intruso",
+        updatedAt: new Date("2026-09-20T11:00:00.000Z"),
+      });
+
+      expect(result).toEqual({ updated: false, currentVersion: 0 });
+    });
   });
 }
