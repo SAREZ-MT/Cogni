@@ -58,30 +58,39 @@ export function useAutosave({
     savingRef.current = true;
     setStatus("saving");
 
-    const result = await port.save({
-      pageId,
-      content: contentRef.current,
-      expectedVersion: versionRef.current,
-    });
-    savingRef.current = false;
+    // The port may reject instead of resolving to a Result (for example a
+    // Server Action failing at the transport level). Treat that like a
+    // failed save: keep the draft, show "error" and retry on the next
+    // pause. The finally block guarantees savingRef is always released.
+    try {
+      const result = await port.save({
+        pageId,
+        content: contentRef.current,
+        expectedVersion: versionRef.current,
+      });
 
-    if (result.ok) {
-      versionRef.current = result.value.version;
-      setStatus("saved");
-    } else if (
-      isDomainError(result.error) &&
-      result.error.code === PAGE_VERSION_CONFLICT_CODE
-    ) {
-      const current = await port.getCurrent(pageId);
-      if (current.ok) {
-        setConflictDraft(contentRef.current);
-        contentRef.current = current.value.content;
-        versionRef.current = current.value.version;
-        setContentState(current.value.content);
+      if (result.ok) {
+        versionRef.current = result.value.version;
+        setStatus("saved");
+      } else if (
+        isDomainError(result.error) &&
+        result.error.code === PAGE_VERSION_CONFLICT_CODE
+      ) {
+        const current = await port.getCurrent(pageId);
+        if (current.ok) {
+          setConflictDraft(contentRef.current);
+          contentRef.current = current.value.content;
+          versionRef.current = current.value.version;
+          setContentState(current.value.content);
+        }
+        setStatus("conflict");
+      } else {
+        setStatus("error");
       }
-      setStatus("conflict");
-    } else {
+    } catch {
       setStatus("error");
+    } finally {
+      savingRef.current = false;
     }
 
     if (dirtyDuringSaveRef.current) {

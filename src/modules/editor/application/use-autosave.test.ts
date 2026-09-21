@@ -95,6 +95,46 @@ describe("useAutosave", () => {
     });
   });
 
+  // Scenario "Fallo de red" (specs/editor/spec.md): the port may reject
+  // instead of resolving to a Result when the transport itself fails.
+  it("recovers from a rejected save: error state, content kept, next pause retries", async () => {
+    const inner = new FakeSavePagePort({ content: doc("v1"), version: 1 });
+    let rejectNext = true;
+    const port: typeof inner = Object.create(inner);
+    port.save = async (input) => {
+      if (rejectNext) {
+        rejectNext = false;
+        throw new Error("transport down");
+      }
+      return inner.save(input);
+    };
+    const { result } = renderHook(() =>
+      useAutosave({
+        pageId: PAGE_ID,
+        initialContent: doc("v1"),
+        initialVersion: 1,
+        port,
+      }),
+    );
+
+    act(() => result.current.setContent(doc("offline edit")));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1500);
+    });
+
+    expect(result.current.status).toBe("error");
+    expect(result.current.content).toEqual(doc("offline edit"));
+
+    act(() => result.current.setContent(doc("back online")));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1500);
+    });
+
+    expect(inner.saveCalls).toHaveLength(1);
+    expect(inner.saveCalls[0]).toMatchObject({ content: doc("back online") });
+    expect(result.current.status).toBe("saved");
+  });
+
   // Scenario "Fallo de red" (specs/editor/spec.md)
   it("shows an error state, keeps the content and retries only on the next pause", async () => {
     const port = new FakeSavePagePort({ content: doc("v1"), version: 1 });
