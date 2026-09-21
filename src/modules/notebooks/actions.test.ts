@@ -154,6 +154,39 @@ describe("notebooks Server Actions", () => {
       if (!result.ok) expect(result.error.code).toBe("PAGE_VERSION_CONFLICT");
     });
 
+    // A Server Action's return value crosses the RSC/Flight boundary:
+    // React redacts Error subclasses on the wire, so a DomainError instance
+    // never survives as one on the client (`instanceof DomainError` would
+    // silently become false again there, the root cause the two-tab
+    // conflict e2e test hit). saveContent/getCurrentContent must already
+    // hand back the plain { code, message } shape isDomainErrorLike() reads,
+    // not a DomainError instance, so no instanceof check downstream can
+    // ever rely on surviving the boundary.
+    it("returns a plain { code, message } error, not a DomainError instance", async () => {
+      const { DomainError } = await import("@/shared/kernel/domain-error");
+      const { createNotebook, createPage, saveContent } = await import(
+        "./actions"
+      );
+      const notebook = await createNotebook({ title: "Cuaderno" });
+      const page = await createPage({ notebookId: notebook.id });
+
+      const result = await saveContent({
+        pageId: page.id,
+        expectedVersion: page.contentVersion + 99,
+        content: { type: "doc", content: [] },
+      });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).not.toBeInstanceOf(DomainError);
+        expect(result.error).not.toBeInstanceOf(Error);
+        expect(result.error).toEqual({
+          code: "PAGE_VERSION_CONFLICT",
+          message: expect.any(String),
+        });
+      }
+    });
+
     it("getCurrentContent returns ok({ content, version }) for the caller's own page", async () => {
       const { createNotebook, createPage, getCurrentContent } = await import(
         "./actions"
@@ -173,6 +206,56 @@ describe("notebooks Server Actions", () => {
       const result = await getCurrentContent("does-not-exist");
 
       expect(result.ok).toBe(false);
+      // PR3b review advisory: strengthen this assertion to the exact code
+      // instead of only checking result.ok.
+      if (!result.ok) expect(result.error.code).toBe("PAGE_NOT_FOUND");
+    });
+
+    it("getCurrentContent also returns a plain { code, message } error, not a DomainError instance", async () => {
+      const { DomainError } = await import("@/shared/kernel/domain-error");
+      const { getCurrentContent } = await import("./actions");
+
+      const result = await getCurrentContent("does-not-exist");
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).not.toBeInstanceOf(DomainError);
+        expect(result.error).not.toBeInstanceOf(Error);
+      }
+    });
+  });
+
+  // PR3b review advisory: saveContent/getCurrentContent must satisfy the
+  // Result-returning SavePagePort contract even without a session, instead
+  // of throwing like the other (unwrap()-based) Server Actions in this
+  // file — a rejected promise is not a shape use-autosave.ts can reconcile.
+  describe("saveContent / getCurrentContent without a session", () => {
+    beforeEach(() => {
+      getCurrentUser.mockResolvedValue(null);
+    });
+
+    it("saveContent returns a Result error instead of throwing", async () => {
+      const { saveContent } = await import("./actions");
+
+      const result = await saveContent({
+        pageId: "does-not-exist",
+        expectedVersion: 1,
+        content: { type: "doc", content: [] },
+      });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok)
+        expect(result.error.code).toBe("NOTEBOOKS_SESSION_REQUIRED");
+    });
+
+    it("getCurrentContent returns a Result error instead of throwing", async () => {
+      const { getCurrentContent } = await import("./actions");
+
+      const result = await getCurrentContent("any-page-id");
+
+      expect(result.ok).toBe(false);
+      if (!result.ok)
+        expect(result.error.code).toBe("NOTEBOOKS_SESSION_REQUIRED");
     });
   });
 });

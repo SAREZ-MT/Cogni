@@ -5,8 +5,12 @@ import { z } from "zod";
 import { getCurrentUser } from "@/modules/identity";
 import { getDb } from "@/shared/db/client";
 import { systemClock } from "@/shared/kernel/clock";
-import type { DomainError } from "@/shared/kernel/domain-error";
-import { ok, type Result } from "@/shared/kernel/result";
+import {
+  type ActionError,
+  DomainError,
+  toActionError,
+} from "@/shared/kernel/domain-error";
+import { err, ok, type Result } from "@/shared/kernel/result";
 import {
   archiveNotebook as archiveNotebookUseCase,
   archivePage as archivePageUseCase,
@@ -20,6 +24,7 @@ import {
   savePage as savePageUseCase,
   setNotebookAppearance as setNotebookAppearanceUseCase,
 } from "./application";
+import { NOTEBOOKS_ERROR } from "./domain/errors";
 import type { Notebook } from "./domain/notebook";
 import type { Page } from "./domain/page";
 import type { TiptapDoc } from "./domain/plain-text";
@@ -50,6 +55,28 @@ async function requireOwnerId(): Promise<string> {
   const user = await getCurrentUser();
   if (!user) throw new Error(NOTEBOOKS_COPY.sessionRequired);
   return user.id;
+}
+
+// saveContent/getCurrentContent structurally satisfy editor/domain's
+// Result-returning SavePagePort (design.md, "notebooks como único puerto
+// de persistencia hacia el editor"), so a missing session must resolve to
+// err(DomainError) here too, instead of the throwing requireOwnerId()
+// every other (unwrap()-based) Server Action in this file uses. A
+// rejected promise is not a shape use-autosave.ts's try/catch treats as
+// a domain conflict or a transport failure it can retry.
+async function requireOwnerIdResult(): Promise<Result<string, ActionError>> {
+  const user = await getCurrentUser();
+  if (!user) {
+    return err(
+      toActionError(
+        new DomainError(
+          NOTEBOOKS_ERROR.SESSION_REQUIRED,
+          NOTEBOOKS_COPY.sessionRequired,
+        ),
+      ),
+    );
+  }
+  return ok(user.id);
 }
 
 function deps() {
@@ -142,27 +169,37 @@ export async function getSidebarTree(): Promise<SidebarNotebook[]> {
 // Saves a page's content through the atomic compare-and-swap of
 // SavePage/updateIfVersion (notebooks/application/save-page.ts). A stale
 // expectedVersion resolves as err(PAGE_VERSION_CONFLICT) rather than
-// throwing, so editor/application/use-autosave.ts can reconcile it.
+// throwing, so editor/application/use-autosave.ts can reconcile it. The
+// DomainError savePageUseCase produces is mapped to the plain ActionError
+// shape here, at the Server Action boundary: React's RSC/Flight protocol
+// redacts Error subclasses in transit, so a DomainError instance never
+// survives as one on the client, and use-autosave.ts's conflict detection
+// (isDomainErrorLike, a shape check) needs that shape, not the class.
 export async function saveContent(
   input: unknown,
-): Promise<Result<{ version: number }, DomainError>> {
-  const ownerId = await requireOwnerId();
-  return savePageUseCase(input, deps(), ownerId);
+): Promise<Result<{ version: number }, ActionError>> {
+  const ownerId = await requireOwnerIdResult();
+  if (!ownerId.ok) return ownerId;
+  const result = await savePageUseCase(input, deps(), ownerId.value);
+  if (!result.ok) return err(toActionError(result.error));
+  return result;
 }
 
 // Reads a page's current content/version — used by the editor mount point
 // and by SavePagePort.getCurrent's conflict-reconciliation path. Matches
-// the port's `(pageId: string) => Promise<Result<...>>` shape exactly.
+// the port's `(pageId: string) => Promise<Result<...>>` shape exactly (see
+// saveContent's comment on why the error is mapped to ActionError here).
 export async function getCurrentContent(
   pageId: unknown,
-): Promise<Result<{ content: TiptapDoc; version: number }, DomainError>> {
-  const ownerId = await requireOwnerId();
+): Promise<Result<{ content: TiptapDoc; version: number }, ActionError>> {
+  const ownerId = await requireOwnerIdResult();
+  if (!ownerId.ok) return ownerId;
   const result = await getPageUseCase(
     { pageId },
     { pages: deps().pages },
-    ownerId,
+    ownerId.value,
   );
-  if (!result.ok) return result;
+  if (!result.ok) return err(toActionError(result.error));
   return ok({
     content: result.value.content,
     version: result.value.contentVersion,

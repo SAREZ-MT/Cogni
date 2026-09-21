@@ -209,4 +209,183 @@ describe("useAutosave", () => {
     });
     expect(result.current.status).toBe("saved");
   });
+
+  // Root cause of the two-tab conflict e2e bug: a real Server Action's
+  // error crosses the RSC/Flight boundary as a plain object (React redacts
+  // Error subclasses in transit), never as a DomainError instance. This
+  // scripts exactly that shape — no DomainError, no instanceof possible —
+  // to prove the hook detects PAGE_VERSION_CONFLICT by the error's shape
+  // (isDomainErrorLike), not by `instanceof DomainError`.
+  it("reconciles a version conflict reported as a plain { code } object, not a DomainError instance", async () => {
+    const port = new FakeSavePagePort({
+      content: doc("server v4"),
+      version: 4,
+    });
+    port.scriptNextSave({
+      ok: false,
+      error: { code: "PAGE_VERSION_CONFLICT", message: "current version is 4" },
+    });
+    const { result } = renderHook(() =>
+      useAutosave({
+        pageId: PAGE_ID,
+        initialContent: doc("local v3"),
+        initialVersion: 3,
+        port,
+      }),
+    );
+
+    act(() => result.current.setContent(doc("local edit while stale")));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1500);
+    });
+
+    expect(result.current.status).toBe("conflict");
+    expect(result.current.content).toEqual(doc("server v4"));
+    expect(result.current.conflictDraft).toEqual(doc("local edit while stale"));
+  });
+
+  // PR3b review advisory: flush() must be a no-op when there is nothing
+  // pending and no save in flight, so Mod+S never fires a duplicate save.
+  it("flush() does nothing when there is no pending change and no save in flight", async () => {
+    const port = new FakeSavePagePort({ content: doc("v1"), version: 1 });
+    const { result } = renderHook(() =>
+      useAutosave({
+        pageId: PAGE_ID,
+        initialContent: doc("v1"),
+        initialVersion: 1,
+        port,
+      }),
+    );
+
+    act(() => result.current.flush());
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(port.saveCalls).toHaveLength(0);
+    expect(result.current.status).toBe("idle");
+  });
+
+  // PR3b review advisory: a failing/rejecting getCurrent() during conflict
+  // reconciliation must not leave the hook in a stale "conflict" state with
+  // no way forward — it must end in "error" and retry on the next pause.
+  it("ends in error, dirty, when getCurrent() fails while reconciling a conflict", async () => {
+    const port = new FakeSavePagePort({
+      content: doc("server v4"),
+      version: 4,
+    });
+    const workingGetCurrent = port.getCurrent.bind(port);
+    let failNext = true;
+    port.getCurrent = async (pageId: string) => {
+      if (failNext) {
+        failNext = false;
+        throw new Error("getCurrent transport down");
+      }
+      return workingGetCurrent(pageId);
+    };
+    const { result } = renderHook(() =>
+      useAutosave({
+        pageId: PAGE_ID,
+        initialContent: doc("local v3"),
+        initialVersion: 3,
+        port,
+      }),
+    );
+
+    act(() => result.current.setContent(doc("local edit while stale")));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1500);
+    });
+
+    expect(result.current.status).toBe("error");
+    // The local content is preserved — getCurrent() failing must not
+    // silently discard what the user typed.
+    expect(result.current.content).toEqual(doc("local edit while stale"));
+
+    // Retries only on the next pause, same contract as a plain save
+    // failure. versionRef is still stale (3), so the retry hits the same
+    // conflict path, this time with a working getCurrent().
+    act(() => result.current.setContent(doc("edit after error")));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1500);
+    });
+
+    expect(result.current.status).toBe("conflict");
+    expect(result.current.content).toEqual(doc("server v4"));
+  });
+
+  // Same advisory, but getCurrent() resolves to a Result error instead of
+  // rejecting — must not leave the hook claiming "conflict" without having
+  // reconciled any content.
+  it("ends in error when getCurrent() resolves to a Result error while reconciling", async () => {
+    const port = new FakeSavePagePort({
+      content: doc("server v4"),
+      version: 4,
+    });
+    port.getCurrent = async () => ({
+      ok: false,
+      error: new (await import("@/shared/kernel/domain-error")).DomainError(
+        "PAGE_NOT_FOUND",
+        "gone",
+      ),
+    });
+    const { result } = renderHook(() =>
+      useAutosave({
+        pageId: PAGE_ID,
+        initialContent: doc("local v3"),
+        initialVersion: 3,
+        port,
+      }),
+    );
+
+    act(() => result.current.setContent(doc("local edit while stale")));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1500);
+    });
+
+    expect(result.current.status).toBe("error");
+    expect(result.current.content).toEqual(doc("local edit while stale"));
+  });
+
+  // PR3b review advisory (editor.tsx): the Tiptap document must only be
+  // resynced from the hook's `content` on an actual server-driven
+  // reconciliation (conflict), never as a side effect of the user's own
+  // typing. `reconcileVersion` is the single source of truth editor.tsx
+  // watches for that, instead of diffing `content` on every keystroke.
+  it("only bumps reconcileVersion on a real conflict reconciliation, not on ordinary content updates", async () => {
+    const port = new FakeSavePagePort({ content: doc("v1"), version: 1 });
+    const { result } = renderHook(() =>
+      useAutosave({
+        pageId: PAGE_ID,
+        initialContent: doc("v1"),
+        initialVersion: 1,
+        port,
+      }),
+    );
+
+    const initialReconcileVersion = result.current.reconcileVersion;
+
+    act(() => result.current.setContent(doc("typed by the user")));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1500);
+    });
+
+    expect(result.current.status).toBe("saved");
+    expect(result.current.reconcileVersion).toBe(initialReconcileVersion);
+
+    port.setServerState({ content: doc("server v9"), version: 9 });
+    act(() => result.current.setContent(doc("stale edit")));
+    // Force a conflict on this save by making the port's version diverge
+    // from what the hook believes: the FakeSavePagePort compares
+    // expectedVersion, and the hook's versionRef is still 2 (after the
+    // previous successful save), while the port is now at 9.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1500);
+    });
+
+    expect(result.current.status).toBe("conflict");
+    expect(result.current.reconcileVersion).toBeGreaterThan(
+      initialReconcileVersion,
+    );
+  });
 });
