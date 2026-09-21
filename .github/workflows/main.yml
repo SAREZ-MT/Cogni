@@ -10,7 +10,8 @@ permissions:
 # Vercel's Git integration builds and deploys main on its own. This workflow
 # is the gate that runs before production is trusted: the PR checks, the
 # pooler smoke test and Playwright against cogni-dev. Migrations run inside
-# the Vercel build itself (package.json#build), not as a workflow job.
+# the Vercel production build only (package.json#build guards on
+# VERCEL_ENV=production), not as a workflow job and never on Preview builds.
 jobs:
   verify:
     runs-on: ubuntu-latest

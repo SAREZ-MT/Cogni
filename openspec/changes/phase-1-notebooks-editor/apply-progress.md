@@ -108,3 +108,21 @@ Pendiente exclusivamente `(usuario)`: 0.6 completa y 0.7 mitad Vercel. El
 commit de trabajo (`fix(db): add profiles auth FK and migrate-in-build`) lo
 crea el orquestador, no este batch, según instrucción explícita de no
 commitear.
+
+### Corrección de revisión: gate de `VERCEL_ENV` en migrate-in-build (R4-migrate-ungated-in-build)
+
+`package.json#build` corría `drizzle-kit migrate` en todo build, así que
+cualquier build de Preview de Vercel (uno por rama) migraba la base que
+apuntara `DATABASE_URL` de Preview, y en `main` la migración corría sin
+depender de los checks de CI. `scripts/migrate-in-build.mjs` expone
+`shouldRunMigrations(env)` (pura, testeada RED→GREEN en
+`src/shared/config/migrate-in-build.test.ts`, 5 casos) que solo devuelve
+`true` con `VERCEL_ENV === "production"` o `RUN_DB_MIGRATIONS=1`;
+`package.json#build` ahora es `"node scripts/migrate-in-build.mjs && next build"`.
+Verificado localmente: `VERCEL_ENV=preview` con `DATABASE_URL` inválida
+imprime la línea de skip y `next build` compila; `VERCEL_ENV=production`
+con `DATABASE_URL` inválida falla dentro de `drizzle-kit migrate` antes de
+compilar; `RUN_DB_MIGRATIONS=1` con la `DATABASE_URL` real de `.env.local`
+hace no-op (`already exists, skipping`) y el build pasa completo. Gate:
+`pnpm test` (93/93), `pnpm typecheck`, `pnpm lint`, `pnpm depcruise`, todos
+en verde.
