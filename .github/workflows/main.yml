@@ -39,6 +39,10 @@ jobs:
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.DEV_SUPABASE_SERVICE_ROLE_KEY }}
       DATABASE_URL: ${{ secrets.DEV_DATABASE_URL }}
       CRON_SECRET: ${{ secrets.DEV_CRON_SECRET }}
+      # Not a secret: the bucket migration 0004 provisions on cogni-dev. The
+      # server env schema requires it, so without it serverEnv() throws on
+      # the first DB call and every authenticated e2e test times out.
+      SUPABASE_STORAGE_BUCKET: page-assets
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
