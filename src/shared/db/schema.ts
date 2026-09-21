@@ -1,4 +1,13 @@
-import { pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  text,
+  timestamp,
+  unique,
+  uuid,
+} from "drizzle-orm/pg-core";
 
 // profiles mirrors auth.users (same id). Rows are created by the
 // EnsureProfile use case, never by a database trigger (design.md).
@@ -21,3 +30,92 @@ export const profiles = pgTable("profiles", {
 }).enableRLS();
 
 export type ProfileRow = typeof profiles.$inferSelect;
+
+// Two-level hierarchy: owner -> notebook -> page (documento-maestro §3.1).
+// ids are UUID v7 generated in application by createId(), never a Postgres
+// default (design.md, "Modelo de datos de notebooks/pages/page_assets").
+export const notebooks = pgTable(
+  "notebooks",
+  {
+    id: uuid("id").primaryKey(),
+    ownerId: uuid("owner_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    icon: text("icon"),
+    color: text("color"),
+    position: integer("position").notNull(),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index("notebooks_owner_id_idx").on(table.ownerId)],
+).enableRLS();
+
+export type NotebookRow = typeof notebooks.$inferSelect;
+
+// content is the raw Tiptap JSON document; plain_text is materialized on
+// the server from content on every save (design.md, "plain_text como
+// recorrido puro de AST"). content_version powers optimistic
+// compare-and-swap concurrency in SavePage.
+export const pages = pgTable(
+  "pages",
+  {
+    id: uuid("id").primaryKey(),
+    ownerId: uuid("owner_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    notebookId: uuid("notebook_id")
+      .notNull()
+      .references(() => notebooks.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    content: jsonb("content").notNull(),
+    plainText: text("plain_text").notNull().default(""),
+    contentVersion: integer("content_version").notNull().default(1),
+    position: integer("position").notNull(),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index("pages_notebook_id_idx").on(table.notebookId)],
+).enableRLS();
+
+export type PageRow = typeof pages.$inferSelect;
+
+// storage_path is unique so RegisterPageAsset can upsert idempotently on
+// repeated registration of the same uploaded object (design.md).
+export const pageAssets = pgTable(
+  "page_assets",
+  {
+    id: uuid("id").primaryKey(),
+    ownerId: uuid("owner_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    pageId: uuid("page_id")
+      .notNull()
+      .references(() => pages.id, { onDelete: "cascade" }),
+    storagePath: text("storage_path").notNull(),
+    mime: text("mime").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("page_assets_page_id_idx").on(table.pageId),
+    unique("page_assets_storage_path_key").on(table.storagePath),
+  ],
+).enableRLS();
+
+export type PageAssetRow = typeof pageAssets.$inferSelect;
