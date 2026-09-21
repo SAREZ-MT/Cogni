@@ -14,6 +14,7 @@ import TaskItem from "@tiptap/extension-task-item";
 import TaskList from "@tiptap/extension-task-list";
 import StarterKit from "@tiptap/starter-kit";
 import { SlashCommand } from "../slash-command";
+import { createTableExtensions } from "./table";
 
 // specs/editor/spec.md, "Marcas de texto": a link MUST accept only http,
 // https or mailto URLs; anything else (in particular `javascript:`) MUST be
@@ -50,6 +51,7 @@ export function createEditorExtensions(): AnyExtension[] {
     }),
     TaskList,
     TaskItem.configure({ nested: true }),
+    ...createTableExtensions(),
     SlashCommand,
   ];
 }
