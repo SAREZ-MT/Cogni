@@ -13,6 +13,7 @@ import type { AnyExtension } from "@tiptap/core";
 import TaskItem from "@tiptap/extension-task-item";
 import TaskList from "@tiptap/extension-task-list";
 import StarterKit from "@tiptap/starter-kit";
+import { CogniHighlight } from "../highlight-palette";
 import { SlashCommand } from "../slash-command";
 import { createTableExtensions } from "./table";
 
@@ -51,6 +52,7 @@ export function createEditorExtensions(): AnyExtension[] {
     }),
     TaskList,
     TaskItem.configure({ nested: true }),
+    CogniHighlight,
     ...createTableExtensions(),
     SlashCommand,
   ];
