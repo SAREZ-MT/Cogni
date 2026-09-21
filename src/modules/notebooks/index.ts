@@ -1,10 +1,22 @@
 // Public surface of the notebooks module (cross-module-via-index in
 // .dependency-cruiser.cjs forbids importing anything else from it).
-// Phase 1 has no infrastructure or Server Actions yet (design.md, "notebooks
-// como unico puerto de persistencia hacia el editor" lands in a later
-// phase): this barrel exposes domain types/ports and the application use
-// cases so tests and future Server Actions can compose them.
+// Phase 2 adds the Server Actions (actions.ts): every client-reachable
+// mutation of this module goes through them (design.md, "notebooks como
+// unico puerto de persistencia hacia el editor").
 
+export {
+  archiveNotebook as archiveNotebookAction,
+  archivePage as archivePageAction,
+  createNotebook as createNotebookAction,
+  createPage as createPageAction,
+  getCurrentContent,
+  getNotebookForRoute,
+  getPageForRoute,
+  getSidebarTree,
+  renameNotebook as renameNotebookAction,
+  renamePage as renamePageAction,
+  setNotebookAppearance as setNotebookAppearanceAction,
+} from "./actions";
 export {
   archiveNotebook,
   archiveNotebookSchema,
@@ -53,3 +65,4 @@ export {
   type UpdateIfVersionInput,
   type UpdateIfVersionResult,
 } from "./domain";
+export { SidebarTree } from "./ui/sidebar-tree";
