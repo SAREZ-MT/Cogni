@@ -2,6 +2,8 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { ensureProfileForUser, getCurrentUser } from "@/modules/identity";
+import { SidebarTree } from "@/modules/notebooks";
+import { QueryProvider } from "./_components/query-provider";
 import { Sidebar } from "./_components/sidebar";
 import {
   SIDEBAR_COLLAPSED,
@@ -21,19 +23,23 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     cookieStore.get(SIDEBAR_COOKIE)?.value === SIDEBAR_COLLAPSED;
 
   return (
-    <div className="flex h-dvh bg-canvas">
-      <Sidebar initialCollapsed={collapsed} />
-      <div className="flex min-w-0 flex-1 flex-col py-3 pr-3 pl-6">
-        <div
-          data-testid="content-area"
-          className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-content border border-border-subtle bg-page shadow-xs"
-        >
-          <Topbar />
-          <main className="flex flex-1 flex-col overflow-auto p-(--content-padding)">
-            {children}
-          </main>
+    <QueryProvider>
+      <div className="flex h-dvh bg-canvas">
+        <Sidebar initialCollapsed={collapsed}>
+          <SidebarTree />
+        </Sidebar>
+        <div className="flex min-w-0 flex-1 flex-col py-3 pr-3 pl-6">
+          <div
+            data-testid="content-area"
+            className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-content border border-border-subtle bg-page shadow-xs"
+          >
+            <Topbar />
+            <main className="flex flex-1 flex-col overflow-auto p-(--content-padding)">
+              {children}
+            </main>
+          </div>
         </div>
       </div>
-    </div>
+    </QueryProvider>
   );
 }
