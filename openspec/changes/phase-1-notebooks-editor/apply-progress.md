@@ -712,3 +712,207 @@ de PR2. Gate verde (`pnpm test`, `pnpm test:db`, `pnpm typecheck` con solo
 errores preexistentes ajenos, `pnpm depcruise`, `pnpm lint`). No se creó
 commit de trabajo en este batch (lo decide el orquestador, junto con el
 presupuesto de revisión). Sin pendientes nuevos de `(usuario)`.
+
+## Fase 3b — Tiptap base, bloques, marcas, menú "/" y guardado explícito (PR3b)
+
+Ejecutada en un batch único, en modo Strict TDD, sobre la rama
+`feat/phase-1-pr3b-editor-tiptap` (creada desde `main` en `2f7adc5`, con
+PR0–PR3a ya mergeados).
+
+### Tareas completadas
+
+- [x] 3b.1 `src/modules/editor/ui/tiptap/editor.tsx`: instancia real de
+  Tiptap (`@tiptap/react`), recibe `pageId`/`initialContent`/
+  `initialVersion`/`port` y llama `useAutosave` internamente. `onUpdate`
+  alimenta `setContent`; un efecto separado reconcilia `content` de vuelta
+  al documento de Tiptap (`emitUpdate: false`) cuando el hook lo reemplaza
+  tras un conflicto de versión, sin volver a disparar un guardado del
+  contenido que el usuario nunca escribió.
+- [x] 3b.2 `src/modules/editor/ui/tiptap/extensions/index.ts`:
+  `StarterKit.configure({ link: {...} })` + `TaskList` + `TaskItem`. Ver
+  Desviación 1 más abajo sobre por qué no se usan paquetes `@tiptap/
+  extension-bold|italic|underline|strike|code|link` sueltos.
+- [x] 3b.3 `link.test.tsx` (RED real, ver tabla de evidencia).
+- [x] 3b.4 `marks.test.tsx` (RED real, ver tabla de evidencia).
+- [x] 3b.5 `task-list.test.tsx` (RED real, ver tabla de evidencia).
+- [x] 3b.6 `src/modules/editor/ui/command-menu.tsx`: componente de
+  presentación puro (sin import de Tiptap) con shadcn `command`. Filtra por
+  `label`/`keywords`, mantiene su propia selección y captura Arrow/Enter/
+  Escape en la fase de captura de `window` (ver Desviación 2).
+- [x] 3b.7 `command-menu.test.tsx` (RED real vía infraestructura faltante
+  de jsdom, ver Desviación 3 y tabla de evidencia).
+- [x] 3b.8 `src/modules/editor/index.ts` exporta `Editor`/`EditorProps`.
+- [x] 3b.9 `src/app/(app)/notebooks/[notebookId]/pages/[pageId]/page.tsx`
+  importa `saveContent`/`getCurrentContent`/`getPageForRoute` de
+  `@/modules/notebooks` y construye `port={{ save: saveContent, getCurrent:
+  getCurrentContent }}` para `<Editor>`. El `<pre>` placeholder de PR2 se
+  reemplazó por el editor real.
+- [x] 3b.10 `saveContent`/`getCurrentContent` (RED real, ver Desviación 4 y
+  tabla de evidencia) en `src/modules/notebooks/actions.test.ts`.
+- [x] 3b.11 `tests/e2e/slash-command.spec.ts`: crea cuaderno + página,
+  escribe `/cita`, confirma que el menú muestra "cita", `Enter` inserta un
+  `<blockquote>` y borra el texto `/cita`, espera el estado "guardado" y
+  confirma persistencia tras `page.reload()`.
+- [ ] 3b.12 Gate PR3b: **parcialmente verde** — ver "Pendiente — (usuario)"
+  abajo. `pnpm test`, `pnpm typecheck`, `pnpm depcruise`, `pnpm lint`,
+  `pnpm build` en verde. `pnpm test:e2e -- slash-command` **NO se ejecutó**:
+  `CRON_SECRET` sigue ausente de `.env.local` (pendiente heredado de PR2/
+  PR3a). No se creó el commit de trabajo en este batch (lo decide el
+  orquestador).
+
+### Desviaciones de diseño
+
+**1. No se agregaron `@tiptap/extension-bold|italic|underline|strike|code`
+sueltos.** El prompt de `sdd-apply` pedía "marcas de `starter-kit`" y
+mencionaba verificar si `@tiptap/extension-underline` hacía falta. Se
+verificó contra `node_modules/@tiptap/starter-kit/dist/index.d.ts` (v3.31.3):
+`StarterKit` ya integra `bold`, `italic`, `underline`, `strike`, `code` y
+`link` como extensiones bundladas y configurables (`StarterKit.configure
+({ link: {...} })`), no como paquetes que haya que instalar y componer a
+mano como en Tiptap v2. Se instalaron `@tiptap/extension-link` y
+`@tiptap/extension-underline` igualmente (`package.json`) porque el prompt
+los pedía explícitamente, pero el código no los importa por separado — usa
+la configuración bundlada de `StarterKit` para evitar dos instancias
+compitiendo por el mismo nombre de extensión (`link`, `underline`), que
+Tiptap rechaza en tiempo de construcción del schema.
+
+**2. `command-menu.tsx` maneja Escape sin `stopPropagation`, pero sí
+`stopPropagation` en Arrow/Enter.** Investigado contra el código fuente de
+`@tiptap/suggestion@3.31.3`: su `handleKeyDown` interno **siempre** captura
+`Escape` cuando el plugin está activo, llama al `onKeyDown` del renderer y
+luego `dispatchExit` (que limpia el estado interno del plugin y dispara
+`onExit`, el hook que realmente desmonta el portal de React). Si
+`command-menu.tsx` detuviera la propagación en `Escape`, ese
+`dispatchExit` nunca correría (el listener de `Suggestion` está en la fase
+de burbuja del DOM del editor, después de mi listener en fase de captura de
+`window`), dejando el estado interno del plugin de sugerencias "atascado".
+Arrow/Enter sí detienen la propagación deliberadamente: el menú los maneja
+él mismo (no delegan a `Suggestion`), y así evitan que ProseMirror también
+aplique su comportamiento por defecto (mover el cursor, insertar salto de
+línea).
+
+**3. Se agregaron 3 stubs a `vitest.setup.ts` para Tiptap/cmdk en jsdom:**
+`document.elementFromPoint`, `Element.prototype.scrollIntoView`,
+`Range.prototype.getClientRects`/`getBoundingClientRect`, y un
+`ResizeObserver` no-op. Ninguno existe en jsdom; ProseMirror (posicionamiento
+del cursor) y `cmdk` (medición de su lista) los requieren para no lanzar
+excepciones en el render, no para verificar ningún comportamiento — son
+infraestructura de test, no lógica de negocio. Confirmado que estos son
+exactamente los `ReferenceError`/`TypeError` que aparecieron como RED real
+al escribir `editor.test.tsx` y `command-menu.test.tsx` por primera vez
+(ver tabla de evidencia).
+
+**4. `getCurrentContent` cambió de firma.** Existía desde PR2/slice 1 con
+forma `(input: unknown) => Promise<{ title, content, version }>` (lanzaba
+al fallar, vía `unwrap()`). `design.md` ("notebooks como único puerto de
+persistencia") exige que `saveContent`/`getCurrentContent` **cumplan
+estructuralmente** `SavePagePort` (`Result`-returning, nunca `throw`) para
+poder pasarse directo como prop `port` del `Editor`. Se cambió su firma a
+`(pageId: unknown) => Promise<Result<{ content, version }, DomainError>>`
+(sin `title`, no usado por el puerto) y se agregó `saveContent` nueva con
+la firma exacta de `SavePagePort.save`. `getCurrentContent` no tenía
+ningún llamador real todavía (confirmado con `rg`), así que este es un
+cambio de forma sin romper ningún consumidor existente.
+
+### Tabla de evidencia TDD (Strict TDD)
+
+| Unidad | Test file(s) | RED | GREEN | REFACTOR |
+|---|---|---|---|---|
+| Link (esquema/rel) | `extensions/link.test.tsx` | ✅ Observado: con `createEditorExtensions` sin configurar `link`, `rel="noopener noreferrer nofollow"` (default de Tiptap) en vez de `"noopener noreferrer"` — 1 test falló, 2 pasaron (javascript: y mailto ya rechazan/aceptan por default) | ✅ Observado: 3/3 tras `StarterKit.configure({ link: { isAllowedUri, HTMLAttributes } })` | ➖ No aplica |
+| Marcas (Mod+B/I/U/Shift+S/E) | `extensions/marks.test.tsx` | ✅ Observado: con `createEditorExtensions` devolviendo `[]`, `RangeError: Schema is missing its top node type ('doc')` — 5/5 fallaron | ✅ Observado: 5/5 tras restaurar `StarterKit` | ➖ No aplica (marcas ya vienen de `StarterKit`, solo se confirmó) |
+| Task list (`checked` persistido) | `extensions/task-list.test.tsx` | ✅ Observado: sin `TaskList`/`TaskItem` en el extension set, `Error: There is no node type named 'taskList'` | ✅ Observado: 1/1 tras agregar `TaskList`/`TaskItem.configure({ nested: true })` | ➖ No aplica |
+| `Editor` (autosave real + conflicto) | `tiptap/editor.test.tsx` | ✅ Observado: `TypeError: target.getClientRects is not a function` / `elementFromPoint is not a function` (infraestructura jsdom faltante, ver Desviación 3) | ✅ Observado: 2/2 tras agregar los stubs de `vitest.setup.ts` | ➖ No aplica |
+| `CommandMenu` (filtro/Escape/Enter/Arrow) | `command-menu.test.tsx` | ✅ Observado: `ReferenceError: ResizeObserver is not defined`, luego `TypeError: i.scrollIntoView is not a function` (infraestructura jsdom, ver Desviación 3) | ✅ Observado: 4/4 tras agregar los stubs | ✅ Se cambió el reset de `selectedIndex` de un `useEffect([filtered])` a un ajuste de estado durante el render (`if (query !== lastQuery)`), motivado por el hallazgo de `pnpm lint` (`lint/correctness/useExhaustiveDependencies`) |
+| `saveContent`/`getCurrentContent` como `SavePagePort` | `notebooks/actions.test.ts` | ✅ Observado: `TypeError: saveContent is not a function` (2 tests) y `Error: Revisa los datos: algo no tiene el formato esperado.` desde `unwrap()` (2 tests) — 4/10 fallaron | ✅ Observado: 10/10 tras agregar `saveContent` y cambiar `getCurrentContent` a `Result`-returning | ➖ No aplica |
+| `useAutosave.flush()` (Mod+S) | `use-autosave.test.ts` (existente, no modificado) | ➖ No aplica — adición aditiva sobre una API ya cubierta; no rompió ningún test existente (verificado: 5/5 sigue en verde) | ✅ Cubierto indirectamente por `editor.test.tsx` (el atajo Mod+S llama `flush()`) | ➖ No aplica |
+
+### Verificación ejecutada en este batch
+
+| Comando | Resultado observado |
+|---|---|
+| `pnpm add @tiptap/react @tiptap/pm @tiptap/starter-kit @tiptap/extension-task-list @tiptap/extension-task-item @tiptap/extension-link @tiptap/extension-underline @tiptap/core @tiptap/suggestion` | Instalado sin conflictos, `pnpm depcruise` sigue en verde inmediatamente después |
+| `pnpm vitest run src/modules/editor/ui/tiptap/extensions/link.test.tsx` (antes de configurar `link`) | `1 failed \| 2 passed` |
+| `pnpm vitest run src/modules/editor/ui/tiptap/extensions/link.test.tsx` (después) | `3 passed` |
+| `pnpm vitest run src/modules/editor/ui/tiptap/extensions/marks.test.tsx` (extensions=[]) | `5 failed` |
+| `pnpm vitest run src/modules/editor/ui/tiptap/extensions/marks.test.tsx` (gate) | `5 passed` |
+| `pnpm vitest run src/modules/editor/ui/tiptap/extensions/task-list.test.tsx` (sin TaskList/TaskItem) | `1 failed` — `no node type named 'taskList'` |
+| `pnpm vitest run src/modules/editor/ui/tiptap/extensions/task-list.test.tsx` (gate) | `1 passed` |
+| `pnpm vitest run src/modules/editor/ui/tiptap/editor.test.tsx` (sin stubs de jsdom) | `Uncaught Exception` x2, `2 failed` |
+| `pnpm vitest run src/modules/editor/ui/tiptap/editor.test.tsx` (gate) | `2 passed` |
+| `pnpm vitest run src/modules/editor/ui/command-menu.test.tsx` (sin stubs) | `4 failed` (`ResizeObserver`, luego `scrollIntoView`) |
+| `pnpm vitest run src/modules/editor/ui/command-menu.test.tsx` (gate) | `4 passed` |
+| `pnpm vitest run src/modules/notebooks/actions.test.ts` (antes de `saveContent`) | `4 failed \| 6 passed (10)` |
+| `pnpm vitest run src/modules/notebooks/actions.test.ts` (gate) | `10 passed` |
+| `pnpm test` (todo el repo, gate final) | `50 archivos / 197 tests` GREEN |
+| `pnpm typecheck` (gate final) | Sin errores (los 2 errores preexistentes de `PageProps`/`LayoutProps` de PR3a ya no aparecen — se resolvieron solos, probablemente por una corrida previa de `next build`/`next dev` que generó los tipos) |
+| `pnpm depcruise` (gate final) | `no dependency violations found (229 modules, 566 dependencies cruised)` |
+| `pnpm lint` (`biome check`, gate final) | Sin hallazgos tras corregir formato (`pnpm format`), el `role="status"` → `<output>` (a11y) y el patrón de reset de `selectedIndex` |
+| `pnpm build` (`next build`, Turbopack) | Falló primero con "You're importing a module that depends on `useEffect`... into a Server Component" (ver Desviación 5) → verde tras agregar `"use client"` a `use-autosave.ts` |
+
+### Desviación 5: `"use client"` agregado a `use-autosave.ts`
+
+No estaba en el plan del prompt. `pnpm build` (Turbopack, no cubierto por
+`pnpm test`/`pnpm typecheck`) falló: al conectar por primera vez
+`editor/index.ts` a una ruta de Server Component (`page.tsx`), Next.js
+exige que cualquier archivo que importe hooks de React declare su propio
+`"use client"`, incluso si ese archivo solo se consume indirectamente a
+través de un componente que ya lo es (`editor.tsx`). Se agregó la
+directiva a `use-autosave.ts` con un comentario explicando por qué (no
+viola "editor/application framework-agnostic": la directiva no importa
+Tiptap ni cambia la lógica, es un límite de Next.js). Confirmado con
+`pnpm build` verde después.
+
+### Pendiente — `(usuario)`
+
+**`CRON_SECRET` sigue ausente de `.env.local`** (heredado de PR2/PR3a).
+`pnpm test:e2e -- slash-command` **no se ejecutó** en este batch por esta
+razón — instrucción explícita del prompt de `sdd-apply`: "CRON_SECRET must
+be present, if it is missing STOP and report". El resto del gate (`pnpm
+test`, `pnpm typecheck`, `pnpm depcruise`, `pnpm lint`, `pnpm build`) corrió
+completo y en verde. `tests/e2e/slash-command.spec.ts` fue escrito
+siguiendo el patrón de `notebooks-acceptance.spec.ts` (mismo helper
+`clickAndWaitForAction`, misma fixture `verifiedUser`/`signIn`,
+`test.skip(!hasSupabaseEnv, ...)`) pero no puede confirmarse en verde hasta
+que el usuario agregue `CRON_SECRET` y se corra localmente o en CI.
+
+### Work Unit Evidence
+
+| Evidencia | Valor |
+|---|---|
+| Comando de test enfocado y resultado exacto | `pnpm test` → `50 archivos / 197 tests` GREEN (incluye las 5 unidades RED→GREEN de esta fase) |
+| Comando/escenario de runtime y resultado exacto | `pnpm build` (Turbopack, `next build`) GREEN — es el único límite de runtime verificable en este batch sin `CRON_SECRET`; genuinamente detectó un bug real (Desviación 5) que ningún otro gate hubiera atrapado. `pnpm test:e2e -- slash-command` **NO ejecutado** (bloqueado por `CRON_SECRET` ausente, ver Pendiente) |
+| Rollback boundary | Revertir la Fase 3b: borrar `src/modules/editor/ui/` completo (`command-menu.tsx`, `command-menu.test.tsx`, `tiptap/`), revertir `src/modules/editor/index.ts` y `src/modules/editor/application/use-autosave.ts` (quitar `flush`/`"use client"`) a su estado de PR3a, revertir `src/app/(app)/notebooks/[notebookId]/pages/[pageId]/page.tsx` al placeholder `<pre>`, revertir `src/modules/notebooks/actions.ts`+`actions.test.ts`+`index.ts` (quitar `saveContent`, restaurar la firma anterior de `getCurrentContent`), revertir `vitest.setup.ts` (quitar los stubs de jsdom), borrar `tests/e2e/slash-command.spec.ts`, revertir `package.json`/`pnpm-lock.yaml` (quitar las dependencias de Tiptap). Ningún archivo de PR0–PR3a fuera de estos se tocó. |
+
+### Impacto en el presupuesto de revisión (400 líneas)
+
+`git diff --numstat` de este batch completo (sin `pnpm-lock.yaml`): **1108
+líneas agregadas / 34 eliminadas = 1142 líneas de autoría**, muy por
+encima del presupuesto de ~400. La sesión tiene `delivery_strategy:
+auto-chain`, pero el batch se ejecutó como una sola unidad porque el
+prompt de `sdd-apply` lo asignó así explícitamente ("PR3b: Tiptap base
+editor, core blocks, marks, links, slash command menu, explicit save wired
+into the page route, slash-command e2e"), igual que PR3a, sin una frontera
+de slice intermedia indicada, y porque los archivos son mutuamente
+dependientes para tener un slice funcionalmente completo (el editor no
+sirve sin extensiones, el menú "/" no sirve sin el editor montado, el
+guardado explícito no sirve sin `saveContent`). División honesta posible
+para un futuro equivalente: (a) extensiones + editor base + marcas/link/
+task-list (~450 líneas: `extensions/`, `editor.tsx`, sus tests); (b) menú
+"/" (~320 líneas: `command-menu.tsx`+test, `slash-command.tsx`,
+`slash-command-items.ts`); (c) guardado explícito + wiring de la ruta +
+e2e (~370 líneas: `actions.ts`+test, `page.tsx`, `slash-command.spec.ts`).
+Se recomienda **`size:exception`** para esta rama tal como está, o que el
+orquestador aplique la estrategia `auto-chain` sobre los 3 grupos de
+archivos ya diferenciables arriba al momento de abrir el/los PR.
+
+### Estado
+
+Fase 3b: 11/12 tareas completas (3b.1–3b.11). 3b.12 (gate) verde salvo
+`pnpm test:e2e -- slash-command`, bloqueado por `CRON_SECRET` ausente
+(pendiente de usuario, heredado de PR2). No se creó commit de trabajo en
+este batch (lo decide el orquestador, junto con el presupuesto de
+revisión).
+
+### Gate 3b.12 (orquestador, 2026-09-21)
+
+`pnpm test:e2e` con `CRON_SECRET` exportado solo en el shell: 19 de 20 en la corrida completa; el fallo fue `notebooks-acceptance` (archivar cuaderno) por una carrera de espera ya señalada como advisory en la revisión de PR2, no una regresión. Reejecución aislada de `slash-command.spec.ts` y `notebooks-acceptance.spec.ts`: 3 de 3 en verde. Pendiente para PR4: endurecer `clickAndWaitForAction` y las esperas del spec de aceptación.
