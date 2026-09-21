@@ -186,6 +186,8 @@ Reglas de recorrido (cobertura 100 %, ver Testing Strategy):
 
 **Rationale**: documentado en `01-app/02-guides/server-actions.md` de Next.js: el límite por defecto de `bodySizeLimit` es 1 MB e incluye el overhead de `multipart/form-data`; fotos de apuntes superan eso con frecuencia. La ruta firmada directa evita tocar ese límite global (que también relajaría el límite de `SavePage`) y coincide con "URLs firmadas de corta duración" de §9.
 
+`StorageGateway` agrega `getObjectMetadata(path) → { sizeBytes, mime } | null`. `RegisterPageAsset` lee el tamaño y content type reales del objeto ya subido a Storage y rechaza con `DomainError` sin persistir fila cuando el objeto no existe, excede los límites o difiere del `mime` declarado; el `mime`/`sizeBytes` declarados por el cliente pasan a ser solo orientativos y el `mime`/`size_bytes` persistidos provienen del objeto real.
+
 ```ts
 // src/modules/notebooks/domain/page-asset.ts — pure validation, no Storage SDK
 export const ALLOWED_MIME = [
@@ -212,7 +214,7 @@ export function validateAssetInput(input: {
 
 ### Decision: Bucket privado `page-assets`, ruta canónica y RLS por `owner_id`
 
-**Choice**: variable `SUPABASE_STORAGE_BUCKET=page-assets` (nueva clave en `serverSchema`, solo servidor). Ruta de objeto: `{ownerId}/{pageId}/{assetId}.{ext}`, `assetId` generado con `createId()`. Políticas RLS del bucket (aplicadas por el usuario en el dashboard de Supabase o vía SQL versionado en `drizzle/000X_storage_policies.sql` si Drizzle puede expresarlas contra `storage.objects`):
+**Choice**: variable `SUPABASE_STORAGE_BUCKET=page-assets` (nueva clave en `serverSchema`, solo servidor). Ruta de objeto: `{ownerId}/{pageId}/{assetId}.{ext}`, `assetId` generado con `createId()`. El bucket `page-assets` MUST crearse con `file_size_limit = 10485760` y `allowed_mime_types = ['image/jpeg','image/png','image/webp','image/gif']`: Storage rechaza cualquier subida que exceda esos límites sobre los bytes reales, sin importar lo que el cliente haya declarado al pedir el permiso firmado (Supabase Storage, "Restricting uploads": `allowedMimeTypes`/`fileSizeLimit` en la creación del bucket rechazan uploads que no los cumplan, incluida la subida directa vía `createSignedUploadUrl`; https://supabase.com/docs/guides/storage/buckets/creating-buckets). Políticas RLS del bucket (aplicadas por el usuario en el dashboard de Supabase o vía SQL versionado en `drizzle/000X_storage_policies.sql` si Drizzle puede expresarlas contra `storage.objects`):
 
 ```sql
 create policy "page-assets read own"
@@ -329,10 +331,13 @@ Tiptap onUpdate → debounce (800–1500ms) → use-autosave hook (editor/applic
     → port.save({ pageId, content, expectedVersion })  // Server Action de notebooks/index.ts
         → SavePage(ownerId, pageId, content, expectedVersion)  // notebooks/application
             → PageRepository.findById(pageId) ── owner_id / archived_at check
-            → content_version === expectedVersion ? sigue : DomainError(PAGE_VERSION_CONFLICT)
             → extractPlainText(content)  // notebooks/domain, sin Tiptap
-            → PageRepository.save({ content, plainText, contentVersion: expectedVersion + 1 })
-        ← { version: expectedVersion + 1 }
+            → PageRepository.updateIfVersion({ pageId, ownerId, expectedVersion, content, plainText, updatedAt })
+                // UPDATE condicional atómico: WHERE id=$pageId AND owner_id=$ownerId
+                //   AND archived_at IS NULL AND content_version=$expectedVersion
+                //   SET content_version=content_version+1 RETURNING content_version
+            → 0 filas afectadas ? DomainError(PAGE_VERSION_CONFLICT, "current version is <releída>") : sigue
+        ← { version: content_version actualizado }
     ← hook actualiza content_version local, estado "Guardado"
 
 En conflicto:
@@ -450,26 +455,29 @@ export async function savePage(
   if (!page || page.ownerId !== ownerId || page.archivedAt) {
     return err(new DomainError("PAGE_NOT_FOUND", parsed.value.pageId));
   }
-  if (page.contentVersion !== parsed.value.expectedVersion) {
+  const plainText = extractPlainText(parsed.value.content);
+  // updateIfVersion es un UPDATE condicional atómico: nunca lectura-comparación-escritura
+  const result = await deps.pages.updateIfVersion({
+    pageId: parsed.value.pageId,
+    ownerId,
+    expectedVersion: parsed.value.expectedVersion,
+    content: parsed.value.content,
+    plainText,
+    updatedAt: deps.clock.now(),
+  });
+  if (!result.updated) {
     return err(
       new DomainError(
         "PAGE_VERSION_CONFLICT",
-        `current version is ${page.contentVersion}`,
+        `current version is ${result.currentVersion}`,
       ),
     );
   }
-  const plainText = extractPlainText(parsed.value.content);
-  const version = page.contentVersion + 1;
-  await deps.pages.save({
-    ...page,
-    content: parsed.value.content,
-    plainText,
-    contentVersion: version,
-    updatedAt: deps.clock.now(),
-  });
-  return ok({ version });
+  return ok({ version: result.version });
 }
 ```
+
+**`PageRepository.updateIfVersion`**: el puerto de 383 agrega `updateIfVersion(input): Promise<{ updated: true; version: number } | { updated: false; currentVersion: number }>`, que ejecuta el `UPDATE` condicional anterior en una sola sentencia. `InMemoryPageRepository` implementa la misma semántica condicional (comparar y escribir como una operación atómica, sin ventana entre lectura y escritura), y un test de contrato compartido (`application/testing/page-repository.contract.ts`) se ejecuta tanto contra el doble en memoria como contra `DrizzlePageRepository`.
 
 ```ts
 // src/modules/notebooks/domain/errors.ts — DomainError codes for this change
@@ -508,11 +516,11 @@ alter table profiles drop constraint profiles_id_fkey;
 | Layer | What to Test | Approach |
 |---|---|---|
 | Unit — domain | Invariantes de `Notebook`/`Page` (título, color, posición), `extractPlainText` (cobertura 100 %, tabla de nodos anterior), `validateAssetInput` | Vitest puro, sin jsdom ni Next, siguiendo el patrón de `profile.test.ts` |
-| Unit — application | Los 13 casos de uso con `InMemory*Repository`/`FakeStorageGateway`, incluidos los escenarios de conflicto de versión, ownership ajeno, MIME/tamaño fuera de rango, registro repetido de asset | Vitest, fakes en `application/testing/` |
+| Unit — application | Los 13 casos de uso con `InMemory*Repository`/`FakeStorageGateway`, incluidos los escenarios de conflicto de versión, ownership ajeno, MIME/tamaño fuera de rango, registro repetido de asset; test de contrato de `updateIfVersion` sobre el doble en memoria | Vitest, fakes en `application/testing/` |
 | Unit — editor | `use-autosave` con `FakeSavePagePort` (guardado tras pausa, escritura durante guardado, fallo de red, conflicto), extensiones de marcas (resaltado por nombre, enlace con esquema no permitido) | Vitest + Testing Library, jsdom |
 | Component | Menú `/` (filtro, teclado, Escape), banner de conflicto, estado de progreso de subida | Testing Library |
 | Arquitectura | Reglas de `.dependency-cruiser.cjs`, incluida la ausencia de imports de Tiptap/ProseMirror en `domain`/`application` de ambos módulos | `pnpm depcruise` en CI |
-| DB smoke | Migración aplicada y revertida (tres tablas, `content_version` default 1, FK de `profiles`) | `pnpm test:db` contra `cogni-dev` |
+| DB smoke | Migración aplicada y revertida (tres tablas, `content_version` default 1, FK de `profiles`); carrera de `SavePage`: dos escritores con el mismo `expectedVersion` → exactamente uno actualiza | `pnpm test:db` contra `cogni-dev` |
 | E2E | Aceptación de §13 (crear cuaderno → página → cada familia de bloques → recargar), subida y renderizado de imagen, inserción con `/`, ida y vuelta de bloques, RLS negativo entre usuarios, reescritura de `shell-empty-state.spec.ts` | Playwright, Chromium, contra preview |
 
 ## Threat Matrix
@@ -526,8 +534,8 @@ Este change agrega enrutamiento nuevo (vistas de cuaderno/página bajo `(app)`) 
 | Ruta de Storage fuera del prefijo del owner en `RegisterPageAsset` | `DomainError`, sin persistir | Unit: "Ruta fuera del prefijo del owner" |
 | Lectura de asset ajeno vía `GetAssetReadUrl` | `DomainError`, ninguna URL | Unit: "Asset ajeno" |
 | RLS de `storage.objects` para el bucket `page-assets` | denegación a nivel de Postgres, no solo de aplicación | E2E: "Lectura entre usuarios denegada", "Acceso anónimo denegado" |
-| MIME/tamaño de imagen fuera de política | rechazo antes de que cualquier byte llegue a Storage, en cliente y de nuevo en servidor | Unit: "MIME no permitido", "Tamaño excedido" |
-| `SavePage` con `content_version` obsoleto | rechazo con `DomainError`, contenido almacenado sin cambios | Unit: "Guardado obsoleto rechazado" |
+| MIME/tamaño de imagen fuera de política | rechazo en tres capas del servidor: permiso (metadatos declarados), bucket (`file_size_limit`/`allowed_mime_types` sobre los bytes reales), registro (metadatos reales del objeto) | Unit: "MIME no permitido", "Tamaño excedido", "Objeto real fuera de política"; E2E: "Subida que excede el límite del bucket rechazada" |
+| `SavePage` con `content_version` obsoleto | rechazo con `DomainError`; la escritura es un `UPDATE` condicional atómico en Postgres, nunca lectura-comparación-escritura | Unit: "Guardado obsoleto rechazado"; DB smoke: carrera de `SavePage` |
 | `plain_text` enviado por el cliente en `SavePage` | ignorado o rechazado por Zod; el valor persistido siempre viene del cálculo del servidor | Unit: "`plain_text` enviado por el cliente ignorado" |
 
 ## Migration / Rollout

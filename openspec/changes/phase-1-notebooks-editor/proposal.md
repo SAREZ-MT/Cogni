@@ -155,7 +155,7 @@ Los slices 3 y 5 tienen el mayor riesgo de superar las 400 líneas de autoría p
 - [ ] `pages.plain_text` se completa en cada guardado y coincide con la salida testeada como unidad del extractor; el cliente nunca lo envía.
 - [ ] Un guardado obsoleto (discrepancia de `content_version`) es rechazado por `SavePage` y la UI reconcilia sin pérdida de datos.
 - [ ] Una URL firmada para el asset de otro usuario es rechazada por RLS de Storage (test negativo).
-- [ ] Las subidas mayores a 10 MB o fuera de la lista de MIME permitidos se rechazan antes de que cualquier byte llegue a Storage.
+- [ ] Las subidas mayores a 10 MB o fuera de la lista de MIME permitidos se rechazan en el servidor en tres capas: permiso firmado, límites del bucket sobre los bytes reales y verificación del objeto real al registrar.
 - [ ] CI en verde en cada PR: Biome, `tsc --noEmit`, Vitest, dependency-cruiser, `pnpm audit`; cobertura del 100% en el extractor de `plain_text` y en las invariantes de dominio.
 - [ ] Cada PR de la cadena se mantiene dentro de las ~400 líneas de autoría cambiadas o lleva un `size:exception` explícito.
 - [ ] `drizzle migrate` corre dentro del build de Vercel; `profiles` tiene la FK hacia `auth.users`.

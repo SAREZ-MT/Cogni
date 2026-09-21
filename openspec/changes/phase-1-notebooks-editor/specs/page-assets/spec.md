@@ -8,7 +8,13 @@ Pipeline de imágenes de página sobre Supabase Storage: bucket privado con RLS 
 
 ### Requirement: Bucket privado con RLS por propietario
 
-MUST existir un bucket privado de Supabase Storage cuyo nombre se lee de la variable de entorno `SUPABASE_STORAGE_BUCKET` (solo servidor). Todo objeto MUST almacenarse bajo la ruta `{ownerId}/{pageId}/{assetId}.{ext}`. Las políticas RLS del bucket MUST permitir leer y escribir un objeto solo cuando el primer segmento de su ruta coincide con `auth.uid()`. MUST NOT existir acceso público ni anónimo.
+MUST existir un bucket privado de Supabase Storage cuyo nombre se lee de la variable de entorno `SUPABASE_STORAGE_BUCKET` (solo servidor). Todo objeto MUST almacenarse bajo la ruta `{ownerId}/{pageId}/{assetId}.{ext}`. Las políticas RLS del bucket MUST permitir leer y escribir un objeto solo cuando el primer segmento de su ruta coincide con `auth.uid()`. MUST NOT existir acceso público ni anónimo. El bucket MUST configurarse con `file_size_limit` de 10 485 760 bytes y `allowed_mime_types` limitado a `image/jpeg`, `image/png`, `image/webp` e `image/gif`, de modo que Storage rechace bytes que no cumplan esos límites incluso con un permiso firmado válido.
+
+#### Scenario: Subida que excede el límite del bucket rechazada (e2e)
+
+- GIVEN un permiso firmado emitido para `image/png` de 2 MB
+- WHEN el navegador sube un objeto de 11 MB o de otro tipo
+- THEN Storage rechaza la subida y no existe el objeto
 
 #### Scenario: Lectura entre usuarios denegada (e2e)
 
@@ -24,7 +30,7 @@ MUST existir un bucket privado de Supabase Storage cuyo nombre se lee de la vari
 
 ### Requirement: Permiso de subida firmado con límites del servidor
 
-El caso de uso `RequestImageUpload` MUST recibir `ownerId`, `pageId`, `mime` y `sizeBytes`, verificar que la página está activa y pertenece al owner, verificar que `mime` es `image/jpeg`, `image/png`, `image/webp` o `image/gif` y que `sizeBytes` no supera 10 485 760 bytes, y devolver un permiso de subida firmado hacia la ruta canónica del asset con vigencia máxima de 10 minutos. Cualquier verificación fallida MUST devolver un `DomainError` antes de que un byte llegue a Storage.
+El caso de uso `RequestImageUpload` MUST recibir `ownerId`, `pageId`, `mime` y `sizeBytes`, verificar que la página está activa y pertenece al owner, verificar que `mime` es `image/jpeg`, `image/png`, `image/webp` o `image/gif` y que `sizeBytes` no supera 10 485 760 bytes, y devolver un permiso de subida firmado hacia la ruta canónica del asset con vigencia máxima de 10 minutos. Cualquier verificación fallida MUST devolver un `DomainError`. Este es el primer nivel de rechazo, sobre metadatos declarados por el cliente; los límites del bucket sobre los bytes reales son el segundo nivel.
 
 #### Scenario: Permiso emitido (unit)
 
@@ -68,13 +74,19 @@ Los bytes de la imagen MUST viajar directamente del navegador a Storage usando e
 
 ### Requirement: Registro de `PageAsset` con revalidación
 
-El caso de uso `RegisterPageAsset` MUST recibir `ownerId`, `pageId`, `storagePath`, `mime` y `sizeBytes`, verificar de nuevo la propiedad de la página, los límites de MIME y tamaño y que `storagePath` comienza con `{ownerId}/{pageId}/`, y persistir una fila de `page_assets`. Un registro repetido para el mismo `storagePath` MUST devolver la fila existente sin duplicarla. Una verificación fallida MUST devolver un `DomainError` y no persistir.
+El caso de uso `RegisterPageAsset` MUST recibir `ownerId`, `pageId`, `storagePath`, `mime` y `sizeBytes`, verificar de nuevo la propiedad de la página y que `storagePath` comienza con `{ownerId}/{pageId}/`, y persistir una fila de `page_assets`. MUST leer los metadatos reales del objeto en Storage a través del gateway y MUST rechazar con `DomainError` sin persistir cuando el objeto no existe, excede los límites o su content type no está permitido; el `mime`/`size_bytes` persistidos MUST provenir del objeto real, no de los valores declarados. Un registro repetido para el mismo `storagePath` MUST devolver la fila existente sin duplicarla.
 
 #### Scenario: Registro exitoso (unit)
 
 - GIVEN una subida completada con ruta canónica
 - WHEN se invoca `RegisterPageAsset`
-- THEN existe una fila con `page_id`, `storage_path`, `mime` y `size_bytes` declarados
+- THEN existe una fila con `page_id`, `storage_path`, con `mime` y `size_bytes` del objeto real
+
+#### Scenario: Objeto real fuera de política (unit)
+
+- GIVEN un `storagePath` cuyo objeto real mide 12 MB según el gateway
+- WHEN se invoca `RegisterPageAsset` declarando 2 MB
+- THEN devuelve un `DomainError` y no crea la fila
 
 #### Scenario: Ruta fuera del prefijo del owner (unit)
 

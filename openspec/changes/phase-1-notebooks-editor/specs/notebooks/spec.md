@@ -144,7 +144,7 @@ Archivar MUST fijar `archived_at` con la fecha actual y MUST NOT borrar filas. L
 
 ### Requirement: Guardado de contenido con comparar-e-intercambiar de `content_version`
 
-El caso de uso `SavePage` MUST recibir `ownerId`, `pageId`, `content` (JSON de Tiptap con nodo raíz `doc`) y `expectedVersion`. Si `expectedVersion` coincide con `content_version` actual, MUST persistir `content`, incrementar `content_version` en uno, materializar `plain_text` y devolver la nueva versión. Si no coincide, MUST devolver un `DomainError` de conflicto de versión que incluya la versión actual, sin escribir nada. El caso de uso MUST NOT aceptar `plain_text` del cliente.
+El caso de uso `SavePage` MUST recibir `ownerId`, `pageId`, `content` (JSON de Tiptap con nodo raíz `doc`) y `expectedVersion`. Si `expectedVersion` coincide con `content_version` actual, MUST persistir `content`, incrementar `content_version` en uno, materializar `plain_text` y devolver la nueva versión. Si no coincide, MUST devolver un `DomainError` de conflicto de versión que incluya la versión actual, sin escribir nada. El caso de uso MUST NOT aceptar `plain_text` del cliente. La escritura MUST ser una actualización condicional atómica en el repositorio (predicado `content_version = expectedVersion` en la misma sentencia que la escritura); MUST NOT implementarse como lectura, comparación en memoria y escritura incondicional.
 
 #### Scenario: Guardado con versión vigente (unit)
 
@@ -169,6 +169,12 @@ El caso de uso `SavePage` MUST recibir `ownerId`, `pageId`, `content` (JSON de T
 - GIVEN una entrada cuyo `content` no tiene nodo raíz `doc`
 - WHEN se invoca `SavePage`
 - THEN la validación falla con un `DomainError` y no se escribe nada
+
+#### Scenario: Dos escrituras concurrentes con la misma versión (db smoke)
+
+- GIVEN una página con `content_version` 3
+- WHEN dos invocaciones de `SavePage` con `expectedVersion` 3 se ejecutan concurrentemente contra Postgres
+- THEN exactamente una devuelve versión 4 y la otra devuelve el `DomainError` de conflicto indicando la versión 4
 
 ### Requirement: Materialización de `plain_text` en el servidor
 
