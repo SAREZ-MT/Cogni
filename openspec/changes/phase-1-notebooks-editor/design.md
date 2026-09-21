@@ -10,19 +10,19 @@ El trabajo previo del slice 0 (migrate-in-build, FK de `profiles`) modifica `obs
 
 ### Decision: Migrar dentro del build de Vercel, no como job posterior al deploy
 
-**Choice**: `package.json` cambia `"build": "next build"` a `"build": "drizzle-kit migrate && next build"`. `vercel.json` no necesita `buildCommand` propio porque el `build` script ya lo cubre. `DATABASE_URL` debe existir como variable de entorno de Vercel en Production y Preview con alcance de build (paso de usuario en el dashboard, ya documentado en el `proposal.md` bajo Dependencies). El job `migrate` de `.github/workflows/main.yml` (que hoy corre después de `e2e` con `secrets.PROD_DATABASE_URL`) se elimina; los otros dos jobs (`verify`, `e2e`) quedan intactos.
+**Choice**: `package.json` cambia `"build": "next build"` a `"build": "node scripts/migrate-in-build.mjs && next build"`. `scripts/migrate-in-build.mjs` solo ejecuta `drizzle-kit migrate` cuando `VERCEL_ENV === "production"` (o `RUN_DB_MIGRATIONS=1` como escape hatch local contra `cogni-dev`); en cualquier otro caso — Preview de cualquier rama, o build local sin esas variables — se salta la migración y deja pasar `next build`, porque Vercel crea un build de Preview para cada rama y comparte cualquier `DATABASE_URL` configurada con alcance de Preview. `vercel.json` no necesita `buildCommand` propio porque el `build` script ya lo cubre. `DATABASE_URL` debe existir como variable de entorno de Vercel en Production y Preview con alcance de build (paso de usuario en el dashboard, ya documentado en el `proposal.md` bajo Dependencies), pero **Preview debe apuntar a `cogni-dev`, nunca a producción** — el guard por `VERCEL_ENV` evita que un build de Preview migre, pero no protege contra apuntar esa variable a la base equivocada. El orden que precede a producción es el workflow `pr.yml` (`verify`: lint, typecheck, tests, depcruise, audit; más `e2e` si el pipeline lo agrega) reforzado por una regla de protección de rama en `main` con esos checks como requeridos, de modo que ningún cambio llega a producción sin pasar ese gate. El job `migrate` de `.github/workflows/main.yml` (que corría después de `e2e` con `secrets.PROD_DATABASE_URL`) se elimina; los otros dos jobs (`verify`, `e2e`) quedan intactos.
 
-**Alternatives considered**: mantener el job posterior al deploy (Fase 0); migrar desde un `postbuild` script; usar `vercel-build` explícito en `vercel.json`.
+**Alternatives considered**: mantener el job posterior al deploy (Fase 0); migrar desde un `postbuild` script; usar `vercel-build` explícito en `vercel.json`; migrar en todo build sin distinguir `VERCEL_ENV` (descartado por el advisory de revisión "R4-migrate-ungated-in-build": todo build de Preview de cualquier rama migraría la base que apunte `DATABASE_URL` de Preview).
 
-**Rationale**: el job posterior al deploy corre después de que Vercel ya sirve el código nuevo, así que hay una ventana donde la aplicación desplegada lee tablas que aún no existen (§6.1 lo exige antes de leer `notebooks`/`pages`/`page_assets`). Migrar dentro del build hace que un fallo de migración falle el build completo: Vercel conserva el deployment anterior activo (fail-closed, según el Rollback Plan del `proposal.md`) y el código nuevo nunca se sirve sin su esquema. `postbuild` correría después de `next build`, es decir, después de que Next ya haya generado páginas que podrían fallar en build time si tocan la base de datos; anteponer la migración es más seguro. Un `buildCommand` de Vercel duplicaría lo que ya hace `package.json#build` y divergiría entre entornos locales y de CI.
+**Rationale**: el job posterior al deploy corre después de que Vercel ya sirve el código nuevo, así que hay una ventana donde la aplicación desplegada lee tablas que aún no existen (§6.1 lo exige antes de leer `notebooks`/`pages`/`page_assets`). Migrar dentro del build hace que un fallo de migración falle el build completo: Vercel conserva el deployment anterior activo (fail-closed, según el Rollback Plan del `proposal.md`) y el código nuevo nunca se sirve sin su esquema. `postbuild` correría después de `next build`, es decir, después de que Next ya haya generado páginas que podrían fallar en build time si tocan la base de datos; anteponer la migración es más seguro. Un `buildCommand` de Vercel duplicaría lo que ya hace `package.json#build` y divergiría entre entornos locales y de CI. Gatear por `VERCEL_ENV === "production"` evita migrar en cada Preview (que corre en cada push de cada rama, no solo en `main`) sin depender de CI para decidir si migrar.
 
 ### Decision: FK de `profiles` hacia `auth.users` como migración Drizzle explícita
 
-**Choice**: nueva migración `drizzle/0002_profiles_auth_fk.sql` que agrega `alter table profiles add constraint profiles_id_fkey foreign key (id) references auth.users(id) on delete cascade`. Drizzle no puede generar este SQL desde el schema porque `auth.users` vive en el esquema `auth`, fuera de la introspección de `drizzle-kit generate` (ya señalado en el `design.md` de la Fase 0); la migración se escribe a mano y se versiona igual que las generadas.
+**Choice**: nueva migración `drizzle/0002_profiles_auth_fk.sql` que primero elimina cualquier fila huérfana de `profiles` (`delete from profiles p where not exists (select 1 from auth.users u where u.id = p.id)`) y luego agrega `alter table profiles add constraint profiles_id_fkey foreign key (id) references auth.users(id) on delete cascade`. Drizzle no puede generar este SQL desde el schema porque `auth.users` vive en el esquema `auth`, fuera de la introspección de `drizzle-kit generate` (ya señalado en el `design.md` de la Fase 0); la migración se escribe a mano y se versiona igual que las generadas.
 
-**Alternatives considered**: trigger SQL en `auth.users` (descartado en Fase 0 por la misma razón de introspección); dejar la FK pendiente indefinidamente.
+**Alternatives considered**: trigger SQL en `auth.users` (descartado en Fase 0 por la misma razón de introspección); dejar la FK pendiente indefinidamente; agregar la FK sin limpiar huérfanos primero (descartado porque una fila huérfana preexistente haría fallar la migración).
 
-**Rationale**: sin la FK, un `profiles.id` huérfano es posible si una fila de `auth.users` se borra fuera de flujo; la cascada evita perfiles huérfanos y de paso documenta la relación en el esquema real de Postgres, no solo en el código de aplicación.
+**Rationale**: sin la FK, un `profiles.id` huérfano es posible si una fila de `auth.users` se borra fuera de flujo; la cascada evita perfiles huérfanos y de paso documenta la relación en el esquema real de Postgres, no solo en el código de aplicación. Un perfil sin usuario de `auth.users` correspondiente nunca puede iniciar sesión, así que borrarlo antes de agregar la restricción es seguro; ese borrado también hace que la migración pueda correr sin fallar dentro del build de Vercel en producción (cierra el advisory de revisión "FK migration blocks prod build on orphans").
 
 ### Decision: Modelo de datos de `notebooks`/`pages`/`page_assets` en una sola migración versionada
 
@@ -504,12 +504,18 @@ export const ASSET_ERROR = {
 
 ```sql
 -- drizzle/0002_profiles_auth_fk.sql
+-- guard:start ... guard:end: do $$ ... raise exception ... end $$; (ver archivo real)
+delete from profiles p where not exists (select 1 from auth.users u where u.id = p.id);
+
 alter table profiles
   add constraint profiles_id_fkey
   foreign key (id) references auth.users(id) on delete cascade;
--- 0002_profiles_auth_fk.down.sql
+-- 0002_profiles_auth_fk.down.sql (only drops the constraint; the deleted
+-- orphan rows above are not restored)
 alter table profiles drop constraint profiles_id_fkey;
 ```
+
+El bloque `do $$ ... $$` (entre los marcadores `-- guard:start`/`-- guard:end` del archivo real) falla cerrado: si `auth.users` aparece vacía mientras `profiles` tiene filas, aborta la migración con una excepción en vez de borrar la tabla completa sin retroceso; los conteos de huérfanos quedan registrados con `raise notice` para diagnóstico.
 
 ## Testing Strategy
 

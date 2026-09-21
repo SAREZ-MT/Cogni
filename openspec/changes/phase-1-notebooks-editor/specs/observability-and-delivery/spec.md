@@ -4,7 +4,7 @@
 
 ### Requirement: Pipeline en `main` con migraciones antes del deploy
 
-El workflow de `main` MUST ejecutar los pasos del pull request, además Playwright contra el despliegue de preview. `drizzle migrate` MUST aplicarse dentro del build command de Vercel (`vercel.json` o el build command configurado en el dashboard), no como un job de workflow posterior al deploy. El build de Vercel MUST fallar de forma segura (fail-closed) si la migración falla, dejando el despliegue anterior activo.
+El workflow de `main` MUST ejecutar los pasos del pull request, además Playwright contra el despliegue de preview. `drizzle migrate` MUST aplicarse dentro del build command de Vercel (`vercel.json` o el build command configurado en el dashboard), no como un job de workflow posterior al deploy, y únicamente cuando el build es de producción (`VERCEL_ENV === "production"`); un build de Preview de cualquier rama MUST NOT ejecutar migraciones. El build de Vercel MUST fallar de forma segura (fail-closed) si la migración falla, dejando el despliegue anterior activo.
 
 #### Scenario: Build de Vercel aplica migraciones (db smoke)
 
@@ -23,6 +23,18 @@ El workflow de `main` MUST ejecutar los pasos del pull request, además Playwrig
 - GIVEN un merge a `main` sin migraciones pendientes con error
 - WHEN corre el workflow y el build de Vercel
 - THEN pasan los chequeos, pasa Playwright contra el preview, el build aplica las migraciones y luego se despliega producción
+
+#### Scenario: Build de preview no ejecuta migraciones (unit)
+
+- GIVEN `VERCEL_ENV` distinto de `production` y sin `RUN_DB_MIGRATIONS`
+- WHEN corre el build
+- THEN `drizzle-kit migrate` no se ejecuta y el build continúa
+
+#### Scenario: Gate previo a producción (usuario)
+
+- GIVEN un cambio que va a `main`
+- WHEN se intenta hacer merge del pull request
+- THEN la protección de rama de `main` exige que pasen los checks de `pr.yml` (`verify`, y `e2e` si el pipeline lo agrega) antes de permitir el merge
 
 ## ADDED Requirements
 

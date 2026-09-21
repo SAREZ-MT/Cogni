@@ -9,7 +9,9 @@ permissions:
 
 # Vercel's Git integration builds and deploys main on its own. This workflow
 # is the gate that runs before production is trusted: the PR checks, the
-# pooler smoke test, Playwright against cogni-dev and the migration step.
+# pooler smoke test and Playwright against cogni-dev. Migrations run inside
+# the Vercel production build only (package.json#build guards on
+# VERCEL_ENV=production), not as a workflow job and never on Preview builds.
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -54,19 +56,3 @@ jobs:
           name: playwright-report
           path: playwright-report
           retention-days: 7
-
-  migrate:
-    needs: e2e
-    runs-on: ubuntu-latest
-    environment: production
-    env:
-      DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm db:migrate

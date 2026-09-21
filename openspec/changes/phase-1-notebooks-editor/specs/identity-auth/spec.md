@@ -24,6 +24,12 @@ MUST existir una migración Drizzle versionada que cree `profiles` con `id` (igu
 - WHEN se intenta insertar una fila en `profiles` con ese `id`
 - THEN la base de datos rechaza la inserción por violación de la clave foránea
 
+#### Scenario: Migración rechaza borrar perfiles cuando auth.users está vacío (db smoke)
+
+- GIVEN `auth.users` sin filas y `profiles` con filas
+- WHEN corre el bloque de guarda de la migración 0002
+- THEN falla con una excepción y no borra nada
+
 #### Scenario: Escritura concurrente resuelta por el upsert (unit)
 
 - GIVEN dos invocaciones concurrentes de `EnsureProfile` para el mismo usuario sin fila previa
