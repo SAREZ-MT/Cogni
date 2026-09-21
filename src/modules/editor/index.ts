@@ -1,8 +1,8 @@
 // Public API of the "editor" module (cross-module-via-index in
 // .dependency-cruiser.cjs forbids importing anything else from it).
-// This slice (PR3a) exports only the framework-agnostic autosave state
-// and hook; the Tiptap-backed `Editor` component is added in PR3b
-// (design.md, "Tiptap y ProseMirror solo en editor/ui").
+// PR3a exported only the framework-agnostic autosave state and hook; PR3b
+// adds the Tiptap-backed `Editor` component (design.md, "Tiptap y
+// ProseMirror solo en editor/ui").
 
 export type {
   UseAutosaveOptions,
@@ -15,3 +15,5 @@ export type {
   TiptapDoc,
   TiptapNode,
 } from "./domain/save-page-port";
+export type { EditorProps } from "./ui/tiptap/editor";
+export { Editor } from "./ui/tiptap/editor";
