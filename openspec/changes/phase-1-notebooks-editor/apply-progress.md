@@ -486,3 +486,229 @@ para que el orquestador cree el commit de trabajo y decida el presupuesto
 de revisión. Pendiente exclusivamente `(usuario)`: `CRON_SECRET` en
 `.env.local` para poder correr `pnpm test:e2e` localmente sin exportarlo a
 mano.
+
+## PR3a: Advisorías del review de PR2 + Editor — dominio y aplicación sin Tiptap
+
+Batch ejecutado en la rama `feat/phase-1-pr3a-editor-core` (creada desde
+`main` en `e57b112`, PR0–PR2 ya mergeados). Incluye, en orden, tres
+correcciones pequeñas señaladas por el review de PR2 y luego la Fase 3a
+completa de `tasks.md` (3a.1–3a.8).
+
+### Advisorías plegadas
+
+1. **`getPageForRoute` no validaba/usaba `notebookId` de la ruta**
+   (`src/modules/notebooks/actions.ts`, `src/app/(app)/notebooks/[notebookId]/pages/[pageId]/page.tsx`).
+   La función solo recibía `pageId` y nunca comprobaba que la página
+   perteneciera al `notebookId` de la URL: una ruta con un `notebookId`
+   ajeno pero un `pageId` propio igual resolvía la página. Se cambió la
+   firma a `getPageForRoute(notebookId, pageId)`, se agregó
+   `routePageParamsSchema` (Zod, mismo patrón `z.object({ ...: z.string() })`
+   que el resto de las Server Actions) y se exige `page.notebookId ===
+   notebookId` además de las comprobaciones de `ownerId`/`archivedAt` que ya
+   hacía `getPage`. La ruta de página ahora pasa ambos ids. RED real:
+   `pnpm test -- src/modules/notebooks/actions.test.ts` →
+   `AssertionError: expected undefined to be '<pageId>'` en el caso "returns
+   the page when it belongs to the notebook in the route param" (la firma
+   antigua de un solo argumento hacía que el `notebookId` de prueba se
+   interpretara como `pageId`). GREEN tras el fix: 170/170.
+2. **Fuga de `content_version` real a un `owner_id` ajeno en
+   `updateIfVersion`** (`src/modules/notebooks/infrastructure/drizzle-page-repository.ts`,
+   `src/modules/notebooks/application/testing/in-memory-page-repository.ts`).
+   Cuando el `UPDATE` condicional afectaba cero filas, el re-read de
+   fallback para reportar `currentVersion` no estaba filtrado por
+   `owner_id` (ni por `archived_at` en el caso Drizzle): un llamador con un
+   `ownerId` incorrecto podía enterarse de la versión real de una página
+   que no le pertenece. Se agregó un caso al contrato compartido
+   (`page-repository.contract.ts`, "does not leak the real content_version
+   to a different owner's stale write") y se corrigieron ambas
+   implementaciones para que el re-read de fallback esté scoped por
+   `owner_id` (y `archived_at IS NULL` en Drizzle), tratando una página
+   ajena o archivada como `currentVersion: 0` en vez de filtrar el valor
+   real. RED real: `expected { updated: false, currentVersion: 5 } to
+   deeply equal { updated: false, currentVersion: 0 }` contra el doble en
+   memoria. GREEN: `pnpm test -- in-memory-page-repository.contract` (171/171)
+   y `pnpm test:db` (12/12, mismo caso corrido contra Postgres real vía
+   `tests/db/drizzle-page-repository.contract.test.ts`).
+3. **Rollback optimista de `sidebar-tree-client.tsx` podía descartar el
+   cambio optimista de una mutación hermana concurrente**. `rollbackOn`
+   restauraba siempre el snapshot `previous` capturado por `onMutate` de la
+   mutación que falló, sin comprobar si otra mutación había aplicado su
+   propio cambio sobre el árbol mientras tanto — un rollback de una
+   mutación fallida podía pisar por completo el resultado optimista de una
+   mutación hermana todavía pendiente. Se cambió `optimisticUpdate` para
+   devolver también `applied` (el array exacto que esa mutación acaba de
+   escribir) y `rollbackOn` ahora solo restaura `previous` cuando el dato
+   actual de la query sigue siendo referencialmente ese `applied` (nadie
+   más lo tocó desde entonces); si otra mutación ya cambió el árbol, el
+   rollback se omite y la invalidación de `onSettled` corrige el estado
+   final igual. RED real (component test con `renderHook`-equivalente vía
+   `@testing-library/react` + `userEvent`, dos mutaciones concurrentes:
+   renombrar el cuaderno n1 que falla, renombrar la página p1 que queda
+   pendiente): `expected document not to contain element, found <span>
+   Página 1</span>` (el rollback de n1 borraba el renombrado optimista de
+   p1). GREEN: `pnpm test -- sidebar-tree-client` (172/172).
+
+### Fase 3a — Editor: dominio y aplicación sin Tiptap
+
+- [x] 3a.1 `.dependency-cruiser.cjs`: regla `editor-tiptap-only-in-ui`
+  agregada. **Desviación de diseño**: el patrón literal de `design.md`
+  (`to: { path: "node_modules/(@tiptap|prosemirror-)" }`) solo puede
+  matchear una vez que Tiptap está instalado, porque dependency-cruiser
+  reporta un módulo no resoluble con su especificador crudo
+  (`"@tiptap/core"`), no con un path `node_modules/...` — confirmado
+  empíricamente con `--output-type json` (`resolved: "@tiptap/core"`,
+  `couldNotResolve: true`). Como PR3a no instala Tiptap (por diseño, tarea
+  3a.2), el patrón literal jamás dispara la regla nueva en este slice, solo
+  la regla genérica `domain-is-pure`. Se ajustó a
+  `to: { path: "^(node_modules/)?(@tiptap|prosemirror-)" }` para cubrir
+  ambos casos (especificador crudo hoy, path resuelto real una vez Tiptap
+  se instale en PR3b) sin cambiar la intención de la regla. Verificado que
+  sigue permitiendo el import equivalente dentro de `editor/ui`.
+- [x] 3a.2 RED de arquitectura confirmado con un archivo temporal
+  (`src/modules/editor/domain/_tmp-tiptap-import-check.ts`, borrado tras la
+  corrida): `pnpm depcruise` → `error editor-tiptap-only-in-ui:
+  src/modules/editor/domain/_tmp-tiptap-import-check.ts → @tiptap/core`
+  (y también `domain-is-pure`, esperado). GREEN tras borrar el archivo:
+  `no dependency violations found`.
+- [x] 3a.3 `src/modules/editor/domain/save-page-port.ts`: reexporta
+  `SavePagePort`/`TiptapDoc`/`TiptapNode` como `export type` desde
+  `@/modules/notebooks` (import solo de tipos, sin costo en runtime). Además
+  declara `PAGE_VERSION_CONFLICT_CODE` — ver Desviación más abajo.
+- [x] 3a.4 `src/modules/editor/domain/autosave-state.ts`: `AutosaveStatus`
+  (`idle`/`pending`/`saving`/`saved`/`error`/`conflict`) y `AutosaveState`,
+  sin ninguna dependencia externa.
+- [x] 3a.5 `src/modules/editor/application/testing/fake-save-page-port.ts`:
+  doble en memoria de `SavePagePort` con `scriptNextSave` (cola FIFO de
+  resultados, éxito/fallo/conflicto), `setServerState` (contenido/versión
+  que devuelve `getCurrent`), y `holdNextSaves`/`resolveNextSave` (control
+  manual de cuándo se resuelve un guardado en curso, necesario para el
+  Scenario "Escritura durante el guardado" de forma determinista sin
+  depender de temporizadores reales) y `latencyMs` para simular latencia de
+  red cuando el guardado no está retenido manualmente.
+- [x] 3a.6 `src/modules/editor/application/use-autosave.test.ts` (RED real,
+  ver tabla de evidencia TDD) → `use-autosave.ts`: debounce configurable
+  (default 1000ms, dentro de 800–1500ms), un guardado por pausa, guardado
+  encolado durante uno en curso que se dispara con el contenido más
+  reciente al terminar el primero, estado `error` que conserva el
+  contenido y solo reintenta en la siguiente pausa (sin reintento
+  automático), y reconciliación de conflicto (recarga `getCurrent`,
+  reemplaza el documento, expone `conflictDraft` con el borrador
+  descartado, el siguiente guardado usa la versión recargada). Ningún
+  import de Tiptap/ProseMirror.
+- [x] 3a.7 `src/modules/editor/index.ts`: exporta `AutosaveStatus`,
+  `AutosaveState`, `SavePagePort`, `TiptapDoc`, `TiptapNode`,
+  `UseAutosaveOptions`, `UseAutosaveResult` y `useAutosave`. El componente
+  `Editor` queda para 3b.
+- [x] 3a.8 Gate PR3a verde: `pnpm test -- editor` (176/176, incluye el
+  resto del proyecto porque el filtro `-- editor` de Vitest no acota por
+  ruta con este runner de forma estricta — se confirmó igual que los 4
+  tests nuevos de `use-autosave.test.ts` corrieron y pasaron), `pnpm
+  typecheck` (sin errores nuevos — ver Desviación/pendiente de entorno),
+  `pnpm depcruise` (`no dependency violations found`, 212 módulos), `pnpm
+  lint` (`biome check`, se corrigieron con `--write` el orden de imports y
+  el formato de `editor/index.ts`, `use-autosave.ts`,
+  `use-autosave.test.ts`, `in-memory-page-repository.ts` y
+  `sidebar-tree-client.tsx`; corrida final sin hallazgos). Commit de
+  trabajo lo crea el orquestador (no incluido en este batch, según la
+  instrucción recibida).
+
+### Desviación de diseño: `PAGE_VERSION_CONFLICT_CODE` redeclarado en `editor/domain` en vez de importado como valor
+
+`design.md` no especifica de dónde `use-autosave.ts` obtiene el código
+`PAGE_VERSION_CONFLICT` para reconocer un conflicto de versión. Importar el
+valor `PAGE_ERROR` desde `@/modules/notebooks` (el índice público, como
+exige el Requirement "Puerto de guardado como única dependencia") rompe en
+tests: ese índice también reexporta `actions.ts` (Server Actions), que
+importa `@/modules/identity` — un módulo con `import "server-only"` en su
+primera línea — y ese import se evalúa incondicionalmente en cuanto
+cualquier símbolo del barrel se importa, sin importar cuál. Confirmado con
+el error real: `This module cannot be imported from a Client Component
+module` al correr `use-autosave.test.ts` con un `import { PAGE_ERROR } from
+"@/modules/notebooks"`. En Next.js real esto se resuelve en build time (una
+Server Action importada desde un Client Component se reemplaza por un stub
+RPC), pero Vitest no aplica esa transformación. Se optó por redeclarar el
+código como un literal (`PAGE_VERSION_CONFLICT_CODE = "PAGE_VERSION_CONFLICT"`)
+en `editor/domain/save-page-port.ts`, documentado como el mismo contrato de
+`notebooks/domain/errors.ts` (`PAGE_ERROR.VERSION_CONFLICT`) sin importar su
+valor. El import `export type { SavePagePort, TiptapDoc, TiptapNode } from
+"@/modules/notebooks"` en el mismo archivo sí se mantiene como estaba
+diseñado porque es `export type` puro (TypeScript lo borra por completo en
+runtime, nunca ejecuta el barrel).
+
+### Tabla de evidencia TDD (Strict TDD)
+
+| Unidad | Test file(s) | RED | GREEN | REFACTOR |
+|---|---|---|---|---|
+| Advisoría 1 (`getPageForRoute`) | `src/modules/notebooks/actions.test.ts` | ✅ Observado: `AssertionError: expected undefined to be '<pageId>'` (firma de un solo argumento) | ✅ Observado: `170/170` tras agregar `routePageParamsSchema` y el chequeo `notebookId` | ➖ No aplica |
+| Advisoría 2 (`updateIfVersion` fallback) | `page-repository.contract.ts` (in-memory + Drizzle) | ✅ Observado: `expected currentVersion: 5 to equal 0` contra el doble en memoria | ✅ Observado: `171/171` (in-memory) y `12/12` (`pnpm test:db`, Drizzle real) | ➖ No aplica |
+| Advisoría 3 (rollback optimista) | `sidebar-tree-client.test.tsx` | ✅ Observado: `expected document not to contain element, found <span>Página 1</span>` con dos mutaciones concurrentes reales (una falla, la otra queda pendiente) | ✅ Observado: `172/172` tras que `rollbackOn` compare `applied` antes de restaurar `previous` | ➖ No aplica |
+| 3a.1/3a.2 regla de depcruise | archivo temporal en `editor/domain` (borrado) | ✅ Observado: `error editor-tiptap-only-in-ui: ... → @tiptap/core` (y `domain-is-pure`) | ✅ Observado: `no dependency violations found` tras borrar el archivo | ➖ Se ajustó el patrón de la regla para cubrir el especificador no resuelto (ver Desviación) — motivado directamente por la corrida RED real |
+| 3a.6 `use-autosave` | `use-autosave.test.ts` (4 tests: pausa, escritura durante guardado, fallo de red, conflicto+reconciliación) | ✅ Observado: `Failed to resolve import "./use-autosave"` (el archivo no existía) → luego `This module cannot be imported from a Client Component module` (import de valor desde `@/modules/notebooks`) | ✅ Observado tras crear `use-autosave.ts` y redeclarar el código de conflicto localmente: `176/176`, los 4 tests del hook en verde | ➖ No aplica |
+
+### Verificación ejecutada en este batch
+
+| Comando | Resultado observado |
+|---|---|
+| `pnpm test -- src/modules/notebooks/actions.test.ts` (antes del fix 1) | `1 failed \| 43 passed` — `getPageForRoute` con la firma vieja |
+| `pnpm test -- src/modules/notebooks/actions.test.ts` (después) | `44 passed (170 tests)` |
+| `pnpm test -- in-memory-page-repository.contract` (antes del fix 2) | `1 failed \| 43 passed` — fuga de `currentVersion` |
+| `pnpm test -- in-memory-page-repository.contract` (después) | `44 passed (171 tests)` |
+| `pnpm test:db` (fix 2 contra Postgres real) | `7 passed (7 files)` / `12 passed (12 tests)` contra `cogni-dev` |
+| `pnpm test -- sidebar-tree-client` (antes del fix 3, con `act`+`setTimeout(50)` para forzar el flush real del microtask de `onError`) | `1 failed \| 3 passed` — `Página 1` reaparecía |
+| `pnpm test -- sidebar-tree-client` (después) | `4 passed (172 tests)` |
+| `pnpm depcruise` (con archivo temporal en `editor/domain`) | `2 dependency violations` nombrando `editor-tiptap-only-in-ui` y `domain-is-pure` |
+| `pnpm depcruise` (sin el archivo temporal, gate final) | `no dependency violations found (212 modules, 526 dependencies cruised)` |
+| `pnpm test -- src/modules/editor/application/use-autosave.test.ts` (antes de crear el hook) | `Failed to resolve import "./use-autosave"` |
+| `pnpm test -- src/modules/editor/application/use-autosave.test.ts` (con import de valor a `@/modules/notebooks`) | `This module cannot be imported from a Client Component module` (server-only) |
+| `pnpm test -- src/modules/editor/application/use-autosave.test.ts` (gate final) | `45 passed (176 tests)` |
+| `pnpm test` (gate final, todo el repo) | `45 passed (176 tests)` |
+| `pnpm test:db` (gate final) | `7 passed (7)` / `12 passed (12)` |
+| `pnpm typecheck` (gate final) | Solo 2 errores preexistentes y ajenos a este batch (`PageProps`/`LayoutProps` en `src/app/(public)/login/page.tsx` y `src/app/layout.tsx`, tipos globales generados por Next.js 16 que requieren haber corrido `next dev`/`next build` al menos una vez — confirmado idéntico contra el HEAD limpio de la rama con `git stash`) |
+| `pnpm lint` (`biome check`) | 4 hallazgos de formato/orden de imports en `editor/index.ts`, `use-autosave.ts`, `use-autosave.test.ts`, `in-memory-page-repository.ts`; corregidos con `biome check --write`; corrida final sin hallazgos |
+
+### Pendiente — `(usuario)`
+
+Ninguno nuevo en este batch. Sigue pendiente el `CRON_SECRET` en
+`.env.local` registrado en la sección de PR2, necesario solo para
+`pnpm test:e2e` local (no se corrió en este batch: la Fase 3a no agrega
+ningún spec de Playwright, ver Traceability de `tasks.md`).
+
+### Work Unit Evidence
+
+| Evidencia | Valor |
+|---|---|
+| Comando de test enfocado y resultado exacto | `pnpm test` → `45 archivos / 176 tests` GREEN (incluye los 3 advisory fixes y los 4 tests del hook de autosave); `pnpm test:db` → `7/7` archivos, `12/12` tests GREEN contra `cogni-dev` real |
+| Comando/escenario de runtime y resultado exacto | `pnpm depcruise` (`no dependency violations found`, 212 módulos, 526 dependencias) es el único límite de runtime relevante en este batch — no hay spec de Playwright nuevo en la Fase 3a (el editor real con Tiptap, que sí tendrá e2e, llega en PR3b) |
+| Rollback boundary | Revertir la Fase 3a: borrar `src/modules/editor/{domain,application}/` completo (`save-page-port.ts`, `autosave-state.ts`, `use-autosave.ts`, `use-autosave.test.ts`, `application/testing/fake-save-page-port.ts`), revertir `src/modules/editor/index.ts` y `README.md` a su estado de esqueleto, revertir `.dependency-cruiser.cjs` (quitar la regla `editor-tiptap-only-in-ui`). Revertir las 3 advisorías por separado: `git checkout` de `src/modules/notebooks/actions.ts`+`actions.test.ts` (fix 1), `infrastructure/drizzle-page-repository.ts`+`application/testing/{in-memory-page-repository.ts,page-repository.contract.ts}` (fix 2), `ui/sidebar-tree-client.tsx`+`.test.tsx` (fix 3), y `src/app/(app)/notebooks/[notebookId]/pages/[pageId]/page.tsx` (caller de `getPageForRoute`). Ningún archivo de PR0–PR2 fuera de estos se tocó. |
+
+### Impacto en el presupuesto de revisión (400 líneas)
+
+`git diff --numstat` de este batch completo (advisorías + Fase 3a, sin
+`pnpm-lock.yaml` porque no se agregó ninguna dependencia nueva) da **671
+líneas agregadas / 45 eliminadas = 716 líneas de autoría**, por encima de
+las ~400 del presupuesto por defecto. La sesión tiene `delivery_strategy:
+auto-chain`, pero el batch se ejecutó como una sola unidad porque así lo
+pidió explícitamente el prompt de `sdd-apply` recibido ("PR3a: editor
+domain and application without Tiptap... preceded by three small advisory
+fixes"), sin una frontera de slice intermedia indicada. División honesta
+posible para un futuro batch equivalente: (a) las 3 advisorías del review
+de PR2 (244 líneas de autoría: 205 agregadas / 39 eliminadas, en
+`actions.ts`+`actions.test.ts`, `drizzle-page-repository.ts`+
+`in-memory-page-repository.ts`+`page-repository.contract.ts`,
+`sidebar-tree-client.tsx`+`.test.tsx` y la ruta de página) como un PR de
+mantenimiento separado, ya que son correcciones aisladas sin dependencia
+entre sí ni con la Fase 3a; (b) la Fase 3a propiamente dicha (472 líneas de
+autoría: 466 agregadas / 6 eliminadas — regla de depcruise, dominio,
+aplicación, tests y `index.ts`) como el PR de feature. No se dividió en este batch porque ya se ejecutó y
+verificó de punta a punta como se pidió; se recomienda **`size:exception`**
+para esta rama tal como está, o que el orquestador aplique el chain
+strategy de `auto-chain` sobre los commits ya diferenciables (advisorías
+vs. Fase 3a) al momento de abrir el/los PR.
+
+### Estado
+
+Fase 3a completa: 8/8 tareas (3a.1–3a.8), más las 3 advisorías del review
+de PR2. Gate verde (`pnpm test`, `pnpm test:db`, `pnpm typecheck` con solo
+errores preexistentes ajenos, `pnpm depcruise`, `pnpm lint`). No se creó
+commit de trabajo en este batch (lo decide el orquestador, junto con el
+presupuesto de revisión). Sin pendientes nuevos de `(usuario)`.

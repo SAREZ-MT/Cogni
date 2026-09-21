@@ -6,12 +6,19 @@ Extensiones Tiptap, bloques, menú `/`, resaltados y autoguardado.
 
 ## Estado
 
-Pendiente. Este módulo es un esqueleto sin lógica de dominio: solo existe
-`index.ts` (API pública vacía) y este `README.md`.
+PR3a completo: dominio y aplicación sin Tiptap. `domain/save-page-port.ts`
+reexporta el tipo `SavePagePort` de `notebooks` (nunca su implementación) y
+declara el código de conflicto de versión; `domain/autosave-state.ts` define
+el estado puro del autoguardado; `application/use-autosave.ts` implementa el
+debounce, el reintento y la reconciliación de conflicto contra un
+`SavePagePort` inyectado, sin importar Tiptap ni ProseMirror
+(`.dependency-cruiser.cjs`, regla `editor-tiptap-only-in-ui`). El componente
+`Editor` de Tiptap llega en PR3b.
 
 ## Fase pendiente
 
-Fase 1 — Cuadernos y editor (ver `docs/documento-maestro.md` §13).
+PR3b — Tiptap base, bloques principales y menú "/" (ver
+`openspec/changes/phase-1-notebooks-editor/tasks.md`, Fase 3b).
 
 ## Dependencias declaradas
 
