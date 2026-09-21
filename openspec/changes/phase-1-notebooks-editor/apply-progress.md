@@ -126,3 +126,13 @@ compilar; `RUN_DB_MIGRATIONS=1` con la `DATABASE_URL` real de `.env.local`
 hace no-op (`already exists, skipping`) y el build pasa completo. Gate:
 `pnpm test` (93/93), `pnpm typecheck`, `pnpm lint`, `pnpm depcruise`, todos
 en verde.
+
+### Corrección de revisión 2: guarda contra borrado desatendido (R4-unguarded-orphan-delete-in-prod-build)
+
+`0002_profiles_auth_fk.sql` borraba `profiles` huérfanas sin verificar,
+desatendido en el build de Vercel; con `auth.users` vacía por
+`DATABASE_URL` equivocada, vaciaría toda la tabla. Guarda `do $$ ... $$`
+falla cerrado si `auth.users` está vacía y `profiles` no. RED→GREEN en
+`tests/db/orphan-guard.smoke.test.ts`. No se re-corrió `pnpm db:migrate`
+(0002 ya aplicada; Drizzle compara por `created_at`, no por hash). Gate:
+`pnpm test:db`, `pnpm test`, `pnpm lint`, `pnpm typecheck`, `pnpm depcruise`, verde.

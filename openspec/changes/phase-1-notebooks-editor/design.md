@@ -504,6 +504,7 @@ export const ASSET_ERROR = {
 
 ```sql
 -- drizzle/0002_profiles_auth_fk.sql
+-- guard:start ... guard:end: do $$ ... raise exception ... end $$; (ver archivo real)
 delete from profiles p where not exists (select 1 from auth.users u where u.id = p.id);
 
 alter table profiles
@@ -513,6 +514,8 @@ alter table profiles
 -- orphan rows above are not restored)
 alter table profiles drop constraint profiles_id_fkey;
 ```
+
+El bloque `do $$ ... $$` (entre los marcadores `-- guard:start`/`-- guard:end` del archivo real) falla cerrado: si `auth.users` aparece vacía mientras `profiles` tiene filas, aborta la migración con una excepción en vez de borrar la tabla completa sin retroceso; los conteos de huérfanos quedan registrados con `raise notice` para diagnóstico.
 
 ## Testing Strategy
 
