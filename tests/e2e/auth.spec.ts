@@ -76,8 +76,13 @@ test.describe("authentication", () => {
     const user = await createVerifiedUser();
     try {
       await signIn(page, user);
+      // Both the sidebar tree and the home content area show this same
+      // empty-state copy (notebooks/design-tokens-and-shell specs), so it
+      // must be scoped to one of them to avoid a strict-mode ambiguity.
       await expect(
-        page.getByText("Aún no tienes cuadernos. Crea uno para empezar."),
+        page
+          .getByTestId("content-area")
+          .getByText("Aún no tienes cuadernos. Crea uno para empezar."),
       ).toBeVisible();
 
       await page.goto("/login");

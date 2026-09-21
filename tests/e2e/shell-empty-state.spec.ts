@@ -30,13 +30,22 @@ test.describe("app shell", () => {
     await expect(content).toHaveCSS("border-top-left-radius", "20px");
   });
 
-  test("shows only an empty state, no product features", async ({ page }) => {
+  // Scenario "Reescritura de shell-empty-state.spec.ts"
+  // (specs/design-tokens-and-shell/spec.md): a fresh owner without
+  // notebooks sees notebooks' own empty-state message and a control to
+  // create the first one, inside the sidebar tree.
+  test("sidebar shows the notebooks empty state and a control to create the first notebook", async ({
+    page,
+  }) => {
     await page.goto("/");
 
+    const sidebar = page.getByRole("navigation", { name: "Barra lateral" });
     await expect(
-      page.getByText("Aún no tienes cuadernos. Crea uno para empezar."),
+      sidebar.getByText("Aún no tienes cuadernos. Crea uno para empezar."),
     ).toBeVisible();
-    await expect(page.getByRole("link", { name: /cuadernos/i })).toHaveCount(0);
+    await expect(
+      sidebar.getByRole("button", { name: "Crear cuaderno" }),
+    ).toBeVisible();
   });
 
   test("collapses the sidebar to 64px and keeps the choice after navigating", async ({
@@ -47,7 +56,6 @@ test.describe("app shell", () => {
     const sidebar = page.getByRole("navigation", { name: "Barra lateral" });
     await page.getByRole("button", { name: "Contraer barra lateral" }).click();
     await expect(sidebar).toHaveCSS("width", "64px");
-    await expect(sidebar.getByRole("link", { name: "Inicio" })).toBeVisible();
 
     await page.reload();
     await expect(sidebar).toHaveCSS("width", "64px");

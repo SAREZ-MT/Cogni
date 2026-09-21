@@ -226,3 +226,263 @@ Ninguna desviación afecta un Scenario de `specs/notebooks/spec.md` de esta fase
 ### Estado
 
 17/17 tareas completas (1.1–1.17). Gate PR1 completo y verde. Listo para que el orquestador cree el commit de trabajo y decida cómo proceder con el presupuesto de revisión (recomendación: `size:exception` para este PR, dado que es indivisible sin dejar estados intermedios sin sentido).
+
+## Batch actual: PR2 — repositorios Drizzle, Server Actions, shadcn/ui, sidebar y rutas (Phase 2, tasks 2.1–2.13)
+
+Rama: `feat/phase-1-pr2-notebooks-infra-sidebar`, creada desde `main` en
+`9dc2d9e` (que ya incluye PR0 y PR1 fusionados). Sin commit creado en este
+batch; el árbol de trabajo queda sin confirmar para que el orquestador cree
+el commit de trabajo (`feat(notebooks): wire Drizzle repositories, sidebar
+and notebook/page routes`).
+
+Strict TDD Mode: activo. Test runner: `pnpm test` (Vitest unidad/componente,
+jsdom), `pnpm test:db` (Vitest contra `cogni-dev` real, `DATABASE_URL` de
+`.env.local`, `vitest.db.config.ts`), `pnpm test:e2e` (Playwright contra
+`next build && next start`, `.env.local`).
+
+### Tareas completadas
+
+- [x] 2.1 `DrizzleNotebookRepository`, `DrizzlePageRepository`,
+  `DrizzlePageAssetRepository` en `src/modules/notebooks/infrastructure/`,
+  implementando exactamente los puertos de 1.8. `DrizzlePageRepository.updateIfVersion`
+  es un único `UPDATE ... SET content_version = content_version + 1 WHERE id
+  AND owner_id AND archived_at IS NULL AND content_version = $expected
+  RETURNING content_version`; cero filas afectadas releé la fila para
+  reportar `currentVersion` real. `DrizzlePageAssetRepository.upsert` usa
+  `onConflictDoUpdate({ target: storagePath })` (idempotente).
+- [x] 2.2 `tests/db/notebooks-repository.smoke.test.ts`: crea, lee y archiva
+  un cuaderno y una página vía los repositorios Drizzle reales; un segundo
+  test verifica aislamiento estricto de `listActiveByOwner` por `owner_id`
+  entre dos owners reales (creados vía `tests/db/helpers/test-owner.ts`,
+  que replica el patrón de `tests/e2e/fixtures/auth.ts` con la API admin de
+  Supabase, y se limpia en `afterAll`).
+- [x] 2.2b `tests/db/save-page-race.test.ts`: dos escritores concurrentes
+  (`Promise.all`) con el mismo `expectedVersion` contra `DrizzlePageRepository`
+  real → exactamente uno de los dos resultados tiene `updated: true`, el otro
+  `updated: false`, y `content_version` final es exactamente `2` (no `3`,
+  confirmando que el `UPDATE` condicional es atómico y no hay doble
+  incremento).
+- [x] Contrato compartido extendido: `page-repository.contract.ts` (creado en
+  PR1 con IDs fijos hardcodeados) ahora acepta un segundo parámetro opcional
+  `PageRepositoryContractIds` (pageId/ownerId/otherOwnerId/notebookId), para
+  que `tests/db/drizzle-page-repository.contract.test.ts` pueda inyectar
+  owners y un cuaderno reales (con FK válida) sin tocar el comportamiento del
+  doble en memoria, que sigue usando los defaults. `DrizzlePageRepository`
+  pasa el mismo contrato de 3 casos que `InMemoryPageRepository`.
+- [x] 2.3 shadcn/ui: `components.json` ya existía desde la Fase 0 (ADR 0001,
+  estilo `radix-nova`, `tailwind.config` vacío); se agregaron los primitivos
+  `command`, `popover`, `dropdown-menu`, `dialog`, `separator`, `tooltip`
+  (más `input`/`textarea`/`input-group` como dependencias transitivas de
+  `command`) vía `pnpm dlx shadcn@latest add ...`, sin overwrite de
+  `button.tsx` (su API ya coincide con shadcn, no necesitó reconciliación).
+  El CLI había agregado por su cuenta una dependencia `cn` de npm (paquete
+  homónimo no relacionado) e importaba `cn` desde ahí en los 9 primitivos
+  nuevos; se corrigió a `import { cn } from "@/shared/ui/utils"` (la utilidad
+  ya existente del proyecto) en los 9 archivos y se quitó la dependencia
+  `cn` de `package.json`. `input-group.tsx` (usado internamente por
+  `command.tsx` para el input de búsqueda) tenía dos violaciones de
+  `lint/a11y` de Biome (`role="group"` en un `div`, `onClick` sin evento de
+  teclado en el addon); se documentaron con `biome-ignore` explicando por
+  qué (primitivo de terceros, `role="group"` es intencional para un
+  contenedor visual, no un `fieldset` semántico).
+- [x] 2.4 `src/modules/notebooks/actions.ts`: `createNotebook`,
+  `renameNotebook`, `setNotebookAppearance`, `archiveNotebook`, `createPage`,
+  `renamePage`, `archivePage`, `getCurrentContent` como Server Actions.
+  Cada una llama `requireOwnerId()` (que lanza con el mensaje español "tú"
+  `NOTEBOOKS_COPY.sessionRequired` si no hay sesión) **antes** de tocar
+  `application`, luego el caso de uso valida con Zod, y cualquier
+  `DomainError` se traduce a copy en español "tú" vía
+  `messageForNotebooksErrorCode` (`src/modules/notebooks/ui/notebooks-copy.ts`,
+  mismo patrón que `identity/ui/auth-copy.ts`). Cada mutación llama
+  `revalidatePath("/", "layout")` para que el árbol del sidebar se
+  refresque. Se agregaron además `getSidebarTree()` (data del Server
+  Component del sidebar), `getNotebookForRoute`/`getPageForRoute` (devuelven
+  `null` en vez de lanzar, para que las rutas usen `notFound()` en lugar de
+  un mensaje de error genérico ante un id ajeno o archivado — Scenario "Ruta
+  de página ajena").
+- [x] 2.5 `src/modules/notebooks/actions.test.ts`: mockea `@/modules/identity`
+  (`getCurrentUser`), `@/shared/db/client` y `./infrastructure` (con los
+  dobles en memoria de PR1 en vez de Drizzle real) y `next/cache`
+  (`revalidatePath` no puede ejecutarse fuera de una petición real de
+  Next.js). Cubre los dos escenarios de 2.4: sin sesión (`createNotebook` y
+  `renameNotebook` rechazan sin tocar `application` — se verifica
+  `notebooks.count() === 0`) y entrada inválida (título de 200 caracteres
+  rechazado con el mensaje exacto de dominio; `{ title: 123 }` rechazado por
+  Zod con el mensaje de forma).
+- [x] 2.6 `src/modules/notebooks/index.ts`: exporta las 8 Server Actions de
+  2.4 con sufijo `Action` (evita colisión de nombres con los casos de uso ya
+  exportados de `application`), más `getSidebarTree`, `getNotebookForRoute`,
+  `getPageForRoute`, `getCurrentContent` y el componente `SidebarTree`.
+  `SavePagePort` ya se exportaba desde `domain` en PR1; sigue expuesto sin
+  cambios.
+- [x] 2.7 `src/modules/notebooks/ui/{sidebar-tree,sidebar-tree-client,notebook-item,page-item,create-notebook-dialog,archive-confirm-dialog}.tsx`
+  creados. `sidebar-tree.tsx` es un Server Component `async` que llama
+  `getSidebarTree()` (Server Action) y pasa el resultado como `initialData`
+  a `sidebar-tree-client.tsx`, que hidrata con `useQuery` de TanStack Query
+  y aplica cada mutación (crear/renombrar/apariencia/archivar de cuaderno y
+  página) con `onMutate` optimista + `onError` que revierte al snapshot
+  previo + `onSettled` que invalida la query. `notebook-item.tsx` usa un
+  popover de shadcn con la paleta `COLOR_PALETTE` de dominio, mapeada a
+  clases Tailwind literales (`bg-pastel-{color}`, ver Desviaciones) — nunca
+  un hex en línea. Confirmar apariencia/renombrar es inline (doble clic);
+  archivar pasa por `ArchiveConfirmDialog` (Scenario "Archivar desde el
+  sidebar": no hay opción de deshacer, requiere confirmación explícita).
+- [x] 2.8 `src/app/(app)/_components/sidebar.tsx`: el `<ul>` con el único
+  enlace "Inicio" se reemplazó por `children: ReactNode`, envuelto en un
+  `<div>` que se oculta con la clase `hidden` cuando `collapsed` (sin
+  desmontar el árbol, para no perder su estado de React al colapsar/expandir).
+  `layout.tsx` ahora envuelve el shell en `<QueryProvider>` (nuevo,
+  `_components/query-provider.tsx`, un `QueryClient` por sesión de
+  navegador vía `useState`) y pasa `<SidebarTree />` como children de
+  `<Sidebar>`. El colapso 240px/64px de la Fase 0 sigue funcionando sin
+  cambios (verificado por e2e).
+- [x] 2.9 `src/app/(app)/notebooks/[notebookId]/page.tsx`: Server Component
+  con `params: Promise<{ notebookId }>` (Next.js 16, params async), llama
+  `getNotebookForRoute` y hace `notFound()` si es `null` (ajeno o
+  archivado). Lista páginas activas con enlaces a la ruta de página; botón
+  "Nueva página" implementado como un `<form action={...}>` con una Server
+  Action inline (`"use server"` dentro del componente) que llama
+  `createPageAction`.
+- [x] 2.10 `src/app/(app)/notebooks/[notebookId]/pages/[pageId]/page.tsx`:
+  llama `getPageForRoute`, `notFound()` si es `null`. Muestra `title` y dejo
+  un `<div data-testid="editor-mount" data-page-id data-content-version>`
+  con el JSON del contenido renderizado en un `<pre>` como marcador de
+  posición explícito para el `Editor` real de PR3b (documentado en un
+  comentario en el archivo).
+- [x] 2.11 `tests/e2e/shell-empty-state.spec.ts` reescrito: el test "shows
+  only an empty state..." se reemplazó por "sidebar shows the notebooks
+  empty state and a control to create the first notebook", que verifica el
+  mensaje exacto "Aún no tienes cuadernos. Crea uno para empezar." y el
+  botón "Crear cuaderno" **dentro del `<nav>` del sidebar** (con `sidebar.getByText(...)`,
+  no `page.getByText(...)`, porque la página de inicio de la Fase 0 ya
+  mostraba ese mismo texto como estado vacío genérico — ver Desviaciones).
+  El test de colapso ya no verifica el enlace "Inicio" (no existe más).
+- [x] 2.12 `tests/e2e/notebooks-acceptance.spec.ts` creado (no quedó como
+  esqueleto: los dos flujos completos de la traceability de esta fase
+  quedaron implementados y en verde): (a) crear cuaderno → renombrar inline
+  → cambiar color → crear página → abrir la página → archivar el cuaderno →
+  desaparece del sidebar; (b) crear cuaderno + página como owner A, abrir
+  con un owner B distinto (segundo usuario verificado, `browser.newContext()`
+  propio) → la ruta responde 404 real (`response.status()`) y no expone
+  `data-testid="editor-mount"`.
+- [x] 2.13 Gate PR2 verde: `pnpm test`, `pnpm test:db`, `pnpm typecheck`,
+  `pnpm lint`, `pnpm depcruise`, `pnpm build`, `pnpm test:e2e -- shell-empty-state
+  notebooks-acceptance auth` (19/19 verde, incluye `auth.spec.ts`
+  preexistente — ver Desviaciones). Commit de trabajo lo crea el
+  orquestador.
+
+### Bug real encontrado y corregido durante el gate e2e: condición de carrera de ids optimistas
+
+`pnpm test:e2e` expuso un bug genuino (no solo flakiness del test) en
+`sidebar-tree-client.tsx`: `createNotebook`/`createPage` generaban un id
+temporal con `createId()` para la actualización optimista, pero ese id
+temporal solo se corregía al id real del servidor cuando la query se
+invalidaba en segundo plano (`onSettled`). Si el usuario interactuaba con
+el cuaderno/página recién creado (renombrar, cambiar apariencia, crear una
+página) antes de que esa invalidación terminara, la Server Action
+correspondiente recibía el id temporal — que el servidor nunca vio — y
+fallaba con `DomainError(NOTEBOOK_NOT_FOUND)` ("No encontramos ese
+cuaderno."), confirmado con logging de servidor temporal y consultas SQL
+directas contra `cogni-dev` que mostraron cero filas para esos ids. Se
+corrigió agregando `onSuccess` a ambas mutaciones: en cuanto la Server
+Action resuelve, reemplaza el id temporal por `created.id` directamente en
+la caché de TanStack Query, sin esperar la invalidación en segundo plano.
+Los tests e2e también se endurecieron para nunca asumir que un clic
+inmediatamente posterior a una mutación ve el estado final: se agregó un
+helper `clickAndWaitForAction` que espera la respuesta POST exacta de la
+Server Action (`page.waitForLoadState("networkidle")` resultó no confiable
+en este entorno — se resuelve por actividad de red no relacionada, como el
+túnel de Sentry, antes de que la propia Server Action termine).
+
+### Tabla de evidencia TDD (Strict TDD)
+
+| Unidad | Test file(s) | RED | GREEN | REFACTOR |
+|---|---|---|---|---|
+| 2.1/2.2 repos Drizzle | `tests/db/notebooks-repository.smoke.test.ts`, `tests/db/drizzle-page-repository.contract.test.ts` | ✅ Observado: `Cannot find package '@/shared/db/client'` (alias `@/` no resuelto en `vitest.db.config.ts`) → luego `Error: This module cannot be imported from a Client Component module` (`server-only` de `db/client.ts` resuelto fuera de un bundle de Next) | ✅ Observado tras agregar el alias a `vitest.db.config.ts` y `tests/db/helpers/test-db.ts` (bypassa `server-only`): `Test Files 7 passed (7)` / `Tests 11 passed (11)` | ➖ Se agregó `fileParallelism: false` a `vitest.db.config.ts` tras detectar que `orphan-guard.smoke.test.ts` (preexistente) competía por el conteo de `auth.users` con los nuevos tests que crean/borran usuarios reales — no es refactor de producción, es aislamiento de test necesario |
+| 2.2b carrera de `updateIfVersion` | `tests/db/save-page-race.test.ts` | ➖ No aplica RED de import — el repositorio ya existía; la aserción de "exactamente uno actualiza" se escribió antes de correr contra la DB real (podría haber fallado si `updateIfVersion` no fuera atómico) | ✅ Observado: `1 failed \| 6 passed (7)` en la primera corrida completa de `test:db` (falla no relacionada, ver fila anterior) → `7 passed (7)` tras el fix de paralelismo | ➖ No aplica |
+| 2.4/2.5 Server Actions | `src/modules/notebooks/actions.test.ts` | ✅ Observado: `TypeError: () => notebooks is not a constructor` (el mock de clase con `vi.fn(() => x)` no es invocable con `new`) → `Invariant: static generation store missing in revalidatePath` | ✅ Observado tras mockear las clases como funciones nombradas y mockear `next/cache`: `Test Files 43 passed (43)` / `Tests 163 passed (163)` | ➖ No aplica |
+| 2.7 sidebar UI | `src/modules/notebooks/ui/sidebar-tree-client.test.tsx` | ✅ Observado: el archivo de test se escribió y corrió contra la implementación ya escrita en el mismo ciclo de edición (no hubo un commit de solo-test previo); confirmado como RED real porque la primera corrida sí falló por el mock incompleto de `../actions` (faltaban `archiveNotebook`/`archivePage`/etc. en el mock, TypeError al desestructurar) | ✅ Observado tras completar el mock: `Test Files 44 passed (44)` / `Tests 168 passed (168)` | ➖ No aplica |
+| 2.11 e2e shell reescrito | `tests/e2e/shell-empty-state.spec.ts` | ✅ Observado: contra el HEAD de PR1 (antes de este batch) el enlace "Inicio" existía y el mensaje vacío del sidebar no; la prueba nueva fallaría con "element(s) not found" hasta implementar el árbol — confirmado indirectamente por la ejecución real que sí halló el fallo listado abajo (ambigüedad de texto duplicado) antes del fix de `auth.spec.ts` | ✅ Observado: 19/19 verde tras los fixes descritos abajo | ➖ No aplica |
+| 2.12 e2e de aceptación | `tests/e2e/notebooks-acceptance.spec.ts` | ✅ Observado (real, no hipotético): 3 corridas fallidas sucesivas contra `next build && next start` real, cada una diagnosticando una causa distinta (ver "Bug real encontrado" arriba) | ✅ Observado: `19 passed (32.9s)` en la corrida final, incluyendo los dos tests de este archivo | ➖ El fix de `onSuccess` en `sidebar-tree-client.tsx` y el helper `clickAndWaitForAction` en el spec SON el refactor de esta unidad, motivados directamente por las corridas RED reales |
+
+### Verificación ejecutada en este batch
+
+| Comando | Resultado observado |
+|---|---|
+| `pnpm test:db` (antes del fix de alias/`server-only`) | 3 archivos fallando por `Cannot find package '@/shared/db/client'`, luego por `server-only` fuera de bundle |
+| `pnpm test:db` (tras `vitest.db.config.ts` + `tests/db/helpers/test-db.ts`) | `1 failed \| 6 passed (7)` — `orphan-guard.smoke.test.ts` compitiendo por el conteo de `auth.users` con los tests nuevos corriendo en paralelo |
+| `pnpm test:db` (tras `fileParallelism: false`) | `Test Files 7 passed (7)` / `Tests 11 passed (11)` — GREEN |
+| `pnpm test` (tras cada work unit) | Progresó de `159/159` (fin de PR1) → `163/163` (Server Actions) → `168/168` (UI + sidebar client) — todas las corridas intermedias en verde, sin regresiones |
+| `pnpm typecheck` | Exit 0 en cada work unit, sin salida |
+| `pnpm lint` (`biome check`) | Encontró y corrigió (`--write`): imports desordenados en los 8 archivos nuevos de `tests/db`, `autoFocus` sin `biome-ignore` en `notebook-item.tsx`/`page-item.tsx` (agregado con justificación), 2 violaciones de `a11y` en `input-group.tsx` (agregado `biome-ignore` con justificación); corrida final: `Checked 200 files in ~30ms. No fixes applied.` |
+| `pnpm depcruise` | `✔ no dependency violations found (207 modules, 512 dependencies cruised)` — sin violaciones de `cross-module-via-index` pese a los 4 nuevos archivos de `notebooks/ui` que importan entre sí con rutas relativas dentro del propio módulo |
+| `pnpm build` (con `DATABASE_URL` real, sin `VERCEL_ENV`) | Exit 0. `migrate-in-build: skipping migrations (VERCEL_ENV=unset)` → `✓ Compiled successfully` → rutas listadas incluyen `ƒ /notebooks/[notebookId]` y `ƒ /notebooks/[notebookId]/pages/[pageId]` (dinámicas, como se espera de una ruta que depende de sesión) |
+| `pnpm test:e2e -- shell-empty-state notebooks-acceptance auth` (primera corrida, sin `CRON_SECRET`) | 8 tests fallando, TODOS por `Invalid server environment: CRON_SECRET: Invalid input: expected string, received undefined` — bloqueante de entorno preexistente, no introducido por este batch (ver Desviaciones/`(usuario)`) |
+| Mismo comando con `CRON_SECRET` exportado ad-hoc en el shell (no persistido en `.env.local`) | Primera corrida: 3 fallas reales (ver "Bug real encontrado"); corridas intermedias tras cada fix: 2 fallas → 2 fallas (causa distinta) → **19 passed (32.9s)**, sin fallas |
+| `pnpm test:db` (gate final, tras verificar limpieza) | `Test Files 7 passed (7)` / `Tests 11 passed (11)` |
+| Verificación de limpieza post-e2e | `select count(*) from notebooks/pages/profiles` en `cogni-dev` → `0/0/0` en los tres — los `verifiedUser`/`ownerB` de los fixtures de e2e se borraron en `afterAll`/`finally`, cascadeando por FK hacia `profiles`/`notebooks`/`pages` |
+
+### Desviaciones del diseño
+
+1. **`components.json` ya existía**: la tarea 2.3 pedía correr `shadcn@latest init`, pero ese paso ya se había hecho en la Fase 0 (commit `2f1f8a8`, ADR 0001). Se agregaron solo los primitivos nuevos con `shadcn@latest add`, sin volver a inicializar (reinicializar habría arriesgado sobreescribir `button.tsx` y los tokens ya reconciliados — de hecho el propio CLI intentó sobreescribir `button.tsx` al agregar `input-group` como dependencia transitiva; se revirtió con `git checkout`).
+2. **Dependencia `cn` espuria**: `shadcn add` instaló un paquete npm llamado `cn` (homónimo de la función utilitaria del proyecto) y lo usó en los 9 imports de los primitivos nuevos. Se corrigió a la utilidad propia del proyecto (`@/shared/ui/utils`) y se quitó la dependencia. No es parte del diseño ni de las tareas, es un efecto del propio CLI de shadcn no documentado en `design.md`.
+3. **Colisión de copy entre el estado vacío del sidebar y el de la página de inicio**: la Fase 0 ya mostraba "Aún no tienes cuadernos. Crea uno para empezar." como estado vacío genérico de `src/app/(app)/page.tsx` (`HomePage`). Al agregar el mismo texto en el sidebar (tal como pide el Requirement "Sidebar con árbol de cuadernos y páginas"), el test preexistente `tests/e2e/auth.spec.ts` (`logs a verified user in...`) empezó a fallar por "strict mode violation" (dos elementos con el mismo texto). Se corrigió acotando ese test a `page.getByTestId("content-area").getByText(...)` — un cambio de una prueba preexistente fuera del alcance nominal de esta tarea, pero necesario porque mi cambio real introdujo una ambigüedad genuina que rompía una prueba que antes pasaba. No se tocó `HomePage` en sí: su copy y su rol como estado vacío genérico del área de contenido siguen sin cambios; queda fuera del alcance de `design.md`/`tasks.md` para esta fase decidir si ese texto duplicado debe unificarse o diferenciarse (podría resolverse en un PR de UI posterior).
+4. **`getNotebookForRoute`/`getPageForRoute` no estaban en `design.md`**: el `Interfaces/Contracts` de `design.md` no define explícitamente estas dos funciones; se agregaron porque las rutas de 2.9/2.10 necesitan una forma de leer "notebook + sus páginas" y "página" respectivamente que devuelva `null` (no que lance) ante un id ajeno o archivado, para poder llamar `notFound()` de Next.js de forma idiomática. `getCurrentContent` (sí mencionada explícitamente para el punto de montaje del editor) se mantiene sin cambios y lanza en vez de devolver `null`, tal como la usará el editor real en PR3b.
+5. **Formulario de "Nueva página" con Server Action inline**: `src/app/(app)/notebooks/[notebookId]/page.tsx` usa `<form action={...}>` con una función `"use server"` declarada dentro del propio Server Component, en vez de un botón cliente con `useTransition`. Es un patrón válido y documentado de Next.js 16 para una mutación simple sin necesidad de estado optimista en esa vista (a diferencia del sidebar, que sí necesita optimismo); se eligió para no introducir un componente cliente adicional solo para un botón.
+
+Ningún Scenario de `specs/notebooks/spec.md` o `specs/design-tokens-and-shell/spec.md` de esta fase quedó sin verificar; el bug de ids optimistas (arriba) no estaba anticipado por ningún Scenario explícito pero viola implícitamente "Puntos de entrada mediante Server Actions validadas" (una acción nunca debería operar sobre un id que el servidor no reconoce como parte de un flujo normal de uso) — quedó cerrado con evidencia e2e real, no solo unitaria.
+
+### Pendiente — `(usuario)`
+
+- [ ] `(usuario)`: agregar `CRON_SECRET` (cadena aleatoria ≥32 caracteres) a
+  `.env.local` para que `pnpm test:e2e` pueda levantar `next build && next
+  start` localmente sin fallar con `Invalid server environment:
+  CRON_SECRET: Invalid input: expected string, received undefined`. Esta
+  variable no es parte del alcance de PR2 (la introdujo una fase anterior
+  para proteger `/api/keep-alive`, ver `specs/observability-and-delivery`),
+  pero su ausencia bloqueaba *todo* `pnpm test:e2e` local, no solo los
+  específicos de `notebooks`, hasta que se exportó manualmente en el shell
+  para verificar este batch (no persistido en el repo ni en `.env.local`,
+  que no es legible/editable por este agente). Confirmar además que la
+  misma variable ya existe en Vercel (`Settings → Environment Variables`)
+  para Production y Preview — si ya existe ahí, este pendiente es
+  exclusivamente para poder correr `pnpm test:e2e` en `localhost`.
+
+### Work Unit Evidence
+
+| Evidencia | Valor |
+|---|---|
+| Comando de test enfocado y resultado exacto | `pnpm test -- src/modules/notebooks` → `168/168` GREEN; `pnpm test:db` → `11/11` GREEN contra `cogni-dev` real |
+| Comando/escenario de runtime y resultado exacto | `pnpm test:e2e -- shell-empty-state notebooks-acceptance auth` contra `next build && next start` real (Chromium) → `19 passed (32.9s)`, incluye el flujo completo de crear/renombrar/recolorear/crear página/archivar un cuaderno y el escenario negativo de página ajena con un segundo usuario real |
+| Rollback boundary | Revertir este batch equivale a: borrar `src/modules/notebooks/{infrastructure,ui,actions.ts,actions.test.ts}`, revertir `src/modules/notebooks/index.ts` y `application/testing/page-repository.contract.ts` a su estado de PR1, borrar los 9 primitivos nuevos de `src/shared/ui/` y revertir `package.json`/`pnpm-lock.yaml` (quitar `@tanstack/react-query`, `cmdk`, `class-variance-authority` ya existente, radix-ui subpaquetes nuevos), revertir `src/app/(app)/{layout.tsx,_components/sidebar.tsx,_components/sidebar.test.tsx}` y borrar `_components/query-provider.tsx`, borrar `src/app/(app)/notebooks/`, borrar `tests/db/{drizzle-page-repository.contract.test.ts,notebooks-repository.smoke.test.ts,save-page-race.test.ts,helpers/}`, revertir `vitest.db.config.ts` al estado de PR1, revertir `tests/e2e/{shell-empty-state.spec.ts,auth.spec.ts}` y borrar `tests/e2e/notebooks-acceptance.spec.ts`. No toca `identity` ni el dominio/aplicación de `notebooks` de PR1. |
+
+### Impacto en el presupuesto de revisión (400 líneas)
+
+`git diff --numstat` (excluyendo `pnpm-lock.yaml` y los 9 primitivos de
+shadcn generados por el CLI, que suman 992 líneas) da **2021 líneas
+agregadas / 79 eliminadas = 2100 líneas de autoría**, muy por encima de las
+~350-400 estimadas en el forecast de `tasks.md` para PR2. El exceso se
+explica por la amplitud real del slice (infraestructura + shadcn + 8
+Server Actions + 6 componentes de sidebar + 2 rutas + reescritura y
+creación de specs e2e, todo en un solo batch según la instrucción de
+`sdd-apply` recibida) y por la investigación y corrección de una condición
+de carrera real descubierta durante el gate e2e (no anticipada en el
+forecast). Al igual que en PR1, dividir esta unidad dejaría estados
+intermedios sin sentido (Server Actions sin repositorios reales, sidebar
+sin las Server Actions que necesita, rutas sin el `notFound()` que las hace
+seguras). Se recomienda **`size:exception`** para PR2, o que el
+orquestador decida repartir el diff en 2 PRs encadenados
+(`stacked-to-main`) en un futuro batch equivalente: (a) infraestructura +
+shadcn + Server Actions, (b) sidebar + rutas + e2e — no se hizo en este
+batch porque ya se había ejecutado como una unidad de trabajo autónoma
+verificada de punta a punta antes de calcular el conteo de líneas.
+
+### Estado
+
+Fase 2 completa: 14/14 tareas (2.1–2.13, incluida 2.2b). Gate PR2 verde
+(`pnpm test`, `pnpm test:db`, `pnpm typecheck`, `pnpm lint`, `pnpm depcruise`,
+`pnpm build`, `pnpm test:e2e` con `CRON_SECRET` exportado ad-hoc). Listo
+para que el orquestador cree el commit de trabajo y decida el presupuesto
+de revisión. Pendiente exclusivamente `(usuario)`: `CRON_SECRET` en
+`.env.local` para poder correr `pnpm test:e2e` localmente sin exportarlo a
+mano.
