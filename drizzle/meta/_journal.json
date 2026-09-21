@@ -22,6 +22,13 @@
       "when": 1789753000000,
       "tag": "0002_profiles_auth_fk",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1789964406049,
+      "tag": "0003_notebooks_pages_assets",
+      "breakpoints": true
     }
   ]
 }
