@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Fase 1 — Subida y lectura de imagen",
+    "output": "fase-1-subida-imagen.html",
+    "viewBox": [1080, 900],
+    "quality_profile": "showcase",
+    "column_fit": "spread",
+    "views": [
+      { "id": "subida", "label": "Permiso y subida directa", "focus": ["editor", "request-action", "usecase", "storage"], "note": "Los bytes de la imagen nunca pasan por una Server Action." },
+      { "id": "lectura", "label": "Registro y lectura firmada", "focus": ["register-action", "read-action", "storage", "editor"], "note": "El nodo persiste solo el storagePath; la URL firmada se resuelve al renderizar." }
+    ]
+  },
+  "participants": [
+    { "id": "editor", "type": "frontend", "label": "Bloque imagen", "sublabel": "editor/ui" },
+    { "id": "request-action", "type": "backend", "label": "requestImgUpload", "sublabel": "notebooks/index.ts" },
+    { "id": "usecase", "type": "backend", "label": "RequestImgUpload", "sublabel": "notebooks/application" },
+    { "id": "register-action", "type": "backend", "label": "registerPageAsset", "sublabel": "notebooks/index.ts" },
+    { "id": "read-action", "type": "backend", "label": "getAssetReadUrl", "sublabel": "notebooks/index.ts" },
+    { "id": "storage", "type": "cloud", "label": "Supabase Storage", "sublabel": "bucket page-assets" },
+    { "id": "db", "type": "database", "label": "Postgres", "sublabel": "page_assets" }
+  ],
+  "segments": [
+    { "from": 150, "to": 430, "label": "Permiso de subida y subida directa" },
+    { "from": 446, "to": 630, "label": "Registro del asset" },
+    { "from": 646, "to": 820, "label": "Renderizado con URL firmada" }
+  ],
+  "messages": [
+    { "from": "editor", "to": "request-action", "y": 216, "label": "requestImageUpload({ pageId, mime, sizeBytes })", "variant": "emphasis", "note": "valida MIME y ≤10MB en el cliente" },
+    { "from": "request-action", "to": "usecase", "y": 250, "label": "RequestImageUpload(ownerId, input)", "variant": "emphasis", "note": "revalida página activa, MIME, tamaño" },
+    { "from": "usecase", "to": "storage", "y": 318, "label": "createSignedUploadUrl(path)" },
+    { "from": "storage", "to": "usecase", "y": 350, "label": "{ signedUrl, token }", "variant": "return" },
+    { "from": "usecase", "to": "editor", "y": 382, "label": "{ storagePath, signedUrl, token }", "variant": "return" },
+    { "from": "editor", "to": "storage", "y": 414, "label": "uploadToSignedUrl(bytes)", "variant": "emphasis" },
+    { "from": "editor", "to": "register-action", "y": 470, "label": "registerPageAsset({ storagePath, mime, sizeBytes })", "variant": "emphasis", "note": "revalida ownership, MIME, tamaño, prefijo de ruta" },
+    { "from": "register-action", "to": "db", "y": 530, "label": "INSERT page_assets (idempotente)" },
+    { "from": "register-action", "to": "editor", "y": 560, "label": "PageAsset persistido", "variant": "return", "note": "el nodo guarda solo { assetId }, sin URL firmada" },
+    { "from": "editor", "to": "read-action", "y": 660, "label": "getAssetReadUrl({ assetId })", "variant": "default" },
+    { "from": "read-action", "to": "storage", "y": 694, "label": "createSignedUrl(path, 1h)" },
+    { "from": "storage", "to": "read-action", "y": 726, "label": "URL firmada", "variant": "return" },
+    { "from": "read-action", "to": "editor", "y": 758, "label": "URL firmada (1h)", "variant": "return", "note": "<img src=URL firmada>" }
+  ],
+  "activations": [
+    { "participant": "request-action", "from": 240, "to": 392, "type": "backend" },
+    { "participant": "usecase", "from": 264, "to": 360, "type": "backend" },
+    { "participant": "register-action", "from": 460, "to": 570, "type": "backend" },
+    { "participant": "read-action", "from": 650, "to": 768, "type": "backend" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Subida directa", "items": ["Ninguna Server Action recibe ni almacena en memoria bytes de imagen", "El límite de 1MB de las Server Actions nunca se toca"] },
+    { "dot": "rose", "title": "Doble verificación", "items": ["MIME y tamaño se revalidan al emitir el permiso y de nuevo al registrar", "storagePath debe empezar con {ownerId}/{pageId}/ o se rechaza"] }
+  ]
+}
