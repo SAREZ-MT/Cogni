@@ -6,7 +6,7 @@ import { getCurrentUser } from "@/modules/identity";
 import { getDb } from "@/shared/db/client";
 import { systemClock } from "@/shared/kernel/clock";
 import type { DomainError } from "@/shared/kernel/domain-error";
-import type { Result } from "@/shared/kernel/result";
+import { ok, type Result } from "@/shared/kernel/result";
 import {
   archiveNotebook as archiveNotebookUseCase,
   archivePage as archivePageUseCase,
@@ -17,6 +17,7 @@ import {
   renameNotebook as renameNotebookUseCase,
   renamePage as renamePageUseCase,
   type SidebarNotebook,
+  savePage as savePageUseCase,
   setNotebookAppearance as setNotebookAppearanceUseCase,
 } from "./application";
 import type { Notebook } from "./domain/notebook";
@@ -131,20 +132,41 @@ export async function getSidebarTree(): Promise<SidebarNotebook[]> {
   return listSidebar({ notebooks, pages }, ownerId);
 }
 
-// Reads a page's current content/version — used by the editor mount point
-// (slice 3) and by SavePagePort.getCurrent's conflict-reconciliation path.
-export async function getCurrentContent(
+// design.md, "notebooks como único puerto de persistencia hacia el
+// editor": saveContent/getCurrentContent below structurally satisfy
+// SavePagePort (Result-returning, never throwing on a domain error) so the
+// page route can pass them directly as the `Editor` component's `port`
+// prop, instead of the throw-on-error `unwrap()` pattern the other Server
+// Actions in this file use.
+
+// Saves a page's content through the atomic compare-and-swap of
+// SavePage/updateIfVersion (notebooks/application/save-page.ts). A stale
+// expectedVersion resolves as err(PAGE_VERSION_CONFLICT) rather than
+// throwing, so editor/application/use-autosave.ts can reconcile it.
+export async function saveContent(
   input: unknown,
-): Promise<{ title: string; content: TiptapDoc; version: number }> {
+): Promise<Result<{ version: number }, DomainError>> {
   const ownerId = await requireOwnerId();
-  const page = unwrap(
-    await getPageUseCase(input, { pages: deps().pages }, ownerId),
+  return savePageUseCase(input, deps(), ownerId);
+}
+
+// Reads a page's current content/version — used by the editor mount point
+// and by SavePagePort.getCurrent's conflict-reconciliation path. Matches
+// the port's `(pageId: string) => Promise<Result<...>>` shape exactly.
+export async function getCurrentContent(
+  pageId: unknown,
+): Promise<Result<{ content: TiptapDoc; version: number }, DomainError>> {
+  const ownerId = await requireOwnerId();
+  const result = await getPageUseCase(
+    { pageId },
+    { pages: deps().pages },
+    ownerId,
   );
-  return {
-    title: page.title,
-    content: page.content,
-    version: page.contentVersion,
-  };
+  if (!result.ok) return result;
+  return ok({
+    content: result.value.content,
+    version: result.value.contentVersion,
+  });
 }
 
 // The two functions below back the notebook/page routes' notFound()

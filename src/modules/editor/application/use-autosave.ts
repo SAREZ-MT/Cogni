@@ -1,3 +1,13 @@
+"use client";
+
+// This hook is exported from editor/index.ts alongside the Server-safe
+// autosave state types. Since PR3b wires the barrel into
+// src/app/(app)/notebooks/[notebookId]/pages/[pageId]/page.tsx (a Server
+// Component), Next.js's RSC boundary check requires this file to declare
+// its own "use client" directive — otherwise it treats a hook-using module
+// as reachable from the server graph purely through the re-export, even
+// though the hook itself is only ever called from editor/ui/tiptap/
+// editor.tsx (already "use client").
 import { useCallback, useEffect, useRef, useState } from "react";
 import { isDomainError } from "@/shared/kernel/domain-error";
 import type { AutosaveStatus } from "../domain/autosave-state";
@@ -27,6 +37,10 @@ export interface UseAutosaveResult {
   // "Autosave con debounce de cliente y reconciliación en la UI").
   conflictDraft: TiptapDoc | null;
   setContent: (content: TiptapDoc) => void;
+  // Cancels the pending debounce (if any) and saves immediately with the
+  // latest content. Used for an explicit save shortcut (editor/ui,
+  // Mod+S) on top of the regular debounced autosave.
+  flush: () => void;
 }
 
 // Framework-agnostic autosave hook: debounces content changes, saves
@@ -116,11 +130,19 @@ export function useAutosave({
     [scheduleSave],
   );
 
+  const flush = useCallback(() => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    void runSave();
+  }, [runSave]);
+
   useEffect(() => {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
   }, []);
 
-  return { status, content, conflictDraft, setContent };
+  return { status, content, conflictDraft, setContent, flush };
 }
