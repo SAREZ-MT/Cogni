@@ -15,6 +15,7 @@ export {
   getSidebarTree,
   renameNotebook as renameNotebookAction,
   renamePage as renamePageAction,
+  saveContent,
   setNotebookAppearance as setNotebookAppearanceAction,
 } from "./actions";
 export {

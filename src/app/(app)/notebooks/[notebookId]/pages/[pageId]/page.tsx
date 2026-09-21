@@ -1,15 +1,21 @@
 import { notFound } from "next/navigation";
-import { getPageForRoute } from "@/modules/notebooks";
+import { Editor } from "@/modules/editor";
+import {
+  getCurrentContent,
+  getPageForRoute,
+  saveContent,
+} from "@/modules/notebooks";
 
 interface PagePageProps {
   params: Promise<{ notebookId: string; pageId: string }>;
 }
 
 // A foreign or archived pageId renders as not-found, never leaking its
-// title or content (specs/notebooks/spec.md, "Ruta de página ajena"). The
-// `<div data-testid="editor-mount">` below is a placeholder: the Tiptap
-// editor and its real Server Action wiring land in PR3a/PR3b (design.md,
-// "Editor — Tiptap base"); this slice only loads and shows title/content.
+// title or content (specs/notebooks/spec.md, "Ruta de página ajena").
+// This is the composition root design.md's "notebooks como único puerto de
+// persistencia hacia el editor" describes: it is the only place that wires
+// the real `saveContent`/`getCurrentContent` Server Actions into the
+// `SavePagePort` shape and passes it down to the Tiptap-backed `Editor`.
 export default async function PageView({ params }: PagePageProps) {
   const { notebookId, pageId } = await params;
   const page = await getPageForRoute(notebookId, pageId);
@@ -24,9 +30,12 @@ export default async function PageView({ params }: PagePageProps) {
         data-content-version={page.contentVersion}
         className="flex-1"
       >
-        <pre className="whitespace-pre-wrap text-fg-secondary text-sm">
-          {JSON.stringify(page.content, null, 2)}
-        </pre>
+        <Editor
+          pageId={page.id}
+          initialContent={page.content}
+          initialVersion={page.contentVersion}
+          port={{ save: saveContent, getCurrent: getCurrentContent }}
+        />
       </div>
     </section>
   );

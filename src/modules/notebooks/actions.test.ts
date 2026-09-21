@@ -110,4 +110,69 @@ describe("notebooks Server Actions", () => {
       expect(result?.id).toBe(page.id);
     });
   });
+
+  // design.md, "notebooks como único puerto de persistencia hacia el
+  // editor": saveContent/getCurrentContent must structurally satisfy
+  // SavePagePort (Result-returning, never throwing on a domain error) so
+  // the page route can pass them directly as the editor's port prop.
+  describe("saveContent / getCurrentContent as SavePagePort", () => {
+    beforeEach(() => {
+      getCurrentUser.mockResolvedValue({ id: OWNER_ID, email: "a@b.com" });
+    });
+
+    it("saves and returns ok({ version }) on the expected version", async () => {
+      const { createNotebook, createPage, saveContent } = await import(
+        "./actions"
+      );
+      const notebook = await createNotebook({ title: "Cuaderno" });
+      const page = await createPage({ notebookId: notebook.id });
+
+      const result = await saveContent({
+        pageId: page.id,
+        expectedVersion: page.contentVersion,
+        content: { type: "doc", content: [] },
+      });
+
+      expect(result.ok).toBe(true);
+      if (result.ok) expect(result.value.version).toBe(page.contentVersion + 1);
+    });
+
+    it("returns err(PAGE_VERSION_CONFLICT) instead of throwing on a stale version", async () => {
+      const { createNotebook, createPage, saveContent } = await import(
+        "./actions"
+      );
+      const notebook = await createNotebook({ title: "Cuaderno" });
+      const page = await createPage({ notebookId: notebook.id });
+
+      const result = await saveContent({
+        pageId: page.id,
+        expectedVersion: page.contentVersion + 99,
+        content: { type: "doc", content: [] },
+      });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.error.code).toBe("PAGE_VERSION_CONFLICT");
+    });
+
+    it("getCurrentContent returns ok({ content, version }) for the caller's own page", async () => {
+      const { createNotebook, createPage, getCurrentContent } = await import(
+        "./actions"
+      );
+      const notebook = await createNotebook({ title: "Cuaderno" });
+      const page = await createPage({ notebookId: notebook.id });
+
+      const result = await getCurrentContent(page.id);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) expect(result.value.version).toBe(page.contentVersion);
+    });
+
+    it("getCurrentContent returns err(NOT_FOUND) instead of throwing for a foreign page", async () => {
+      const { getCurrentContent } = await import("./actions");
+
+      const result = await getCurrentContent("does-not-exist");
+
+      expect(result.ok).toBe(false);
+    });
+  });
 });
