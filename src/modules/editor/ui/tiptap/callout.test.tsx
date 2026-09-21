@@ -82,4 +82,26 @@ describe("Callout node", () => {
       "bg-pastel-blue",
     );
   });
+
+  // PR5a review advisory: an unrecognized `kind` MUST fall back to "idea"
+  // explicitly, both when parsed from HTML and at render time, instead of
+  // relying on an untested default.
+  it("falls back to idea when the kind is unrecognized", async () => {
+    const port = new FakeSavePagePort({
+      content: docWithCallout("bogus" as never),
+      version: 1,
+    });
+    render(
+      <Editor
+        pageId="page-1"
+        initialContent={docWithCallout("bogus" as never)}
+        initialVersion={1}
+        port={port}
+      />,
+    );
+
+    const callout = await screen.findByTestId("callout");
+    expect(callout).toHaveAttribute("data-kind", "idea");
+    expect(callout.className).toContain("bg-pastel-yellow");
+  });
 });

@@ -16,6 +16,7 @@ import StarterKit from "@tiptap/starter-kit";
 import { Callout } from "../callout-node";
 import { CogniHighlight } from "../highlight-palette";
 import { SlashCommand } from "../slash-command";
+import { CodeBlock } from "./code-block";
 import { createTableExtensions } from "./table";
 
 // specs/editor/spec.md, "Marcas de texto": a link MUST accept only http,
@@ -40,6 +41,10 @@ export function isAllowedLinkUri(uri: string | undefined): boolean {
 export function createEditorExtensions(): AnyExtension[] {
   return [
     StarterKit.configure({
+      // Replaced below by `CodeBlock` (`@tiptap/extension-code-block-
+      // lowlight`), which adds syntax highlighting and a language
+      // selector (design.md, "Tiptap y ProseMirror solo en editor/ui").
+      codeBlock: false,
       link: {
         openOnClick: false,
         autolink: false,
@@ -55,6 +60,7 @@ export function createEditorExtensions(): AnyExtension[] {
     TaskItem.configure({ nested: true }),
     CogniHighlight,
     Callout,
+    CodeBlock,
     ...createTableExtensions(),
     SlashCommand,
   ];

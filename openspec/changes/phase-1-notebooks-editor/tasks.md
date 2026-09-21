@@ -151,14 +151,14 @@ Traceability: `specs/editor/spec.md` → "Conjunto completo de bloques de §3.2"
 
 Open Question resuelta: se usa `lowlight` (no `shiki`) porque `design.md` ya fija `@tiptap/extension-code-block-lowlight` como la extensión de bloque de código; `lowlight` es su integración soportada oficialmente y evita cargar un segundo motor de resaltado (`shiki`) solo para el selector de lenguaje que ya cubre `lowlight` + `highlight.js`.
 
-- [ ] 5b.1 Agregar dependencias `@tiptap/extension-code-block-lowlight`, `lowlight` (y el subconjunto de lenguajes de `highlight.js` necesario: al menos JS/TS, Python, HTML, CSS, JSON, bash) a `package.json`.
-- [ ] 5b.2 Crear `src/modules/editor/ui/tiptap/extensions/code-block.ts`: configura `CodeBlockLowlight` con el registro de lenguajes de 5b.1 y un selector de lenguaje en la UI del bloque.
-- [ ] 5b.3 RED test de componente `code-block.test.tsx`: bloque de código con lenguaje `typescript` renderiza con resaltado y persiste el atributo de lenguaje (Scenario "Bloque de código con lenguaje").
-- [ ] 5b.4 Aplicar el tema de resaltado de sintaxis con los tokens de `docs/design-system/colors_and_type.css` (JetBrains Mono ya vigente desde la Fase 0), sin introducir un tema de terceros con colores propios.
-- [ ] 5b.4b Crear el selector de resaltado: un control inline (menú burbuja sobre la selección o entradas `/resaltar <color>` del menú de comandos) que aplique la marca `CogniHighlight` con un nombre de la paleta; RED test de componente que verifica que elegir un color desde el control produce `{ color: "<nombre>" }` en el JSON (cierra el hueco dejado en 5a.4: la marca existe pero no era alcanzable desde la UI).
-- [ ] 5b.5 RED test `no-inline-hex.test.tsx` sobre `src/modules/editor/ui/**`: inspecciona clases/estilos de los componentes del editor y falla si encuentra un código hexadecimal en línea (Scenario "Ausencia de valores literales").
-- [ ] 5b.6 Revisión manual de copy: todo texto visible del editor y el menú "/" en español "tú", oración con minúscula inicial, sin emoji, foco visible y respeto de `prefers-reduced-motion` (Scenario "Revisión de textos del editor", e2e manual o Playwright con `prefers-reduced-motion: reduce` emulado).
-- [ ] 5b.7 Gate PR5b: `pnpm test -- editor`, `pnpm typecheck`, `pnpm depcruise` en verde. Commit de trabajo (`feat(editor): add syntax-highlighted code blocks and finish design-system pass`).
+- [x] 5b.1 Agregar dependencias `@tiptap/extension-code-block-lowlight`, `lowlight` (y el subconjunto de lenguajes de `highlight.js` necesario: al menos JS/TS, Python, HTML, CSS, JSON, bash) a `package.json`.
+- [x] 5b.2 Crear `src/modules/editor/ui/tiptap/extensions/code-block.ts`: configura `CodeBlockLowlight` con el registro de lenguajes de 5b.1 y un selector de lenguaje en la UI del bloque.
+- [x] 5b.3 RED test de componente `code-block.test.tsx`: bloque de código con lenguaje `typescript` renderiza con resaltado y persiste el atributo de lenguaje (Scenario "Bloque de código con lenguaje").
+- [x] 5b.4 Aplicar el tema de resaltado de sintaxis con los tokens de `docs/design-system/colors_and_type.css` (JetBrains Mono ya vigente desde la Fase 0), sin introducir un tema de terceros con colores propios.
+- [x] 5b.4b Crear el selector de resaltado: un control inline (menú burbuja sobre la selección o entradas `/resaltar <color>` del menú de comandos) que aplique la marca `CogniHighlight` con un nombre de la paleta; RED test de componente que verifica que elegir un color desde el control produce `{ color: "<nombre>" }` en el JSON (cierra el hueco dejado en 5a.4: la marca existe pero no era alcanzable desde la UI).
+- [x] 5b.5 RED test `no-inline-hex.test.tsx` sobre `src/modules/editor/ui/**`: inspecciona clases/estilos de los componentes del editor y falla si encuentra un código hexadecimal en línea (Scenario "Ausencia de valores literales").
+- [x] 5b.6 Revisión manual de copy: todo texto visible del editor y el menú "/" en español "tú", oración con minúscula inicial, sin emoji, foco visible y respeto de `prefers-reduced-motion` (Scenario "Revisión de textos del editor", e2e manual o Playwright con `prefers-reduced-motion: reduce` emulado).
+- [x] 5b.7 Gate PR5b: `pnpm test -- editor`, `pnpm typecheck`, `pnpm depcruise` en verde. Commit de trabajo (`feat(editor): add syntax-highlighted code blocks and finish design-system pass`).
 
 ## Phase 6: Pipeline de imágenes (PR6)
 
@@ -224,6 +224,7 @@ Traceability: `specs/identity-auth/spec.md` → "Sesión por cookies con refresc
 - [ ] 8b.9 Confirmar que `DrizzleProfileRepository.upsert` conserva `onConflictDoNothing({ target: profiles.id })` (sin cambio de código); agregar/ajustar el test `Upsert no sobrescribe campos existentes` si no está ya cubierto explícitamente en la suite de la Fase 0, dejando la decisión declarada en un comentario TSDoc junto al método.
 - [ ] 8b.10 Modificar `src/modules/identity/index.ts`: `ensureProfileForUser` envuelve la llamada a `ensureProfile` en `try/catch`, reintenta una vez tras un backoff corto ante un error transitorio, y si el reintento falla registra el error en Sentry sin relanzar la excepción hacia el layout de `(app)`.
 - [ ] 8b.11 RED `ensure-profile-resilience.test.ts` (con un repositorio en memoria que falla la primera invocación y luego funciona) → implementar 8b.10 hasta verde; agregar un caso donde ambos intentos fallan y se confirma que no se relanza la excepción y se registra en Sentry (mock del cliente de Sentry).
+- [ ] 8b.11b Menú "/": el resaltado visual del ítem seleccionado no sigue la navegación por teclado porque `CommandItem` de `cmdk` pisa el `data-selected` propio con su estado interno de selección por mouse (hallazgo de PR5b; ya señalado como advisory en PR3b). RED test de componente con ArrowDown y verificación del ítem resaltado → corregir (controlar la selección con la API de `cmdk` o reemplazar el atributo por una clase propia) hasta verde.
 - [ ] 8b.12 Gate PR8b: `pnpm test -- identity`, `pnpm typecheck`, `pnpm depcruise`, `pnpm test:e2e -- auth` en verde. Commit de trabajo (`fix(identity): expose userId from sign-in gateway, harden sign-out and EnsureProfile`).
 
 ## Phase 9: Cierre de fase

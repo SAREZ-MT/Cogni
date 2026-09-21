@@ -7,6 +7,7 @@ import type { SavePagePort, TiptapDoc } from "../../domain/save-page-port";
 import { ConflictBanner } from "../conflict-banner";
 import { SaveStatus } from "../save-status";
 import { createEditorExtensions } from "./extensions";
+import { HighlightPicker } from "./highlight-picker";
 import { toPlainTiptapDoc } from "./to-plain-tiptap-doc";
 
 export interface EditorProps {
@@ -124,6 +125,7 @@ export function Editor({
         onRestore={restoreDraft}
         onDiscard={discardDraft}
       />
+      {editor ? <HighlightPicker editor={editor} /> : null}
       <EditorContent
         editor={editor}
         data-testid="editor-content"

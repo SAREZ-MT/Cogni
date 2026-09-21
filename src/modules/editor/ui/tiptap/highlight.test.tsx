@@ -54,4 +54,20 @@ describe("CogniHighlight", () => {
 
     editor.destroy();
   });
+
+  // PR5a review advisory: `parseHTML` MUST also reject an unrecognized
+  // `data-color` value (pasted content or hand-authored HTML), not just
+  // the `setHighlight` command path covered above.
+  it("rejects an unknown color name when parsed from HTML", () => {
+    const editor = createHeadlessEditor();
+    editor.commands.setContent('<p><mark data-color="crimson">hola</mark></p>');
+
+    const json = editor.getJSON();
+    const mark = json.content?.[0]?.content?.[0]?.marks?.find(
+      (m) => m.type === "highlight",
+    );
+    expect(mark?.attrs?.color ?? null).toBeNull();
+
+    editor.destroy();
+  });
 });

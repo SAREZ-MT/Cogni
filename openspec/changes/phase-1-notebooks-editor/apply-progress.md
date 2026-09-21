@@ -1067,3 +1067,81 @@ Traceability: `specs/editor/spec.md` → "Conjunto completo de bloques de §3.2"
 ### Estado
 
 Fase 5a: 5a.1–5a.9 completas. Gate completo en verde (`pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm depcruise`, `pnpm build`, e2e combinado `slash-command` + `notebooks-acceptance` 7/7). No se creó commit de trabajo en este batch (lo decide el orquestador, junto con el presupuesto de revisión — ver arriba, recomendación `size:exception`). Pendiente abierto no bloqueante: decidir la UI de selección de resaltado (bubble menu vs. entradas `/resaltar <color>`) antes de que la Fase 5b dependa de ella.
+
+## Fase 5b: Resaltado de sintaxis y estilos finales (PR5b)
+
+### Completed Tasks
+
+- [x] 5b.1 Dependencias agregadas: `@tiptap/extension-code-block-lowlight@3.31.3`, `lowlight@3.3.0` (pedidas por el prompt) y, adicionalmente, `highlight.js@11.12.0` como dependencia directa (ver Deviations).
+- [x] 5b.2 `src/modules/editor/ui/tiptap/extensions/code-block.tsx` (nota de nombre de archivo en Deviations): `CodeBlockLowlight` extendido con un `ReactNodeViewRenderer` que agrega un `<select aria-label="Lenguaje">` sobre el bloque; reemplaza el `codeBlock` de `StarterKit` (`codeBlock: false` en `extensions/index.ts`).
+- [x] 5b.3 RED→GREEN: `code-block.test.tsx` (3 casos): resaltado `.hljs-keyword` + persistencia de `language: "typescript"`; cambio de lenguaje vía el selector; bloque sin lenguaje se renderiza como texto plano.
+- [x] 5b.4 Tema de resaltado en `src/app/globals.css`: bloque `.hljs-*` que mapea comentario/palabra clave/cadena/número/función/atributo/tipo a los tokens `--fg-muted` y `--color-pastel-*-fg` ya existentes (nunca hex ni un tema de terceros). JetBrains Mono ya aplicaba vía `font-mono`.
+- [x] 5b.4b Selector de resaltado: `highlight-picker-controls.tsx` (presentacional, aplica la marca directamente al `editor` recibido) + `highlight-picker.tsx` (envoltorio `BubbleMenu` de `@tiptap/react/menus`, visible solo con selección no vacía). RED→GREEN confirmado explícitamente (ver TDD Cycle Evidence). Se optó por el bubble menu como camino probado (no se agregaron entradas `/resaltar <color>`, ver Deviations) porque `HighlightPickerControls` es testeable sin depender del cálculo de posición de `floating-ui`; el wrapper `BubbleMenu` solo tiene un smoke test.
+- [x] 5b.5 RED→GREEN: `no-inline-hex.test.ts` recorre `src/modules/editor/ui/**/*.{ts,tsx,css}` (excluyendo tests) buscando `#[0-9a-fA-F]{3,8}`; no se encontró ningún literal (0 archivos a corregir). RED confirmado inyectando temporalmente un hex de prueba y revirtiéndolo.
+- [x] 5b.6 Revisión de copy y accesibilidad: todo el texto visible de `editor/ui` y `slash-command-items.ts` ya estaba en español "tú", oración con minúscula inicial, sin emoji (sin cambios necesarios). Los controles nuevos (`select` de lenguaje, swatches de resaltado, botón "quitar resaltado") tienen `aria-label` y `focus-visible:ring-2 focus-visible:ring-ring`. `prefers-reduced-motion: reduce` ya se aplicaba globalmente (`src/app/globals.css`, regla `@media (prefers-reduced-motion: reduce)` desde Fase 0); no fue necesario tocarla. Se agregó `tests/e2e/editor-a11y.spec.ts` con `test.use({ reducedMotion: "reduce" })` que abre el menú "/", confirma el filtrado y el cierre con Escape.
+- [x] 5b.7 Gate: `pnpm test` (251/251), `pnpm typecheck`, `pnpm lint`, `pnpm depcruise`, `pnpm build` y Playwright (`slash-command.spec.ts` + `notebooks-acceptance.spec.ts` + `editor-a11y.spec.ts`) todos en verde — ver Work Unit Evidence. No se creó commit de trabajo (lo decide el orquestador).
+
+### Advisories plegados (PR5a review)
+
+- `highlight-palette.tsx` (líneas 47-62 del prompt): el código ya rechazaba un `color` desconocido tanto en `setHighlight` como en `parseHTML` (`isHighlightColor(...) ? value : null`). Se agregó el caso de prueba faltante (`highlight.test.tsx`, "rejects an unknown color name when parsed from HTML": `setContent('<mark data-color="crimson">...')` → el mark no persiste `color`), que pasó en verde de inmediato — coverage-only, sin cambio de producción.
+- `callout-node.tsx` (líneas 41-43 del prompt): el fallback a `"idea"` para un `kind` desconocido ya existía (`isCalloutKind(value) ? value : "idea"`). Se agregó el caso de prueba faltante (`callout.test.tsx`, "falls back to idea when the kind is unrecognized" con `kind: "bogus"` en el JSON inicial), verde de inmediato — coverage-only.
+- `tests/e2e/slash-command.spec.ts` (líneas 183-188 del prompt): revisadas; las aserciones en esa zona ya usan `expect(...).toHaveCount(0)`/`toBeVisible()` (auto-retrying de Playwright), no un `waitForResponse` con predicado amplio — ese patrón solo aparece en `clickAndWaitForAction` (líneas ~10-17), fuera del rango señalado. No se encontró una espera imprecisa que corregir en las líneas indicadas; no se hizo cambio para evitar tocar un archivo e2e sin una razón concreta y verificable.
+
+### TDD Cycle Evidence
+
+| Unidad | RED | GREEN | REFACTOR |
+|---|---|---|---|
+| `code-block.test.tsx` (3 casos) | Import de `code-block.tsx` fallaba (`highlight.js/lib/languages/bash` no resoluble) hasta agregar `highlight.js` como dependencia directa; el caso "updates the persisted language attribute" falló primero (`expected 'javascript' to be 'python'`) por no envolver `fireEvent.change` en `act()` | Los 3 casos en verde tras agregar `highlight.js` y envolver el cambio de select en `act()` | Sin cambios adicionales |
+| `no-inline-hex.test.ts` | Confirmado insertando temporalmente `// #ff00ff` en `highlight-picker.tsx`: el test falló listando ese archivo como infractor | Verde tras revertir la línea de prueba (no había hex real en el módulo) | N/A — no había código de producción que corregir |
+| `highlight-picker.test.tsx` (4 casos) | Confirmado moviendo `highlight-picker.tsx`/`highlight-picker-controls.tsx` fuera del árbol temporalmente: el archivo de test fallaba al no resolver los imports | Verde al restaurar los dos archivos de implementación | Sin cambios adicionales |
+| `highlight.test.tsx` (advisory) | No RED — el código de producción ya rechazaba el color inválido en `parseHTML`; el test nuevo pasó en verde de inmediato (coverage-only, documentado explícitamente) | Verde | N/A |
+| `callout.test.tsx` (advisory) | No RED — mismo caso: el fallback a `"idea"` ya existía; el test nuevo pasó en verde de inmediato (coverage-only, documentado explícitamente) | Verde | N/A |
+| `editor-a11y.spec.ts` | RED por selector `[data-selected="true"]` que nunca aparece (ver Deviations, cmdk no sincroniza ese atributo con la navegación por teclado del componente) y luego por el filtro de "/parrafo" (sin tilde) sin coincidencias | Verde tras cambiar la aserción a algo que el componente sí garantiza (menú visible, ítem filtrado visible, cierre con Escape) y usar "/normal" (keyword ASCII de "párrafo") | Sin cambios adicionales |
+
+### Deviations from Design
+
+- **Extensión `highlight.js` como dependencia directa**: `design.md`/tasks.md solo piden `@tiptap/extension-code-block-lowlight` y `lowlight`, pero `lowlight`'s API para registrar un subconjunto de lenguajes requiere importar cada gramática desde `highlight.js/lib/languages/<lang>` — pnpm's strict `node_modules` no resuelve ese subpath si `highlight.js` no es una dependencia declarada del propio proyecto (confirmado: el build de Vitest fallaba con "Failed to resolve import" hasta agregarla). Se agregó `highlight.js@11.12.0` (ya fijado como dependencia transitiva por `lowlight`/`@tiptap/extension-code-block-lowlight`, misma versión) como dependencia directa.
+- **Nombre de archivo**: tasks.md 5b.2 pide `code-block.ts`; se creó como `code-block.tsx` porque el archivo contiene JSX (el node view de React) — mismo contenido y ubicación, solo la extensión de archivo cambia para que el compilador lo trate como TSX.
+- **5b.4b — bubble menu en vez de (o junto con) `/resaltar <color>`**: el prompt ofrecía dos caminos ("un menú burbuja sobre la selección o entradas `/resaltar <color>`") y aceptaba probar solo el bubble menu con un smoke test si el otro camino era impráctico en jsdom. Se implementó el bubble menu; no se agregaron entradas `/resaltar <color>` al menú "/", porque `HighlightPickerControls` (la lógica real de aplicar/quitar la marca) ya es 100% testeable sin pasar por `BubbleMenu`/`floating-ui`, cerrando la necesidad de un camino de prueba alternativo. Riesgo residual: el flujo real de "seleccionar texto → aparece el bubble menu → click en un swatch" solo tiene un smoke test (sin aserciones de posición/aparición reales, limitado por `floating-ui` en jsdom); se recomienda una verificación visual manual (`pnpm dev`) antes de dar la Fase 5b por cerrada para el usuario final.
+- **Gap preexistente descubierto en `CommandMenu`/`cmdk`, no corregido en este batch**: `src/shared/ui/command.tsx`'s `CommandItem` (envoltorio de `cmdk@1.1.1`) sobrescribe el prop `data-selected` que `command-menu.tsx` calcula a partir de su propio estado de teclado (`ArrowUp`/`ArrowDown`) — `cmdk` fija su propio `data-selected`/`aria-selected` según su estado interno, que solo cambia con el mouse (`onPointerMove`) porque `command-menu.tsx` intercepta y detiene la propagación de las flechas antes de que lleguen al `onKeyDown` de `cmdk`. Efecto observable: el resaltado visual (`data-selected:bg-muted`) no seguía la selección por teclado en las pruebas e2e (motivo del RED inicial de `editor-a11y.spec.ts`). No es una regresión de esta fase (el código de `command-menu.tsx`/`command.tsx` no se tocó) y su alcance de arreglo (sincronizar el estado controlado de `cmdk` o dejar de depender de su `data-selected`) excede el presupuesto de esta fase; se reporta como hallazgo para un batch futuro o un issue de accesibilidad separado.
+- Resto de la implementación coincide con `design.md` ("Tiptap y ProseMirror solo en editor/ui", tokens del sistema de diseño, sin tema de terceros).
+
+### Issues Found
+
+- Ver el gap de `cmdk`/`data-selected` arriba (Deviations) — no bloqueante para esta fase, pero afecta la fidelidad del foco visible por teclado en el menú "/".
+- `tests/e2e/notebooks-acceptance.spec.ts:145` ("Ruta de página ajena") falló una vez en una corrida repetida localmente por *strict mode violation* (dos enlaces "Sin título" en la barra lateral) — causado por acumulación de datos de pruebas e2e anteriores (cuadernos "Cuaderno a11y"/"Privado de A" sin limpiar) bajo el mismo `verifiedUser` en `cogni-dev`, no por un cambio de esta fase. Al correr el conjunto completo una sola vez (primera corrida limpia) los 8 casos originales (`slash-command` + `notebooks-acceptance`) pasaron 8/8; ver Work Unit Evidence.
+
+### Files Changed
+
+| File | Action | What Was Done |
+|---|---|---|
+| `package.json`, `pnpm-lock.yaml` | Modified | + `@tiptap/extension-code-block-lowlight`, `lowlight`, `highlight.js` |
+| `src/modules/editor/ui/tiptap/extensions/code-block.tsx` | Created | `CodeBlock` (lowlight + selector de lenguaje, node view de React) |
+| `src/modules/editor/ui/tiptap/extensions/code-block.test.tsx` | Created | 3 casos RED→GREEN |
+| `src/modules/editor/ui/tiptap/extensions/index.ts` | Modified | `codeBlock: false` en `StarterKit`, registra `CodeBlock` |
+| `src/app/globals.css` | Modified | Bloque `.hljs-*` con tokens del sistema de diseño |
+| `src/modules/editor/ui/tiptap/highlight-picker-controls.tsx` | Created | Controles de resaltado (aplicar/quitar) sobre el `editor` |
+| `src/modules/editor/ui/tiptap/highlight-picker.tsx` | Created | Envoltorio `BubbleMenu` |
+| `src/modules/editor/ui/tiptap/highlight-picker.test.tsx` | Created | 3 casos + 1 smoke test, RED→GREEN confirmado |
+| `src/modules/editor/ui/tiptap/editor.tsx` | Modified | Monta `HighlightPicker` junto al `EditorContent` |
+| `src/modules/editor/ui/tiptap/highlight.test.tsx` | Modified | + caso advisory `parseHTML` (coverage-only) |
+| `src/modules/editor/ui/tiptap/callout.test.tsx` | Modified | + caso advisory `kind` desconocido (coverage-only) |
+| `src/modules/editor/ui/no-inline-hex.test.ts` | Created | Guard sin dependencias nuevas (recorrido con `node:fs`) |
+| `tests/e2e/editor-a11y.spec.ts` | Created | `reducedMotion: "reduce"`, abre/filtra/cierra el menú "/" |
+| `openspec/changes/phase-1-notebooks-editor/tasks.md` | Modified | 5b.1–5b.7 marcadas `[x]` |
+
+### Impacto en el presupuesto de revisión (400 líneas)
+
+`git diff --numstat` de este batch (staged temporalmente para medir, sin `pnpm-lock.yaml`): **578 líneas agregadas / 8 eliminadas = 586 líneas de autoría totales**, por encima del presupuesto de ~400, igual que las fases anteriores. `tasks.md` mantiene `Chain strategy: stacked-to-main` para todo el cambio (confirmado por el usuario) — PR5b es su propia PR apuntando a `main`, igual que PR0…PR5a. La fase es una unidad TDD coherente (bloque de código + tema + selector de resaltado + guard de hex + pase de a11y, todos exigidos juntos por `tasks.md` Fase 5b); no se recortaron comentarios, tests ni código para bajar el número. Se recomienda **`size:exception`** para PR5b tal como en fases anteriores.
+
+### Work Unit Evidence
+
+| Evidencia | Valor |
+|---|---|
+| Comando de test enfocado y resultado exacto | `pnpm test` → `60 archivos / 251 tests` GREEN |
+| Comando/escenario de runtime y resultado exacto | `pnpm build` (Turbopack) GREEN; `pnpm exec playwright test tests/e2e/slash-command.spec.ts tests/e2e/notebooks-acceptance.spec.ts tests/e2e/editor-a11y.spec.ts --workers=1` → 8/8 GREEN en la primera corrida limpia (ver Issues Found para el detalle de una repetición posterior afectada por datos residuales, no por este código) |
+| Rollback boundary | Revertir esta fase: borrar `extensions/code-block.tsx`+test, `highlight-picker.tsx`, `highlight-picker-controls.tsx`+test, `no-inline-hex.test.ts`, `tests/e2e/editor-a11y.spec.ts`; revertir `extensions/index.ts` (quitar `codeBlock: false` y el import/registro de `CodeBlock`), `editor.tsx` (quitar el import y el `<HighlightPicker>`), `highlight.test.tsx`/`callout.test.tsx` (quitar los 2 casos advisory), `globals.css` (quitar el bloque `.hljs-*`), `package.json`/`pnpm-lock.yaml` (quitar `@tiptap/extension-code-block-lowlight`, `lowlight`, `highlight.js`). Ningún archivo de fases anteriores fuera de estos se tocó. |
+
+### Estado
+
+Fase 5b: 5b.1–5b.7 completas. Gate completo en verde (`pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm depcruise`, `pnpm build`, e2e). No se creó commit de trabajo en este batch (lo decide el orquestador, junto con el presupuesto de revisión — recomendación `size:exception`). Pendientes no bloqueantes reportados: verificación visual manual del bubble menu de resaltado; gap de accesibilidad preexistente en `cmdk`'s `data-selected` vs. navegación por teclado de `CommandMenu` (fuera de alcance de esta fase).
