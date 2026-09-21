@@ -155,4 +155,43 @@ describe("extractPlainText", () => {
 
     expect(extractPlainText(doc)).toBe("");
   });
+
+  // specs/editor/spec.md, "Conjunto completo de bloques de §3.2": a
+  // callout is a plain block node here (no special-cased type), so its
+  // paragraph content contributes the same way blockquote's does.
+  it("descends into a callout node's content", () => {
+    const doc: TiptapDoc = {
+      type: "doc",
+      content: [
+        {
+          type: "callout",
+          attrs: { kind: "warning" },
+          content: [{ type: "paragraph", content: [text("cuidado")] }],
+        },
+      ],
+    };
+
+    expect(extractPlainText(doc)).toBe("cuidado");
+  });
+
+  // specs/editor/spec.md, "Paleta de resaltado de Cogni y callouts": marks
+  // (including highlight) never affect the extracted text.
+  it("ignores the highlight mark's color attribute", () => {
+    const doc: TiptapDoc = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            {
+              ...text("importante"),
+              marks: [{ type: "highlight", attrs: { color: "purple" } }],
+            },
+          ],
+        },
+      ],
+    };
+
+    expect(extractPlainText(doc)).toBe("importante");
+  });
 });

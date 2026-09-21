@@ -44,7 +44,13 @@ test.describe("slash command menu", () => {
       page,
       sidebar.getByRole("button", { name: "Crear página en Cuaderno slash" }),
     );
-    const pageLink = sidebar.getByRole("link", { name: "Sin título" });
+    // Scoped to this test's notebook: other notebooks created by earlier
+    // tests in the same worker (shared `verifiedUser`) also have a "Sin
+    // título" page and may be expanded in the sidebar at the same time.
+    const pageLink = sidebar
+      .getByRole("listitem")
+      .filter({ hasText: "Cuaderno slash" })
+      .getByRole("link", { name: "Sin título" });
     await expect(pageLink).toBeVisible();
     await pageLink.click();
 
@@ -74,5 +80,111 @@ test.describe("slash command menu", () => {
     await expect(
       page.getByTestId("editor-mount").locator("blockquote"),
     ).toBeVisible();
+  });
+
+  // specs/editor/spec.md, "Conjunto completo de bloques de §3.2", Scenario
+  // "Tabla editable" (e2e), and "Menú de comandos `/`": "/tabla" + Enter
+  // inserts a table now that the table extension exists (tasks.md, 5a.3).
+  test("typing /tabla and pressing Enter inserts a table", async ({ page }) => {
+    const sidebar = page.getByRole("navigation", { name: "Barra lateral" });
+    await page.goto("/");
+
+    await sidebar.getByRole("button", { name: "Crear cuaderno" }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByLabel("Título").fill("Cuaderno tabla");
+    await clickAndWaitForAction(
+      page,
+      dialog.getByRole("button", { name: "Crear cuaderno" }),
+    );
+    await expect(sidebar.getByText("Cuaderno tabla")).toBeVisible();
+
+    await clickAndWaitForAction(
+      page,
+      sidebar.getByRole("button", { name: "Crear página en Cuaderno tabla" }),
+    );
+    // Scoped to this test's notebook: other notebooks created by earlier
+    // tests in the same worker (shared `verifiedUser`) also have a "Sin
+    // título" page and may be expanded in the sidebar at the same time.
+    const pageLink = sidebar
+      .getByRole("listitem")
+      .filter({ hasText: "Cuaderno tabla" })
+      .getByRole("link", { name: "Sin título" });
+    await expect(pageLink).toBeVisible();
+    await pageLink.click();
+
+    const editorMount = page.getByTestId("editor-mount");
+    await expect(editorMount).toBeVisible();
+    const editable = editorMount.locator('[contenteditable="true"]');
+    await editable.click();
+    await page.keyboard.type("/tabla");
+
+    const menu = page.getByTestId("command-menu");
+    await expect(menu).toBeVisible();
+    await expect(menu.getByText("tabla")).toBeVisible();
+
+    await page.keyboard.press("Enter");
+
+    await expect(menu).toHaveCount(0);
+    const table = editable.locator("table");
+    await expect(table).toBeVisible();
+    await expect(table.locator("td, th")).toHaveCount(4);
+    await expect(editable).not.toContainText("/tabla");
+
+    await expect(editorMount.getByText("guardado")).toBeVisible({
+      timeout: 5000,
+    });
+    await page.reload();
+    await expect(
+      page.getByTestId("editor-mount").locator("table"),
+    ).toBeVisible();
+  });
+
+  // specs/editor/spec.md, "Paleta de resaltado de Cogni y callouts",
+  // Scenario "Callout de advertencia": reachable from the "/" menu too.
+  test("typing /advertencia and pressing Enter inserts a warning callout", async ({
+    page,
+  }) => {
+    const sidebar = page.getByRole("navigation", { name: "Barra lateral" });
+    await page.goto("/");
+
+    await sidebar.getByRole("button", { name: "Crear cuaderno" }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByLabel("Título").fill("Cuaderno callout");
+    await clickAndWaitForAction(
+      page,
+      dialog.getByRole("button", { name: "Crear cuaderno" }),
+    );
+    await expect(sidebar.getByText("Cuaderno callout")).toBeVisible();
+
+    await clickAndWaitForAction(
+      page,
+      sidebar.getByRole("button", {
+        name: "Crear página en Cuaderno callout",
+      }),
+    );
+    const pageLink = sidebar
+      .getByRole("listitem")
+      .filter({ hasText: "Cuaderno callout" })
+      .getByRole("link", { name: "Sin título" });
+    await expect(pageLink).toBeVisible();
+    await pageLink.click();
+
+    const editorMount = page.getByTestId("editor-mount");
+    await expect(editorMount).toBeVisible();
+    const editable = editorMount.locator('[contenteditable="true"]');
+    await editable.click();
+    await page.keyboard.type("/advertencia");
+
+    const menu = page.getByTestId("command-menu");
+    await expect(menu).toBeVisible();
+    await expect(menu.getByText("callout de advertencia")).toBeVisible();
+
+    await page.keyboard.press("Enter");
+
+    await expect(menu).toHaveCount(0);
+    const callout = editable.locator('[data-testid="callout"]');
+    await expect(callout).toBeVisible();
+    await expect(callout).toHaveAttribute("data-kind", "warning");
+    await expect(editable).not.toContainText("/advertencia");
   });
 });
