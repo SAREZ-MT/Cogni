@@ -1,7 +1,7 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, Home } from "lucide-react";
-import Link from "next/link";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import type { ReactNode } from "react";
 import { useState } from "react";
 import { cn } from "@/shared/ui/utils";
 import {
@@ -16,9 +16,10 @@ const ONE_YEAR_IN_SECONDS = 60 * 60 * 24 * 365;
 
 type SidebarProps = {
   initialCollapsed: boolean;
+  children: ReactNode;
 };
 
-export function Sidebar({ initialCollapsed }: SidebarProps) {
+export function Sidebar({ initialCollapsed, children }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(initialCollapsed);
 
   function toggle() {
@@ -46,22 +47,11 @@ export function Sidebar({ initialCollapsed }: SidebarProps) {
         </span>
       </div>
 
-      <ul className="flex flex-col gap-1 px-3">
-        <li>
-          <Link
-            href="/"
-            aria-current="page"
-            title="Inicio"
-            className={cn(
-              "flex min-h-11 items-center gap-3 rounded-input bg-active px-3 font-medium text-fg-active text-sm",
-              collapsed && "justify-center px-0",
-            )}
-          >
-            <Home aria-hidden="true" size={20} strokeWidth={1.75} />
-            <span className={cn(collapsed && "sr-only")}>Inicio</span>
-          </Link>
-        </li>
-      </ul>
+      <div
+        className={cn("flex min-h-0 flex-1 flex-col", collapsed && "hidden")}
+      >
+        {children}
+      </div>
 
       <button
         type="button"
