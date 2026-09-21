@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Fase 1 — Guardado de contenido de página",
+    "output": "fase-1-guardado-pagina.html",
+    "viewBox": [1080, 900],
+    "quality_profile": "showcase",
+    "column_fit": "spread",
+    "views": [
+      { "id": "guardado-exitoso", "label": "Guardado exitoso", "focus": ["editor", "hook", "action", "usecase", "repo", "db"], "note": "El camino feliz: versión vigente, plain_text recalculado, versión incrementada." },
+      { "id": "conflicto", "label": "Conflicto de versión", "focus": ["hook", "action", "usecase", "editor"], "note": "expectedVersion desactualizado: la UI reconcilia sin sobrescribir el servidor." }
+    ]
+  },
+  "participants": [
+    { "id": "editor", "type": "frontend", "label": "Tiptap", "sublabel": "editor/ui" },
+    { "id": "hook", "type": "frontend", "label": "useAutosave", "sublabel": "editor/application" },
+    { "id": "action", "type": "backend", "label": "index.ts", "sublabel": "notebooks Server Action" },
+    { "id": "usecase", "type": "backend", "label": "SavePage", "sublabel": "notebooks/application" },
+    { "id": "domain", "type": "backend", "label": "extractPlainText", "sublabel": "notebooks/domain" },
+    { "id": "repo", "type": "backend", "label": "PageRepository", "sublabel": "notebooks/infrastructure" },
+    { "id": "db", "type": "database", "label": "Postgres", "sublabel": "pages" }
+  ],
+  "segments": [
+    { "from": 150, "to": 420, "label": "Guardado con versión vigente" },
+    { "from": 436, "to": 760, "label": "Guardado obsoleto y reconciliación" }
+  ],
+  "messages": [
+    { "from": "editor", "to": "hook", "y": 180, "label": "onUpdate(content)", "variant": "default" },
+    { "from": "hook", "to": "action", "y": 250, "label": "save({ pageId, content, expectedVersion })", "variant": "emphasis", "note": "tras debounce de 800–1500ms" },
+    { "from": "action", "to": "usecase", "y": 288, "label": "SavePage(ownerId, input)", "variant": "emphasis" },
+    { "from": "usecase", "to": "repo", "y": 322, "label": "findById(pageId)" },
+    { "from": "repo", "to": "usecase", "y": 352, "label": "página, content_version=3", "variant": "return" },
+    { "from": "usecase", "to": "domain", "y": 382, "label": "extractPlainText(content)" },
+    { "from": "usecase", "to": "repo", "y": 412, "label": "save(content, plainText, version=4)", "variant": "emphasis" },
+    { "from": "repo", "to": "db", "y": 440, "label": "UPDATE pages" },
+    { "from": "usecase", "to": "action", "y": 470, "label": "ok({ version: 4 })", "variant": "return" },
+    { "from": "action", "to": "hook", "y": 500, "label": "{ version: 4 }", "variant": "return" },
+    { "from": "hook", "to": "editor", "y": 530, "label": "estado \"Guardado\"", "variant": "return" },
+    { "from": "hook", "to": "action", "y": 600, "label": "save(expectedVersion=3)", "variant": "emphasis" },
+    { "from": "action", "to": "usecase", "y": 630, "label": "SavePage(ownerId, input)", "variant": "emphasis" },
+    { "from": "usecase", "to": "repo", "y": 660, "label": "findById(pageId) → version=4" },
+    { "from": "usecase", "to": "action", "y": 690, "label": "DomainError(PAGE_VERSION_CONFLICT)", "variant": "security" },
+    { "from": "action", "to": "hook", "y": 720, "label": "error de conflicto", "variant": "security" },
+    { "from": "hook", "to": "action", "y": 750, "label": "getCurrent(pageId)", "variant": "dashed" },
+    { "from": "action", "to": "hook", "y": 780, "label": "{ content, version: 4 }", "variant": "return" },
+    { "from": "hook", "to": "editor", "y": 810, "label": "reemplaza documento, avisa cambio, conserva borrador", "variant": "return" }
+  ],
+  "activations": [
+    { "participant": "hook", "from": 200, "to": 540, "type": "frontend" },
+    { "participant": "action", "from": 278, "to": 510, "type": "backend" },
+    { "participant": "usecase", "from": 316, "to": 480, "type": "backend" },
+    { "participant": "hook", "from": 590, "to": 820, "type": "frontend" },
+    { "participant": "action", "from": 620, "to": 790, "type": "backend" },
+    { "participant": "usecase", "from": 650, "to": 700, "type": "backend" }
+  ],
+  "cards": [
+    { "dot": "emerald", "title": "Fuente única de verdad", "items": ["plain_text se calcula solo en application, nunca lo envía el cliente", "content_version se compara antes de escribir (compare-and-swap)"] },
+    { "dot": "amber", "title": "Reconciliación de conflicto", "items": ["Un DomainError de conflicto nunca sobrescribe el servidor", "El hook recarga contenido y versión vigentes antes del siguiente guardado", "El borrador local queda disponible para el usuario, no se pierde"] }
+  ]
+}

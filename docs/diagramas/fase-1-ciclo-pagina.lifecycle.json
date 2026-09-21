@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "diagram_type": "lifecycle",
+  "meta": {
+    "title": "Fase 1 — Ciclo de vida de una página",
+    "output": "fase-1-ciclo-pagina.html",
+    "quality_profile": "showcase",
+    "views": [
+      { "id": "camino-principal", "label": "Camino principal", "focus": ["created", "active", "archived"], "note": "Creación, edición continua y archivado lógico; sin borrado físico en esta fase." },
+      { "id": "autosave", "label": "Ciclo de autosave", "focus": ["active", "saving"], "note": "El debounce alterna entre editar y guardar mientras la página está activa." },
+      { "id": "conflicto", "label": "Conflicto de versión", "focus": ["active", "version_conflict"], "note": "Un content_version desactualizado es recuperable: vuelve a active sin perder el borrador." }
+    ]
+  },
+  "lanes": [
+    { "id": "main", "label": "Ciclo principal" },
+    { "id": "waiting", "label": "Autosave" },
+    { "id": "exceptions", "label": "Conflicto" }
+  ],
+  "states": [
+    { "id": "created", "type": "start", "label": "Creada", "sublabel": "content_version = 1", "lane": "main", "col": 0, "step": "01", "tag": "CreatePage" },
+    { "id": "active", "type": "active", "label": "Activa", "sublabel": "editable en el sidebar", "lane": "main", "col": 2, "step": "02", "tag": "archived_at = null" },
+    { "id": "archived", "type": "neutral", "label": "Archivada", "sublabel": "oculta, filas conservadas", "lane": "main", "col": 4, "step": "03", "tag": "ArchivePage" },
+    { "id": "saving", "type": "waiting", "label": "Guardando", "sublabel": "SavePage en curso", "lane": "waiting", "col": 0, "tag": "debounce" },
+    { "id": "version_conflict", "type": "failure", "label": "Conflicto de versión", "sublabel": "expectedVersion obsoleto", "lane": "exceptions", "col": 2, "tag": "recuperable" }
+  ],
+  "transitions": [
+    { "id": "created-to-active", "from": "created", "to": "active", "label": "primera edición", "variant": "default" },
+    { "id": "active-to-saving", "from": "active", "to": "saving", "label": "debounce vence", "note": "800–1500ms", "variant": "default", "fromSide": "bottom", "toSide": "top", "route": "straight", "labelAt": [342, 202] },
+    { "id": "saving-to-active", "from": "saving", "to": "active", "label": "guardado confirmado", "note": "content_version + 1", "variant": "emphasis", "labelAt": [342, 350] },
+    { "id": "active-to-conflict", "from": "active", "to": "version_conflict", "label": "content_version no coincide", "variant": "security", "labelAt": [554, 400] },
+    { "id": "conflict-to-active", "from": "version_conflict", "to": "active", "label": "reconciliado: recarga versión vigente", "note": "conserva borrador", "variant": "emphasis", "labelAt": [554, 440] },
+    { "id": "active-to-archived", "from": "active", "to": "archived", "label": "ArchivePage (idempotente)", "variant": "default", "route": "straight" }
+  ],
+  "cards": [
+    { "dot": "emerald", "title": "Sin papelera", "items": ["Archivar fija archived_at y oculta del sidebar, sin borrar filas", "No existe transición de archivada hacia activa en esta fase", "El borrado físico queda para un job de limpieza futuro"] },
+    { "dot": "amber", "title": "Autosave y conflicto", "items": ["Guardando y Conflicto son estados recuperables, nunca terminales", "Un conflicto nunca sobrescribe el contenido del servidor"] }
+  ]
+}

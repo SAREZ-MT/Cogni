@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Fase 1 — Módulos de cuadernos y editor",
+    "output": "fase-1-arquitectura-modulos.html",
+    "quality_profile": "showcase",
+    "views": [
+      { "id": "editor-a-notebooks", "label": "Editor hacia notebooks", "focus": ["editor-ui", "notebooks-index", "notebooks-app", "notebooks-domain"], "note": "editor solo entra a notebooks por su index.ts, nunca por application o infrastructure." },
+      { "id": "persistencia", "label": "Persistencia y Storage", "focus": ["notebooks-infra", "postgres", "storage"], "note": "Solo infrastructure toca Postgres y Supabase Storage; domain y application quedan puros." },
+      { "id": "identidad", "label": "Autorización por sesión", "focus": ["identity-index", "notebooks-app"], "note": "notebooks obtiene ownerId de identity a través de su index.ts, igual que el resto de la app." }
+    ]
+  },
+  "components": [
+    { "id": "browser", "type": "external", "label": "Navegador", "sublabel": "Tiptap + TanStack Query", "pos": [40, 300], "size": [140, 64] },
+    { "id": "editor-ui", "type": "frontend", "label": "editor/ui", "sublabel": "Tiptap, ProseMirror, extensiones", "pos": [260, 300], "size": [150, 64] },
+    { "id": "editor-app", "type": "frontend", "label": "editor/application", "sublabel": "hook de autosave", "pos": [260, 150], "size": [150, 64] },
+    { "id": "notebooks-index", "type": "backend", "label": "notebooks/index.ts", "sublabel": "Server Actions públicas", "pos": [490, 300], "size": [150, 64], "tag": "único punto de entrada" },
+    { "id": "notebooks-app", "type": "backend", "label": "notebooks/application", "sublabel": "Result<T, DomainError>", "pos": [490, 460], "size": [150, 64] },
+    { "id": "notebooks-domain", "type": "backend", "label": "notebooks/domain", "sublabel": "entidades, plain_text puro", "pos": [720, 460], "size": [150, 64] },
+    { "id": "notebooks-infra", "type": "backend", "label": "notebooks/infrastructure", "sublabel": "repositorios Drizzle, Storage gateway", "pos": [720, 300], "size": [180, 64] },
+    { "id": "identity-index", "type": "backend", "label": "identity/index.ts", "sublabel": "getCurrentUser (ownerId)", "pos": [490, 150], "size": [150, 64] },
+    { "id": "postgres", "type": "database", "label": "Postgres", "sublabel": "notebooks, pages, page_assets", "pos": [950, 300], "size": [140, 64] },
+    { "id": "storage", "type": "cloud", "label": "Supabase Storage", "sublabel": "bucket privado page-assets", "pos": [950, 460], "size": [140, 64], "tag": "RLS por owner_id" }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "src/modules/editor", "wraps": ["editor-ui", "editor-app"] },
+    { "kind": "region", "label": "src/modules/notebooks", "wraps": ["notebooks-index", "notebooks-app", "notebooks-domain", "notebooks-infra"] },
+    { "kind": "security-group", "label": "solo domain: sin npm salvo Zod", "wraps": ["notebooks-domain"] }
+  ],
+  "connections": [
+    { "id": "user-types", "from": "browser", "to": "editor-ui", "label": "escribe bloques", "variant": "emphasis" },
+    { "id": "editor-debounce", "from": "editor-ui", "to": "editor-app", "label": "onUpdate + debounce", "fromSide": "top", "toSide": "bottom" },
+    { "id": "port-save", "from": "editor-app", "to": "notebooks-index", "label": "SavePagePort.save()", "variant": "emphasis" },
+    { "id": "own-id", "from": "notebooks-index", "to": "identity-index", "label": "ownerId de sesión", "fromSide": "top", "toSide": "bottom", "labelAt": [615, 258] },
+    { "id": "index-to-app", "from": "notebooks-index", "to": "notebooks-app", "label": "invoca caso de uso", "fromSide": "bottom", "toSide": "top", "labelDy": 24 },
+    { "id": "app-domain", "from": "notebooks-app", "to": "notebooks-domain", "label": "extractPlainText, invariantes", "labelDy": 56 },
+    { "id": "app-infra", "from": "notebooks-app", "to": "notebooks-infra", "label": "puertos (repository, gateway)", "fromSide": "top", "toSide": "bottom" },
+    { "id": "infra-db", "from": "notebooks-infra", "to": "postgres", "label": "Drizzle" },
+    { "id": "infra-storage", "from": "notebooks-infra", "to": "storage", "label": "URL firmada" },
+    { "id": "upload-direct", "from": "browser", "to": "storage", "label": "subida directa de bytes", "variant": "dashed", "fromSide": "bottom", "toSide": "left", "via": [[110, 580], [935, 580], [935, 492]] }
+  ],
+  "cards": [
+    { "dot": "violet", "title": "Regla de frontera", "items": ["editor solo importa de notebooks a través de notebooks/index.ts", "Tiptap y ProseMirror viven únicamente en editor/ui", "notebooks/domain no importa ningún paquete npm salvo Zod y shared/kernel"] },
+    { "dot": "emerald", "title": "Autorización", "items": ["Cada caso de uso recibe ownerId de la sesión resuelta en identity", "RLS se omite en la conexión del servidor; la autorización es explícita en application", "RLS permanece activo en Storage por owner_id"] }
+  ]
+}
