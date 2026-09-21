@@ -29,3 +29,28 @@ export function validateAssetInput(input: {
   }
   return ok(undefined);
 }
+
+// One file name segment as RequestImageUpload generates it: `{assetId}.{ext}`
+// with no dots, slashes or percent-escapes anywhere else, so neither a
+// literal nor an encoded dot-segment can appear.
+const FILE_NAME = /^[A-Za-z0-9_-]+\.[a-z0-9]+$/;
+
+// specs/page-assets/spec.md, "Registro de PageAsset con revalidación": the
+// storagePath a client hands back must be exactly
+// `{ownerId}/{pageId}/{assetId}.{ext}`. A prefix check alone is not enough:
+// the service-role gateway hands the key to an HTTP client that normalises
+// `..` segments, so `{ownerId}/{pageId}/../../other/x.png` would resolve to
+// another owner's object while still "starting with" the caller's prefix.
+export function isCanonicalStoragePath(
+  ownerId: string,
+  pageId: string,
+  storagePath: string,
+): boolean {
+  const segments = storagePath.split("/");
+  return (
+    segments.length === 3 &&
+    segments[0] === ownerId &&
+    segments[1] === pageId &&
+    FILE_NAME.test(segments[2] ?? "")
+  );
+}

@@ -2,10 +2,14 @@ import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createNotebook } from "@/modules/notebooks/domain/notebook";
 import { createPage } from "@/modules/notebooks/domain/page";
-import {
-  DrizzleNotebookRepository,
-  DrizzlePageRepository,
-} from "@/modules/notebooks/infrastructure";
+// Imported from their concrete files, not the "@/modules/notebooks/
+// infrastructure" barrel: that barrel also exports SupabaseStorageGateway,
+// which starts with `import "server-only"` — fine under Next's build (only
+// resolved from a Server Component/Action graph), but vitest.db.config.ts
+// runs with plain Node module resolution, where "server-only" throws
+// unconditionally at import time.
+import { DrizzleNotebookRepository } from "@/modules/notebooks/infrastructure/drizzle-notebook-repository";
+import { DrizzlePageRepository } from "@/modules/notebooks/infrastructure/drizzle-page-repository";
 import { profiles } from "@/shared/db/schema";
 import { systemClock } from "@/shared/kernel/clock";
 import { createTestDb } from "./helpers/test-db";

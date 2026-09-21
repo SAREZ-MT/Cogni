@@ -1,6 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { DrizzlePageRepository } from "@/modules/notebooks/infrastructure";
+// Imported from its concrete file, not the barrel: see
+// notebooks-repository.smoke.test.ts's comment on why (SupabaseStorage
+// Gateway's `import "server-only"` breaks plain Node module resolution).
+import { DrizzlePageRepository } from "@/modules/notebooks/infrastructure/drizzle-page-repository";
 import { notebooks, pages, profiles } from "@/shared/db/schema";
 import { createTestDb } from "./helpers/test-db";
 import {

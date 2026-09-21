@@ -9,16 +9,23 @@ export class FakeStorageGateway implements StorageGateway {
     { sizeBytes: number; mime: string }
   >();
 
+  // Records every call so tests can assert a rejected use case never
+  // reaches Storage (specs/page-assets/spec.md, Scenarios "MIME no
+  // permitido"/"Tamaño excedido": "no contacta a Storage").
+  readonly signedUploadUrlCalls: string[] = [];
+
   put(path: string, metadata: { sizeBytes: number; mime: string }): void {
     this.objects.set(path, metadata);
   }
 
   async createSignedUploadUrl(
     path: string,
-  ): Promise<{ signedUrl: string; token: string }> {
+  ): Promise<{ signedUrl: string; token: string; bucket: string }> {
+    this.signedUploadUrlCalls.push(path);
     return {
       signedUrl: `https://fake.local/upload/${path}`,
       token: "fake-token",
+      bucket: "fake-bucket",
     };
   }
 
