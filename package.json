@@ -7,7 +7,7 @@
     "preinstall": "npx only-allow pnpm",
     "postinstall": "next typegen",
     "dev": "next dev",
-    "build": "next build",
+    "build": "drizzle-kit migrate && next build",
     "start": "next start",
     "lint": "biome check",
     "format": "biome format --write",

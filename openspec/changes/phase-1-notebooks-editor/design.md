@@ -18,11 +18,11 @@ El trabajo previo del slice 0 (migrate-in-build, FK de `profiles`) modifica `obs
 
 ### Decision: FK de `profiles` hacia `auth.users` como migración Drizzle explícita
 
-**Choice**: nueva migración `drizzle/0002_profiles_auth_fk.sql` que agrega `alter table profiles add constraint profiles_id_fkey foreign key (id) references auth.users(id) on delete cascade`. Drizzle no puede generar este SQL desde el schema porque `auth.users` vive en el esquema `auth`, fuera de la introspección de `drizzle-kit generate` (ya señalado en el `design.md` de la Fase 0); la migración se escribe a mano y se versiona igual que las generadas.
+**Choice**: nueva migración `drizzle/0002_profiles_auth_fk.sql` que primero elimina cualquier fila huérfana de `profiles` (`delete from profiles p where not exists (select 1 from auth.users u where u.id = p.id)`) y luego agrega `alter table profiles add constraint profiles_id_fkey foreign key (id) references auth.users(id) on delete cascade`. Drizzle no puede generar este SQL desde el schema porque `auth.users` vive en el esquema `auth`, fuera de la introspección de `drizzle-kit generate` (ya señalado en el `design.md` de la Fase 0); la migración se escribe a mano y se versiona igual que las generadas.
 
-**Alternatives considered**: trigger SQL en `auth.users` (descartado en Fase 0 por la misma razón de introspección); dejar la FK pendiente indefinidamente.
+**Alternatives considered**: trigger SQL en `auth.users` (descartado en Fase 0 por la misma razón de introspección); dejar la FK pendiente indefinidamente; agregar la FK sin limpiar huérfanos primero (descartado porque una fila huérfana preexistente haría fallar la migración).
 
-**Rationale**: sin la FK, un `profiles.id` huérfano es posible si una fila de `auth.users` se borra fuera de flujo; la cascada evita perfiles huérfanos y de paso documenta la relación en el esquema real de Postgres, no solo en el código de aplicación.
+**Rationale**: sin la FK, un `profiles.id` huérfano es posible si una fila de `auth.users` se borra fuera de flujo; la cascada evita perfiles huérfanos y de paso documenta la relación en el esquema real de Postgres, no solo en el código de aplicación. Un perfil sin usuario de `auth.users` correspondiente nunca puede iniciar sesión, así que borrarlo antes de agregar la restricción es seguro; ese borrado también hace que la migración pueda correr sin fallar dentro del build de Vercel en producción (cierra el advisory de revisión "FK migration blocks prod build on orphans").
 
 ### Decision: Modelo de datos de `notebooks`/`pages`/`page_assets` en una sola migración versionada
 
@@ -504,10 +504,13 @@ export const ASSET_ERROR = {
 
 ```sql
 -- drizzle/0002_profiles_auth_fk.sql
+delete from profiles p where not exists (select 1 from auth.users u where u.id = p.id);
+
 alter table profiles
   add constraint profiles_id_fkey
   foreign key (id) references auth.users(id) on delete cascade;
--- 0002_profiles_auth_fk.down.sql
+-- 0002_profiles_auth_fk.down.sql (only drops the constraint; the deleted
+-- orphan rows above are not restored)
 alter table profiles drop constraint profiles_id_fkey;
 ```
 
