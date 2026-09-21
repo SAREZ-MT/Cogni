@@ -1,24 +1,15 @@
 import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
-import { clientEnv } from "./src/shared/config/env.client";
+import { supabaseImageRemotePatterns } from "./src/shared/config/image-remote-patterns";
 import { securityHeaders } from "./src/shared/config/security-headers";
-
-// design.md, "images.remotePatterns y img-src de CSP en el mismo pase":
-// only the exact configured Supabase project host, scoped to the read
-// signed-URL path (`getAssetReadUrl` returns URLs under
-// `/storage/v1/object/sign/...`).
-const supabaseStorageHost = new URL(clientEnv().NEXT_PUBLIC_SUPABASE_URL)
-  .hostname;
 
 const nextConfig: NextConfig = {
   images: {
-    remotePatterns: [
-      {
-        protocol: "https",
-        hostname: supabaseStorageHost,
-        pathname: "/storage/v1/object/sign/**",
-      },
-    ],
+    // Derived without clientEnv(): this file must stay loadable when the
+    // app env is absent (see image-remote-patterns.ts).
+    remotePatterns: supabaseImageRemotePatterns(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+    ),
   },
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];
