@@ -11,8 +11,8 @@ interface PagePageProps {
 // editor and its real Server Action wiring land in PR3a/PR3b (design.md,
 // "Editor — Tiptap base"); this slice only loads and shows title/content.
 export default async function PageView({ params }: PagePageProps) {
-  const { pageId } = await params;
-  const page = await getPageForRoute(pageId);
+  const { notebookId, pageId } = await params;
+  const page = await getPageForRoute(notebookId, pageId);
   if (!page) notFound();
 
   return (

@@ -44,20 +44,21 @@ export class InMemoryPageRepository implements PageRepository {
     input: UpdateIfVersionInput,
   ): Promise<UpdateIfVersionResult> {
     const page = this.rows.get(input.pageId);
-    if (
-      !page ||
-      page.ownerId !== input.ownerId ||
-      page.archivedAt ||
-      page.contentVersion !== input.expectedVersion
-    ) {
+    // The fallback "current version" report must be scoped by owner_id,
+    // exactly like the conditional write itself: a page owned by someone
+    // else (or archived) is not-found for this caller, never a stale
+    // version they can read by probing updateIfVersion.
+    const visible =
+      page && page.ownerId === input.ownerId && !page.archivedAt ? page : null;
+    if (!visible || visible.contentVersion !== input.expectedVersion) {
       return {
         updated: false,
-        currentVersion: page?.contentVersion ?? 0,
+        currentVersion: visible?.contentVersion ?? 0,
       };
     }
-    const nextVersion = page.contentVersion + 1;
-    this.rows.set(page.id, {
-      ...page,
+    const nextVersion = visible.contentVersion + 1;
+    this.rows.set(visible.id, {
+      ...visible,
       content: input.content,
       plainText: input.plainText,
       contentVersion: nextVersion,
