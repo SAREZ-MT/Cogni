@@ -13,8 +13,10 @@ import type { AnyExtension } from "@tiptap/core";
 import TaskItem from "@tiptap/extension-task-item";
 import TaskList from "@tiptap/extension-task-list";
 import StarterKit from "@tiptap/starter-kit";
+import type { ImageUploadPort } from "../../../domain/image-upload-port";
 import { Callout } from "../callout-node";
 import { CogniHighlight } from "../highlight-palette";
+import { ImageBlock } from "../image-node";
 import { SlashCommand } from "../slash-command";
 import { CodeBlock } from "./code-block";
 import { createTableExtensions } from "./table";
@@ -38,7 +40,16 @@ export function isAllowedLinkUri(uri: string | undefined): boolean {
 // specs/editor/spec.md, "Marcas de texto": a link MUST open in a new tab
 // with rel="noopener noreferrer" (Tiptap's default also adds "nofollow",
 // which the spec does not ask for and this extension set drops).
-export function createEditorExtensions(): AnyExtension[] {
+export interface CreateEditorExtensionsOptions {
+  pageId?: string;
+  imagePort?: ImageUploadPort | null;
+}
+
+export function createEditorExtensions(
+  options: CreateEditorExtensionsOptions = {},
+): AnyExtension[] {
+  const pageId = options.pageId ?? "";
+  const imagePort = options.imagePort ?? null;
   return [
     StarterKit.configure({
       // Replaced below by `CodeBlock` (`@tiptap/extension-code-block-
@@ -61,6 +72,7 @@ export function createEditorExtensions(): AnyExtension[] {
     CogniHighlight,
     Callout,
     CodeBlock,
+    ImageBlock.configure({ pageId, imagePort }),
     ...createTableExtensions(),
     SlashCommand,
   ];

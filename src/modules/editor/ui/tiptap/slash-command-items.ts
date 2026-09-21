@@ -108,6 +108,21 @@ export const SLASH_COMMAND_ITEMS: SlashCommandItem[] = [
         .run(),
   },
   {
+    id: "image",
+    label: "imagen",
+    keywords: ["imagen", "foto", "image"],
+    run: (editor, range) =>
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertContent({
+          type: "image",
+          attrs: { assetId: null },
+        })
+        .run(),
+  },
+  {
     id: "callout-idea",
     label: "callout de idea",
     keywords: ["idea", "callout"],

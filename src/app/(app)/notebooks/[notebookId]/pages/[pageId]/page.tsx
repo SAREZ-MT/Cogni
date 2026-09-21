@@ -1,8 +1,11 @@
 import { notFound } from "next/navigation";
 import { Editor } from "@/modules/editor";
 import {
+  getAssetReadUrl,
   getCurrentContent,
   getPageForRoute,
+  registerPageAsset,
+  requestImageUpload,
   saveContent,
 } from "@/modules/notebooks";
 
@@ -35,6 +38,11 @@ export default async function PageView({ params }: PagePageProps) {
           initialContent={page.content}
           initialVersion={page.contentVersion}
           port={{ save: saveContent, getCurrent: getCurrentContent }}
+          imagePort={{
+            requestUpload: requestImageUpload,
+            register: registerPageAsset,
+            getReadUrl: getAssetReadUrl,
+          }}
         />
       </div>
     </section>
