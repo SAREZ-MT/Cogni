@@ -25,6 +25,10 @@ export const serverSchema = clientSchema.extend({
   // Long enough that a brute force against /api/keep-alive is pointless.
   CRON_SECRET: z.string().min(32),
   SENTRY_DSN: z.string().url().optional(),
+  // Name of the private Supabase Storage bucket for page assets
+  // (design.md, "Bucket privado `page-assets`, ruta canónica y RLS por
+  // `owner_id`"). Server-only: never exposed to the client bundle.
+  SUPABASE_STORAGE_BUCKET: z.string().min(1),
 });
 
 export type ClientEnv = z.infer<typeof clientSchema>;

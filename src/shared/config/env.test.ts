@@ -12,6 +12,7 @@ const server = {
   SUPABASE_SERVICE_ROLE_KEY: "sb_secret_x",
   DATABASE_URL: "postgresql://u:p@host:6543/postgres",
   CRON_SECRET: "0123456789abcdef0123456789abcdef",
+  SUPABASE_STORAGE_BUCKET: "page-assets",
 };
 
 describe("parseClientEnv", () => {
@@ -63,6 +64,11 @@ describe("parseServerEnv", () => {
     expect(() => parseServerEnv({ ...server, CRON_SECRET: "short" })).toThrow(
       /CRON_SECRET/,
     );
+  });
+
+  it("fails at boot naming SUPABASE_STORAGE_BUCKET when it is absent", () => {
+    const { SUPABASE_STORAGE_BUCKET: _, ...missing } = server;
+    expect(() => parseServerEnv(missing)).toThrow(/SUPABASE_STORAGE_BUCKET/);
   });
 
   it("treats an empty optional variable as unset (.env.example ships blanks)", () => {
