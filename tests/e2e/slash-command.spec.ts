@@ -7,9 +7,13 @@ import { expect, hasSupabaseEnv, signIn, test } from "./fixtures/auth";
 // block already available (blockquote); the "/tabla" variant is added in
 // slice 5a once the table extension exists.
 
+// Hardened per PR3b review: scope to a successful (2xx) response so a
+// failed action is not silently raced past by an unscoped "any POST".
 async function clickAndWaitForAction(page: Page, locator: Locator) {
   await Promise.all([
-    page.waitForResponse((response) => response.request().method() === "POST"),
+    page.waitForResponse(
+      (response) => response.request().method() === "POST" && response.ok(),
+    ),
     locator.click(),
   ]);
 }
