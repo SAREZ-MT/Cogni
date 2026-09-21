@@ -58,11 +58,19 @@ export async function signIn(page: Page, user: TestUser): Promise<void> {
   await expect(page).toHaveURL("/");
 }
 
-// Worker-scoped verified user shared by every shell test in that worker.
+// Worker-scoped verified user shared by every shell test in that worker,
+// plus a test-scoped one for scenarios that need an owner with no data at
+// all (the worker user accumulates notebooks across specs).
 export const test = base.extend<
-  Record<never, never>,
+  { freshUser: TestUser },
   { verifiedUser: TestUser }
 >({
+  // biome-ignore lint/correctness/noEmptyPattern: Playwright fixture signature
+  freshUser: async ({}, use) => {
+    const user = await createVerifiedUser();
+    await use(user);
+    await deleteUserByEmail(user.email);
+  },
   verifiedUser: [
     // biome-ignore lint/correctness/noEmptyPattern: Playwright fixture signature
     async ({}, use) => {

@@ -1,4 +1,9 @@
-import { ASSET_ERROR, NOTEBOOK_ERROR, PAGE_ERROR } from "../domain/errors";
+import {
+  ASSET_ERROR,
+  NOTEBOOK_ERROR,
+  NOTEBOOKS_ERROR,
+  PAGE_ERROR,
+} from "../domain/errors";
 
 // Every user-facing notebooks message lives here: Spanish, "tú",
 // actionable (same pattern as identity/ui/auth-copy.ts).
@@ -24,6 +29,8 @@ export function messageForNotebooksErrorCode(code: string): string {
   switch (code) {
     case "NOTEBOOKS_INVALID_INPUT":
       return NOTEBOOKS_COPY.invalidInput;
+    case NOTEBOOKS_ERROR.SESSION_REQUIRED:
+      return NOTEBOOKS_COPY.sessionRequired;
     case NOTEBOOK_ERROR.NOT_FOUND:
       return NOTEBOOKS_COPY.notebookNotFound;
     case NOTEBOOK_ERROR.ARCHIVED:

@@ -36,7 +36,14 @@ test.describe("app shell", () => {
   // create the first one, inside the sidebar tree.
   test("sidebar shows the notebooks empty state and a control to create the first notebook", async ({
     page,
+    freshUser,
   }) => {
+    // The worker user may already own notebooks created by other specs in
+    // the same worker, so this scenario signs in as a brand-new owner. The
+    // beforeEach session must go first: the proxy keeps a signed-in user
+    // away from /login.
+    await page.context().clearCookies();
+    await signIn(page, freshUser);
     await page.goto("/");
 
     const sidebar = page.getByRole("navigation", { name: "Barra lateral" });

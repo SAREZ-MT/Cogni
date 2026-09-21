@@ -1,6 +1,11 @@
 // DomainError codes for this module (design.md, "Interfaces / Contracts").
 // notebooks/application maps every failure to one of these codes; nothing
 // else leaves the module as an error shape.
+// Session-related errors, module-wide (not scoped to notebooks or pages).
+export const NOTEBOOKS_ERROR = {
+  SESSION_REQUIRED: "NOTEBOOKS_SESSION_REQUIRED",
+} as const;
+
 export const NOTEBOOK_ERROR = {
   NOT_FOUND: "NOTEBOOK_NOT_FOUND",
   ARCHIVED: "NOTEBOOK_ARCHIVED",

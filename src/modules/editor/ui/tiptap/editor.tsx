@@ -1,22 +1,13 @@
 "use client";
 
 import { EditorContent, useEditor } from "@tiptap/react";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useAutosave } from "../../application/use-autosave";
 import type { SavePagePort, TiptapDoc } from "../../domain/save-page-port";
+import { ConflictBanner } from "../conflict-banner";
+import { SaveStatus } from "../save-status";
 import { createEditorExtensions } from "./extensions";
-
-// specs/editor/spec.md, "Autosave con debounce y actualización optimista":
-// visible status copy, Spanish "tú", sentence case, no emoji
-// (.agents/skills/cogni-design/SKILL.md).
-const STATUS_COPY: Record<string, string> = {
-  idle: "",
-  pending: "guardando…",
-  saving: "guardando…",
-  saved: "guardado",
-  error: "no se pudo guardar, reintentando…",
-  conflict: "la página cambió en otra pestaña",
-};
+import { toPlainTiptapDoc } from "./to-plain-tiptap-doc";
 
 export interface EditorProps {
   pageId: string;
@@ -36,7 +27,16 @@ export function Editor({
   initialVersion,
   port,
 }: EditorProps) {
-  const { status, content, setContent, flush } = useAutosave({
+  const {
+    status,
+    content,
+    conflictDraft,
+    reconcileVersion,
+    setContent,
+    flush,
+    restoreDraft,
+    discardDraft,
+  } = useAutosave({
     pageId,
     initialContent,
     initialVersion,
@@ -48,28 +48,26 @@ export function Editor({
     content: initialContent as unknown as Record<string, unknown>,
     immediatelyRender: false,
     onUpdate: ({ editor: current }) => {
-      setContent(current.getJSON() as TiptapDoc);
+      setContent(toPlainTiptapDoc(current.getJSON()));
     },
   });
 
   // design.md, "Autosave con debounce de cliente y reconciliación en la
-  // UI": when the hook replaces `content` after reloading the server's
-  // version (conflict reconciliation), reflect it in the Tiptap document
-  // without re-emitting onUpdate (which would otherwise reschedule a save
-  // of content the user never typed).
+  // UI": resync the Tiptap document from the hook's `content` only when
+  // `reconcileVersion` actually changed — bumped exclusively by a real
+  // server-driven reconciliation (version conflict or restoreDraft()),
+  // never by the user's own typing. Watching `content` directly instead
+  // (diffing its JSON every keystroke) would risk a "setContent echo"
+  // that resets the user's cursor mid-word (PR3b review advisory).
+  const appliedReconcileVersionRef = useRef(reconcileVersion);
   useEffect(() => {
     if (!editor) return;
-    const currentJson = JSON.stringify(editor.getJSON());
-    const nextJson = JSON.stringify(content);
-    if (currentJson !== nextJson) {
-      editor.commands.setContent(
-        content as unknown as Record<string, unknown>,
-        {
-          emitUpdate: false,
-        },
-      );
-    }
-  }, [content, editor]);
+    if (appliedReconcileVersionRef.current === reconcileVersion) return;
+    appliedReconcileVersionRef.current = reconcileVersion;
+    editor.commands.setContent(content as unknown as Record<string, unknown>, {
+      emitUpdate: false,
+    });
+  }, [reconcileVersion, content, editor]);
 
   // specs/editor/spec.md's autosave requirement is debounce-driven; Mod+S
   // adds an explicit save on top of it without waiting for the pause.
@@ -87,15 +85,45 @@ export function Editor({
     return () => dom.removeEventListener("keydown", handleKeydown);
   }, [editor, flush]);
 
+  // specs/editor/spec.md, "Autosave con debounce y actualización
+  // optimista": "Al salir de la página con cambios pendientes el editor
+  // MUST intentar guardarlos". The debounce alone (800-1500ms) does not
+  // cover a user closing the tab or navigating away mid-pause, so this
+  // flushes on every signal Next.js's App Router (client-side navigation
+  // has no router events; see node_modules/next/dist/docs/) and the
+  // browser expose for "the user is leaving": the tab becoming hidden
+  // (also covers mobile app-switching, which never fires beforeunload),
+  // an actual unload, and this component unmounting (an App Router
+  // client-side navigation away from the page). flush() itself is a
+  // no-op when nothing is pending, so this never re-sends an already-
+  // saved document. beforeunload intentionally never sets
+  // `event.preventDefault()`/`returnValue`: the save is fire-and-forget,
+  // not a blocking "are you sure?" confirmation, which is out of this
+  // Requirement's scope.
+  useEffect(() => {
+    function handleVisibilityChange() {
+      if (document.visibilityState === "hidden") flush();
+    }
+    function handleBeforeUnload() {
+      flush();
+    }
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      flush();
+    };
+  }, [flush]);
+
   return (
     <div className="flex flex-col gap-2">
-      <output
-        data-testid="autosave-status"
-        aria-live="polite"
-        className="text-fg-secondary text-xs"
-      >
-        {STATUS_COPY[status]}
-      </output>
+      <SaveStatus status={status} />
+      <ConflictBanner
+        conflictDraft={conflictDraft}
+        onRestore={restoreDraft}
+        onDiscard={discardDraft}
+      />
       <EditorContent
         editor={editor}
         data-testid="editor-content"

@@ -1,4 +1,4 @@
-import { DomainError } from "@/shared/kernel/domain-error";
+import type { ActionError } from "@/shared/kernel/domain-error";
 import { err, ok, type Result } from "@/shared/kernel/result";
 import {
   PAGE_VERSION_CONFLICT_CODE,
@@ -12,10 +12,17 @@ export interface FakeSaveCall {
   expectedVersion: number;
 }
 
-type SaveResult = Result<{ version: number }, DomainError>;
+// ActionError, not DomainError: this fake stands in for saveContent/
+// getCurrentContent, real Server Actions whose returned error is always the
+// plain { code, message } shape toActionError() produces (see save-page-
+// port.ts) — never a DomainError instance, which does not survive the RSC/
+// Flight boundary. Tests may still script a real DomainError instance
+// (it's structurally an ActionError), but the port's own contract is the
+// plain shape.
+type SaveResult = Result<{ version: number }, ActionError>;
 type GetCurrentResult = Result<
   { content: TiptapDoc; version: number },
-  DomainError
+  ActionError
 >;
 
 function delay(ms: number): Promise<void> {
@@ -86,12 +93,10 @@ export class FakeSavePagePort implements SavePagePort {
     if (scripted) return scripted;
 
     if (input.expectedVersion !== this.version) {
-      return err(
-        new DomainError(
-          PAGE_VERSION_CONFLICT_CODE,
-          `current version is ${this.version}`,
-        ),
-      );
+      return err({
+        code: PAGE_VERSION_CONFLICT_CODE,
+        message: `current version is ${this.version}`,
+      });
     }
     this.content = input.content;
     this.version += 1;
