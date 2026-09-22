@@ -2,8 +2,8 @@
 
 | Campo | Valor |
 |---|---|
-| Versión del documento | 1.0.0 |
-| Fecha | 2026-09-14 |
+| Versión del documento | 1.0.1 (ADR 0002: Fase 2 diferida) |
+| Fecha | 2026-09-14 (actualizado 2026-09-22) |
 | Estado | Aprobado. Fuente de verdad para todas las fases. |
 | Autor | Javier Sarez |
 | Metodología de construcción | Spec-Driven Development (SDD) con gentle-ai, un change por unidad de trabajo |
@@ -593,7 +593,9 @@ Hecho cuando: un usuario se registra, verifica correo, inicia sesión con Google
 Entregables: CRUD de cuadernos y páginas, sidebar, editor Tiptap con todos los bloques de 3.2, menú `/`, resaltados con paleta Cogni, imágenes a Storage, autoguardado optimista, `plain_text` materializado.
 Hecho cuando: un usuario toma apuntes completos de una clase sin salir de Cogni y los recupera al volver a entrar.
 
-### Fase 2 — Importación de PDF
+### Fase 2 — Importación de PDF (diferida, ver "Próximamente")
+
+> **Diferida el 2026-09-22 por ADR 0002.** Se implementa después de la Fase 8. La planificación SDD ya hecha se conserva en `openspec/changes/proximamente/phase-2-pdf-import/`.
 
 Entregables: subida a Storage, `ImportJob`, tarea Trigger.dev con unpdf, conversión de texto a bloques (títulos por heurística, párrafos, listas), estado de progreso en UI, manejo de PDF sin texto.
 Hecho cuando: un PDF de 30 páginas con capa de texto termina como página editable en menos de 60 segundos.
@@ -627,6 +629,16 @@ Hecho cuando: el usuario puede responder "qué estudio hoy" y "cómo voy" sin ab
 
 Entregables: Better Stack con log drain, revisión de límites y cuotas, pruebas de carga ligeras, auditoría de accesibilidad, manual de usuario, documentación final y diagramas con archify, entregables académicos.
 Hecho cuando: la plataforma se publica para uso abierto.
+
+### Próximamente
+
+Fases diferidas por decisión registrada en ADR. Se retoman cuando todas las fases activas estén desplegadas y usables, en el orden de esta lista.
+
+| Fase | Diferida el | ADR | Estado de la planificación | Dónde está |
+|---|---|---|---|---|
+| Fase 2 — Importación de PDF | 2026-09-22 | ADR 0002 | Exploración, propuesta aprobada, specs y diseño validados; sin tasks ni código | `openspec/changes/proximamente/phase-2-pdf-import/` (README con pasos para reanudar) |
+
+Mientras una fase esté diferida, el texto de las fases activas que mencione "contenido importado" se lee como "contenido escrito en el editor".
 
 ---
 
