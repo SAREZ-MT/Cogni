@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { Locator, Page } from "@playwright/test";
 import {
   createVerifiedUser,
@@ -119,7 +120,13 @@ test.describe("notebooks acceptance", () => {
         name: "Crear página en Cuaderno renombrado",
       }),
     );
-    const pageLink = sidebar.getByRole("link", { name: "Sin título" });
+    // Scoped to this notebook's own sidebar item: the worker-scoped
+    // verifiedUser accumulates notebooks (and "Sin título" pages) across
+    // the spec files that share the single worker.
+    const pageLink = sidebar
+      .getByRole("listitem")
+      .filter({ hasText: "Cuaderno renombrado" })
+      .getByRole("link", { name: "Sin título" });
     await expect(pageLink).toBeVisible();
     await pageLink.click();
     await expect(page.getByTestId("editor-mount")).toBeVisible();
@@ -163,7 +170,10 @@ test.describe("notebooks acceptance", () => {
       page,
       sidebar.getByRole("button", { name: "Crear página en Privado de A" }),
     );
-    const pageLink = sidebar.getByRole("link", { name: "Sin título" });
+    const pageLink = sidebar
+      .getByRole("listitem")
+      .filter({ hasText: "Privado de A" })
+      .getByRole("link", { name: "Sin título" });
     await expect(pageLink).toBeVisible();
     await pageLink.click();
     await expect(page.getByTestId("editor-mount")).toBeVisible();
@@ -301,6 +311,175 @@ test.describe("notebooks acceptance", () => {
     );
     await expect(reloadedEditable.locator("pre code")).toContainText(
       "const x = 1;",
+    );
+  });
+
+  // Task 9.1 audit gap: the test above only covers H1, paragraph, bullet
+  // list, task list, quote and code. This test covers the remaining §3.2
+  // families reachable end to end today: H2/H3, ordered list, divider,
+  // the "idea"/"nota" callouts (proposal.md Success Criteria; specs/
+  // editor/spec.md, Scenario "Persistencia al volver"), the Cogni
+  // highlight mark and the five inline marks (Scenario "Marca por
+  // atajo"). A link is left out on purpose: the app has no dialog,
+  // button or keyboard shortcut that calls `setLink()` (extensions/
+  // index.ts, link.test.tsx), so a real user cannot reach it end to end
+  // yet — see the delegated report's gap note.
+  test("writes the remaining block families (H2/H3, ordered list, divider, callouts, highlight, inline marks), saves and survives a reload", async ({
+    page,
+  }) => {
+    const sidebar = page.getByRole("navigation", { name: "Barra lateral" });
+    await page.goto("/");
+
+    const title = `Cuaderno de bloques ${randomUUID().slice(0, 8)}`;
+    await sidebar.getByRole("button", { name: "Crear cuaderno" }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByLabel("Título").fill(title);
+    await clickAndWaitForAction(
+      page,
+      dialog.getByRole("button", { name: "Crear cuaderno" }),
+    );
+    await expect(sidebar.getByText(title)).toBeVisible();
+
+    await clickAndWaitForAction(
+      page,
+      sidebar.getByRole("button", { name: `Crear página en ${title}` }),
+    );
+    const notebookItem = sidebar
+      .getByRole("listitem")
+      .filter({ hasText: title });
+    const pageLink = notebookItem.getByRole("link", { name: "Sin título" });
+    await expect(pageLink).toBeVisible();
+    await pageLink.click();
+
+    const editorMount = page.getByTestId("editor-mount");
+    await expect(editorMount).toBeVisible();
+    const editable = editorMount.locator('[contenteditable="true"]');
+    await editable.click();
+
+    // H2 / H3, via the "/" menu.
+    await page.keyboard.type("/h2");
+    await expect(page.getByTestId("command-menu")).toBeVisible();
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("Segundo nivel");
+    await page.keyboard.press("Enter");
+
+    await page.keyboard.type("/h3");
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("Tercer nivel");
+    await page.keyboard.press("Enter");
+
+    // Ordered (numbered) list.
+    await page.keyboard.type("/numeros");
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("paso uno");
+    await page.keyboard.press("Enter");
+    await page.keyboard.press("Enter"); // exit the list
+
+    // Divider: `setHorizontalRule` already leaves the cursor in the
+    // paragraph it inserts right after the <hr>, so no extra Enter here.
+    await page.keyboard.type("/divisor");
+    await page.keyboard.press("Enter");
+
+    // Callouts "idea" and "nota" ("advertencia" is already covered by
+    // slash-command.spec.ts). Same "block+" node as blockquote, so the
+    // same double-Enter lifts an empty trailing paragraph back out.
+    await page.keyboard.type("/idea");
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("una idea genial");
+    await page.keyboard.press("Enter");
+    await page.keyboard.press("Enter");
+
+    await page.keyboard.type("/nota");
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("nota importante");
+    await page.keyboard.press("Enter");
+    await page.keyboard.press("Enter");
+
+    // Inline marks and the Cogni highlight: typed in one plain pass first
+    // (each word/phrase its own paragraph, still unmarked — the same safe
+    // pattern the block families above already use), then marked in a
+    // second pass that never types or presses Enter again. Applying a
+    // keyboard shortcut or the highlight button, then pressing Enter to
+    // start a new paragraph right after, can corrupt the just-marked
+    // paragraph; not typing anything after a mark also means there is no
+    // stored mark left to leak into later text.
+    await page.keyboard.type("negrita");
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("cursiva");
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("subrayado");
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("tachado");
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("codigoinline");
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("texto resaltado");
+
+    // A triple click (a real mouse selection) selects the whole (one-word)
+    // line, and the standard Tiptap shortcut applies its mark (extensions/
+    // marks.test.tsx).
+    async function applyMarkTo(word: string, shortcut: string) {
+      const wordLocator = editable.getByText(word, { exact: true });
+      await wordLocator.click({ clickCount: 3 });
+      await page.keyboard.press(shortcut);
+    }
+
+    await applyMarkTo("negrita", "ControlOrMeta+b");
+    await applyMarkTo("cursiva", "ControlOrMeta+i");
+    await applyMarkTo("subrayado", "ControlOrMeta+u");
+    await applyMarkTo("tachado", "ControlOrMeta+Shift+s");
+    await applyMarkTo("codigoinline", "ControlOrMeta+e");
+
+    // Cogni highlight mark: applied through the bubble menu that appears
+    // on selection (highlight-picker.tsx/highlight-picker-controls.tsx), a
+    // button portalled outside the editor's own DOM. Same triple-click
+    // selection as the inline marks above; a keyboard-only Home/Shift+End
+    // does not reliably make this particular menu appear.
+    await editable
+      .getByText("texto resaltado", { exact: true })
+      .click({ clickCount: 3 });
+    await page
+      .getByTestId("highlight-picker")
+      .getByRole("button", { name: "Resaltar en verde" })
+      .click();
+    await expect(editable.locator('mark[data-color="green"]')).toContainText(
+      "texto resaltado",
+    );
+
+    // Six rapid mark toggles above can each restart the 800-1500ms autosave
+    // debounce (design.md, "Autosave con debounce de cliente"): an autosave
+    // already in flight for an earlier mark does not pick up a later one,
+    // it only schedules its own follow-up debounce. Waiting for "guardado"
+    // right away can observe that earlier, incomplete save. Letting the
+    // debounce fully settle first (no further edits for longer than its
+    // window) guarantees the next "guardado" covers every mark above.
+    await page.waitForTimeout(1800);
+    await waitForSaved(editorMount);
+
+    await page.reload();
+
+    const reloadedEditable = page
+      .getByTestId("editor-mount")
+      .locator('[contenteditable="true"]');
+    await expect(reloadedEditable.locator("h2")).toHaveText("Segundo nivel");
+    await expect(reloadedEditable.locator("h3")).toHaveText("Tercer nivel");
+    await expect(reloadedEditable.locator("ol li")).toContainText("paso uno");
+    await expect(reloadedEditable.locator("hr")).toBeVisible();
+    await expect(
+      reloadedEditable.locator('[data-testid="callout"][data-kind="idea"]'),
+    ).toContainText("una idea genial");
+    await expect(
+      reloadedEditable.locator('[data-testid="callout"][data-kind="note"]'),
+    ).toContainText("nota importante");
+    await expect(
+      reloadedEditable.locator('mark[data-color="green"]'),
+    ).toContainText("texto resaltado");
+    await expect(reloadedEditable.locator("strong")).toContainText("negrita");
+    await expect(reloadedEditable.locator("em")).toContainText("cursiva");
+    await expect(reloadedEditable.locator("u")).toContainText("subrayado");
+    await expect(reloadedEditable.locator("s")).toContainText("tachado");
+    await expect(reloadedEditable.locator("p code")).toContainText(
+      "codigoinline",
     );
   });
 
