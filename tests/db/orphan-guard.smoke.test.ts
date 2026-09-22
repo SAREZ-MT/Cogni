@@ -26,6 +26,7 @@ describe.skipIf(!url)("0002 orphan-delete guard", () => {
   it("rejects deleting orphan profiles when auth.users is empty", async () => {
     const sql = postgres(url as string, { prepare: false, max: 1 });
     const orphanId = randomUUID();
+    const [before] = await sql`select count(*)::int as n from auth.users`;
 
     await sql
       .begin(async (tx) => {
@@ -52,6 +53,10 @@ describe.skipIf(!url)("0002 orphan-delete guard", () => {
     expect(c).toBeDefined();
     const [orphan] = await sql`select 1 from profiles where id = ${orphanId}`;
     expect(orphan).toBeUndefined();
+    // The delete above must never leak past the rollback into the shared
+    // dev database.
+    const [after] = await sql`select count(*)::int as n from auth.users`;
+    expect(after?.n).toBe(before?.n);
     await sql.end();
   });
 });
