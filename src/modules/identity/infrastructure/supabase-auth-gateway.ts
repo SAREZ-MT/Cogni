@@ -48,20 +48,28 @@ export class SupabaseAuthGateway implements AuthGateway {
   async signInWithPassword(input: {
     email: string;
     password: string;
-  }): Promise<Result<void, DomainError>> {
-    const { error } = await this.auth.signInWithPassword(input);
-    if (!error) return ok(undefined);
-    if (error.code === "email_not_confirmed") {
-      return err(
-        new DomainError(AUTH_ERROR.EMAIL_NOT_VERIFIED, "email not verified"),
-      );
+  }): Promise<Result<{ userId: string }, DomainError>> {
+    const { data, error } = await this.auth.signInWithPassword(input);
+    if (error) {
+      if (error.code === "email_not_confirmed") {
+        return err(
+          new DomainError(AUTH_ERROR.EMAIL_NOT_VERIFIED, "email not verified"),
+        );
+      }
+      if (error.code === "invalid_credentials") {
+        return err(
+          new DomainError(
+            AUTH_ERROR.INVALID_CREDENTIALS,
+            "invalid credentials",
+          ),
+        );
+      }
+      return err(providerError(error.message));
     }
-    if (error.code === "invalid_credentials") {
-      return err(
-        new DomainError(AUTH_ERROR.INVALID_CREDENTIALS, "invalid credentials"),
-      );
-    }
-    return err(providerError(error.message));
+    // data.user is always present on a successful signInWithPassword
+    // response, so the caller (identity/actions.ts) never needs a second
+    // auth.getUser() query to learn who just signed in.
+    return ok({ userId: data.user.id });
   }
 
   async signOut(): Promise<Result<void, DomainError>> {

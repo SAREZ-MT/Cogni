@@ -19,6 +19,7 @@ describe("signIn", () => {
 
     expect(result.ok).toBe(true);
     expect(auth.signedIn).toBe("ana@example.com");
+    expect(result.ok && result.value.userId).toBe("fake-user-1");
   });
 
   it("rejects an unverified user and asks for verification", async () => {

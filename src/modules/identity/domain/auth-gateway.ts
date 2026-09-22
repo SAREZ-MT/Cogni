@@ -21,7 +21,7 @@ export interface AuthGateway {
   signInWithPassword(input: {
     email: string;
     password: string;
-  }): Promise<Result<void, DomainError>>;
+  }): Promise<Result<{ userId: string }, DomainError>>;
   signOut(): Promise<Result<void, DomainError>>;
   requestPasswordReset(input: {
     email: string;

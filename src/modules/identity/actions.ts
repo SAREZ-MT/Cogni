@@ -69,16 +69,22 @@ export async function signInAction(
   });
   if (!result.ok)
     return { status: "error", message: messageForCode(result.error.code) };
-  const {
-    data: { user },
-  } = await (await createSupabaseServerClient()).auth.getUser();
-  if (user) after(() => analytics().track("user_signed_in", user.id));
+  // The gateway already exposes userId from the sign-in response, so
+  // signInAction never needs a second auth.getUser() query to learn who
+  // just signed in (specs/identity-auth/spec.md, "Sesión por cookies con
+  // refresco en middleware").
+  const { userId } = result.value;
+  after(() => analytics().track("user_signed_in", userId));
   redirect("/");
 }
 
-export async function signOutAction(): Promise<void> {
+export async function signOutAction(): Promise<
+  { status: "error"; message: string } | undefined
+> {
   const auth = await gateway();
-  await auth.signOut();
+  const result = await auth.signOut();
+  if (!result.ok)
+    return { status: "error", message: messageForCode(result.error.code) };
   redirect("/login");
 }
 
