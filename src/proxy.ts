@@ -1,6 +1,7 @@
-import { type NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { updateSession } from "@/modules/identity/infrastructure/supabase-proxy-client";
 import { clientEnv } from "@/shared/config/env.client";
+import { buildSecurityHeaders } from "@/shared/config/security-headers";
 
 // Next.js 16 renamed middleware to proxy. It refreshes the Supabase session
 // before any route handler or Server Action runs, sends visitors without a
@@ -42,16 +43,42 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(apexTarget, 308);
   }
 
-  const { response, user } = await updateSession(request);
+  // node_modules/next/dist/docs/01-app/02-guides/content-security-policy.md,
+  // "Adding a nonce with Proxy": a fresh nonce per request, written on the
+  // request headers (so Server Components can read it via `x-nonce`, and so
+  // Next.js can parse 'nonce-{value}' from the request's own CSP header
+  // while rendering) and mirrored onto the response headers sent back.
+  const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
+  const csp = buildSecurityHeaders(nonce).find(
+    (header) => header.key === "Content-Security-Policy",
+  )?.value;
+  if (!csp) {
+    throw new Error("buildSecurityHeaders did not return a CSP header");
+  }
+
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-nonce", nonce);
+  requestHeaders.set("Content-Security-Policy", csp);
+  const requestWithNonce = new NextRequest(request, {
+    headers: requestHeaders,
+  });
+
+  const { response, user } = await updateSession(requestWithNonce);
+  response.headers.set("Content-Security-Policy", csp);
+
   const { pathname } = request.nextUrl;
   const isAuthPath = AUTH_PATHS.has(pathname);
   const isCallback = pathname.startsWith("/auth/");
 
   if (!user && !isAuthPath && !isCallback) {
-    return withCookies(new URL("/login", request.url), response);
+    const redirect = withCookies(new URL("/login", request.url), response);
+    redirect.headers.set("Content-Security-Policy", csp);
+    return redirect;
   }
   if (user && isAuthPath) {
-    return withCookies(new URL("/", request.url), response);
+    const redirect = withCookies(new URL("/", request.url), response);
+    redirect.headers.set("Content-Security-Policy", csp);
+    return redirect;
   }
   return response;
 }
