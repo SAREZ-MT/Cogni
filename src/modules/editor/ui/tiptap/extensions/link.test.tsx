@@ -16,41 +16,52 @@ function createHeadlessEditor() {
 describe("link extension", () => {
   it("rejects a javascript: URL and leaves the text unmarked", () => {
     const editor = createHeadlessEditor();
-    editor.commands.selectAll();
+    // destroy() must run even if an assertion throws, otherwise
+    // ProseMirror's DOMObserver setTimeout flush can fire after Vitest has
+    // torn down jsdom for this file, throwing "document is not defined".
+    try {
+      editor.commands.selectAll();
 
-    const applied = editor.commands.setLink({ href: "javascript:alert(1)" });
+      const applied = editor.commands.setLink({ href: "javascript:alert(1)" });
 
-    expect(applied).toBe(false);
-    const json = editor.getJSON();
-    const textNode = json.content?.[0]?.content?.[0];
-    expect(textNode?.marks ?? []).toHaveLength(0);
-
-    editor.destroy();
+      expect(applied).toBe(false);
+      const json = editor.getJSON();
+      const textNode = json.content?.[0]?.content?.[0];
+      expect(textNode?.marks ?? []).toHaveLength(0);
+    } finally {
+      editor.destroy();
+    }
   });
 
   it("accepts an https URL and applies the mark with the required rel/target", () => {
     const editor = createHeadlessEditor();
-    editor.commands.selectAll();
+    // See the destroy() note above: must run on every path.
+    try {
+      editor.commands.selectAll();
 
-    const applied = editor.commands.setLink({ href: "https://cogni.app" });
+      const applied = editor.commands.setLink({ href: "https://cogni.app" });
 
-    expect(applied).toBe(true);
-    const html = editor.getHTML();
-    expect(html).toContain('rel="noopener noreferrer"');
-    expect(html).toContain('target="_blank"');
-    expect(html).not.toContain("nofollow");
-
-    editor.destroy();
+      expect(applied).toBe(true);
+      const html = editor.getHTML();
+      expect(html).toContain('rel="noopener noreferrer"');
+      expect(html).toContain('target="_blank"');
+      expect(html).not.toContain("nofollow");
+    } finally {
+      editor.destroy();
+    }
   });
 
   it("accepts a mailto URL", () => {
     const editor = createHeadlessEditor();
-    editor.commands.selectAll();
+    // See the destroy() note above: must run on every path.
+    try {
+      editor.commands.selectAll();
 
-    const applied = editor.commands.setLink({ href: "mailto:tu@cogni.app" });
+      const applied = editor.commands.setLink({ href: "mailto:tu@cogni.app" });
 
-    expect(applied).toBe(true);
-
-    editor.destroy();
+      expect(applied).toBe(true);
+    } finally {
+      editor.destroy();
+    }
   });
 });

@@ -12,32 +12,38 @@ describe("task list extension", () => {
       content: "<p>comprar leche</p>",
     });
 
-    editor.commands.selectAll();
-    editor.commands.toggleList("taskList", "taskItem");
+    // destroy() must run even if an assertion throws, otherwise
+    // ProseMirror's DOMObserver setTimeout flush can fire after Vitest has
+    // torn down jsdom for this file, throwing "document is not defined".
+    try {
+      editor.commands.selectAll();
+      editor.commands.toggleList("taskList", "taskItem");
 
-    // Locate the taskItem node and mark it as checked directly through a
-    // transaction, mirroring what the UI checkbox click does internally.
-    let taskItemPos = -1;
-    editor.state.doc.descendants((node, pos) => {
-      if (node.type.name === "taskItem" && taskItemPos === -1) {
-        taskItemPos = pos;
-      }
-    });
-    expect(taskItemPos).toBeGreaterThanOrEqual(0);
+      // Locate the taskItem node and mark it as checked directly through a
+      // transaction, mirroring what the UI checkbox click does internally.
+      let taskItemPos = -1;
+      editor.state.doc.descendants((node, pos) => {
+        if (node.type.name === "taskItem" && taskItemPos === -1) {
+          taskItemPos = pos;
+        }
+      });
+      expect(taskItemPos).toBeGreaterThanOrEqual(0);
 
-    editor.view.dispatch(
-      editor.state.tr.setNodeAttribute(taskItemPos, "checked", true),
-    );
+      editor.view.dispatch(
+        editor.state.tr.setNodeAttribute(taskItemPos, "checked", true),
+      );
 
-    const json = editor.getJSON();
-    const taskItemJson = json.content?.find((node) => node.type === "taskList")
-      ?.content?.[0] as
-      | { type: string; attrs?: Record<string, unknown> }
-      | undefined;
+      const json = editor.getJSON();
+      const taskItemJson = json.content?.find(
+        (node) => node.type === "taskList",
+      )?.content?.[0] as
+        | { type: string; attrs?: Record<string, unknown> }
+        | undefined;
 
-    expect(taskItemJson?.type).toBe("taskItem");
-    expect(taskItemJson?.attrs?.checked).toBe(true);
-
-    editor.destroy();
+      expect(taskItemJson?.type).toBe("taskItem");
+      expect(taskItemJson?.attrs?.checked).toBe(true);
+    } finally {
+      editor.destroy();
+    }
   });
 });

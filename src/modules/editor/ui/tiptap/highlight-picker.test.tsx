@@ -75,11 +75,16 @@ describe("HighlightPicker (smoke)", () => {
       content: "<p>hola</p>",
     });
 
-    expect(() => {
-      const { unmount } = render(<HighlightPicker editor={editor} />);
-      unmount();
-    }).not.toThrow();
-
-    editor.destroy();
+    // destroy() must run even if the assertion below throws, otherwise
+    // ProseMirror's DOMObserver setTimeout flush can fire after Vitest has
+    // torn down jsdom for this file, throwing "document is not defined".
+    try {
+      expect(() => {
+        const { unmount } = render(<HighlightPicker editor={editor} />);
+        unmount();
+      }).not.toThrow();
+    } finally {
+      editor.destroy();
+    }
   });
 });

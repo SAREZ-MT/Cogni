@@ -40,35 +40,42 @@ describe("toPlainTiptapDoc", () => {
       },
     });
 
-    const raw = editor.getJSON();
-    const rawHeadingAttrs = (raw.content?.[0] as { attrs?: object }).attrs;
-    // Sanity check: the bug actually reproduces against the real library,
-    // independent of environment (no browser needed).
-    expect(Object.getPrototypeOf(rawHeadingAttrs)).not.toBe(Object.prototype);
+    // destroy() must run even if an assertion below throws, otherwise
+    // ProseMirror's DOMObserver setTimeout flush can fire after Vitest has
+    // torn down jsdom for this file, throwing "document is not defined".
+    try {
+      const raw = editor.getJSON();
+      const rawHeadingAttrs = (raw.content?.[0] as { attrs?: object }).attrs;
+      // Sanity check: the bug actually reproduces against the real library,
+      // independent of environment (no browser needed).
+      expect(Object.getPrototypeOf(rawHeadingAttrs)).not.toBe(Object.prototype);
 
-    const plain = toPlainTiptapDoc(raw);
+      const plain = toPlainTiptapDoc(raw);
 
-    for (const node of plain.content ?? []) {
-      const attrs = (node as { attrs?: unknown }).attrs;
-      if (attrs !== undefined && attrs !== null) {
-        expect(Object.getPrototypeOf(attrs)).toBe(Object.prototype);
+      for (const node of plain.content ?? []) {
+        const attrs = (node as { attrs?: unknown }).attrs;
+        if (attrs !== undefined && attrs !== null) {
+          expect(Object.getPrototypeOf(attrs)).toBe(Object.prototype);
+        }
       }
+      expect(plain).toEqual({
+        type: "doc",
+        content: [
+          {
+            type: "heading",
+            attrs: { level: 1 },
+            content: [{ type: "text", text: "hi" }],
+          },
+          {
+            type: "codeBlock",
+            attrs: { language: null },
+            content: [{ type: "text", text: "x" }],
+          },
+        ],
+      });
+    } finally {
+      editor.destroy();
     }
-    expect(plain).toEqual({
-      type: "doc",
-      content: [
-        {
-          type: "heading",
-          attrs: { level: 1 },
-          content: [{ type: "text", text: "hi" }],
-        },
-        {
-          type: "codeBlock",
-          attrs: { language: null },
-          content: [{ type: "text", text: "x" }],
-        },
-      ],
-    });
   });
 
   // Table cells carry their own default-valued attrs (colspan, rowspan,
@@ -81,21 +88,28 @@ describe("toPlainTiptapDoc", () => {
       extensions: createEditorExtensions(),
       content: "<p></p>",
     });
-    editor.commands.insertTable({ rows: 1, cols: 1, withHeaderRow: false });
 
-    const raw = editor.getJSON();
-    const table = raw.content?.find((node) => node.type === "table") as
-      | { content?: Array<{ content?: Array<{ attrs?: object }> }> }
-      | undefined;
-    const rawCellAttrs = table?.content?.[0]?.content?.[0]?.attrs;
-    expect(Object.getPrototypeOf(rawCellAttrs)).not.toBe(Object.prototype);
+    // See the destroy() note above: must run on every path, including
+    // assertion failures, to avoid a ProseMirror timer outliving jsdom.
+    try {
+      editor.commands.insertTable({ rows: 1, cols: 1, withHeaderRow: false });
 
-    const plain = toPlainTiptapDoc(raw);
-    const plainTable = plain.content?.find((node) => node.type === "table") as
-      | { content?: Array<{ content?: Array<{ attrs?: object }> }> }
-      | undefined;
-    const plainCellAttrs = plainTable?.content?.[0]?.content?.[0]?.attrs;
-    expect(Object.getPrototypeOf(plainCellAttrs)).toBe(Object.prototype);
+      const raw = editor.getJSON();
+      const table = raw.content?.find((node) => node.type === "table") as
+        | { content?: Array<{ content?: Array<{ attrs?: object }> }> }
+        | undefined;
+      const rawCellAttrs = table?.content?.[0]?.content?.[0]?.attrs;
+      expect(Object.getPrototypeOf(rawCellAttrs)).not.toBe(Object.prototype);
+
+      const plain = toPlainTiptapDoc(raw);
+      const plainTable = plain.content?.find((node) => node.type === "table") as
+        | { content?: Array<{ content?: Array<{ attrs?: object }> }> }
+        | undefined;
+      const plainCellAttrs = plainTable?.content?.[0]?.content?.[0]?.attrs;
+      expect(Object.getPrototypeOf(plainCellAttrs)).toBe(Object.prototype);
+    } finally {
+      editor.destroy();
+    }
   });
 
   it("is a no-op for a document that is already plain JSON", () => {
