@@ -13,14 +13,16 @@ nextEnv.loadEnvConfig(process.cwd());
 //   pnpm exec playwright test tests/e2e/csp-nonce.spec.ts --config playwright.preview.config.ts
 const baseURL = process.env.PREVIEW_URL;
 if (!baseURL) {
-  throw new Error("PREVIEW_URL is required (the deployment URL to test against)");
+  throw new Error(
+    "PREVIEW_URL is required (the deployment URL to test against)",
+  );
 }
 
 // Vercel Deployment Protection: the bypass secret goes in a request header
 // and the second header asks Vercel to also set a bypass cookie for the
 // browser context, so later navigations stay authorized.
 const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
-const extraHTTPHeaders = bypassSecret
+const extraHTTPHeaders: Record<string, string> = bypassSecret
   ? {
       "x-vercel-protection-bypass": bypassSecret,
       "x-vercel-set-bypass-cookie": "true",
