@@ -1278,3 +1278,95 @@ Ninguno más allá de las desviaciones documentadas arriba, todas resueltas dent
 ### Estado
 
 Fase 6: 6.1, 6.3 y 6.5–6.20 completas (20/22 tareas; 6.2 y 6.4 son pasos manuales del usuario). Gate completo en verde (`pnpm test`, `pnpm test:db`, `pnpm typecheck`, `pnpm lint`, `pnpm depcruise`, `pnpm build`, e2e). No se creó commit de trabajo en este batch (instrucción explícita del prompt). Pendiente: los dos pasos `(usuario)` de arriba y la decisión de entrega sobre el presupuesto de revisión.
+
+## Fase 8a: Follow-ups de cierre — CSP, proxy, redirect de apex (PR8a)
+
+Strict TDD Mode: activo. Test runners: `pnpm exec vitest run <path>` (unit, jsdom) y `pnpm exec playwright test <spec>` (e2e, contra `next build && next start` real — ver `playwright.config.ts`). No se creó commit de trabajo en este batch (instrucción explícita del prompt de esta ejecución: el orquestador dividirá los commits por unidad de trabajo y correrá la revisión nativa después).
+
+Contexto adicional recibido a mitad de este batch: la URL real del proyecto `cogni-dev` es `https://www.cogni-dev.com` (canónico con `www`). No cambió la implementación — `apexRedirectTarget` en `src/proxy.ts` deriva el host canónico genéricamente de `clientEnv().NEXT_PUBLIC_SITE_URL`, nunca de un literal hardcodeado — pero confirma que el caso de prueba elegido (canónico = variante `www`, ver Deviations) coincide con el despliegue real.
+
+### Files Changed (agrupado por unidad de trabajo)
+
+**(a) Anclaje del matcher del proxy**
+
+| File | Action | What Was Done |
+|---|---|---|
+| `src/proxy.ts` | Modified | `matcher` cambia el segmento `monitoring` (sin ancla) por `monitoring(?:/|$)` dentro del grupo negativo de exclusión (Requirement "Anclaje del proxy matcher a rutas de aplicación") |
+| `tests/proxy/matcher.test.ts` | Created | Compila `config.matcher[0]` con el mismo `path-to-regexp` interno que usa Next (`next/dist/compiled/path-to-regexp`, vía `next/dist/lib/try-to-parse-path.js`), y evalúa el resultado igual que `next/dist/shared/lib/router/utils/middleware-route-matcher.js` (`new RegExp(matcher.regexp).exec(pathname)`); prueba `/monitoring`, `/monitoring/algo` (excluidas) y `/monitoring-extra` (NO excluida) |
+
+**(b) Nonce de CSP por petición + `security-headers.ts`**
+
+| File | Action | What Was Done |
+|---|---|---|
+| `src/shared/config/security-headers.ts` | Modified | Refactor de constante estática a `buildSecurityHeaders(nonce: string)`; `script-src`/`style-src` sustituyen `'unsafe-inline'` por `` `'nonce-${nonce}' 'strict-dynamic'` `` cuando hay nonce; `securityHeaders` (export estático, sin nonce) se conserva para `next.config.ts` como red de seguridad |
+| `src/shared/config/security-headers.test.ts` | Modified | Los 5 tests existentes de `securityHeaders` quedan intactos; se agregan 3 casos para `buildSecurityHeaders(nonce)`: sustitución de `'unsafe-inline'` por el nonce dado en `script-src`/`style-src`, un caso de triangulación (dos nonces distintos producen `script-src` distintos), y un caso que confirma que el resto de directivas/headers no-nonce quedan idénticas al export estático |
+| `src/proxy.ts` | Modified | Genera `const nonce = Buffer.from(crypto.randomUUID()).toString("base64")` por petición; construye `requestHeaders` con `x-nonce` y el `Content-Security-Policy` resultante, y pasa un `NextRequest` clonado con esos headers a `updateSession` (para que Next pueda parsear `'nonce-{value}'` del CSP de la propia petición durante el renderizado, según `node_modules/next/dist/docs/01-app/02-guides/content-security-policy.md`); fija el mismo CSP en la respuesta final, incluyendo las dos ramas de redirect de sesión (`withCookies`) |
+| `tests/proxy/nonce.test.ts` | Created | Mockea `updateSession` (nunca toca Supabase real); 2 casos: dos peticiones a la misma ruta producen nonces distintos en la CSP de la respuesta (Scenario "Nonce único por petición"), y el `x-nonce` visto por `updateSession` (i.e. por el renderizado) coincide con el nonce de la CSP de esa misma petición |
+| `tests/e2e/csp-nonce.spec.ts` | Created | 2 casos contra el build de producción real: la CSP de `/login` trae un nonce y no contiene `'unsafe-inline'` en `script-src`; un `<script>` sin nonce insertado en el HTML antes de que el navegador lo parsee (ver Deviations, punto 1) es bloqueado — se verifica el evento `securitypolicyviolation` y que el marcador que ese script intentaba fijar nunca se establece |
+
+**(c) Redirect del dominio apex**
+
+| File | Action | What Was Done |
+|---|---|---|
+| `src/proxy.ts` | Modified | `apexRedirectTarget` calcula el host canónico de `clientEnv().NEXT_PUBLIC_SITE_URL`; si el host de la petición difiere y ambos son la variante apex/`www` del mismo dominio (comparación simétrica quitando el prefijo `www.` de ambos lados), el proxy responde `NextResponse.redirect` 308 antes de tocar la sesión, preservando `pathname` y `search` |
+| `tests/proxy/apex-redirect.test.ts` | Created | 3 casos: apex → redirect 308 al canónico (`www`) con ruta y query string preservados (Scenario "Apex redirige al dominio canónico"); una petición ya en el host canónico NO se redirige y sigue el flujo normal de sesión; un host no relacionado (`*.vercel.app`) NO se redirige |
+
+**(d) e2e adicional + configuración**
+
+| File | Action | What Was Done |
+|---|---|---|
+| `vitest.config.ts` | Modified | `include` agrega `tests/proxy/**/*.{test,spec}.{ts,tsx}` (ver Deviations, punto 2); `tests/e2e/**` sigue excluido y `vitest.db.config.ts` sigue siendo un runner separado con su propio `include`, sin overlap |
+| `openspec/changes/phase-1-notebooks-editor/tasks.md` | Modified | 8a.1–8a.9 marcadas `[x]`, con notas en 8a.4 y 8a.9 |
+
+### TDD Cycle Evidence
+
+| Task | Test File | Layer | Safety Net | RED | GREEN | TRIANGULATE | REFACTOR |
+|------|-----------|-------|------------|-----|-------|-------------|----------|
+| 8a.1 | `tests/proxy/nonce.test.ts` | Unit | ✅ `pnpm exec vitest run src/shared/config/security-headers.test.ts` 5/5 antes de tocar el archivo (proxy.ts no tenía test co-ubicado que tocara nonces) | ✅ Escrito antes de tocar `src/proxy.ts`/`security-headers.ts`: ambos casos fallan (`expected undefined to be defined`, sin CSP en la respuesta) | ✅ 2/2 en verde tras implementar | ✅ 2 casos (nonces distintos entre peticiones; coherencia `x-nonce` ↔ CSP dentro de la misma petición) | — (proxy.ts se refactorizó en el mismo cambio que lo puso en verde; sin paso de refactor posterior) |
+| 8a.2 | `src/shared/config/security-headers.test.ts` | Unit | ✅ 5/5 tests estáticos existentes, corridos antes de refactorizar el archivo | Implementación (no marcada RED en tasks.md); los 3 casos nuevos de `buildSecurityHeaders` se escribieron junto con la función y pasaron en la primera corrida | ✅ 8/8 en verde (5 existentes + 3 nuevos) | ✅ Caso explícito de triangulación (dos nonces → dos `script-src` distintos) | ✅ `pnpm exec biome check --write` (solo formato: envolturas de línea) |
+| 8a.3 | `tests/proxy/nonce.test.ts` (segundo caso) | Unit | Ver 8a.1 | ✅ Mismo RED que 8a.1 (el caso de `x-nonce` visto por `updateSession`) | ✅ Verde tras implementar | ➖ Cubierto por el mismo caso | — |
+| 8a.4 | `tests/e2e/csp-nonce.spec.ts` | E2E | N/A (archivo nuevo) | ✅ Escrito antes de correrlo contra el build; primera corrida del segundo caso falló (ver Deviations, punto 1: `page.evaluate()` no está sujeto a CSP) | ✅ 2/2 en verde tras corregir el mecanismo de inyección (intercepción de la respuesta real vía `page.route`) | ➖ Un solo escenario del Requirement | — |
+| 8a.5/8a.6 | `tests/proxy/matcher.test.ts` | Unit | ✅ `src/proxy.test.ts` (test co-ubicado preexistente) 4/4 en verde antes de tocar `src/proxy.ts` | ✅ Escrito antes de anclar el `matcher`: el caso `/monitoring-extra` falla (`expected false to be true`, la ruta quedaba excluida por error) | ✅ 2/2 en verde tras anclar `monitoring(?:/|$)` | ✅ 2 casos (excluidas: `/monitoring`, `/monitoring/algo`; no excluida: `/monitoring-extra`) | — |
+| 8a.7/8a.8 | `tests/proxy/apex-redirect.test.ts` | Unit | Ver 8a.1 (mismo archivo `src/proxy.ts`) | ✅ Escrito antes de implementar el redirect: el caso de redirect real falla (`updateSession` se invoca, cuando no debería) | ✅ 3/3 en verde tras implementar `apexRedirectTarget` | ✅ 3 casos (redirect apex→canónico; canónico sin redirect; host no relacionado sin redirect) | — |
+
+### Test Summary
+
+- **Total tests escritos en este batch**: 15 (7 en `tests/proxy/`, 3 nuevos en `security-headers.test.ts`, 2 en `tests/e2e/csp-nonce.spec.ts`, más los 3 existentes de `src/proxy.test.ts` verificados como red de seguridad — no reescritos)
+- **Total tests en verde**: 15/15 nuevos; suite completa `pnpm exec vitest run` → 70 archivos / 311 tests en verde (antes de este batch: 66/281 según Fase 6)
+- **Layers usadas**: Unit (13), E2E (2)
+- **Approval tests** (refactoring): Ninguno — `security-headers.ts` se reescribió como una función parametrizada, no una refactorización de comportamiento externo (el export estático conserva byte a byte el mismo resultado, cubierto por los 5 tests preexistentes sin modificar)
+- **Pure functions creadas**: `bareHost`, `apexRedirectTarget`, `scriptSrc`, `styleSrc`, `buildContentSecurityPolicy`, `buildHeaders`, `buildSecurityHeaders` (todas sin efectos secundarios; `apexRedirectTarget` solo lee `clientEnv()`, no muta nada)
+
+### Work Unit Evidence
+
+| Evidencia | Valor |
+|---|---|
+| Comando de test enfocado y resultado exacto | `pnpm exec vitest run proxy` → 4 archivos / 11 tests en verde (nota: el comando literal del gate `pnpm test -- proxy` no filtra — ver Deviations, punto 3 — y corre la suite completa: 70 archivos / 311 tests en verde, que también incluye estos 11); `pnpm exec vitest run src/shared/config/security-headers.test.ts` → 8/8 en verde |
+| Comando/escenario de runtime y resultado exacto | `pnpm exec tsc --noEmit` limpio; `pnpm lint` (biome check) limpio tras `pnpm exec biome check --write` sobre los archivos tocados (solo diffs de formato); `pnpm depcruise` sin violaciones (281 módulos, 739 dependencias); `pnpm build` (build real de Next con `.env.local`, migración de DB correctamente omitida por `VERCEL_ENV` no productivo) exitoso; `pnpm exec playwright test tests/e2e/csp-nonce.spec.ts` → 2/2 en verde contra `next build && next start` real; smoke adicional `pnpm exec playwright test tests/e2e/shell-empty-state.spec.ts tests/e2e/editor-a11y.spec.ts` → 10/10 en verde (confirma que `style-src` con nonce no rompe Tailwind, el menú "/" de cmdk ni el layout del shell) |
+| Rollback boundary | Revertir esta fase: eliminar `tests/proxy/` y `tests/e2e/csp-nonce.spec.ts` (archivos nuevos); revertir las ediciones de `src/proxy.ts`, `src/shared/config/security-headers.ts`, `src/shared/config/security-headers.test.ts` y `vitest.config.ts`. `src/proxy.test.ts` (preexistente) no se tocó. Ningún archivo de las fases 0–6 se tocó fuera de este alcance. |
+
+### Deviations from Design
+
+1. **El segundo caso de `tests/e2e/csp-nonce.spec.ts` no inyecta el script sin nonce vía `page.evaluate()`.** Diseño intuitivo inicial: crear el elemento `<script>` con `document.createElement`/`appendChild` dentro de `page.evaluate()`. Falló en la primera corrida real: el script se ejecutó igual, porque `page.evaluate()` corre a través del DevTools Protocol (`Runtime.evaluate`), que Chromium trata como un contexto de ejecución confiable — un elemento creado ahí no pasa por el mismo análisis de "¿quién lo insertó?" que usa `'strict-dynamic'`, así que el navegador no lo bloquea aunque el CSP real (verificado con `curl`, ver más abajo) sí tenía el nonce correcto y ningún `'unsafe-inline'`. Corrección: el test ahora intercepta la respuesta real de `/login` con `page.route` (`route.fetch()` conserva los headers reales, incluido el CSP con el nonce real de esa petición), le agrega un `<script>` sin nonce al HTML antes de `</body>`, y sirve ese HTML modificado con `route.fulfill`. Al ser HTML parseado genuinamente por el navegador (script insertado por el parser, no por un script ya confiado), `'strict-dynamic'` no lo exime de necesitar el nonce, y el navegador lo bloquea como corresponde. Verificado independientemente con `curl -D -` contra el build real: un único header `Content-Security-Policy`, con el nonce y sin `'unsafe-inline'` en `script-src`/`style-src`.
+2. **`vitest.config.ts` agrega `tests/proxy/**/*.{test,spec}.{ts,tsx}` a `include`.** Autorizado explícitamente por el prompt de este batch: los tests 8a.1/8a.6/8a.8 de tasks.md nombran rutas bajo `tests/proxy/`, fuera del `include` original (`src/**/*.{test,spec}.{ts,tsx}`). `tests/e2e/**` se mantiene excluido (Playwright-only) y `vitest.db.config.ts` sigue siendo un runner separado con su propio `include`, sin overlap.
+3. **`pnpm test -- proxy` (comando literal del gate 8a.9) no filtra por nombre de archivo**: corre la suite completa (70/311 en verde) en vez de solo los archivos que contienen "proxy" en la ruta. Es un artefacto de cómo pnpm reenvía argumentos al script `vitest run` (aparece como `vitest run -- proxy` en la salida, y vitest no toma "proxy" como patrón de archivo después de ese `--`). El comando equivalente que sí filtra es `pnpm exec vitest run proxy` (4 archivos / 11 tests en verde, incluye los 3 nuevos de `tests/proxy/` más `src/proxy.test.ts` preexistente). No es una regresión introducida por este batch — no se investigó más por estar fuera de alcance — pero se documenta porque el resultado del comando literal solicitado no es el filtrado que su nombre sugiere.
+4. **`style-src` sí adopta `'nonce-${nonce}' 'strict-dynamic'` en producción, sin caer de vuelta a `'unsafe-inline'`.** El Requirement "Nonces de CSP" solo exige `MUST NOT` usar `'unsafe-inline'` para *scripts*; `design.md` pedía la misma sustitución también para `style-src` como decisión más estricta, con la instrucción explícita de este batch de verificar contra un build real y documentar una desviación si rompía Tailwind o atributos de estilo en línea. Se verificó: `pnpm exec playwright test tests/e2e/shell-empty-state.spec.ts tests/e2e/editor-a11y.spec.ts` (10/10 en verde, incluye aserciones `toHaveCSS` sobre colores/anchos reales del shell público y autenticado, y el menú "/" de `cmdk`, que posiciona vía estilos en línea) no mostró ninguna ruptura. No fue necesario ningún fallback: se implementó tal como lo pedía `design.md`, sin desviación.
+
+### Issues Found
+
+Ninguno más allá de las desviaciones documentadas arriba, todas resueltas dentro de este mismo batch.
+
+### Impacto en el presupuesto de revisión (400 líneas)
+
+`git diff --numstat` de los archivos trackeados modificados en este batch: **206 líneas agregadas / 48 eliminadas** (`tasks.md` 9/9, `src/proxy.ts` 63/6, `security-headers.test.ts` 62/1, `security-headers.ts` 68/31, `vitest.config.ts` 4/1). Los 4 archivos nuevos (no trackeados) suman **285 líneas** (`tests/proxy/nonce.test.ts` 73, `tests/proxy/matcher.test.ts` 51, `tests/proxy/apex-redirect.test.ts` 80, `tests/e2e/csp-nonce.spec.ts` 81). **Total de autoría de este batch ≈ 539 líneas**, por encima tanto del pronóstico inicial (~200–280 líneas) como del presupuesto de ~400.
+
+`delivery_strategy: auto-chain`, `chain_strategy: stacked-to-main` ya estaban resueltos antes de este batch, y el prompt delimitó "Phase 8a" completa como una sola unidad entregable (PR8a), agrupando explícitamente los "Files Changed" de arriba en 4 unidades de trabajo — (a) anclaje del matcher, (b) nonce de CSP + `security-headers.ts`, (c) redirect de apex, (d) e2e + configuración — "para que el orquestador pueda dividir los commits". No se dividió el trabajo en múltiples PRs dentro de este batch: ese es el criterio explícito que el prompt delegó al orquestador. **Queda pendiente para el orquestador**: decidir si PR8a sale como una sola PR con `size:exception` (~539 líneas) o si las 4 unidades de trabajo (a)–(d) se convierten en commits/PRs encadenados separados dentro del mismo `chain_strategy: stacked-to-main` ya elegido.
+
+### Pendiente — `(usuario)`
+
+- [ ] 8a.4 `(usuario)`: correr `tests/e2e/csp-nonce.spec.ts` contra un despliegue de preview real de Vercel (el tasks.md original pedía "ajustar hasta que el escenario se cumpla contra preview"). Este batch lo verificó en verde contra `next build && next start` local (producción real, mismo binario que preview), pero no contra una URL de preview desplegada — no hay acceso a Vercel desde este entorno de ejecución.
+- [ ] Decisión de entrega pendiente: confirmar si PR8a se entrega como una sola PR con `size:exception` (~539 líneas de autoría) o se divide en las 4 unidades de trabajo (a)–(d) listadas arriba, dentro de `chain_strategy: stacked-to-main` (ver "Impacto en el presupuesto de revisión").
+
+### Estado
+
+Fase 8a: 8a.1–8a.9 completas (9/9 tareas `[x]` en `tasks.md`). Gate en verde: `pnpm exec vitest run` (70/311), `pnpm exec vitest run proxy` (4/11), `pnpm exec tsc --noEmit`, `pnpm lint`, `pnpm depcruise`, `pnpm build`, `pnpm exec playwright test tests/e2e/csp-nonce.spec.ts` (2/2) más smoke adicional de `shell-empty-state`/`editor-a11y` (10/10). No se creó commit de trabajo en este batch (instrucción explícita del prompt). Pendiente: la corrida de 8a.4 contra un preview real `(usuario)`, y la decisión de entrega sobre el presupuesto de revisión (~539 líneas, por encima de los ~400).
