@@ -1,7 +1,8 @@
 import "server-only";
+import * as Sentry from "@sentry/nextjs";
 import { getDb } from "@/shared/db/client";
 import { systemClock } from "@/shared/kernel/clock";
-import { ensureProfile } from "./application";
+import { ensureProfileResilient } from "./application";
 import {
   createSupabaseServerClient,
   DrizzleProfileRepository,
@@ -24,17 +25,28 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
 
 // First authenticated request of a session: creates the profiles row if
 // missing. Idempotent, so it is safe to call from the (app) layout.
+// Resilient to one transient repository failure (retries once, then
+// degrades to a Sentry report instead of blocking the shell — see
+// ensureProfileResilient in application/).
 export async function ensureProfileForUser(ownerId: string): Promise<void> {
-  const result = await ensureProfile(
+  await ensureProfileResilient(
     { ownerId },
-    { profiles: new DrizzleProfileRepository(getDb()), clock: systemClock },
+    {
+      profiles: new DrizzleProfileRepository(getDb()),
+      clock: systemClock,
+      onTransientFailure: (error) => Sentry.captureException(error),
+    },
   );
-  if (!result.ok) throw result.error;
 }
 
 // OAuth and email-link callback: trades the PKCE code for session cookies.
-export async function exchangeCodeForSession(code: string): Promise<boolean> {
+// Returns the userId from the response instead of the boolean the caller
+// used to get, so a Google sign-in callback can emit `user_signed_in`
+// without a second auth query (same discipline as `signInAction`).
+export async function exchangeCodeForSession(
+  code: string,
+): Promise<{ ok: boolean; userId: string | null }> {
   const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.auth.exchangeCodeForSession(code);
-  return !error;
+  const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+  return { ok: !error, userId: data.user?.id ?? null };
 }

@@ -1,5 +1,9 @@
 export { PASSWORD_MIN_LENGTH } from "./credentials-schema";
 export { type EnsureProfileDeps, ensureProfile } from "./ensure-profile";
+export {
+  type EnsureProfileResilientDeps,
+  ensureProfileResilient,
+} from "./ensure-profile-resilient";
 export { getProfile } from "./get-profile";
 export {
   RESET_PASSWORD_PATH,

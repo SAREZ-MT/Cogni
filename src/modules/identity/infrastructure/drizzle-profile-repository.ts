@@ -26,8 +26,19 @@ export class DrizzleProfileRepository implements ProfileRepository {
     return row ? toProfile(row) : null;
   }
 
-  // Insert-or-ignore keeps EnsureProfile idempotent under concurrent
-  // first requests (two tabs after verification).
+  /**
+   * Insert-or-ignore (`onConflictDoNothing`), not upsert-and-overwrite.
+   *
+   * Two deliberate reasons, both required by
+   * specs/identity-auth/spec.md ("Autorización por propiedad en la capa
+   * de aplicación", "Upsert no sobrescribe campos existentes"):
+   * - it keeps `EnsureProfile` idempotent under concurrent first requests
+   *   (two tabs finishing verification at the same time);
+   * - it never overwrites a `display_name`/`locale`/`timezone` the user
+   *   already personalized with the defaults `createProfile` fills in on
+   *   every repeated call. `onConflictDoUpdate` would silently discard
+   *   that personalization on every subsequent sign-in.
+   */
   async upsert(profile: Profile): Promise<void> {
     await this.db
       .insert(profiles)
