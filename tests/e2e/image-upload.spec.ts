@@ -197,4 +197,39 @@ test.describe("image upload pipeline", () => {
       .where(eq(pageAssets.storagePath, storagePath));
     expect(row).toBeUndefined();
   });
+
+  // specs/page-assets/spec.md, "Subida que excede el límite del bucket
+  // rechazada (e2e)": the same scenario covers an object "de 11 MB o de
+  // otro tipo". The app's own upload pipeline (image-node.tsx's
+  // validateClientSide, mirroring the server's authoritative allow-list)
+  // rejects a disallowed MIME before ever requesting an upload grant.
+  test("a disallowed MIME type is rejected by the app's own upload pipeline and no row is persisted (Scenario: Subida que excede el límite del bucket rechazada)", async ({
+    page,
+  }) => {
+    const { editorMount, pageId } = await createNotebookAndPage(page);
+    const editable = editorMount.locator('[contenteditable="true"]');
+    await editable.click();
+    await page.keyboard.type("/imagen");
+    await expect(page.getByTestId("command-menu")).toBeVisible();
+    await page.keyboard.press("Enter");
+
+    const fileInput = editorMount.getByTestId("image-node-input");
+    await fileInput.setInputFiles({
+      name: "documento.pdf",
+      mimeType: "application/pdf",
+      buffer: Buffer.from("%PDF-1.4\n%%EOF"),
+    });
+
+    await expect(editorMount.getByTestId("image-node-error")).toHaveText(
+      "Ese tipo de archivo no está permitido.",
+    );
+    await expect(editorMount.getByTestId("image-node-img")).toHaveCount(0);
+
+    const db = createTestDb();
+    const rows = await db
+      .select()
+      .from(pageAssets)
+      .where(eq(pageAssets.pageId, pageId as string));
+    expect(rows).toHaveLength(0);
+  });
 });

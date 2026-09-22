@@ -16,7 +16,20 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  // Always 1, in CI and locally: the webServer above is a single `next
+  // start` process, and its Postgres client is created with `max: 1`
+  // (src/shared/db/client.ts), so more than one worker hitting it at once
+  // starves that one connection and tests fail non-deterministically.
+  workers: 1,
+  // Every authenticated flow talks to the real cogni-dev Supabase project
+  // over the network, and the acceptance flows chain several Server
+  // Actions and reloads (or an 11 MB upload). Playwright's default 30 s
+  // per test is too tight for them on a home connection.
+  timeout: 60_000,
+  // Same reason for the assertion timeout: a Server Action's effect (a new
+  // sidebar item, an autosave status) can take more than the default 5 s
+  // to show up when the single Postgres connection is busy.
+  expect: { timeout: 10_000 },
   reporter: "list",
   use: {
     baseURL,

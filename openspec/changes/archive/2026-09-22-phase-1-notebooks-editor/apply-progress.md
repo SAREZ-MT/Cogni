@@ -1492,3 +1492,51 @@ Strict TDD Mode: activo. Test runners: `pnpm exec vitest run <path>` (unit/compo
 ### Estado
 
 Fase 8b: 8b.1–8b.12 completas, incluyendo 8b.11b (13/13 ítems `[x]` en `tasks.md`, contando 8b.11b). Gate en verde: `pnpm exec vitest run` (75/325), `pnpm exec vitest run identity` (13/43), `pnpm exec tsc --noEmit`, `pnpm lint`, `pnpm depcruise` (286 módulos, 760 dependencias, sin violaciones), `pnpm build`, `pnpm exec playwright test tests/e2e/auth.spec.ts` (8/8 en verde contra Supabase real, sin fallos ambientales esta vez). No se creó commit de trabajo en este batch (instrucción explícita del prompt): el orquestador decidirá la división en PRs encadenados y correrá la revisión nativa después. Ningún ítem quedó pendiente `(usuario)` en este batch.
+
+---
+
+## Batch: Fase 9 — Cierre de fase (9.1, 9.2) — 2026-09-22
+
+Rama `chore/phase-1-close` sobre `main` aa4fc2c (PR8b #26/#27 ya fusionadas). Fase 7 queda pendiente por decisión del usuario (documentación, diagramas y reconciliación de specs se difieren); las tareas `(usuario)` 0.6, 0.7, 6.2 y 6.4 siguen abiertas. Ejecutado por el orquestador con un writer genérico acotado (el dispatch de `sdd-apply` está bloqueado en Claude Code); el writer entregó typecheck y lint en verde y luego se detuvo, por lo que el orquestador verificó el diff completo y corrió las gates por su cuenta.
+
+### Files Changed (agrupado por unidad de trabajo)
+
+| Unidad | Archivo | Cambio |
+|---|---|---|
+| (a) harness e2e | `playwright.config.ts` | `workers: 1` incondicional, `timeout: 60_000`, `expect.timeout: 10_000`, con comentarios que explican la causa (único `next start`, cliente Postgres `max: 1`, base remota) |
+| (b) cobertura 9.1 | `tests/e2e/notebooks-acceptance.spec.ts` | nuevo test "writes the remaining block families (H2/H3, ordered list, divider, callouts, highlight, inline marks), saves and survives a reload"; dos localizadores de "Sin título" acotados al `listitem` de su cuaderno |
+| (b) cobertura 9.1 | `tests/e2e/image-upload.spec.ts` | nuevo test "a disallowed MIME type is rejected by the app's own upload pipeline and no row is persisted" (capa 1, `application/pdf` por el input del bloque de imagen, sin fila en `page_assets`) |
+| (c) artefactos | `tasks.md`, `apply-progress.md` | 9.1 y 9.2 marcadas con su evidencia |
+
+### TDD Cycle Evidence
+
+- Los tests nuevos cubren comportamiento ya implementado: RED se obtuvo por comprobación de mutación (aserción invertida a propósito, fallo observado, aserción restaurada) durante la escritura; el orquestador releyó el diff completo para confirmar que no quedó ninguna aserción invertida.
+- El test de familias de bloques falló una vez en RED real por el selector del resaltado (`mark[data-color="green"]` no encontrado) y se corrigió leyendo `highlight-picker-controls.tsx`; el resaltado se aplica por el menú de selección, no por atajo.
+- La marca de enlace queda fuera: la app no ofrece diálogo, botón ni atajo que invoque `setLink()` (`extensions/index.ts`), así que no es alcanzable end-to-end. Follow-up de producto.
+
+### Test Summary
+
+- **Tests nuevos**: 2 e2e (32 en total en la suite, antes 30).
+- **Corridas completas de `pnpm test:e2e` (1 worker)**: 1ª 29/30 (11 MB, timeout 30 s); 2ª 31/32 (sidebar, timeout 30 s); 3ª 31/32 (`/cita`, efecto no visible en 5 s); 4ª **32/32 en 5,7 min** con la configuración final. Con 6 workers (default anterior en local) la suite daba 10/30 fallos por contención.
+
+### Work Unit Evidence
+
+| Evidencia | Valor |
+|---|---|
+| Comando de test enfocado y resultado exacto | `pnpm test:e2e tests/e2e/notebooks-acceptance.spec.ts tests/e2e/image-upload.spec.ts tests/e2e/slash-command.spec.ts` → 11/12 (localizador sin acotar), luego suite completa 32/32 |
+| Gates 9.2 en local | `pnpm test` 75/325; `pnpm test:db` 8/14 (con `DATABASE_URL` exportada); `pnpm typecheck` limpio; `pnpm lint` limpio; `pnpm depcruise` 286 módulos / 760 dependencias sin violaciones; `pnpm audit --audit-level=high` exit 0 (1 moderada); `pnpm test:e2e` 32/32 |
+| Rollback boundary | (a) revertir `playwright.config.ts`; (b) revertir los dos specs; ningún archivo de `src/` se tocó |
+
+### Issues Found
+
+1. **Contención local con varios workers** (harness, no producto): `src/shared/db/client.ts` abre una sola conexión por diseño serverless; con 6 workers contra un solo `next start` las Server Actions se serializan y los `expect` vencen. Resuelto con `workers: 1`.
+2. **Localizadores sin acotar en `notebooks-acceptance.spec.ts`** (latente): `sidebar.getByRole("link", { name: "Sin título" })` resolvía a varias páginas cuando el usuario del worker acumulaba cuadernos de specs anteriores; antes no se veía porque un fallo previo reiniciaba el worker. Corregido.
+3. **Avisos `MaxListenersExceededWarning` (11 close listeners en `ServerResponse`) y algún "The destination stream closed early" en `next start` durante corridas largas.** No afectan el resultado; posible follow-up (Sentry/Next internals), fuera del alcance del cierre.
+
+### Impacto en el presupuesto de revisión (400 líneas)
+
+`git diff --numstat` sobre `main`: `playwright.config.ts` ~16, `notebooks-acceptance.spec.ts` ~183, `image-upload.spec.ts` ~35, `tasks.md` ~2, `apply-progress.md` este bloque. **≈ 240 líneas de código y config**, dentro del presupuesto; una sola PR (`delivery_strategy: auto-chain`, `chain_strategy: stacked-to-main`).
+
+### Estado
+
+Fase 9: 9.1 y 9.2 completas en su mitad local; 9.2 conserva la mitad `(usuario)` de confirmar CI en verde en GitHub. 9.3 (`sdd-archive`) se ejecuta a continuación en esta misma rama. Pendientes que el archive registrará como no completados: Fase 7 (7.1–7.4) y las tareas `(usuario)` 0.6, 0.7, 6.2, 6.4.
