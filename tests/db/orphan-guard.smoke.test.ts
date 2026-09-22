@@ -26,12 +26,18 @@ describe.skipIf(!url)("0002 orphan-delete guard", () => {
   it("rejects deleting orphan profiles when auth.users is empty", async () => {
     const sql = postgres(url as string, { prepare: false, max: 1 });
     const orphanId = randomUUID();
+    const [before] = await sql`select count(*)::int as n from auth.users`;
 
     await sql
       .begin(async (tx) => {
         await tx.unsafe(
           "alter table profiles drop constraint profiles_id_fkey",
         );
+        // The guard fires only when auth.users is empty. cogni-dev is
+        // shared and an interrupted e2e run can leave a fixture user
+        // behind, so the precondition is created inside this transaction
+        // (rolled back below) instead of assumed from the environment.
+        await tx`delete from auth.users`;
         await tx`insert into profiles (id) values (${orphanId})`;
         await expect(tx.unsafe(extractGuardSql())).rejects.toMatchObject({
           code: "P0001",
@@ -47,6 +53,10 @@ describe.skipIf(!url)("0002 orphan-delete guard", () => {
     expect(c).toBeDefined();
     const [orphan] = await sql`select 1 from profiles where id = ${orphanId}`;
     expect(orphan).toBeUndefined();
+    // The delete above must never leak past the rollback into the shared
+    // dev database.
+    const [after] = await sql`select count(*)::int as n from auth.users`;
+    expect(after?.n).toBe(before?.n);
     await sql.end();
   });
 });
