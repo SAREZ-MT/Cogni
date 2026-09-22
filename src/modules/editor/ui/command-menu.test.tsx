@@ -89,4 +89,43 @@ describe("CommandMenu", () => {
       expect.objectContaining({ id: "paragraph" }),
     );
   });
+
+  // PR5b finding (flagged as advisory in PR3b): cmdk's own CommandItem
+  // recomputes `data-selected` from its internal pointer/value state after
+  // rendering, always overwriting a consumer-supplied `data-selected` prop
+  // (node_modules/cmdk/dist/index.mjs spreads `...props` before setting its
+  // own `data-selected`). The visual highlight therefore never followed
+  // ArrowDown navigation.
+  it("visually highlights the item selected by ArrowDown, not only the initial one", () => {
+    const onSelect = vi.fn();
+    const onClose = vi.fn();
+    render(
+      <CommandMenu
+        items={ITEMS}
+        query=""
+        onSelect={onSelect}
+        onClose={onClose}
+      />,
+    );
+
+    expect(screen.getByText("encabezado 1")).toHaveAttribute(
+      "data-selected",
+      "true",
+    );
+    expect(screen.getByText("párrafo")).toHaveAttribute(
+      "data-selected",
+      "false",
+    );
+
+    fireEvent.keyDown(window, { key: "ArrowDown" });
+
+    expect(screen.getByText("párrafo")).toHaveAttribute(
+      "data-selected",
+      "true",
+    );
+    expect(screen.getByText("encabezado 1")).toHaveAttribute(
+      "data-selected",
+      "false",
+    );
+  });
 });

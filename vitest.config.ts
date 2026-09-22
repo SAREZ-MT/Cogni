@@ -15,6 +15,7 @@ export default defineConfig({
     include: [
       "src/**/*.{test,spec}.{ts,tsx}",
       "tests/proxy/**/*.{test,spec}.{ts,tsx}",
+      "tests/identity/**/*.{test,spec}.{ts,tsx}",
     ],
     exclude: ["node_modules", "tests/e2e/**", ".next/**"],
     coverage: {

@@ -109,18 +109,28 @@ export function CommandMenu({
     <Command
       data-testid="command-menu"
       className="w-64 rounded-lg border border-border bg-popover shadow-lg"
+      // cmdk recomputes `data-selected` on its Item from this controlled
+      // value, always overwriting a plain `data-selected` prop passed
+      // straight to CommandItem — that was the bug (PR5b finding, flagged
+      // as advisory in PR3b): the highlight never followed ArrowDown.
+      // Driving cmdk's own selection API keeps keyboard and mouse
+      // (onValueChange fires on pointer move too) in sync with one state.
+      value={filtered[selectedIndex]?.id}
+      onValueChange={(value) => {
+        const index = filtered.findIndex((item) => item.id === value);
+        if (index !== -1) setSelectedIndex(index);
+      }}
     >
       <CommandList>
         {filtered.length === 0 ? (
           <CommandEmpty>no se encontraron bloques</CommandEmpty>
         ) : (
           <CommandGroup heading="bloques">
-            {filtered.map((item, index) => (
+            {filtered.map((item) => (
               <CommandItem
                 key={item.id}
-                data-selected={index === selectedIndex}
+                value={item.id}
                 onSelect={() => onSelect(item)}
-                onMouseEnter={() => setSelectedIndex(index)}
               >
                 {item.label}
               </CommandItem>
