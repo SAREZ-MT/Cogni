@@ -29,34 +29,42 @@ function findTable(json: { content?: unknown[] }): TableNodeJSON | undefined {
 describe("table extension", () => {
   it("inserts a 2x2 table with a header row", () => {
     const editor = createHeadlessEditor();
-    editor.commands.insertTable({ rows: 2, cols: 2, withHeaderRow: true });
+    // destroy() must run even if an assertion throws, otherwise
+    // ProseMirror's DOMObserver setTimeout flush can fire after Vitest has
+    // torn down jsdom for this file, throwing "document is not defined".
+    try {
+      editor.commands.insertTable({ rows: 2, cols: 2, withHeaderRow: true });
 
-    const table = findTable(editor.getJSON());
-    expect(table).toBeDefined();
-    expect(table?.content).toHaveLength(2);
-    expect(table?.content?.[0].content).toHaveLength(2);
-
-    editor.destroy();
+      const table = findTable(editor.getJSON());
+      expect(table).toBeDefined();
+      expect(table?.content).toHaveLength(2);
+      expect(table?.content?.[0].content).toHaveLength(2);
+    } finally {
+      editor.destroy();
+    }
   });
 
   it("adds a row and a column, then types in a cell and keeps the new dimensions and text after serializing", () => {
     const editor = createHeadlessEditor();
-    editor.commands.insertTable({ rows: 2, cols: 2, withHeaderRow: false });
+    // See the destroy() note above: must run on every path.
+    try {
+      editor.commands.insertTable({ rows: 2, cols: 2, withHeaderRow: false });
 
-    // Place the cursor in the first cell before growing the table.
-    editor.commands.setTextSelection(4);
-    editor.commands.addRowAfter();
-    editor.commands.addColumnAfter();
-    editor.commands.insertContent("hola");
+      // Place the cursor in the first cell before growing the table.
+      editor.commands.setTextSelection(4);
+      editor.commands.addRowAfter();
+      editor.commands.addColumnAfter();
+      editor.commands.insertContent("hola");
 
-    const json = editor.getJSON();
-    const table = findTable(json);
-    expect(table?.content).toHaveLength(3);
-    expect(table?.content?.[0].content).toHaveLength(3);
+      const json = editor.getJSON();
+      const table = findTable(json);
+      expect(table?.content).toHaveLength(3);
+      expect(table?.content?.[0].content).toHaveLength(3);
 
-    const serializedText = JSON.stringify(json);
-    expect(serializedText).toContain("hola");
-
-    editor.destroy();
+      const serializedText = JSON.stringify(json);
+      expect(serializedText).toContain("hola");
+    } finally {
+      editor.destroy();
+    }
   });
 });

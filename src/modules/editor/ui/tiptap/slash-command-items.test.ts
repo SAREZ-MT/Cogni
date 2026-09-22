@@ -25,11 +25,17 @@ describe("SLASH_COMMAND_ITEMS", () => {
     expect(item.label).toBe("tabla");
 
     const editor = createHeadlessEditor();
-    item.run(editor, { from: 1, to: 1 });
+    // destroy() must run even if an assertion throws, otherwise
+    // ProseMirror's DOMObserver setTimeout flush can fire after Vitest has
+    // torn down jsdom for this file, throwing "document is not defined".
+    try {
+      item.run(editor, { from: 1, to: 1 });
 
-    const json = editor.getJSON();
-    expect(json.content?.some((node) => node.type === "table")).toBe(true);
-    editor.destroy();
+      const json = editor.getJSON();
+      expect(json.content?.some((node) => node.type === "table")).toBe(true);
+    } finally {
+      editor.destroy();
+    }
   });
 
   it("includes the three callout kinds with Spanish labels", () => {
@@ -41,11 +47,15 @@ describe("SLASH_COMMAND_ITEMS", () => {
     expect(warning.label).toBe("callout de advertencia");
 
     const editor = createHeadlessEditor();
-    warning.run(editor, { from: 1, to: 1 });
+    // See the destroy() note above: must run on every path.
+    try {
+      warning.run(editor, { from: 1, to: 1 });
 
-    const json = editor.getJSON();
-    const callout = json.content?.find((node) => node.type === "callout");
-    expect(callout?.attrs).toEqual({ kind: "warning" });
-    editor.destroy();
+      const json = editor.getJSON();
+      const callout = json.content?.find((node) => node.type === "callout");
+      expect(callout?.attrs).toEqual({ kind: "warning" });
+    } finally {
+      editor.destroy();
+    }
   });
 });

@@ -17,42 +17,53 @@ function createHeadlessEditor() {
 describe("CogniHighlight", () => {
   it("stores the palette color name, not a hex code, when applied", () => {
     const editor = createHeadlessEditor();
-    editor.commands.selectAll();
-    const applied = editor.commands.setHighlight({ color: "purple" });
+    // destroy() must run even if an assertion throws, otherwise
+    // ProseMirror's DOMObserver setTimeout flush can fire after Vitest has
+    // torn down jsdom for this file, throwing "document is not defined".
+    try {
+      editor.commands.selectAll();
+      const applied = editor.commands.setHighlight({ color: "purple" });
 
-    expect(applied).toBe(true);
-    const json = editor.getJSON();
-    const paragraph = json.content?.[0];
-    const mark = paragraph?.content?.[0]?.marks?.find(
-      (m) => m.type === "highlight",
-    );
-    expect(mark?.attrs).toEqual({ color: "purple" });
-
-    editor.destroy();
+      expect(applied).toBe(true);
+      const json = editor.getJSON();
+      const paragraph = json.content?.[0];
+      const mark = paragraph?.content?.[0]?.marks?.find(
+        (m) => m.type === "highlight",
+      );
+      expect(mark?.attrs).toEqual({ color: "purple" });
+    } finally {
+      editor.destroy();
+    }
   });
 
   it("renders the purple/purple-fg design tokens, never a hex value", () => {
     const editor = createHeadlessEditor();
-    editor.commands.selectAll();
-    editor.commands.setHighlight({ color: "purple" });
+    // See the destroy() note above: must run on every path.
+    try {
+      editor.commands.selectAll();
+      editor.commands.setHighlight({ color: "purple" });
 
-    const html = editor.getHTML();
-    expect(html).toContain("bg-pastel-purple");
-    expect(html).toContain("text-pastel-purple-fg");
-    expect(html).not.toMatch(/#[0-9a-f]{3,6}/i);
-
-    editor.destroy();
+      const html = editor.getHTML();
+      expect(html).toContain("bg-pastel-purple");
+      expect(html).toContain("text-pastel-purple-fg");
+      expect(html).not.toMatch(/#[0-9a-f]{3,6}/i);
+    } finally {
+      editor.destroy();
+    }
   });
 
   it("rejects an unknown color name instead of storing it", () => {
     const editor = createHeadlessEditor();
-    editor.commands.selectAll();
-    editor.commands.setHighlight({ color: "crimson" });
+    // See the destroy() note above: must run on every path.
+    try {
+      editor.commands.selectAll();
+      editor.commands.setHighlight({ color: "crimson" });
 
-    const html = editor.getHTML();
-    expect(html).not.toContain("data-color");
-
-    editor.destroy();
+      const html = editor.getHTML();
+      expect(html).not.toContain("data-color");
+    } finally {
+      editor.destroy();
+    }
   });
 
   // PR5a review advisory: `parseHTML` MUST also reject an unrecognized
@@ -60,14 +71,19 @@ describe("CogniHighlight", () => {
   // the `setHighlight` command path covered above.
   it("rejects an unknown color name when parsed from HTML", () => {
     const editor = createHeadlessEditor();
-    editor.commands.setContent('<p><mark data-color="crimson">hola</mark></p>');
+    // See the destroy() note above: must run on every path.
+    try {
+      editor.commands.setContent(
+        '<p><mark data-color="crimson">hola</mark></p>',
+      );
 
-    const json = editor.getJSON();
-    const mark = json.content?.[0]?.content?.[0]?.marks?.find(
-      (m) => m.type === "highlight",
-    );
-    expect(mark?.attrs?.color ?? null).toBeNull();
-
-    editor.destroy();
+      const json = editor.getJSON();
+      const mark = json.content?.[0]?.content?.[0]?.marks?.find(
+        (m) => m.type === "highlight",
+      );
+      expect(mark?.attrs?.color ?? null).toBeNull();
+    } finally {
+      editor.destroy();
+    }
   });
 });
