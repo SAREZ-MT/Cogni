@@ -6,7 +6,7 @@ import { credentialsSchema, parseInput } from "./credentials-schema";
 export async function signIn(
   input: unknown,
   deps: { auth: AuthGateway },
-): Promise<Result<void, DomainError>> {
+): Promise<Result<{ userId: string }, DomainError>> {
   const parsed = parseInput(credentialsSchema, input);
   if (!parsed.ok) return parsed;
 

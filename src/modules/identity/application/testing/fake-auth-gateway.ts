@@ -41,11 +41,12 @@ export class FakeAuthGateway implements AuthGateway {
   async signInWithPassword(input: {
     email: string;
     password: string;
-  }): Promise<Result<void, DomainError>> {
+  }): Promise<Result<{ userId: string }, DomainError>> {
     this.calls.push({ method: "signInWithPassword", input });
-    const user = this.users.find(
+    const index = this.users.findIndex(
       (candidate) => candidate.email === input.email,
     );
+    const user = this.users[index];
     if (!user || user.password !== input.password) {
       return err(
         new DomainError(AUTH_ERROR.INVALID_CREDENTIALS, "invalid credentials"),
@@ -57,7 +58,7 @@ export class FakeAuthGateway implements AuthGateway {
       );
     }
     this.signedIn = user.email;
-    return ok(undefined);
+    return ok({ userId: `fake-user-${index + 1}` });
   }
 
   async signOut(): Promise<Result<void, DomainError>> {

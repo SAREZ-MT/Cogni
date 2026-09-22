@@ -74,6 +74,19 @@ describe("SupabaseAuthGateway", () => {
     expect(!b.ok && b.error.code).toBe(AUTH_ERROR.INVALID_CREDENTIALS);
   });
 
+  it('exposes the userId from a successful sign-in (Scenario "Gateway de sign-in expone userId")', async () => {
+    const gateway = fakeAuth({
+      signInWithPassword: {
+        data: { user: { id: "u-77" }, session: { access_token: "x" } },
+        error: null,
+      },
+    });
+
+    const result = await gateway.signInWithPassword(INPUT);
+
+    expect(result).toEqual({ ok: true, value: { userId: "u-77" } });
+  });
+
   it("hides unknown provider failures behind PROVIDER_UNAVAILABLE", async () => {
     const gateway = fakeAuth({
       signInWithPassword: {
