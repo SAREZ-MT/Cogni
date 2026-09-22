@@ -32,6 +32,11 @@ describe.skipIf(!url)("0002 orphan-delete guard", () => {
         await tx.unsafe(
           "alter table profiles drop constraint profiles_id_fkey",
         );
+        // The guard fires only when auth.users is empty. cogni-dev is
+        // shared and an interrupted e2e run can leave a fixture user
+        // behind, so the precondition is created inside this transaction
+        // (rolled back below) instead of assumed from the environment.
+        await tx`delete from auth.users`;
         await tx`insert into profiles (id) values (${orphanId})`;
         await expect(tx.unsafe(extractGuardSql())).rejects.toMatchObject({
           code: "P0001",
