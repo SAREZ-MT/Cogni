@@ -1,5 +1,5 @@
 import "server-only";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, StorageApiError } from "@supabase/supabase-js";
 import type { PdfStorageGateway } from "../domain/pdf-storage-gateway";
 
 // design.md, "ingestion define su propio PdfStorageGateway y el adaptador
@@ -23,6 +23,23 @@ export class PdfStorageAdapterError extends Error {
     super(message, options);
     this.name = "PdfStorageAdapterError";
   }
+}
+
+// Review follow-up from T7b (R3-metadata-transient-error-as-missing):
+// `getObjectMetadata` must return null only when the object genuinely does
+// not exist, never for a transient/5xx failure. The real client's `.info()`
+// resolves a `StorageApiError` (never rejects) whose `status`/`statusCode`
+// carry the HTTP status; "Object not found" is the exact message the
+// Storage API returns for a missing object
+// (https://supabase.com/docs/guides/storage/debugging/error-codes). The
+// message check is a defensive fallback for an error that does not (or
+// cannot, in a test double) carry the structured status.
+function isNotFoundStorageError(error: unknown): boolean {
+  if (error instanceof StorageApiError) {
+    return error.status === 404 || error.statusCode === "404";
+  }
+  const message = (error as { message?: unknown } | null | undefined)?.message;
+  return typeof message === "string" && /object not found/i.test(message);
 }
 
 export class SupabasePdfStorageGateway implements PdfStorageGateway {
@@ -60,7 +77,13 @@ export class SupabasePdfStorageGateway implements PdfStorageGateway {
     path: string,
   ): Promise<{ sizeBytes: number; mime: string } | null> {
     const { data, error } = await this.storage().info(path);
-    if (error || !data) return null;
+    if (error) {
+      if (isNotFoundStorageError(error)) return null;
+      throw new PdfStorageAdapterError("failed to read object metadata", {
+        cause: error,
+      });
+    }
+    if (!data) return null;
     if (typeof data.size !== "number" || !data.contentType) return null;
     return { sizeBytes: data.size, mime: data.contentType };
   }

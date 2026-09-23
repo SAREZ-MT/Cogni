@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, describe, expect, it } from "vitest";
 import { runImportJobRepositoryContract } from "@/modules/ingestion/application/testing/import-job-repository.contract";
+import { ABANDONED_AFTER_MS } from "@/modules/ingestion/domain/import-budget";
+import type { ImportJob } from "@/modules/ingestion/domain/import-job";
 // Imported from its concrete file, not the "@/modules/ingestion/
 // infrastructure" barrel: see notebooks-repository.smoke.test.ts's comment
 // on why (a module barrel that also exports something starting with
@@ -35,6 +37,21 @@ if (url) {
   const notebookId = randomUUID();
   const pageId = randomUUID();
 
+  // Registered right after the auth user exists and before any of the
+  // setup inserts below, so a failure in any of them (profiles, notebooks,
+  // pages) still cleans up the auth user and closes the Postgres client
+  // instead of leaking both (T7a follow-up: R3-toplevel-setup-leak). The
+  // client close lives in `finally` so a failed deleteTestOwner() never
+  // leaks the connection either (same shape as import-jobs.smoke.test.ts's
+  // afterAll).
+  afterAll(async () => {
+    try {
+      await deleteTestOwner(owner.id);
+    } finally {
+      await db.$client.end();
+    }
+  });
+
   await db.insert(profiles).values({ id: owner.id });
   await db.insert(notebooks).values({
     id: notebookId,
@@ -49,13 +66,6 @@ if (url) {
     title: "Página del contrato",
     content: { type: "doc", content: [] },
     position: 1,
-  });
-
-  afterAll(async () => {
-    // Deleting the auth user cascades into profiles, notebooks, pages and
-    // every import_jobs row the contract created along the way — no
-    // per-test cleanup needed, same as notebooks-repository.smoke.test.ts.
-    await deleteTestOwner(owner.id);
   });
 
   runImportJobRepositoryContract({
@@ -135,6 +145,239 @@ if (url) {
         const [job] = await tx`select 1 from import_jobs where id = ${jobId}`;
         expect(job).toBeUndefined();
       });
+    });
+  });
+
+  // T7a review follow-up (R3-transition-methods-unproved): the shared
+  // contract only exercises `claim` and `create`'s storagePath
+  // uniqueness; every other conditional `UPDATE ... RETURNING` transition
+  // (markDone, markFailed, listActivePageIds' abandoned cutoff,
+  // findLatestByPage's ordering) is proven here against real Postgres
+  // instead. Jobs are built directly (bypassing `createImportJob`, which
+  // always starts a job `queued`) so each test can seed the exact status
+  // the transition under test requires.
+  describe("DrizzleImportJobRepository transitions", () => {
+    const repo = new DrizzleImportJobRepository(db);
+    const baseNow = new Date("2026-09-23T09:00:00.000Z");
+
+    function seedJob(overrides: Partial<ImportJob> = {}): ImportJob {
+      return {
+        id: randomUUID(),
+        ownerId: owner.id,
+        pageId,
+        storagePath: `${owner.id}/${randomUUID()}.pdf`,
+        fileName: "notas.pdf",
+        sizeBytes: 1024,
+        status: "queued",
+        pageCount: null,
+        pagesWithoutText: 0,
+        error: null,
+        startedAt: null,
+        finishedAt: null,
+        createdAt: baseNow,
+        updatedAt: baseNow,
+        ...overrides,
+      };
+    }
+
+    it("markDone: processing -> done, persisting the counts", async () => {
+      const job = seedJob({ status: "processing", startedAt: baseNow });
+      await repo.create(job);
+      const now = new Date("2026-09-23T09:05:00.000Z");
+
+      const done = await repo.markDone({
+        id: job.id,
+        pageCount: 12,
+        pagesWithoutText: 2,
+        now,
+      });
+
+      expect(done?.status).toBe("done");
+      expect(done?.pageCount).toBe(12);
+      expect(done?.pagesWithoutText).toBe(2);
+      expect(done?.finishedAt).toEqual(now);
+    });
+
+    it("markDone: rejected on a queued job, row left unchanged", async () => {
+      const job = seedJob({ status: "queued" });
+      await repo.create(job);
+
+      const result = await repo.markDone({
+        id: job.id,
+        pageCount: 5,
+        pagesWithoutText: 0,
+        now: new Date("2026-09-23T09:05:00.000Z"),
+      });
+
+      expect(result).toBeNull();
+      const stored = await repo.findById(job.id);
+      expect(stored?.status).toBe("queued");
+      expect(stored?.pageCount).toBeNull();
+    });
+
+    it("markDone: rejected on an already-terminal job, row left unchanged", async () => {
+      const job = seedJob({
+        status: "failed",
+        error: "ya falló antes",
+        finishedAt: baseNow,
+      });
+      await repo.create(job);
+
+      const result = await repo.markDone({
+        id: job.id,
+        pageCount: 5,
+        pagesWithoutText: 0,
+        now: new Date("2026-09-23T09:05:00.000Z"),
+      });
+
+      expect(result).toBeNull();
+      const stored = await repo.findById(job.id);
+      expect(stored?.status).toBe("failed");
+      expect(stored?.error).toBe("ya falló antes");
+    });
+
+    it("markFailed: timeout on a queued job transitions to failed (the only queued -> failed path)", async () => {
+      const job = seedJob({ status: "queued" });
+      await repo.create(job);
+      const now = new Date("2026-09-23T09:10:00.000Z");
+
+      const failed = await repo.markFailed({
+        id: job.id,
+        kind: "timeout",
+        message: "La importación tardó demasiado.",
+        now,
+      });
+
+      expect(failed?.status).toBe("failed");
+      expect(failed?.error).toBe("La importación tardó demasiado.");
+      expect(failed?.finishedAt).toEqual(now);
+    });
+
+    it("markFailed: a non-timeout reason on a queued job is rejected, row left unchanged", async () => {
+      const job = seedJob({ status: "queued" });
+      await repo.create(job);
+
+      const result = await repo.markFailed({
+        id: job.id,
+        kind: "download",
+        message: "No pudimos leer el archivo.",
+        now: new Date("2026-09-23T09:10:00.000Z"),
+      });
+
+      expect(result).toBeNull();
+      const stored = await repo.findById(job.id);
+      expect(stored?.status).toBe("queued");
+      expect(stored?.error).toBeNull();
+    });
+
+    it("markFailed: on a processing job keeps pageCount/pagesWithoutText when omitted", async () => {
+      const job = seedJob({
+        status: "processing",
+        startedAt: baseNow,
+        pageCount: 8,
+        pagesWithoutText: 3,
+      });
+      await repo.create(job);
+      const now = new Date("2026-09-23T09:12:00.000Z");
+
+      const failed = await repo.markFailed({
+        id: job.id,
+        kind: "persistence",
+        message: "La página cambió durante la importación.",
+        now,
+      });
+
+      expect(failed?.status).toBe("failed");
+      expect(failed?.pageCount).toBe(8);
+      expect(failed?.pagesWithoutText).toBe(3);
+    });
+
+    it("listActivePageIds: excludes a processing job older than ABANDONED_AFTER_MS and includes a fresh one", async () => {
+      const freshPageId = randomUUID();
+      const abandonedPageId = randomUUID();
+      await db.insert(pages).values([
+        {
+          id: freshPageId,
+          ownerId: owner.id,
+          notebookId,
+          title: "Página con importación activa",
+          content: { type: "doc", content: [] },
+          position: 3,
+        },
+        {
+          id: abandonedPageId,
+          ownerId: owner.id,
+          notebookId,
+          title: "Página con importación abandonada",
+          content: { type: "doc", content: [] },
+          position: 4,
+        },
+      ]);
+      // listActivePageIds derives its cutoff from the real wall clock
+      // (Date.now()), not an injectable clock (the port carries no `now`
+      // parameter) — this test must use real timestamps around it too.
+      const realNow = Date.now();
+      const abandonedUpdatedAt = new Date(
+        realNow - ABANDONED_AFTER_MS - 60_000,
+      );
+      const freshUpdatedAt = new Date(realNow - 1_000);
+
+      await repo.create(
+        seedJob({
+          pageId: abandonedPageId,
+          status: "processing",
+          createdAt: abandonedUpdatedAt,
+          updatedAt: abandonedUpdatedAt,
+        }),
+      );
+      await repo.create(
+        seedJob({
+          pageId: freshPageId,
+          status: "processing",
+          createdAt: freshUpdatedAt,
+          updatedAt: freshUpdatedAt,
+        }),
+      );
+
+      const activePageIds = await repo.listActivePageIds(owner.id);
+
+      expect(activePageIds).toContain(freshPageId);
+      expect(activePageIds).not.toContain(abandonedPageId);
+    });
+
+    it("findLatestByPage: returns the newest job by createdAt when several exist for a page", async () => {
+      const retriedPageId = randomUUID();
+      await db.insert(pages).values({
+        id: retriedPageId,
+        ownerId: owner.id,
+        notebookId,
+        title: "Página con reintentos",
+        content: { type: "doc", content: [] },
+        position: 5,
+      });
+      const olderJob = seedJob({
+        pageId: retriedPageId,
+        status: "failed",
+        error: "primer intento fallido",
+        createdAt: new Date("2026-09-23T08:00:00.000Z"),
+        updatedAt: new Date("2026-09-23T08:00:01.000Z"),
+        finishedAt: new Date("2026-09-23T08:00:01.000Z"),
+      });
+      const newerJob = seedJob({
+        pageId: retriedPageId,
+        status: "queued",
+        createdAt: new Date("2026-09-23T09:00:00.000Z"),
+        updatedAt: new Date("2026-09-23T09:00:00.000Z"),
+      });
+      // Insert the newer job first so a naive "last inserted" read would
+      // fail this test the same way a naive "first inserted" read would —
+      // only ordering by createdAt itself passes either way.
+      await repo.create(newerJob);
+      await repo.create(olderJob);
+
+      const latest = await repo.findLatestByPage(retriedPageId);
+
+      expect(latest?.id).toBe(newerJob.id);
     });
   });
 }

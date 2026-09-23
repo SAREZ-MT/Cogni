@@ -48,6 +48,12 @@ interface Failure {
   message: string;
   pageCount?: number;
   pagesWithoutText?: number;
+  // Review follow-up from T7b (R3-swallowed-exception-cause-lost): the
+  // original thrown exception (extractor or write), when there was one,
+  // forwarded to `telemetry.finished` so `ImportTelemetryAdapter` can
+  // report it to Sentry with `captureException` (stack included) instead
+  // of the stack-less `captureMessage`.
+  cause?: unknown;
 }
 
 // design.md, "Decision: Procesamiento síncrono en la Server Action con
@@ -129,7 +135,7 @@ export async function processImportJob(
       const current = await deps.jobs.findById(claimed.id);
       return ok(current ?? claimed);
     }
-    await reportFinished(failed, { kind: failure.kind });
+    await reportFinished(failed, { kind: failure.kind, cause: failure.cause });
     return ok(failed);
   };
 
@@ -173,9 +179,14 @@ export async function processImportJob(
   // bug (or unpdf itself) can still reject; the job must reach a terminal
   // state instead of leaking the exception out of processImportJob.
   let extracted: Awaited<ReturnType<PdfTextExtractor["extract"]>>;
+  // Captured only when `extract` actually threw (never set for a plain
+  // `err(...)` Result) so `finishFailed` only forwards a `cause` to
+  // telemetry when there is a real exception with a stack to report.
+  let extractCause: unknown;
   try {
     extracted = await deps.extractor.extract(bytes);
-  } catch {
+  } catch (error) {
+    extractCause = error;
     extracted = err(new DomainError(PDF_FILE_ERROR.UNREADABLE, "threw"));
   }
   deps.telemetry.stage(
@@ -187,6 +198,7 @@ export async function processImportJob(
     return finishFailed({
       kind: "invalid_pdf",
       message: failureMessage("invalid_pdf"),
+      cause: extractCause,
     });
   }
 
@@ -226,13 +238,17 @@ export async function processImportJob(
   // message, the same text design.md assigns to "PAGE_NOT_FOUND o
   // excepción".
   let written: Awaited<ReturnType<NotebookPagesPort["writeImportedContent"]>>;
+  // Same convention as `extractCause` above: only set when
+  // `writeImportedContent` actually threw.
+  let writeCause: unknown;
   try {
     written = await deps.notebookPages.writeImportedContent(ownerId, {
       pageId: claimed.pageId,
       content: blocksResult.doc,
       expectedVersion: 1,
     });
-  } catch {
+  } catch (error) {
+    writeCause = error;
     // Any code other than PAGE_VERSION_CONFLICT_CODE below maps to the
     // generic page-unavailable message; this sentinel just needs to not
     // collide with that one literal.
@@ -253,7 +269,7 @@ export async function processImportJob(
       written.error.code === PAGE_VERSION_CONFLICT_CODE
         ? failureMessage("persistence")
         : PERSISTENCE_PAGE_UNAVAILABLE_MESSAGE;
-    return finishFailed({ kind: "persistence", message });
+    return finishFailed({ kind: "persistence", message, cause: writeCause });
   }
 
   const completed = await deps.jobs.markDone({

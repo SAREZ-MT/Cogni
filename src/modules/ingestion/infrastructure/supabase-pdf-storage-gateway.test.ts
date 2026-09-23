@@ -1,3 +1,4 @@
+import { StorageApiError } from "@supabase/supabase-js";
 import { describe, expect, it, vi } from "vitest";
 import {
   PdfStorageAdapterError,
@@ -25,9 +26,17 @@ const download = vi.fn();
 const from = vi.fn(() => ({ createSignedUploadUrl, info, download }));
 const createClient = vi.fn((..._args: unknown[]) => ({ storage: { from } }));
 
-vi.mock("@supabase/supabase-js", () => ({
-  createClient: (...args: unknown[]) => createClient(...args),
-}));
+// `StorageApiError` is kept as the real class (via importOriginal) instead
+// of also being stubbed: the adapter's not-found detection does an
+// `instanceof StorageApiError` check, so the test must construct the very
+// same class the adapter imports from this mocked module.
+vi.mock("@supabase/supabase-js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@supabase/supabase-js")>();
+  return {
+    ...actual,
+    createClient: (...args: unknown[]) => createClient(...args),
+  };
+});
 
 const CONFIG = {
   supabaseUrl: "https://project.supabase.co",
@@ -70,22 +79,45 @@ describe("SupabasePdfStorageGateway", () => {
       expect(createSignedUploadUrl).toHaveBeenCalledWith("owner-1/x.pdf");
     });
 
+    // T7b review follow-up (R3-signed-url-sanitization-test-vacuous): the
+    // previous version only mocked the first call — the second, unmocked
+    // call returned `undefined` from the `vi.fn()` default, so destructuring
+    // `{ data, error }` inside the adapter threw its own TypeError, and the
+    // catch block's assertions passed against that TypeError instead of
+    // against the sanitization path they claimed to prove. `expect.
+    // assertions` plus a second, distinctly-mocked failure make sure both
+    // calls actually exercise `createSignedUploadUrl`'s error branch.
     it("throws a typed PdfStorageAdapterError, never the raw Supabase error", async () => {
-      const rawError = { message: "internal supabase detail", status: 500 };
+      expect.assertions(4);
+      const firstRawError = {
+        message: "internal supabase detail",
+        status: 500,
+      };
       createSignedUploadUrl.mockResolvedValueOnce({
         data: null,
-        error: rawError,
+        error: firstRawError,
       });
       const gateway = new SupabasePdfStorageGateway(CONFIG);
 
       await expect(
         gateway.createSignedUploadUrl("owner-1/x.pdf"),
       ).rejects.toBeInstanceOf(PdfStorageAdapterError);
+
+      const secondRawError = {
+        message: "another internal supabase detail",
+        status: 503,
+      };
+      createSignedUploadUrl.mockResolvedValueOnce({
+        data: null,
+        error: secondRawError,
+      });
       try {
         await gateway.createSignedUploadUrl("owner-1/x.pdf");
+        throw new Error("expected createSignedUploadUrl to throw");
       } catch (error) {
-        expect(error).not.toBe(rawError);
-        expect((error as Error).message).not.toContain("internal supabase");
+        expect(error).toBeInstanceOf(PdfStorageAdapterError);
+        expect(error).not.toBe(secondRawError);
+        expect((error as Error).message).not.toContain("supabase detail");
       }
     });
   });
@@ -103,16 +135,62 @@ describe("SupabasePdfStorageGateway", () => {
       expect(metadata).toEqual({ sizeBytes: 2048, mime: "application/pdf" });
     });
 
-    it("returns null (never throws) when the object does not exist", async () => {
+    // T7b review follow-up (R3-metadata-transient-error-as-missing): the
+    // real client resolves a `StorageApiError` (never rejects) for a
+    // not-found object, carrying `status`/`statusCode` "404".
+    it("returns null (never throws) when the object does not exist (structured StorageApiError)", async () => {
       info.mockResolvedValueOnce({
         data: null,
-        error: { message: "not found" },
+        error: new StorageApiError("Object not found", 404, "404"),
       });
       const gateway = new SupabasePdfStorageGateway(CONFIG);
 
       const metadata = await gateway.getObjectMetadata("owner-1/x.pdf");
 
       expect(metadata).toBeNull();
+    });
+
+    // Defensive fallback branch: an error that carries the "Object not
+    // found" message but not the structured status/statusCode (e.g. a
+    // future client version, or a differently-shaped test double).
+    it("returns null when a plain error object's message says the object was not found", async () => {
+      info.mockResolvedValueOnce({
+        data: null,
+        error: { message: "Object not found" },
+      });
+      const gateway = new SupabasePdfStorageGateway(CONFIG);
+
+      const metadata = await gateway.getObjectMetadata("owner-1/x.pdf");
+
+      expect(metadata).toBeNull();
+    });
+
+    // T7b review follow-up (R3-metadata-transient-error-as-missing): a
+    // transient/5xx failure must never be reported as "object does not
+    // exist" — the caller (startPdfImport) would otherwise tell the user
+    // their upload vanished instead of retrying.
+    it("throws a typed PdfStorageAdapterError for a transient/5xx error, never treating it as missing", async () => {
+      info.mockResolvedValueOnce({
+        data: null,
+        error: new StorageApiError("internal server error", 500, "500"),
+      });
+      const gateway = new SupabasePdfStorageGateway(CONFIG);
+
+      await expect(
+        gateway.getObjectMetadata("owner-1/x.pdf"),
+      ).rejects.toBeInstanceOf(PdfStorageAdapterError);
+    });
+
+    it("throws a typed PdfStorageAdapterError for an error with no recognizable not-found shape", async () => {
+      info.mockResolvedValueOnce({
+        data: null,
+        error: { weird: "shape" },
+      });
+      const gateway = new SupabasePdfStorageGateway(CONFIG);
+
+      await expect(
+        gateway.getObjectMetadata("owner-1/x.pdf"),
+      ).rejects.toBeInstanceOf(PdfStorageAdapterError);
     });
 
     it("returns null when the response is missing size or contentType", async () => {
