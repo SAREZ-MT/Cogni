@@ -285,6 +285,25 @@ describe("createNotebooksServerApi", () => {
 
       expect(notebookId).toBeNull();
     });
+
+    // T7a review follow-up (R3-notebook-owner-unchecked): a defensive
+    // check against a data inconsistency where the page's notebook is no
+    // longer owned by the same caller, even though page.ownerId matched.
+    it("returns null when the page's notebook is owned by someone else than the page (defensive)", async () => {
+      const { createNotebooksServerApi } = await import("./server-api");
+      await notebooks.create(makeNotebook());
+      const api = createNotebooksServerApi({ db: FAKE_DB });
+      const created = await api.createPage(OWNER_ID, { notebookId: "nb-1" });
+      if (!created.ok) throw new Error("setup failed");
+      await notebooks.update(makeNotebook({ ownerId: OTHER_OWNER_ID }));
+
+      const notebookId = await api.findPageNotebookId(
+        OWNER_ID,
+        created.value.id,
+      );
+
+      expect(notebookId).toBeNull();
+    });
   });
 
   describe("writeImportedContent (updatedAt)", () => {

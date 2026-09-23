@@ -141,6 +141,13 @@ export async function startPdfImport(
 // the idempotent path must echo the existing job's *real* notebookId —
 // looked up from its page — instead of blindly trusting the caller's
 // input, and reject a request whose notebookId no longer matches it.
+//
+// Review follow-up from T6 (R3-idempotent-null-page-reported-as-mismatch):
+// `findPageNotebookId` returning null means the page is missing, archived
+// or no longer owned by the caller — a different failure than a
+// notebookId that simply does not match — so it must not fall through to
+// the `!== notebookId` comparison, which would always be true for null
+// and misreport a mismatch.
 async function echoIdempotentJob(
   deps: { notebookPages: NotebookPagesPort },
   job: { id: string; pageId: string; status: ImportJobStatus },
@@ -151,6 +158,9 @@ async function echoIdempotentJob(
     ownerId,
     job.pageId,
   );
+  if (actualNotebookId === null) {
+    return err(new DomainError(INGESTION_ERROR.PAGE_NOT_FOUND, job.pageId));
+  }
   if (actualNotebookId !== notebookId) {
     return err(new DomainError(INGESTION_ERROR.NOTEBOOK_MISMATCH, notebookId));
   }

@@ -81,7 +81,13 @@ export function createNotebooksServerApi(deps: {
       const page = await pages.findById(pageId);
       if (!page || page.ownerId !== ownerId || page.archivedAt) return null;
       const notebook = await notebooks.findById(page.notebookId);
-      if (!notebook || notebook.archivedAt) return null;
+      // T7a review follow-up (R3-notebook-owner-unchecked): a page's own
+      // ownerId should always match its notebook's, but this defends
+      // against a data inconsistency instead of trusting that invariant
+      // silently.
+      if (!notebook || notebook.ownerId !== ownerId || notebook.archivedAt) {
+        return null;
+      }
       return page.notebookId;
     },
   };

@@ -196,6 +196,35 @@ describe("startPdfImport use case", () => {
     }
   });
 
+  // T7b review follow-up from T6 (R3-idempotent-null-page-reported-as-
+  // mismatch): a null findPageNotebookId (page missing/archived/unowned)
+  // must surface as a distinct page-not-found error, not a notebook
+  // mismatch.
+  it("returns a page-not-found error on the idempotent path when the existing job's page is no longer available", async () => {
+    const deps = makeDeps();
+    const path = uploadPath(OWNER_ID, NOW.getTime());
+    seedObject(deps, path);
+    const input = {
+      notebookId: "nb-1",
+      storagePath: path,
+      fileName: "a.pdf",
+      mime: "application/pdf",
+      sizeBytes: 1024,
+    };
+    const first = await startPdfImport(input, deps, OWNER_ID);
+    expect(first.ok).toBe(true);
+    vi.spyOn(deps.notebookPages, "findPageNotebookId").mockResolvedValueOnce(
+      null,
+    );
+
+    const second = await startPdfImport(input, deps, OWNER_ID);
+
+    expect(second.ok).toBe(false);
+    if (!second.ok) {
+      expect(second.error.code).toBe("INGESTION_PAGE_NOT_FOUND");
+    }
+  });
+
   // T6 review follow-up from T5 (R3-idempotency-check-then-act-race):
   // ImportJobRepository.create surfaces a storage_path conflict as a typed
   // result instead of throwing; startPdfImport resolves it by re-fetching

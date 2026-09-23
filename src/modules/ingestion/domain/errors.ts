@@ -48,7 +48,14 @@ export const PDF_FILE_ERROR = {
 // has a job) when the caller's `notebookId` does not match the notebook
 // the existing job's page actually lives in, instead of blindly echoing
 // back whatever `notebookId` the caller supplied.
+// `PAGE_NOT_FOUND` is T7b's addition (review follow-up from T6:
+// R3-idempotent-null-page-reported-as-mismatch): the same idempotent path
+// raises this instead of `NOTEBOOK_MISMATCH` when
+// `NotebookPagesPort.findPageNotebookId` returns null — the existing job's
+// page is missing, archived or no longer owned by the caller, which is a
+// different failure than a `notebookId` that simply no longer matches.
 export const INGESTION_ERROR = {
   NOTEBOOK_NOT_FOUND: "INGESTION_NOTEBOOK_NOT_FOUND",
   NOTEBOOK_MISMATCH: "INGESTION_NOTEBOOK_MISMATCH",
+  PAGE_NOT_FOUND: "INGESTION_PAGE_NOT_FOUND",
 } as const;

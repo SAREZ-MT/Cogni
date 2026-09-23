@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { Clock } from "@/shared/kernel/clock";
 import { DomainError } from "@/shared/kernel/domain-error";
 import { err, ok, type Result } from "@/shared/kernel/result";
-import { IMPORT_JOB_ERROR } from "../domain/errors";
+import { IMPORT_JOB_ERROR, PDF_FILE_ERROR } from "../domain/errors";
 import { PROCESSING_BUDGET_MS } from "../domain/import-budget";
 import {
   failureMessage,
@@ -94,6 +94,26 @@ export async function processImportJob(
     (claimed.startedAt ?? deps.clock.now()).getTime() + PROCESSING_BUDGET_MS;
   const remainingMs = () => deadlineMs - deps.clock.now().getTime();
 
+  // Review follow-up from T6 (R3-telemetry-finished-rejection-propagates):
+  // the job's terminal state is already durably persisted by the time
+  // `finished()` runs; a rejection here (a broken adapter, despite the
+  // port's "never throws" contract) must never surface as an unhandled
+  // rejection out of `processImportJob` and must never undo the terminal
+  // transition that already happened.
+  const reportFinished = async (
+    finishedJob: ImportJob,
+    failure?: { kind: ImportFailureKind; cause?: unknown },
+  ): Promise<void> => {
+    try {
+      await deps.telemetry.finished(finishedJob, failure);
+    } catch (error) {
+      console.error("ingestion: telemetry.finished rejected", {
+        importJobId: finishedJob.id,
+        error,
+      });
+    }
+  };
+
   const finishFailed = async (
     failure: Failure,
   ): Promise<Result<ImportJob, DomainError>> => {
@@ -109,7 +129,7 @@ export async function processImportJob(
       const current = await deps.jobs.findById(claimed.id);
       return ok(current ?? claimed);
     }
-    await deps.telemetry.finished(failed, { kind: failure.kind });
+    await reportFinished(failed, { kind: failure.kind });
     return ok(failed);
   };
 
@@ -148,7 +168,16 @@ export async function processImportJob(
   }
 
   const extractStart = deps.clock.now();
-  const extracted = await deps.extractor.extract(bytes);
+  // Review follow-up from T6 (R3-persist-and-extract-exceptions-
+  // unhandled): the port promises a Result, never a throw, but an adapter
+  // bug (or unpdf itself) can still reject; the job must reach a terminal
+  // state instead of leaking the exception out of processImportJob.
+  let extracted: Awaited<ReturnType<PdfTextExtractor["extract"]>>;
+  try {
+    extracted = await deps.extractor.extract(bytes);
+  } catch {
+    extracted = err(new DomainError(PDF_FILE_ERROR.UNREADABLE, "threw"));
+  }
   deps.telemetry.stage(
     claimed,
     "extract",
@@ -190,11 +219,30 @@ export async function processImportJob(
   }
 
   const persistStart = deps.clock.now();
-  const written = await deps.notebookPages.writeImportedContent(ownerId, {
-    pageId: claimed.pageId,
-    content: blocksResult.doc,
-    expectedVersion: 1,
-  });
+  // Review follow-up from T6 (R3-persist-and-extract-exceptions-
+  // unhandled): the port promises a Result, but a thrown database
+  // exception must still leave the job terminal instead of propagating
+  // out of processImportJob — mapped to the generic page-unavailable
+  // message, the same text design.md assigns to "PAGE_NOT_FOUND o
+  // excepción".
+  let written: Awaited<ReturnType<NotebookPagesPort["writeImportedContent"]>>;
+  try {
+    written = await deps.notebookPages.writeImportedContent(ownerId, {
+      pageId: claimed.pageId,
+      content: blocksResult.doc,
+      expectedVersion: 1,
+    });
+  } catch {
+    // Any code other than PAGE_VERSION_CONFLICT_CODE below maps to the
+    // generic page-unavailable message; this sentinel just needs to not
+    // collide with that one literal.
+    written = err(
+      new DomainError(
+        "INGESTION_WRITE_IMPORTED_CONTENT_THREW",
+        "writeImportedContent threw",
+      ),
+    );
+  }
   deps.telemetry.stage(
     claimed,
     "persist",
@@ -218,6 +266,6 @@ export async function processImportJob(
     const current = await deps.jobs.findById(claimed.id);
     return ok(current ?? claimed);
   }
-  await deps.telemetry.finished(completed);
+  await reportFinished(completed);
   return ok(completed);
 }
