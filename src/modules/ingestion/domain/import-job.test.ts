@@ -180,6 +180,68 @@ describe("complete", () => {
 
     expect(result.ok).toBe(false);
   });
+
+  it("rejects a NaN pageCount (R3-complete-count-guard)", () => {
+    const job = buildJob({ status: "processing" });
+
+    const result = complete(
+      job,
+      { pageCount: Number.NaN, pagesWithoutText: 0 },
+      createFixedClock(LATER),
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.code).toBe("IMPORT_JOB_INVALID_TRANSITION");
+  });
+
+  it("rejects a negative pageCount (R3-complete-count-guard)", () => {
+    const job = buildJob({ status: "processing" });
+
+    const result = complete(
+      job,
+      { pageCount: -1, pagesWithoutText: 0 },
+      createFixedClock(LATER),
+    );
+
+    expect(result.ok).toBe(false);
+  });
+
+  it("rejects a non-integer pageCount (R3-complete-count-guard)", () => {
+    const job = buildJob({ status: "processing" });
+
+    const result = complete(
+      job,
+      { pageCount: 3.5, pagesWithoutText: 0 },
+      createFixedClock(LATER),
+    );
+
+    expect(result.ok).toBe(false);
+  });
+
+  it("rejects a negative pagesWithoutText (R3-complete-count-guard)", () => {
+    const job = buildJob({ status: "processing" });
+
+    const result = complete(
+      job,
+      { pageCount: 3, pagesWithoutText: -1 },
+      createFixedClock(LATER),
+    );
+
+    expect(result.ok).toBe(false);
+  });
+
+  it("rejects a non-integer pagesWithoutText (R3-complete-count-guard)", () => {
+    const job = buildJob({ status: "processing" });
+
+    const result = complete(
+      job,
+      { pageCount: 3, pagesWithoutText: 1.2 },
+      createFixedClock(LATER),
+    );
+
+    expect(result.ok).toBe(false);
+  });
 });
 
 describe("fail", () => {
@@ -323,6 +385,71 @@ describe("fail", () => {
     if (!result.ok) return;
     expect(result.value.error).toBe("mensaje con espacios");
   });
+
+  it("rejects a NaN pageCount when provided (R3-fail-counts-unvalidated)", () => {
+    const job = buildJob({ status: "processing" });
+
+    const result = fail(
+      job,
+      {
+        kind: "no_text_layer",
+        message: "mensaje",
+        pageCount: Number.NaN,
+        pagesWithoutText: 0,
+      },
+      createFixedClock(LATER),
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.code).toBe("IMPORT_JOB_INVALID_TRANSITION");
+  });
+
+  it("rejects a negative pageCount when provided (R3-fail-counts-unvalidated)", () => {
+    const job = buildJob({ status: "processing" });
+
+    const result = fail(
+      job,
+      {
+        kind: "no_text_layer",
+        message: "mensaje",
+        pageCount: -2,
+        pagesWithoutText: 0,
+      },
+      createFixedClock(LATER),
+    );
+
+    expect(result.ok).toBe(false);
+  });
+
+  it("rejects a non-integer pagesWithoutText when provided (R3-fail-counts-unvalidated)", () => {
+    const job = buildJob({ status: "processing" });
+
+    const result = fail(
+      job,
+      {
+        kind: "no_text_layer",
+        message: "mensaje",
+        pageCount: 2,
+        pagesWithoutText: 0.5,
+      },
+      createFixedClock(LATER),
+    );
+
+    expect(result.ok).toBe(false);
+  });
+
+  it("accepts fail() with no counts at all (they stay optional)", () => {
+    const job = buildJob({ status: "processing" });
+
+    const result = fail(
+      job,
+      { kind: "download", message: "mensaje" },
+      createFixedClock(LATER),
+    );
+
+    expect(result.ok).toBe(true);
+  });
 });
 
 describe("isTerminal", () => {
@@ -335,9 +462,15 @@ describe("isTerminal", () => {
     expect(isTerminal(status)).toBe(expected);
   });
 
-  it("agrees with IMPORT_JOB_STATUS on every known status", () => {
+  it("agrees with IMPORT_JOB_STATUS on every known status (R3-weak-isTerminal-test)", () => {
+    const expectedByStatus: Record<ImportJobStatus, boolean> = {
+      queued: false,
+      processing: false,
+      done: true,
+      failed: true,
+    };
     for (const status of IMPORT_JOB_STATUS) {
-      expect(typeof isTerminal(status)).toBe("boolean");
+      expect(isTerminal(status)).toBe(expectedByStatus[status]);
     }
   });
 });

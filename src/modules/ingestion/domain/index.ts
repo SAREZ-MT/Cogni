@@ -1,4 +1,4 @@
-export { IMPORT_JOB_ERROR } from "./errors";
+export { IMPORT_JOB_ERROR, PDF_FILE_ERROR } from "./errors";
 export {
   ABANDONED_AFTER_MS,
   MAX_DURATION_S,
@@ -22,3 +22,31 @@ export {
   type NewImportJob,
   start,
 } from "./import-job";
+export {
+  type ImportedBlock,
+  type ImportedBulletList,
+  type ImportedDoc,
+  type ImportedHeading,
+  type ImportedListItem,
+  type ImportedOrderedList,
+  type ImportedParagraph,
+  type ImportedText,
+  importedBulletList,
+  importedHeading,
+  importedListItem,
+  importedOrderedList,
+  importedParagraph,
+  importedText,
+} from "./imported-doc";
+export {
+  isOwnedPdfPath,
+  looksLikePdf,
+  MAX_PDF_BYTES,
+  PDF_MIME,
+  pageTitleFromFileName,
+  UPLOAD_GRANT_TTL_MS,
+  uploadIdAgeMs,
+  validateFileName,
+  validatePdfInput,
+} from "./pdf-file";
+export { type TextToBlocksResult, textToBlocks } from "./text-to-blocks";

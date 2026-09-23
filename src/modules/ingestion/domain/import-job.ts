@@ -48,6 +48,15 @@ function invalidTransition(from: ImportJobStatus, action: string): DomainError {
   );
 }
 
+// A page count (or pages-without-text count) is only ever a non-negative
+// integer. `Number.isInteger` is false for `NaN`, `Infinity` and any
+// fractional value, so this single guard rejects all three at once
+// (review follow-up from T2: R3-complete-count-guard /
+// R3-fail-counts-unvalidated).
+function isValidCount(value: number): boolean {
+  return Number.isInteger(value) && value >= 0;
+}
+
 // StartPdfImport (application) builds the job's fields; this factory only
 // fixes the schema defaults for a brand-new job (design.md's ImportJob
 // interface: `queued`, no page count yet, zero pages without text, no
@@ -94,7 +103,11 @@ export function complete(
   if (job.status !== "processing") {
     return err(invalidTransition(job.status, "complete"));
   }
-  if (counts.pageCount == null || counts.pagesWithoutText >= counts.pageCount) {
+  if (
+    !isValidCount(counts.pageCount) ||
+    !isValidCount(counts.pagesWithoutText) ||
+    counts.pagesWithoutText >= counts.pageCount
+  ) {
     return err(
       new DomainError(
         IMPORT_JOB_ERROR.INVALID_TRANSITION,
@@ -140,6 +153,18 @@ export function fail(
       new DomainError(
         IMPORT_JOB_ERROR.INVALID_TRANSITION,
         "fail requires a non-empty message",
+      ),
+    );
+  }
+  if (
+    (failure.pageCount !== undefined && !isValidCount(failure.pageCount)) ||
+    (failure.pagesWithoutText !== undefined &&
+      !isValidCount(failure.pagesWithoutText))
+  ) {
+    return err(
+      new DomainError(
+        IMPORT_JOB_ERROR.INVALID_TRANSITION,
+        "fail requires pageCount/pagesWithoutText to be non-negative integers when provided",
       ),
     );
   }

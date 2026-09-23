@@ -50,10 +50,13 @@ describe("failureMessage", () => {
     );
   });
 
-  it("never contains stack traces, file paths, signed URLs or env var names (Errores seguros para la interfaz)", () => {
+  it("never contains stack traces, file paths, signed URLs or env var names (Errores seguros para la interfaz) (R3-unsafe-copy-coverage-gap)", () => {
     const unsafePatterns = [/https?:\/\//, /\//, /\bat\s+\w+/, /process\.env/];
-    for (const kind of IMPORT_FAILURE_KIND) {
-      const message = failureMessage(kind);
+    const messages = [
+      ...IMPORT_FAILURE_KIND.map((kind) => failureMessage(kind)),
+      PERSISTENCE_PAGE_UNAVAILABLE_MESSAGE,
+    ];
+    for (const message of messages) {
       for (const pattern of unsafePatterns) {
         expect(message).not.toMatch(pattern);
       }
