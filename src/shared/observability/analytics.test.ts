@@ -40,6 +40,43 @@ describe("createServerAnalytics", () => {
     expect(shutdown).toHaveBeenCalledWith(2000);
   });
 
+  // Fase 2 (T7b): pdf_imported needs page_count/pages_without_text/
+  // duration_ms/status alongside distinctId.
+  it("forwards optional properties to PostHog's capture call", async () => {
+    const { createServerAnalytics } = await import("./analytics");
+    const analytics = createServerAnalytics(config);
+
+    await analytics.track("pdf_imported", "user-1", {
+      page_count: 12,
+      pages_without_text: 0,
+      duration_ms: 4200,
+      status: "done",
+    });
+
+    expect(capture).toHaveBeenCalledWith({
+      distinctId: "user-1",
+      event: "pdf_imported",
+      properties: {
+        page_count: 12,
+        pages_without_text: 0,
+        duration_ms: 4200,
+        status: "done",
+      },
+    });
+  });
+
+  it("omits the properties field entirely when none are given", async () => {
+    const { createServerAnalytics } = await import("./analytics");
+    const analytics = createServerAnalytics(config);
+
+    await analytics.track("user_signed_in", "user-1");
+
+    expect(capture).toHaveBeenCalledWith({
+      distinctId: "user-1",
+      event: "user_signed_in",
+    });
+  });
+
   it("is a no-op without a key so local runs send nothing", async () => {
     const { createServerAnalytics } = await import("./analytics");
     const analytics = createServerAnalytics({

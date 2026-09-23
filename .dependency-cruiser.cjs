@@ -64,6 +64,17 @@ module.exports = {
       from: { path: "^src/modules/study-engine/" },
       to: { path: "^src/modules/(flashcards|exams|active-recall)/" },
     },
+    {
+      name: "unpdf-only-in-ingestion-infra",
+      comment:
+        "unpdf may only be imported from ingestion/infrastructure (unpdf-text-extractor.ts); every other layer and module must stay decoupled from the PDF parsing library. Unanchored (not `^node_modules/unpdf`): pnpm resolves it to a nested node_modules/.pnpm/unpdf@.../node_modules/unpdf/... path.",
+      severity: "error",
+      from: {
+        path: "^src/",
+        pathNot: "^src/modules/ingestion/infrastructure/",
+      },
+      to: { path: "node_modules/unpdf" },
+    },
   ],
   options: {
     tsConfig: { fileName: "tsconfig.json" },

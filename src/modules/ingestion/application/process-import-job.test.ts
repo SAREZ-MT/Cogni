@@ -115,6 +115,57 @@ describe("processImportJob use case", () => {
     expect(deps.telemetry.finishedCalls).toHaveLength(0);
   });
 
+  // T7b review follow-up from T6 (R3-idempotency-test-overclaims): the
+  // test above only exercises `processing`; `done` and `failed` need
+  // their own proof of no download and no second `pdf_imported`.
+  it("is a no-op for a job already done: no download, no second pdf_imported", async () => {
+    const deps = makeDeps();
+    const job = await seedQueuedJob(deps);
+    seedTextExtraction(deps, ["hola mundo"]);
+    const first = await processImportJob(
+      { importJobId: job.id },
+      deps,
+      OWNER_ID,
+    );
+    expect(first.ok && first.value.status).toBe("done");
+
+    const second = await processImportJob(
+      { importJobId: job.id },
+      deps,
+      OWNER_ID,
+    );
+
+    expect(second.ok).toBe(true);
+    if (!second.ok) return;
+    expect(second.value.status).toBe("done");
+    expect(deps.storage.downloadCalls).toHaveLength(1);
+    expect(deps.telemetry.finishedCalls).toHaveLength(1);
+  });
+
+  it("is a no-op for a job already failed: no download, no second pdf_imported", async () => {
+    const deps = makeDeps();
+    const job = await seedQueuedJob(deps);
+    // No object was ever `put()`, so the first call fails(download).
+    const first = await processImportJob(
+      { importJobId: job.id },
+      deps,
+      OWNER_ID,
+    );
+    expect(first.ok && first.value.status).toBe("failed");
+
+    const second = await processImportJob(
+      { importJobId: job.id },
+      deps,
+      OWNER_ID,
+    );
+
+    expect(second.ok).toBe(true);
+    if (!second.ok) return;
+    expect(second.value.status).toBe("failed");
+    expect(deps.storage.downloadCalls).toHaveLength(1);
+    expect(deps.telemetry.finishedCalls).toHaveLength(1);
+  });
+
   it("returns the current job when claim() loses the race (another call already claimed it)", async () => {
     const deps = makeDeps();
     const job = await seedQueuedJob(deps);
@@ -322,6 +373,36 @@ describe("processImportJob use case", () => {
     );
   });
 
+  // T7b review follow-up from T6 (R3-persist-and-extract-exceptions-
+  // unhandled): the port promises a Result, but a thrown exception must
+  // still leave the job terminal instead of propagating out of
+  // processImportJob.
+  it("fails(invalid_pdf) when the extractor throws instead of returning an error Result", async () => {
+    const deps = makeDeps();
+    const job = await seedQueuedJob(deps);
+    deps.storage.put(STORAGE_PATH, {
+      sizeBytes: PDF_BYTES.length,
+      mime: "application/pdf",
+      bytes: PDF_BYTES,
+    });
+    vi.spyOn(deps.extractor, "extract").mockRejectedValueOnce(
+      new Error("unpdf blew up"),
+    );
+
+    const result = await processImportJob(
+      { importJobId: job.id },
+      deps,
+      OWNER_ID,
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.status).toBe("failed");
+    expect(result.value.error).toBe(
+      "Este archivo no es un PDF válido o está protegido. Revisa que no tenga contraseña e inténtalo de nuevo.",
+    );
+  });
+
   it("fails(no_text_layer) when no page has text", async () => {
     const deps = makeDeps();
     const job = await seedQueuedJob(deps);
@@ -450,6 +531,31 @@ describe("processImportJob use case", () => {
     );
   });
 
+  // T7b review follow-up from T6 (R3-persist-and-extract-exceptions-
+  // unhandled): a thrown database exception from writeImportedContent
+  // must map to the generic page-unavailable message, not propagate.
+  it("fails(persistence) with the page-unavailable message when writeImportedContent throws", async () => {
+    const deps = makeDeps();
+    const job = await seedQueuedJob(deps);
+    seedTextExtraction(deps, ["hola mundo"]);
+    vi.spyOn(deps.notebookPages, "writeImportedContent").mockRejectedValueOnce(
+      new Error("connection reset"),
+    );
+
+    const result = await processImportJob(
+      { importJobId: job.id },
+      deps,
+      OWNER_ID,
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.status).toBe("failed");
+    expect(result.value.error).toBe(
+      "La página de destino ya no está disponible. Vuelve a importar el PDF.",
+    );
+  });
+
   it("completes the job, writes the content and reports pdf_imported exactly once", async () => {
     const deps = makeDeps();
     const job = await seedQueuedJob(deps);
@@ -470,6 +576,33 @@ describe("processImportJob use case", () => {
     expect(deps.telemetry.finishedCalls).toEqual([
       { job: result.value, failure: undefined },
     ]);
+  });
+
+  // T7b review follow-up from T6 (R3-telemetry-finished-rejection-
+  // propagates): the job is already terminal in the repository by the
+  // time telemetry.finished() runs; a rejection there must never surface
+  // out of processImportJob or undo the terminal transition.
+  it("still resolves ok with the terminal job when telemetry.finished() rejects", async () => {
+    const deps = makeDeps();
+    const job = await seedQueuedJob(deps);
+    seedTextExtraction(deps, ["hola mundo"]);
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    vi.spyOn(deps.telemetry, "finished").mockRejectedValueOnce(
+      new Error("posthog unreachable"),
+    );
+
+    const result = await processImportJob(
+      { importJobId: job.id },
+      deps,
+      OWNER_ID,
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.status).toBe("done");
+    consoleError.mockRestore();
   });
 
   it("never emits a second pdf_imported when markDone/markFailed lose the race (job already terminal)", async () => {

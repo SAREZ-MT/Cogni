@@ -22,10 +22,11 @@ describe("ingestion domain error codes", () => {
     });
   });
 
-  it("exposes the ingestion-level error codes (T5/T6 additions)", () => {
+  it("exposes the ingestion-level error codes (T5/T6/T7b additions)", () => {
     expect(INGESTION_ERROR).toEqual({
       NOTEBOOK_NOT_FOUND: "INGESTION_NOTEBOOK_NOT_FOUND",
       NOTEBOOK_MISMATCH: "INGESTION_NOTEBOOK_MISMATCH",
+      PAGE_NOT_FOUND: "INGESTION_PAGE_NOT_FOUND",
     });
   });
 });
