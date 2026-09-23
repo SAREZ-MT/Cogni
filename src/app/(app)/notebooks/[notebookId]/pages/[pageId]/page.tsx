@@ -11,6 +11,7 @@ import {
   saveContent,
 } from "@/modules/notebooks";
 import { SetBreadcrumb } from "../../../../_components/breadcrumb";
+import { PageHeader } from "../../../../_components/page-header";
 
 // ADR 0002 (Vercel Fluid Compute, no worker, no Trigger.dev) + design.md,
 // "Decision: Procesamiento síncrono en la Server Action con maxDuration":
@@ -66,7 +67,17 @@ export default async function PageView({ params }: PagePageProps) {
     // content width; the import cards use the same max-w-2xl.
     <section className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4">
       <SetBreadcrumb items={breadcrumbItems} />
-      <h1 className="font-semibold text-fg text-xl">{page.title}</h1>
+      {/* S5 (odd/tasks/app-shell-restyle.md): title 28-36px/700 + last-edit
+          meta row (screenshots/editor.png). PageHeader accepts an optional
+          statusSlot for the autosave indicator, but it is intentionally
+          left unset here: notebooks-acceptance.spec.ts and
+          image-upload.spec.ts scope `autosave-status` inside
+          `editorMount.getByTestId("autosave-status")`
+          (data-testid="editor-mount"), so moving/duplicating SaveStatus's
+          output into this header would break those Playwright locators.
+          The status stays exactly where it already renders, inside the
+          Editor's own top row (editor/ui/tiptap/editor.tsx). */}
+      <PageHeader title={page.title} updatedAt={page.updatedAt} />
       <PageImportView
         initial={initialJob}
         pageId={page.id}

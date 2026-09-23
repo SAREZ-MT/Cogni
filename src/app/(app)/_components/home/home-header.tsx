@@ -1,5 +1,5 @@
 import { CreateNotebookTrigger } from "@/modules/notebooks";
-import { greetingForHour } from "./format";
+import { greetingForHour } from "../format";
 
 interface HomeHeaderProps {
   displayName: string;

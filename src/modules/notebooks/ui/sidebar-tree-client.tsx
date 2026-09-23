@@ -125,10 +125,12 @@ export function SidebarTreeClient({
               : notebook,
           ),
       );
-      // S4 review follow-up: Home's stats/grid are server-rendered, so a
-      // notebook created from the sidebar needs its own refresh, not only
-      // the sidebar tree's React Query cache invalidation below.
-      router.refresh();
+      // R3-sidebar-create-notebook-unconditional-refresh: Home's stats/grid
+      // are server-rendered, so a notebook created from the sidebar needs
+      // its own refresh, not only the sidebar tree's React Query cache
+      // invalidation below — but, like every other mutation here, only
+      // while the user is actually on Home.
+      refreshHomeIfActive();
     },
     onError: (_error, _title, context) => rollbackOn(context),
     onSettled: invalidate,

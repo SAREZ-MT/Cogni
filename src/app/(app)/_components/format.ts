@@ -1,8 +1,10 @@
-// Home's small, fixed set of Spanish presentation formats
-// (ui_kits/app/Home Page.html): greeting text and compact relative time
-// ("hace 2h", "ayer", "hace 3 días", "hace 1 sem"). No date-fns dependency:
-// the repo has no relative-time formatting yet, and this set of buckets is
-// small and fixed enough not to need one.
+// Small, fixed set of Spanish presentation formats shared across the
+// authenticated shell (ui_kits/app/Home Page.html): greeting text and
+// compact relative time ("hace 2h", "ayer", "hace 3 días", "hace 1 sem").
+// Moved out of home/ (S5, odd/tasks/app-shell-restyle.md) so the page
+// header's "última edición" meta item can reuse formatTimeAgo too. No
+// date-fns dependency: the repo has no relative-time formatting yet, and
+// this set of buckets is small and fixed enough not to need one.
 
 // Server time (Home is a Server Component with no client interactivity in
 // the greeting itself); the identity module's profile timezone is not

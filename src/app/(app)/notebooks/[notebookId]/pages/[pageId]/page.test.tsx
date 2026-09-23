@@ -37,6 +37,7 @@ function page() {
     title: "Apuntes",
     content: { type: "doc", content: [] },
     contentVersion: 3,
+    updatedAt: new Date("2026-09-23T10:00:00.000Z"),
   };
 }
 
@@ -102,6 +103,29 @@ describe("page route ingestion wiring", () => {
     const props = await renderRoute();
 
     expect(props.initial).toBeNull();
+  });
+
+  // S5 (odd/tasks/app-shell-restyle.md): the route renders PageHeader
+  // instead of a bare <h1>, passing the page's own title and updatedAt for
+  // the meta row's last-edit item.
+  it("renders PageHeader with the page's title and updatedAt", async () => {
+    getPageForRoute.mockResolvedValue(page());
+    getImportJobStatus.mockResolvedValue({ ok: true, value: null });
+
+    const { default: PageView } = await import("./page");
+    const section = (await PageView({
+      params: Promise.resolve({ notebookId: "nb-1", pageId: "page-1" }),
+    })) as ReactElement<{ children: ReactElement[] }>;
+
+    const header = section.props.children[1] as ReactElement<{
+      title: string;
+      updatedAt: Date;
+    }>;
+
+    expect(header.props.title).toBe("Apuntes");
+    expect(header.props.updatedAt).toEqual(
+      new Date("2026-09-23T10:00:00.000Z"),
+    );
   });
 
   it("passes the Editor mount as the editor prop", async () => {
