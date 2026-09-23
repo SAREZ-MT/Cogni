@@ -51,6 +51,17 @@ async function renderRoute() {
 }
 
 describe("page route ingestion wiring", () => {
+  it("constrains the title and the editor to the design system reading measure (max-w-2xl, centered)", async () => {
+    getPageForRoute.mockResolvedValue(page());
+    getImportJobStatus.mockResolvedValue({ ok: true, value: null });
+    const { default: PageView } = await import("./page");
+    const section = (await PageView({
+      params: Promise.resolve({ notebookId: "nb-1", pageId: "page-1" }),
+    })) as ReactElement<{ className: string }>;
+    expect(section.props.className).toContain("max-w-2xl");
+    expect(section.props.className).toContain("mx-auto");
+  });
+
   it("fetches the job status by page id and passes it as PageImportView's initial prop", async () => {
     getPageForRoute.mockResolvedValue(page());
     const view = {
