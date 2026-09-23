@@ -47,6 +47,8 @@ export {
   savePageSchema,
   setNotebookAppearance,
   setNotebookAppearanceSchema,
+  writeImportedContent,
+  writeImportedContentSchema,
 } from "./application";
 export {
   ASSET_ERROR,
@@ -73,4 +75,8 @@ export {
   type UpdateIfVersionInput,
   type UpdateIfVersionResult,
 } from "./domain";
+export {
+  createNotebooksServerApi,
+  type NotebooksServerApi,
+} from "./server-api";
 export { SidebarTree } from "./ui/sidebar-tree";
