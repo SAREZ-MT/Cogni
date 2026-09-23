@@ -1,7 +1,12 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { ImportPdfMenuItem, PdfImportProvider } from "@/modules/ingestion";
+import {
+  ActiveImportsProvider,
+  ImportingPageBadge,
+  ImportPdfMenuItem,
+  PdfImportProvider,
+} from "@/modules/ingestion";
 // Deep import, not `@/modules/notebooks`'s public index.ts: that barrel
 // also re-exports `createNotebooksServerApi` (server-api.ts), which pulls
 // `notebooks/infrastructure` — and its `import "server-only"` — into the
@@ -18,23 +23,33 @@ import { NotebookActionsSlotProvider } from "@/modules/notebooks/ui/notebook-act
 // desde la raíz de composición", step 5 — the one place `notebooks` and
 // `ingestion` meet. `notebooks` cannot import `ingestion`
 // (`cross-module-via-index`), so this composition root injects
-// `ingestion`'s menu entry through the slot `notebooks/ui/
-// notebook-actions-slot.tsx` exposes. `pageBadge` stays undefined here;
-// T13 adds the importing badge. layout.tsx wraps `<SidebarTree />` with
-// this component.
-export function NotebookActions({ children }: { children: ReactNode }) {
+// `ingestion`'s menu entry and page badge through the slot
+// `notebooks/ui/notebook-actions-slot.tsx` exposes. `initialPageIds` comes
+// from a server-side `getActiveImports()` call in layout.tsx (degrades to
+// `[]` there on failure), so the sidebar's importing badge is correct on
+// first paint. layout.tsx wraps `<SidebarTree />` with this component.
+export function NotebookActions({
+  children,
+  initialPageIds,
+}: {
+  children: ReactNode;
+  initialPageIds: string[];
+}) {
   return (
-    <PdfImportProvider>
-      <NotebookActionsSlotProvider
-        menuItems={(notebook, helpers) => (
-          <ImportPdfMenuItem
-            notebook={notebook}
-            onImported={helpers.refreshTree}
-          />
-        )}
-      >
-        {children}
-      </NotebookActionsSlotProvider>
-    </PdfImportProvider>
+    <ActiveImportsProvider initialPageIds={initialPageIds}>
+      <PdfImportProvider>
+        <NotebookActionsSlotProvider
+          menuItems={(notebook, helpers) => (
+            <ImportPdfMenuItem
+              notebook={notebook}
+              onImported={helpers.refreshTree}
+            />
+          )}
+          pageBadge={(page) => <ImportingPageBadge pageId={page.id} />}
+        >
+          {children}
+        </NotebookActionsSlotProvider>
+      </PdfImportProvider>
+    </ActiveImportsProvider>
   );
 }

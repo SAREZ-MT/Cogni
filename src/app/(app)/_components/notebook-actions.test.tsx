@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ReactNode } from "react";
+import type { ReactElement, ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 // notebook-actions.tsx is the composition root design.md assigns this exact
@@ -9,6 +9,9 @@ import { describe, expect, it, vi } from "vitest";
 // mocked so this test proves only the wiring between them, the same way
 // actions.test.ts files in this codebase mock their infrastructure.
 const { start } = vi.hoisted(() => ({ start: vi.fn() }));
+const { capturedActiveImportsProps } = vi.hoisted(() => ({
+  capturedActiveImportsProps: [] as Array<{ initialPageIds: string[] }>,
+}));
 vi.mock("@/modules/ingestion", () => ({
   PdfImportProvider: ({ children }: { children: ReactNode }) => (
     <div data-testid="pdf-import-provider">{children}</div>
@@ -30,24 +33,38 @@ vi.mock("@/modules/ingestion", () => ({
       Importar PDF de {notebook.title}
     </button>
   ),
+  ActiveImportsProvider: ({
+    initialPageIds,
+    children,
+  }: {
+    initialPageIds: string[];
+    children: ReactNode;
+  }) => {
+    capturedActiveImportsProps.push({ initialPageIds });
+    return <div data-testid="active-imports-provider">{children}</div>;
+  },
+  ImportingPageBadge: ({ pageId }: { pageId: string }) => (
+    <span data-testid={`badge-${pageId}`}>importando</span>
+  ),
 }));
 
 type MenuItems = (
   notebook: { id: string; title: string },
   helpers: { refreshTree: () => void },
 ) => ReactNode;
+type PageBadge = (page: { id: string }) => ReactNode;
 
 const { capturedSlotProps } = vi.hoisted(() => ({
   capturedSlotProps: [] as Array<{
     menuItems?: MenuItems;
-    pageBadge?: unknown;
+    pageBadge?: PageBadge;
   }>,
 }));
 vi.mock("@/modules/notebooks/ui/notebook-actions-slot", () => ({
   NotebookActionsSlotProvider: (props: {
     children: ReactNode;
     menuItems?: MenuItems;
-    pageBadge?: unknown;
+    pageBadge?: PageBadge;
   }) => {
     capturedSlotProps.push(props);
     return <div data-testid="slot-provider">{props.children}</div>;
@@ -60,18 +77,34 @@ async function importNotebookActions() {
 }
 
 describe("NotebookActions composition root", () => {
-  it("mounts PdfImportProvider around NotebookActionsSlotProvider and renders the children", async () => {
+  it("mounts ActiveImportsProvider around PdfImportProvider around NotebookActionsSlotProvider and renders the children", async () => {
     const NotebookActions = await importNotebookActions();
 
     render(
-      <NotebookActions>
+      <NotebookActions initialPageIds={[]}>
         <div data-testid="sidebar-tree-stub">árbol</div>
       </NotebookActions>,
     );
 
+    expect(screen.getByTestId("active-imports-provider")).toBeInTheDocument();
     expect(screen.getByTestId("pdf-import-provider")).toBeInTheDocument();
     expect(screen.getByTestId("slot-provider")).toBeInTheDocument();
     expect(screen.getByTestId("sidebar-tree-stub")).toBeInTheDocument();
+  });
+
+  it("passes initialPageIds through to ActiveImportsProvider (server-side getActiveImports() call in layout.tsx)", async () => {
+    const NotebookActions = await importNotebookActions();
+
+    render(
+      <NotebookActions initialPageIds={["page-1", "page-2"]}>
+        <div />
+      </NotebookActions>,
+    );
+
+    expect(capturedActiveImportsProps.at(-1)?.initialPageIds).toEqual([
+      "page-1",
+      "page-2",
+    ]);
   });
 
   it("passes a menuItems function that renders ImportPdfMenuItem wired to the caller's refreshTree helper", async () => {
@@ -80,7 +113,7 @@ describe("NotebookActions composition root", () => {
     const user = userEvent.setup();
 
     render(
-      <NotebookActions>
+      <NotebookActions initialPageIds={[]}>
         <div />
       </NotebookActions>,
     );
@@ -97,15 +130,19 @@ describe("NotebookActions composition root", () => {
     expect(refreshTree).toHaveBeenCalledTimes(1);
   });
 
-  it("leaves pageBadge undefined (T13 adds the importing badge)", async () => {
+  it("passes a pageBadge function that renders ImportingPageBadge for the given page", async () => {
     const NotebookActions = await importNotebookActions();
 
     render(
-      <NotebookActions>
+      <NotebookActions initialPageIds={[]}>
         <div />
       </NotebookActions>,
     );
 
-    expect(capturedSlotProps.at(-1)?.pageBadge).toBeUndefined();
+    const { pageBadge } = capturedSlotProps.at(-1) ?? {};
+    expect(pageBadge).toBeDefined();
+    render(pageBadge?.({ id: "page-1" }) as ReactElement);
+
+    expect(screen.getByTestId("badge-page-1")).toBeInTheDocument();
   });
 });

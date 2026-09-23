@@ -15,6 +15,7 @@ import {
 import { createPortal } from "react-dom";
 import { requestPdfUpload, startPdfImport } from "../actions";
 import { MAX_PDF_BYTES, PDF_MIME } from "../domain/pdf-file";
+import { useActiveImportsActions } from "./active-imports-provider";
 import { ImportProgress } from "./import-progress";
 import { INGESTION_COPY, messageForIngestionErrorCode } from "./ingestion-copy";
 import { uploadPdfToSignedUrl } from "./upload-pdf-to-signed-url";
@@ -81,6 +82,7 @@ export function useNotebookImport(notebookId: string): NotebookImportState {
 
 export function PdfImportProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
+  const activeImports = useActiveImportsActions();
   const fileInputRef = useRef<HTMLInputElement>(null);
   // `document.body` only exists after hydration; render the portal once
   // mounted so the server and first client render agree.
@@ -196,7 +198,12 @@ export function PdfImportProvider({ children }: { children: ReactNode }) {
       }
 
       // Success: clear the banner and hand off to the page (T11's
-      // PageImportView takes over the progress display from here).
+      // PageImportView takes over the progress display from here). T13a:
+      // mark the new page as actively importing immediately so the
+      // sidebar badge shows without waiting for the next
+      // ActiveImportsProvider poll — safe since the job is already
+      // persisted server-side by the time startPdfImport resolved.
+      activeImports.add(started.value.pageId);
       setState(null);
       onPageCreated?.();
       router.push(`/notebooks/${notebookId}/pages/${started.value.pageId}`);

@@ -14,6 +14,7 @@ import {
 import { err, ok, type Result } from "@/shared/kernel/result";
 import { createServerAnalytics } from "@/shared/observability/analytics";
 import {
+  getActiveImports as getActiveImportsUseCase,
   getImportJobStatus as getImportJobStatusUseCase,
   type ImportJobStatusView,
   type PdfUploadGrant,
@@ -188,5 +189,22 @@ export async function getImportJobStatus(
     );
     if (!result.ok) return err(toActionError(result.error));
     return result;
+  });
+}
+
+// design.md, "Decision: Vista de página ...": page ids of the caller's
+// active (queued/processing, non-abandoned) imports, for the sidebar's
+// ImportingPageBadge (T13a). No input to validate; the use case itself has
+// no error channel (see get-active-imports.ts), so any real failure here
+// can only be a thrown exception, already caught by withBoundary below.
+export async function getActiveImports(): Promise<
+  Result<string[], ActionError>
+> {
+  return withBoundary(async () => {
+    const ownerId = await requireOwnerId();
+    if (!ownerId.ok) return ownerId;
+    const { jobs } = deps();
+    const pageIds = await getActiveImportsUseCase({ jobs }, ownerId.value);
+    return ok(pageIds);
   });
 }

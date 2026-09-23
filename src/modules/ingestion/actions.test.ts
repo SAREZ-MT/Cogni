@@ -156,6 +156,17 @@ describe("ingestion Server Actions", () => {
         expect(result.error.code).toBe("INGESTION_SESSION_REQUIRED");
       }
     });
+
+    it("rejects getActiveImports with a session-required ActionError", async () => {
+      const { getActiveImports } = await import("./actions");
+
+      const result = await getActiveImports();
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.code).toBe("INGESTION_SESSION_REQUIRED");
+      }
+    });
   });
 
   describe("with a session", () => {
@@ -291,6 +302,32 @@ describe("ingestion Server Actions", () => {
       if (!result.ok) expect(result.error.code).toBe("IMPORT_JOB_NOT_FOUND");
     });
 
+    it("getActiveImports returns an empty array with no active imports", async () => {
+      const { getActiveImports } = await import("./actions");
+
+      const result = await getActiveImports();
+
+      expect(result).toEqual({ ok: true, value: [] });
+    });
+
+    it("getActiveImports returns the page id of a job just started with startPdfImport", async () => {
+      const path = freshUploadPath(OWNER_ID);
+      current.storage.put(path, { sizeBytes: 2048, mime: "application/pdf" });
+      const { startPdfImport, getActiveImports } = await import("./actions");
+      const started = await startPdfImport({
+        notebookId: "nb-1",
+        storagePath: path,
+        fileName: "a.pdf",
+        mime: "application/pdf",
+        sizeBytes: 1024,
+      });
+      if (!started.ok) throw new Error("setup failed: startPdfImport rejected");
+
+      const result = await getActiveImports();
+
+      expect(result).toEqual({ ok: true, value: [started.value.pageId] });
+    });
+
     it("getImportJobStatus maps a job owned by another user to an ActionError, without revealing it exists", async () => {
       const path = freshUploadPath(OWNER_ID);
       current.storage.put(path, { sizeBytes: 2048, mime: "application/pdf" });
@@ -346,6 +383,20 @@ describe("ingestion Server Actions", () => {
         const { processPdfImport } = await import("./actions");
 
         const result = await processPdfImport({ importJobId: createId() });
+
+        expect(result.ok).toBe(false);
+        if (!result.ok) expect(result.error.code).toBe("INGESTION_UNEXPECTED");
+        expect(captureException).toHaveBeenCalledWith(boom);
+      });
+
+      it("maps a thrown listActivePageIds to an unexpected ActionError instead of crashing", async () => {
+        const boom = new Error("repository connection dropped");
+        current.jobs.listActivePageIds = async () => {
+          throw boom;
+        };
+        const { getActiveImports } = await import("./actions");
+
+        const result = await getActiveImports();
 
         expect(result.ok).toBe(false);
         if (!result.ok) expect(result.error.code).toBe("INGESTION_UNEXPECTED");

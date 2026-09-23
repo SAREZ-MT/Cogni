@@ -23,6 +23,11 @@ vi.mock("./upload-pdf-to-signed-url", () => ({ uploadPdfToSignedUrl }));
 const { push } = vi.hoisted(() => ({ push: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
 
+const { add: addActiveImport } = vi.hoisted(() => ({ add: vi.fn() }));
+vi.mock("./active-imports-provider", () => ({
+  useActiveImportsActions: () => ({ add: addActiveImport, remove: vi.fn() }),
+}));
+
 const { captureException } = vi.hoisted(() => ({ captureException: vi.fn() }));
 vi.mock("@sentry/nextjs", () => ({ captureException }));
 
@@ -89,6 +94,7 @@ describe("PdfImportProvider", () => {
     uploadPdfToSignedUrl.mockReset();
     push.mockReset();
     captureException.mockReset();
+    addActiveImport.mockReset();
   });
 
   it("portals the hidden file input outside the provider's subtree so a wrapping <nav> never contains it", async () => {
@@ -216,6 +222,68 @@ describe("PdfImportProvider", () => {
       mime: "application/pdf",
       sizeBytes: 1024,
     });
+  });
+
+  it("marks the new page as actively importing right after startPdfImport succeeds (T13a)", async () => {
+    requestPdfUpload.mockResolvedValue(
+      ok({
+        storagePath: "owner-1/upload-1.pdf",
+        signedUrl: "https://signed.example/upload",
+        token: "token-1",
+        bucket: "page-pdfs",
+        expiresAt: new Date().toISOString(),
+      }),
+    );
+    uploadPdfToSignedUrl.mockResolvedValue(ok(undefined));
+    startPdfImport.mockResolvedValue(
+      ok({
+        importJobId: "job-1",
+        pageId: "page-1",
+        notebookId: "nb-1",
+        status: "queued",
+      }),
+    );
+
+    render(
+      <PdfImportProvider>
+        <Probe notebookId="nb-1" />
+      </PdfImportProvider>,
+    );
+
+    await pickFile(makeFile());
+
+    await waitFor(() => expect(addActiveImport).toHaveBeenCalledWith("page-1"));
+    expect(push).toHaveBeenCalledWith("/notebooks/nb-1/pages/page-1");
+  });
+
+  it("does not mark a page as importing when startPdfImport fails", async () => {
+    requestPdfUpload.mockResolvedValue(
+      ok({
+        storagePath: "owner-1/upload-1.pdf",
+        signedUrl: "https://signed.example/upload",
+        token: "token-1",
+        bucket: "page-pdfs",
+        expiresAt: new Date().toISOString(),
+      }),
+    );
+    uploadPdfToSignedUrl.mockResolvedValue(ok(undefined));
+    startPdfImport.mockResolvedValue({
+      ok: false,
+      error: { code: "PDF_UPLOAD_EXPIRED", message: "expired" },
+    });
+
+    render(
+      <PdfImportProvider>
+        <Probe notebookId="nb-1" />
+      </PdfImportProvider>,
+    );
+
+    await pickFile(makeFile());
+
+    await waitFor(() =>
+      expect(screen.getByTestId("status-nb-1")).toHaveTextContent("failed"),
+    );
+    expect(addActiveImport).not.toHaveBeenCalled();
   });
 
   it("shows the uploading state and an import-progress region above the children while requestPdfUpload is in flight", async () => {

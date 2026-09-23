@@ -22,10 +22,9 @@ Follows the same hexagonal shape as `notebooks`
   blocks, the time budgets (`import-budget.ts`) and every port interface.
   No framework, no npm dependency other than Zod.
 - `application/`: the five use cases (`requestPdfUpload`, `startPdfImport`,
-  `processImportJob`, `getImportJobStatus`; a fifth, `listActiveImports`,
-  ships in a later task), each `Result`-returning and testable with the
-  in-memory fakes under `application/testing/`. Never imports
-  `infrastructure` or `ui`.
+  `processImportJob`, `getImportJobStatus`, `getActiveImports`), each
+  `Result`-returning and testable with the in-memory fakes under
+  `application/testing/`. Never imports `infrastructure` or `ui`.
 - `infrastructure/`: the only layer allowed to import `unpdf`, the Supabase
   client and `@/modules/notebooks`. `SupabasePdfStorageGateway` wraps the
   private `page-pdfs` bucket, `UnpdfTextExtractor` wraps `unpdf`,
@@ -37,13 +36,18 @@ Follows the same hexagonal shape as `notebooks`
   every `DomainError` to the plain `ActionError` shape before returning, so
   no action ever throws to the client. This is also the only file allowed
   to read `serverEnv()`'s Supabase/PostHog configuration for this module.
-- `index.ts`: the public API. Only the four Server Actions, pure
+- `index.ts`: the public API. Only the five Server Actions, pure
   types/constants from `domain`/`application` are re-exported; nothing from
   `infrastructure` ever crosses this barrel, so importing this module from
   a Client Component never pulls Drizzle, the Supabase client or `unpdf`
   into the client bundle.
-- `ui/` (added starting the sidebar/upload tasks): the menu item, progress
-  card, providers and page view.
+- `ui/`: the menu item, progress card, providers and page view.
+  `ActiveImportsProvider`/`useIsImporting` (T13a) track the sidebar's
+  active imports (initial ids from a server-side `getActiveImports()` call
+  plus polling) so `ImportingPageBadge` can show next to a page under
+  import; `PdfImportProvider` calls `add()` right after `startPdfImport`
+  succeeds and `PageImportView` calls `remove()` once its own job reaches a
+  terminal state.
 
 ## Ports and adapters
 
