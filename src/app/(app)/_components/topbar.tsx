@@ -1,10 +1,18 @@
+import { Breadcrumb } from "./breadcrumb";
 import { UserMenu } from "./user-menu";
 
-export function Topbar() {
+type TopbarProps = {
+  user: { id: string; email: string | null };
+};
+
+// comp-topbar.html, Engram obs 140 (topbar anatomy): 52px sticky, translucent
+// white + blur, route-aware breadcrumb on the left, the account trigger on
+// the right.
+export function Topbar({ user }: TopbarProps) {
   return (
-    <header className="sticky top-0 flex h-(--topbar-height) shrink-0 items-center justify-between border-border-subtle border-b bg-glass px-6 backdrop-blur-md">
-      <p className="text-fg-secondary text-sm">Inicio</p>
-      <UserMenu />
+    <header className="sticky top-0 z-10 flex h-(--topbar-height) shrink-0 items-center justify-between border-border-subtle border-b bg-glass px-6 backdrop-blur-md">
+      <Breadcrumb />
+      <UserMenu user={user} />
     </header>
   );
 }

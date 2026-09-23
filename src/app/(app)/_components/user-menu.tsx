@@ -1,9 +1,32 @@
 "use client";
 
-import { CircleUser } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { SignOutButton } from "@/modules/identity/ui";
 import { cn } from "@/shared/ui/utils";
+
+type AccountUser = { id: string; email: string | null };
+
+// No display-name field is fetched for the shell yet (layout.tsx only calls
+// getCurrentUser()), so every trigger that needs a human-friendly label
+// derives one from the email's local part instead of inventing one. Shared
+// by the topbar avatar below and sidebar-user-card.tsx (S2 product
+// decision 3: the same identity everywhere, not two divergent labels).
+export function displayNameFromEmail(email: string | null): string {
+  if (!email) return "Cuenta";
+  const local = email.split("@")[0] || email;
+  return local.charAt(0).toUpperCase() + local.slice(1);
+}
+
+export function initialsFrom(displayName: string): string {
+  const parts = displayName
+    .trim()
+    .split(/[\s._-]+/)
+    .filter(Boolean);
+  if (parts.length >= 2) {
+    return `${parts[0]?.[0] ?? ""}${parts[1]?.[0] ?? ""}`.toUpperCase();
+  }
+  return displayName.slice(0, 2).toUpperCase();
+}
 
 // Shared open/close + outside-click/Escape behaviour for every trigger that
 // opens the account menu (the topbar avatar below, and the sidebar footer
@@ -54,8 +77,12 @@ export function AccountMenuPanel({ className }: { className?: string }) {
   );
 }
 
-export function UserMenu() {
+// Topbar trigger (comp-topbar.html, Engram obs 140 topbar anatomy): a
+// gradient avatar with the user's initials, not a generic person icon.
+export function UserMenu({ user }: { user: AccountUser }) {
   const { open, setOpen, rootRef } = useAccountMenu();
+  const displayName = displayNameFromEmail(user.email);
+  const initials = initialsFrom(displayName);
 
   return (
     <div ref={rootRef} className="relative">
@@ -65,9 +92,9 @@ export function UserMenu() {
         aria-expanded={open}
         aria-label="Menú de usuario"
         onClick={() => setOpen((value) => !value)}
-        className="flex size-11 items-center justify-center rounded-full text-fg-secondary hover:bg-hover hover:text-fg"
+        className="avatar-gradient flex size-8 items-center justify-center rounded-full font-semibold text-[12px] text-white transition-opacity hover:opacity-90"
       >
-        <CircleUser aria-hidden="true" size={24} strokeWidth={1.5} />
+        {initials}
       </button>
 
       {open && <AccountMenuPanel className="top-full right-0 mt-2" />}

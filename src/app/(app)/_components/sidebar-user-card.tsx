@@ -7,32 +7,17 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/shared/ui/tooltip";
-import { AccountMenuPanel, useAccountMenu } from "./user-menu";
+import {
+  AccountMenuPanel,
+  displayNameFromEmail,
+  initialsFrom,
+  useAccountMenu,
+} from "./user-menu";
 
 type SidebarUserCardProps = {
   user: { id: string; email: string | null };
   collapsed?: boolean;
 };
-
-// No display-name field is fetched for the shell yet (layout.tsx only calls
-// getCurrentUser(), per S2 scope); the card derives a human-friendly label
-// from the email's local part instead of inventing one.
-function displayNameFromEmail(email: string | null): string {
-  if (!email) return "Cuenta";
-  const local = email.split("@")[0] || email;
-  return local.charAt(0).toUpperCase() + local.slice(1);
-}
-
-function initialsFrom(displayName: string): string {
-  const parts = displayName
-    .trim()
-    .split(/[\s._-]+/)
-    .filter(Boolean);
-  if (parts.length >= 2) {
-    return `${parts[0]?.[0] ?? ""}${parts[1]?.[0] ?? ""}`.toUpperCase();
-  }
-  return displayName.slice(0, 2).toUpperCase();
-}
 
 // Pinned sidebar footer card (comp-sidebar.html .account, Engram obs 140):
 // gradient avatar + name/caption + a kebab opening the same account menu the
@@ -61,16 +46,37 @@ export function SidebarUserCard({
   );
 
   if (collapsed) {
+    // R3-collapsed-card-unreachable: this used to be a non-focusable
+    // <span>, unreachable by keyboard. It is now a real button that opens
+    // the same account menu as the expanded state, keeping the same
+    // "Opciones de la cuenta" accessible name (avoids the "Menú de
+    // usuario" substring collision noted below).
     return (
-      <div className="mt-auto flex justify-center border-border-subtle border-t px-3 py-3">
+      <div
+        ref={rootRef}
+        className="relative mt-auto flex justify-center border-border-subtle border-t px-3 py-3"
+      >
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <span>{avatar}</span>
+              <button
+                type="button"
+                aria-haspopup="menu"
+                aria-expanded={open}
+                aria-label="Opciones de la cuenta"
+                onClick={() => setOpen((value) => !value)}
+                className="rounded-full outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+              >
+                {avatar}
+              </button>
             </TooltipTrigger>
             <TooltipContent side="right">{displayName}</TooltipContent>
           </Tooltip>
         </TooltipProvider>
+
+        {open && (
+          <AccountMenuPanel className="bottom-full left-1/2 mb-2 -translate-x-1/2" />
+        )}
       </div>
     );
   }

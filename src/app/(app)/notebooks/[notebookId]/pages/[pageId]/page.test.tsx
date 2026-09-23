@@ -1,5 +1,5 @@
 import type { ReactElement } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // T11, design.md "Decision: Vista de página, llamada en curso y polling con
 // TanStack Query": this route now fetches the job status on the server and
@@ -11,11 +11,15 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 vi.mock("@/modules/editor", () => ({ Editor: () => null }));
 
-const { getPageForRoute } = vi.hoisted(() => ({ getPageForRoute: vi.fn() }));
+const { getPageForRoute, getNotebookTitleForRoute } = vi.hoisted(() => ({
+  getPageForRoute: vi.fn(),
+  getNotebookTitleForRoute: vi.fn(),
+}));
 vi.mock("@/modules/notebooks", () => ({
   getAssetReadUrl: vi.fn(),
   getCurrentContent: vi.fn(),
   getPageForRoute,
+  getNotebookTitleForRoute,
   registerPageAsset: vi.fn(),
   requestImageUpload: vi.fn(),
   saveContent: vi.fn(),
@@ -42,7 +46,7 @@ async function renderRoute() {
     params: Promise.resolve({ notebookId: "nb-1", pageId: "page-1" }),
   })) as ReactElement<{ children: ReactElement[] }>;
   const children = section.props.children;
-  const importView = children[1] as ReactElement<{
+  const importView = children[2] as ReactElement<{
     initial: unknown;
     pageId: string;
     editor: unknown;
@@ -51,6 +55,11 @@ async function renderRoute() {
 }
 
 describe("page route ingestion wiring", () => {
+  beforeEach(() => {
+    getNotebookTitleForRoute.mockReset();
+    getNotebookTitleForRoute.mockResolvedValue("Biología Celular");
+  });
+
   it("constrains the title and the editor to the design system reading measure (max-w-2xl, centered)", async () => {
     getPageForRoute.mockResolvedValue(page());
     getImportJobStatus.mockResolvedValue({ ok: true, value: null });
@@ -102,5 +111,46 @@ describe("page route ingestion wiring", () => {
     const props = await renderRoute();
 
     expect(props.editor).toBeDefined();
+  });
+
+  // S3 breadcrumb: "Cogni › {cuaderno} › {página}" — the notebook title is
+  // read server-side via getNotebookTitleForRoute so SetBreadcrumb can
+  // publish both segments.
+  it("publishes '{cuaderno} › {página}' as the breadcrumb trail", async () => {
+    getPageForRoute.mockResolvedValue(page());
+    getImportJobStatus.mockResolvedValue({ ok: true, value: null });
+    getNotebookTitleForRoute.mockResolvedValue("Biología Celular");
+
+    const { default: PageView } = await import("./page");
+    const section = (await PageView({
+      params: Promise.resolve({ notebookId: "nb-1", pageId: "page-1" }),
+    })) as ReactElement<{ children: ReactElement[] }>;
+
+    const setBreadcrumb = section.props.children[0] as ReactElement<{
+      items: { label: string }[];
+    }>;
+
+    expect(getNotebookTitleForRoute).toHaveBeenCalledWith("nb-1");
+    expect(setBreadcrumb.props.items).toEqual([
+      { label: "Biología Celular" },
+      { label: "Apuntes" },
+    ]);
+  });
+
+  it("degrades to just the page title when the notebook lookup fails", async () => {
+    getPageForRoute.mockResolvedValue(page());
+    getImportJobStatus.mockResolvedValue({ ok: true, value: null });
+    getNotebookTitleForRoute.mockResolvedValue(null);
+
+    const { default: PageView } = await import("./page");
+    const section = (await PageView({
+      params: Promise.resolve({ notebookId: "nb-1", pageId: "page-1" }),
+    })) as ReactElement<{ children: ReactElement[] }>;
+
+    const setBreadcrumb = section.props.children[0] as ReactElement<{
+      items: { label: string }[];
+    }>;
+
+    expect(setBreadcrumb.props.items).toEqual([{ label: "Apuntes" }]);
   });
 });

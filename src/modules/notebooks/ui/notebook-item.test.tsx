@@ -61,6 +61,34 @@ describe("NotebookItem", () => {
     ).toBeInTheDocument();
   });
 
+  // S3 sidebar-order fix, "notebook rows not truncating early": the hover
+  // actions used to reserve inline flex space at all times, shrinking the
+  // title even when nothing was hovered. They must now float over the row
+  // (removed from flow) so the title's flex-1 always gets the full width.
+  it("floats the hover actions instead of reserving inline space next to the title", () => {
+    renderNotebookItem(notebookItemElement());
+
+    const title = screen.getByRole("button", { name: "Biología" });
+    expect(title.className).toContain("flex-1");
+
+    const actions = screen
+      .getByRole("button", { name: "Archivar cuaderno Biología" })
+      .closest('[data-slot="notebook-item-actions"]');
+    expect(actions).not.toBeNull();
+    // Actions stay in flow but hidden until hover/focus-within: they must
+    // never overlay the title (an absolute overlay intercepted clicks and
+    // double-clicks on the title's right half, breaking rename).
+    // ...and never `display: none` either: Playwright/assistive tech must
+    // still find the action buttons without hovering first (the e2e
+    // suite clicks "Crear página en {título}" directly). In-flow +
+    // opacity-0 is the Phase 1 behaviour that keeps both properties.
+    expect(actions).not.toHaveClass("absolute");
+    expect(actions).not.toHaveClass("hidden");
+    expect(actions).toHaveClass("opacity-0");
+    expect(actions).toHaveClass("group-hover/notebook:opacity-100");
+    expect(actions).toHaveClass("group-focus-within/notebook:opacity-100");
+  });
+
   it("does not render the actions menu trigger by default (no slot mounted)", () => {
     renderNotebookItem(notebookItemElement());
 

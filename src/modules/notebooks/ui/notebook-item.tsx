@@ -86,7 +86,7 @@ export function NotebookItem({
 
   return (
     <li className="flex flex-col gap-0.5">
-      <div className="group/notebook flex items-center gap-1">
+      <div className="group/notebook relative flex items-center gap-1">
         <Popover>
           <PopoverTrigger asChild>
             <button
@@ -147,37 +147,49 @@ export function NotebookItem({
           </button>
         )}
 
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-xs"
-          onClick={onCreatePage}
-          aria-label={`Crear página en ${notebook.title}`}
-          className="opacity-0 group-hover/notebook:opacity-100"
+        {/* Hover actions stay IN FLOW and fade in (opacity), the Phase 1
+            behaviour, on purpose. Two alternatives were tried during the
+            S3 restyle and rejected: an absolute overlay sat on top of the
+            full-width title and intercepted clicks/double-clicks on its
+            right half (rename broke); `display: none` until hover made the
+            buttons invisible to Playwright and assistive tech (the e2e
+            suite clicks "Crear página en {título}" without hovering). The
+            reserved width is kept small with icon-xs buttons and a tight
+            gap so titles truncate as late as possible. */}
+        <div
+          data-slot="notebook-item-actions"
+          className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover/notebook:opacity-100 group-focus-within/notebook:opacity-100"
         >
-          <FilePlus aria-hidden="true" size={14} />
-        </Button>
-        <ArchiveConfirmDialog
-          itemLabel={`el cuaderno "${notebook.title}"`}
-          onConfirm={onArchive}
-          trigger={
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-xs"
-              className="opacity-0 group-hover/notebook:opacity-100"
-              aria-label={`Archivar cuaderno ${notebook.title}`}
-            >
-              <Trash2 aria-hidden="true" size={14} />
-            </Button>
-          }
-        />
-        {slot.menuItems && (
-          <NotebookActionsMenu
-            notebook={{ id: notebook.id, title: notebook.title }}
-            menuItems={slot.menuItems}
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            onClick={onCreatePage}
+            aria-label={`Crear página en ${notebook.title}`}
+          >
+            <FilePlus aria-hidden="true" size={14} />
+          </Button>
+          <ArchiveConfirmDialog
+            itemLabel={`el cuaderno "${notebook.title}"`}
+            onConfirm={onArchive}
+            trigger={
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                aria-label={`Archivar cuaderno ${notebook.title}`}
+              >
+                <Trash2 aria-hidden="true" size={14} />
+              </Button>
+            }
           />
-        )}
+          {slot.menuItems && (
+            <NotebookActionsMenu
+              notebook={{ id: notebook.id, title: notebook.title }}
+              menuItems={slot.menuItems}
+            />
+          )}
+        </div>
       </div>
 
       {notebook.pages.length > 0 && (
@@ -227,11 +239,6 @@ function NotebookActionsMenu({
           variant="ghost"
           size="icon-xs"
           aria-label={`Acciones de ${notebook.title}`}
-          // opacity-0 + group-hover reveals it like the sibling buttons
-          // above; group-focus-within/focus-visible keeps it reachable by
-          // keyboard even before it (or any sibling) is hovered
-          // (design.md, "siempre alcanzable por teclado").
-          className="opacity-0 group-hover/notebook:opacity-100 group-focus-within/notebook:opacity-100 focus-visible:opacity-100"
         >
           <MoreHorizontal aria-hidden="true" size={14} strokeWidth={1.75} />
         </Button>

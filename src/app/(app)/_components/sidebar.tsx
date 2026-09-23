@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  BookOpen,
   Brain,
   ChevronLeft,
   ChevronRight,
@@ -27,6 +26,16 @@ export { SIDEBAR_COOKIE } from "./sidebar-cookie";
 
 const ONE_YEAR_IN_SECONDS = 60 * 60 * 24 * 365;
 
+// Shared section-label styling (comp-sidebar.html section headers): used
+// for the notebook tree's "Cuadernos" label and every SECTIONS entry below.
+function SectionLabel({ children }: { children: ReactNode }) {
+  return (
+    <p className="px-2.5 pt-3.5 pb-1 font-medium text-[11px] text-fg-muted uppercase tracking-wide">
+      {children}
+    </p>
+  );
+}
+
 // Static nav content (comp-sidebar.html, ui_kits/app/Home Page.html
 // 296-366): no module import needed, so it lives in Sidebar directly rather
 // than being threaded in like `collapsedCreateAction` (which exists only to
@@ -40,6 +49,10 @@ type NavEntry =
     }
   | { icon: typeof Home; label: string; disabled: true; hint: string };
 
+// R3-cuadernos-href-home follow-up: this used to also carry a "Cuadernos"
+// entry that linked to "/" (same href as Inicio) and matched on a bare
+// `/notebooks` prefix — it never pointed anywhere useful. The notebook
+// tree section rendered above this one (Sidebar below) replaces it.
 const MAIN_SECTION: { label: string; items: NavEntry[] } = {
   label: "Menú principal",
   items: [
@@ -48,12 +61,6 @@ const MAIN_SECTION: { label: string; items: NavEntry[] } = {
       icon: Home,
       label: "Inicio",
       isActive: (path) => path === "/",
-    },
-    {
-      href: "/",
-      icon: BookOpen,
-      label: "Cuadernos",
-      isActive: (path) => path.startsWith("/notebooks"),
     },
   ],
 };
@@ -134,13 +141,28 @@ export function Sidebar({
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-2 pb-2">
+        {/* Notebook tree section first (sidebar-preview.png, S3 sidebar-
+            order fix: logo -> Cuadernos -> Menú principal -> Técnicas ->
+            Cuenta -> user card). `flex-1` here is what lets the tree grow
+            to fill the sidebar's leftover height, pushing the nav sections
+            below it down near the footer, matching the reference. */}
+        {!collapsed && <SectionLabel>Cuadernos</SectionLabel>}
+
+        {collapsed && collapsedCreateAction ? (
+          <div className="flex flex-col items-center gap-2 py-2">
+            {collapsedCreateAction}
+          </div>
+        ) : null}
+
+        <div
+          className={cn("flex min-h-0 flex-1 flex-col", collapsed && "hidden")}
+        >
+          {children}
+        </div>
+
         {SECTIONS.map((section) => (
           <div key={section.label} className="flex flex-col gap-0.5">
-            {!collapsed && (
-              <p className="px-2.5 pt-3.5 pb-1 font-medium text-[11px] text-fg-muted uppercase tracking-wide">
-                {section.label}
-              </p>
-            )}
+            {!collapsed && <SectionLabel>{section.label}</SectionLabel>}
             {section.items.map((item) =>
               "disabled" in item ? (
                 <NavItem
@@ -165,18 +187,6 @@ export function Sidebar({
             )}
           </div>
         ))}
-
-        {collapsed && collapsedCreateAction ? (
-          <div className="flex flex-col items-center gap-2 py-2">
-            {collapsedCreateAction}
-          </div>
-        ) : null}
-
-        <div
-          className={cn("flex min-h-0 flex-1 flex-col", collapsed && "hidden")}
-        >
-          {children}
-        </div>
       </div>
 
       <SidebarUserCard user={user} collapsed={collapsed} />

@@ -47,6 +47,27 @@ describe("CreateNotebookIconButton", () => {
     });
   });
 
+  // R3-icon-create-no-error-path: the mutation had no error path at all,
+  // failing silently.
+  it("surfaces a mutation error instead of failing silently", async () => {
+    const user = userEvent.setup();
+    createNotebook.mockRejectedValue(new Error("network down"));
+    render(<CreateNotebookIconButton />, { wrapper: Wrapper });
+
+    await user.click(screen.getByRole("button", { name: "Crear cuaderno" }));
+    const dialog = await screen.findByRole("dialog");
+    await user.type(within(dialog).getByLabelText("Título"), "Álgebra lineal");
+    await user.click(
+      within(dialog).getByRole("button", { name: "Crear cuaderno" }),
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "No se pudo crear el cuaderno. Intenta de nuevo.",
+      );
+    });
+  });
+
   it("opens the same create-notebook dialog and submits the mutation", async () => {
     const user = userEvent.setup();
     render(<CreateNotebookIconButton />, { wrapper: Wrapper });

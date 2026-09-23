@@ -32,27 +32,40 @@ export function CreateNotebookIconButton() {
   });
 
   return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span className="inline-flex">
-            <CreateNotebookDialog
-              onCreate={(title) => createNotebook.mutate(title)}
-              trigger={
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-lg"
-                  aria-label="Crear cuaderno"
-                >
-                  <Plus aria-hidden="true" size={16} strokeWidth={1.75} />
-                </Button>
-              }
-            />
-          </span>
-        </TooltipTrigger>
-        <TooltipContent side="right">Crear cuaderno</TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <div className="flex flex-col items-center gap-1">
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="inline-flex">
+              <CreateNotebookDialog
+                onCreate={(title) => createNotebook.mutate(title)}
+                trigger={
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-lg"
+                    aria-label="Crear cuaderno"
+                  >
+                    <Plus aria-hidden="true" size={16} strokeWidth={1.75} />
+                  </Button>
+                }
+              />
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side="right">Crear cuaderno</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+
+      {/* R3-icon-create-no-error-path: this mutation used to have no error
+          path at all, failing silently in the collapsed sidebar column. */}
+      {createNotebook.isError && (
+        <p
+          role="alert"
+          className="max-w-16 text-center text-[10px] text-destructive"
+        >
+          No se pudo crear el cuaderno. Intenta de nuevo.
+        </p>
+      )}
+    </div>
   );
 }

@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { ensureProfileForUser, getCurrentUser } from "@/modules/identity";
 import { getActiveImports } from "@/modules/ingestion";
 import { CreateNotebookIconButton, SidebarTree } from "@/modules/notebooks";
+import { BreadcrumbProvider } from "./_components/breadcrumb";
 import { NotebookActions } from "./_components/notebook-actions";
 import { QueryProvider } from "./_components/query-provider";
 import { Sidebar } from "./_components/sidebar";
@@ -36,28 +37,30 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <QueryProvider>
-      <div className="flex h-dvh bg-canvas">
-        <Sidebar
-          initialCollapsed={collapsed}
-          collapsedCreateAction={<CreateNotebookIconButton />}
-          user={user}
-        >
-          <NotebookActions initialPageIds={initialActiveImportPageIds}>
-            <SidebarTree />
-          </NotebookActions>
-        </Sidebar>
-        <div className="flex min-w-0 flex-1 flex-col py-3 pr-3 pl-6">
-          <div
-            data-testid="content-area"
-            className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-content border border-border-subtle bg-page shadow-xs"
+      <BreadcrumbProvider>
+        <div className="flex h-dvh bg-canvas">
+          <Sidebar
+            initialCollapsed={collapsed}
+            collapsedCreateAction={<CreateNotebookIconButton />}
+            user={user}
           >
-            <Topbar />
-            <main className="flex flex-1 flex-col overflow-auto p-(--content-padding)">
-              {children}
-            </main>
+            <NotebookActions initialPageIds={initialActiveImportPageIds}>
+              <SidebarTree />
+            </NotebookActions>
+          </Sidebar>
+          <div className="flex min-w-0 flex-1 flex-col py-3 pr-3 pl-6">
+            <div
+              data-testid="content-area"
+              className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-content border border-border-subtle bg-page shadow-xs"
+            >
+              <Topbar user={user} />
+              <main className="flex flex-1 flex-col overflow-auto p-(--content-padding)">
+                {children}
+              </main>
+            </div>
           </div>
         </div>
-      </div>
+      </BreadcrumbProvider>
     </QueryProvider>
   );
 }

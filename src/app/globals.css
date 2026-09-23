@@ -128,7 +128,7 @@
   --bg-hover: var(--color-neutral-50);
   --bg-active: var(--color-primary-50);
   --bg-muted: var(--color-neutral-100);
-  --bg-glass: rgb(255 255 255 / 0.8);
+  --bg-glass: rgb(255 255 255 / 0.85);
 
   --fg-default: var(--color-neutral-900);
   --fg-secondary: var(--color-neutral-500);

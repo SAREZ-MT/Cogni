@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+import { Breadcrumb, BreadcrumbProvider } from "./_components/breadcrumb";
 import HomePage from "./page";
 
 describe("HomePage (app shell empty state)", () => {
@@ -15,5 +16,17 @@ describe("HomePage (app shell empty state)", () => {
     render(<HomePage />);
 
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
+  });
+
+  it("publishes 'Inicio' as the breadcrumb trail", () => {
+    render(
+      <BreadcrumbProvider>
+        <HomePage />
+        <Breadcrumb />
+      </BreadcrumbProvider>,
+    );
+
+    expect(screen.getByText("Cogni")).toBeInTheDocument();
+    expect(screen.getByText("Inicio")).toBeInTheDocument();
   });
 });
