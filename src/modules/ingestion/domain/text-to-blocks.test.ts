@@ -324,5 +324,44 @@ describe("textToBlocks", () => {
         content: [H(2, "1.1 SECCIÓN DOS")],
       });
     });
+
+    // T3 follow-up (R3-bare-number-heading): a bare integer followed by
+    // text is ordinary prose, not a heading — only "N." (with the dot)
+    // is a single-level numeric heading prefix.
+    it("treats a bare integer followed by text as a paragraph, not a heading (R3-bare-number-heading)", () => {
+      const result = textToBlocks(["3 manzanas rojas"]);
+
+      expect(result.doc).toEqual({
+        type: "doc",
+        content: [P("3 manzanas rojas")],
+      });
+    });
+
+    it("treats a 4-digit number followed by text as a paragraph, not a heading (R3-bare-number-heading)", () => {
+      const result = textToBlocks(["2020 fue un año difícil"]);
+
+      expect(result.doc).toEqual({
+        type: "doc",
+        content: [P("2020 fue un año difícil")],
+      });
+    });
+
+    it("still reads a single-level numeric prefix as a heading when the dot is present", () => {
+      const result = textToBlocks(["3. Manzanas rojas"]);
+
+      expect(result.doc).toEqual({
+        type: "doc",
+        content: [H(1, "3. Manzanas rojas")],
+      });
+    });
+
+    it("reads a multi-level numeric prefix as a heading even without a trailing dot (R3-bare-number-heading)", () => {
+      const result = textToBlocks(["1.2.3 Subsección"]);
+
+      expect(result.doc).toEqual({
+        type: "doc",
+        content: [H(3, "1.2.3 Subsección")],
+      });
+    });
   });
 });

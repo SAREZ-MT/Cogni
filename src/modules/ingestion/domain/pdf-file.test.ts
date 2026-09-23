@@ -146,6 +146,22 @@ describe("uploadIdAgeMs", () => {
 
     expect(uploadIdAgeMs(path, now)).toBe(-1_000);
   });
+
+  // T3 follow-up (R3-upload-age-nan-fail-open): a malformed last segment
+  // must fail closed (treated as infinitely old), never fail open.
+  it("returns +Infinity when the last segment has non-hex characters (fails closed, not open)", () => {
+    const path = `${OWNER_ID}/not-a-real-uuid-segment.pdf`;
+    const now = new Date("2026-09-23T10:00:00.000Z");
+
+    expect(uploadIdAgeMs(path, now)).toBe(Number.POSITIVE_INFINITY);
+  });
+
+  it("returns +Infinity when the last segment has fewer than 12 hex digits", () => {
+    const path = `${OWNER_ID}/abc123.pdf`;
+    const now = new Date("2026-09-23T10:00:00.000Z");
+
+    expect(uploadIdAgeMs(path, now)).toBe(Number.POSITIVE_INFINITY);
+  });
 });
 
 describe("looksLikePdf", () => {
@@ -191,5 +207,29 @@ describe("pageTitleFromFileName", () => {
   it("returns undefined when nothing is left after stripping", () => {
     expect(pageTitleFromFileName(".pdf")).toBeUndefined();
     expect(pageTitleFromFileName("   .pdf")).toBeUndefined();
+  });
+
+  // T3 follow-up (R3-title-truncation-trailing-space): truncating at a
+  // fixed length can land right after a space; that trailing space must
+  // be trimmed away too, not just the one from the original edges.
+  it("trims a trailing space left by truncation at the 120-character cut", () => {
+    const name = `${"a".repeat(119)} ${"b".repeat(50)}.pdf`;
+    const title = pageTitleFromFileName(name);
+
+    expect(title).toBe("a".repeat(119));
+    expect(title?.endsWith(" ")).toBe(false);
+  });
+
+  // T3 follow-up (R3-title-truncation-trailing-space): a naive slice(0, 120)
+  // can land in the middle of a surrogate pair (e.g. an emoji), producing
+  // an invalid lone surrogate; the whole character must be dropped
+  // instead.
+  it("never splits a surrogate pair (emoji) at the 120-character cut", () => {
+    const name = `${"a".repeat(119)}😀${"resto de un texto largo"}.pdf`;
+    const title = pageTitleFromFileName(name);
+
+    expect(title).toBe("a".repeat(119));
+    // No lone surrogate (a half-emoji) survives in the result.
+    expect(title).not.toMatch(/[\uD800-\uDFFF]/);
   });
 });

@@ -74,10 +74,22 @@ export function isOwnedPdfPath(ownerId: string, path: string): boolean {
 // The UUID v7's leading 12 hex digits (48 bits) encode the unix
 // millisecond timestamp it was created at, big-endian — the same layout
 // `@/shared/kernel/id.ts`'s `createId()` writes. `age = now - timestamp`.
+//
+// A malformed last segment (fewer than 12 hex digits, or characters
+// outside 0-9a-f) has no valid embedded timestamp. `Number.parseInt`
+// would silently return `NaN`, which fails OPEN: `NaN > tenMinutes` is
+// always `false`, so a caller doing a plain "> TTL" check would treat a
+// garbled path as fresh. Returning `+Infinity` instead makes every "is
+// this too old" comparison resolve to expired (review follow-up from T3:
+// R3-upload-age-nan-fail-open; `startPdfImport` relies on this sentinel
+// instead of its own `Number.isFinite` guard).
 export function uploadIdAgeMs(path: string, now: Date): number {
   const fileName = path.slice(path.lastIndexOf("/") + 1);
   const uploadId = fileName.replace(PDF_EXTENSION, "");
   const timestampHex = uploadId.replace(/-/g, "").slice(0, 12);
+  if (!/^[0-9a-f]{12}$/i.test(timestampHex)) {
+    return Number.POSITIVE_INFINITY;
+  }
   const timestampMs = Number.parseInt(timestampHex, 16);
   return now.getTime() - timestampMs;
 }
@@ -85,6 +97,26 @@ export function uploadIdAgeMs(path: string, now: Date): number {
 export function looksLikePdf(bytes: Uint8Array): boolean {
   if (bytes.length < PDF_MAGIC.length) return false;
   return PDF_MAGIC.every((byte, index) => bytes[index] === byte);
+}
+
+const TITLE_MAX_LENGTH = 120;
+
+// UTF-16 high surrogates (0xD800-0xDBFF): `slice` cuts by code unit, not
+// by code point, so slicing right after a high surrogate would keep a
+// lone surrogate in the result — an invalid, unrenderable half of an
+// astral character (e.g. an emoji). Pulling the cut back one unit drops
+// the whole character instead of mangling it (T3 follow-up:
+// R3-title-truncation-trailing-space).
+function truncateWithoutSplittingSurrogates(
+  text: string,
+  maxLength: number,
+): string {
+  if (text.length <= maxLength) return text;
+  const isHighSurrogate =
+    maxLength > 0 &&
+    text.charCodeAt(maxLength - 1) >= 0xd800 &&
+    text.charCodeAt(maxLength - 1) <= 0xdbff;
+  return text.slice(0, isHighSurrogate ? maxLength - 1 : maxLength);
 }
 
 export function pageTitleFromFileName(fileName: string): string | undefined {
@@ -95,6 +127,12 @@ export function pageTitleFromFileName(fileName: string): string | undefined {
   const base = segments[segments.length - 1];
   const withoutExtension = base.replace(PDF_EXTENSION, "");
   const collapsed = withoutExtension.replace(/\s+/g, " ").trim();
-  const truncated = collapsed.slice(0, 120);
+  // Truncating at a fixed length can land right after a space (leaving a
+  // trailing space) as easily as mid-word; trim again after cutting
+  // (T3 follow-up: R3-title-truncation-trailing-space).
+  const truncated = truncateWithoutSplittingSurrogates(
+    collapsed,
+    TITLE_MAX_LENGTH,
+  ).trim();
   return truncated.length > 0 ? truncated : undefined;
 }

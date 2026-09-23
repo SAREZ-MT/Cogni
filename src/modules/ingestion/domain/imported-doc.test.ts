@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  hasTextContent,
   importedBulletList,
   importedHeading,
   importedListItem,
@@ -120,5 +121,73 @@ describe("importedOrderedList", () => {
         },
       ],
     });
+  });
+});
+
+// T4 follow-up (R3-empty-invariant-shallow): `hasTextContent` is what T6's
+// `processImportJob` calls before `writeImportedContent`.
+describe("hasTextContent", () => {
+  it("returns false for a document with no blocks", () => {
+    expect(hasTextContent({ type: "doc", content: [] })).toBe(false);
+  });
+
+  it("returns true when a paragraph has non-whitespace text", () => {
+    expect(
+      hasTextContent({ type: "doc", content: [importedParagraph("hola")] }),
+    ).toBe(true);
+  });
+
+  it("returns false when every paragraph is only whitespace", () => {
+    expect(
+      hasTextContent({
+        type: "doc",
+        content: [importedParagraph("   "), importedParagraph("\t\n")],
+      }),
+    ).toBe(false);
+  });
+
+  it("returns true when a heading has non-whitespace text", () => {
+    expect(
+      hasTextContent({
+        type: "doc",
+        content: [importedHeading(1, "Título")],
+      }),
+    ).toBe(true);
+  });
+
+  it("returns true when a bullet list item has non-whitespace text", () => {
+    expect(
+      hasTextContent({
+        type: "doc",
+        content: [importedBulletList(["  ", "algo"])],
+      }),
+    ).toBe(true);
+  });
+
+  it("returns false when every bullet list item is only whitespace", () => {
+    expect(
+      hasTextContent({
+        type: "doc",
+        content: [importedBulletList(["  ", " \t"])],
+      }),
+    ).toBe(false);
+  });
+
+  it("returns true when an ordered list item has non-whitespace text", () => {
+    expect(
+      hasTextContent({
+        type: "doc",
+        content: [importedOrderedList(["  ", "algo"])],
+      }),
+    ).toBe(true);
+  });
+
+  it("returns false when every ordered list item is only whitespace", () => {
+    expect(
+      hasTextContent({
+        type: "doc",
+        content: [importedOrderedList(["  ", " \t"])],
+      }),
+    ).toBe(false);
   });
 });

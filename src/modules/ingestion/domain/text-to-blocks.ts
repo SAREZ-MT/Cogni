@@ -32,9 +32,16 @@ const ORDERED_PAREN_MARKER = /^(\d+)\) (\S.*)$/;
 // R4 rule 2: "N. ..." is an ordered item only when a neighbor agrees.
 const ORDERED_DOT_MARKER = /^(\d+)\. (\S.*)$/;
 
-// R5(a): "N." / "N.N" / "N.N.N"... prefix, with or without a trailing dot
-// on the prefix, followed by a space and non-blank content.
-const NUMERIC_HEADING_PREFIX = /^(\d+(?:\.\d+)*)\.?\s(\S.*)$/;
+// R5(a): "N." / "N.N" / "N.N.N"... prefix followed by a space and
+// non-blank content. A single-level prefix ("N") requires the trailing
+// dot, or a bare integer at the start of a sentence ("3 manzanas rojas",
+// "2020 fue un año difícil") would be misread as a heading (T3 follow-up:
+// R3-bare-number-heading). A multi-level prefix ("N.N", "N.N.N", ...)
+// already can't be confused with a bare number, so its trailing dot stays
+// optional, matching the multi-level examples in the E1-E20 table (e.g.
+// "1.1 SECCIÓN DOS").
+const NUMERIC_HEADING_PREFIX_SINGLE_LEVEL = /^(\d+)\.\s(\S.*)$/;
+const NUMERIC_HEADING_PREFIX_MULTI_LEVEL = /^(\d+(?:\.\d+)+)\.?\s(\S.*)$/;
 // R5(b): a valid uppercase Roman numeral (1-3999) followed by ". ".
 const ROMAN_HEADING_PREFIX =
   /^(M{0,4}(?:CM|CD|D?C{0,3})(?:XC|XL|L?X{0,3})(?:IX|IV|V?I{0,3}))\. (\S.*)$/;
@@ -76,11 +83,13 @@ function headingLevel(line: string): number | null {
 
   // R6: "si hay prefijo y además mayúsculas, decide el prefijo" — the
   // numeric/Roman prefix checks run before the all-uppercase fallback.
-  const numeric = NUMERIC_HEADING_PREFIX.exec(line);
-  if (numeric) {
-    const segments = numeric[1].split(".").length;
+  const numericMultiLevel = NUMERIC_HEADING_PREFIX_MULTI_LEVEL.exec(line);
+  if (numericMultiLevel) {
+    const segments = numericMultiLevel[1].split(".").length;
     return Math.min(segments, 3);
   }
+  const numericSingleLevel = NUMERIC_HEADING_PREFIX_SINGLE_LEVEL.exec(line);
+  if (numericSingleLevel) return 1;
   const roman = ROMAN_HEADING_PREFIX.exec(line);
   if (roman && roman[1].length > 0) return 1;
   if (isAllUppercase(line)) return 1;

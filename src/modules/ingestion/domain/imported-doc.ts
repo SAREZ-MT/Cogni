@@ -75,3 +75,28 @@ export function importedOrderedList(
   }
   return { type: "orderedList", content };
 }
+
+function hasNonWhitespaceText(node: ImportedText): boolean {
+  return node.text.trim().length > 0;
+}
+
+// T4 follow-up: a small domain predicate `processImportJob` (T6) uses to
+// reject an extracted doc whose blocks carry no real text — only empty
+// paragraphs, or blocks that R10 would never actually emit — *before*
+// calling `NotebookPagesPort.writeImportedContent` (review follow-up
+// R3-empty-invariant-shallow; `textToBlocks`'s own `pagesWithoutText ===
+// pageCount` already covers the "no page had text" case, this covers the
+// deeper "no block anywhere has text" one).
+export function hasTextContent(doc: ImportedDoc): boolean {
+  return doc.content.some((block) => {
+    if (block.type === "paragraph" || block.type === "heading") {
+      return block.content.some(hasNonWhitespaceText);
+    }
+    // bulletList / orderedList: each item holds exactly one paragraph.
+    return block.content.some((item) =>
+      item.content.some((paragraph) =>
+        paragraph.content.some(hasNonWhitespaceText),
+      ),
+    );
+  });
+}
