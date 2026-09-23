@@ -122,6 +122,24 @@ export const pageAssets = pgTable(
 
 export type PageAssetRow = typeof pageAssets.$inferSelect;
 
+// The four ImportJob statuses (mirrors domain's IMPORT_JOB_STATUS in
+// modules/ingestion/domain/import-job.ts). Kept as its own literal tuple
+// here — not imported from that module — because schema.ts stays free of
+// module imports, like every other table in this file; `status`'s
+// `$type<>()` below and the `import_jobs_status_check` constraint text
+// are both derived from this single tuple so they can never drift apart
+// from each other (review follow-up from T1: R2-status-untyped). If this
+// list ever changes, `import-jobs.smoke.test.ts` asserts the CHECK
+// constraint still matches it, and the domain tuple must be updated too.
+export const IMPORT_JOB_STATUSES = [
+  "queued",
+  "processing",
+  "done",
+  "failed",
+] as const;
+
+export type ImportJobStatusValue = (typeof IMPORT_JOB_STATUSES)[number];
+
 // One row per PDF import (design.md, "Tabla `import_jobs` solo accesible
 // desde el servidor"). RLS is on with no policies, like pages: only the
 // server connection reads or writes it. There is no external run id
@@ -139,7 +157,10 @@ export const importJobs = pgTable(
     storagePath: text("storage_path").notNull(),
     fileName: text("file_name").notNull(),
     sizeBytes: integer("size_bytes").notNull(),
-    status: text("status").notNull().default("queued"),
+    status: text("status")
+      .notNull()
+      .default("queued")
+      .$type<ImportJobStatusValue>(),
     pageCount: integer("page_count"),
     pagesWithoutText: integer("pages_without_text").notNull().default(0),
     error: text("error"),

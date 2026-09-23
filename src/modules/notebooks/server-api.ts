@@ -37,6 +37,13 @@ export interface NotebooksServerApi {
     ownerId: string,
     input: { pageId: string; content: TiptapDoc; expectedVersion: number },
   ): Promise<Result<{ version: number }, DomainError>>;
+  // The page -> notebook lookup NotebookPagesPort.findPageNotebookId (T6)
+  // needs: null when the page does not exist, belongs to another owner, is
+  // archived, or its notebook does not exist, belongs to another owner or
+  // is archived. Never leaks whether an unowned/archived page exists (T7a
+  // deliverable; ingestion's NotebooksPagesAdapter, T7b, will implement
+  // NotebookPagesPort.findPageNotebookId by calling this one-to-one).
+  findPageNotebookId(ownerId: string, pageId: string): Promise<string | null>;
 }
 
 export function createNotebooksServerApi(deps: {
@@ -68,6 +75,14 @@ export function createNotebooksServerApi(deps: {
 
     async writeImportedContent(ownerId, input) {
       return writeImportedContentUseCase(input, { pages, clock }, ownerId);
+    },
+
+    async findPageNotebookId(ownerId, pageId) {
+      const page = await pages.findById(pageId);
+      if (!page || page.ownerId !== ownerId || page.archivedAt) return null;
+      const notebook = await notebooks.findById(page.notebookId);
+      if (!notebook || notebook.archivedAt) return null;
+      return page.notebookId;
     },
   };
 }
