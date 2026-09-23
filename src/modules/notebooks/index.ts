@@ -79,4 +79,11 @@ export {
   createNotebooksServerApi,
   type NotebooksServerApi,
 } from "./server-api";
+export {
+  type NotebookActionsHelpers,
+  NotebookActionsSlotProvider,
+  type NotebookActionsSlotTarget,
+  type NotebookActionsSlotValue,
+  type PageActionsSlotTarget,
+} from "./ui/notebook-actions-slot";
 export { SidebarTree } from "./ui/sidebar-tree";

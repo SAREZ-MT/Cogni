@@ -1,14 +1,33 @@
 "use client";
 
-import { FilePlus, Notebook as NotebookIcon, Trash2 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  FilePlus,
+  MoreHorizontal,
+  Notebook as NotebookIcon,
+  Trash2,
+} from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/shared/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/shared/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover";
 import { cn } from "@/shared/ui/utils";
 import type { SidebarNotebook } from "../application/list-sidebar";
 import { COLOR_PALETTE, type NotebookColor } from "../domain/notebook";
 import { ArchiveConfirmDialog } from "./archive-confirm-dialog";
+import { useNotebookActionsSlot } from "./notebook-actions-slot";
 import { PageItem } from "./page-item";
+
+// Mirrors the literal query key sidebar-tree-client.tsx owns privately
+// (SIDEBAR_TREE_QUERY_KEY): TanStack Query matches queries by value, not by
+// reference, so this duplicate literal invalidates the same cache entry
+// without notebooks/index.ts exporting the key (design.md, "clave que
+// sigue siendo privada de notebooks").
+const SIDEBAR_TREE_QUERY_KEY = ["notebooks", "sidebar-tree"] as const;
 
 // Tailwind (v4) needs literal class names to keep them in the generated
 // CSS; a template-interpolated `bg-${color}` string is invisible to its
@@ -59,6 +78,17 @@ export function NotebookItem({
 }: NotebookItemProps) {
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(notebook.title);
+  const queryClient = useQueryClient();
+  const slot = useNotebookActionsSlot();
+  const injectedMenuItems = slot.menuItems?.(
+    { id: notebook.id, title: notebook.title },
+    {
+      refreshTree: () =>
+        void queryClient.invalidateQueries({
+          queryKey: SIDEBAR_TREE_QUERY_KEY,
+        }),
+    },
+  );
 
   function commit() {
     setEditing(false);
@@ -155,6 +185,26 @@ export function NotebookItem({
             </Button>
           }
         />
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              aria-label={`Acciones de ${notebook.title}`}
+              // opacity-0 + group-hover reveals it like the sibling
+              // buttons above; group-focus-within/focus-visible keeps it
+              // reachable by keyboard even before it (or any sibling) is
+              // hovered (design.md, "siempre alcanzable por teclado").
+              className="opacity-0 group-hover/notebook:opacity-100 group-focus-within/notebook:opacity-100 focus-visible:opacity-100"
+            >
+              <MoreHorizontal aria-hidden="true" size={14} strokeWidth={1.75} />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            {injectedMenuItems}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {notebook.pages.length > 0 && (

@@ -7,6 +7,7 @@ import { Button } from "@/shared/ui/button";
 import { cn } from "@/shared/ui/utils";
 import type { SidebarPage } from "../application/list-sidebar";
 import { ArchiveConfirmDialog } from "./archive-confirm-dialog";
+import { useNotebookActionsSlot } from "./notebook-actions-slot";
 
 interface PageItemProps {
   notebookId: string;
@@ -23,6 +24,8 @@ export function PageItem({
 }: PageItemProps) {
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(page.title);
+  const slot = useNotebookActionsSlot();
+  const badge = slot.pageBadge?.({ id: page.id });
 
   function commit() {
     setEditing(false);
@@ -63,6 +66,9 @@ export function PageItem({
           <FileText aria-hidden="true" size={16} strokeWidth={1.75} />
           <span className="truncate">{page.title}</span>
         </Link>
+      )}
+      {!editing && badge && (
+        <span className="shrink-0 text-muted-foreground text-xs">{badge}</span>
       )}
       <ArchiveConfirmDialog
         itemLabel={`la página "${page.title}"`}
