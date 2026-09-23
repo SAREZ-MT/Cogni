@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { ensureProfileForUser, getCurrentUser } from "@/modules/identity";
 import { getActiveImports } from "@/modules/ingestion";
-import { SidebarTree } from "@/modules/notebooks";
+import { CreateNotebookIconButton, SidebarTree } from "@/modules/notebooks";
 import { NotebookActions } from "./_components/notebook-actions";
 import { QueryProvider } from "./_components/query-provider";
 import { Sidebar } from "./_components/sidebar";
@@ -37,7 +37,11 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   return (
     <QueryProvider>
       <div className="flex h-dvh bg-canvas">
-        <Sidebar initialCollapsed={collapsed}>
+        <Sidebar
+          initialCollapsed={collapsed}
+          collapsedCreateAction={<CreateNotebookIconButton />}
+          user={user}
+        >
           <NotebookActions initialPageIds={initialActiveImportPageIds}>
             <SidebarTree />
           </NotebookActions>

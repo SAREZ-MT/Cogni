@@ -81,6 +81,15 @@ Callout kinds map to colors: idea → yellow, note → blue, warning → orange.
 - **Auth screens:** split-panel — dark `#1C1917` left with radial-gradient violet glows + warm `#FAFAF8` right form panel.
 - **Study panel:** right sidebar next to the editor listing the three techniques with a "Generar" action each, NotebookLM style.
 
+## Editor (mandatory reference)
+
+The page editor must look and behave like the editor shown in the Tiptap documentation, in the Notion style: <https://tiptap.dev/docs/editor/getting-started/overview> (overview) and the "Notion-like editor" template <https://tiptap.dev/docs/ui-components/templates/notion-like-editor> (concrete anatomy).
+
+- Interactions: `/` slash command menu with block types; a per-block drag handle ("⋮⋮") that reorders blocks by drag and drop, with a "+" affordance to insert; a floating (bubble) toolbar on text selection for inline formatting and links; placeholder copy on empty blocks ("Escribe / para ver los comandos" style, Spanish); keyboard shortcuts and undo/redo.
+- Look: clean Notion-like reading column, block spacing and hover states as in the Tiptap demo, but colors, typography and radii come from this design system (`.editor-content` tokens), not from Tiptap's default theme.
+- Blocks: keep Cogni's families (headings, paragraphs, lists, task list, callout, highlight, code, divider, image, table).
+- Licensing: the official Notion-like template needs a paid Tiptap plan for production. Default is to reproduce its look and interactions with the free open-source extensions (`@tiptap/extension-placeholder`, bubble and floating menus, drag handle when available in the installed version, the existing slash command) and Cogni's own UI. Do not install the paid template unless the user opts into the plan.
+
 ## Copy Rules
 
 - Spanish "tú", sentence case for headings and buttons (Title Case only for "Cogni").

@@ -3,8 +3,15 @@
 import { CircleUser } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { SignOutButton } from "@/modules/identity/ui";
+import { cn } from "@/shared/ui/utils";
 
-export function UserMenu() {
+// Shared open/close + outside-click/Escape behaviour for every trigger that
+// opens the account menu (the topbar avatar below, and the sidebar footer
+// card's kebab in sidebar-user-card.tsx — S2 product decision 3: the same
+// menu, not two competing implementations). Each caller owns its own
+// `rootRef` container and open state, so two triggers can exist on screen
+// at once without colliding.
+export function useAccountMenu() {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -26,6 +33,30 @@ export function UserMenu() {
     };
   }, [open]);
 
+  return { open, setOpen, rootRef };
+}
+
+// The menu content itself: "Cerrar sesión" lives here exactly once. `className`
+// positions the panel relative to its trigger (topbar: below-right; sidebar
+// footer card: above-right, since it sits at the bottom of the column).
+export function AccountMenuPanel({ className }: { className?: string }) {
+  return (
+    <div
+      role="menu"
+      aria-label="Menú de usuario"
+      className={cn(
+        "absolute min-w-44 rounded-lg border border-border-default bg-card p-1 shadow-md",
+        className,
+      )}
+    >
+      <SignOutButton className="flex min-h-11 w-full items-center gap-2 rounded-input px-3 text-fg text-sm hover:bg-hover" />
+    </div>
+  );
+}
+
+export function UserMenu() {
+  const { open, setOpen, rootRef } = useAccountMenu();
+
   return (
     <div ref={rootRef} className="relative">
       <button
@@ -39,15 +70,7 @@ export function UserMenu() {
         <CircleUser aria-hidden="true" size={24} strokeWidth={1.5} />
       </button>
 
-      {open && (
-        <div
-          role="menu"
-          aria-label="Menú de usuario"
-          className="absolute top-full right-0 mt-2 min-w-44 rounded-lg border border-border-default bg-card p-1 shadow-md"
-        >
-          <SignOutButton className="flex min-h-11 w-full items-center gap-2 rounded-input px-3 text-fg text-sm hover:bg-hover" />
-        </div>
-      )}
+      {open && <AccountMenuPanel className="top-full right-0 mt-2" />}
     </div>
   );
 }
