@@ -70,6 +70,26 @@
     sans-serif;
   --font-mono: var(--font-jetbrains-mono), "Fira Code", monospace;
 
+  /* Type scale (docs/design-system/colors_and_type.css, preview/type-
+     scale.html): pinned explicitly as design tokens, even though most of
+     these values already match Tailwind v4's own defaults, so `text-3xl`/
+     `text-2xl`/`text-xl`/`leading-snug` etc. used by `.editor-content`
+     below resolve to the Cogni type scale on purpose, not to an unpinned
+     framework default that could drift. `--leading-tight` is the one real
+     override: the design system specifies 1.2, Tailwind's built-in
+     `leading-tight` is 1.25. */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+  --text-4xl: 2.25rem;
+  --leading-tight: 1.2;
+  --leading-snug: 1.375;
+  --leading-normal: 1.5;
+
   /* Radii */
   --radius-sm: 6px;
   --radius-md: 8px;
@@ -170,6 +190,146 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+}
+
+/* T13b (design fidelity, docs/design-system/screenshots/editor.png and
+   preview/type-scale.html): imported and hand-written content must read
+   like the design system, not like `@tailwindcss/typography`'s generic
+   `.prose` look. That plugin was evaluated and rejected — its default
+   scale/colors don't match Cogni's tokens, and overriding every
+   `--tw-prose-*` variable to fit would be more code, and a second source
+   of truth for typography, than styling the real ProseMirror output
+   directly. This block does that: `.editor-content` (editor.tsx) scopes
+   real element selectors (h1-h3, p, lists, task list, blockquote, code,
+   hr, img, highlight mark, link) to the editor only, entirely from the
+   `@theme` tokens above — no hex, no third-party defaults. The callout
+   node view (callout-node.tsx) and the code-block node view (extensions/
+   code-block.tsx) already style themselves with Tailwind utilities and
+   need nothing here. */
+@layer components {
+  .editor-content h1 {
+    font-size: var(--text-3xl);
+    font-weight: 700;
+    line-height: var(--leading-tight);
+    margin-top: 1.5rem;
+    margin-bottom: 0.75rem;
+  }
+  .editor-content h2 {
+    font-size: var(--text-2xl);
+    font-weight: 600;
+    line-height: var(--leading-tight);
+    margin-top: 1.25rem;
+    margin-bottom: 0.5rem;
+  }
+  .editor-content h3 {
+    font-size: var(--text-xl);
+    font-weight: 600;
+    line-height: var(--leading-snug);
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
+  }
+  .editor-content h1:first-child,
+  .editor-content h2:first-child,
+  .editor-content h3:first-child {
+    margin-top: 0;
+  }
+
+  .editor-content p {
+    font-size: var(--text-base);
+    line-height: var(--leading-normal);
+    margin-bottom: 0.75rem;
+  }
+
+  .editor-content ul,
+  .editor-content ol {
+    margin-bottom: 0.75rem;
+    padding-left: 1.5rem;
+  }
+  .editor-content ul {
+    list-style-type: disc;
+  }
+  .editor-content ol {
+    list-style-type: decimal;
+  }
+  .editor-content li {
+    margin-bottom: 0.25rem;
+  }
+  .editor-content li::marker {
+    color: var(--color-fg-secondary);
+  }
+  .editor-content li > ul,
+  .editor-content li > ol {
+    margin-top: 0.25rem;
+    margin-bottom: 0;
+  }
+
+  /* @tiptap/extension-task-list / -task-item render
+     `ul[data-type="taskList"] > li[data-checked]`, each li holding a
+     `<label><input type="checkbox">…</label>` next to its content — no
+     bullet marker, an aligned checkbox column instead. */
+  .editor-content ul[data-type="taskList"] {
+    list-style: none;
+    padding-left: 0;
+  }
+  .editor-content ul[data-type="taskList"] li {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  .editor-content ul[data-type="taskList"] li > label {
+    margin-top: 0.2rem;
+    user-select: none;
+  }
+  .editor-content ul[data-type="taskList"] input[type="checkbox"] {
+    accent-color: var(--color-primary-600);
+    width: 1rem;
+    height: 1rem;
+  }
+  .editor-content ul[data-type="taskList"] li[data-checked="true"] > div {
+    color: var(--color-fg-muted);
+    text-decoration: line-through;
+  }
+
+  .editor-content blockquote {
+    border-left: 3px solid var(--color-border-default);
+    padding-left: 1rem;
+    margin-bottom: 0.75rem;
+    color: var(--color-fg-secondary);
+    font-style: italic;
+  }
+
+  .editor-content hr {
+    border: none;
+    border-top: 1px solid var(--color-border-default);
+    margin: 1.5rem 0;
+  }
+
+  .editor-content img {
+    display: block;
+    max-width: 100%;
+    border-radius: var(--radius-2xl);
+  }
+
+  /* Inline code only — the code-block node view (extensions/code-block.tsx)
+     renders its own `pre`/`code` with its own classes. */
+  .editor-content :not(pre) > code {
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    background-color: var(--color-muted);
+    border-radius: var(--radius-sm);
+    padding: 0.125rem 0.375rem;
+  }
+
+  .editor-content mark {
+    border-radius: var(--radius-sm);
+    padding: 0 0.15em;
+  }
+
+  .editor-content a {
+    color: var(--color-primary-600);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
 }
 
 /* Violet glows for the public auth brand panel. */

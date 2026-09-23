@@ -14,6 +14,19 @@ const { processPdfImport, getImportJobStatus } = vi.hoisted(() => ({
 }));
 vi.mock("../actions", () => ({ processPdfImport, getImportJobStatus }));
 
+// Review follow-up from the T12+T13a slice
+// (R3-refresh-transition-test-models-promise): `next/navigation`'s real
+// `router.refresh()` returns void (node_modules/next/dist/docs/), not a
+// Promise. This mock models it as one so the "keeps the editor unmounted
+// while the router.refresh transition is pending" test below has
+// something to control `startRefreshTransition`'s `await router.refresh()`
+// with in jsdom. Whether the real void-returning `router.refresh()` still
+// gates `isRefreshPending` the same way is not provable here — that is
+// proven in the browser by the parent's T13a visual pass (the editor
+// mounts with the refreshed content right after the import finishes;
+// screenshots t13a-2, t13a-*.png). Keep this test in place regardless: it
+// still proves the component reads `isRefreshPending` correctly once a
+// transition is in flight, which is real, mock-independent behavior.
 const { refresh } = vi.hoisted(() => ({ refresh: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
 

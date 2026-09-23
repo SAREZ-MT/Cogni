@@ -135,10 +135,18 @@ export function Editor({
         onDiscard={discardDraft}
       />
       {editor ? <HighlightPicker editor={editor} /> : null}
+      {/* T13b (design fidelity, docs/design-system/screenshots/editor.png):
+          `.editor-content` (src/app/globals.css) styles the real
+          ProseMirror output against the Cogni type scale instead of
+          `@tailwindcss/typography`'s generic `.prose` — see the comment
+          above that block for why the plugin was rejected. The comfortable
+          reading measure is the page route's `mx-auto max-w-2xl` section
+          (notebooks/[notebookId]/pages/[pageId]/page.tsx), which also
+          aligns the page title, so this stays `max-w-none`. */}
       <EditorContent
         editor={editor}
         data-testid="editor-content"
-        className="prose prose-sm max-w-none text-fg focus:outline-none"
+        className="editor-content max-w-none text-fg focus:outline-none"
       />
     </div>
   );

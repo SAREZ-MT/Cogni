@@ -51,7 +51,10 @@ export default async function PageView({ params }: PagePageProps) {
   const initialJob = jobResult.ok ? jobResult.value : null;
 
   return (
-    <section className="flex flex-1 flex-col gap-4">
+    // Reading measure (docs/design-system/screenshots/editor.png): the title
+    // and the editor share one centered column instead of running the full
+    // content width; the import cards use the same max-w-2xl.
+    <section className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4">
       <h1 className="font-semibold text-fg text-xl">{page.title}</h1>
       <PageImportView
         initial={initialJob}

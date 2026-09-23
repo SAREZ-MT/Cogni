@@ -87,24 +87,28 @@ export function ActiveImportsProvider({
     retry: false,
   });
 
-  // `initialData` is unconditional (a plain array, never derived from
-  // component state), so `query.data` is guaranteed defined for the whole
-  // lifetime of this component — TanStack seeds the cache with it
-  // synchronously and keeps the last known data across a failed refetch
-  // (the queryFn's own `throw` above). Read directly instead of defending
-  // with `??`, which would leave a branch no test could legitimately
-  // exercise through the public setQueryData API.
+  // Review follow-up from the T12+T13a slice
+  // (R3-stale-closure-active-imports-mutations): `add`/`remove` used to
+  // read `query.data` from the closure captured at the render that created
+  // them (a plain read, defended above as always-defined). A caller that
+  // still held an OLDER render's `add`/`remove` — bound before the cache
+  // was refreshed by something else, such as a poll tick or another
+  // add()/remove() — would then overwrite that other change with its own
+  // stale snapshot, silently dropping it. `setQueryData`'s functional
+  // updater receives TanStack's live cache value at call time instead of
+  // this render's closure, so a stale caller can never regress the cache
+  // to a state older than the one it is updating. `?? []` guards the same
+  // rare-eviction case `query.data` was defended against above.
   function add(pageId: string): void {
-    if (query.data.includes(pageId)) return;
-    queryClient.setQueryData<string[]>(ACTIVE_IMPORTS_QUERY_KEY, [
-      ...query.data,
-      pageId,
-    ]);
+    queryClient.setQueryData<string[]>(ACTIVE_IMPORTS_QUERY_KEY, (old = []) =>
+      old.includes(pageId) ? old : [...old, pageId],
+    );
   }
 
   function remove(pageId: string): void {
-    const next = query.data.filter((id) => id !== pageId);
-    queryClient.setQueryData<string[]>(ACTIVE_IMPORTS_QUERY_KEY, next);
+    queryClient.setQueryData<string[]>(ACTIVE_IMPORTS_QUERY_KEY, (old = []) =>
+      old.filter((id) => id !== pageId),
+    );
   }
 
   const value: ActiveImportsContextValue = {
