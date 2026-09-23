@@ -29,6 +29,9 @@ export const serverSchema = clientSchema.extend({
   // (design.md, "Bucket privado `page-assets`, ruta canónica y RLS por
   // `owner_id`"). Server-only: never exposed to the client bundle.
   SUPABASE_STORAGE_BUCKET: z.string().min(1),
+  // Name of the private bucket for imported PDFs (design.md, "Bucket privado
+  // `page-pdfs` por migración"). Server-only, like SUPABASE_STORAGE_BUCKET.
+  SUPABASE_PDF_BUCKET: z.string().min(1),
 });
 
 export type ClientEnv = z.infer<typeof clientSchema>;

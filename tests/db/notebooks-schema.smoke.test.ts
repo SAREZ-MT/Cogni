@@ -8,12 +8,19 @@ import { describe, expect, it } from "vitest";
 // specs/notebooks/spec.md, Requirement "Modelo de datos segun S6.1".
 const url = process.env.DATABASE_URL;
 
-function readDownSql(): string {
+function readDownSql(migration: string): string {
   return readFileSync(
-    path.join(process.cwd(), "drizzle", "0003_notebooks_pages_assets.down.sql"),
+    path.join(process.cwd(), "drizzle", `${migration}.down.sql`),
     "utf8",
   );
 }
+
+// Reversions run newest first. import_jobs (0005) references pages, so it
+// must be reverted before 0003 can drop the tables it depends on.
+const REVERSIONS_DOWN_TO_0003 = [
+  "0005_import_jobs",
+  "0003_notebooks_pages_assets",
+];
 
 class ForceRollback extends Error {}
 
@@ -104,7 +111,9 @@ describe.skipIf(!url)("0003 notebooks/pages/page_assets schema", () => {
     try {
       await sql
         .begin(async (tx) => {
-          await tx.unsafe(readDownSql());
+          for (const migration of REVERSIONS_DOWN_TO_0003) {
+            await tx.unsafe(readDownSql(migration));
+          }
 
           const tables = await tx`
             select table_name from information_schema.tables

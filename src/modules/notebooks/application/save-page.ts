@@ -5,28 +5,8 @@ import { err, ok, type Result } from "@/shared/kernel/result";
 import { PAGE_ERROR } from "../domain/errors";
 import type { PageRepository } from "../domain/page-repository";
 import { extractPlainText, type TiptapDoc } from "../domain/plain-text";
+import { tiptapDocSchema } from "./content-schema";
 import { parseInput } from "./validation";
-
-const tiptapNodeSchema: z.ZodType<{
-  type: string;
-  content?: unknown[];
-  text?: string;
-  attrs?: Record<string, unknown>;
-  marks?: Array<{ type: string; attrs?: Record<string, unknown> }>;
-}> = z.object({
-  type: z.string(),
-  content: z.array(z.lazy(() => tiptapNodeSchema)).optional(),
-  text: z.string().optional(),
-  attrs: z.record(z.string(), z.unknown()).optional(),
-  marks: z
-    .array(
-      z.object({
-        type: z.string(),
-        attrs: z.record(z.string(), z.unknown()).optional(),
-      }),
-    )
-    .optional(),
-});
 
 // content MUST have a "doc" root node (Scenario: "Contenido que no es un
 // documento Tiptap"). plain_text is intentionally not part of this schema:
@@ -35,10 +15,7 @@ const tiptapNodeSchema: z.ZodType<{
 export const savePageSchema = z.object({
   pageId: z.string(),
   expectedVersion: z.number().int(),
-  content: z.object({
-    type: z.literal("doc"),
-    content: z.array(tiptapNodeSchema).optional(),
-  }),
+  content: tiptapDocSchema,
 });
 
 export async function savePage(

@@ -13,6 +13,7 @@ const server = {
   DATABASE_URL: "postgresql://u:p@host:6543/postgres",
   CRON_SECRET: "0123456789abcdef0123456789abcdef",
   SUPABASE_STORAGE_BUCKET: "page-assets",
+  SUPABASE_PDF_BUCKET: "page-pdfs",
 };
 
 describe("parseClientEnv", () => {
@@ -69,6 +70,21 @@ describe("parseServerEnv", () => {
   it("fails at boot naming SUPABASE_STORAGE_BUCKET when it is absent", () => {
     const { SUPABASE_STORAGE_BUCKET: _, ...missing } = server;
     expect(() => parseServerEnv(missing)).toThrow(/SUPABASE_STORAGE_BUCKET/);
+  });
+
+  it("exposes SUPABASE_PDF_BUCKET when it is set", () => {
+    expect(parseServerEnv(server).SUPABASE_PDF_BUCKET).toBe("page-pdfs");
+  });
+
+  it("fails at boot naming SUPABASE_PDF_BUCKET when it is absent", () => {
+    const { SUPABASE_PDF_BUCKET: _, ...missing } = server;
+    expect(() => parseServerEnv(missing)).toThrow(/SUPABASE_PDF_BUCKET/);
+  });
+
+  it("rejects an empty SUPABASE_PDF_BUCKET", () => {
+    expect(() =>
+      parseServerEnv({ ...server, SUPABASE_PDF_BUCKET: "" }),
+    ).toThrow(/SUPABASE_PDF_BUCKET/);
   });
 
   it("treats an empty optional variable as unset (.env.example ships blanks)", () => {
