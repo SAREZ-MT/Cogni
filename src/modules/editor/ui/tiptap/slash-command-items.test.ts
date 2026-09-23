@@ -22,7 +22,7 @@ function findItem(id: string) {
 describe("SLASH_COMMAND_ITEMS", () => {
   it("includes a Spanish-labeled table entry that inserts a table", () => {
     const item = findItem("table");
-    expect(item.label).toBe("tabla");
+    expect(item.label).toBe("Tabla");
 
     const editor = createHeadlessEditor();
     // destroy() must run even if an assertion throws, otherwise
@@ -42,9 +42,9 @@ describe("SLASH_COMMAND_ITEMS", () => {
     const idea = findItem("callout-idea");
     const note = findItem("callout-note");
     const warning = findItem("callout-warning");
-    expect(idea.label).toBe("callout de idea");
-    expect(note.label).toBe("callout de nota");
-    expect(warning.label).toBe("callout de advertencia");
+    expect(idea.label).toBe("Callout de idea");
+    expect(note.label).toBe("Callout de nota");
+    expect(warning.label).toBe("Callout de advertencia");
 
     const editor = createHeadlessEditor();
     // See the destroy() note above: must run on every path.
@@ -56,6 +56,77 @@ describe("SLASH_COMMAND_ITEMS", () => {
       expect(callout?.attrs).toEqual({ kind: "warning" });
     } finally {
       editor.destroy();
+    }
+  });
+
+  // S6a (odd/tasks/app-shell-restyle.md), Editor directive: the restyled
+  // "/" menu renders an icon tile and a group heading per item (command-
+  // menu.tsx), so every entry here must declare both.
+  it("gives every item an icon and a group", () => {
+    for (const item of SLASH_COMMAND_ITEMS) {
+      expect(item.icon, `missing icon on "${item.id}"`).toBeTruthy();
+      expect(item.group, `missing group on "${item.id}"`).toBeTruthy();
+    }
+  });
+
+  it("keeps the four documented groups in a stable, first-appearance order", () => {
+    const order: string[] = [];
+    for (const item of SLASH_COMMAND_ITEMS) {
+      if (item.group && !order.includes(item.group)) order.push(item.group);
+    }
+    expect(order).toEqual(["Básicos", "Listas", "Bloques", "Medios"]);
+  });
+
+  it("puts every heading and the paragraph in Básicos", () => {
+    for (const id of ["heading-1", "heading-2", "heading-3", "paragraph"]) {
+      expect(findItem(id).group).toBe("Básicos");
+    }
+  });
+
+  it("puts the three list types in Listas", () => {
+    for (const id of ["bullet-list", "ordered-list", "task-list"]) {
+      expect(findItem(id).group).toBe("Listas");
+    }
+  });
+
+  it("puts the image entry in Medios", () => {
+    expect(findItem("image").group).toBe("Medios");
+  });
+
+  // S6a defect fix (docs/design-system SKILL.md, Notion style: "Heading 1"):
+  // every label must be sentence case, matching the Notion-style slash menu.
+  // `keywords` stay lowercase on purpose (filterItems in slash-command.tsx
+  // lowercases both the query and the haystack before comparing, so
+  // lowercase keywords keep "/cita"/"/tabla"/"/advertencia" matching).
+  it("gives every item a sentence-case label", () => {
+    const expected: Record<string, string> = {
+      "heading-1": "Encabezado 1",
+      "heading-2": "Encabezado 2",
+      "heading-3": "Encabezado 3",
+      paragraph: "Párrafo",
+      "bullet-list": "Lista con viñetas",
+      "ordered-list": "Lista numerada",
+      "task-list": "Lista de tareas",
+      blockquote: "Cita",
+      "code-block": "Bloque de código",
+      divider: "Divisor",
+      table: "Tabla",
+      "callout-idea": "Callout de idea",
+      "callout-note": "Callout de nota",
+      "callout-warning": "Callout de advertencia",
+      image: "Imagen",
+    };
+
+    for (const item of SLASH_COMMAND_ITEMS) {
+      expect(item.label, `label for "${item.id}"`).toBe(expected[item.id]);
+    }
+  });
+
+  it("keeps every keyword lowercase for filtering", () => {
+    for (const item of SLASH_COMMAND_ITEMS) {
+      for (const keyword of item.keywords ?? []) {
+        expect(keyword, `keyword on "${item.id}"`).toBe(keyword.toLowerCase());
+      }
     }
   });
 });

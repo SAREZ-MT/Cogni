@@ -12,6 +12,7 @@
 import type { AnyExtension } from "@tiptap/core";
 import TaskItem from "@tiptap/extension-task-item";
 import TaskList from "@tiptap/extension-task-list";
+import { Placeholder } from "@tiptap/extensions";
 import StarterKit from "@tiptap/starter-kit";
 import type { ImageUploadPort } from "../../../domain/image-upload-port";
 import { Callout } from "../callout-node";
@@ -75,5 +76,20 @@ export function createEditorExtensions(
     ImageBlock.configure({ pageId, imagePort }),
     ...createTableExtensions(),
     SlashCommand,
+    // S6a (Editor directive, .agents/skills/cogni-design/SKILL.md
+    // "Editor"): placeholder copy per the Tiptap docs Notion-style editor,
+    // level-aware for headings. `.editor-content .is-empty::before`
+    // (globals.css) reads the `data-placeholder` attribute this decorates
+    // the empty node with (default `emptyNodeClass: "is-empty"`,
+    // `dataAttribute: "placeholder"`).
+    Placeholder.configure({
+      placeholder: ({ node }) => {
+        if (node.type.name === "heading") {
+          const level = (node.attrs.level as number | undefined) ?? 1;
+          return `Título ${level}`;
+        }
+        return "Escribe algo o presiona / para insertar un bloque";
+      },
+    }),
   ];
 }
