@@ -35,6 +35,32 @@ describe("FakeNotebookPagesPort", () => {
     });
   });
 
+  it("returns null from findPageNotebookId for a page that was never created", async () => {
+    const port = new FakeNotebookPagesPort();
+
+    expect(await port.findPageNotebookId(OWNER_ID, "missing")).toBeNull();
+  });
+
+  it("returns null from findPageNotebookId for a page owned by someone else", async () => {
+    const port = new FakeNotebookPagesPort();
+    const created = await port.createPage(OWNER_ID, { notebookId: "nb-1" });
+    if (!created.ok) throw new Error("setup failed");
+
+    expect(
+      await port.findPageNotebookId(OTHER_OWNER_ID, created.value.id),
+    ).toBeNull();
+  });
+
+  it("returns the real notebookId of an owned page", async () => {
+    const port = new FakeNotebookPagesPort();
+    const created = await port.createPage(OWNER_ID, { notebookId: "nb-1" });
+    if (!created.ok) throw new Error("setup failed");
+
+    expect(await port.findPageNotebookId(OWNER_ID, created.value.id)).toBe(
+      "nb-1",
+    );
+  });
+
   it("creates a page and records the call", async () => {
     const port = new FakeNotebookPagesPort();
 

@@ -26,9 +26,38 @@ describe("InMemoryImportJobRepository", () => {
     const clock = { now: () => new Date("2026-09-23T10:00:00.000Z") };
     const job = createImportJob(newJobInput(), clock);
 
-    await repo.create(job);
+    const created = await repo.create(job);
 
+    expect(created.ok).toBe(true);
     expect(await repo.findById(job.id)).toEqual(job);
+  });
+
+  // T6 review follow-up from T5 (R3-idempotency-check-then-act-race): the
+  // real table has a unique constraint on storage_path (T1); this fake
+  // must reject a duplicate the same way instead of silently overwriting.
+  it("rejects a second create() with the same storagePath as a typed conflict, without overwriting the first job", async () => {
+    const repo = new InMemoryImportJobRepository();
+    const clock = { now: () => new Date("2026-09-23T10:00:00.000Z") };
+    const storagePath = `${OWNER_ID}/upload-conflict.pdf`;
+    const first = createImportJob(
+      newJobInput({ id: "job-first", storagePath }),
+      clock,
+    );
+    const second = createImportJob(
+      newJobInput({ id: "job-second", storagePath }),
+      clock,
+    );
+
+    const firstCreated = await repo.create(first);
+    const secondCreated = await repo.create(second);
+
+    expect(firstCreated.ok).toBe(true);
+    expect(secondCreated.ok).toBe(false);
+    if (!secondCreated.ok) {
+      expect(secondCreated.error.code).toBe("IMPORT_JOB_STORAGE_PATH_CONFLICT");
+    }
+    expect(await repo.findByStoragePath(storagePath)).toEqual(first);
+    expect(await repo.findById("job-second")).toBeNull();
   });
 
   it("returns null from findById for a missing job", async () => {
@@ -54,11 +83,19 @@ describe("InMemoryImportJobRepository", () => {
   it("finds the latest job for a page by createdAt, ignoring jobs for other pages", async () => {
     const repo = new InMemoryImportJobRepository();
     const older = createImportJob(
-      newJobInput({ id: "job-older", pageId: "page-1" }),
+      newJobInput({
+        id: "job-older",
+        pageId: "page-1",
+        storagePath: `${OWNER_ID}/upload-older.pdf`,
+      }),
       { now: () => new Date("2026-09-23T09:00:00.000Z") },
     );
     const newer = createImportJob(
-      newJobInput({ id: "job-newer", pageId: "page-1" }),
+      newJobInput({
+        id: "job-newer",
+        pageId: "page-1",
+        storagePath: `${OWNER_ID}/upload-newer.pdf`,
+      }),
       { now: () => new Date("2026-09-23T10:00:00.000Z") },
     );
     const otherPage = createImportJob(
@@ -99,11 +136,19 @@ describe("InMemoryImportJobRepository", () => {
     const clock = { now: () => now };
 
     const queued = createImportJob(
-      newJobInput({ id: "job-queued", pageId: "page-queued" }),
+      newJobInput({
+        id: "job-queued",
+        pageId: "page-queued",
+        storagePath: `${OWNER_ID}/upload-queued.pdf`,
+      }),
       clock,
     );
     const done = createImportJob(
-      newJobInput({ id: "job-done", pageId: "page-done" }),
+      newJobInput({
+        id: "job-done",
+        pageId: "page-done",
+        storagePath: `${OWNER_ID}/upload-done.pdf`,
+      }),
       clock,
     );
     const doneResult = complete(

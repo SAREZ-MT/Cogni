@@ -1,4 +1,7 @@
 import type { Clock } from "@/shared/kernel/clock";
+import { DomainError } from "@/shared/kernel/domain-error";
+import { err, ok, type Result } from "@/shared/kernel/result";
+import { IMPORT_JOB_ERROR } from "../../domain/errors";
 import type { ImportFailureKind } from "../../domain/import-failure";
 import {
   complete,
@@ -25,8 +28,19 @@ function clockAt(now: Date): Clock {
 export class InMemoryImportJobRepository implements ImportJobRepository {
   private readonly jobs = new Map<string, ImportJob>();
 
-  async create(job: ImportJob): Promise<void> {
+  async create(job: ImportJob): Promise<Result<void, DomainError>> {
+    for (const existing of this.jobs.values()) {
+      if (existing.storagePath === job.storagePath) {
+        return err(
+          new DomainError(
+            IMPORT_JOB_ERROR.STORAGE_PATH_CONFLICT,
+            job.storagePath,
+          ),
+        );
+      }
+    }
     this.jobs.set(job.id, job);
+    return ok(undefined);
   }
 
   async findById(id: string): Promise<ImportJob | null> {

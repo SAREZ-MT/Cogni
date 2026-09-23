@@ -27,6 +27,7 @@ export {
   start,
 } from "./import-job";
 export type { ImportJobRepository } from "./import-job-repository";
+export type { ImportTelemetry } from "./import-telemetry";
 export {
   hasTextContent,
   type ImportedBlock,
@@ -57,4 +58,5 @@ export {
   validatePdfInput,
 } from "./pdf-file";
 export type { PdfStorageGateway } from "./pdf-storage-gateway";
+export type { PdfTextExtractor } from "./pdf-text-extractor";
 export { type TextToBlocksResult, textToBlocks } from "./text-to-blocks";

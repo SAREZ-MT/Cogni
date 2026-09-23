@@ -24,6 +24,15 @@ export interface NotebookPagesPort {
     ownerId: string,
     input: { notebookId: string; title?: string },
   ): Promise<Result<{ id: string; notebookId: string }, DomainError>>;
+  // null when the page does not exist or belongs to another owner. T6
+  // addition (review follow-up from T5: R3-idempotent-notebookid-echoed-
+  // from-input) — `startPdfImport`'s idempotent path uses this to echo the
+  // existing job's *real* notebookId back to the caller and reject a
+  // request whose `notebookId` no longer matches it, instead of blindly
+  // trusting the caller-supplied value. `NotebooksPagesAdapter` (T7) will
+  // need `notebooks` to expose an equivalent lookup, since
+  // `NotebooksServerApi` (T4) does not yet have one.
+  findPageNotebookId(ownerId: string, pageId: string): Promise<string | null>;
   writeImportedContent(
     ownerId: string,
     input: { pageId: string; content: ImportedDoc; expectedVersion: number },

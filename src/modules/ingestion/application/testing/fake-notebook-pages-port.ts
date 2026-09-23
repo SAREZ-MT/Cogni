@@ -93,6 +93,15 @@ export class FakeNotebookPagesPort implements NotebookPagesPort {
     return ok({ id: page.id, notebookId: page.notebookId });
   }
 
+  async findPageNotebookId(
+    ownerId: string,
+    pageId: string,
+  ): Promise<string | null> {
+    const page = this.pages.get(pageId);
+    if (!page || page.ownerId !== ownerId) return null;
+    return page.notebookId;
+  }
+
   async writeImportedContent(
     ownerId: string,
     input: { pageId: string; content: ImportedDoc; expectedVersion: number },

@@ -5,9 +5,16 @@
 // this single code, exactly as design.md specifies. `NOT_FOUND` is raised
 // by the application layer (T6's `processImportJob`/`getImportJobStatus`),
 // never by `import-job.ts` itself.
+// `STORAGE_PATH_CONFLICT` is T6's addition (review follow-up from T5:
+// R3-idempotency-check-then-act-race): `ImportJobRepository.create`
+// returns this instead of throwing when a job with the same `storage_path`
+// already exists (the DB unique constraint since T1), so `startPdfImport`
+// can resolve the race by re-fetching the winning job instead of leaking
+// an exception after the page was already created.
 export const IMPORT_JOB_ERROR = {
   INVALID_TRANSITION: "IMPORT_JOB_INVALID_TRANSITION",
   NOT_FOUND: "IMPORT_JOB_NOT_FOUND",
+  STORAGE_PATH_CONFLICT: "IMPORT_JOB_STORAGE_PATH_CONFLICT",
 } as const;
 
 // DomainError codes for `pdf-file.ts` (design.md, `errors.ts` code list).
@@ -35,6 +42,13 @@ export const PDF_FILE_ERROR = {
 // T5's task report). `SESSION_REQUIRED` mirrors
 // `NOTEBOOKS_ERROR.SESSION_REQUIRED` and is added by T8's `actions.ts`,
 // which is the only layer that resolves a session.
+// `NOTEBOOK_MISMATCH` is T6's addition (review follow-up from T5:
+// R3-idempotent-notebookid-echoed-from-input): raised by `startPdfImport`
+// on its idempotent path (a repeated call for a `storagePath` that already
+// has a job) when the caller's `notebookId` does not match the notebook
+// the existing job's page actually lives in, instead of blindly echoing
+// back whatever `notebookId` the caller supplied.
 export const INGESTION_ERROR = {
   NOTEBOOK_NOT_FOUND: "INGESTION_NOTEBOOK_NOT_FOUND",
+  NOTEBOOK_MISMATCH: "INGESTION_NOTEBOOK_MISMATCH",
 } as const;
