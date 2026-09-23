@@ -101,7 +101,11 @@ describe("writeImportedContent use case", () => {
     );
 
     expect(result.ok).toBe(false);
+    // R3-weak-error-assertions: a shape violation caught by Zod must
+    // surface the parseInput edge's code, not just any falsy result.
+    expect(!result.ok && result.error.code).toBe("NOTEBOOKS_INVALID_INPUT");
     const stored = await pages.findById(page.id);
+    expect(stored?.content).toEqual({ type: "doc", content: [] });
     expect(stored?.contentVersion).toBe(1);
   });
 
@@ -120,7 +124,9 @@ describe("writeImportedContent use case", () => {
     );
 
     expect(result.ok).toBe(false);
+    expect(!result.ok && result.error.code).toBe("NOTEBOOKS_INVALID_INPUT");
     const stored = await pages.findById(page.id);
+    expect(stored?.content).toEqual({ type: "doc", content: [] });
     expect(stored?.contentVersion).toBe(1);
   });
 
@@ -155,6 +161,7 @@ describe("writeImportedContent use case", () => {
     expect(result.ok).toBe(false);
     expect(!result.ok && result.error.code).toBe("PAGE_NOT_FOUND");
     const stored = await pages.findById(page.id);
+    expect(stored?.content).toEqual({ type: "doc", content: [] });
     expect(stored?.contentVersion).toBe(1);
   });
 
@@ -183,6 +190,10 @@ describe("writeImportedContent use case", () => {
 
     expect(result.ok).toBe(false);
     expect(!result.ok && result.error.code).toBe("PAGE_NOT_FOUND");
+    const stored = await deps.pages.findById(page.value.id);
+    expect(stored?.content).toEqual({ type: "doc", content: [] });
+    expect(stored?.contentVersion).toBe(1);
+    expect(stored?.archivedAt).toEqual(deps.clock.now());
   });
 
   it("rejects a nonexistent pageId (Scenario: Página o cuaderno ajenos)", async () => {

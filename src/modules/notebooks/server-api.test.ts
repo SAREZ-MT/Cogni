@@ -181,8 +181,113 @@ describe("createNotebooksServerApi", () => {
 
       expect(result.ok).toBe(false);
       expect(!result.ok && result.error.code).toBe("PAGE_VERSION_CONFLICT");
+      // R3-conflict-test-no-state-assert: the rejected second call must
+      // never touch the page the first call already wrote.
+      const stored = await pages.findById(created.value.id);
+      expect(stored?.content).toEqual(IMPORTED_DOC);
+      expect(stored?.contentVersion).toBe(2);
     });
 
+    it("rejects a page owned by another user without revealing whether it exists", async () => {
+      const { createNotebooksServerApi } = await import("./server-api");
+      await notebooks.create(makeNotebook());
+      const api = createNotebooksServerApi({ db: FAKE_DB });
+      const created = await api.createPage(OWNER_ID, { notebookId: "nb-1" });
+      if (!created.ok) throw new Error("setup failed");
+
+      const result = await api.writeImportedContent(OTHER_OWNER_ID, {
+        pageId: created.value.id,
+        content: IMPORTED_DOC,
+        expectedVersion: 1,
+      });
+
+      expect(result.ok).toBe(false);
+      expect(!result.ok && result.error.code).toBe("PAGE_NOT_FOUND");
+      const stored = await pages.findById(created.value.id);
+      expect(stored?.content).not.toEqual(IMPORTED_DOC);
+      expect(stored?.contentVersion).toBe(1);
+    });
+  });
+
+  describe("findPageNotebookId", () => {
+    it("returns the notebookId of a page owned by the caller in an active notebook", async () => {
+      const { createNotebooksServerApi } = await import("./server-api");
+      await notebooks.create(makeNotebook());
+      const api = createNotebooksServerApi({ db: FAKE_DB });
+      const created = await api.createPage(OWNER_ID, { notebookId: "nb-1" });
+      if (!created.ok) throw new Error("setup failed");
+
+      const notebookId = await api.findPageNotebookId(
+        OWNER_ID,
+        created.value.id,
+      );
+
+      expect(notebookId).toBe("nb-1");
+    });
+
+    it("returns null for a page owned by another user", async () => {
+      const { createNotebooksServerApi } = await import("./server-api");
+      await notebooks.create(makeNotebook());
+      const api = createNotebooksServerApi({ db: FAKE_DB });
+      const created = await api.createPage(OWNER_ID, { notebookId: "nb-1" });
+      if (!created.ok) throw new Error("setup failed");
+
+      const notebookId = await api.findPageNotebookId(
+        OTHER_OWNER_ID,
+        created.value.id,
+      );
+
+      expect(notebookId).toBeNull();
+    });
+
+    it("returns null for a nonexistent page", async () => {
+      const { createNotebooksServerApi } = await import("./server-api");
+      const api = createNotebooksServerApi({ db: FAKE_DB });
+
+      const notebookId = await api.findPageNotebookId(
+        OWNER_ID,
+        "does-not-exist",
+      );
+
+      expect(notebookId).toBeNull();
+    });
+
+    it("returns null for an archived page", async () => {
+      const { createNotebooksServerApi } = await import("./server-api");
+      await notebooks.create(makeNotebook());
+      const api = createNotebooksServerApi({ db: FAKE_DB });
+      const created = await api.createPage(OWNER_ID, { notebookId: "nb-1" });
+      if (!created.ok) throw new Error("setup failed");
+      const page = await pages.findById(created.value.id);
+      if (!page) throw new Error("setup failed");
+      await pages.update({ ...page, archivedAt: NOW });
+
+      const notebookId = await api.findPageNotebookId(
+        OWNER_ID,
+        created.value.id,
+      );
+
+      expect(notebookId).toBeNull();
+    });
+
+    it("returns null when the page's notebook is archived", async () => {
+      const { createNotebooksServerApi } = await import("./server-api");
+      await notebooks.create(makeNotebook());
+      const api = createNotebooksServerApi({ db: FAKE_DB });
+      const created = await api.createPage(OWNER_ID, { notebookId: "nb-1" });
+      if (!created.ok) throw new Error("setup failed");
+      await notebooks.update(makeNotebook({ archivedAt: NOW }));
+
+      const notebookId = await api.findPageNotebookId(
+        OWNER_ID,
+        created.value.id,
+      );
+
+      expect(notebookId).toBeNull();
+    });
+  });
+
+  describe("writeImportedContent (updatedAt)", () => {
     it("uses the injected clock for updatedAt instead of the system clock", async () => {
       const { createNotebooksServerApi } = await import("./server-api");
       await notebooks.create(makeNotebook());

@@ -126,4 +126,61 @@ describe.skipIf(!url)("Drizzle notebook/page repositories", () => {
     expect(listA.some((n) => n.id === notebookB.value.id)).toBe(false);
     expect(listB.some((n) => n.id === notebookA.value.id)).toBe(false);
   });
+
+  // T4 review follow-up (R3-archived-toctou): writeImportedContent's write
+  // (notebooks/application/write-imported-content.ts) reads the page,
+  // checks it is not archived, then calls updateIfVersion. Between those
+  // two steps another actor (e.g. the user archiving the page from the
+  // sidebar) could archive it. updateIfVersion's conditional UPDATE
+  // already filters `archived_at IS NULL` (drizzle-page-repository.ts), so
+  // this proves that guard holds against real Postgres, not just the
+  // in-memory double: archiving the page directly stands in for that
+  // concurrent actor, landing strictly after the page was created with
+  // fresh content and strictly before the conditional UPDATE below runs.
+  it("updateIfVersion refuses to overwrite a page archived after it was last read (TOCTOU)", async () => {
+    const position = await notebookRepo.nextPosition(ownerA.id);
+    const notebook = createNotebook(
+      {
+        id: randomUUID(),
+        ownerId: ownerA.id,
+        title: "Cuaderno para TOCTOU",
+        position,
+      },
+      systemClock,
+    );
+    if (!notebook.ok) throw new Error("setup failed");
+    await notebookRepo.create(notebook.value);
+
+    const pagePosition = await pageRepo.nextPosition(notebook.value.id);
+    const page = createPage(
+      {
+        id: randomUUID(),
+        ownerId: ownerA.id,
+        notebookId: notebook.value.id,
+        position: pagePosition,
+      },
+      systemClock,
+    );
+    if (!page.ok) throw new Error("setup failed");
+    await pageRepo.create(page.value);
+
+    await pageRepo.update({ ...page.value, archivedAt: new Date() });
+
+    const result = await pageRepo.updateIfVersion({
+      pageId: page.value.id,
+      ownerId: ownerA.id,
+      expectedVersion: page.value.contentVersion,
+      content: { type: "doc", content: [{ type: "text", text: "importado" }] },
+      plainText: "importado",
+      updatedAt: new Date(),
+    });
+
+    // Scoped exactly like a nonexistent/other-owner page: the fallback
+    // "current version" report never reveals a real contentVersion for a
+    // row the WHERE clause excluded (drizzle-page-repository.ts comment).
+    expect(result).toEqual({ updated: false, currentVersion: 0 });
+    const stored = await pageRepo.findById(page.value.id);
+    expect(stored?.content).toEqual(page.value.content);
+    expect(stored?.contentVersion).toBe(page.value.contentVersion);
+  });
 });
