@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
 import { SIDEBAR_COOKIE, Sidebar } from "./sidebar";
@@ -58,5 +58,41 @@ describe("Sidebar", () => {
     render(<Sidebar initialCollapsed={false}>contenido del árbol</Sidebar>);
 
     expect(screen.getByText("contenido del árbol")).not.toHaveClass("hidden");
+  });
+
+  it("always renders the Cogni logo in the header row", () => {
+    render(<Sidebar initialCollapsed={false}>contenido</Sidebar>);
+
+    expect(screen.getByRole("link", { name: "Cogni" })).toBeInTheDocument();
+  });
+
+  it("shows the collapsed create-notebook action only while collapsed", () => {
+    const collapsedTrigger = <button type="button">Crear cuaderno</button>;
+
+    const collapsedRender = render(
+      <Sidebar initialCollapsed={true} collapsedCreateAction={collapsedTrigger}>
+        contenido
+      </Sidebar>,
+    );
+    expect(
+      within(collapsedRender.container).getByRole("button", {
+        name: "Crear cuaderno",
+      }),
+    ).toBeInTheDocument();
+    collapsedRender.unmount();
+
+    const expandedRender = render(
+      <Sidebar
+        initialCollapsed={false}
+        collapsedCreateAction={collapsedTrigger}
+      >
+        contenido
+      </Sidebar>,
+    );
+    expect(
+      within(expandedRender.container).queryByRole("button", {
+        name: "Crear cuaderno",
+      }),
+    ).not.toBeInTheDocument();
   });
 });

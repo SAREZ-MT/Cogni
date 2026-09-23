@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { ReactNode } from "react";
 import { useState } from "react";
 import { cn } from "@/shared/ui/utils";
+import { Logo } from "./logo";
 import {
   SIDEBAR_COLLAPSED,
   SIDEBAR_COOKIE,
@@ -16,10 +17,18 @@ const ONE_YEAR_IN_SECONDS = 60 * 60 * 24 * 365;
 
 type SidebarProps = {
   initialCollapsed: boolean;
+  // Icon-only "Crear cuaderno" trigger shown in the collapsed column
+  // (notebooks/ui/create-notebook-icon-button.tsx, wired from layout.tsx):
+  // Sidebar itself stays generic and never imports the notebooks module.
+  collapsedCreateAction?: ReactNode;
   children: ReactNode;
 };
 
-export function Sidebar({ initialCollapsed, children }: SidebarProps) {
+export function Sidebar({
+  initialCollapsed,
+  collapsedCreateAction,
+  children,
+}: SidebarProps) {
   const [collapsed, setCollapsed] = useState(initialCollapsed);
 
   function toggle() {
@@ -42,10 +51,14 @@ export function Sidebar({ initialCollapsed, children }: SidebarProps) {
       )}
     >
       <div className="flex h-(--topbar-height) items-center px-5">
-        <span className="font-semibold text-base text-fg">
-          {collapsed ? "C" : "Cogni"}
-        </span>
+        <Logo collapsed={collapsed} />
       </div>
+
+      {collapsed && collapsedCreateAction ? (
+        <div className="flex flex-col items-center gap-2 px-3 py-2">
+          {collapsedCreateAction}
+        </div>
+      ) : null}
 
       <div
         className={cn("flex min-h-0 flex-1 flex-col", collapsed && "hidden")}

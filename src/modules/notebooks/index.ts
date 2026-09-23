@@ -79,6 +79,7 @@ export {
   createNotebooksServerApi,
   type NotebooksServerApi,
 } from "./server-api";
+export { CreateNotebookIconButton } from "./ui/create-notebook-icon-button";
 export {
   type NotebookActionsHelpers,
   NotebookActionsSlotProvider,
