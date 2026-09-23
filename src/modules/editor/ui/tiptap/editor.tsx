@@ -7,6 +7,7 @@ import type { ImageUploadPort } from "../../domain/image-upload-port";
 import type { SavePagePort, TiptapDoc } from "../../domain/save-page-port";
 import { ConflictBanner } from "../conflict-banner";
 import { SaveStatus } from "../save-status";
+import { BlockHandle } from "./block-handle";
 import { BubbleToolbar } from "./bubble-toolbar";
 import { createEditorExtensions } from "./extensions";
 import { toPlainTiptapDoc } from "./to-plain-tiptap-doc";
@@ -139,6 +140,10 @@ export function Editor({
           HighlightPicker BubbleMenu here — that module and its tests stay
           intact for direct/unit use. */}
       {editor ? <BubbleToolbar editor={editor} /> : null}
+      {/* S6b (odd/tasks/app-shell-restyle.md): per-block "⋮⋮" drag handle +
+          "+" insert in the left gutter, matching the Tiptap docs
+          Notion-style editor. */}
+      {editor ? <BlockHandle editor={editor} /> : null}
       {/* T13b (design fidelity, docs/design-system/screenshots/editor.png):
           `.editor-content` (src/app/globals.css) styles the real
           ProseMirror output against the Cogni type scale instead of

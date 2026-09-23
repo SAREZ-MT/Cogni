@@ -10,6 +10,7 @@
 // The remaining §3.2 blocks (table, image, highlight palette, callouts)
 // land in later slices (tasks.md, Phase 3b traceability).
 import type { AnyExtension } from "@tiptap/core";
+import { NodeRange } from "@tiptap/extension-node-range";
 import TaskItem from "@tiptap/extension-task-item";
 import TaskList from "@tiptap/extension-task-list";
 import { Placeholder } from "@tiptap/extensions";
@@ -76,6 +77,12 @@ export function createEditorExtensions(
     ImageBlock.configure({ pageId, imagePort }),
     ...createTableExtensions(),
     SlashCommand,
+    // S6b (odd/tasks/app-shell-restyle.md), Editor directive: a standalone
+    // ProseMirror extension (unlike the React `DragHandle` component in
+    // block-handle.tsx, which needs no extension registered) that decorates
+    // a Shift/Ctrl multi-block selection with `ProseMirror-
+    // selectednoderange`, styled in globals.css with Cogni tokens.
+    NodeRange,
     // S6a (Editor directive, .agents/skills/cogni-design/SKILL.md
     // "Editor"): placeholder copy per the Tiptap docs Notion-style editor,
     // level-aware for headings. `.editor-content .is-empty::before`
