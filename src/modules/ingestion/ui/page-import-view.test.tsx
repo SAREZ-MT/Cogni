@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
+import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ok } from "@/shared/kernel/result";
 import type { ImportJobStatusView } from "../application";
@@ -18,6 +19,16 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
 
 const { captureException } = vi.hoisted(() => ({ captureException: vi.fn() }));
 vi.mock("@sentry/nextjs", () => ({ captureException }));
+
+const { removeActiveImport } = vi.hoisted(() => ({
+  removeActiveImport: vi.fn(),
+}));
+vi.mock("./active-imports-provider", () => ({
+  useActiveImportsActions: () => ({
+    add: vi.fn(),
+    remove: removeActiveImport,
+  }),
+}));
 
 function job(
   overrides: Partial<ImportJobStatusView> = {},
@@ -60,6 +71,7 @@ describe("PageImportView", () => {
     getImportJobStatus.mockReset();
     refresh.mockReset();
     captureException.mockReset();
+    removeActiveImport.mockReset();
     vi.useRealTimers();
   });
 
@@ -330,5 +342,78 @@ describe("PageImportView", () => {
 
     expect(screen.getByText(INGESTION_COPY.progress.delay)).toBeInTheDocument();
     vi.useRealTimers();
+  });
+
+  // T11 review follow-up (folded into T13a): render the editor only after
+  // router.refresh()'s transition has completed, so it mounts with the
+  // refreshed initialContent/initialVersion instead of the stale ones from
+  // before the import (explains the blank-editor screenshot from T11's
+  // visual pass).
+  it("keeps the editor unmounted while the router.refresh transition is pending, and mounts it once resolved", async () => {
+    let resolveRefresh: () => void = () => {};
+    refresh.mockReturnValue(
+      new Promise<void>((resolve) => {
+        resolveRefresh = resolve;
+      }),
+    );
+    processPdfImport.mockResolvedValue(ok(job({ status: "done" })));
+
+    renderView({ initial: job({ status: "queued" }) });
+
+    await waitFor(() => expect(refresh).toHaveBeenCalledTimes(1));
+    expect(screen.queryByTestId("editor")).not.toBeInTheDocument();
+    expect(screen.getByTestId("page-import-view")).toHaveAttribute(
+      "data-state",
+      "done",
+    );
+
+    resolveRefresh();
+    await waitFor(() =>
+      expect(screen.getByTestId("editor")).toBeInTheDocument(),
+    );
+  });
+
+  it("removes the page from ActiveImportsProvider once the job reaches a terminal state", async () => {
+    processPdfImport.mockResolvedValue(ok(job({ status: "done" })));
+
+    renderView({ initial: job({ status: "queued" }), pageId: "page-1" });
+
+    await waitFor(() =>
+      expect(screen.getByTestId("editor")).toBeInTheDocument(),
+    );
+    expect(removeActiveImport).toHaveBeenCalledWith("page-1");
+  });
+
+  it("does not call remove() for an already-terminal initial job (no transition happened)", () => {
+    renderView({ initial: job({ status: "done" }), pageId: "page-1" });
+
+    expect(removeActiveImport).not.toHaveBeenCalled();
+  });
+
+  // T11 review follow-up (folded into T13a): a startedRef guard so React
+  // StrictMode's dev double-invoked effects cannot call processPdfImport
+  // twice for the same queued job.
+  it("calls processPdfImport only once under React StrictMode's double-invoked effects", async () => {
+    processPdfImport.mockResolvedValue(ok(job({ status: "done" })));
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    render(
+      <StrictMode>
+        <QueryClientProvider client={client}>
+          <PageImportView
+            initial={job({ status: "queued" })}
+            pageId="page-1"
+            editor={<div data-testid="editor" />}
+          />
+        </QueryClientProvider>
+      </StrictMode>,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("editor")).toBeInTheDocument(),
+    );
+    expect(processPdfImport).toHaveBeenCalledTimes(1);
   });
 });

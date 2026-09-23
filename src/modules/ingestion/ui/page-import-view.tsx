@@ -3,9 +3,16 @@
 import * as Sentry from "@sentry/nextjs";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import {
+  type ReactNode,
+  useEffect,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import { getImportJobStatus, processPdfImport } from "../actions";
 import type { ImportJobStatusView } from "../application";
+import { useActiveImportsActions } from "./active-imports-provider";
 import { ImportProgress } from "./import-progress";
 import { INGESTION_COPY, messageForIngestionErrorCode } from "./ingestion-copy";
 
@@ -60,20 +67,49 @@ export function PageImportView({
   editor,
 }: PageImportViewProps) {
   const router = useRouter();
+  const activeImports = useActiveImportsActions();
   const [state, setState] = useState<ViewState>(() =>
     initialViewState(initial),
   );
   const [delayed, setDelayed] = useState(false);
+  const [isRefreshPending, startRefreshTransition] = useTransition();
   // `initial` is stable for this component's instance: a reload or a fresh
   // navigation remounts PageImportView with new server-rendered props.
   const initialJobRef = useRef(initial);
+  // T11 review follow-up (R3-strict-mode-double-process-call): guards the
+  // queued -> processing-call effect below against React StrictMode's dev
+  // double-invocation of effects (mount -> cleanup -> mount), which would
+  // otherwise call processPdfImport twice for the same job. `startedRef`
+  // persists across that double-invocation (same fiber) and is only ever
+  // set once, unlike a local `cancelled` flag scoped to one effect
+  // invocation. `mountedRef` is reset to true at the top of every
+  // invocation (including StrictMode's synthetic remount) and only a real
+  // unmount's cleanup is the last thing to run before the in-flight
+  // promise resolves, so the callbacks below can still tell a genuine
+  // unmount (mountedRef.current === false when they run) from StrictMode's
+  // synthetic one (reset back to true by the immediate remount).
+  const startedRef = useRef(false);
+  const mountedRef = useRef(true);
 
   const isActive =
     state.phase === "processing-call" || state.phase === "polling";
 
+  // T11 review follow-up (R3-editor-mounts-with-stale-content): the editor
+  // must mount only once router.refresh()'s transition has actually
+  // completed, so it renders with the refreshed initialContent/
+  // initialVersion instead of the stale ones from before the import.
+  // `remove()` fires immediately (optimistic sidebar badge update), not
+  // gated on the transition.
   function finishTerminal(view: ImportJobStatusView): void {
     setState({ phase: "terminal", view });
-    router.refresh();
+    activeImports.remove(pageId);
+    // `router.refresh()` is called from an async transition function (not
+    // a plain synchronous callback) so React keeps `isRefreshPending` true
+    // until the refresh actually settles, instead of a same-tick flip that
+    // would defeat the point of gating the editor on it.
+    startRefreshTransition(async () => {
+      await router.refresh();
+    });
   }
 
   // design.md: "llama processPdfImport({ importJobId }) una vez y la
@@ -81,40 +117,42 @@ export function PageImportView({
   // consulta por polling". Runs exactly once for a job that starts queued.
   // biome-ignore lint/correctness/useExhaustiveDependencies: runs once per mount for a queued job; state.phase is only read at that first render and finishTerminal is stable
   useEffect(() => {
+    mountedRef.current = true;
     const job = initialJobRef.current;
-    if (state.phase !== "processing-call" || !job) return;
-    let cancelled = false;
-
-    processPdfImport({ importJobId: job.importJobId })
-      .then((result) => {
-        if (cancelled) return;
-        if (!result.ok) {
-          // Deliverable: a Result error from processPdfImport is reported
-          // to Sentry from the client too, not just actions.ts's own
-          // withBoundary — this is the terminal signal for the whole
-          // import flow, so a typed failure here is still worth telemetry.
-          Sentry.captureException(new Error(result.error.message));
-          finishTerminal(
-            withError(job, messageForIngestionErrorCode(result.error.code)),
-          );
-          return;
-        }
-        if (isTerminalStatus(result.value.status)) {
-          finishTerminal(result.value);
-        } else {
-          // Another call already claimed the job (concurrent tabs); fall
-          // back to polling instead of calling processPdfImport again.
-          setState({ phase: "polling", view: result.value });
-        }
-      })
-      .catch((error: unknown) => {
-        if (cancelled) return;
-        Sentry.captureException(error);
-        finishTerminal(withError(job, INGESTION_COPY.unexpected));
-      });
+    if (state.phase === "processing-call" && job && !startedRef.current) {
+      startedRef.current = true;
+      processPdfImport({ importJobId: job.importJobId })
+        .then((result) => {
+          if (!mountedRef.current) return;
+          if (!result.ok) {
+            // Deliverable: a Result error from processPdfImport is
+            // reported to Sentry from the client too, not just
+            // actions.ts's own withBoundary — this is the terminal signal
+            // for the whole import flow, so a typed failure here is still
+            // worth telemetry.
+            Sentry.captureException(new Error(result.error.message));
+            finishTerminal(
+              withError(job, messageForIngestionErrorCode(result.error.code)),
+            );
+            return;
+          }
+          if (isTerminalStatus(result.value.status)) {
+            finishTerminal(result.value);
+          } else {
+            // Another call already claimed the job (concurrent tabs); fall
+            // back to polling instead of calling processPdfImport again.
+            setState({ phase: "polling", view: result.value });
+          }
+        })
+        .catch((error: unknown) => {
+          if (!mountedRef.current) return;
+          Sentry.captureException(error);
+          finishTerminal(withError(job, INGESTION_COPY.unexpected));
+        });
+    }
 
     return () => {
-      cancelled = true;
+      mountedRef.current = false;
     };
   }, []);
 
@@ -190,7 +228,9 @@ export function PageImportView({
             />
           </div>
         )}
-      {(state.phase === "no-job" || state.phase === "terminal") && editor}
+      {(state.phase === "no-job" ||
+        (state.phase === "terminal" && !isRefreshPending)) &&
+        editor}
     </div>
   );
 }

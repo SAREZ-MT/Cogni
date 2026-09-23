@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { ensureProfileForUser, getCurrentUser } from "@/modules/identity";
+import { getActiveImports } from "@/modules/ingestion";
 import { SidebarTree } from "@/modules/notebooks";
 import { NotebookActions } from "./_components/notebook-actions";
 import { QueryProvider } from "./_components/query-provider";
@@ -23,11 +24,21 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   const collapsed =
     cookieStore.get(SIDEBAR_COOKIE)?.value === SIDEBAR_COLLAPSED;
 
+  // T13a: initial ids for the sidebar's ImportingPageBadge, read
+  // server-side so the badge is correct on first paint. Degrades to `[]`
+  // on failure (getActiveImports's own withBoundary never throws): a
+  // missing badge on first paint is not worth a broken shell, and
+  // ActiveImportsProvider's own polling will pick it up shortly after.
+  const activeImports = await getActiveImports();
+  const initialActiveImportPageIds = activeImports.ok
+    ? activeImports.value
+    : [];
+
   return (
     <QueryProvider>
       <div className="flex h-dvh bg-canvas">
         <Sidebar initialCollapsed={collapsed}>
-          <NotebookActions>
+          <NotebookActions initialPageIds={initialActiveImportPageIds}>
             <SidebarTree />
           </NotebookActions>
         </Sidebar>
