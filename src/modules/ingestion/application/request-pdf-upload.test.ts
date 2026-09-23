@@ -162,4 +162,31 @@ describe("requestPdfUpload use case", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe("INGESTION_INVALID_INPUT");
   });
+
+  // T7c review follow-up (R3-metadata-throw-callers-unproved), T8: a thrown
+  // createSignedUploadUrl (e.g. PdfStorageAdapterError from
+  // SupabasePdfStorageGateway) must resolve to a typed failure instead of
+  // propagating out of the use case.
+  it("maps a thrown createSignedUploadUrl to INGESTION_STORAGE_UNAVAILABLE", async () => {
+    const deps = makeDeps();
+    deps.storage.forceNextCreateSignedUploadUrlError(
+      new Error("transient storage failure"),
+    );
+
+    const result = await requestPdfUpload(
+      {
+        notebookId: "nb-1",
+        fileName: "a.pdf",
+        mime: "application/pdf",
+        sizeBytes: 1024,
+      },
+      deps,
+      OWNER_ID,
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("INGESTION_STORAGE_UNAVAILABLE");
+    }
+  });
 });

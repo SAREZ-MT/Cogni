@@ -550,4 +550,36 @@ describe("startPdfImport use case", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe("INGESTION_INVALID_INPUT");
   });
+
+  // T7c review follow-up (R3-metadata-throw-callers-unproved), T8: a thrown
+  // getObjectMetadata (e.g. PdfStorageAdapterError for a transient Supabase
+  // failure) must resolve to a typed failure — never leak an exception out
+  // of the use case, and never create a page for an object it could not
+  // verify.
+  it("maps a thrown getObjectMetadata to INGESTION_STORAGE_UNAVAILABLE without creating a page", async () => {
+    const deps = makeDeps();
+    const path = uploadPath(OWNER_ID, NOW.getTime());
+    deps.storage.forceNextGetObjectMetadataError(
+      new Error("transient storage failure"),
+    );
+
+    const result = await startPdfImport(
+      {
+        notebookId: "nb-1",
+        storagePath: path,
+        fileName: "a.pdf",
+        mime: "application/pdf",
+        sizeBytes: 1024,
+      },
+      deps,
+      OWNER_ID,
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("INGESTION_STORAGE_UNAVAILABLE");
+    }
+    expect(deps.notebookPages.createPageCalls).toHaveLength(0);
+    expect(await deps.jobs.findByStoragePath(path)).toBeNull();
+  });
 });
