@@ -1,19 +1,95 @@
 "use client";
 
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  BookOpen,
+  Brain,
+  ChevronLeft,
+  ChevronRight,
+  ClipboardList,
+  Home,
+  Layers,
+  Settings,
+} from "lucide-react";
+import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { useState } from "react";
 import { cn } from "@/shared/ui/utils";
 import { Logo } from "./logo";
+import { NavItem } from "./nav-item";
 import {
   SIDEBAR_COLLAPSED,
   SIDEBAR_COOKIE,
   SIDEBAR_EXPANDED,
 } from "./sidebar-cookie";
+import { SidebarUserCard } from "./sidebar-user-card";
 
 export { SIDEBAR_COOKIE } from "./sidebar-cookie";
 
 const ONE_YEAR_IN_SECONDS = 60 * 60 * 24 * 365;
+
+// Static nav content (comp-sidebar.html, ui_kits/app/Home Page.html
+// 296-366): no module import needed, so it lives in Sidebar directly rather
+// than being threaded in like `collapsedCreateAction` (which exists only to
+// keep the notebooks module out of this generic component).
+type NavEntry =
+  | {
+      href: string;
+      icon: typeof Home;
+      label: string;
+      isActive: (path: string) => boolean;
+    }
+  | { icon: typeof Home; label: string; disabled: true; hint: string };
+
+const MAIN_SECTION: { label: string; items: NavEntry[] } = {
+  label: "Menú principal",
+  items: [
+    {
+      href: "/",
+      icon: Home,
+      label: "Inicio",
+      isActive: (path) => path === "/",
+    },
+    {
+      href: "/",
+      icon: BookOpen,
+      label: "Cuadernos",
+      isActive: (path) => path.startsWith("/notebooks"),
+    },
+  ],
+};
+
+const TECNICAS_SECTION: { label: string; items: NavEntry[] } = {
+  label: "Técnicas",
+  items: [
+    { icon: Layers, label: "Flashcards", disabled: true, hint: "próximamente" },
+    {
+      icon: Brain,
+      label: "Active recall",
+      disabled: true,
+      hint: "próximamente",
+    },
+    {
+      icon: ClipboardList,
+      label: "Exámenes",
+      disabled: true,
+      hint: "próximamente",
+    },
+  ],
+};
+
+const CUENTA_SECTION: { label: string; items: NavEntry[] } = {
+  label: "Cuenta",
+  items: [
+    {
+      icon: Settings,
+      label: "Configuración",
+      disabled: true,
+      hint: "próximamente",
+    },
+  ],
+};
+
+const SECTIONS = [MAIN_SECTION, TECNICAS_SECTION, CUENTA_SECTION];
 
 type SidebarProps = {
   initialCollapsed: boolean;
@@ -21,15 +97,18 @@ type SidebarProps = {
   // (notebooks/ui/create-notebook-icon-button.tsx, wired from layout.tsx):
   // Sidebar itself stays generic and never imports the notebooks module.
   collapsedCreateAction?: ReactNode;
+  user: { id: string; email: string | null };
   children: ReactNode;
 };
 
 export function Sidebar({
   initialCollapsed,
   collapsedCreateAction,
+  user,
   children,
 }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(initialCollapsed);
+  const pathname = usePathname();
 
   function toggle() {
     const next = !collapsed;
@@ -54,17 +133,53 @@ export function Sidebar({
         <Logo collapsed={collapsed} />
       </div>
 
-      {collapsed && collapsedCreateAction ? (
-        <div className="flex flex-col items-center gap-2 px-3 py-2">
-          {collapsedCreateAction}
-        </div>
-      ) : null}
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-2 pb-2">
+        {SECTIONS.map((section) => (
+          <div key={section.label} className="flex flex-col gap-0.5">
+            {!collapsed && (
+              <p className="px-2.5 pt-3.5 pb-1 font-medium text-[11px] text-fg-muted uppercase tracking-wide">
+                {section.label}
+              </p>
+            )}
+            {section.items.map((item) =>
+              "disabled" in item ? (
+                <NavItem
+                  key={item.label}
+                  href="#"
+                  icon={item.icon}
+                  label={item.label}
+                  disabled
+                  hint={item.hint}
+                  collapsed={collapsed}
+                />
+              ) : (
+                <NavItem
+                  key={item.label}
+                  href={item.href}
+                  icon={item.icon}
+                  label={item.label}
+                  active={item.isActive(pathname ?? "/")}
+                  collapsed={collapsed}
+                />
+              ),
+            )}
+          </div>
+        ))}
 
-      <div
-        className={cn("flex min-h-0 flex-1 flex-col", collapsed && "hidden")}
-      >
-        {children}
+        {collapsed && collapsedCreateAction ? (
+          <div className="flex flex-col items-center gap-2 py-2">
+            {collapsedCreateAction}
+          </div>
+        ) : null}
+
+        <div
+          className={cn("flex min-h-0 flex-1 flex-col", collapsed && "hidden")}
+        >
+          {children}
+        </div>
       </div>
+
+      <SidebarUserCard user={user} collapsed={collapsed} />
 
       <button
         type="button"

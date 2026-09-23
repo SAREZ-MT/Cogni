@@ -40,6 +40,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         <Sidebar
           initialCollapsed={collapsed}
           collapsedCreateAction={<CreateNotebookIconButton />}
+          user={user}
         >
           <NotebookActions initialPageIds={initialActiveImportPageIds}>
             <SidebarTree />
