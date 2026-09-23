@@ -20,11 +20,15 @@ export function ImportPdfMenuItem({
 }: ImportPdfMenuItemProps) {
   const { start } = usePdfImport();
   const { status } = useNotebookImport(notebook.id);
-  const busy = status === "uploading" || status === "queued";
+  // "busy" (T10 follow-up: R3-provider-concurrent-imports-clobber-banner)
+  // means another notebook is currently uploading/queued — only one PDF
+  // import may run at a time.
+  const disabled =
+    status === "uploading" || status === "queued" || status === "busy";
 
   return (
     <DropdownMenuItem
-      disabled={busy}
+      disabled={disabled}
       onSelect={() =>
         start({ notebookId: notebook.id, onPageCreated: onImported })
       }
