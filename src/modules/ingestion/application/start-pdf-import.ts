@@ -91,7 +91,19 @@ export async function startPdfImport(
     return err(new DomainError(INGESTION_ERROR.NOTEBOOK_NOT_FOUND, notebookId));
   }
 
-  const metadata = await deps.storage.getObjectMetadata(storagePath);
+  // T7c follow-up (R3-metadata-throw-callers-unproved): the port now
+  // throws on a transient error instead of reporting it as missing
+  // (T7b/T7c: R3-metadata-transient-error-as-missing); this use case must
+  // map that thrown exception to a typed failure instead of leaking it,
+  // and must not create a page for an object it could not verify.
+  let metadata: { sizeBytes: number; mime: string } | null;
+  try {
+    metadata = await deps.storage.getObjectMetadata(storagePath);
+  } catch {
+    return err(
+      new DomainError(INGESTION_ERROR.STORAGE_UNAVAILABLE, storagePath),
+    );
+  }
   if (!metadata) {
     return err(new DomainError(PDF_FILE_ERROR.OBJECT_MISSING, storagePath));
   }

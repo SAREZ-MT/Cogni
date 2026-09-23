@@ -65,8 +65,18 @@ export async function requestPdfUpload(
   }
 
   const storagePath = `${ownerId}/${createId()}.pdf`;
-  const { signedUrl, token, bucket } =
-    await deps.storage.createSignedUploadUrl(storagePath);
+  // T7c follow-up (R3-metadata-throw-callers-unproved): a thrown Storage
+  // call (e.g. PdfStorageAdapterError for a transient failure) must
+  // resolve to a typed failure instead of propagating out of the use case.
+  let grant: { signedUrl: string; token: string; bucket: string };
+  try {
+    grant = await deps.storage.createSignedUploadUrl(storagePath);
+  } catch {
+    return err(
+      new DomainError(INGESTION_ERROR.STORAGE_UNAVAILABLE, storagePath),
+    );
+  }
+  const { signedUrl, token, bucket } = grant;
   const expiresAt = new Date(
     deps.clock.now().getTime() + UPLOAD_GRANT_TTL_MS,
   ).toISOString();

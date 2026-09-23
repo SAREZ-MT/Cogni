@@ -54,8 +54,17 @@ export const PDF_FILE_ERROR = {
 // `NotebookPagesPort.findPageNotebookId` returns null — the existing job's
 // page is missing, archived or no longer owned by the caller, which is a
 // different failure than a `notebookId` that simply no longer matches.
+// `SESSION_REQUIRED` is T8's addition (design.md, `errors.ts` code list):
+// raised only by `ingestion/actions.ts`, the only layer that resolves a
+// session, mirroring `NOTEBOOKS_ERROR.SESSION_REQUIRED`.
+// `STORAGE_UNAVAILABLE` is T8's addition (T7c review follow-up: a thrown
+// `PdfStorageGateway` call — `createSignedUploadUrl` in `requestPdfUpload`,
+// `getObjectMetadata` in `startPdfImport` — must resolve to a typed
+// failure instead of propagating an exception out of the use case).
 export const INGESTION_ERROR = {
   NOTEBOOK_NOT_FOUND: "INGESTION_NOTEBOOK_NOT_FOUND",
   NOTEBOOK_MISMATCH: "INGESTION_NOTEBOOK_MISMATCH",
   PAGE_NOT_FOUND: "INGESTION_PAGE_NOT_FOUND",
+  SESSION_REQUIRED: "INGESTION_SESSION_REQUIRED",
+  STORAGE_UNAVAILABLE: "INGESTION_STORAGE_UNAVAILABLE",
 } as const;

@@ -56,4 +56,36 @@ describe("FakePdfStorageGateway", () => {
 
     expect(downloaded).toBeNull();
   });
+
+  // T8: requestPdfUpload/startPdfImport must map a thrown storage call to a
+  // typed failure (INGESTION_ERROR.STORAGE_UNAVAILABLE); these let their
+  // tests force that throw without a real Supabase client.
+  describe("forced errors", () => {
+    it("throws the forced error once from createSignedUploadUrl, then recovers", async () => {
+      const gateway = new FakePdfStorageGateway();
+      const forced = new Error("transient storage failure");
+      gateway.forceNextCreateSignedUploadUrlError(forced);
+
+      await expect(gateway.createSignedUploadUrl("owner-1/x.pdf")).rejects.toBe(
+        forced,
+      );
+      await expect(
+        gateway.createSignedUploadUrl("owner-1/x.pdf"),
+      ).resolves.toBeTruthy();
+    });
+
+    it("throws the forced error once from getObjectMetadata, then recovers", async () => {
+      const gateway = new FakePdfStorageGateway();
+      gateway.put("owner-1/x.pdf", { sizeBytes: 10, mime: "application/pdf" });
+      const forced = new Error("transient storage failure");
+      gateway.forceNextGetObjectMetadataError(forced);
+
+      await expect(gateway.getObjectMetadata("owner-1/x.pdf")).rejects.toBe(
+        forced,
+      );
+      await expect(gateway.getObjectMetadata("owner-1/x.pdf")).resolves.toEqual(
+        { sizeBytes: 10, mime: "application/pdf" },
+      );
+    });
+  });
 });

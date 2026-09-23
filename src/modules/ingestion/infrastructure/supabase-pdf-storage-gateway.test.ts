@@ -169,28 +169,44 @@ describe("SupabasePdfStorageGateway", () => {
     // transient/5xx failure must never be reported as "object does not
     // exist" — the caller (startPdfImport) would otherwise tell the user
     // their upload vanished instead of retrying.
+    // T7c review follow-up (R3-metadata-error-sanitization-unasserted): the
+    // raw Supabase error must survive as `cause` (server-side diagnostics
+    // only — actions.ts, T8, never forwards it to the client), and the
+    // thrown error's own message must never repeat the raw error's detail.
     it("throws a typed PdfStorageAdapterError for a transient/5xx error, never treating it as missing", async () => {
-      info.mockResolvedValueOnce({
-        data: null,
-        error: new StorageApiError("internal server error", 500, "500"),
-      });
+      expect.assertions(4);
+      const rawError = new StorageApiError("internal server error", 500, "500");
+      info.mockResolvedValueOnce({ data: null, error: rawError });
       const gateway = new SupabasePdfStorageGateway(CONFIG);
 
-      await expect(
-        gateway.getObjectMetadata("owner-1/x.pdf"),
-      ).rejects.toBeInstanceOf(PdfStorageAdapterError);
+      try {
+        await gateway.getObjectMetadata("owner-1/x.pdf");
+        throw new Error("expected getObjectMetadata to throw");
+      } catch (error) {
+        expect(error).toBeInstanceOf(PdfStorageAdapterError);
+        expect((error as PdfStorageAdapterError).cause).toBe(rawError);
+        expect((error as Error).message).not.toContain("internal server error");
+        expect((error as Error).message).not.toBe(rawError.message);
+      }
     });
 
     it("throws a typed PdfStorageAdapterError for an error with no recognizable not-found shape", async () => {
-      info.mockResolvedValueOnce({
-        data: null,
-        error: { weird: "shape" },
-      });
+      expect.assertions(4);
+      const rawError = { weird: "shape", message: "internal supabase detail" };
+      info.mockResolvedValueOnce({ data: null, error: rawError });
       const gateway = new SupabasePdfStorageGateway(CONFIG);
 
-      await expect(
-        gateway.getObjectMetadata("owner-1/x.pdf"),
-      ).rejects.toBeInstanceOf(PdfStorageAdapterError);
+      try {
+        await gateway.getObjectMetadata("owner-1/x.pdf");
+        throw new Error("expected getObjectMetadata to throw");
+      } catch (error) {
+        expect(error).toBeInstanceOf(PdfStorageAdapterError);
+        expect((error as PdfStorageAdapterError).cause).toBe(rawError);
+        expect((error as Error).message).not.toContain(
+          "internal supabase detail",
+        );
+        expect((error as Error).message).not.toBe(rawError.message);
+      }
     });
 
     it("returns null when the response is missing size or contentType", async () => {
