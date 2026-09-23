@@ -582,4 +582,40 @@ describe("startPdfImport use case", () => {
     expect(deps.notebookPages.createPageCalls).toHaveLength(0);
     expect(await deps.jobs.findByStoragePath(path)).toBeNull();
   });
+
+  // T8 review follow-up (R3-storage-unavailable-discards-cause).
+  it("keeps the original getObjectMetadata exception as cause and logs it", async () => {
+    const deps = makeDeps();
+    const path = uploadPath(OWNER_ID, NOW.getTime());
+    const original = new Error("transient storage failure");
+    deps.storage.forceNextGetObjectMetadataError(original);
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+
+    try {
+      const result = await startPdfImport(
+        {
+          notebookId: "nb-1",
+          storagePath: path,
+          fileName: "a.pdf",
+          mime: "application/pdf",
+          sizeBytes: 1024,
+        },
+        deps,
+        OWNER_ID,
+      );
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect((result.error as { cause?: unknown }).cause).toBe(original);
+      }
+      expect(consoleError).toHaveBeenCalledWith(
+        expect.stringContaining("getObjectMetadata"),
+        original,
+      );
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
 });

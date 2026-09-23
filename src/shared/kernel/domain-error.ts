@@ -6,8 +6,13 @@
 export class DomainError extends Error {
   readonly code: string;
 
-  constructor(code: string, message: string) {
-    super(message);
+  // `options.cause` keeps the original thrown exception (e.g. a Storage
+  // adapter error) attached for server-side diagnostics without ever
+  // reaching the client: toActionError() below only copies `code` and
+  // `message`, so `cause` never crosses the Server Action boundary
+  // (ingestion T8 follow-up: R3-storage-unavailable-discards-cause).
+  constructor(code: string, message: string, options?: { cause?: unknown }) {
+    super(message, options);
     this.name = "DomainError";
     this.code = code;
   }

@@ -16,8 +16,7 @@ import type { SidebarNotebook } from "../application/list-sidebar";
 import type { NotebookColor } from "../domain/notebook";
 import { CreateNotebookDialog } from "./create-notebook-dialog";
 import { NotebookItem } from "./notebook-item";
-
-const SIDEBAR_TREE_QUERY_KEY = ["notebooks", "sidebar-tree"] as const;
+import { SIDEBAR_TREE_QUERY_KEY } from "./sidebar-tree-query-key";
 
 interface SidebarTreeClientProps {
   initialNotebooks: SidebarNotebook[];

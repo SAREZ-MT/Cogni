@@ -29,6 +29,21 @@ describe("DomainError", () => {
   it("isDomainError() returns false for a non-error value", () => {
     expect(isDomainError({ code: "FAKE" })).toBe(false);
   });
+
+  it("keeps an optional cause for server-side diagnostics", () => {
+    const original = new Error("network down");
+    const error = new DomainError("STORAGE_UNAVAILABLE", "storage failed", {
+      cause: original,
+    });
+
+    expect(error.cause).toBe(original);
+  });
+
+  it("has no cause when none is provided", () => {
+    const error = new DomainError("STORAGE_UNAVAILABLE", "storage failed");
+
+    expect(error.cause).toBeUndefined();
+  });
 });
 
 // A Server Action's returned DomainError does not survive the RSC/Flight

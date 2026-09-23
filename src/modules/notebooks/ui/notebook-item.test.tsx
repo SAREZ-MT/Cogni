@@ -6,6 +6,7 @@ import { DropdownMenuItem } from "@/shared/ui/dropdown-menu";
 import type { SidebarNotebook } from "../application/list-sidebar";
 import { NotebookActionsSlotProvider } from "./notebook-actions-slot";
 import { NotebookItem } from "./notebook-item";
+import { SIDEBAR_TREE_QUERY_KEY } from "./sidebar-tree-query-key";
 
 const notebook: SidebarNotebook = {
   id: "n1",
@@ -29,21 +30,25 @@ function renderNotebookItem(
   };
 }
 
+function notebookItemElement() {
+  return (
+    <NotebookItem
+      notebook={notebook}
+      onRename={noop}
+      onSetAppearance={noop}
+      onArchive={noop}
+      onCreatePage={noop}
+      onRenamePage={noop}
+      onArchivePage={noop}
+    />
+  );
+}
+
 describe("NotebookItem", () => {
   // Regression guard for tests/e2e/notebooks-acceptance.spec.ts, which
   // targets these exact accessible names.
   it("keeps the existing notebook action buttons and their accessible names", () => {
-    renderNotebookItem(
-      <NotebookItem
-        notebook={notebook}
-        onRename={noop}
-        onSetAppearance={noop}
-        onArchive={noop}
-        onCreatePage={noop}
-        onRenamePage={noop}
-        onArchivePage={noop}
-      />,
-    );
+    renderNotebookItem(notebookItemElement());
 
     expect(
       screen.getByRole("button", { name: "Cambiar apariencia de Biología" }),
@@ -56,27 +61,31 @@ describe("NotebookItem", () => {
     ).toBeInTheDocument();
   });
 
-  it("renders an actions menu trigger with no items by default", async () => {
-    const user = userEvent.setup();
+  it("does not render the actions menu trigger by default (no slot mounted)", () => {
+    renderNotebookItem(notebookItemElement());
+
+    expect(
+      screen.queryByRole("button", { name: "Acciones de Biología" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("does not render the actions menu trigger when a mounted slot yields no items (T9 visual follow-up: empty Radix menu renders as a thin sliver)", () => {
     renderNotebookItem(
-      <NotebookItem
-        notebook={notebook}
-        onRename={noop}
-        onSetAppearance={noop}
-        onArchive={noop}
-        onCreatePage={noop}
-        onRenamePage={noop}
-        onArchivePage={noop}
-      />,
+      <NotebookActionsSlotProvider menuItems={() => null}>
+        {notebookItemElement()}
+      </NotebookActionsSlotProvider>,
     );
 
-    const trigger = screen.getByRole("button", {
-      name: "Acciones de Biología",
-    });
-    await user.click(trigger);
+    expect(
+      screen.queryByRole("button", { name: "Acciones de Biología" }),
+    ).not.toBeInTheDocument();
+  });
 
-    expect(await screen.findByRole("menu")).toBeInTheDocument();
-    expect(screen.queryAllByRole("menuitem")).toHaveLength(0);
+  it("renders without a QueryClientProvider when no slot is mounted (R3-hard-queryclient-dependency)", () => {
+    expect(() => render(notebookItemElement())).not.toThrow();
+    expect(
+      screen.getByRole("button", { name: "Archivar cuaderno Biología" }),
+    ).toBeInTheDocument();
   });
 
   it("opens the actions menu from the keyboard and activates an injected item with Enter", async () => {
@@ -91,15 +100,7 @@ describe("NotebookItem", () => {
           </DropdownMenuItem>
         )}
       >
-        <NotebookItem
-          notebook={notebook}
-          onRename={noop}
-          onSetAppearance={noop}
-          onArchive={noop}
-          onCreatePage={noop}
-          onRenamePage={noop}
-          onArchivePage={noop}
-        />
+        {notebookItemElement()}
       </NotebookActionsSlotProvider>,
     );
 
@@ -115,7 +116,7 @@ describe("NotebookItem", () => {
     expect(onImport).toHaveBeenCalledWith("n1");
   });
 
-  it("passes a refreshTree helper that invalidates the sidebar tree query", async () => {
+  it("passes a refreshTree helper that invalidates the real sidebar tree query key", async () => {
     const invalidateQueries = vi.fn();
     const client = new QueryClient({
       defaultOptions: { queries: { retry: false } },
@@ -125,21 +126,13 @@ describe("NotebookItem", () => {
       (
         _notebook: { id: string; title: string },
         _helpers: { refreshTree: () => void },
-      ) => null,
+      ) => <DropdownMenuItem>Importar PDF</DropdownMenuItem>,
     );
     const user = userEvent.setup();
 
     renderNotebookItem(
       <NotebookActionsSlotProvider menuItems={menuItems}>
-        <NotebookItem
-          notebook={notebook}
-          onRename={noop}
-          onSetAppearance={noop}
-          onArchive={noop}
-          onCreatePage={noop}
-          onRenamePage={noop}
-          onArchivePage={noop}
-        />
+        {notebookItemElement()}
       </NotebookActionsSlotProvider>,
       client,
     );
@@ -156,7 +149,7 @@ describe("NotebookItem", () => {
     helpers?.refreshTree();
 
     expect(invalidateQueries).toHaveBeenCalledWith({
-      queryKey: ["notebooks", "sidebar-tree"],
+      queryKey: SIDEBAR_TREE_QUERY_KEY,
     });
   });
 });

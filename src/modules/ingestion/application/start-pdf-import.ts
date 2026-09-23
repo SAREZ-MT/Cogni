@@ -99,9 +99,16 @@ export async function startPdfImport(
   let metadata: { sizeBytes: number; mime: string } | null;
   try {
     metadata = await deps.storage.getObjectMetadata(storagePath);
-  } catch {
+  } catch (cause) {
+    // T8 review follow-up (R3-storage-unavailable-discards-cause): keep the
+    // original exception as `cause` for server-side diagnostics (never sent
+    // to the client — toActionError() only copies code/message) and log it
+    // so it is visible in the Vercel function logs.
+    console.error("startPdfImport: getObjectMetadata failed", cause);
     return err(
-      new DomainError(INGESTION_ERROR.STORAGE_UNAVAILABLE, storagePath),
+      new DomainError(INGESTION_ERROR.STORAGE_UNAVAILABLE, storagePath, {
+        cause,
+      }),
     );
   }
   if (!metadata) {
