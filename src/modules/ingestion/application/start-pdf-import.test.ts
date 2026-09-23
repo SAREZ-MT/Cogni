@@ -1,5 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { DomainError } from "@/shared/kernel/domain-error";
+import { err } from "@/shared/kernel/result";
+import { IMPORT_JOB_ERROR } from "../domain/errors";
+import { createImportJob } from "../domain/import-job";
 import { UPLOAD_GRANT_TTL_MS } from "../domain/pdf-file";
 import { startPdfImport } from "./start-pdf-import";
 import { FakeNotebookPagesPort } from "./testing/fake-notebook-pages-port";
@@ -148,6 +151,140 @@ describe("startPdfImport use case", () => {
     expect(second.ok).toBe(true);
     if (!first.ok || !second.ok) return;
     expect(second.value.importJobId).toBe(first.value.importJobId);
+  });
+
+  // T6 review follow-up from T5 (R3-idempotent-notebookid-echoed-from-
+  // input): the idempotent path must echo the existing job's *real*
+  // notebookId, not blindly trust the caller's input.
+  it("rejects the idempotent path when the input notebookId no longer matches the existing job's real notebook", async () => {
+    const deps = makeDeps();
+    deps.notebookPages.addNotebook({
+      id: "nb-2",
+      ownerId: OWNER_ID,
+      active: true,
+    });
+    const path = uploadPath(OWNER_ID, NOW.getTime());
+    seedObject(deps, path);
+    const first = await startPdfImport(
+      {
+        notebookId: "nb-1",
+        storagePath: path,
+        fileName: "a.pdf",
+        mime: "application/pdf",
+        sizeBytes: 1024,
+      },
+      deps,
+      OWNER_ID,
+    );
+    expect(first.ok).toBe(true);
+
+    const second = await startPdfImport(
+      {
+        notebookId: "nb-2",
+        storagePath: path,
+        fileName: "a.pdf",
+        mime: "application/pdf",
+        sizeBytes: 1024,
+      },
+      deps,
+      OWNER_ID,
+    );
+
+    expect(second.ok).toBe(false);
+    if (!second.ok) {
+      expect(second.error.code).toBe("INGESTION_NOTEBOOK_MISMATCH");
+    }
+  });
+
+  // T6 review follow-up from T5 (R3-idempotency-check-then-act-race):
+  // ImportJobRepository.create surfaces a storage_path conflict as a typed
+  // result instead of throwing; startPdfImport resolves it by re-fetching
+  // the concurrent winner instead of leaking the conflict to the caller.
+  it("resolves a create() storagePath race to the concurrent winner's job, echoing the winner's real notebookId", async () => {
+    const deps = makeDeps();
+    const path = uploadPath(OWNER_ID, NOW.getTime());
+    seedObject(deps, path);
+
+    vi.spyOn(deps.jobs, "findByStoragePath").mockResolvedValueOnce(null);
+    const realCreate = deps.jobs.create.bind(deps.jobs);
+    let winnerId: string | undefined;
+    vi.spyOn(deps.jobs, "create").mockImplementationOnce(async (job) => {
+      // Simulate a concurrent startPdfImport call winning the race for the
+      // same storagePath a moment before this call's own create().
+      const winnerPage = await deps.notebookPages.createPage(OWNER_ID, {
+        notebookId: "nb-1",
+      });
+      if (!winnerPage.ok) throw new Error("setup failed");
+      const winner = createImportJob(
+        {
+          id: "job-winner",
+          ownerId: OWNER_ID,
+          pageId: winnerPage.value.id,
+          storagePath: job.storagePath,
+          fileName: "winner.pdf",
+          sizeBytes: 2048,
+        },
+        deps.clock,
+      );
+      await realCreate(winner);
+      winnerId = winner.id;
+      return err(
+        new DomainError(
+          IMPORT_JOB_ERROR.STORAGE_PATH_CONFLICT,
+          job.storagePath,
+        ),
+      );
+    });
+
+    const result = await startPdfImport(
+      {
+        notebookId: "nb-1",
+        storagePath: path,
+        fileName: "loser.pdf",
+        mime: "application/pdf",
+        sizeBytes: 1024,
+      },
+      deps,
+      OWNER_ID,
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.importJobId).toBe(winnerId);
+    expect(result.value.notebookId).toBe("nb-1");
+    // The loser's own page (created before the race was discovered)
+    // becomes an orphan — accepted risk per design.md's non-atomic
+    // "página → job" ordering — but no second job for this storagePath
+    // exists.
+    expect(deps.notebookPages.createPageCalls).toHaveLength(2);
+  });
+
+  it("surfaces the raw conflict when the concurrent winner cannot be found after a create() race (defensive)", async () => {
+    const deps = makeDeps();
+    const path = uploadPath(OWNER_ID, NOW.getTime());
+    seedObject(deps, path);
+    const conflict = new DomainError(
+      IMPORT_JOB_ERROR.STORAGE_PATH_CONFLICT,
+      path,
+    );
+    vi.spyOn(deps.jobs, "create").mockResolvedValueOnce(err(conflict));
+    vi.spyOn(deps.jobs, "findByStoragePath")
+      .mockResolvedValueOnce(null) // the pre-create idempotency check
+      .mockResolvedValueOnce(null); // the post-conflict winner lookup
+
+    const result = await startPdfImport(
+      {
+        notebookId: "nb-1",
+        storagePath: path,
+        fileName: "a.pdf",
+        mime: "application/pdf",
+        sizeBytes: 1024,
+      },
+      deps,
+      OWNER_ID,
+    );
+
+    expect(result).toEqual({ ok: false, error: conflict });
   });
 
   it("rejects a path owned by someone else without touching the repository or Storage (Scenario: Ruta fuera del alcance)", async () => {

@@ -6,6 +6,7 @@ describe("ingestion domain error codes", () => {
     expect(IMPORT_JOB_ERROR).toEqual({
       INVALID_TRANSITION: "IMPORT_JOB_INVALID_TRANSITION",
       NOT_FOUND: "IMPORT_JOB_NOT_FOUND",
+      STORAGE_PATH_CONFLICT: "IMPORT_JOB_STORAGE_PATH_CONFLICT",
     });
   });
 
@@ -21,9 +22,10 @@ describe("ingestion domain error codes", () => {
     });
   });
 
-  it("exposes the ingestion-level error codes (T5 addition)", () => {
+  it("exposes the ingestion-level error codes (T5/T6 additions)", () => {
     expect(INGESTION_ERROR).toEqual({
       NOTEBOOK_NOT_FOUND: "INGESTION_NOTEBOOK_NOT_FOUND",
+      NOTEBOOK_MISMATCH: "INGESTION_NOTEBOOK_MISMATCH",
     });
   });
 });

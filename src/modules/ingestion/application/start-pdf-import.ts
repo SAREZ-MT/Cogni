@@ -75,12 +75,7 @@ export async function startPdfImport(
 
   const existing = await deps.jobs.findByStoragePath(storagePath);
   if (existing) {
-    return ok({
-      importJobId: existing.id,
-      pageId: existing.pageId,
-      notebookId,
-      status: existing.status,
-    });
+    return echoIdempotentJob(deps, existing, notebookId, ownerId);
   }
 
   const ageMs = uploadIdAgeMs(storagePath, deps.clock.now());
@@ -120,12 +115,49 @@ export async function startPdfImport(
     },
     deps.clock,
   );
-  await deps.jobs.create(job);
+  const created = await deps.jobs.create(job);
+  if (!created.ok) {
+    // Lost the race: another concurrent call already created a job for
+    // this storagePath between the idempotency check above and this
+    // create() (review follow-up R3-idempotency-check-then-act-race). The
+    // page just created above becomes an orphan — accepted risk per
+    // design.md's non-atomic "página → job" ordering — and this call
+    // resolves idempotently against the winner instead of leaking the
+    // conflict.
+    const winner = await deps.jobs.findByStoragePath(storagePath);
+    if (!winner) return created;
+    return echoIdempotentJob(deps, winner, notebookId, ownerId);
+  }
 
   return ok({
     importJobId: job.id,
     pageId: page.value.id,
     notebookId,
+    status: job.status,
+  });
+}
+
+// Review follow-up from T5 (R3-idempotent-notebookid-echoed-from-input):
+// the idempotent path must echo the existing job's *real* notebookId —
+// looked up from its page — instead of blindly trusting the caller's
+// input, and reject a request whose notebookId no longer matches it.
+async function echoIdempotentJob(
+  deps: { notebookPages: NotebookPagesPort },
+  job: { id: string; pageId: string; status: ImportJobStatus },
+  notebookId: string,
+  ownerId: string,
+): Promise<Result<StartPdfImportResult, DomainError>> {
+  const actualNotebookId = await deps.notebookPages.findPageNotebookId(
+    ownerId,
+    job.pageId,
+  );
+  if (actualNotebookId !== notebookId) {
+    return err(new DomainError(INGESTION_ERROR.NOTEBOOK_MISMATCH, notebookId));
+  }
+  return ok({
+    importJobId: job.id,
+    pageId: job.pageId,
+    notebookId: actualNotebookId,
     status: job.status,
   });
 }
