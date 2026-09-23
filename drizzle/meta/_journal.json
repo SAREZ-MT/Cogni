@@ -36,6 +36,20 @@
       "when": 1790026435234,
       "tag": "0004_page_assets_storage",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790140313411,
+      "tag": "0005_import_jobs",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790140322272,
+      "tag": "0006_page_pdfs_storage",
+      "breakpoints": true
     }
   ]
 }

@@ -43,6 +43,8 @@ jobs:
       # server env schema requires it, so without it serverEnv() throws on
       # the first DB call and every authenticated e2e test times out.
       SUPABASE_STORAGE_BUCKET: page-assets
+      # Same reason: required by the server env schema since phase 2 (0006).
+      SUPABASE_PDF_BUCKET: page-pdfs
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

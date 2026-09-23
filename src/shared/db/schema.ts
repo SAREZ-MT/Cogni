@@ -1,4 +1,6 @@
+import { sql } from "drizzle-orm";
 import {
+  check,
   index,
   integer,
   jsonb,
@@ -119,3 +121,47 @@ export const pageAssets = pgTable(
 ).enableRLS();
 
 export type PageAssetRow = typeof pageAssets.$inferSelect;
+
+// One row per PDF import (design.md, "Tabla `import_jobs` solo accesible
+// desde el servidor"). RLS is on with no policies, like pages: only the
+// server connection reads or writes it. There is no external run id
+// column: processing runs inside the app itself (ADR 0002).
+export const importJobs = pgTable(
+  "import_jobs",
+  {
+    id: uuid("id").primaryKey(),
+    ownerId: uuid("owner_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    pageId: uuid("page_id")
+      .notNull()
+      .references(() => pages.id, { onDelete: "cascade" }),
+    storagePath: text("storage_path").notNull(),
+    fileName: text("file_name").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    status: text("status").notNull().default("queued"),
+    pageCount: integer("page_count"),
+    pagesWithoutText: integer("pages_without_text").notNull().default(0),
+    error: text("error"),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("import_jobs_page_id_idx").on(table.pageId),
+    // Serves the sidebar query for active imports of one owner.
+    index("import_jobs_owner_status_idx").on(table.ownerId, table.status),
+    unique("import_jobs_storage_path_key").on(table.storagePath),
+    check(
+      "import_jobs_status_check",
+      sql`${table.status} in ('queued', 'processing', 'done', 'failed')`,
+    ),
+  ],
+).enableRLS();
+
+export type ImportJobRow = typeof importJobs.$inferSelect;
