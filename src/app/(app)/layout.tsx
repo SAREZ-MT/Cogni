@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { ensureProfileForUser, getCurrentUser } from "@/modules/identity";
 import { SidebarTree } from "@/modules/notebooks";
+import { NotebookActions } from "./_components/notebook-actions";
 import { QueryProvider } from "./_components/query-provider";
 import { Sidebar } from "./_components/sidebar";
 import {
@@ -26,7 +27,9 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     <QueryProvider>
       <div className="flex h-dvh bg-canvas">
         <Sidebar initialCollapsed={collapsed}>
-          <SidebarTree />
+          <NotebookActions>
+            <SidebarTree />
+          </NotebookActions>
         </Sidebar>
         <div className="flex min-w-0 flex-1 flex-col py-3 pr-3 pl-6">
           <div

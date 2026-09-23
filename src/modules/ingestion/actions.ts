@@ -1,5 +1,6 @@
 "use server";
 
+import * as Sentry from "@sentry/nextjs";
 import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/modules/identity";
 import { serverEnv } from "@/shared/config/env.server";
@@ -90,19 +91,43 @@ function revalidateSidebar(): void {
   revalidatePath("/", "layout");
 }
 
+const UNEXPECTED_ERROR: ActionError = {
+  code: INGESTION_ERROR.UNEXPECTED,
+  message: "unexpected ingestion action failure",
+};
+
+// design.md: "none of these four actions ever throws to the client". Every
+// exported action below runs its body through this boundary so an
+// unforeseen exception from a dependency (getCurrentUser, a use case, an
+// adapter) degrades to a typed ActionError and a Sentry report instead of
+// crashing the Server Action or leaking an unhandled rejection to the
+// client (T8 review follow-up: R3-actions-never-throw-unenforced).
+async function withBoundary<T>(
+  run: () => Promise<Result<T, ActionError>>,
+): Promise<Result<T, ActionError>> {
+  try {
+    return await run();
+  } catch (error) {
+    Sentry.captureException(error);
+    return err(UNEXPECTED_ERROR);
+  }
+}
+
 export async function requestPdfUpload(
   input: unknown,
 ): Promise<Result<PdfUploadGrant, ActionError>> {
-  const ownerId = await requireOwnerId();
-  if (!ownerId.ok) return ownerId;
-  const { notebookPages, storage, clock } = deps();
-  const result = await requestPdfUploadUseCase(
-    input,
-    { notebookPages, storage, clock },
-    ownerId.value,
-  );
-  if (!result.ok) return err(toActionError(result.error));
-  return result;
+  return withBoundary(async () => {
+    const ownerId = await requireOwnerId();
+    if (!ownerId.ok) return ownerId;
+    const { notebookPages, storage, clock } = deps();
+    const result = await requestPdfUploadUseCase(
+      input,
+      { notebookPages, storage, clock },
+      ownerId.value,
+    );
+    if (!result.ok) return err(toActionError(result.error));
+    return result;
+  });
 }
 
 // design.md, "Decision: Flujo de subida y procesamiento", step 3: fast, no
@@ -111,17 +136,19 @@ export async function requestPdfUpload(
 export async function startPdfImport(
   input: unknown,
 ): Promise<Result<StartPdfImportResult, ActionError>> {
-  const ownerId = await requireOwnerId();
-  if (!ownerId.ok) return ownerId;
-  const { notebookPages, storage, jobs, clock } = deps();
-  const result = await startPdfImportUseCase(
-    input,
-    { notebookPages, storage, jobs, clock },
-    ownerId.value,
-  );
-  if (!result.ok) return err(toActionError(result.error));
-  revalidateSidebar();
-  return result;
+  return withBoundary(async () => {
+    const ownerId = await requireOwnerId();
+    if (!ownerId.ok) return ownerId;
+    const { notebookPages, storage, jobs, clock } = deps();
+    const result = await startPdfImportUseCase(
+      input,
+      { notebookPages, storage, jobs, clock },
+      ownerId.value,
+    );
+    if (!result.ok) return err(toActionError(result.error));
+    revalidateSidebar();
+    return result;
+  });
 }
 
 // design.md, "Decision: Procesamiento síncrono en la Server Action con
@@ -132,29 +159,34 @@ export async function startPdfImport(
 export async function processPdfImport(
   input: unknown,
 ): Promise<Result<ImportJobStatusView, ActionError>> {
-  const ownerId = await requireOwnerId();
-  if (!ownerId.ok) return ownerId;
-  const { notebookPages, storage, jobs, extractor, telemetry, clock } = deps();
-  const result = await processImportJobUseCase(
-    input,
-    { jobs, storage, extractor, notebookPages, telemetry, clock },
-    ownerId.value,
-  );
-  if (!result.ok) return err(toActionError(result.error));
-  return ok(toImportJobStatusView(result.value));
+  return withBoundary(async () => {
+    const ownerId = await requireOwnerId();
+    if (!ownerId.ok) return ownerId;
+    const { notebookPages, storage, jobs, extractor, telemetry, clock } =
+      deps();
+    const result = await processImportJobUseCase(
+      input,
+      { jobs, storage, extractor, notebookPages, telemetry, clock },
+      ownerId.value,
+    );
+    if (!result.ok) return err(toActionError(result.error));
+    return ok(toImportJobStatusView(result.value));
+  });
 }
 
 export async function getImportJobStatus(
   input: unknown,
 ): Promise<Result<ImportJobStatusView | null, ActionError>> {
-  const ownerId = await requireOwnerId();
-  if (!ownerId.ok) return ownerId;
-  const { jobs, clock } = deps();
-  const result = await getImportJobStatusUseCase(
-    input,
-    { jobs, clock },
-    ownerId.value,
-  );
-  if (!result.ok) return err(toActionError(result.error));
-  return result;
+  return withBoundary(async () => {
+    const ownerId = await requireOwnerId();
+    if (!ownerId.ok) return ownerId;
+    const { jobs, clock } = deps();
+    const result = await getImportJobStatusUseCase(
+      input,
+      { jobs, clock },
+      ownerId.value,
+    );
+    if (!result.ok) return err(toActionError(result.error));
+    return result;
+  });
 }

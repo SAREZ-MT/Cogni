@@ -71,9 +71,16 @@ export async function requestPdfUpload(
   let grant: { signedUrl: string; token: string; bucket: string };
   try {
     grant = await deps.storage.createSignedUploadUrl(storagePath);
-  } catch {
+  } catch (cause) {
+    // T8 review follow-up (R3-storage-unavailable-discards-cause): keep the
+    // original exception as `cause` for server-side diagnostics (never sent
+    // to the client — toActionError() only copies code/message) and log it
+    // so it is visible in the Vercel function logs.
+    console.error("requestPdfUpload: createSignedUploadUrl failed", cause);
     return err(
-      new DomainError(INGESTION_ERROR.STORAGE_UNAVAILABLE, storagePath),
+      new DomainError(INGESTION_ERROR.STORAGE_UNAVAILABLE, storagePath, {
+        cause,
+      }),
     );
   }
   const { signedUrl, token, bucket } = grant;

@@ -67,8 +67,10 @@ export function PageItem({
           <span className="truncate">{page.title}</span>
         </Link>
       )}
-      {!editing && badge && (
-        <span className="shrink-0 text-muted-foreground text-xs">{badge}</span>
+      {!editing && (
+        <span className="shrink-0 text-muted-foreground text-xs">
+          {badge === null || badge === undefined ? null : badge}
+        </span>
       )}
       <ArchiveConfirmDialog
         itemLabel={`la página "${page.title}"`}

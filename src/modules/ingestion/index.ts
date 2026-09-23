@@ -4,10 +4,9 @@
 // "use server" directive (actions.ts), so importing them here never pulls
 // `infrastructure` — Drizzle, the Supabase client or `unpdf` — into a
 // client bundle. Everything else exported is a pure type or constant from
-// `domain`/`application`. T13 will add `getActiveImports`/
-// `ActiveImportsProvider`; T9/T10/T11 will add the UI components
-// (`ImportPdfMenuItem`, `ImportProgress`, `PageImportView`,
-// `PdfImportProvider`) design.md's contract lists for this file.
+// `domain`/`application`, or a "use client" UI component. T13 will add
+// `getActiveImports`/`ActiveImportsProvider`/`ImportingPageBadge`; T11
+// will add `PageImportView`.
 export {
   getImportJobStatus,
   processPdfImport,
@@ -27,3 +26,9 @@ export {
   MAX_DURATION_S,
   PDF_FILE_ERROR,
 } from "./domain";
+export { ImportPdfMenuItem } from "./ui/import-pdf-menu-item";
+export { ImportProgress } from "./ui/import-progress";
+export {
+  PdfImportProvider,
+  useNotebookImport,
+} from "./ui/pdf-import-provider";

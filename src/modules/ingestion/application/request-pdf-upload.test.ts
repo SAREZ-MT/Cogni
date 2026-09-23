@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { isOwnedPdfPath } from "../domain/pdf-file";
 import { requestPdfUpload } from "./request-pdf-upload";
 import { FakeNotebookPagesPort } from "./testing/fake-notebook-pages-port";
@@ -187,6 +187,40 @@ describe("requestPdfUpload use case", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("INGESTION_STORAGE_UNAVAILABLE");
+    }
+  });
+
+  // T8 review follow-up (R3-storage-unavailable-discards-cause).
+  it("keeps the original createSignedUploadUrl exception as cause and logs it", async () => {
+    const deps = makeDeps();
+    const original = new Error("transient storage failure");
+    deps.storage.forceNextCreateSignedUploadUrlError(original);
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+
+    try {
+      const result = await requestPdfUpload(
+        {
+          notebookId: "nb-1",
+          fileName: "a.pdf",
+          mime: "application/pdf",
+          sizeBytes: 1024,
+        },
+        deps,
+        OWNER_ID,
+      );
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect((result.error as { cause?: unknown }).cause).toBe(original);
+      }
+      expect(consoleError).toHaveBeenCalledWith(
+        expect.stringContaining("createSignedUploadUrl"),
+        original,
+      );
+    } finally {
+      consoleError.mockRestore();
     }
   });
 });

@@ -19,15 +19,12 @@ import { cn } from "@/shared/ui/utils";
 import type { SidebarNotebook } from "../application/list-sidebar";
 import { COLOR_PALETTE, type NotebookColor } from "../domain/notebook";
 import { ArchiveConfirmDialog } from "./archive-confirm-dialog";
-import { useNotebookActionsSlot } from "./notebook-actions-slot";
+import {
+  type NotebookActionsSlotValue,
+  useNotebookActionsSlot,
+} from "./notebook-actions-slot";
 import { PageItem } from "./page-item";
-
-// Mirrors the literal query key sidebar-tree-client.tsx owns privately
-// (SIDEBAR_TREE_QUERY_KEY): TanStack Query matches queries by value, not by
-// reference, so this duplicate literal invalidates the same cache entry
-// without notebooks/index.ts exporting the key (design.md, "clave que
-// sigue siendo privada de notebooks").
-const SIDEBAR_TREE_QUERY_KEY = ["notebooks", "sidebar-tree"] as const;
+import { SIDEBAR_TREE_QUERY_KEY } from "./sidebar-tree-query-key";
 
 // Tailwind (v4) needs literal class names to keep them in the generated
 // CSS; a template-interpolated `bg-${color}` string is invisible to its
@@ -78,17 +75,7 @@ export function NotebookItem({
 }: NotebookItemProps) {
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(notebook.title);
-  const queryClient = useQueryClient();
   const slot = useNotebookActionsSlot();
-  const injectedMenuItems = slot.menuItems?.(
-    { id: notebook.id, title: notebook.title },
-    {
-      refreshTree: () =>
-        void queryClient.invalidateQueries({
-          queryKey: SIDEBAR_TREE_QUERY_KEY,
-        }),
-    },
-  );
 
   function commit() {
     setEditing(false);
@@ -185,26 +172,12 @@ export function NotebookItem({
             </Button>
           }
         />
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-xs"
-              aria-label={`Acciones de ${notebook.title}`}
-              // opacity-0 + group-hover reveals it like the sibling
-              // buttons above; group-focus-within/focus-visible keeps it
-              // reachable by keyboard even before it (or any sibling) is
-              // hovered (design.md, "siempre alcanzable por teclado").
-              className="opacity-0 group-hover/notebook:opacity-100 group-focus-within/notebook:opacity-100 focus-visible:opacity-100"
-            >
-              <MoreHorizontal aria-hidden="true" size={14} strokeWidth={1.75} />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            {injectedMenuItems}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {slot.menuItems && (
+          <NotebookActionsMenu
+            notebook={{ id: notebook.id, title: notebook.title }}
+            menuItems={slot.menuItems}
+          />
+        )}
       </div>
 
       {notebook.pages.length > 0 && (
@@ -221,5 +194,51 @@ export function NotebookItem({
         </ul>
       )}
     </li>
+  );
+}
+
+// Split out so `useQueryClient` (which throws without a mounted
+// QueryClientProvider) is only ever called when a slot provider actually
+// injected `menuItems` — NotebookItem itself must keep rendering without a
+// QueryClientProvider when no slot is mounted (T10 review follow-up from
+// T9: R3-hard-queryclient-dependency). Also hides the "Acciones" trigger
+// entirely when the slot yields no items, instead of opening an empty
+// Radix menu that renders as a thin sliver (T9 visual follow-up).
+function NotebookActionsMenu({
+  notebook,
+  menuItems,
+}: {
+  notebook: { id: string; title: string };
+  menuItems: NonNullable<NotebookActionsSlotValue["menuItems"]>;
+}) {
+  const queryClient = useQueryClient();
+  const injectedMenuItems = menuItems(notebook, {
+    refreshTree: () =>
+      void queryClient.invalidateQueries({ queryKey: SIDEBAR_TREE_QUERY_KEY }),
+  });
+
+  if (!injectedMenuItems) return null;
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          aria-label={`Acciones de ${notebook.title}`}
+          // opacity-0 + group-hover reveals it like the sibling buttons
+          // above; group-focus-within/focus-visible keeps it reachable by
+          // keyboard even before it (or any sibling) is hovered
+          // (design.md, "siempre alcanzable por teclado").
+          className="opacity-0 group-hover/notebook:opacity-100 group-focus-within/notebook:opacity-100 focus-visible:opacity-100"
+        >
+          <MoreHorizontal aria-hidden="true" size={14} strokeWidth={1.75} />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start">
+        {injectedMenuItems}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

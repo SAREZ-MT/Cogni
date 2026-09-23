@@ -61,10 +61,16 @@ export const PDF_FILE_ERROR = {
 // `PdfStorageGateway` call — `createSignedUploadUrl` in `requestPdfUpload`,
 // `getObjectMetadata` in `startPdfImport` — must resolve to a typed
 // failure instead of propagating an exception out of the use case).
+// `UNEXPECTED` is T10's addition (T8 review follow-up:
+// R3-actions-never-throw-unenforced): the boundary `try/catch` every
+// Server Action in `actions.ts` wraps its body in maps any exception a
+// dependency throws (`getCurrentUser`, a use case, an adapter) to this
+// code instead of ever letting it escape to the client.
 export const INGESTION_ERROR = {
   NOTEBOOK_NOT_FOUND: "INGESTION_NOTEBOOK_NOT_FOUND",
   NOTEBOOK_MISMATCH: "INGESTION_NOTEBOOK_MISMATCH",
   PAGE_NOT_FOUND: "INGESTION_PAGE_NOT_FOUND",
   SESSION_REQUIRED: "INGESTION_SESSION_REQUIRED",
   STORAGE_UNAVAILABLE: "INGESTION_STORAGE_UNAVAILABLE",
+  UNEXPECTED: "INGESTION_UNEXPECTED",
 } as const;
