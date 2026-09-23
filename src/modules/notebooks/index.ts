@@ -12,6 +12,7 @@ export {
   getAssetReadUrl,
   getCurrentContent,
   getNotebookForRoute,
+  getNotebookTitleForRoute,
   getPageForRoute,
   getSidebarTree,
   registerPageAsset,

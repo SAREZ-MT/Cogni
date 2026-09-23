@@ -148,9 +148,6 @@ describe("Sidebar", () => {
       "aria-current",
       "page",
     );
-    expect(screen.getByRole("link", { name: "Cuadernos" })).not.toHaveAttribute(
-      "aria-current",
-    );
 
     for (const label of [
       "Flashcards",
@@ -164,22 +161,43 @@ describe("Sidebar", () => {
     }
   });
 
-  it("marks Cuadernos active on a /notebooks/* route instead of Inicio", () => {
-    pathname.current = "/notebooks/nb-1";
-
+  // R3-cuadernos-href-home follow-up: the standalone "Cuadernos" nav item
+  // linked to "/" (same as Inicio) and used a bare `/notebooks` prefix
+  // match, so it never actually pointed anywhere useful; the notebook tree
+  // section (rendered above "Menú principal", see the reorder test below)
+  // replaces it.
+  it("does not render a redundant Cuadernos nav item", () => {
     render(
       <Sidebar initialCollapsed={false} user={USER}>
         contenido
       </Sidebar>,
     );
 
-    expect(screen.getByRole("link", { name: "Cuadernos" })).toHaveAttribute(
-      "aria-current",
-      "page",
+    expect(
+      screen.queryByRole("link", { name: "Cuadernos" }),
+    ).not.toBeInTheDocument();
+  });
+
+  // S3 sidebar-order fix (sidebar-preview.png): logo -> notebook tree
+  // section ("Cuadernos" label) -> Menú principal -> Técnicas -> Cuenta ->
+  // user card.
+  it("orders the Cuadernos tree section above Menú principal, Técnicas and Cuenta", () => {
+    render(
+      <Sidebar initialCollapsed={false} user={USER}>
+        contenido del árbol
+      </Sidebar>,
     );
-    expect(screen.getByRole("link", { name: "Inicio" })).not.toHaveAttribute(
-      "aria-current",
-    );
+
+    const labels = screen
+      .getAllByText(/^(Cuadernos|Menú principal|Técnicas|Cuenta)$/)
+      .map((node) => node.textContent);
+
+    expect(labels).toEqual([
+      "Cuadernos",
+      "Menú principal",
+      "Técnicas",
+      "Cuenta",
+    ]);
   });
 
   it("pins the user footer card at the bottom with the sign-out menu", async () => {

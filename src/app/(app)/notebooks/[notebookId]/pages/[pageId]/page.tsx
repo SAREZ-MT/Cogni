@@ -4,11 +4,13 @@ import { getImportJobStatus, PageImportView } from "@/modules/ingestion";
 import {
   getAssetReadUrl,
   getCurrentContent,
+  getNotebookTitleForRoute,
   getPageForRoute,
   registerPageAsset,
   requestImageUpload,
   saveContent,
 } from "@/modules/notebooks";
+import { SetBreadcrumb } from "../../../../_components/breadcrumb";
 
 // ADR 0002 (Vercel Fluid Compute, no worker, no Trigger.dev) + design.md,
 // "Decision: Procesamiento síncrono en la Server Action con maxDuration":
@@ -39,6 +41,14 @@ export default async function PageView({ params }: PagePageProps) {
   const page = await getPageForRoute(notebookId, pageId);
   if (!page) notFound();
 
+  // S3 breadcrumb "{cuaderno} › {página}": a foreign/archived notebookId
+  // (or any other lookup failure) degrades to just the page title rather
+  // than blocking the route — getNotebookTitleForRoute never throws.
+  const notebookTitle = await getNotebookTitleForRoute(notebookId);
+  const breadcrumbItems = notebookTitle
+    ? [{ label: notebookTitle }, { label: page.title }]
+    : [{ label: page.title }];
+
   // design.md, "Decision: Vista de página, llamada en curso y polling con
   // TanStack Query": this route fetches the job status once on the server
   // and hands it to PageImportView (T11), which owns calling
@@ -55,6 +65,7 @@ export default async function PageView({ params }: PagePageProps) {
     // and the editor share one centered column instead of running the full
     // content width; the import cards use the same max-w-2xl.
     <section className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4">
+      <SetBreadcrumb items={breadcrumbItems} />
       <h1 className="font-semibold text-fg text-xl">{page.title}</h1>
       <PageImportView
         initial={initialJob}

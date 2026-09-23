@@ -121,6 +121,57 @@ describe("notebooks Server Actions", () => {
     });
   });
 
+  // S3 breadcrumb: the page route needs the notebook's title without
+  // paying for getNotebookForRoute's full active-pages fetch on every page
+  // view.
+  describe("getNotebookTitleForRoute", () => {
+    beforeEach(() => {
+      getCurrentUser.mockResolvedValue({ id: OWNER_ID, email: "a@b.com" });
+    });
+
+    it("returns the title of a notebook the caller owns", async () => {
+      const { createNotebook, getNotebookTitleForRoute } = await import(
+        "./actions"
+      );
+      const notebook = await createNotebook({ title: "Biología Celular" });
+
+      const result = await getNotebookTitleForRoute(notebook.id);
+
+      expect(result).toBe("Biología Celular");
+    });
+
+    it("returns null for a notebook id that does not exist", async () => {
+      const { getNotebookTitleForRoute } = await import("./actions");
+
+      const result = await getNotebookTitleForRoute("missing-id");
+
+      expect(result).toBeNull();
+    });
+
+    it("returns null for a notebook owned by a different user", async () => {
+      const { createNotebook, getNotebookTitleForRoute } = await import(
+        "./actions"
+      );
+      const notebook = await createNotebook({ title: "Ajeno" });
+
+      getCurrentUser.mockResolvedValue({ id: "other-owner", email: "x@y.com" });
+      const result = await getNotebookTitleForRoute(notebook.id);
+
+      expect(result).toBeNull();
+    });
+
+    it("returns null for an archived notebook", async () => {
+      const { createNotebook, archiveNotebook, getNotebookTitleForRoute } =
+        await import("./actions");
+      const notebook = await createNotebook({ title: "Archivado" });
+      await archiveNotebook({ notebookId: notebook.id });
+
+      const result = await getNotebookTitleForRoute(notebook.id);
+
+      expect(result).toBeNull();
+    });
+  });
+
   // design.md, "notebooks como único puerto de persistencia hacia el
   // editor": saveContent/getCurrentContent must structurally satisfy
   // SavePagePort (Result-returning, never throwing on a domain error) so

@@ -232,6 +232,20 @@ export async function getNotebookForRoute(
   return { notebook, pages: await pages.listActiveByNotebook(notebook.id) };
 }
 
+// S3 breadcrumb: the page route ("{cuaderno} › {página}") needs the
+// notebook's title without paying for getNotebookForRoute's full
+// active-pages fetch on every page view.
+export async function getNotebookTitleForRoute(
+  notebookId: string,
+): Promise<string | null> {
+  const ownerId = await requireOwnerId();
+  const notebook = await deps().notebooks.findById(notebookId);
+  if (!notebook || notebook.ownerId !== ownerId || notebook.archivedAt) {
+    return null;
+  }
+  return notebook.title;
+}
+
 // design.md, "Subida de imagen firmada": the image node view (editor/ui)
 // treats every failure as a friendly Spanish message, never a thrown
 // exception, so these three follow saveContent/getCurrentContent's
