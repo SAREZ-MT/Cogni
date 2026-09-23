@@ -86,6 +86,39 @@ describe("getHomeOverview use case", () => {
     expect(overview.notebooks[0]?.id).toBe(notebook.value.id);
   });
 
+  // R3-home-overview-archived-notebook-pages (S4 review follow-up):
+  // archiveNotebook cascades the same instant to its active pages, but this
+  // defends against a page that stays active under a notebook archived by
+  // some other path (data inconsistency) — it must never leak into counts,
+  // lastActivityAt or recentPages with an empty notebookTitle.
+  it("excludes a page whose notebook is archived, even if the page itself is still active", async () => {
+    const deps = makeDeps();
+    const notebook = await createNotebook(
+      { title: "Notas viejas" },
+      deps,
+      OWNER_ID,
+    );
+    if (!notebook.ok) throw new Error("setup failed");
+    const page = await createPage(
+      { notebookId: notebook.value.id },
+      deps,
+      OWNER_ID,
+    );
+    if (!page.ok) throw new Error("setup failed");
+    await deps.pages.update({ ...page.value, updatedAt: NOW });
+    // Archive the notebook directly (bypassing the archiveNotebook use
+    // case's own cascade) so its page stays active — the inconsistent state
+    // this defensive filter guards against.
+    await deps.notebooks.update({ ...notebook.value, archivedAt: NOW });
+
+    const overview = await getHomeOverview(deps, OWNER_ID);
+
+    expect(overview.pageCount).toBe(0);
+    expect(overview.pagesEditedThisWeek).toBe(0);
+    expect(overview.lastActivityAt).toBeNull();
+    expect(overview.recentPages).toHaveLength(0);
+  });
+
   it("counts pages edited within the last 7 days, not older ones", async () => {
     const deps = makeDeps();
     const notebook = await createNotebook({ title: "Cálculo" }, deps, OWNER_ID);

@@ -6,7 +6,7 @@ import {
   type NotebookColor,
 } from "@/modules/notebooks";
 import { cn } from "@/shared/ui/utils";
-import { formatTimeAgo } from "./format";
+import { formatTimeAgo } from "../format";
 
 // Tailwind (v4) needs literal class names to keep them in the generated
 // CSS; a template-interpolated `bg-${color}` string is invisible to its
@@ -60,7 +60,9 @@ export function NotebookGrid({
           </p>
           <div className="mt-auto flex items-center justify-between">
             <span className="text-[11.5px] text-fg-muted">
-              {notebook.pageCount} páginas
+              {notebook.pageCount === 1
+                ? "1 página"
+                : `${notebook.pageCount} páginas`}
             </span>
             <span className="text-[11px] text-fg-muted">
               {formatTimeAgo(notebook.updatedAt, now)}

@@ -38,6 +38,18 @@ describe("NotebookGrid", () => {
     expect(screen.getByText("8 páginas")).toBeInTheDocument();
   });
 
+  // Copy nit from the S4 visual pass: "1 páginas" reads wrong.
+  it("pluralizes the page count singular", () => {
+    render(
+      <NotebookGrid
+        notebooks={[notebook({ pageCount: 1 })]}
+        now={new Date("2026-09-23T12:00:00.000Z")}
+      />,
+    );
+
+    expect(screen.getByText("1 página")).toBeInTheDocument();
+  });
+
   it("always renders the create-notebook tile as the last item", () => {
     render(<NotebookGrid notebooks={[notebook()]} now={new Date()} />);
 

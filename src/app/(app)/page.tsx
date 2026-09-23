@@ -4,7 +4,7 @@ import { getCurrentUser } from "@/modules/identity";
 import { CreateNotebookTrigger, getHomeOverview } from "@/modules/notebooks";
 import { displayNameFromEmail } from "./_components/account-name";
 import { SetBreadcrumb } from "./_components/breadcrumb";
-import { formatTimeAgo } from "./_components/home/format";
+import { formatTimeAgo } from "./_components/format";
 import { HomeHeader } from "./_components/home/home-header";
 import { NotebookGrid } from "./_components/home/notebook-grid";
 import { RecentPages } from "./_components/home/recent-pages";

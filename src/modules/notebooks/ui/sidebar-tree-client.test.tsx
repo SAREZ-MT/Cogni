@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, render, screen, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -96,7 +96,9 @@ describe("SidebarTreeClient", () => {
 
   // S4 review follow-up: a notebook created from the sidebar's own dialog
   // must refresh Home's server-rendered data too, not only the sidebar
-  // tree's React Query cache.
+  // tree's React Query cache. R3-refresh-assertion-without-waitfor: wrapped
+  // in waitFor like the other refresh tests instead of asserting
+  // synchronously right after the click.
   it("refreshes the router after successfully creating a notebook", async () => {
     createNotebook.mockResolvedValue({
       id: "n1",
@@ -112,7 +114,35 @@ describe("SidebarTreeClient", () => {
     await user.type(dialog.getByLabelText("Título"), "Trabajo");
     await user.click(dialog.getByRole("button", { name: "Crear cuaderno" }));
 
-    expect(refresh).toHaveBeenCalled();
+    await waitFor(() => {
+      expect(refresh).toHaveBeenCalled();
+    });
+  });
+
+  // R3-sidebar-create-notebook-unconditional-refresh: createNotebook must
+  // go through refreshHomeIfActive() like every other mutation, not call
+  // router.refresh() unconditionally — a notebook created from the sidebar
+  // while editing a page must not re-render that page route.
+  it("does not refresh the router after creating a notebook outside Home", async () => {
+    pathname.current = "/notebooks/n1/pages/p1";
+    createNotebook.mockResolvedValue({
+      id: "n1",
+      title: "Trabajo",
+      icon: null,
+      color: null,
+    });
+    const user = userEvent.setup();
+    render(<SidebarTreeClient initialNotebooks={[]} />, { wrapper: Wrapper });
+
+    await user.click(screen.getByRole("button", { name: "Crear cuaderno" }));
+    const dialog = within(screen.getByRole("dialog"));
+    await user.type(dialog.getByLabelText("Título"), "Trabajo");
+    await user.click(dialog.getByRole("button", { name: "Crear cuaderno" }));
+
+    await waitFor(() => {
+      expect(createNotebook).toHaveBeenCalled();
+    });
+    expect(refresh).not.toHaveBeenCalled();
   });
 
   it("renders active notebooks and their pages from initialData", () => {

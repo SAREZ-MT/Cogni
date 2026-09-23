@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { HomeRecentPage } from "@/modules/notebooks";
-import { formatTimeAgo } from "./format";
+import { formatTimeAgo } from "../format";
 
 interface RecentPagesProps {
   pages: HomeRecentPage[];

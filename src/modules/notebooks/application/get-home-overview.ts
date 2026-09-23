@@ -41,10 +41,22 @@ export async function getHomeOverview(
   deps: { notebooks: NotebookRepository; pages: PageRepository; clock: Clock },
   ownerId: string,
 ): Promise<HomeOverview> {
-  const [notebooks, pages] = await Promise.all([
+  const [notebooks, allPages] = await Promise.all([
     deps.notebooks.listActiveByOwner(ownerId),
     deps.pages.listActiveByOwner(ownerId),
   ]);
+
+  // R3-home-overview-archived-notebook-pages (S4 review follow-up):
+  // listActiveByOwner filters pages only by their own archivedAt.
+  // archiveNotebook cascades the same instant to its active pages, but this
+  // defends against a page that stays active under a notebook archived by
+  // some other path — it must never leak into pageCount,
+  // pagesEditedThisWeek, lastActivityAt or recentPages with an empty
+  // notebookTitle.
+  const activeNotebookIds = new Set(notebooks.map((notebook) => notebook.id));
+  const pages = allPages.filter((page) =>
+    activeNotebookIds.has(page.notebookId),
+  );
 
   const pagesByNotebook = new Map<string, Page[]>();
   for (const page of pages) {
