@@ -63,9 +63,12 @@ describe("NotebookItem", () => {
 
   // S3 sidebar-order fix, "notebook rows not truncating early": the hover
   // actions used to reserve inline flex space at all times, shrinking the
-  // title even when nothing was hovered. They must now float over the row
-  // (removed from flow) so the title's flex-1 always gets the full width.
-  it("floats the hover actions instead of reserving inline space next to the title", () => {
+  // title even when nothing was hovered. Review follow-up
+  // (R3-notebook-item-test-title-contradicts): this case's title used to
+  // say the actions "float" over the row, contradicting the in-flow
+  // opacity-0 behaviour the assertions below (and the comment above them)
+  // actually describe.
+  it("keeps the hover actions in flow, hidden via opacity until hover/focus-within", () => {
     renderNotebookItem(notebookItemElement());
 
     const title = screen.getByRole("button", { name: "Biología" });

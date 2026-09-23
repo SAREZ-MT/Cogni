@@ -17,7 +17,9 @@ import {
   createNotebook as createNotebookUseCase,
   createPage as createPageUseCase,
   getAssetReadUrl as getAssetReadUrlUseCase,
+  getHomeOverview as getHomeOverviewUseCase,
   getPage as getPageUseCase,
+  type HomeOverview,
   type ImageUploadGrant,
   listSidebar,
   registerPageAsset as registerPageAssetUseCase,
@@ -168,6 +170,14 @@ export async function getSidebarTree(): Promise<SidebarNotebook[]> {
   return listSidebar({ notebooks, pages }, ownerId);
 }
 
+// Home's only data dependency (S4, odd/tasks/app-shell-restyle.md): real
+// stats/notebooks/recent pages, never invented metrics.
+export async function getHomeOverview(): Promise<HomeOverview> {
+  const ownerId = await requireOwnerId();
+  const { notebooks, pages, clock } = deps();
+  return getHomeOverviewUseCase({ notebooks, pages, clock }, ownerId);
+}
+
 // design.md, "notebooks como único puerto de persistencia hacia el
 // editor": saveContent/getCurrentContent below structurally satisfy
 // SavePagePort (Result-returning, never throwing on a domain error) so the
@@ -234,16 +244,23 @@ export async function getNotebookForRoute(
 
 // S3 breadcrumb: the page route ("{cuaderno} › {página}") needs the
 // notebook's title without paying for getNotebookForRoute's full
-// active-pages fetch on every page view.
+// active-pages fetch on every page view. Review follow-up from S3
+// (R3-breadcrumb-lookup-throws): a missing session or a repository failure
+// must degrade to the page's own title alone, like a foreign/archived
+// notebookId, never throw and break the whole page route.
 export async function getNotebookTitleForRoute(
   notebookId: string,
 ): Promise<string | null> {
-  const ownerId = await requireOwnerId();
-  const notebook = await deps().notebooks.findById(notebookId);
-  if (!notebook || notebook.ownerId !== ownerId || notebook.archivedAt) {
+  try {
+    const ownerId = await requireOwnerId();
+    const notebook = await deps().notebooks.findById(notebookId);
+    if (!notebook || notebook.ownerId !== ownerId || notebook.archivedAt) {
+      return null;
+    }
+    return notebook.title;
+  } catch {
     return null;
   }
-  return notebook.title;
 }
 
 // design.md, "Subida de imagen firmada": the image node view (editor/ui)

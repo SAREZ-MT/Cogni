@@ -200,6 +200,20 @@ describe("Sidebar", () => {
     ]);
   });
 
+  // S4 sidebar nit: the tree container used to be flex-1, growing to fill
+  // the whole scrollable nav column and pushing "Menú principal" down to
+  // the bottom instead of right below the tree, unlike sidebar-preview.png.
+  it("does not stretch the notebook tree slot to fill the sidebar (sections follow it directly)", () => {
+    render(
+      <Sidebar initialCollapsed={false} user={USER}>
+        contenido del árbol
+      </Sidebar>,
+    );
+
+    const slot = screen.getByText("contenido del árbol");
+    expect(slot).not.toHaveClass("flex-1");
+  });
+
   it("pins the user footer card at the bottom with the sign-out menu", async () => {
     const eventUser = userEvent.setup();
     render(

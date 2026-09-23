@@ -40,6 +40,12 @@ export class InMemoryPageRepository implements PageRepository {
       .sort((a, b) => a.position - b.position);
   }
 
+  async listActiveByOwner(ownerId: string): Promise<Page[]> {
+    return [...this.rows.values()].filter(
+      (page) => page.ownerId === ownerId && !page.archivedAt,
+    );
+  }
+
   async updateIfVersion(
     input: UpdateIfVersionInput,
   ): Promise<UpdateIfVersionResult> {

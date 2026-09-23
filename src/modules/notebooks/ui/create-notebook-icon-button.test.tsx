@@ -12,6 +12,11 @@ vi.mock("../actions", () => ({
   createNotebook,
 }));
 
+// S4 review follow-up ("refresh after creating a notebook"): the collapsed
+// sidebar's compact trigger must also refresh Home's server-rendered data.
+const { refresh } = vi.hoisted(() => ({ refresh: vi.fn() }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
+
 function Wrapper({ children }: { children: ReactNode }) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -26,6 +31,7 @@ describe("CreateNotebookIconButton", () => {
   beforeEach(() => {
     createNotebook.mockReset();
     createNotebook.mockResolvedValue({ id: "notebook-1" });
+    refresh.mockReset();
   });
 
   it("renders an icon-only button named 'Crear cuaderno'", () => {
@@ -82,6 +88,24 @@ describe("CreateNotebookIconButton", () => {
 
     await waitFor(() => {
       expect(createNotebook).toHaveBeenCalledWith({ title: "Álgebra lineal" });
+    });
+  });
+
+  // S4 review follow-up: Home's stats/grid are server-rendered, so the
+  // collapsed column's create trigger needs its own refresh too.
+  it("refreshes the router after successfully creating a notebook", async () => {
+    const user = userEvent.setup();
+    render(<CreateNotebookIconButton />, { wrapper: Wrapper });
+
+    await user.click(screen.getByRole("button", { name: "Crear cuaderno" }));
+    const dialog = await screen.findByRole("dialog");
+    await user.type(within(dialog).getByLabelText("Título"), "Álgebra lineal");
+    await user.click(
+      within(dialog).getByRole("button", { name: "Crear cuaderno" }),
+    );
+
+    await waitFor(() => {
+      expect(refresh).toHaveBeenCalled();
     });
   });
 });

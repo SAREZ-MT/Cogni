@@ -5,6 +5,10 @@ import type { PageRepository } from "../domain/page-repository";
 export interface SidebarPage {
   readonly id: string;
   readonly title: string;
+  // Client-only: true while an optimistically-created page still carries a
+  // temporary id (SidebarTreeClient's createPage.onMutate) and the Server
+  // Action hasn't returned the real one yet. Never set by the server.
+  readonly pending?: boolean;
 }
 
 export interface SidebarNotebook {
@@ -13,6 +17,10 @@ export interface SidebarNotebook {
   readonly icon: string | null;
   readonly color: NotebookColor | null;
   readonly pages: SidebarPage[];
+  // Client-only: true while an optimistically-created notebook still
+  // carries a temporary id (SidebarTreeClient's createNotebook.onMutate).
+  // Never set by the server.
+  readonly pending?: boolean;
 }
 
 // No invalid input or ownership violation is possible here: ownerId comes

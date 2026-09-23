@@ -143,9 +143,9 @@ export function Sidebar({
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-2 pb-2">
         {/* Notebook tree section first (sidebar-preview.png, S3 sidebar-
             order fix: logo -> Cuadernos -> Menú principal -> Técnicas ->
-            Cuenta -> user card). `flex-1` here is what lets the tree grow
-            to fill the sidebar's leftover height, pushing the nav sections
-            below it down near the footer, matching the reference. */}
+            Cuenta -> user card). This outer column already grows/scrolls
+            (flex-1 overflow-y-auto above); the tree itself stays sized to
+            its content so the sections below sit directly under it. */}
         {!collapsed && <SectionLabel>Cuadernos</SectionLabel>}
 
         {collapsed && collapsedCreateAction ? (
@@ -154,9 +154,7 @@ export function Sidebar({
           </div>
         ) : null}
 
-        <div
-          className={cn("flex min-h-0 flex-1 flex-col", collapsed && "hidden")}
-        >
+        <div className={cn("flex min-h-0 flex-col", collapsed && "hidden")}>
           {children}
         </div>
 

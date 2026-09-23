@@ -1,6 +1,11 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { Breadcrumb, BreadcrumbProvider, SetBreadcrumb } from "./breadcrumb";
+import {
+  Breadcrumb,
+  BreadcrumbProvider,
+  SetBreadcrumb,
+  useBreadcrumb,
+} from "./breadcrumb";
 
 describe("Breadcrumb", () => {
   it("shows the default trail 'Cogni › Inicio' when no route has published crumbs", () => {
@@ -99,5 +104,31 @@ describe("Breadcrumb", () => {
     rerender(<Wrapper published={false} />);
     expect(screen.queryByText("Biología")).not.toBeInTheDocument();
     expect(screen.getByText("Inicio")).toBeInTheDocument();
+  });
+
+  // Review follow-up from S3 (R3-setbreadcrumb-effect-identity): the
+  // provider's context value used to be a fresh object literal on every
+  // render, so SetBreadcrumb's effect (which depended on that whole
+  // object) re-ran an extra time after its own publish() call caused the
+  // provider to re-render — a second, redundant publish that re-rendered
+  // every context consumer again. An inline `items` array (its identity
+  // changes on every render of the caller, same as a real page route)
+  // must still settle after exactly one publish.
+  it("settles publishing after one render with an inline items array, not two", () => {
+    const renders: string[] = [];
+    function Probe() {
+      const items = useBreadcrumb();
+      renders.push(items.map((item) => item.label).join(">"));
+      return null;
+    }
+
+    render(
+      <BreadcrumbProvider>
+        <SetBreadcrumb items={[{ label: "Biología" }]} />
+        <Probe />
+      </BreadcrumbProvider>,
+    );
+
+    expect(renders).toEqual(["Inicio", "Biología"]);
   });
 });

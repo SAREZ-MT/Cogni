@@ -6,22 +6,42 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SidebarNotebook } from "../application/list-sidebar";
 import { SidebarTreeClient } from "./sidebar-tree-client";
 
-const { createNotebook, getSidebarTree, renameNotebook, renamePage } =
-  vi.hoisted(() => ({
-    createNotebook: vi.fn(),
-    getSidebarTree: vi.fn(),
-    renameNotebook: vi.fn(),
-    renamePage: vi.fn(),
-  }));
+const {
+  createNotebook,
+  createPage,
+  getSidebarTree,
+  renameNotebook,
+  renamePage,
+} = vi.hoisted(() => ({
+  createNotebook: vi.fn(),
+  createPage: vi.fn(),
+  getSidebarTree: vi.fn(),
+  renameNotebook: vi.fn(),
+  renamePage: vi.fn(),
+}));
 vi.mock("../actions", () => ({
   createNotebook,
   archiveNotebook: vi.fn(),
   archivePage: vi.fn(),
-  createPage: vi.fn(),
+  createPage,
   renameNotebook,
   renamePage,
   setNotebookAppearance: vi.fn(),
   getSidebarTree,
+}));
+
+// S4 review follow-up ("refresh after creating a notebook"): a notebook
+// created from the sidebar must also refresh Home's server-rendered data.
+// Extended for the same follow-up's remaining mutations: the refresh must
+// only fire while the user is actually on Home (pathname "/"), never on
+// another route (e.g. mid-edit on a page), so usePathname is mocked too.
+const { refresh, pathname } = vi.hoisted(() => ({
+  refresh: vi.fn(),
+  pathname: { current: "/" },
+}));
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh }),
+  usePathname: () => pathname.current,
 }));
 
 function Wrapper({ children }: { children: ReactNode }) {
@@ -34,10 +54,13 @@ function Wrapper({ children }: { children: ReactNode }) {
 describe("SidebarTreeClient", () => {
   beforeEach(() => {
     createNotebook.mockReset();
+    createPage.mockReset();
     getSidebarTree.mockReset();
     getSidebarTree.mockResolvedValue([]);
     renameNotebook.mockReset();
     renamePage.mockReset();
+    refresh.mockReset();
+    pathname.current = "/";
   });
 
   // Scenario "Reescritura de shell-empty-state.spec.ts" (e2e) — the same
@@ -69,6 +92,27 @@ describe("SidebarTreeClient", () => {
     await user.click(dialog.getByRole("button", { name: "Crear cuaderno" }));
 
     expect(createNotebook).toHaveBeenCalledWith({ title: "Trabajo" });
+  });
+
+  // S4 review follow-up: a notebook created from the sidebar's own dialog
+  // must refresh Home's server-rendered data too, not only the sidebar
+  // tree's React Query cache.
+  it("refreshes the router after successfully creating a notebook", async () => {
+    createNotebook.mockResolvedValue({
+      id: "n1",
+      title: "Trabajo",
+      icon: null,
+      color: null,
+    });
+    const user = userEvent.setup();
+    render(<SidebarTreeClient initialNotebooks={[]} />, { wrapper: Wrapper });
+
+    await user.click(screen.getByRole("button", { name: "Crear cuaderno" }));
+    const dialog = within(screen.getByRole("dialog"));
+    await user.type(dialog.getByLabelText("Título"), "Trabajo");
+    await user.click(dialog.getByRole("button", { name: "Crear cuaderno" }));
+
+    expect(refresh).toHaveBeenCalled();
   });
 
   it("renders active notebooks and their pages from initialData", () => {
@@ -175,5 +219,143 @@ describe("SidebarTreeClient", () => {
     // wipe mutation 2's still-pending optimistic rename back to "Página 1".
     expect(screen.queryByText("Página 1")).not.toBeInTheDocument();
     expect(screen.getByText("Página renombrada")).toBeInTheDocument();
+  });
+
+  // Defect: an optimistic page still carrying its temporary client-only id
+  // must not be a navigable link (clicking it before the real id arrives
+  // 404s), and its notebook's "Crear página" action must not be usable
+  // until its own temporary id has been swapped for the real one.
+  describe("pending optimistic entries", () => {
+    it("renders an optimistic page as non-navigable until its real id arrives", async () => {
+      let resolveCreatePage!: (page: { id: string; title: string }) => void;
+      createPage.mockReturnValue(
+        new Promise((resolve) => {
+          resolveCreatePage = resolve;
+        }),
+      );
+      // Never resolves: keeps the background refetch from overwriting the
+      // optimistic tree with the stale (still real-notebooks-only) fixture
+      // while `await user.click` flushes microtasks, the same reasoning as
+      // the rollback tests above.
+      getSidebarTree.mockReturnValue(new Promise(() => {}));
+      const initialNotebooks: SidebarNotebook[] = [
+        { id: "n1", title: "Cuaderno 1", icon: null, color: null, pages: [] },
+      ];
+      const user = userEvent.setup();
+      render(<SidebarTreeClient initialNotebooks={initialNotebooks} />, {
+        wrapper: Wrapper,
+      });
+
+      await user.click(
+        screen.getByRole("button", { name: "Crear página en Cuaderno 1" }),
+      );
+
+      expect(screen.getByText("Sin título")).toBeInTheDocument();
+      expect(
+        screen.queryByRole("link", { name: /Sin título/ }),
+      ).not.toBeInTheDocument();
+
+      await act(async () => {
+        resolveCreatePage({ id: "real-page-id", title: "Sin título" });
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      });
+
+      expect(screen.getByRole("link", { name: /Sin título/ })).toHaveAttribute(
+        "href",
+        "/notebooks/n1/pages/real-page-id",
+      );
+    });
+
+    it("disables a pending notebook's create-page action until its real id arrives", async () => {
+      let resolveCreateNotebook!: (notebook: {
+        id: string;
+        title: string;
+        icon: null;
+        color: null;
+      }) => void;
+      createNotebook.mockReturnValue(
+        new Promise((resolve) => {
+          resolveCreateNotebook = resolve;
+        }),
+      );
+      getSidebarTree.mockReturnValue(new Promise(() => {}));
+      const user = userEvent.setup();
+      render(<SidebarTreeClient initialNotebooks={[]} />, { wrapper: Wrapper });
+
+      await user.click(screen.getByRole("button", { name: "Crear cuaderno" }));
+      const dialog = within(screen.getByRole("dialog"));
+      await user.type(dialog.getByLabelText("Título"), "Trabajo");
+      await user.click(dialog.getByRole("button", { name: "Crear cuaderno" }));
+
+      expect(
+        screen.getByRole("button", { name: "Crear página en Trabajo" }),
+      ).toBeDisabled();
+
+      await act(async () => {
+        resolveCreateNotebook({
+          id: "real-notebook-id",
+          title: "Trabajo",
+          icon: null,
+          color: null,
+        });
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      });
+
+      expect(
+        screen.getByRole("button", { name: "Crear página en Trabajo" }),
+      ).toBeEnabled();
+    });
+  });
+
+  // Defect: Home's stats/grid/recent pages are server-rendered, so any
+  // sidebar mutation besides createNotebook (which already refreshes) must
+  // also refresh Home's server data, but only while the user is actually on
+  // Home — a refresh while editing a page would re-render the editor route.
+  describe("refreshing Home after other mutations", () => {
+    it("refreshes the router after creating a page while on Home", async () => {
+      createPage.mockResolvedValue({ id: "p1", title: "Sin título" });
+      // Never resolves: same reasoning as the "pending optimistic entries"
+      // tests above — keeps the background refetch from tearing down the
+      // notebook (and its "Crear página" button) mid-interaction.
+      getSidebarTree.mockReturnValue(new Promise(() => {}));
+      const initialNotebooks: SidebarNotebook[] = [
+        { id: "n1", title: "Cuaderno 1", icon: null, color: null, pages: [] },
+      ];
+      const user = userEvent.setup();
+      render(<SidebarTreeClient initialNotebooks={initialNotebooks} />, {
+        wrapper: Wrapper,
+      });
+
+      await user.click(
+        screen.getByRole("button", { name: "Crear página en Cuaderno 1" }),
+      );
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      });
+
+      expect(refresh).toHaveBeenCalled();
+    });
+
+    it("does not refresh the router after creating a page outside Home", async () => {
+      pathname.current = "/notebooks/n1/pages/p1";
+      createPage.mockResolvedValue({ id: "p1", title: "Sin título" });
+      getSidebarTree.mockReturnValue(new Promise(() => {}));
+      const initialNotebooks: SidebarNotebook[] = [
+        { id: "n1", title: "Cuaderno 1", icon: null, color: null, pages: [] },
+      ];
+      const user = userEvent.setup();
+      render(<SidebarTreeClient initialNotebooks={initialNotebooks} />, {
+        wrapper: Wrapper,
+      });
+
+      await user.click(
+        screen.getByRole("button", { name: "Crear página en Cuaderno 1" }),
+      );
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      });
+
+      expect(refresh).not.toHaveBeenCalled();
+    });
   });
 });

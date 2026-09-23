@@ -24,6 +24,11 @@ export interface PageRepository {
   create(page: Page): Promise<void>;
   update(page: Page): Promise<void>;
   listActiveByNotebook(notebookId: string): Promise<Page[]>;
+  // S4 Home overview: every active page across all of an owner's
+  // notebooks, not scoped to one notebook (specs/notebooks/spec.md has no
+  // scenario for this yet — it backs GetHomeOverview's real-data stats and
+  // recent-pages list, never invented metrics).
+  listActiveByOwner(ownerId: string): Promise<Page[]>;
   // Atomic compare-and-swap UPDATE: WHERE id, owner_id, archived_at IS NULL
   // AND content_version = expectedVersion. Never a read-compare-write
   // (design.md, "Guardado de contenido con comparar-e-intercambiar").

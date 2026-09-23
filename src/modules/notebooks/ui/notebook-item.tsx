@@ -165,6 +165,7 @@ export function NotebookItem({
             variant="ghost"
             size="icon-xs"
             onClick={onCreatePage}
+            disabled={notebook.pending}
             aria-label={`Crear página en ${notebook.title}`}
           >
             <FilePlus aria-hidden="true" size={14} />
@@ -177,6 +178,7 @@ export function NotebookItem({
                 type="button"
                 variant="ghost"
                 size="icon-xs"
+                disabled={notebook.pending}
                 aria-label={`Archivar cuaderno ${notebook.title}`}
               >
                 <Trash2 aria-hidden="true" size={14} />
@@ -187,6 +189,7 @@ export function NotebookItem({
             <NotebookActionsMenu
               notebook={{ id: notebook.id, title: notebook.title }}
               menuItems={slot.menuItems}
+              disabled={notebook.pending}
             />
           )}
         </div>
@@ -219,9 +222,11 @@ export function NotebookItem({
 function NotebookActionsMenu({
   notebook,
   menuItems,
+  disabled,
 }: {
   notebook: { id: string; title: string };
   menuItems: NonNullable<NotebookActionsSlotValue["menuItems"]>;
+  disabled?: boolean;
 }) {
   const queryClient = useQueryClient();
   const injectedMenuItems = menuItems(notebook, {
@@ -238,6 +243,7 @@ function NotebookActionsMenu({
           type="button"
           variant="ghost"
           size="icon-xs"
+          disabled={disabled}
           aria-label={`Acciones de ${notebook.title}`}
         >
           <MoreHorizontal aria-hidden="true" size={14} strokeWidth={1.75} />

@@ -4,29 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import { SignOutButton } from "@/modules/identity/ui";
 import { cn } from "@/shared/ui/utils";
 
+import { displayNameFromEmail, initialsFrom } from "./account-name";
+
 type AccountUser = { id: string; email: string | null };
 
-// No display-name field is fetched for the shell yet (layout.tsx only calls
-// getCurrentUser()), so every trigger that needs a human-friendly label
-// derives one from the email's local part instead of inventing one. Shared
-// by the topbar avatar below and sidebar-user-card.tsx (S2 product
-// decision 3: the same identity everywhere, not two divergent labels).
-export function displayNameFromEmail(email: string | null): string {
-  if (!email) return "Cuenta";
-  const local = email.split("@")[0] || email;
-  return local.charAt(0).toUpperCase() + local.slice(1);
-}
-
-export function initialsFrom(displayName: string): string {
-  const parts = displayName
-    .trim()
-    .split(/[\s._-]+/)
-    .filter(Boolean);
-  if (parts.length >= 2) {
-    return `${parts[0]?.[0] ?? ""}${parts[1]?.[0] ?? ""}`.toUpperCase();
-  }
-  return displayName.slice(0, 2).toUpperCase();
-}
+// The name helpers live in account-name.ts (a plain module) because the Home
+// Server Component needs them too; re-exported here for the client-side
+// consumers that already import them from this file.
+export { displayNameFromEmail, initialsFrom };
 
 // Shared open/close + outside-click/Escape behaviour for every trigger that
 // opens the account menu (the topbar avatar below, and the sidebar footer

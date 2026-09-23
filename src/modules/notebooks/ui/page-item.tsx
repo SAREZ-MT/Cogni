@@ -52,6 +52,19 @@ export function PageItem({
           }}
           className="h-8 flex-1 rounded-input border border-border-default bg-background px-2 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
         />
+      ) : page.pending ? (
+        // Optimistic page still carrying its temporary client-only id
+        // (sidebar-tree-client.tsx, createPage.onMutate): rendered as a
+        // non-link so it can't be navigated to before the real id arrives
+        // (navigating early 404s — the Server Action never saw the temp
+        // id). Same styling as the link below, minus the href.
+        <span
+          aria-disabled="true"
+          className="flex h-8 min-w-0 flex-1 items-center gap-2 truncate rounded-input px-2 text-fg-secondary text-sm"
+        >
+          <FileText aria-hidden="true" size={16} strokeWidth={1.75} />
+          <span className="truncate">{page.title}</span>
+        </span>
       ) : (
         <Link
           href={`/notebooks/${notebookId}/pages/${page.id}`}
