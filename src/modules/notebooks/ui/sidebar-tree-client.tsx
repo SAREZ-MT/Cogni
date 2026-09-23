@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { usePathname, useRouter } from "next/navigation";
 import { createId } from "@/shared/kernel/id";
 import {
   archiveNotebook as archiveNotebookAction,
@@ -30,6 +31,8 @@ export function SidebarTreeClient({
   initialNotebooks,
 }: SidebarTreeClientProps) {
   const queryClient = useQueryClient();
+  const router = useRouter();
+  const pathname = usePathname();
   const { data: notebooks } = useQuery({
     queryKey: SIDEBAR_TREE_QUERY_KEY,
     queryFn: getSidebarTree,
@@ -78,13 +81,29 @@ export function SidebarTreeClient({
     void queryClient.invalidateQueries({ queryKey: SIDEBAR_TREE_QUERY_KEY });
   }
 
+  // Home's stats/grid/recent pages are server-rendered (src/app/(app)/
+  // page.tsx), so any mutation that changes them needs its own refresh to
+  // stay in sync — but only while the user is actually looking at Home:
+  // refreshing from another route (e.g. mid-edit on a page) would re-render
+  // that route's Server Component for no reason.
+  function refreshHomeIfActive() {
+    if (pathname === "/") router.refresh();
+  }
+
   const createNotebook = useMutation({
     mutationFn: (title: string) => createNotebookAction({ title }),
     onMutate: (title) => {
       const tempId = createId();
       const context = optimisticUpdate((current) => [
         ...current,
-        { id: tempId, title, icon: null, color: null, pages: [] },
+        {
+          id: tempId,
+          title,
+          icon: null,
+          color: null,
+          pages: [],
+          pending: true,
+        },
       ]);
       return { ...context, tempId };
     },
@@ -93,17 +112,23 @@ export function SidebarTreeClient({
     // freshly created notebook before that refetch resolves (rename, set
     // appearance, add a page) would still be targeting the temporary
     // client-only id, and the Server Action would reject it with
-    // NOTEBOOK_NOT_FOUND.
+    // NOTEBOOK_NOT_FOUND. `pending` is cleared in the same update: until
+    // then the notebook's own actions stay disabled (notebook-item.tsx) so
+    // nothing can be triggered against the temporary id.
     onSuccess: (created, _title, context) => {
       queryClient.setQueryData<SidebarNotebook[]>(
         SIDEBAR_TREE_QUERY_KEY,
         (current) =>
           (current ?? []).map((notebook) =>
             notebook.id === context?.tempId
-              ? { ...notebook, id: created.id }
+              ? { ...notebook, id: created.id, pending: false }
               : notebook,
           ),
       );
+      // S4 review follow-up: Home's stats/grid are server-rendered, so a
+      // notebook created from the sidebar needs its own refresh, not only
+      // the sidebar tree's React Query cache invalidation below.
+      router.refresh();
     },
     onError: (_error, _title, context) => rollbackOn(context),
     onSettled: invalidate,
@@ -118,6 +143,7 @@ export function SidebarTreeClient({
           notebook.id === notebookId ? { ...notebook, title } : notebook,
         ),
       ),
+    onSuccess: refreshHomeIfActive,
     onError: (_error, _input, context) => rollbackOn(context),
     onSettled: invalidate,
   });
@@ -144,6 +170,7 @@ export function SidebarTreeClient({
       optimisticUpdate((previous) =>
         previous.filter((notebook) => notebook.id !== notebookId),
       ),
+    onSuccess: refreshHomeIfActive,
     onError: (_error, _notebookId, context) => rollbackOn(context),
     onSettled: invalidate,
   });
@@ -157,7 +184,10 @@ export function SidebarTreeClient({
           notebook.id === notebookId
             ? {
                 ...notebook,
-                pages: [...notebook.pages, { id: tempId, title: "Sin título" }],
+                pages: [
+                  ...notebook.pages,
+                  { id: tempId, title: "Sin título", pending: true },
+                ],
               }
             : notebook,
         ),
@@ -167,6 +197,8 @@ export function SidebarTreeClient({
     // Same reasoning as createNotebook.onSuccess: replace the temporary
     // page id with the real one right away so an immediate follow-up click
     // (e.g. opening the page) never targets an id the server never saw.
+    // `pending` is cleared in the same update: until then the page renders
+    // as a non-link (page-item.tsx) so it can't be navigated to yet.
     onSuccess: (created, notebookId, context) => {
       queryClient.setQueryData<SidebarNotebook[]>(
         SIDEBAR_TREE_QUERY_KEY,
@@ -177,13 +209,14 @@ export function SidebarTreeClient({
                   ...notebook,
                   pages: notebook.pages.map((page) =>
                     page.id === context?.tempId
-                      ? { ...page, id: created.id }
+                      ? { ...page, id: created.id, pending: false }
                       : page,
                   ),
                 }
               : notebook,
           ),
       );
+      refreshHomeIfActive();
     },
     onError: (_error, _notebookId, context) => rollbackOn(context),
     onSettled: invalidate,
@@ -201,6 +234,7 @@ export function SidebarTreeClient({
           ),
         })),
       ),
+    onSuccess: refreshHomeIfActive,
     onError: (_error, _input, context) => rollbackOn(context),
     onSettled: invalidate,
   });
@@ -214,6 +248,7 @@ export function SidebarTreeClient({
           pages: notebook.pages.filter((page) => page.id !== pageId),
         })),
       ),
+    onSuccess: refreshHomeIfActive,
     onError: (_error, _pageId, context) => rollbackOn(context),
     onSettled: invalidate,
   });

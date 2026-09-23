@@ -82,6 +82,18 @@ export class DrizzlePageRepository implements PageRepository {
     return rows.map(toPage);
   }
 
+  // S4 Home overview: no notebook_id filter, ordered by most recently
+  // updated first (GetHomeOverview re-derives lastActivityAt/
+  // pagesEditedThisWeek/recentPages from this same list either way, but
+  // the DB-level order keeps a debugging query on this table meaningful).
+  async listActiveByOwner(ownerId: string): Promise<Page[]> {
+    const rows = await this.db.query.pages.findMany({
+      where: and(eq(pages.ownerId, ownerId), isNull(pages.archivedAt)),
+      orderBy: [desc(pages.updatedAt)],
+    });
+    return rows.map(toPage);
+  }
+
   // Single conditional UPDATE: compare-and-swap on content_version happens
   // atomically inside Postgres, never as a read-then-write from the app
   // (design.md, "Guardado de contenido con comparar-e-intercambiar"). A

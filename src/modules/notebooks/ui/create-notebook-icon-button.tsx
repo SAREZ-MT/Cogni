@@ -2,6 +2,7 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/shared/ui/button";
 import {
   Tooltip,
@@ -22,12 +23,16 @@ import { SIDEBAR_TREE_QUERY_KEY } from "./sidebar-tree-query-key";
 // itself stays private to `notebooks` either way.
 export function CreateNotebookIconButton() {
   const queryClient = useQueryClient();
+  const router = useRouter();
   const createNotebook = useMutation({
     mutationFn: (title: string) => createNotebookAction({ title }),
     onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: SIDEBAR_TREE_QUERY_KEY,
       });
+      // S4 review follow-up: Home's stats/grid are server-rendered, so a
+      // notebook created from the collapsed column needs its own refresh.
+      router.refresh();
     },
   });
 

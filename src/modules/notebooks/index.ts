@@ -11,6 +11,7 @@ export {
   createPage as createPageAction,
   getAssetReadUrl,
   getCurrentContent,
+  getHomeOverview,
   getNotebookForRoute,
   getNotebookTitleForRoute,
   getPageForRoute,
@@ -34,6 +35,9 @@ export {
   getAssetReadUrlSchema,
   getPage,
   getPageSchema,
+  type HomeNotebookSummary,
+  type HomeOverview,
+  type HomeRecentPage,
   type ImageUploadGrant,
   listSidebar,
   registerPageAssetSchema,
@@ -81,6 +85,7 @@ export {
   type NotebooksServerApi,
 } from "./server-api";
 export { CreateNotebookIconButton } from "./ui/create-notebook-icon-button";
+export { CreateNotebookTrigger } from "./ui/create-notebook-trigger";
 export {
   type NotebookActionsHelpers,
   NotebookActionsSlotProvider,

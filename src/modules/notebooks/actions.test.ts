@@ -170,6 +170,56 @@ describe("notebooks Server Actions", () => {
 
       expect(result).toBeNull();
     });
+
+    // Review follow-up from S3 (R3-breadcrumb-lookup-throws): a session or
+    // repository failure must degrade the breadcrumb to the page's own
+    // title alone, like a foreign/archived notebookId, never throw and
+    // break the whole page route.
+    it("returns null instead of throwing when the session lookup rejects", async () => {
+      const { getNotebookTitleForRoute } = await import("./actions");
+      getCurrentUser.mockRejectedValue(new Error("session lookup failed"));
+
+      const result = await getNotebookTitleForRoute("any-id");
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe("getHomeOverview", () => {
+    beforeEach(() => {
+      getCurrentUser.mockResolvedValue({ id: OWNER_ID, email: "a@b.com" });
+    });
+
+    // Shared repository instances live for the whole file (mocked once at
+    // the top), so other tests may have already created notebooks/pages by
+    // the time this one runs: assert this notebook's own summary, not
+    // exact totals.
+    it("reflects real notebooks/pages created through the same Server Actions", async () => {
+      const { createNotebook, createPage, getHomeOverview } = await import(
+        "./actions"
+      );
+      const notebook = await createNotebook({
+        title: "Biología Celular (Home)",
+      });
+      await createPage({ notebookId: notebook.id });
+
+      const overview = await getHomeOverview();
+
+      const summary = overview.notebooks.find((n) => n.id === notebook.id);
+      expect(summary?.title).toBe("Biología Celular (Home)");
+      expect(summary?.pageCount).toBe(1);
+      expect(overview.notebookCount).toBeGreaterThanOrEqual(1);
+      expect(overview.pageCount).toBeGreaterThanOrEqual(1);
+    });
+
+    it("rejects without a session, like every other notebooks Server Action", async () => {
+      getCurrentUser.mockResolvedValue(null);
+      const { getHomeOverview } = await import("./actions");
+
+      await expect(getHomeOverview()).rejects.toThrow(
+        "Debes iniciar sesión para continuar.",
+      );
+    });
   });
 
   // design.md, "notebooks como único puerto de persistencia hacia el

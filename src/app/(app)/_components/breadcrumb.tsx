@@ -5,6 +5,7 @@ import {
   type ReactNode,
   useContext,
   useEffect,
+  useMemo,
   useState,
 } from "react";
 import { cn } from "@/shared/ui/utils";
@@ -31,11 +32,19 @@ const BreadcrumbContext = createContext<BreadcrumbContextValue | null>(null);
 // currently published.
 export function BreadcrumbProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<BreadcrumbItem[] | null>(null);
+  // Review follow-up from S3 (R3-setbreadcrumb-effect-identity): without
+  // this memo, the provider handed down a brand-new {items, publish}
+  // object literal on every render, so SetBreadcrumb's effect below (which
+  // used to depend on that whole object) re-ran an extra time whenever
+  // anything else caused this provider to re-render, not only when its own
+  // `items` prop actually changed.
+  const value = useMemo<BreadcrumbContextValue>(
+    () => ({ items: items ?? DEFAULT_ITEMS, publish: setItems }),
+    [items],
+  );
 
   return (
-    <BreadcrumbContext.Provider
-      value={{ items: items ?? DEFAULT_ITEMS, publish: setItems }}
-    >
+    <BreadcrumbContext.Provider value={value}>
       {children}
     </BreadcrumbContext.Provider>
   );
@@ -57,12 +66,18 @@ interface SetBreadcrumbProps {
 // route rendered standalone in a test) this is a no-op.
 export function SetBreadcrumb({ items }: SetBreadcrumbProps) {
   const context = useContext(BreadcrumbContext);
+  // Depend on the stable `publish` function (a useState setter, which
+  // React guarantees keeps the same identity for the component's whole
+  // lifetime) instead of the whole context value object: the object's own
+  // identity changes on every publish (see the provider's memo above), so
+  // depending on it re-ran this effect an extra, redundant time per publish.
+  const publish = context?.publish;
 
   useEffect(() => {
-    if (!context) return;
-    context.publish(items);
-    return () => context.publish(null);
-  }, [context, items]);
+    if (!publish) return;
+    publish(items);
+    return () => publish(null);
+  }, [publish, items]);
 
   return null;
 }

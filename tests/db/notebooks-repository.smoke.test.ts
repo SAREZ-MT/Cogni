@@ -127,6 +127,107 @@ describe.skipIf(!url)("Drizzle notebook/page repositories", () => {
     expect(listB.some((n) => n.id === notebookA.value.id)).toBe(false);
   });
 
+  // S4 Home overview: GetHomeOverview needs every active page across all of
+  // an owner's notebooks, isolated by owner_id exactly like
+  // listActiveByOwner/listActiveByNotebook, and excluding archived pages.
+  it("listActiveByOwner returns active pages across notebooks, isolated by owner and excluding archived ones", async () => {
+    const notebookA1 = createNotebook(
+      {
+        id: randomUUID(),
+        ownerId: ownerA.id,
+        title: "Cuaderno A1",
+        position: await notebookRepo.nextPosition(ownerA.id),
+      },
+      systemClock,
+    );
+    if (!notebookA1.ok) throw new Error("setup failed");
+    await notebookRepo.create(notebookA1.value);
+    const notebookA2 = createNotebook(
+      {
+        id: randomUUID(),
+        ownerId: ownerA.id,
+        title: "Cuaderno A2",
+        position: await notebookRepo.nextPosition(ownerA.id),
+      },
+      systemClock,
+    );
+    if (!notebookA2.ok) throw new Error("setup failed");
+    await notebookRepo.create(notebookA2.value);
+    const notebookB = createNotebook(
+      {
+        id: randomUUID(),
+        ownerId: ownerB.id,
+        title: "Cuaderno de B",
+        position: await notebookRepo.nextPosition(ownerB.id),
+      },
+      systemClock,
+    );
+    if (!notebookB.ok) throw new Error("setup failed");
+    await notebookRepo.create(notebookB.value);
+
+    const pageA1 = createPage(
+      {
+        id: randomUUID(),
+        ownerId: ownerA.id,
+        notebookId: notebookA1.value.id,
+        position: await pageRepo.nextPosition(notebookA1.value.id),
+      },
+      systemClock,
+    );
+    if (!pageA1.ok) throw new Error("setup failed");
+    await pageRepo.create(pageA1.value);
+    const pageA2 = createPage(
+      {
+        id: randomUUID(),
+        ownerId: ownerA.id,
+        notebookId: notebookA2.value.id,
+        position: await pageRepo.nextPosition(notebookA2.value.id),
+      },
+      systemClock,
+    );
+    if (!pageA2.ok) throw new Error("setup failed");
+    await pageRepo.create(pageA2.value);
+    const archivedPageA1 = createPage(
+      {
+        id: randomUUID(),
+        ownerId: ownerA.id,
+        notebookId: notebookA1.value.id,
+        position: await pageRepo.nextPosition(notebookA1.value.id),
+      },
+      systemClock,
+    );
+    if (!archivedPageA1.ok) throw new Error("setup failed");
+    await pageRepo.create(archivedPageA1.value);
+    await pageRepo.update({ ...archivedPageA1.value, archivedAt: new Date() });
+    const pageB = createPage(
+      {
+        id: randomUUID(),
+        ownerId: ownerB.id,
+        notebookId: notebookB.value.id,
+        position: await pageRepo.nextPosition(notebookB.value.id),
+      },
+      systemClock,
+    );
+    if (!pageB.ok) throw new Error("setup failed");
+    await pageRepo.create(pageB.value);
+
+    const ownerAPages = await pageRepo.listActiveByOwner(ownerA.id);
+
+    // arrayContaining, not a strict equal set: other cases in this file
+    // (e.g. "creates, reads and archives a notebook and a page") create
+    // their own pages for ownerA earlier in the same describe.skipIf block,
+    // so a strict equality on the exact id set failed whenever this case
+    // ran after them — only the two exclusions below (archived, other
+    // owner) are actually load-bearing for this scenario.
+    expect(ownerAPages.map((page) => page.id)).toEqual(
+      expect.arrayContaining([pageA1.value.id, pageA2.value.id]),
+    );
+    expect(
+      ownerAPages.some((page) => page.id === archivedPageA1.value.id),
+    ).toBe(false);
+    expect(ownerAPages.some((page) => page.id === pageB.value.id)).toBe(false);
+  });
+
   // T4 review follow-up (R3-archived-toctou): writeImportedContent's write
   // (notebooks/application/write-imported-content.ts) reads the page,
   // checks it is not archived, then calls updateIfVersion. Between those
