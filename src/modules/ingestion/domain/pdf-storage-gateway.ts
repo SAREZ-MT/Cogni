@@ -8,7 +8,9 @@ export interface PdfStorageGateway {
   createSignedUploadUrl(
     path: string,
   ): Promise<{ signedUrl: string; token: string; bucket: string }>;
-  // null when the object does not exist.
+  // null when the object does not exist; throws on a transient error
+  // (T7b/T7c follow-up: R3-metadata-transient-error-as-missing) instead of
+  // reporting it as missing.
   getObjectMetadata(
     path: string,
   ): Promise<{ sizeBytes: number; mime: string } | null>;

@@ -377,7 +377,11 @@ describe("processImportJob use case", () => {
   // unhandled): the port promises a Result, but a thrown exception must
   // still leave the job terminal instead of propagating out of
   // processImportJob.
-  it("fails(invalid_pdf) when the extractor throws instead of returning an error Result", async () => {
+  // T7b review follow-up (R3-swallowed-exception-cause-lost): the original
+  // exception must reach `telemetry.finished` as `failure.cause` so
+  // `ImportTelemetryAdapter` can report it to Sentry with `captureException`
+  // (stack included) instead of the stack-less `captureMessage`.
+  it("fails(invalid_pdf) when the extractor throws instead of returning an error Result, forwarding the exception as cause", async () => {
     const deps = makeDeps();
     const job = await seedQueuedJob(deps);
     deps.storage.put(STORAGE_PATH, {
@@ -385,9 +389,8 @@ describe("processImportJob use case", () => {
       mime: "application/pdf",
       bytes: PDF_BYTES,
     });
-    vi.spyOn(deps.extractor, "extract").mockRejectedValueOnce(
-      new Error("unpdf blew up"),
-    );
+    const thrown = new Error("unpdf blew up");
+    vi.spyOn(deps.extractor, "extract").mockRejectedValueOnce(thrown);
 
     const result = await processImportJob(
       { importJobId: job.id },
@@ -401,6 +404,34 @@ describe("processImportJob use case", () => {
     expect(result.value.error).toBe(
       "Este archivo no es un PDF válido o está protegido. Revisa que no tenga contraseña e inténtalo de nuevo.",
     );
+    expect(deps.telemetry.finishedCalls).toEqual([
+      { job: result.value, failure: { kind: "invalid_pdf", cause: thrown } },
+    ]);
+  });
+
+  it("fails(invalid_pdf) with no cause when the extractor returns an error Result without throwing", async () => {
+    const deps = makeDeps();
+    const job = await seedQueuedJob(deps);
+    deps.storage.put(STORAGE_PATH, {
+      sizeBytes: PDF_BYTES.length,
+      mime: "application/pdf",
+      bytes: PDF_BYTES,
+    });
+    deps.extractor.setResult(
+      err(new DomainError("PDF_UNREADABLE", "encrypted")),
+    );
+
+    const result = await processImportJob(
+      { importJobId: job.id },
+      deps,
+      OWNER_ID,
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(deps.telemetry.finishedCalls).toEqual([
+      { job: result.value, failure: { kind: "invalid_pdf", cause: undefined } },
+    ]);
   });
 
   it("fails(no_text_layer) when no page has text", async () => {
@@ -534,12 +565,15 @@ describe("processImportJob use case", () => {
   // T7b review follow-up from T6 (R3-persist-and-extract-exceptions-
   // unhandled): a thrown database exception from writeImportedContent
   // must map to the generic page-unavailable message, not propagate.
-  it("fails(persistence) with the page-unavailable message when writeImportedContent throws", async () => {
+  // T7b review follow-up (R3-swallowed-exception-cause-lost): same
+  // guarantee as the extractor-throws test above, for the write path.
+  it("fails(persistence) with the page-unavailable message when writeImportedContent throws, forwarding the exception as cause", async () => {
     const deps = makeDeps();
     const job = await seedQueuedJob(deps);
     seedTextExtraction(deps, ["hola mundo"]);
+    const thrown = new Error("connection reset");
     vi.spyOn(deps.notebookPages, "writeImportedContent").mockRejectedValueOnce(
-      new Error("connection reset"),
+      thrown,
     );
 
     const result = await processImportJob(
@@ -554,6 +588,9 @@ describe("processImportJob use case", () => {
     expect(result.value.error).toBe(
       "La página de destino ya no está disponible. Vuelve a importar el PDF.",
     );
+    expect(deps.telemetry.finishedCalls).toEqual([
+      { job: result.value, failure: { kind: "persistence", cause: thrown } },
+    ]);
   });
 
   it("completes the job, writes the content and reports pdf_imported exactly once", async () => {
@@ -582,27 +619,39 @@ describe("processImportJob use case", () => {
   // propagates): the job is already terminal in the repository by the
   // time telemetry.finished() runs; a rejection there must never surface
   // out of processImportJob or undo the terminal transition.
-  it("still resolves ok with the terminal job when telemetry.finished() rejects", async () => {
+  // T7b review follow-up (R3-console-spy-restore-skipped-on-failure): the
+  // previous version called `consoleError.mockRestore()` as the last
+  // statement, so a failed assertion above it left the spy installed for
+  // every later test in this file. `finally` restores it unconditionally,
+  // and the added assertion proves `reportFinished` actually logged the
+  // rejection instead of merely swallowing it silently.
+  it("still resolves ok with the terminal job when telemetry.finished() rejects, and logs the rejection", async () => {
     const deps = makeDeps();
     const job = await seedQueuedJob(deps);
     seedTextExtraction(deps, ["hola mundo"]);
+    const rejection = new Error("posthog unreachable");
+    vi.spyOn(deps.telemetry, "finished").mockRejectedValueOnce(rejection);
     const consoleError = vi
       .spyOn(console, "error")
       .mockImplementation(() => undefined);
-    vi.spyOn(deps.telemetry, "finished").mockRejectedValueOnce(
-      new Error("posthog unreachable"),
-    );
 
-    const result = await processImportJob(
-      { importJobId: job.id },
-      deps,
-      OWNER_ID,
-    );
+    try {
+      const result = await processImportJob(
+        { importJobId: job.id },
+        deps,
+        OWNER_ID,
+      );
 
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.value.status).toBe("done");
-    consoleError.mockRestore();
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value.status).toBe("done");
+      expect(consoleError).toHaveBeenCalledWith(
+        "ingestion: telemetry.finished rejected",
+        expect.objectContaining({ importJobId: job.id, error: rejection }),
+      );
+    } finally {
+      consoleError.mockRestore();
+    }
   });
 
   it("never emits a second pdf_imported when markDone/markFailed lose the race (job already terminal)", async () => {
