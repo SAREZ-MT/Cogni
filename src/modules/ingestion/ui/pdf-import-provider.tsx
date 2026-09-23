@@ -24,10 +24,12 @@ import { uploadPdfToSignedUrl } from "./upload-pdf-to-signed-url";
 // hidden `<input type="file">` for the whole app — Radix unmounts a
 // DropdownMenu's content on close, so an input living inside the menu
 // would lose its `change` event before the file was ever read. Only one
-// import can be picked at a time (one hidden input), so a single banner
-// state is enough; `useNotebookImport(notebookId)` below derives each
-// consumer's own view of it.
+// import can run at a time (one hidden input, one banner state);
+// `useNotebookImport(notebookId)` below derives each consumer's own view
+// of it, reporting "busy" for every other notebook while one is active
+// (T10 review follow-up: R3-provider-concurrent-imports-clobber-banner).
 type BannerStatus = "uploading" | "queued" | "failed";
+const ACTIVE_BANNER_STATUSES: readonly BannerStatus[] = ["uploading", "queued"];
 
 interface BannerState {
   notebookId: string;
@@ -36,7 +38,7 @@ interface BannerState {
 }
 
 export interface NotebookImportState {
-  status: "idle" | BannerStatus;
+  status: "idle" | "busy" | BannerStatus;
   error?: string;
 }
 
@@ -51,6 +53,7 @@ interface PdfImportContextValue {
 }
 
 const IDLE_STATE: NotebookImportState = { status: "idle" };
+const BUSY_STATE: NotebookImportState = { status: "busy" };
 
 // Default value (no provider mounted): a no-op start and no banner, so
 // every consumer (ImportPdfMenuItem, its tests) works standalone, the same
@@ -67,8 +70,13 @@ export function usePdfImport(): { start: (input: StartInput) => void } {
 
 export function useNotebookImport(notebookId: string): NotebookImportState {
   const { state } = useContext(PdfImportContext);
-  if (!state || state.notebookId !== notebookId) return IDLE_STATE;
-  return { status: state.status, error: state.error };
+  if (!state) return IDLE_STATE;
+  if (state.notebookId === notebookId) {
+    return { status: state.status, error: state.error };
+  }
+  return ACTIVE_BANNER_STATUSES.includes(state.status)
+    ? BUSY_STATE
+    : IDLE_STATE;
 }
 
 export function PdfImportProvider({ children }: { children: ReactNode }) {
@@ -83,18 +91,28 @@ export function PdfImportProvider({ children }: { children: ReactNode }) {
   const pendingRef = useRef<StartInput | null>(null);
   const [state, setState] = useState<BannerState | null>(null);
 
-  const start = useCallback((input: StartInput) => {
-    pendingRef.current = input;
-    setState(null);
-    // The hidden <input> below always renders (it is never conditional),
-    // so the ref is attached for the whole lifetime of this provider —
-    // long before any consumer can reach `start` through context.
-    const element = fileInputRef.current as HTMLInputElement;
-    // Allows re-selecting the exact same file twice in a row: the native
-    // input only fires `change` when its value actually changes.
-    element.value = "";
-    element.click();
-  }, []);
+  const start = useCallback(
+    (input: StartInput) => {
+      // One import at a time (T10 follow-up:
+      // R3-provider-concurrent-imports-clobber-banner). ImportPdfMenuItem
+      // already disables while busy; this guards a direct start() call
+      // too (e.g. a second click before the disabled state re-renders).
+      if (state && ACTIVE_BANNER_STATUSES.includes(state.status)) return;
+      pendingRef.current = input;
+      setState(null);
+      // Null-guarded (T10 follow-up: R3-start-null-ref-cast). The hidden
+      // <input> is portaled to document.body only once mounted (after
+      // hydration); a start() call before that first effect runs must not
+      // crash on a null ref.
+      const element = fileInputRef.current;
+      if (!element) return;
+      // Allows re-selecting the exact same file twice in a row: the native
+      // input only fires `change` when its value actually changes.
+      element.value = "";
+      element.click();
+    },
+    [state],
+  );
 
   async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -123,60 +141,73 @@ export function PdfImportProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    setState({ notebookId, status: "uploading" });
-    const grant = await requestPdfUpload({
-      notebookId,
-      fileName: file.name,
-      mime: file.type,
-      sizeBytes: file.size,
-    });
-    if (!grant.ok) {
+    // T10 review follow-up (R3-provider-rejected-action-stuck-uploading):
+    // a rejected Server Action call or a throwing upload helper must end
+    // in `failed` with the generic copy and a Sentry report, never leave
+    // the banner stuck in uploading/queued.
+    try {
+      setState({ notebookId, status: "uploading" });
+      const grant = await requestPdfUpload({
+        notebookId,
+        fileName: file.name,
+        mime: file.type,
+        sizeBytes: file.size,
+      });
+      if (!grant.ok) {
+        setState({
+          notebookId,
+          status: "failed",
+          error: messageForIngestionErrorCode(grant.error.code),
+        });
+        return;
+      }
+
+      const uploaded = await uploadPdfToSignedUrl(
+        grant.value.bucket,
+        grant.value.storagePath,
+        grant.value.token,
+        file,
+      );
+      if (!uploaded.ok) {
+        Sentry.captureException(uploaded.error);
+        setState({
+          notebookId,
+          status: "failed",
+          error: INGESTION_COPY.uploadFailed,
+        });
+        return;
+      }
+
+      setState({ notebookId, status: "queued" });
+      const started = await startPdfImport({
+        notebookId,
+        storagePath: grant.value.storagePath,
+        fileName: file.name,
+        mime: file.type,
+        sizeBytes: file.size,
+      });
+      if (!started.ok) {
+        setState({
+          notebookId,
+          status: "failed",
+          error: messageForIngestionErrorCode(started.error.code),
+        });
+        return;
+      }
+
+      // Success: clear the banner and hand off to the page (T11's
+      // PageImportView takes over the progress display from here).
+      setState(null);
+      onPageCreated?.();
+      router.push(`/notebooks/${notebookId}/pages/${started.value.pageId}`);
+    } catch (error) {
+      Sentry.captureException(error);
       setState({
         notebookId,
         status: "failed",
-        error: messageForIngestionErrorCode(grant.error.code),
+        error: INGESTION_COPY.unexpected,
       });
-      return;
     }
-
-    const uploaded = await uploadPdfToSignedUrl(
-      grant.value.bucket,
-      grant.value.storagePath,
-      grant.value.token,
-      file,
-    );
-    if (!uploaded.ok) {
-      Sentry.captureException(uploaded.error);
-      setState({
-        notebookId,
-        status: "failed",
-        error: INGESTION_COPY.uploadFailed,
-      });
-      return;
-    }
-
-    setState({ notebookId, status: "queued" });
-    const started = await startPdfImport({
-      notebookId,
-      storagePath: grant.value.storagePath,
-      fileName: file.name,
-      mime: file.type,
-      sizeBytes: file.size,
-    });
-    if (!started.ok) {
-      setState({
-        notebookId,
-        status: "failed",
-        error: messageForIngestionErrorCode(started.error.code),
-      });
-      return;
-    }
-
-    // Success: clear the banner and hand off to the page (T11's
-    // PageImportView takes over the progress display from here).
-    setState(null);
-    onPageCreated?.();
-    router.push(`/notebooks/${notebookId}/pages/${started.value.pageId}`);
   }
 
   return (

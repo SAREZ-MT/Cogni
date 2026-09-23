@@ -5,8 +5,7 @@
 // `infrastructure` — Drizzle, the Supabase client or `unpdf` — into a
 // client bundle. Everything else exported is a pure type or constant from
 // `domain`/`application`, or a "use client" UI component. T13 will add
-// `getActiveImports`/`ActiveImportsProvider`/`ImportingPageBadge`; T11
-// will add `PageImportView`.
+// `getActiveImports`/`ActiveImportsProvider`/`ImportingPageBadge`.
 export {
   getImportJobStatus,
   processPdfImport,
@@ -28,6 +27,7 @@ export {
 } from "./domain";
 export { ImportPdfMenuItem } from "./ui/import-pdf-menu-item";
 export { ImportProgress } from "./ui/import-progress";
+export { PageImportView } from "./ui/page-import-view";
 export {
   PdfImportProvider,
   useNotebookImport,

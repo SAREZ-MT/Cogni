@@ -5,7 +5,7 @@ import { DropdownMenu, DropdownMenuContent } from "@/shared/ui/dropdown-menu";
 import { ImportPdfMenuItem } from "./import-pdf-menu-item";
 import { INGESTION_COPY } from "./ingestion-copy";
 
-type MockImportStatus = "idle" | "uploading" | "queued" | "failed";
+type MockImportStatus = "idle" | "uploading" | "queued" | "failed" | "busy";
 
 const { start, useNotebookImportMock } = vi.hoisted(() => ({
   start: vi.fn(),
@@ -72,12 +72,29 @@ describe("ImportPdfMenuItem", () => {
     ).toHaveAttribute("data-disabled");
   });
 
-  it("stays enabled when idle or failed", () => {
+  it("stays enabled when idle (the default mock status; R3-menu-item-idle-case-untested)", () => {
+    renderMenuItem();
+
+    expect(
+      screen.getByRole("menuitem", { name: "Importar PDF" }),
+    ).not.toHaveAttribute("data-disabled");
+  });
+
+  it("stays enabled when failed", () => {
     useNotebookImportMock.mockReturnValueOnce({ status: "failed" });
     renderMenuItem();
 
     expect(
       screen.getByRole("menuitem", { name: "Importar PDF" }),
     ).not.toHaveAttribute("data-disabled");
+  });
+
+  it("is disabled while another notebook is importing (busy, T10 follow-up)", () => {
+    useNotebookImportMock.mockReturnValueOnce({ status: "busy" });
+    renderMenuItem();
+
+    expect(
+      screen.getByRole("menuitem", { name: "Importar PDF" }),
+    ).toHaveAttribute("data-disabled");
   });
 });

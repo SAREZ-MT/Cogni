@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { Editor } from "@/modules/editor";
+import { getImportJobStatus, PageImportView } from "@/modules/ingestion";
 import {
   getAssetReadUrl,
   getCurrentContent,
@@ -38,27 +39,44 @@ export default async function PageView({ params }: PagePageProps) {
   const page = await getPageForRoute(notebookId, pageId);
   if (!page) notFound();
 
+  // design.md, "Decision: Vista de página, llamada en curso y polling con
+  // TanStack Query": this route fetches the job status once on the server
+  // and hands it to PageImportView (T11), which owns calling
+  // processPdfImport for a queued job or polling a processing one, and only
+  // swaps in the editor once the job reaches a terminal state. The Editor
+  // is passed as an element so ingestion never imports editor. A failed
+  // lookup degrades to "no job" — getImportJobStatus never throws
+  // (actions.ts's withBoundary) — rather than 500ing this route.
+  const jobResult = await getImportJobStatus({ pageId: page.id });
+  const initialJob = jobResult.ok ? jobResult.value : null;
+
   return (
     <section className="flex flex-1 flex-col gap-4">
       <h1 className="font-semibold text-fg text-xl">{page.title}</h1>
-      <div
-        data-testid="editor-mount"
-        data-page-id={page.id}
-        data-content-version={page.contentVersion}
-        className="flex-1"
-      >
-        <Editor
-          pageId={page.id}
-          initialContent={page.content}
-          initialVersion={page.contentVersion}
-          port={{ save: saveContent, getCurrent: getCurrentContent }}
-          imagePort={{
-            requestUpload: requestImageUpload,
-            register: registerPageAsset,
-            getReadUrl: getAssetReadUrl,
-          }}
-        />
-      </div>
+      <PageImportView
+        initial={initialJob}
+        pageId={page.id}
+        editor={
+          <div
+            data-testid="editor-mount"
+            data-page-id={page.id}
+            data-content-version={page.contentVersion}
+            className="flex-1"
+          >
+            <Editor
+              pageId={page.id}
+              initialContent={page.content}
+              initialVersion={page.contentVersion}
+              port={{ save: saveContent, getCurrent: getCurrentContent }}
+              imagePort={{
+                requestUpload: requestImageUpload,
+                register: registerPageAsset,
+                getReadUrl: getAssetReadUrl,
+              }}
+            />
+          </div>
+        }
+      />
     </section>
   );
 }
