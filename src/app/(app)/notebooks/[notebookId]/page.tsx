@@ -8,10 +8,7 @@ import {
 } from "@/modules/notebooks";
 import { cn } from "@/shared/ui/utils";
 import { SetBreadcrumb } from "../../_components/breadcrumb";
-import {
-  NEUTRAL_SWATCH_CLASS,
-  NOTEBOOK_SWATCH_CLASSES,
-} from "../../_components/notebook-swatches";
+import { NOTEBOOK_SWATCH_CLASSES } from "../../_components/notebook-swatches";
 
 interface NotebookPageProps {
   params: Promise<{ notebookId: string }>;
@@ -51,9 +48,11 @@ export default async function NotebookPage({ params }: NotebookPageProps) {
           <span
             className={cn(
               "flex size-11 items-center justify-center rounded-tile text-lg",
-              notebook.color
-                ? NOTEBOOK_SWATCH_CLASSES[notebook.color]
-                : NEUTRAL_SWATCH_CLASS,
+              // Legacy notebooks created before random colors were assigned
+              // on creation have no stored color; fall back to violet
+              // rather than a flat neutral tile (user decision, design
+              // pass 2).
+              NOTEBOOK_SWATCH_CLASSES[notebook.color ?? "purple"],
             )}
           >
             {notebook.icon ?? (

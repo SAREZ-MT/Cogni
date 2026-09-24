@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createFixedClock } from "@/shared/kernel/clock";
+import { COLOR_PALETTE } from "../domain/notebook";
 import { createNotebook } from "./create-notebook";
 import { InMemoryNotebookRepository } from "./testing/in-memory-notebook-repository";
 
@@ -24,6 +25,31 @@ describe("createNotebook use case", () => {
     expect(result.value.ownerId).toBe(OWNER_ID);
     expect(result.value.title).toBe("Calculo I");
     expect(await deps.notebooks.findById(result.value.id)).not.toBeNull();
+  });
+
+  it("assigns a random palette color when none is supplied (design pass 2: no flat neutral tile on creation)", async () => {
+    const deps = makeDeps();
+
+    const result = await createNotebook({ title: "Calculo I" }, deps, OWNER_ID);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.color).not.toBeNull();
+    expect(COLOR_PALETTE).toContain(result.value.color);
+  });
+
+  it("keeps an explicitly supplied color instead of picking a random one", async () => {
+    const deps = makeDeps();
+
+    const result = await createNotebook(
+      { title: "Calculo I", color: "mint" },
+      deps,
+      OWNER_ID,
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.color).toBe("mint");
   });
 
   it("rejects a blank title and persists nothing (Scenario: Titulo vacio rechazado)", async () => {

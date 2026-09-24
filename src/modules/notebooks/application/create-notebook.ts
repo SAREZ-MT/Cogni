@@ -4,6 +4,7 @@ import type { DomainError } from "@/shared/kernel/domain-error";
 import { createId } from "@/shared/kernel/id";
 import type { Result } from "@/shared/kernel/result";
 import {
+  COLOR_PALETTE,
   type Notebook,
   createNotebook as newNotebook,
 } from "../domain/notebook";
@@ -18,6 +19,15 @@ export const createNotebookSchema = z.object({
   icon: z.string().nullish(),
   color: z.string().nullish(),
 });
+
+// Every new notebook gets a random pastel color when none was supplied, so
+// the library/Home tiles are never a flat neutral tile on creation (user
+// decision, design pass 2). `color` stays optional in the schema/domain so
+// legacy rows created before this rule (or seeded directly) can still carry
+// `null`, but this use case never persists that state for a new notebook.
+function pickRandomColor(): (typeof COLOR_PALETTE)[number] {
+  return COLOR_PALETTE[Math.floor(Math.random() * COLOR_PALETTE.length)];
+}
 
 export async function createNotebook(
   input: unknown,
@@ -34,7 +44,7 @@ export async function createNotebook(
       ownerId,
       title: parsed.value.title,
       icon: parsed.value.icon,
-      color: parsed.value.color,
+      color: parsed.value.color ?? pickRandomColor(),
       position,
     },
     deps.clock,

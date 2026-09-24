@@ -64,7 +64,11 @@ export function ChangeAppearanceDialog({
               className={cn(
                 "size-8 rounded-full transition-transform hover:scale-105",
                 DOT_CLASSES[color],
-                currentColor === color && "ring-2 ring-ring ring-offset-2",
+                // Legacy notebooks without a stored color preview as violet
+                // (same fallback as the icon tiles), so the ring still
+                // highlights the color the tile actually renders.
+                (currentColor ?? "purple") === color &&
+                  "ring-2 ring-ring ring-offset-2",
               )}
             />
           ))}

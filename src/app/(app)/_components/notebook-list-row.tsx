@@ -6,10 +6,7 @@ import {
 } from "@/modules/notebooks";
 import { cn } from "@/shared/ui/utils";
 import { formatTimeAgo } from "./format";
-import {
-  NEUTRAL_SWATCH_CLASS,
-  NOTEBOOK_SWATCH_CLASSES,
-} from "./notebook-swatches";
+import { NOTEBOOK_SWATCH_CLASSES } from "./notebook-swatches";
 
 interface NotebookListRowProps {
   notebook: HomeNotebookSummary;
@@ -28,9 +25,10 @@ export function NotebookListRow({
       <span
         className={cn(
           "flex size-7 shrink-0 items-center justify-center rounded-md text-sm",
-          notebook.color
-            ? NOTEBOOK_SWATCH_CLASSES[notebook.color]
-            : NEUTRAL_SWATCH_CLASS,
+          // Legacy notebooks created before random colors were assigned on
+          // creation have no stored color; fall back to violet rather than
+          // a flat neutral tile (user decision, design pass 2).
+          NOTEBOOK_SWATCH_CLASSES[notebook.color ?? "purple"],
         )}
       >
         {notebook.icon ?? (
