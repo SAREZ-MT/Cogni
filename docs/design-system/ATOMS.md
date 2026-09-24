@@ -608,13 +608,22 @@ feedback only shows once every evaluation for the session has finished): a
 tone-tinted panel (`pending` warning / `success` / `error`) with an
 `IconTile` (a spinning `Loader2` for `pending`) + title + muted description.
 
-- `tone: "pending" | "success" | "error"`, `title`, `description`
-  (`ReactNode`), `className?`, plus the rest of `React.ComponentProps<"div">`
-  (e.g. `data-testid`) forwarded onto the root.
+- `tone: "pending" | "success" | "error" | "rose"`, `title`, `description`
+  (`ReactNode`), `action?` (`ReactNode`, rendered below the description),
+  `className?`, plus the rest of `React.ComponentProps<"div">` (e.g.
+  `data-testid`) forwarded onto the root.
 
 Used by: `active-recall/_components/active-recall-results-view.tsx`
 (`tone="pending"` — this design preview has no backend to ever resolve the
 evaluation, so the results view always renders that tone).
+
+**Extended for Exams (2026-09-24):** `rose` tone + `action` slot (bg
+`pastel-pink/50`, border `rose-500/25`, title `text-pastel-pink-fg`, icon
+`RotateCcw` on the existing `pink` `IconTile` tone — no new `IconTile` tone
+needed). Used by `exams/page.tsx` (hub retake banner, with `action` =
+"Repetir examen"), `exams/_components/exam-player.tsx` ("Examen de
+repetición" notice, no action) and `exams/_components/exam-results-view.tsx`
+(failed-exam banner, with `action` = "Repetir examen").
 
 ### QuestionFeedbackItem (`question-feedback-item.tsx`)
 
@@ -661,3 +670,142 @@ and `ActiveRecallPlayer` build from — `ActiveRecallPlayer` now keeps one
 tallies, so the results view can render each one's own feedback row.
 `data-testid`s: `active-recall-results` (root), `evaluation-status`
 (`StatusBanner`), `question-feedback-item` (each row).
+
+## Exams design preview (2026-09-24)
+
+Six new atoms plus the `StatusBanner` `rose` tone/`action` slot documented
+above, for the `/exams` design-preview screens (design-only pass, no
+backend). Style source: `studyplatform-exams-style.md` (StudyPlatform's
+built Exams screens). Product rules follow documento-maestro §3.3
+"Exámenes", §7.5 "Reprogramación y repetición de exámenes", and the
+`ExamQuestion`/`ExamPageState`/`ExamSession` entities — these win over the
+style source wherever they differ.
+
+**Tokens added:** `--color-rose-400`/`-500`/`-600` (`#fb7185`/`#f43f5e`/
+`#e11d48`) in `globals.css`'s `@theme` — the exam technique's own accent
+(option selection, current-question progress dot, `ExamPageCard`'s gradient
+bar), layered on top of the existing `pastel-pink`/`pastel-pink-fg` pair.
+
+**Product rules:** multiple choice, 4 options, 1 correct, N per session
+(default 10), deterministic correction. A score below 70 % marks the page
+`retake_pending` and reschedules the failed questions (due tomorrow, shown
+in "Hoy" with "Repetir examen"). A retake never repeats the same question
+with the same wording — one AI-generated variant per failed concept, topped
+up with new questions to at least 5. Unlike Active recall/Flashcards, a page
+shows up in the technique screens once it has **generated** questions,
+independent of whether it has been attempted (`exams/_data/sample.ts`'s
+`getExamPagesWithQuestions` filters on `questionCount > 0`, not on
+`attempts`).
+
+### ExamPageCard (`exam-page-card.tsx`)
+
+The "Exámenes por página" grid item (one per page with generated
+questions on a notebook's `/exams/[notebookId]` list): a 4px rose/pink
+gradient top accent bar, page title, a preguntas/intentos meta line, a
+score-or-"Sin intentar" `Pill` row (+ a "Repetir pendiente" `Pill` when
+`retakePending`), the last attempt date, and a CTA that reads the page's
+state ("Presentar examen" / "Repetir examen" / "Ver resultados").
+
+- `href`, `pageTitle`, `questionCount`, `attempts`, `lastScore: number |
+  null`, `retakePending`, `lastDate?`, `className?`.
+
+Used by: `exams/[notebookId]/page.tsx`.
+
+### TimerChip (`timer-chip.tsx`)
+
+The exam session header's count-up timer: a bordered chip with a `Clock`
+icon + `MM:SS`. Presentational only — `ExamPlayer` owns the `setInterval`
+tick itself (so the final elapsed time survives into the results view's
+"Tiempo" stat) instead of this atom running its own.
+
+- `seconds`, `className?`. `data-testid="exam-timer"`.
+
+Used by: `exams/_components/exam-player.tsx`.
+
+### QuestionProgressDots (`question-progress-dots.tsx`)
+
+The exam session's clickable question tracker: a row of 24×6px pills —
+current `rose-500`, answered `pastel-pink-fg`, unanswered
+`neutral-200/60` — each one jumping straight to that question.
+
+- `total`, `current` (0-based), `answered: ReadonlySet<number>`,
+  `onJump: (index: number) => void`, `className?`.
+  `data-testid="exam-progress-dots"`.
+
+Used by: `exams/_components/exam-player.tsx`.
+
+### OptionRow (`option-row.tsx`)
+
+One multiple-choice option: a letter badge (A–D) + option text. While
+taking the exam only `default`/`selected` states are ever used (no
+correct/incorrect reveal during the session, documento-maestro §3.3);
+`correct`/`incorrect` swap the badge for a `Check`/`X` icon, reserved for a
+future read-only reuse.
+
+- `index` (0-based, drives `data-testid="exam-option-{index}"`), `letter`,
+  `text`, `state: "default" | "selected" | "correct" | "incorrect" |
+  "muted"`, `onClick?`, `disabled?`, `className?`.
+
+Used by: `exams/_components/exam-player.tsx`.
+
+### ScoreCard (`score-card.tsx`)
+
+The results view's headline: a 100px tinted disc with the score % (band:
+≥80 success / ≥60 warning / else error) + correct/total, and a band title
+(≥90 "¡Excelente!", ≥70 "¡Buen trabajo!", ≥50 "Puedes mejorar", else "Sigue
+practicando") + page/notebook + a correctas/incorrectas/sin
+responder/tiempo stats row.
+
+- `score`, `correct`, `incorrect`, `unanswered`, `total`, `timeLabel`
+  (preformatted "MM:SS"), `pageTitle`, `notebookTitle`, `className?`.
+  `data-testid="exam-score"` on the score % itself.
+
+Used by: `exams/_components/exam-results-view.tsx`.
+
+### ExamReviewRow (`exam-review-row.tsx`)
+
+One row in the results view's "Revisión pregunta por pregunta" list: a
+status tile (`Check` success / `X` error / `Minus` muted for unanswered) +
+the stem + a status label + a "Concepto: {concept}" `Pill`, then the
+student's own answer (always shown) and the correct one + a pending AI
+explanation block (both only when the answer wasn't correct) — reuses
+`question-feedback-item.tsx`'s exact skeleton pattern for the pending
+explanation.
+
+- `index`, `stem`, `status: "correct" | "incorrect" | "unanswered"`,
+  `concept`, `yourAnswerLabel`, `correctAnswerLabel`,
+  `explanationPending?` (default `true`), `className?`.
+  `data-testid="exam-review-row"`.
+
+Used by: `exams/_components/exam-results-view.tsx`.
+
+### Exams sample data and routes
+
+`exams/_data/sample.ts` (route-local, same reasoning as the other two
+previews' `_data/sample.ts`): `ExamQuestion { id, pageId, stem, options[4],
+correctIndex, concept }`, `ExamPage { id, notebookId, title, questionCount
+(derived, never hand-typed), attempts, lastScore: number | null, passed,
+retakePending, lastDate }`. `getExamPagesWithQuestions(notebookId)`,
+`getExamPage(notebookId, pageId)`, `getExamQuestions(pageId, { retake? })`,
+`getExamVariantQuestions(pageId)` (only "mitocondria" has a variant set in
+this preview — the only sample page with `retakePending: true`) and the
+exported `MITOCONDRIA_RETAKE_CONCEPTS` list (the retake session's
+StatusBanner copy).
+
+Routes mirror the Flashcards/Active recall previews exactly: `exams/page.tsx`
+(hub, + the retake `StatusBanner` when any page has `retakePending`),
+`exams/[notebookId]/page.tsx` (`ExamPageCard` grid), `exams/[notebookId]/
+[pageId]/page.tsx` (resolves `?retake=1` into the variant question set,
+renders the client `exams/_components/exam-player.tsx`, which switches to
+`exams/_components/exam-results-view.tsx` on submit — same in-place
+results pattern as `ActiveRecallResultsView`, not the `SessionSummary`
+overlay). `data-testid`s: `exam-session`/`exam-results` (roots),
+`exam-option-{index}`, `exam-timer`, `exam-progress-dots`, `exam-score`,
+`exam-review-row`.
+
+`flashcards/_data/sample.ts`'s `getSampleStudyItemsForPage()` exam item now
+points at the real preview (`/exams/biologia-celular/mitocondria`,
+"Examen · 22 sept" / "10 preguntas · 60 % · repetir") instead of a
+placeholder `#` href. The sidebar's "Exámenes" item is no longer disabled
+(`sidebar.tsx`'s `TECNICAS_SECTION`, `href: "/exams"`,
+`isActive: (path) => path.startsWith("/exams")`).

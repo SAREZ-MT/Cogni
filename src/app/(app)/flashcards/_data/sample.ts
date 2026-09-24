@@ -388,9 +388,9 @@ export function getSampleStudyItemsForPage(): SampleStudyItemsForPage {
     ],
     exam: [
       {
-        href: "#",
-        label: "Examen de práctica",
-        detail: "10 preguntas · 70 %",
+        href: "/exams/biologia-celular/mitocondria",
+        label: "Examen · 22 sept",
+        detail: "10 preguntas · 60 % · repetir",
         tone: "pink",
       },
     ],

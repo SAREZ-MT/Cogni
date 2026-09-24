@@ -84,7 +84,11 @@ describe("Sidebar", () => {
       "page",
     );
 
-    for (const label of ["Exámenes"]) {
+    // Exams design preview (2026-09-24): "Exámenes" is no longer disabled —
+    // moved to its own "links the Exámenes nav item" test below, same
+    // treatment Flashcards/Active recall already got. The remaining
+    // "pronto" items in Menú principal stay disabled.
+    for (const label of ["Dashboard", "Horarios"]) {
       expect(
         screen.getByText(label).closest("[aria-disabled]"),
       ).toHaveAttribute("aria-disabled", "true");
@@ -160,6 +164,18 @@ describe("Sidebar", () => {
 
   // design pass 2: "Cuadernos" is now a plain nav item to /notebooks
   // (no longer a "/" href and no longer a tree section header).
+  // Exams design preview (design/shell-look, 2026-09-24): same treatment as
+  // Flashcards/Active recall above — no longer disabled/"pronto" once the
+  // preview screens exist at /exams.
+  it("links the Exámenes nav item to /exams", () => {
+    render(<Sidebar initialCollapsed={false} user={USER} />);
+
+    expect(screen.getByRole("link", { name: "Exámenes" })).toHaveAttribute(
+      "href",
+      "/exams",
+    );
+  });
+
   it("links the Cuadernos nav item to /notebooks", () => {
     render(<Sidebar initialCollapsed={false} user={USER} previewsEnabled />);
 
