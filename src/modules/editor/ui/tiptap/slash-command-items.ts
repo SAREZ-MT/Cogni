@@ -46,7 +46,7 @@ export const SLASH_COMMAND_ITEMS: SlashCommandItem[] = [
   // Estilo
   {
     id: "paragraph",
-    label: "Párrafo",
+    label: "Texto",
     keywords: ["texto", "parrafo", "p", "text", "normal"],
     icon: Pilcrow,
     group: "Estilo",

@@ -53,7 +53,13 @@ describe("SLASH_COMMAND_ITEMS", () => {
 
       const json = editor.getJSON();
       const callout = json.content?.find((node) => node.type === "callout");
-      expect(callout?.attrs).toEqual({ kind: "warning" });
+      // E2: callout is also in extensions/index.ts's UNIQUE_ID_TYPES, so it
+      // now carries a `blockId` (@tiptap/extension-unique-id) alongside its
+      // own `kind` attr.
+      expect(callout?.attrs).toEqual({
+        kind: "warning",
+        blockId: expect.any(String),
+      });
     } finally {
       editor.destroy();
     }
@@ -180,7 +186,7 @@ describe("SLASH_COMMAND_ITEMS", () => {
       "heading-1": "Encabezado 1",
       "heading-2": "Encabezado 2",
       "heading-3": "Encabezado 3",
-      paragraph: "Párrafo",
+      paragraph: "Texto",
       "bullet-list": "Lista con viñetas",
       "ordered-list": "Lista numerada",
       "task-list": "Lista de tareas",

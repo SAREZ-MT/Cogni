@@ -42,14 +42,41 @@ function collectHeadings(doc: PMNode) {
   return headings;
 }
 
+function headingsEqual(a: TocHeading[], b: TocHeading[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  return a.every(
+    (heading, index) =>
+      heading.pos === b[index].pos &&
+      heading.level === b[index].level &&
+      heading.text === b[index].text,
+  );
+}
+
 function TocView({ editor }: ReactNodeViewProps) {
   const [headings, setHeadings] = useState<TocHeading[]>(() =>
     collectHeadings(editor.state.doc),
   );
 
+  // Runtime-error fix (E2 coordinator report, "Maximum update depth
+  // exceeded" right after the page loads, before typing — reproduced on a
+  // page whose content already has a `tocBlock`, so this view mounts
+  // immediately): `update`/`selectionUpdate` fire for every transaction,
+  // including ones this component's own re-render can indirectly cause
+  // (e.g. a sibling node view's own decoration sync during the same
+  // document pass). Without an equality check, `refresh` handed React a
+  // brand-new array on every single one of those notifications forever,
+  // even when the heading list itself hadn't changed — this guard makes
+  // `setHeadings` a no-op once the computed list stops differing, the same
+  // "recompute, compare, only update when it actually changed" contract
+  // `useEditorState`'s own selector uses (bubble-toolbar.tsx) elsewhere in
+  // this editor.
   useEffect(() => {
     function refresh() {
-      setHeadings(collectHeadings(editor.state.doc));
+      setHeadings((current) => {
+        const next = collectHeadings(editor.state.doc);
+        return headingsEqual(current, next) ? current : next;
+      });
     }
     editor.on("update", refresh);
     editor.on("selectionUpdate", refresh);

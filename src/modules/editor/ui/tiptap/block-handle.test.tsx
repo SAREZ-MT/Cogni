@@ -74,8 +74,11 @@ describe("BlockHandle", () => {
     expect(
       screen.getByRole("button", { name: "Insertar bloque" }),
     ).toHaveAttribute("data-testid", "block-insert");
+    // E2: the same grip now both drags AND opens the block context menu
+    // on a plain click (block-context-menu.tsx) — "Opciones del bloque"
+    // reflects both, not just the drag gesture.
     expect(
-      screen.getByRole("button", { name: "Arrastrar bloque" }),
+      screen.getByRole("button", { name: "Opciones del bloque" }),
     ).toHaveAttribute("data-testid", "block-drag-handle");
   });
 

@@ -31,6 +31,7 @@ import TextAlign from "@tiptap/extension-text-align";
 // a separate @tiptap/extension-color package.
 import { Color, TextStyle } from "@tiptap/extension-text-style";
 import Typography from "@tiptap/extension-typography";
+import { UniqueID } from "@tiptap/extension-unique-id";
 import { Placeholder } from "@tiptap/extensions";
 import StarterKit from "@tiptap/starter-kit";
 // KaTeX's own stylesheet (goal doc §2, "add CSS for math (.katex sizing)"
@@ -47,8 +48,29 @@ import { CogniMention, createMentionSuggestion } from "../mention-node";
 import { SlashCommand } from "../slash-command";
 import type { SlashCommandItem } from "../slash-command-items";
 import { TocBlock } from "../toc-node";
+import { BlockShortcuts } from "./block-shortcuts";
 import { CodeBlock } from "./code-block";
+import { NodeBackground } from "./node-background";
 import { createTableExtensions } from "./table";
+
+// E2 (block-context-menu.tsx's "Copiar enlace" + drag-handle "Convertir
+// en"/"Colores"): every block type either surface can target needs a
+// stable id (UniqueID below) so "Copiar enlace" has something to copy.
+// Deliberately excludes inline/leaf types (text, hardBreak) and nodes the
+// context menu never opens on (tocBlock — an editor-computed view, not a
+// block a user "converts" or links to).
+const UNIQUE_ID_TYPES = [
+  "paragraph",
+  "heading",
+  "bulletList",
+  "orderedList",
+  "taskList",
+  "blockquote",
+  "codeBlock",
+  "image",
+  "callout",
+  "table",
+];
 
 // specs/editor/spec.md, "Marcas de texto": a link MUST accept only http,
 // https or mailto URLs; anything else (in particular `javascript:`) MUST be
@@ -120,6 +142,31 @@ export function createEditorExtensions(
     // a Shift/Ctrl multi-block selection with `ProseMirror-
     // selectednoderange`, styled in globals.css with Cogni tokens.
     NodeRange,
+    // E2 (block-context-menu.tsx "Copiar enlace"): stable per-block ids —
+    // `attributeName: "blockId"` (not the extension's own "id" default:
+    // `@tiptap/extension-table-of-contents` above already registers its
+    // own global "id" attribute on "heading", `getId: () => uuid()`, and
+    // Tiptap silently lets a later `addGlobalAttributes` for the same
+    // attrs key overwrite the earlier one, so reusing "id" here would fight
+    // TableOfContents over the same slot on every heading) names the JSON
+    // attrs key (`node.attrs.blockId`, read by block-actions.ts's
+    // `blockLinkFragment`); the extension always renders it to the DOM as
+    // `data-block-id` (Context7-confirmed, tiptap-docs uniqueid.mdx: "will
+    // be prefixed with data-"), so the copied `#block-<id>` fragment
+    // identifies the block for future tooling rather than driving the
+    // browser's own native anchor scroll.
+    UniqueID.configure({
+      types: UNIQUE_ID_TYPES,
+      attributeName: "blockId",
+    }),
+    // E2 (drag-handle "Colores" > "Fondo", bubble toolbar's same row): a
+    // block-level background tint, separate from CogniHighlight's inline
+    // text mark.
+    NodeBackground,
+    // E2 (block-context-menu.tsx + this editor's Mod-Shift-C/Mod-D/
+    // Mod-Backspace): the context menu's own row handlers and these
+    // shortcuts share one implementation (block-actions.ts).
+    BlockShortcuts,
     // E1 (goal doc §2): ":" emoji popup. `emoji-suggestion.ts` only adds the
     // `items`/`render` pair on top of the extension's own default
     // char/command/allow (a `.configure()` deep-merge — see its own header

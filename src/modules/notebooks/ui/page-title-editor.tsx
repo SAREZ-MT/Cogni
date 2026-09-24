@@ -13,8 +13,20 @@ import {
   useState,
 } from "react";
 import { renamePage as renamePageAction } from "../actions";
+import { DEFAULT_PAGE_TITLE } from "../domain/page";
 
 const SAVE_DEBOUNCE_MS = 600;
+
+// E2 quick fix 1 (E1 screenshot follow-up): a brand-new page's stored
+// title is the literal domain default ("Sin título" — domain/page.ts's
+// `DEFAULT_PAGE_TITLE`), and rendering that as the textarea's `value`
+// showed it as real typed text instead of a placeholder — typing appended
+// onto it ("Sin títuloMitocondria…") instead of replacing it. Notion
+// behaviour: the field starts EMPTY (so the `placeholder` below shows the
+// muted "Sin título" copy) whenever the stored title equals the default.
+function displayTitle(storedTitle: string): string {
+  return storedTitle === DEFAULT_PAGE_TITLE ? "" : storedTitle;
+}
 
 export interface PageTitleEditorProps {
   pageId: string;
@@ -46,18 +58,19 @@ export function PageTitleEditor({
   initialTitle,
   onSaved,
 }: PageTitleEditorProps) {
-  const [title, setTitle] = useState(initialTitle);
+  const [title, setTitle] = useState(() => displayTitle(initialTitle));
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   // The last title actually confirmed saved (or the initial one) — a save
   // is skipped once the pending value already matches it, and a failed
   // save never advances it, so the next debounce/blur naturally retries
-  // instead of silently giving up.
+  // instead of silently giving up. Tracks the real STORED value (may be
+  // DEFAULT_PAGE_TITLE), not the empty display value.
   const lastSavedRef = useRef(initialTitle);
   const pendingRef = useRef<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    setTitle(initialTitle);
+    setTitle(displayTitle(initialTitle));
     lastSavedRef.current = initialTitle;
   }, [initialTitle]);
 

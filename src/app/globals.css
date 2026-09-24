@@ -346,6 +346,21 @@
     border-radius: var(--radius-2xl);
   }
 
+  /* E2 (drag-handle "Colores" > "Fondo", bubble toolbar's same row):
+     extensions/node-background.ts's `nodeBackground` attribute only ever
+     contributes the `bg-pastel-*` color utility (Tailwind scanner needs a
+     literal class name, so it can't add the padding/radius itself) — this
+     one shared rule turns that flush rectangle into a card that reads as
+     "this whole block", matching CogniHighlight's own `mark` padding
+     above. `-mx-2` compensates the `px-2` so the tint's left/right edges
+     still line up with the untinted text either side of it. */
+  .editor-content [data-node-background] {
+    border-radius: var(--radius-lg);
+    margin-inline: -0.5rem;
+    padding-inline: 0.5rem;
+    padding-block: 0.125rem;
+  }
+
   /* Inline code only — the code-block node view (extensions/code-block.tsx)
      renders its own `pre`/`code` with its own classes. */
   .editor-content :not(pre) > code {

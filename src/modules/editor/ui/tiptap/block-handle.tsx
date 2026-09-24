@@ -15,6 +15,7 @@ import DragHandle from "@tiptap/extension-drag-handle-react";
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import { GripVertical, Plus } from "lucide-react";
 import { useEffect, useRef } from "react";
+import { BlockContextMenu } from "./block-context-menu";
 import { collapseBlockSelection } from "./block-selection";
 
 export interface BlockHandleProps {
@@ -110,14 +111,26 @@ export function BlockHandle({ editor }: BlockHandleProps) {
         >
           <Plus aria-hidden="true" size={16} strokeWidth={1.75} />
         </button>
-        <button
-          type="button"
-          aria-label="Arrastrar bloque"
-          data-testid="block-drag-handle"
-          className={`${HANDLE_BUTTON_CLASS} cursor-grab`}
+        {/* E2 scope A: the SAME grip both drags (native HTML5 drag,
+            @tiptap/extension-drag-handle-react's own behavior on this
+            element) and, on a plain click (no pointer movement — browsers
+            fire "click" instead of "dragstart" for that), opens the block
+            context menu below. `getHoveredPos` re-reads `hoveredRef` at
+            open time rather than closing over a stale value from whenever
+            this render happened. */}
+        <BlockContextMenu
+          editor={editor}
+          getHoveredPos={() => hoveredRef.current?.pos ?? null}
         >
-          <GripVertical aria-hidden="true" size={16} strokeWidth={1.75} />
-        </button>
+          <button
+            type="button"
+            aria-label="Opciones del bloque"
+            data-testid="block-drag-handle"
+            className={`${HANDLE_BUTTON_CLASS} cursor-grab`}
+          >
+            <GripVertical aria-hidden="true" size={16} strokeWidth={1.75} />
+          </button>
+        </BlockContextMenu>
       </div>
     </DragHandle>
   );

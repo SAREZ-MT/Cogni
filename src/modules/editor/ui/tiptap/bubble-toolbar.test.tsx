@@ -62,13 +62,19 @@ describe("BubbleToolbarControls", () => {
     render(<BubbleToolbarControls editor={editor} />);
 
     for (const name of [
+      "Convertir en",
+      "Deshacer",
+      "Rehacer",
       "Negrita",
       "Cursiva",
       "Subrayado",
       "Tachado",
       "Código",
+      "Superíndice",
+      "Subíndice",
+      "Color de texto",
+      "Alineación",
       "Enlace",
-      "Resaltar",
     ]) {
       expect(screen.getByRole("button", { name })).toBeInTheDocument();
     }
@@ -182,18 +188,40 @@ describe("BubbleToolbarControls", () => {
     expect(screen.getByTestId("bubble-toolbar-link-input")).toHaveValue("");
   });
 
-  it("opens the highlight palette and applies a color through it", () => {
+  // E2: "Resaltar" is now one row ("Fondo / Resaltado") inside the
+  // combined color popover opened by "Color de texto" — HighlightPickerControls
+  // itself is unchanged (same `highlight-picker` testid, same "Resaltar en
+  // <color>" swatch names).
+  it("opens the color popover and applies a highlight through its Fondo/Resaltado row", async () => {
     editor = createHeadlessEditor();
     render(<BubbleToolbarControls editor={editor} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Resaltar" }));
-    fireEvent.click(screen.getByTestId("highlight-swatch-purple"));
+    fireEvent.click(screen.getByRole("button", { name: "Color de texto" }));
+    fireEvent.click(await screen.findByTestId("highlight-swatch-purple"));
 
     const json = editor.getJSON();
     const mark = json.content?.[0]?.content?.[0]?.marks?.find(
       (m) => m.type === "highlight",
     );
     expect(mark?.attrs).toEqual({ color: "purple" });
+  });
+
+  // E2: the "Texto" row of the same popover applies the inline Color mark
+  // (block-color-palette.ts) to the current selection.
+  it("opens the color popover and applies a text color through its Texto row", async () => {
+    editor = createHeadlessEditor();
+    render(<BubbleToolbarControls editor={editor} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Color de texto" }));
+    fireEvent.click(
+      await screen.findByTestId("bubble-toolbar-text-color-purple"),
+    );
+
+    const json = editor.getJSON();
+    const mark = json.content?.[0]?.content?.[0]?.marks?.find(
+      (m) => m.type === "textStyle",
+    );
+    expect(mark?.attrs.color).toBe("var(--color-pastel-purple-fg)");
   });
 
   // S6b defect 2 (focus, odd/tasks/app-shell-restyle.md): applying a link
