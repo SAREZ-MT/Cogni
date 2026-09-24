@@ -88,7 +88,18 @@ describe("BlockHandle", () => {
     );
   });
 
-  it("clicking + inserts an empty paragraph after the tracked block and opens the slash menu with /", () => {
+  // S7 review follow-up (R3-slash-open-unasserted, odd/tasks/app-shell-
+  // restyle.md): the previous version of this case only proved the "/"
+  // character landed in the document, never that the slash menu (command-
+  // menu.tsx, mounted by slash-command.tsx's Suggestion plugin) actually
+  // opened in response — a regression that silently broke opening the menu
+  // from "+" would have passed unnoticed.
+  it("clicking + inserts an empty paragraph after the tracked block and opens the slash command menu", async () => {
+    // This test needs the suggestion popup's own real positioning/async
+    // mount to actually settle (unlike the drag-end deferral tests above,
+    // which drive `requestAnimationFrame` by hand), so it opts out of this
+    // describe block's shared fake timers.
+    vi.useRealTimers();
     editor = createHeadlessEditor("<p>hola cogni</p>");
     render(<BlockHandle editor={editor} />);
 
@@ -105,6 +116,42 @@ describe("BlockHandle", () => {
       | { text?: string }
       | undefined;
     expect(secondText?.text).toBe("/");
+
+    expect(await screen.findByTestId("command-menu")).toBeInTheDocument();
+  });
+
+  // S7 review follow-up (R3-stale-hovered-block-position, odd/tasks/
+  // app-shell-restyle.md): `onNodeChange` only fires on pointer moves over
+  // the gutter, so `hoveredRef` can point at a position the document no
+  // longer agrees with by the time "+" is actually clicked (a remote
+  // reconciliation, or the user typing elsewhere first). Re-resolving from
+  // the CURRENT doc and refusing to insert when the node at that position
+  // no longer matches avoids inserting mid an unrelated block.
+  it("does not insert when the document changed between hover and click (stale hovered position)", () => {
+    editor = createHeadlessEditor("<p>primero</p><p>segundo</p>");
+    render(<BlockHandle editor={editor} />);
+    // The drag-handle mock's onNodeChange captured the paragraph "primero"
+    // at pos 0 on mount. Replace it with a different node type at the same
+    // position, simulating a doc change the hover never saw.
+    editor.commands.setContent(
+      {
+        type: "doc",
+        content: [
+          {
+            type: "heading",
+            attrs: { level: 1 },
+            content: [{ type: "text", text: "primero" }],
+          },
+          { type: "paragraph", content: [{ type: "text", text: "segundo" }] },
+        ],
+      } as unknown as Record<string, unknown>,
+      { emitUpdate: false },
+    );
+    const beforeJson = editor.getJSON();
+
+    fireEvent.click(screen.getByTestId("block-insert"));
+
+    expect(editor.getJSON()).toEqual(beforeJson);
   });
 
   // S6b defect 1 (data loss, odd/tasks/app-shell-restyle.md): the drag
@@ -128,5 +175,23 @@ describe("BlockHandle", () => {
 
     expect(blockSelection.collapseBlockSelection).toHaveBeenCalledTimes(1);
     expect(blockSelection.collapseBlockSelection).toHaveBeenCalledWith(editor);
+  });
+
+  // S7 review follow-up (R3-raf-not-cancelled, odd/tasks/app-shell-
+  // restyle.md): unmounting (an App Router navigation away from the page)
+  // within the deferred frame used to leave the scheduled
+  // requestAnimationFrame pending, dispatching into a destroyed editor
+  // once it eventually fired.
+  it("cancels the pending drag-end animation frame on unmount, so a destroyed editor is never dispatched to", () => {
+    editor = createHeadlessEditor("<p>primero</p><p>segundo</p>");
+    const { unmount } = render(<BlockHandle editor={editor} />);
+    expect(capturedOnElementDragEnd).toBeInstanceOf(Function);
+
+    capturedOnElementDragEnd?.({} as DragEvent);
+    unmount();
+
+    vi.runAllTimers();
+
+    expect(blockSelection.collapseBlockSelection).not.toHaveBeenCalled();
   });
 });

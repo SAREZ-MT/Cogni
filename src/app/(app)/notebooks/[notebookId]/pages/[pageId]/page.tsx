@@ -11,7 +11,10 @@ import {
   saveContent,
 } from "@/modules/notebooks";
 import { SetBreadcrumb } from "../../../../_components/breadcrumb";
-import { PageHeader } from "../../../../_components/page-header";
+import {
+  PAGE_STATUS_SLOT_ID,
+  PageHeader,
+} from "../../../../_components/page-header";
 
 // ADR 0002 (Vercel Fluid Compute, no worker, no Trigger.dev) + design.md,
 // "Decision: Procesamiento síncrono en la Server Action con maxDuration":
@@ -67,17 +70,19 @@ export default async function PageView({ params }: PagePageProps) {
     // content width; the import cards use the same max-w-2xl.
     <section className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4">
       <SetBreadcrumb items={breadcrumbItems} />
-      {/* S5 (odd/tasks/app-shell-restyle.md): title 28-36px/700 + last-edit
-          meta row (screenshots/editor.png). PageHeader accepts an optional
-          statusSlot for the autosave indicator, but it is intentionally
-          left unset here: notebooks-acceptance.spec.ts and
-          image-upload.spec.ts scope `autosave-status` inside
-          `editorMount.getByTestId("autosave-status")`
-          (data-testid="editor-mount"), so moving/duplicating SaveStatus's
-          output into this header would break those Playwright locators.
-          The status stays exactly where it already renders, inside the
-          Editor's own top row (editor/ui/tiptap/editor.tsx). */}
-      <PageHeader title={page.title} updatedAt={page.updatedAt} />
+      {/* S5/S7 (odd/tasks/app-shell-restyle.md): title 28-36px/700 +
+          meta row (screenshots/editor.png) with the last-edit time and
+          the autosave status. The status itself still lives inside
+          Editor's own top row and keeps its `autosave-status` testid and
+          `aria-live` (notebooks-acceptance.spec.ts's `waitForSaved` /
+          image-upload.spec.ts read it via `page.getByTestId(...)`, not
+          scoped under `editor-mount`) — it is only portaled into this
+          `statusSlot` visually, via the matching `statusPortalId` below. */}
+      <PageHeader
+        title={page.title}
+        updatedAt={page.updatedAt}
+        statusSlot={<span id={PAGE_STATUS_SLOT_ID} />}
+      />
       <PageImportView
         initial={initialJob}
         pageId={page.id}
@@ -98,6 +103,7 @@ export default async function PageView({ params }: PagePageProps) {
                 register: registerPageAsset,
                 getReadUrl: getAssetReadUrl,
               }}
+              statusPortalId={PAGE_STATUS_SLOT_ID}
             />
           </div>
         }

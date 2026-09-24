@@ -105,10 +105,12 @@ test.describe("image upload pipeline", () => {
     const src = await img.getAttribute("src");
     expect(src).toContain("/storage/v1/object/sign/");
 
-    await expect(editorMount.getByTestId("autosave-status")).toHaveText(
-      "guardado",
-      { timeout: 15000 },
-    );
+    // S7 (odd/tasks/app-shell-restyle.md, drift #1): the status now
+    // portals into the page header's meta row instead of rendering inside
+    // `editor-mount` (editor/ui/tiptap/editor.tsx's `statusPortalId`).
+    await expect(page.getByTestId("autosave-status")).toHaveText("guardado", {
+      timeout: 15000,
+    });
     await page.reload();
     await expect(
       page.getByTestId("editor-mount").getByTestId("image-node-img"),

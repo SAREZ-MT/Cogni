@@ -92,6 +92,19 @@ describe("NotebookItem", () => {
     expect(actions).toHaveClass("group-focus-within/notebook:opacity-100");
   });
 
+  // S7 (odd/tasks/app-shell-restyle.md, sidebar-preview.png): a long title
+  // ("Biología celular") used to `truncate` to "Biología …" at 240px
+  // because the in-flow action buttons reserve width; the reference wraps
+  // titles to two lines instead.
+  it("clamps the title to two lines and wraps instead of truncating (sidebar-preview.png)", () => {
+    renderNotebookItem(notebookItemElement());
+
+    const title = screen.getByRole("button", { name: "Biología" });
+    expect(title.className).toContain("line-clamp-2");
+    expect(title.className).toContain("whitespace-normal");
+    expect(title.className).not.toContain("truncate");
+  });
+
   it("does not render the actions menu trigger by default (no slot mounted)", () => {
     renderNotebookItem(notebookItemElement());
 

@@ -31,6 +31,30 @@ describe("PageItem", () => {
     ).toBeInTheDocument();
   });
 
+  // S7 (odd/tasks/app-shell-restyle.md, sidebar-preview.png): page titles
+  // get the same two-line clamp treatment as notebook titles instead of
+  // truncating to a single line.
+  it("clamps the title to two lines and wraps instead of truncating", () => {
+    render(
+      <ul>
+        <PageItem
+          notebookId="n1"
+          page={page}
+          onRename={noop}
+          onArchive={noop}
+        />
+      </ul>,
+    );
+
+    const link = screen.getByRole("link", { name: "Capítulo 1" });
+    expect(link.className).not.toContain("truncate");
+
+    const titleSpan = screen.getByText("Capítulo 1");
+    expect(titleSpan.className).toContain("line-clamp-2");
+    expect(titleSpan.className).toContain("whitespace-normal");
+    expect(titleSpan.className).not.toContain("truncate");
+  });
+
   it("renders no badge by default", () => {
     render(
       <ul>

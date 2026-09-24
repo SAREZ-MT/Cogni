@@ -45,11 +45,14 @@ async function clickAndWaitForAction(page: Page, locator: Locator) {
 // over (see domain-error.ts's toActionError()/isDomainErrorLike() and
 // editor/ui/tiptap/to-plain-tiptap-doc.ts for the two root causes that used
 // to make every autosave in this flow fail).
-async function waitForSaved(editorMount: Locator) {
-  await expect(editorMount.getByTestId("autosave-status")).toHaveText(
-    "guardado",
-    { timeout: 15000 },
-  );
+// S7 (odd/tasks/app-shell-restyle.md, drift #1): the status now portals
+// into the page header's meta row instead of rendering inside
+// `editor-mount` (editor/ui/tiptap/editor.tsx's `statusPortalId`), so this
+// scopes to the page instead of the (now unrelated) editor mount element.
+async function waitForSaved(page: Page) {
+  await expect(page.getByTestId("autosave-status")).toHaveText("guardado", {
+    timeout: 15000,
+  });
 }
 
 async function waitForConflictBanner(editorMount: Locator) {
@@ -287,7 +290,7 @@ test.describe("notebooks acceptance", () => {
     );
     await expect(editable.locator("pre code")).toContainText("const x = 1;");
 
-    await waitForSaved(editorMount);
+    await waitForSaved(page);
 
     await page.reload();
 
@@ -459,7 +462,7 @@ test.describe("notebooks acceptance", () => {
     // debounce fully settle first (no further edits for longer than its
     // window) guarantees the next "guardado" covers every mark above.
     await page.waitForTimeout(1800);
-    await waitForSaved(editorMount);
+    await waitForSaved(page);
 
     await page.reload();
 
@@ -541,7 +544,7 @@ test.describe("notebooks acceptance", () => {
     const editableA = editorMountA.locator('[contenteditable="true"]');
     await editableA.click();
     await page.keyboard.type("editado desde la pestaña A");
-    await waitForSaved(editorMountA);
+    await waitForSaved(page);
 
     // Tab B: edits its own (now stale) copy. Its autosave still carries
     // expectedVersion 1, which the server rejects.

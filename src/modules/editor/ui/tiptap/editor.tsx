@@ -1,7 +1,8 @@
 "use client";
 
 import { EditorContent, useEditor } from "@tiptap/react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useAutosave } from "../../application/use-autosave";
 import type { ImageUploadPort } from "../../domain/image-upload-port";
 import type { SavePagePort, TiptapDoc } from "../../domain/save-page-port";
@@ -21,6 +22,14 @@ export interface EditorProps {
   // read-only view) can omit it; the image block then shows a friendly
   // error instead of throwing (image-node.tsx).
   imagePort?: ImageUploadPort;
+  // S7 (odd/tasks/app-shell-restyle.md, drift #1): id of a DOM element
+  // (rendered by PageHeader's statusSlot) to portal the autosave
+  // SaveStatus into, so it sits in the page header's meta row next to
+  // "Editada hace X" (screenshots/editor.png) instead of as a loose line
+  // between the header and the first block. Optional and falls back to
+  // rendering inline, right above the content, when omitted or when the
+  // element doesn't exist yet (e.g. a unit test rendering Editor alone).
+  statusPortalId?: string;
 }
 
 // The Tiptap-backed block editor (design.md, "Tiptap y ProseMirror solo en
@@ -34,7 +43,22 @@ export function Editor({
   initialVersion,
   port,
   imagePort,
+  statusPortalId,
 }: EditorProps) {
+  // The slot element (rendered by PageHeader) doesn't exist yet on the
+  // very first render of this client component, so this resolves it after
+  // mount rather than during render — `createPortal` needs a real,
+  // already-committed DOM node. Stays null (inline fallback) whenever
+  // `statusPortalId` is omitted or the element can't be found.
+  const [statusPortalNode, setStatusPortalNode] = useState<HTMLElement | null>(
+    null,
+  );
+  useEffect(() => {
+    setStatusPortalNode(
+      statusPortalId ? document.getElementById(statusPortalId) : null,
+    );
+  }, [statusPortalId]);
+
   const {
     status,
     content,
@@ -127,9 +151,13 @@ export function Editor({
     };
   }, [flush]);
 
+  const statusNode = <SaveStatus status={status} />;
+
   return (
     <div className="flex flex-col gap-2">
-      <SaveStatus status={status} />
+      {statusPortalNode
+        ? createPortal(statusNode, statusPortalNode)
+        : statusNode}
       <ConflictBanner
         conflictDraft={conflictDraft}
         onRestore={restoreDraft}
