@@ -6,7 +6,7 @@ import { IconTile } from "@/shared/ui/icon-tile";
 import { Pill } from "@/shared/ui/pill";
 import { SectionHeader } from "@/shared/ui/section-header";
 import { SetBreadcrumb } from "../_components/breadcrumb";
-import { SAMPLE_DECKS, SAMPLE_NOTEBOOKS } from "./_data/sample";
+import { getSampleDecks, SAMPLE_NOTEBOOKS } from "./_data/sample";
 
 // Flashcards hub (design preview, user decision 2026-09-24: "solo vamos a
 // construir esas pantallas para validar el diseño"). Every notebook, deck
@@ -16,15 +16,13 @@ import { SAMPLE_DECKS, SAMPLE_NOTEBOOKS } from "./_data/sample";
 export default function FlashcardsHubPage() {
   const notebooksWithDecks = SAMPLE_NOTEBOOKS.map((notebook) => ({
     notebook,
-    decks: SAMPLE_DECKS.filter((deck) => deck.notebookId === notebook.id),
+    decks: getSampleDecks(notebook.id),
   })).filter((entry) => entry.decks.length > 0);
+  const allDecks = notebooksWithDecks.flatMap((entry) => entry.decks);
 
-  const totalCards = SAMPLE_DECKS.reduce(
-    (sum, deck) => sum + deck.cardCount,
-    0,
-  );
-  const totalDue = SAMPLE_DECKS.reduce((sum, deck) => sum + deck.dueCount, 0);
-  const alDiaCount = SAMPLE_DECKS.filter((deck) => deck.dueCount === 0).length;
+  const totalCards = allDecks.reduce((sum, deck) => sum + deck.cardCount, 0);
+  const totalDue = allDecks.reduce((sum, deck) => sum + deck.dueCount, 0);
+  const alDiaCount = allDecks.filter((deck) => deck.dueCount === 0).length;
   const activeNotebookCount = notebooksWithDecks.length;
 
   const dueEntry = notebooksWithDecks.find((entry) =>
