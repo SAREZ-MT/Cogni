@@ -1,4 +1,7 @@
 import type { ReactNode } from "react";
+import { Card } from "@/shared/ui/card";
+import { IconTile } from "@/shared/ui/icon-tile";
+import { ProgressBar } from "@/shared/ui/progress-bar";
 import { cn } from "@/shared/ui/utils";
 
 interface StatCardProps {
@@ -45,42 +48,27 @@ export function StatCard({
   footer,
 }: StatCardProps) {
   return (
-    <div
-      className={cn(
-        "flex flex-1 flex-col rounded-xl border border-border-subtle bg-card p-[18px] shadow-xs",
-        muted && "opacity-70",
-      )}
+    <Card
+      padding="none"
+      className={cn("flex flex-1 flex-col p-[18px]", muted && "opacity-70")}
     >
       <div className="mb-3 flex items-center gap-2">
-        <span
-          className={cn(
-            "flex size-[30px] shrink-0 items-center justify-center rounded-md",
-            iconBgClass,
-          )}
-        >
+        <IconTile size="30" radius="md" className={iconBgClass}>
           {icon}
-        </span>
+        </IconTile>
         <span className="font-medium text-fg-muted text-xs">{label}</span>
         {action && <span className="ml-auto shrink-0">{action}</span>}
       </div>
       <p className="font-bold text-[26px] text-fg leading-tight">{value}</p>
       {hint && <p className="mt-1 text-[11.5px] text-fg-muted">{hint}</p>}
       {progress != null && (
-        <div
-          data-slot="progress-bar"
-          className="mt-3 h-[5px] overflow-hidden rounded-pill bg-neutral-200/60"
-        >
-          <div
-            data-slot="progress-fill"
-            className={cn(
-              "h-full rounded-pill bg-primary-500",
-              progressClassName,
-            )}
-            style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
-          />
-        </div>
+        <ProgressBar
+          value={progress}
+          className="mt-3"
+          fillClassName={progressClassName}
+        />
       )}
       {footer}
-    </div>
+    </Card>
   );
 }

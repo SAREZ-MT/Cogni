@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/shared/ui/button";
+import { IconTile } from "@/shared/ui/icon-tile";
 import { createNotebook as createNotebookAction } from "../actions";
 import { CreateNotebookDialog } from "./create-notebook-dialog";
 import { SIDEBAR_TREE_QUERY_KEY } from "./sidebar-tree-query-key";
@@ -44,9 +45,9 @@ export function CreateNotebookTrigger({
         aria-label="Nuevo cuaderno"
         className="flex min-h-[140px] flex-col items-center justify-center gap-2 rounded-xl border border-border-default border-dashed bg-white/40 text-fg-muted transition-colors hover:bg-white/70 hover:text-fg-secondary"
       >
-        <span className="flex size-9 items-center justify-center rounded-md bg-neutral-150">
+        <IconTile size="36" radius="md" className="bg-neutral-150">
           <Plus aria-hidden="true" size={18} strokeWidth={1.75} />
-        </span>
+        </IconTile>
         <span className="font-medium text-sm">Nuevo cuaderno</span>
       </button>
     ) : (

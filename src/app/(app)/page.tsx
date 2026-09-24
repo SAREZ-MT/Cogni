@@ -9,6 +9,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/modules/identity";
 import { CreateNotebookTrigger, getHomeOverview } from "@/modules/notebooks";
+import { EmptyState } from "@/shared/ui/empty-state";
+import { IconTile } from "@/shared/ui/icon-tile";
+import { Pill } from "@/shared/ui/pill";
+import { SectionTitle } from "@/shared/ui/section-header";
 import { displayNameFromEmail } from "./_components/account-name";
 import { SetBreadcrumb } from "./_components/breadcrumb";
 import { HomeHeader } from "./_components/home/home-header";
@@ -42,17 +46,25 @@ export default async function HomePage() {
 
   if (overview.notebookCount === 0) {
     return (
-      <section className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
+      <>
         <SetBreadcrumb items={[{ label: "Inicio" }]} />
-        <span className="flex size-14 items-center justify-center rounded-xl bg-pastel-purple text-pastel-purple-fg">
-          <NotebookPen aria-hidden="true" size={28} strokeWidth={1.5} />
-        </span>
-        <h1 className="font-semibold text-fg text-xl">Tu espacio de estudio</h1>
-        <p className="max-w-sm text-fg-secondary text-sm">
-          Aún no tienes cuadernos. Crea uno para empezar.
-        </p>
-        <CreateNotebookTrigger variant="pill" />
-      </section>
+        <EmptyState
+          as="section"
+          variant="plain"
+          fill
+          icon={
+            <IconTile size="56" radius="xl" tone="purple">
+              <NotebookPen aria-hidden="true" size={28} strokeWidth={1.5} />
+            </IconTile>
+          }
+          title="Tu espacio de estudio"
+          titleAs="h1"
+          titleClassName="text-xl"
+          description="Aún no tienes cuadernos. Crea uno para empezar."
+          descriptionClassName="max-w-sm text-fg-secondary"
+          action={<CreateNotebookTrigger variant="pill" />}
+        />
+      </>
     );
   }
 
@@ -145,9 +157,9 @@ export default async function HomePage() {
           }
           hint="Flashcards llegan pronto"
           action={
-            <span className="rounded-pill bg-neutral-150 px-2 py-0.5 font-semibold text-[10px] text-fg-muted">
+            <Pill size="sm" tone="neutral" className="text-[10px]">
               pronto
-            </span>
+            </Pill>
           }
           muted
         />
@@ -159,15 +171,18 @@ export default async function HomePage() {
       </div>
 
       <div>
-        <div className="mb-3.5 flex items-center justify-between">
-          <h2 className="font-semibold text-fg text-base">Mis cuadernos</h2>
-          <Link
-            href="/notebooks"
-            className="font-medium text-[13px] text-primary-600 hover:underline"
-          >
-            Ver todos →
-          </Link>
-        </div>
+        <SectionTitle
+          action={
+            <Link
+              href="/notebooks"
+              className="font-medium text-[13px] text-primary-600 hover:underline"
+            >
+              Ver todos →
+            </Link>
+          }
+        >
+          Mis cuadernos
+        </SectionTitle>
         <NotebookGrid notebooks={overview.notebooks.slice(0, 6)} now={now} />
       </div>
 

@@ -4,9 +4,10 @@ import {
   type HomeNotebookSummary,
   NotebookCardActions,
 } from "@/modules/notebooks";
-import { cn } from "@/shared/ui/utils";
+import { Card } from "@/shared/ui/card";
+import { IconTile } from "@/shared/ui/icon-tile";
 import { formatTimeAgo } from "./format";
-import { NOTEBOOK_SWATCH_CLASSES } from "./notebook-swatches";
+import { notebookToneFromColor } from "./notebook-swatches";
 
 interface NotebookCardProps {
   notebook: HomeNotebookSummary;
@@ -28,41 +29,44 @@ export function NotebookCard({
   now = new Date(),
 }: NotebookCardProps) {
   return (
-    <article className="group relative flex flex-col gap-3 rounded-xl border border-border-subtle bg-card p-5 shadow-xs transition-all hover:-translate-y-0.5 hover:shadow-card-hover">
-      <div className="flex items-start justify-between">
-        <span
-          className={cn(
-            "flex size-11 items-center justify-center rounded-tile text-lg",
-            // Legacy notebooks created before random colors were assigned on
-            // creation have no stored color; fall back to violet rather than
-            // a flat neutral tile (user decision, design pass 2).
-            NOTEBOOK_SWATCH_CLASSES[notebook.color ?? "purple"],
-          )}
+    <Card
+      asChild
+      padding="md"
+      interactive
+      className="group relative flex flex-col gap-3"
+    >
+      <article>
+        <div className="flex items-start justify-between">
+          <IconTile
+            size="44"
+            className="text-lg"
+            tone={notebookToneFromColor(notebook.color)}
+          >
+            {notebook.icon ?? (
+              <NotebookIcon aria-hidden="true" size={20} strokeWidth={1.75} />
+            )}
+          </IconTile>
+          <span className="relative z-10">
+            <NotebookCardActions notebook={notebook} />
+          </span>
+        </div>
+        <Link
+          href={`/notebooks/${notebook.id}`}
+          className="font-semibold text-fg text-sm after:absolute after:inset-0"
         >
-          {notebook.icon ?? (
-            <NotebookIcon aria-hidden="true" size={20} strokeWidth={1.75} />
-          )}
-        </span>
-        <span className="relative z-10">
-          <NotebookCardActions notebook={notebook} />
-        </span>
-      </div>
-      <Link
-        href={`/notebooks/${notebook.id}`}
-        className="font-semibold text-fg text-sm after:absolute after:inset-0"
-      >
-        <span className="line-clamp-1">{notebook.title}</span>
-      </Link>
-      <div className="mt-auto flex items-center justify-between">
-        <span className="text-[11.5px] text-fg-muted">
-          {notebook.pageCount === 1
-            ? "1 página"
-            : `${notebook.pageCount} páginas`}
-        </span>
-        <span className="text-[11px] text-fg-muted">
-          {formatTimeAgo(notebook.updatedAt, now)}
-        </span>
-      </div>
-    </article>
+          <span className="line-clamp-1">{notebook.title}</span>
+        </Link>
+        <div className="mt-auto flex items-center justify-between">
+          <span className="text-[11.5px] text-fg-muted">
+            {notebook.pageCount === 1
+              ? "1 página"
+              : `${notebook.pageCount} páginas`}
+          </span>
+          <span className="text-[11px] text-fg-muted">
+            {formatTimeAgo(notebook.updatedAt, now)}
+          </span>
+        </div>
+      </article>
+    </Card>
   );
 }
