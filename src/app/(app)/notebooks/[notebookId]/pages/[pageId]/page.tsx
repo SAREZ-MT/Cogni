@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { getImportJobStatus, PageImportView } from "@/modules/ingestion";
 import {
@@ -13,8 +14,13 @@ import {
   PAGE_STATUS_SLOT_ID,
   PageHeader,
 } from "../../../../_components/page-header";
+import {
+  TECHNIQUES_PANEL_COLLAPSED,
+  TECHNIQUES_PANEL_COOKIE,
+} from "../../../../_components/techniques-panel-cookie";
 import { PageEditor } from "./_components/page-editor";
 import { PageTitle } from "./_components/page-title";
+import { TechniquesPanel } from "./_components/techniques-panel";
 
 // ADR 0002 (Vercel Fluid Compute, no worker, no Trigger.dev) + design.md,
 // "Decision: Procesamiento síncrono en la Server Action con maxDuration":
@@ -64,57 +70,69 @@ export default async function PageView({ params }: PagePageProps) {
   const jobResult = await getImportJobStatus({ pageId: page.id });
   const initialJob = jobResult.ok ? jobResult.value : null;
 
+  // design/shell-look: the "Técnicas" panel's collapsed state, read
+  // server-side (same pattern as AppLayout's SIDEBAR_COOKIE) so
+  // TechniquesPanel's first client render already matches the visitor's
+  // last choice instead of always starting expanded.
+  const cookieStore = await cookies();
+  const techniquesPanelCollapsed =
+    cookieStore.get(TECHNIQUES_PANEL_COOKIE)?.value ===
+    TECHNIQUES_PANEL_COLLAPSED;
+
   return (
-    // Reading measure (docs/design-system/screenshots/editor.png): the title
-    // and the editor share one centered column instead of running the full
-    // content width; the import cards use the same max-w-2xl.
-    <section className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4">
-      {/* S5/S7 (odd/tasks/app-shell-restyle.md), E1 (goal doc §1): title
-          36px/700/1.1 (PageTitleEditor, live-editable) + meta row
-          (screenshots/editor.png) with the last-edit time and the autosave
-          status. The status itself still lives inside Editor's own top row
-          and keeps its `autosave-status` testid and `aria-live`
-          (notebooks-acceptance.spec.ts's `waitForSaved` / image-
-          upload.spec.ts read it via `page.getByTestId(...)`, not scoped
-          under `editor-mount`) — it is only portaled into this
-          `statusSlot` visually, via the matching `statusPortalId` below. */}
-      <PageHeader
-        titleSlot={
-          <PageTitle
-            pageId={page.id}
-            initialTitle={page.title}
-            notebookTitle={notebookTitle}
-          />
-        }
-        updatedAt={page.updatedAt}
-        statusSlot={<span id={PAGE_STATUS_SLOT_ID} />}
-      />
-      <PageImportView
-        initial={initialJob}
-        pageId={page.id}
-        editor={
-          <div
-            data-testid="editor-mount"
-            data-page-id={page.id}
-            data-content-version={page.contentVersion}
-            className="flex-1"
-          >
-            <PageEditor
-              notebookId={notebookId}
+    <>
+      {/* Reading measure (docs/design-system/screenshots/editor.png): the
+          title and the editor share one centered column instead of running
+          the full content width; the import cards use the same max-w-2xl. */}
+      <section className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4">
+        {/* S5/S7 (odd/tasks/app-shell-restyle.md), E1 (goal doc §1): title
+            36px/700/1.1 (PageTitleEditor, live-editable) + meta row
+            (screenshots/editor.png) with the last-edit time and the autosave
+            status. The status itself still lives inside Editor's own top row
+            and keeps its `autosave-status` testid and `aria-live`
+            (notebooks-acceptance.spec.ts's `waitForSaved` / image-
+            upload.spec.ts read it via `page.getByTestId(...)`, not scoped
+            under `editor-mount`) — it is only portaled into this
+            `statusSlot` visually, via the matching `statusPortalId` below. */}
+        <PageHeader
+          titleSlot={
+            <PageTitle
               pageId={page.id}
-              initialContent={page.content}
-              initialVersion={page.contentVersion}
-              port={{ save: saveContent, getCurrent: getCurrentContent }}
-              imagePort={{
-                requestUpload: requestImageUpload,
-                register: registerPageAsset,
-                getReadUrl: getAssetReadUrl,
-              }}
-              statusPortalId={PAGE_STATUS_SLOT_ID}
+              initialTitle={page.title}
+              notebookTitle={notebookTitle}
             />
-          </div>
-        }
-      />
-    </section>
+          }
+          updatedAt={page.updatedAt}
+          statusSlot={<span id={PAGE_STATUS_SLOT_ID} />}
+        />
+        <PageImportView
+          initial={initialJob}
+          pageId={page.id}
+          editor={
+            <div
+              data-testid="editor-mount"
+              data-page-id={page.id}
+              data-content-version={page.contentVersion}
+              className="flex-1"
+            >
+              <PageEditor
+                notebookId={notebookId}
+                pageId={page.id}
+                initialContent={page.content}
+                initialVersion={page.contentVersion}
+                port={{ save: saveContent, getCurrent: getCurrentContent }}
+                imagePort={{
+                  requestUpload: requestImageUpload,
+                  register: registerPageAsset,
+                  getReadUrl: getAssetReadUrl,
+                }}
+                statusPortalId={PAGE_STATUS_SLOT_ID}
+              />
+            </div>
+          }
+        />
+      </section>
+      <TechniquesPanel initialCollapsed={techniquesPanelCollapsed} />
+    </>
   );
 }

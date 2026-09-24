@@ -122,6 +122,73 @@ would relocate duplication rather than remove it, and reusing `Button` with
 enough overrides to stay pixel-exact would be more fragile than the plain
 element. Left as native elements; not part of this pass's scope.
 
+## PanelToggleButton (`panel-toggle-button.tsx`)
+
+The 26x26 bordered collapse/expand button (`rounded-md`, `border-neutral-200/70`,
+`bg-neutral-0/60`, muted icon). Extracted from `sidebar.tsx`, which inlined
+this exact markup for its own `PanelLeft` toggle — the refactor is
+zero-visual-change (same classes/DOM, only the icon and aria attributes now
+come in as props).
+
+- `icon`: any `LucideIcon`. `size`/`strokeWidth`: default `15`/`1.75`
+  (Sidebar's size); the techniques panel passes `size={12}` to match its
+  smaller reference chrome.
+- Forwards `onClick`, `aria-expanded`, `aria-label`, `data-testid`, etc. via
+  `React.ComponentProps<"button">` (minus `children`/`type`, which the atom
+  owns).
+
+Used by: `sidebar.tsx` (`PanelLeft`), `techniques-panel.tsx`
+(`PanelRightOpen`/`PanelRightClose`).
+
+## SidePanel (`side-panel.tsx`)
+
+The floating collapsible card shell behind the "Técnicas" panel
+(design/shell-look, studyplatform `StudyPanel.tsx` style reference: 264px
+expanded / 52px collapsed, `rounded-xl`, 220ms width transition). Reuses the
+exact chrome classes the main Sidebar/content-area cards already use
+(`border-neutral-200/60 bg-card shadow-card`) instead of the reference's raw
+box-shadow literal.
+
+- `collapsed`, `width`/`collapsedWidth` (px numbers, default 264/52), `side`
+  (`"left" | "right"`, default `"right"`; only `"right"` is currently styled
+  — a left-side variant is a follow-up if a future panel needs one).
+- `header`/`collapsedContent`/`children` are raw slots: the shell owns only
+  the header row's alignment/padding/border (centered when collapsed,
+  space-between when expanded) and the scrollable body wrapper — the caller
+  builds the actual header content for each state and the body content.
+- Root is a semantic `<aside>`; `aria-label`/`data-testid` forward onto it,
+  and `data-collapsed`/`data-side` are set from props automatically.
+
+Used by: `techniques-panel.tsx` (only consumer so far). The main `Sidebar`
+was **not** migrated onto `SidePanel` in this pass — its collapse/expand,
+cookie, and section-list anatomy differ enough (nav sections, user footer,
+sticky positioning) that migrating it is a separate, not-zero-visual-change
+refactor; left as a documented follow-up.
+
+## TechniqueCard / TechniqueIconStrip (`technique-card.tsx`)
+
+The study-technique cards used by the "Técnicas" panel's expanded body and
+its collapsed icon strip (design/shell-look, studyplatform `StudyPanel.tsx`
+anatomy).
+
+- `TechniqueCard`: icon tile (`IconTile` size `"30"` — closest existing
+  token to the reference's 32px — radius `"md"`) + name + description, a
+  muted meta line, and a disabled action `Button` + `Pill` "pronto". The
+  button stays the technique's tone color at `disabled:opacity-50` (Button's
+  own disabled state) rather than going fully gray, so the panel still
+  "reads colourful and alive" while every action is inert (no technique is
+  built yet).
+- `TechniqueIconStrip`: the collapsed-state 36x36 tinted tile (`IconTile`
+  size `"36"` radius `"input"`) with a native `title` tooltip; `opacity-35`
+  when `available` is false (default).
+- `TechniqueTone`: `"primary" | "green" | "pink"` — mapped onto **existing**
+  `IconTile`/`Pill` tones, not new ones. `primary` (violet) already matches
+  the reference's flashcards brand color; `green`/`pink` already match its
+  active-recall/exam hex pairs almost exactly (`pastel-pink-fg` #9b2c4a is
+  an exact match for the reference's exam color). No new tone was needed.
+
+Used by: `techniques-panel.tsx`.
+
 ## DropdownMenu / Popover (`dropdown-menu.tsx`)
 
 E2b token fix: `DropdownMenuContent` was styled with `bg-popover`/
