@@ -108,6 +108,24 @@ Used by: `app/(app)/page.tsx` (zero-notebooks, `plain`), `notebooks/page.tsx`
 The ⌘/H shortcut chip. Used by `nav-item.tsx` (once per key in a shortcut
 array).
 
+## BackLink (`back-link.tsx`)
+
+Eyebrow-row "back" affordance (user feedback, design/shell-look: the notebook
+detail screen and the editor had no way back except the sidebar). A muted
+`next/link` with a leading `ArrowLeft` (Lucide, size 15, strokeWidth 1.75)
+that only picks up `text-fg` contrast on hover/focus — Notion-style, never a
+full button.
+
+- `href`, `children` (the label), `className?` (forwarded via `cn()`).
+- Style: `inline-flex items-center gap-1.5`, 13px, `text-fg-muted
+  hover:text-fg`, `-ml-1 rounded-md px-1 py-0.5 transition-colors`,
+  `self-start`, `focus-visible:ring-2 focus-visible:ring-ring`.
+
+Used by: `notebooks/[notebookId]/page.tsx` (`<BackLink href="/notebooks">`,
+first child of the section, above `SectionHeader`), `notebooks/[notebookId]/
+pages/[pageId]/page.tsx` (`<BackLink href={/notebooks/${notebookId}}>`, first
+child of the centered `max-w-2xl` column, above `PageHeader`).
+
 ## Button
 
 Audited for hand-rolled duplication; the existing `default | outline |

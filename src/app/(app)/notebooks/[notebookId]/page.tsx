@@ -6,6 +6,7 @@ import {
   createPageAction,
   getNotebookForRoute,
 } from "@/modules/notebooks";
+import { BackLink } from "@/shared/ui/back-link";
 import { Card } from "@/shared/ui/card";
 import { EmptyState } from "@/shared/ui/empty-state";
 import { IconTile } from "@/shared/ui/icon-tile";
@@ -47,44 +48,51 @@ export default async function NotebookPage({
   return (
     <section className="flex flex-1 flex-col gap-6">
       <SetBreadcrumb
-        items={[{ label: "Cuadernos" }, { label: notebook.title }]}
+        items={[
+          { label: "Cuadernos", href: "/notebooks" },
+          { label: notebook.title },
+        ]}
       />
 
-      <SectionHeader
-        icon={
-          <IconTile
-            size="44"
-            className="text-lg"
-            tone={notebookToneFromColor(notebook.color)}
-          >
-            {notebook.icon ?? (
-              <NotebookIcon aria-hidden="true" size={20} strokeWidth={1.75} />
-            )}
-          </IconTile>
-        }
-        eyebrow="Cuaderno"
-        title={notebook.title}
-        titleClassName="mt-0 text-xl"
-        description={
-          pages.length === 0
-            ? "Aún no hay páginas. Crea la primera para empezar."
-            : pages.length === 1
-              ? "1 página"
-              : `${pages.length} páginas`
-        }
-        descriptionClassName="mt-0.5"
-        actions={
-          <form action={createPage}>
-            <button
-              type="submit"
-              className="flex h-10 items-center gap-1.5 rounded-input bg-neutral-900 px-4 text-[13.5px] text-white transition-all hover:bg-neutral-800"
+      <div className="flex flex-col gap-3">
+        <BackLink href="/notebooks">Cuadernos</BackLink>
+
+        <SectionHeader
+          icon={
+            <IconTile
+              size="44"
+              className="text-lg"
+              tone={notebookToneFromColor(notebook.color)}
             >
-              <Plus aria-hidden="true" size={16} strokeWidth={1.75} />
-              Nueva página
-            </button>
-          </form>
-        }
-      />
+              {notebook.icon ?? (
+                <NotebookIcon aria-hidden="true" size={20} strokeWidth={1.75} />
+              )}
+            </IconTile>
+          }
+          eyebrow="Cuaderno"
+          title={notebook.title}
+          titleClassName="mt-0 text-xl"
+          description={
+            pages.length === 0
+              ? "Aún no hay páginas. Crea la primera para empezar."
+              : pages.length === 1
+                ? "1 página"
+                : `${pages.length} páginas`
+          }
+          descriptionClassName="mt-0.5"
+          actions={
+            <form action={createPage}>
+              <button
+                type="submit"
+                className="flex h-10 items-center gap-1.5 rounded-input bg-neutral-900 px-4 text-[13.5px] text-white transition-all hover:bg-neutral-800"
+              >
+                <Plus aria-hidden="true" size={16} strokeWidth={1.75} />
+                Nueva página
+              </button>
+            </form>
+          }
+        />
+      </div>
 
       {pages.length === 0 ? (
         <EmptyState

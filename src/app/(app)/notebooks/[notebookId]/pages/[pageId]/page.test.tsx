@@ -66,8 +66,11 @@ async function renderRoute() {
   const section = (await PageView({
     params: Promise.resolve({ notebookId: "nb-1", pageId: "page-1" }),
   })) as ReactElement<{ children: ReactElement[] }>;
+  // Section children are now [BackLink, PageHeader, PageImportView] — a
+  // BackLink to the notebook was added as the first child (user feedback:
+  // no way back from the editor except the sidebar).
   const children = section.props.children;
-  const importView = children[1] as ReactElement<{
+  const importView = children[2] as ReactElement<{
     initial: unknown;
     pageId: string;
     editor: unknown;
@@ -140,9 +143,13 @@ describe("page route ingestion wiring", () => {
       params: Promise.resolve({ notebookId: "nb-1", pageId: "page-1" }),
     })) as ReactElement<{ children: ReactElement[] }>;
 
-    const header = section.props.children[0] as ReactElement<{
+    // children[0] is now the BackLink to the notebook (user feedback: no
+    // way back from the editor except the sidebar) — PageHeader shifted to
+    // index 1.
+    const header = section.props.children[1] as ReactElement<{
       titleSlot: ReactElement<{
         pageId: string;
+        notebookId: string;
         initialTitle: string;
         notebookTitle: string | null;
       }>;
@@ -153,6 +160,7 @@ describe("page route ingestion wiring", () => {
     expect(header.props.titleSlot.type).toBe(PageTitle);
     expect(header.props.titleSlot.props).toEqual({
       pageId: "page-1",
+      notebookId: "nb-1",
       initialTitle: "Apuntes",
       notebookTitle: "Biología Celular",
     });
@@ -171,7 +179,7 @@ describe("page route ingestion wiring", () => {
       params: Promise.resolve({ notebookId: "nb-1", pageId: "page-1" }),
     })) as ReactElement<{ children: ReactElement[] }>;
 
-    const header = section.props.children[0] as ReactElement<{
+    const header = section.props.children[1] as ReactElement<{
       titleSlot: ReactElement<{ notebookTitle: string | null }>;
     }>;
     expect(header.props.titleSlot.props.notebookTitle).toBeNull();
@@ -200,12 +208,12 @@ describe("page route ingestion wiring", () => {
       params: Promise.resolve({ notebookId: "nb-1", pageId: "page-1" }),
     })) as ReactElement<{ children: ReactElement[] }>;
 
-    const header = section.props.children[0] as ReactElement<{
+    const header = section.props.children[1] as ReactElement<{
       statusSlot?: ReactElement<{ id?: string }>;
     }>;
     expect(header.props.statusSlot?.props.id).toBe(PAGE_STATUS_SLOT_ID);
 
-    const importView = section.props.children[1] as ReactElement<{
+    const importView = section.props.children[2] as ReactElement<{
       editor: ReactElement<{
         children: ReactElement<{ statusPortalId?: string }>;
       }>;
@@ -228,7 +236,7 @@ describe("page route ingestion wiring", () => {
       params: Promise.resolve({ notebookId: "nb-1", pageId: "page-1" }),
     })) as ReactElement<{ children: ReactElement[] }>;
 
-    const importView = section.props.children[1] as ReactElement<{
+    const importView = section.props.children[2] as ReactElement<{
       editor: ReactElement<{
         children: ReactElement<{ notebookId?: string }>;
       }>;

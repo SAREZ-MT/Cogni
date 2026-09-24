@@ -25,12 +25,14 @@ import { SetBreadcrumb } from "../../../../../_components/breadcrumb";
 
 export interface PageTitleProps {
   pageId: string;
+  notebookId: string;
   initialTitle: string;
   notebookTitle: string | null;
 }
 
 export function PageTitle({
   pageId,
+  notebookId,
   initialTitle,
   notebookTitle,
 }: PageTitleProps) {
@@ -50,9 +52,16 @@ export function PageTitle({
   const breadcrumbItems = useMemo(
     () =>
       notebookTitle
-        ? [{ label: notebookTitle }, { label: crumbLabel }]
-        : [{ label: crumbLabel }],
-    [notebookTitle, crumbLabel],
+        ? [
+            { label: "Cuadernos", href: "/notebooks" },
+            {
+              label: notebookTitle,
+              href: `/notebooks/${notebookId}`,
+            },
+            { label: crumbLabel },
+          ]
+        : [{ label: "Cuadernos", href: "/notebooks" }, { label: crumbLabel }],
+    [notebookId, notebookTitle, crumbLabel],
   );
 
   return (

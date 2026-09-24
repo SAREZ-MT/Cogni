@@ -10,6 +10,7 @@ import {
   requestImageUpload,
   saveContent,
 } from "@/modules/notebooks";
+import { BackLink } from "@/shared/ui/back-link";
 import {
   PAGE_STATUS_SLOT_ID,
   PageHeader,
@@ -94,10 +95,14 @@ export default async function PageView({ params }: PagePageProps) {
             upload.spec.ts read it via `page.getByTestId(...)`, not scoped
             under `editor-mount`) — it is only portaled into this
             `statusSlot` visually, via the matching `statusPortalId` below. */}
+        <BackLink href={`/notebooks/${notebookId}`}>
+          {notebookTitle ?? "Cuaderno"}
+        </BackLink>
         <PageHeader
           titleSlot={
             <PageTitle
               pageId={page.id}
+              notebookId={notebookId}
               initialTitle={page.title}
               notebookTitle={notebookTitle}
             />
