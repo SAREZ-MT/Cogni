@@ -7,7 +7,7 @@ import { IconTile } from "@/shared/ui/icon-tile";
 import { Pill } from "@/shared/ui/pill";
 import { SectionHeader } from "@/shared/ui/section-header";
 import { SetBreadcrumb } from "../_components/breadcrumb";
-import { getSampleDecks, SAMPLE_NOTEBOOKS } from "./_data/sample";
+import { getSamplePagesWithCards, SAMPLE_NOTEBOOKS } from "./_data/sample";
 
 // Flashcards hub (design preview, user decision 2026-09-24: "solo vamos a
 // construir esas pantallas para validar el diseño"). Every notebook, deck
@@ -16,24 +16,24 @@ import { getSampleDecks, SAMPLE_NOTEBOOKS } from "./_data/sample";
 // isn't live data yet.
 export default function FlashcardsHubPage() {
   requireDesignPreviews();
-  const notebooksWithDecks = SAMPLE_NOTEBOOKS.map((notebook) => ({
+  const notebooksWithPages = SAMPLE_NOTEBOOKS.map((notebook) => ({
     notebook,
-    decks: getSampleDecks(notebook.id),
-  })).filter((entry) => entry.decks.length > 0);
-  const allDecks = notebooksWithDecks.flatMap((entry) => entry.decks);
+    pages: getSamplePagesWithCards(notebook.id),
+  })).filter((entry) => entry.pages.length > 0);
+  const allPages = notebooksWithPages.flatMap((entry) => entry.pages);
 
-  const totalCards = allDecks.reduce((sum, deck) => sum + deck.cardCount, 0);
-  const totalDue = allDecks.reduce((sum, deck) => sum + deck.dueCount, 0);
-  const alDiaCount = allDecks.filter((deck) => deck.dueCount === 0).length;
-  const activeNotebookCount = notebooksWithDecks.length;
+  const totalCards = allPages.reduce((sum, page) => sum + page.cardCount, 0);
+  const totalDue = allPages.reduce((sum, page) => sum + page.dueCount, 0);
+  const alDiaCount = allPages.filter((page) => page.dueCount === 0).length;
+  const activeNotebookCount = notebooksWithPages.length;
 
-  const dueEntry = notebooksWithDecks.find((entry) =>
-    entry.decks.some((deck) => deck.dueCount > 0),
+  const dueEntry = notebooksWithPages.find((entry) =>
+    entry.pages.some((page) => page.dueCount > 0),
   );
-  const dueDeck = dueEntry?.decks.find((deck) => deck.dueCount > 0);
+  const duePage = dueEntry?.pages.find((page) => page.dueCount > 0);
   const quickStartHref =
-    dueEntry && dueDeck
-      ? `/flashcards/${dueEntry.notebook.id}/session?deck=${dueDeck.id}`
+    dueEntry && duePage
+      ? `/flashcards/${dueEntry.notebook.id}/${duePage.id}`
       : undefined;
 
   return (
@@ -78,7 +78,7 @@ export default function FlashcardsHubPage() {
         }
       />
 
-      {notebooksWithDecks.length > 0 && (
+      {notebooksWithPages.length > 0 && (
         <div className="flex flex-wrap items-center gap-2.5">
           <Pill size="md" tone={totalDue > 0 ? "error" : "success"} dot>
             {totalDue} pendiente{totalDue === 1 ? "" : "s"} hoy
@@ -93,7 +93,7 @@ export default function FlashcardsHubPage() {
         </div>
       )}
 
-      {notebooksWithDecks.length === 0 ? (
+      {notebooksWithPages.length === 0 ? (
         <EmptyState
           fill
           icon={
@@ -108,14 +108,14 @@ export default function FlashcardsHubPage() {
         />
       ) : (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3.5">
-          {notebooksWithDecks.map(({ notebook, decks }) => (
+          {notebooksWithPages.map(({ notebook, pages }) => (
             <DeckSummaryCard
               key={notebook.id}
               href={`/flashcards/${notebook.id}`}
               tone={notebook.color}
               title={notebook.title}
-              cardCount={decks.reduce((sum, deck) => sum + deck.cardCount, 0)}
-              dueCount={decks.reduce((sum, deck) => sum + deck.dueCount, 0)}
+              cardCount={pages.reduce((sum, page) => sum + page.cardCount, 0)}
+              dueCount={pages.reduce((sum, page) => sum + page.dueCount, 0)}
             />
           ))}
         </div>

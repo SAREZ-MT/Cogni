@@ -37,8 +37,10 @@ export interface DeckCardProps {
 // Deck grid item (studyplatform-flashcards-style.md §2, notebook's own
 // deck list): a fixed-height link card with a cycling deck-color border/
 // icon tile, a due/al-día status pill, a centered two-line-clamped label
-// and a footer card count. Links straight into the study session for that
-// deck.
+// and a footer card count. One page owns at most one deck (product rule
+// 2026-09-24), so `label` is the page title and the footer's left text
+// reads "Página" instead of a technique name. Links straight into the
+// study session for that page's deck.
 export function DeckCard({
   href,
   tone,
@@ -82,9 +84,7 @@ export function DeckCard({
       </p>
 
       <div className="flex items-center justify-between">
-        <span className="font-medium text-[11px] text-fg-muted">
-          Flashcards
-        </span>
+        <span className="font-medium text-[11px] text-fg-muted">Página</span>
         <span className="font-semibold text-fg-secondary text-xs">
           {cardCount} tarjetas
         </span>

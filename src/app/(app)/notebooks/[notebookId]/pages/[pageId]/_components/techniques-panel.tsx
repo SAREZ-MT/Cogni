@@ -129,7 +129,7 @@ export function TechniquesPanel({ initialCollapsed }: TechniquesPanelProps) {
         </div>
         <div className="flex flex-col gap-2">
           <SavedStudySection
-            label="Mazos guardados"
+            label="Mazo de esta página"
             items={STUDY_ITEMS.flashcards}
           />
           <SavedStudySection

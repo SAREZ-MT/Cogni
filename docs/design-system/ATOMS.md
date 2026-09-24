@@ -251,12 +251,14 @@ reference.
 
 - `label`, `items: StudyItemRowProps[]`, `className?`.
 
-Used by: `techniques-panel.tsx`, once per technique (`Mazos guardados` /
+Used by: `techniques-panel.tsx`, once per technique (`Mazo de esta página` /
 `Sesiones de Active Recall` / `Exámenes recientes`), below a "Generado en
 esta página" title + a neutral `Pill` "Vista previa" (the section's data
 comes from `flashcards/_data/sample.ts`'s `getSampleStudyItemsForPage()` —
 fixed sample items, not filtered by the real page, since there's no backend
-yet).
+yet). The flashcards group is always at most one item: one page owns at most
+one deck (product rule 2026-09-24), so "Mazo de esta página" never lists more
+than the page's own deck.
 
 ## ViewToggle (`view-toggle.tsx`)
 
@@ -330,13 +332,20 @@ for the session mockup. `Pill` and `IconTile`'s existing `success`/
 `warning`/`error` tones already covered everything the report needed — no
 new `Pill` tones were required (only the `IconTile` `"48"` size above).
 
+**Product rule (2026-09-24): one flashcard deck per page.** A page owns at
+most one deck; the deck has no name of its own — it's identified by the page
+and titled with the page title. There is no notebook-level deck/card
+creation. `flashcards/_data/sample.ts` models this with `SamplePage` (no
+separate deck entity) and `getSamplePagesWithCards(notebookId)`, which only
+returns pages that actually have cards (no empty decks).
+
 ### DeckSummaryCard (`deck-summary-card.tsx`)
 
-Hub grid item (one per notebook that has decks): a pastel-toned header
-(`HEADER_BG`, keyed by `NotebookColor` — always that notebook's own color)
-with a translucent `IconTile` (`size="48"`, `bg-white/[55%]` override) and a
-red due-count badge, then a body with the notebook title and a
-due/al-día meta line (`text-error-600`/`text-success-600`).
+Hub grid item (one per notebook that has pages with decks): a pastel-toned
+header (`HEADER_BG`, keyed by `NotebookColor` — always that notebook's own
+color) with a translucent `IconTile` (`size="48"`, `bg-white/[55%]`
+override) and a red due-count badge, then a body with the notebook title
+and a due/al-día meta line (`text-error-600`/`text-success-600`).
 
 - `href`, `tone: NotebookColor`, `title`, `cardCount`, `dueCount`.
 
@@ -344,15 +353,18 @@ Used by: `flashcards/page.tsx` (hub).
 
 ### DeckCard (`deck-card.tsx`)
 
-Deck grid item (one per deck on a notebook's `/flashcards/[notebookId]`
-list): a fixed 200px-tall link card with a cycling `DeckTone` border (13%
-alpha) and icon tile (14% alpha), a due/al-día status `Pill`, a centered
-two-line-clamped label and a footer card count.
+Deck grid item (one per page with cards on a notebook's
+`/flashcards/[notebookId]` list): a fixed 200px-tall link card with a
+cycling `DeckTone` border (13% alpha) and icon tile (14% alpha), a
+due/al-día status `Pill`, a centered two-line-clamped label and a footer
+card count. `label` is the page title; the footer's left text is the fixed
+string "Página" (not a `Pill`/prop — one page is always one deck, so it
+never needs to say anything else).
 
 - `DeckTone`: `"warning" | "info" | "success" | "orange" | "pink"` — the
   report's amber/blue/green/orange/pink `DECK_COLORS` cycle, mapped onto
   existing warning/info/success/pastel-orange/pastel-pink tokens instead of
-  new hex literals. Assigned by position in the notebook's deck list.
+  new hex literals. Assigned by position in the notebook's page list.
 - `href`, `tone`, `label`, `cardCount`, `dueCount`.
 
 Used by: `flashcards/[notebookId]/page.tsx`.

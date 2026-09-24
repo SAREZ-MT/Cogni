@@ -1,15 +1,14 @@
-import { BookOpen, Plus } from "lucide-react";
+import { BookOpen } from "lucide-react";
 import { notFound } from "next/navigation";
 import { requireDesignPreviews } from "@/shared/config/design-previews";
 import { BackLink } from "@/shared/ui/back-link";
-import { Button } from "@/shared/ui/button";
 import { DeckCard, type DeckTone } from "@/shared/ui/deck-card";
 import { EmptyState } from "@/shared/ui/empty-state";
 import { IconTile } from "@/shared/ui/icon-tile";
 import { Pill } from "@/shared/ui/pill";
 import { SectionHeader, SectionTitle } from "@/shared/ui/section-header";
 import { SetBreadcrumb } from "../../_components/breadcrumb";
-import { getSampleDecks, getSampleNotebook } from "../_data/sample";
+import { getSampleNotebook, getSamplePagesWithCards } from "../_data/sample";
 
 // Cycling deck-color order (studyplatform-flashcards-style.md §2
 // DECK_COLORS), assigned by position within the notebook's deck list.
@@ -36,8 +35,8 @@ export default async function FlashcardsNotebookPage({
   const notebook = getSampleNotebook(notebookId);
   if (!notebook) notFound();
 
-  const decks = getSampleDecks(notebookId);
-  const totalCards = decks.reduce((sum, deck) => sum + deck.cardCount, 0);
+  const pages = getSamplePagesWithCards(notebookId);
+  const totalCards = pages.reduce((sum, page) => sum + page.cardCount, 0);
 
   return (
     <section className="flex flex-1 flex-col gap-6">
@@ -62,22 +61,11 @@ export default async function FlashcardsNotebookPage({
           }
           title={notebook.title}
           titleClassName="text-xl"
-          description={`${totalCards} tarjetas · ${decks.length} mazos`}
-          actions={
-            <div className="flex items-center gap-2">
-              <Button type="button" disabled>
-                <Plus aria-hidden="true" size={16} strokeWidth={1.75} />
-                Nueva tarjeta
-              </Button>
-              <Pill size="sm" tone="neutral">
-                pronto
-              </Pill>
-            </div>
-          }
+          description={`${totalCards} tarjetas · ${pages.length} páginas con flashcards`}
         />
       </div>
 
-      {decks.length === 0 ? (
+      {pages.length === 0 ? (
         <EmptyState
           fill
           icon={
@@ -87,21 +75,21 @@ export default async function FlashcardsNotebookPage({
           }
           title="Sin mazos todavía"
           titleClassName="text-base"
-          description="Crea páginas en tu cuaderno y genera flashcards con IA desde el editor."
+          description="Abre una página de este cuaderno y usa Técnicas → Flashcards → Generar."
           descriptionClassName="max-w-[320px]"
         />
       ) : (
         <>
-          <SectionTitle>Mis mazos</SectionTitle>
+          <SectionTitle>Mazos por página</SectionTitle>
           <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-4">
-            {decks.map((deck, index) => (
+            {pages.map((page, index) => (
               <DeckCard
-                key={deck.id}
-                href={`/flashcards/${notebookId}/session?deck=${deck.id}`}
+                key={page.id}
+                href={`/flashcards/${notebookId}/${page.id}`}
                 tone={DECK_TONES[index % DECK_TONES.length] ?? "warning"}
-                label={deck.label}
-                cardCount={deck.cardCount}
-                dueCount={deck.dueCount}
+                label={page.title}
+                cardCount={page.cardCount}
+                dueCount={page.dueCount}
               />
             ))}
           </div>
