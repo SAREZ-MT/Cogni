@@ -107,6 +107,11 @@
   --shadow-md: 0 4px 12px rgb(0 0 0 / 0.08);
   --shadow-lg: 0 8px 24px rgb(0 0 0 / 0.1);
   --shadow-xl: 0 16px 48px rgb(0 0 0 / 0.12);
+  /* Floating shell cards (design/shell-look, Engram studyplatform obs 140):
+     shared by the sidebar and content cards in the app shell (layout.tsx,
+     sidebar.tsx) — both use the same 16px radius (--radius-xl above) and
+     this shadow. */
+  --shadow-card: 0 2px 12px rgb(0 0 0 / 0.06);
 
   /* Motion */
   --ease-default: cubic-bezier(0.4, 0, 0.2, 1);
@@ -128,13 +133,20 @@
   --bg-hover: var(--color-neutral-50);
   --bg-active: var(--color-primary-50);
   --bg-muted: var(--color-neutral-100);
-  --bg-glass: rgb(255 255 255 / 0.85);
+  /* Topbar glass (design/shell-look, studyplatform obs 140): 0.92 opacity,
+     blur-12 (topbar.tsx). Only consumer is the topbar itself. */
+  --bg-glass: rgb(255 255 255 / 0.92);
 
   --fg-default: var(--color-neutral-900);
   --fg-secondary: var(--color-neutral-500);
   --fg-muted: var(--color-neutral-400);
   --fg-on-primary: var(--color-neutral-0);
   --fg-active: var(--color-primary-700);
+
+  /* Stronger active tone for top-level sidebar nav items only (design/
+     shell-look, studyplatform obs 140): notebook/page rows keep the
+     original --bg-active (primary-50); nav-item.tsx uses this instead. */
+  --bg-active-strong: var(--color-primary-100);
 
   --border-default: var(--color-neutral-200);
   --border-subtle: var(--color-neutral-150);
@@ -171,6 +183,7 @@
   --color-fg-secondary: var(--fg-secondary);
   --color-fg-muted: var(--fg-muted);
   --color-fg-active: var(--fg-active);
+  --color-active-strong: var(--bg-active-strong);
   --color-border-default: var(--border-default);
   --color-border-subtle: var(--border-subtle);
 
@@ -397,12 +410,13 @@
 
 /* Gradient avatar background (sidebar user card and topbar trigger, S2/S3;
    docs/design-system/preview/comp-sidebar.html `.avatar`): tokens only, no
-   inline hex. */
+   inline hex. design/shell-look: primary-400 (not -300) matches the
+   reference's #A78BFA exactly. */
 @layer utilities {
   .avatar-gradient {
     background-image: linear-gradient(
       135deg,
-      var(--color-primary-300),
+      var(--color-primary-400),
       var(--color-primary-600)
     );
   }

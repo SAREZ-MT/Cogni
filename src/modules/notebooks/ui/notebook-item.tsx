@@ -100,7 +100,7 @@ export function NotebookItem({
               )}
             >
               {notebook.icon ?? (
-                <NotebookIcon aria-hidden="true" size={16} strokeWidth={1.75} />
+                <NotebookIcon aria-hidden="true" size={18} strokeWidth={1.75} />
               )}
             </button>
           </PopoverTrigger>
@@ -145,7 +145,7 @@ export function NotebookItem({
             // long title used to `truncate` to "Biología …" at 240px
             // because the in-flow action buttons reserve width; the
             // reference wraps to two lines instead of truncating early.
-            className="min-h-8 min-w-0 flex-1 rounded-input px-2 py-1 text-left font-medium text-fg text-sm line-clamp-2 whitespace-normal break-words leading-snug"
+            className="min-h-8 min-w-0 flex-1 rounded-input px-2 py-1 text-left font-semibold text-[13.5px] text-fg line-clamp-2 whitespace-normal break-words leading-snug"
           >
             {notebook.title}
           </button>
@@ -200,7 +200,7 @@ export function NotebookItem({
       </div>
 
       {notebook.pages.length > 0 && (
-        <ul className="flex flex-col gap-0.5">
+        <ul className="flex flex-col gap-0.5 pl-5">
           {notebook.pages.map((page) => (
             <PageItem
               key={page.id}

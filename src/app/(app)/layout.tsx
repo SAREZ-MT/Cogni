@@ -38,7 +38,14 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   return (
     <QueryProvider>
       <BreadcrumbProvider>
-        <div className="flex h-dvh bg-canvas">
+        {/* Shell canvas (design/shell-look, studyplatform obs 140): a flat
+            8px gutter/gap around two floating cards, replacing the old
+            edge-to-edge sidebar + asymmetric content padding. h-dvh (not
+            min-h-screen, which the reference uses) is kept on purpose: the
+            sidebar's and main's own overflow-y-auto/overflow-auto areas
+            need a bounded height to scroll internally instead of growing
+            the whole shell past the viewport. */}
+        <div className="flex h-dvh gap-2 bg-canvas p-2">
           <Sidebar
             initialCollapsed={collapsed}
             collapsedCreateAction={<CreateNotebookIconButton />}
@@ -48,16 +55,14 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
               <SidebarTree />
             </NotebookActions>
           </Sidebar>
-          <div className="flex min-w-0 flex-1 flex-col py-3 pr-3 pl-6">
-            <div
-              data-testid="content-area"
-              className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-content border border-border-subtle bg-page shadow-xs"
-            >
-              <Topbar user={user} />
-              <main className="flex flex-1 flex-col overflow-auto p-(--content-padding)">
-                {children}
-              </main>
-            </div>
+          <div
+            data-testid="content-area"
+            className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl bg-card shadow-card"
+          >
+            <Topbar user={user} />
+            <main className="flex flex-1 flex-col overflow-auto p-(--content-padding)">
+              {children}
+            </main>
           </div>
         </div>
       </BreadcrumbProvider>

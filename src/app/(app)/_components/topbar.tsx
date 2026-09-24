@@ -10,7 +10,7 @@ type TopbarProps = {
 // the right.
 export function Topbar({ user }: TopbarProps) {
   return (
-    <header className="sticky top-0 z-10 flex h-(--topbar-height) shrink-0 items-center justify-between border-border-subtle border-b bg-glass px-6 backdrop-blur-md">
+    <header className="sticky top-0 z-10 flex h-(--topbar-height) shrink-0 items-center justify-between rounded-t-xl border-neutral-200/60 border-b bg-glass px-6 backdrop-blur-[12px]">
       <Breadcrumb />
       <UserMenu user={user} />
     </header>
