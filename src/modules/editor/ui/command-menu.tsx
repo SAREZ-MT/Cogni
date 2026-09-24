@@ -72,6 +72,20 @@ export function CommandMenu({
     return [...byGroup.entries()];
   }, [filtered]);
 
+  // S6a review follow-up (R3-grouped-order-divergence, folded into S6b):
+  // `selectedIndex` MUST walk the same order the list below actually
+  // renders (bucketed by group), not the flat pre-filter `filtered` array.
+  // When the source data's groups aren't already contiguous (unlike the
+  // real SLASH_COMMAND_ITEMS, grouped contiguously by construction) those
+  // two orders diverge, and ArrowDown would highlight an item that isn't
+  // the one visually right below the current selection. Bucketing once
+  // here and indexing that flattened order keeps keyboard navigation and
+  // the visual highlight in sync regardless of the source order.
+  const orderedItems = useMemo(
+    () => groups.flatMap(([, groupItems]) => groupItems),
+    [groups],
+  );
+
   const [selectedIndex, setSelectedIndex] = useState(0);
 
   // Reset the selection whenever the query changes (a new keystroke re-
@@ -93,7 +107,7 @@ export function CommandMenu({
         event.preventDefault();
         event.stopPropagation();
         setSelectedIndex((current) =>
-          filtered.length === 0 ? 0 : (current + 1) % filtered.length,
+          orderedItems.length === 0 ? 0 : (current + 1) % orderedItems.length,
         );
         return;
       }
@@ -101,16 +115,16 @@ export function CommandMenu({
         event.preventDefault();
         event.stopPropagation();
         setSelectedIndex((current) =>
-          filtered.length === 0
+          orderedItems.length === 0
             ? 0
-            : (current - 1 + filtered.length) % filtered.length,
+            : (current - 1 + orderedItems.length) % orderedItems.length,
         );
         return;
       }
       if (event.key === "Enter") {
         event.preventDefault();
         event.stopPropagation();
-        const item = filtered[selectedIndex];
+        const item = orderedItems[selectedIndex];
         if (item) onSelect(item);
         return;
       }
@@ -129,7 +143,7 @@ export function CommandMenu({
 
     window.addEventListener("keydown", handleKeydown, true);
     return () => window.removeEventListener("keydown", handleKeydown, true);
-  }, [filtered, selectedIndex, onSelect, onClose]);
+  }, [orderedItems, selectedIndex, onSelect, onClose]);
 
   return (
     <Command
@@ -141,9 +155,9 @@ export function CommandMenu({
       // as advisory in PR3b): the highlight never followed ArrowDown.
       // Driving cmdk's own selection API keeps keyboard and mouse
       // (onValueChange fires on pointer move too) in sync with one state.
-      value={filtered[selectedIndex]?.id}
+      value={orderedItems[selectedIndex]?.id}
       onValueChange={(value) => {
-        const index = filtered.findIndex((item) => item.id === value);
+        const index = orderedItems.findIndex((item) => item.id === value);
         if (index !== -1) setSelectedIndex(index);
       }}
     >

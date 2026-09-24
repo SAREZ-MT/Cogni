@@ -350,6 +350,20 @@
   .editor-content .ProseMirror:focus-visible {
     outline: none;
   }
+
+  /* S6b (odd/tasks/app-shell-restyle.md), Editor directive: a block picked
+     up by the per-block drag handle (block-handle.tsx, a ProseMirror
+     `NodeSelection`) or a Shift/Ctrl multi-block range (the free
+     `@tiptap/extension-node-range`, extensions/index.ts) gets the same
+     active tone as an active sidebar item. Notion itself shows no hover
+     background on the block text — only the gutter handle reacts to
+     hover — so this intentionally adds no `:hover` rule. */
+  .editor-content .ProseMirror-selectednode,
+  .editor-content .ProseMirror-selectednoderange {
+    background-color: var(--color-active);
+    border-radius: var(--radius-md);
+    outline: none;
+  }
 }
 
 /* Violet glows for the public auth brand panel. */

@@ -36,6 +36,17 @@ const GROUPED_ITEMS = [
 
 // specs/editor/spec.md, "Menú de comandos `/`", Scenarios "Filtro sin
 // resultados" and "Cierre con Escape".
+// S6a review follow-up (R3-grouped-order-divergence, folded into S6b):
+// items whose group values are NOT already contiguous (unlike the real
+// SLASH_COMMAND_ITEMS, which IS contiguous by construction) exposed a
+// divergence between the flat `filtered` array `selectedIndex` walked and
+// the bucketed-by-group order actually rendered.
+const INTERLEAVED_GROUPED_ITEMS = [
+  { id: "a1", label: "Elemento A1", group: "Grupo A" },
+  { id: "b1", label: "Elemento B1", group: "Grupo B" },
+  { id: "a2", label: "Elemento A2", group: "Grupo A" },
+];
+
 describe("CommandMenu", () => {
   it("shows a no-results message and Enter inserts nothing when the filter matches no block", () => {
     const onSelect = vi.fn();
@@ -256,6 +267,59 @@ describe("CommandMenu", () => {
 
     expect(onSelect).toHaveBeenCalledWith(
       expect.objectContaining({ id: "blockquote" }),
+    );
+  });
+
+  // S6a review follow-up (R3-grouped-order-divergence, folded into S6b):
+  // keyboard `selectedIndex` must walk the same bucketed-by-group order as
+  // rendering, not the flat pre-filter order, so ArrowDown always
+  // highlights the item that is visually right below the current one —
+  // even when that means crossing a group boundary because the source
+  // data interleaves groups.
+  it("walks the rendered (bucketed-by-group) order with ArrowDown, not the flat pre-filter order", () => {
+    const onSelect = vi.fn();
+    const onClose = vi.fn();
+    render(
+      <CommandMenu
+        items={INTERLEAVED_GROUPED_ITEMS}
+        query=""
+        onSelect={onSelect}
+        onClose={onClose}
+      />,
+    );
+
+    // Rendered order (bucketed by first appearance): Grupo A [a1, a2],
+    // then Grupo B [b1] -> a1, a2, b1. The flat pre-filter order was
+    // a1, b1, a2 -- if selectedIndex walked that instead, the first
+    // ArrowDown would highlight "Elemento B1", not "Elemento A2".
+    expect(commandItemFor("Elemento A1")).toHaveAttribute(
+      "data-selected",
+      "true",
+    );
+
+    fireEvent.keyDown(window, { key: "ArrowDown" });
+
+    expect(commandItemFor("Elemento A2")).toHaveAttribute(
+      "data-selected",
+      "true",
+    );
+    expect(commandItemFor("Elemento B1")).toHaveAttribute(
+      "data-selected",
+      "false",
+    );
+
+    // Second ArrowDown now crosses the group boundary into "Grupo B".
+    fireEvent.keyDown(window, { key: "ArrowDown" });
+
+    expect(commandItemFor("Elemento B1")).toHaveAttribute(
+      "data-selected",
+      "true",
+    );
+
+    fireEvent.keyDown(window, { key: "Enter" });
+
+    expect(onSelect).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "b1" }),
     );
   });
 

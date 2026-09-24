@@ -1,8 +1,29 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { Editor } from "@tiptap/core";
-import { afterEach, describe, expect, it } from "vitest";
-import { BubbleToolbar, BubbleToolbarControls } from "./bubble-toolbar";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  BubbleToolbar,
+  BubbleToolbarControls,
+  LinkPopover,
+  shouldShowBubbleToolbar,
+} from "./bubble-toolbar";
 import { createEditorExtensions } from "./extensions";
+
+// Finds the position right before the first occurrence of `needle` inside
+// any text node, for placing the selection/caret precisely (same intent as
+// extensions/task-list.test.tsx's `descendants` search, adapted for text).
+function findTextPosition(editor: Editor, needle: string): number {
+  let result = -1;
+  editor.state.doc.descendants((node, pos) => {
+    if (result !== -1) return false;
+    if (node.isText && node.text?.includes(needle)) {
+      result = pos + node.text.indexOf(needle);
+    }
+    return true;
+  });
+  if (result === -1) throw new Error(`"${needle}" not found in the document`);
+  return result;
+}
 
 // S6a (odd/tasks/app-shell-restyle.md), Editor directive: bubble toolbar on
 // selection for inline formatting, matching the Tiptap docs Notion-style
@@ -109,6 +130,57 @@ describe("BubbleToolbarControls", () => {
     expect(editor.isActive("link")).toBe(false);
   });
 
+  // S6a review follow-up (R3-link-scheme-untested, folded into S6b):
+  // typing a disallowed scheme must not apply anything (extensions/
+  // index.ts's `isAllowedLinkUri` already rejects it, tested directly in
+  // extensions/link.test.tsx) AND the input must still close, matching the
+  // https/Escape/clear paths above instead of leaving a dead-end open input.
+  it("rejects a javascript: URL, leaves the document unchanged and closes the input", () => {
+    editor = createHeadlessEditor();
+    render(<BubbleToolbarControls editor={editor} />);
+
+    const beforeJson = editor.getJSON();
+    fireEvent.click(screen.getByRole("button", { name: "Enlace" }));
+    const input = screen.getByTestId("bubble-toolbar-link-input");
+    fireEvent.change(input, { target: { value: "javascript:alert(1)" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    expect(editor.isActive("link")).toBe(false);
+    expect(editor.getJSON()).toEqual(beforeJson);
+    expect(
+      screen.queryByTestId("bubble-toolbar-link-input"),
+    ).not.toBeInTheDocument();
+  });
+
+  // S6a review follow-up (R3-stale-toolbar-state, folded into S6b): a
+  // selection change while the link input is open must reset it, so a
+  // stale draft URL never gets applied to a new, unrelated selection.
+  it("closes the open link input when the selection changes elsewhere in the document", () => {
+    editor = createHeadlessEditor("<p>hola cogni mundo</p>");
+    editor.commands.setTextSelection({
+      from: findTextPosition(editor, "cogni"),
+      to: findTextPosition(editor, "cogni") + "cogni".length,
+    });
+    const { rerender } = render(<BubbleToolbarControls editor={editor} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Enlace" }));
+    const input = screen.getByTestId("bubble-toolbar-link-input");
+    fireEvent.change(input, { target: { value: "https://stale.example" } });
+
+    // Move the selection to "mundo" without going through applyLink().
+    const from = findTextPosition(editor, "mundo");
+    editor.commands.setTextSelection({ from, to: from + "mundo".length });
+    rerender(<BubbleToolbarControls editor={editor} />);
+
+    expect(
+      screen.queryByTestId("bubble-toolbar-link-input"),
+    ).not.toBeInTheDocument();
+
+    // Reopening after the reset must not resurrect the stale draft value.
+    fireEvent.click(screen.getByRole("button", { name: "Enlace" }));
+    expect(screen.getByTestId("bubble-toolbar-link-input")).toHaveValue("");
+  });
+
   it("opens the highlight palette and applies a color through it", () => {
     editor = createHeadlessEditor();
     render(<BubbleToolbarControls editor={editor} />);
@@ -121,6 +193,45 @@ describe("BubbleToolbarControls", () => {
       (m) => m.type === "highlight",
     );
     expect(mark?.attrs).toEqual({ color: "purple" });
+  });
+
+  // S6b defect 2 (focus, odd/tasks/app-shell-restyle.md): applying a link
+  // must leave the editor focused, not `document.body`. Tiptap's own
+  // `editor.chain().focus()` command (already used above) restores the
+  // selection but only calls the real DOM `view.focus()` inside a
+  // `requestAnimationFrame` callback (@tiptap/core's `focus` command,
+  // `delayedFocus`) — deferred past the point where closing the popover
+  // removes the currently-focused input from the DOM, which blurs to
+  // `document.body` in the meantime. `editor.view.focus()` is
+  // ProseMirror's own synchronous method (no rAF), so spying on it proves
+  // the handler grabs focus back immediately instead of waiting a frame
+  // (the orchestrator observed `document.activeElement === body` right
+  // after Enter, matching that gap).
+  it("keeps the editor focused synchronously after applying a link on Enter", () => {
+    editor = createHeadlessEditor();
+    const focusSpy = vi.spyOn(editor.view, "focus");
+    render(<BubbleToolbarControls editor={editor} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Enlace" }));
+    const input = screen.getByTestId("bubble-toolbar-link-input");
+    fireEvent.change(input, { target: { value: "https://cogni.app" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    expect(focusSpy).toHaveBeenCalled();
+  });
+
+  it("keeps the editor focused synchronously after removing a link with an empty URL on Enter", () => {
+    editor = createHeadlessEditor();
+    editor.commands.setLink({ href: "https://cogni.app" });
+    const focusSpy = vi.spyOn(editor.view, "focus");
+    render(<BubbleToolbarControls editor={editor} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Enlace" }));
+    const input = screen.getByTestId("bubble-toolbar-link-input");
+    fireEvent.change(input, { target: { value: "" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    expect(focusSpy).toHaveBeenCalled();
   });
 });
 
@@ -143,5 +254,200 @@ describe("BubbleToolbar (smoke)", () => {
     } finally {
       editor.destroy();
     }
+  });
+});
+
+// S6a review follow-up (R3-shouldshow-unproved, folded into S6b): the
+// `shouldShow` predicate passed to the real `BubbleMenu` was never unit
+// tested on its own, relying only on the smoke test above (which never
+// exercises a non-empty selection, since floating-ui can't position in
+// jsdom). Extracted as a pure function so it can be proved directly against
+// a headless editor, independent of floating-ui/BubbleMenu.
+describe("shouldShowBubbleToolbar", () => {
+  it("returns false for an empty selection", () => {
+    const editor = createHeadlessEditor();
+    try {
+      editor.commands.setTextSelection(1);
+      const { from, to } = editor.state.selection;
+      expect(
+        shouldShowBubbleToolbar({ editor, state: editor.state, from, to }),
+      ).toBe(false);
+    } finally {
+      editor.destroy();
+    }
+  });
+
+  it("returns false for a selection inside a code block", () => {
+    const editor = new Editor({
+      extensions: createEditorExtensions(),
+      content: {
+        type: "doc",
+        content: [
+          {
+            type: "codeBlock",
+            content: [{ type: "text", text: "const x = 1;" }],
+          },
+        ],
+      } as unknown as Record<string, unknown>,
+    });
+    try {
+      // `selectAll()` produces an `AllSelection` spanning the whole doc
+      // (from just before the codeBlock to just after it), which sits
+      // OUTSIDE the codeBlock's own depth and does not count as "inside"
+      // it for `isActive`. A plain text selection within its content does.
+      editor.commands.setTextSelection({ from: 1, to: 5 });
+      const { from, to } = editor.state.selection;
+      expect(
+        shouldShowBubbleToolbar({ editor, state: editor.state, from, to }),
+      ).toBe(false);
+    } finally {
+      editor.destroy();
+    }
+  });
+
+  it("returns false when the selected node is an image", () => {
+    const editor = new Editor({
+      extensions: createEditorExtensions(),
+      content: {
+        type: "doc",
+        content: [{ type: "image", attrs: { assetId: null } }],
+      } as unknown as Record<string, unknown>,
+    });
+    try {
+      editor.commands.setNodeSelection(0);
+      const { from, to } = editor.state.selection;
+      expect(
+        shouldShowBubbleToolbar({ editor, state: editor.state, from, to }),
+      ).toBe(false);
+    } finally {
+      editor.destroy();
+    }
+  });
+
+  it("returns true for a plain, non-empty text selection", () => {
+    const editor = createHeadlessEditor();
+    try {
+      editor.commands.selectAll();
+      const { from, to } = editor.state.selection;
+      expect(
+        shouldShowBubbleToolbar({ editor, state: editor.state, from, to }),
+      ).toBe(true);
+    } finally {
+      editor.destroy();
+    }
+  });
+});
+
+// S6b (odd/tasks/app-shell-restyle.md): the link popover shown when the
+// caret sits inside an existing link with no selection ("Abrir"/"Editar"/
+// "Quitar"), matching the Tiptap docs Notion-style editor's inline-link
+// affordance. Same headless-editor + direct-render pattern as
+// BubbleToolbarControls above.
+describe("LinkPopover", () => {
+  let editor: Editor;
+
+  afterEach(() => {
+    editor?.destroy();
+  });
+
+  function createEditorWithCaretInLink(href: string) {
+    const instance = new Editor({
+      extensions: createEditorExtensions(),
+      content: "<p>visita cogni hoy</p>",
+    });
+    const from = findTextPosition(instance, "cogni");
+    const to = from + "cogni".length;
+    instance.commands.setTextSelection({ from, to });
+    instance.commands.setLink({ href });
+    // Caret inside the link, no selection, matching how a user's cursor
+    // would land after clicking into linked text.
+    instance.commands.setTextSelection(from + 2);
+    return instance;
+  }
+
+  it("shows a labeled dialog with the (truncated) URL", () => {
+    editor = createEditorWithCaretInLink(
+      "https://cogni.app/una-ruta-de-ejemplo-bastante-larga-para-truncar",
+    );
+    render(<LinkPopover editor={editor} />);
+
+    expect(screen.getByRole("dialog", { name: "Enlace" })).toHaveAttribute(
+      "data-testid",
+      "link-popover",
+    );
+  });
+
+  it("Abrir opens the URL in a new tab with rel=noopener noreferrer", () => {
+    editor = createEditorWithCaretInLink("https://cogni.app/pagina");
+    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+
+    render(<LinkPopover editor={editor} />);
+    fireEvent.click(screen.getByRole("button", { name: "Abrir enlace" }));
+
+    expect(openSpy).toHaveBeenCalledWith(
+      "https://cogni.app/pagina",
+      "_blank",
+      "noopener,noreferrer",
+    );
+  });
+
+  it("Editar opens the inline input prefilled with the current URL", () => {
+    editor = createEditorWithCaretInLink("https://cogni.app/pagina");
+    render(<LinkPopover editor={editor} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Editar enlace" }));
+
+    expect(screen.getByTestId("link-popover-input")).toHaveValue(
+      "https://cogni.app/pagina",
+    );
+  });
+
+  it("applies an edited URL on Enter", () => {
+    editor = createEditorWithCaretInLink("https://cogni.app/vieja");
+    render(<LinkPopover editor={editor} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Editar enlace" }));
+    const input = screen.getByTestId("link-popover-input");
+    fireEvent.change(input, { target: { value: "https://cogni.app/nueva" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    expect(editor.isActive("link", { href: "https://cogni.app/nueva" })).toBe(
+      true,
+    );
+  });
+
+  it("Quitar removes the link mark", () => {
+    editor = createEditorWithCaretInLink("https://cogni.app/pagina");
+    render(<LinkPopover editor={editor} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Quitar enlace" }));
+
+    expect(editor.isActive("link")).toBe(false);
+  });
+
+  // S6b defect 2 (focus, odd/tasks/app-shell-restyle.md): same gap as
+  // BubbleToolbarControls's applyLink above, for the popover's own
+  // Editar (apply) and Quitar (remove) actions.
+  it("keeps the editor focused synchronously after Editar applies an edited URL on Enter", () => {
+    editor = createEditorWithCaretInLink("https://cogni.app/vieja");
+    const focusSpy = vi.spyOn(editor.view, "focus");
+    render(<LinkPopover editor={editor} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Editar enlace" }));
+    const input = screen.getByTestId("link-popover-input");
+    fireEvent.change(input, { target: { value: "https://cogni.app/nueva" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    expect(focusSpy).toHaveBeenCalled();
+  });
+
+  it("keeps the editor focused synchronously after Quitar removes the link", () => {
+    editor = createEditorWithCaretInLink("https://cogni.app/pagina");
+    const focusSpy = vi.spyOn(editor.view, "focus");
+    render(<LinkPopover editor={editor} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Quitar enlace" }));
+
+    expect(focusSpy).toHaveBeenCalled();
   });
 });
