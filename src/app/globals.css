@@ -330,6 +330,26 @@
     text-decoration: underline;
     text-underline-offset: 2px;
   }
+
+  /* S6a (Editor directive): placeholder copy on the currently empty block,
+     decorated by @tiptap/extensions' Placeholder (extensions/index.ts)
+     with the `is-empty` class + `data-placeholder` attribute. */
+  .editor-content .is-empty::before {
+    content: attr(data-placeholder);
+    float: left;
+    height: 0;
+    pointer-events: none;
+    color: var(--color-fg-muted);
+  }
+
+  /* S6a defect fix: the global `:focus-visible` rule below draws a ring
+     around the whole ProseMirror content area whenever the editor is
+     focused. Notion-style editors show no outline on the document itself
+     (the caret is the only focus cue); every other focusable control keeps
+     the global ring. */
+  .editor-content .ProseMirror:focus-visible {
+    outline: none;
+  }
 }
 
 /* Violet glows for the public auth brand panel. */

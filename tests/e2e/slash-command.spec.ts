@@ -62,7 +62,12 @@ test.describe("slash command menu", () => {
 
     const menu = page.getByTestId("command-menu");
     await expect(menu).toBeVisible();
-    await expect(menu.getByText("cita")).toBeVisible();
+    // S6a defect fix: labels are now sentence case ("Cita") and each item
+    // also renders a description line containing the plain word "cita"
+    // ("Resalta una cita o fragmento"), so a plain getByText("cita") match
+    // both and violates Playwright's strict mode. The label is the cmdk
+    // option's accessible name and starts with it.
+    await expect(menu.getByRole("option", { name: /^Cita/ })).toBeVisible();
 
     await page.keyboard.press("Enter");
 
@@ -120,7 +125,10 @@ test.describe("slash command menu", () => {
 
     const menu = page.getByTestId("command-menu");
     await expect(menu).toBeVisible();
-    await expect(menu.getByText("tabla")).toBeVisible();
+    // S6a defect fix: same strict-mode collision as "/cita" above — the
+    // description "Tabla editable de filas y columnas" also contains
+    // "tabla".
+    await expect(menu.getByRole("option", { name: /^Tabla/ })).toBeVisible();
 
     await page.keyboard.press("Enter");
 

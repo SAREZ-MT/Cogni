@@ -1,5 +1,6 @@
 "use client";
 
+import type { LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   Command,
@@ -13,6 +14,14 @@ export interface CommandMenuItem {
   id: string;
   label: string;
   keywords?: string[];
+  // S6a (odd/tasks/app-shell-restyle.md), Editor directive: the restyled
+  // "/" menu shows an icon tile, an optional description line and a group
+  // heading per item, matching the Tiptap docs Notion-style editor. All
+  // three stay optional so a caller (or this file's own tests) can keep
+  // passing the plain `{ id, label, keywords }` shape unchanged.
+  icon?: LucideIcon;
+  description?: string;
+  group?: string;
 }
 
 export interface CommandMenuProps {
@@ -45,6 +54,23 @@ export function CommandMenu({
       return haystack.includes(normalizedQuery);
     });
   }, [items, query]);
+
+  // Groups the already-filtered items by their declared `group`, keeping
+  // each group's first-appearance order (a plain Map preserves insertion
+  // order) — this is what keeps the rendered group order stable across
+  // re-filters instead of resorting alphabetically. Items without a
+  // `group` fall into one heading-less bucket ("") so callers that never
+  // pass it (this file's own pre-S6a tests) render exactly as before.
+  const groups = useMemo(() => {
+    const byGroup = new Map<string, CommandMenuItem[]>();
+    for (const item of filtered) {
+      const key = item.group ?? "";
+      const bucket = byGroup.get(key);
+      if (bucket) bucket.push(item);
+      else byGroup.set(key, [item]);
+    }
+    return [...byGroup.entries()];
+  }, [filtered]);
 
   const [selectedIndex, setSelectedIndex] = useState(0);
 
@@ -108,7 +134,7 @@ export function CommandMenu({
   return (
     <Command
       data-testid="command-menu"
-      className="w-64 rounded-lg border border-border bg-popover shadow-lg"
+      className="min-w-64 max-h-80 overflow-y-auto rounded-lg border border-border-default bg-card p-1 shadow-md"
       // cmdk recomputes `data-selected` on its Item from this controlled
       // value, always overwriting a plain `data-selected` prop passed
       // straight to CommandItem — that was the bug (PR5b finding, flagged
@@ -125,17 +151,42 @@ export function CommandMenu({
         {filtered.length === 0 ? (
           <CommandEmpty>no se encontraron bloques</CommandEmpty>
         ) : (
-          <CommandGroup heading="bloques">
-            {filtered.map((item) => (
-              <CommandItem
-                key={item.id}
-                value={item.id}
-                onSelect={() => onSelect(item)}
-              >
-                {item.label}
-              </CommandItem>
-            ))}
-          </CommandGroup>
+          groups.map(([group, groupItems]) => (
+            <CommandGroup
+              key={group || "__ungrouped__"}
+              heading={group || undefined}
+            >
+              {groupItems.map((item) => (
+                <CommandItem
+                  key={item.id}
+                  value={item.id}
+                  className="data-[selected=true]:bg-active data-[selected=true]:text-fg-active gap-2"
+                  onSelect={() => onSelect(item)}
+                >
+                  {item.icon && (
+                    <span
+                      data-testid={`command-menu-item-icon-${item.id}`}
+                      className="bg-hover flex size-7 shrink-0 items-center justify-center rounded-md"
+                    >
+                      <item.icon
+                        aria-hidden="true"
+                        size={15}
+                        strokeWidth={1.75}
+                      />
+                    </span>
+                  )}
+                  <span className="flex min-w-0 flex-col">
+                    <span className="text-[13.5px]">{item.label}</span>
+                    {item.description && (
+                      <span className="text-fg-muted truncate text-xs">
+                        {item.description}
+                      </span>
+                    )}
+                  </span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          ))
         )}
       </CommandList>
     </Command>

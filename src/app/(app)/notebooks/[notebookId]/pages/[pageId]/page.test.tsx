@@ -1,5 +1,6 @@
 import type { ReactElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { PageHeader } from "../../../../_components/page-header";
 
 // T11, design.md "Decision: Vista de página, llamada en curso y polling con
 // TanStack Query": this route now fetches the job status on the server and
@@ -107,7 +108,10 @@ describe("page route ingestion wiring", () => {
 
   // S5 (odd/tasks/app-shell-restyle.md): the route renders PageHeader
   // instead of a bare <h1>, passing the page's own title and updatedAt for
-  // the meta row's last-edit item.
+  // the meta row's last-edit item. R3-002 (review follow-up folded into
+  // S6a): assert the element's actual type, not only its props by
+  // position — a future reorder of `section`'s children would otherwise
+  // silently start asserting props against the wrong element.
   it("renders PageHeader with the page's title and updatedAt", async () => {
     getPageForRoute.mockResolvedValue(page());
     getImportJobStatus.mockResolvedValue({ ok: true, value: null });
@@ -122,6 +126,7 @@ describe("page route ingestion wiring", () => {
       updatedAt: Date;
     }>;
 
+    expect(header.type).toBe(PageHeader);
     expect(header.props.title).toBe("Apuntes");
     expect(header.props.updatedAt).toEqual(
       new Date("2026-09-23T10:00:00.000Z"),

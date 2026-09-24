@@ -123,6 +123,20 @@ describe("SidebarTreeClient", () => {
   // go through refreshHomeIfActive() like every other mutation, not call
   // router.refresh() unconditionally — a notebook created from the sidebar
   // while editing a page must not re-render that page route.
+  //
+  // R3-001 (review follow-up folded into S6a): asserting `refresh` was not
+  // called right after awaiting only `createNotebook` proved nothing — the
+  // mutation's `onSuccess` (which conditionally calls
+  // `refreshHomeIfActive()`) may not have run yet at that point, so the
+  // assertion could pass for the wrong reason. `onSettled: invalidate()`
+  // always runs strictly after `onSuccess` in TanStack Query's mutation
+  // lifecycle, and it calls `getSidebarTree` again (the mount's own
+  // background refetch is the first call) — waiting for that second call is
+  // a deterministic "onSuccess has finished" sign that does not depend on a
+  // DOM race the way waiting for the optimistic row to settle would (a
+  // second `getSidebarTree` mock resolving mid-interaction can otherwise
+  // flip `notebooks.length === 0` to the populated branch and unmount the
+  // still-open dialog).
   it("does not refresh the router after creating a notebook outside Home", async () => {
     pathname.current = "/notebooks/n1/pages/p1";
     createNotebook.mockResolvedValue({
@@ -141,6 +155,9 @@ describe("SidebarTreeClient", () => {
 
     await waitFor(() => {
       expect(createNotebook).toHaveBeenCalled();
+    });
+    await waitFor(() => {
+      expect(getSidebarTree.mock.calls.length).toBeGreaterThanOrEqual(2);
     });
     expect(refresh).not.toHaveBeenCalled();
   });

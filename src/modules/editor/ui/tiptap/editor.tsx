@@ -7,8 +7,8 @@ import type { ImageUploadPort } from "../../domain/image-upload-port";
 import type { SavePagePort, TiptapDoc } from "../../domain/save-page-port";
 import { ConflictBanner } from "../conflict-banner";
 import { SaveStatus } from "../save-status";
+import { BubbleToolbar } from "./bubble-toolbar";
 import { createEditorExtensions } from "./extensions";
-import { HighlightPicker } from "./highlight-picker";
 import { toPlainTiptapDoc } from "./to-plain-tiptap-doc";
 
 export interface EditorProps {
@@ -134,7 +134,11 @@ export function Editor({
         onRestore={restoreDraft}
         onDiscard={discardDraft}
       />
-      {editor ? <HighlightPicker editor={editor} /> : null}
+      {/* S6a (Editor directive): the bubble toolbar's "Resaltar" button
+          now reuses HighlightPickerControls, so it replaces the standalone
+          HighlightPicker BubbleMenu here — that module and its tests stay
+          intact for direct/unit use. */}
+      {editor ? <BubbleToolbar editor={editor} /> : null}
       {/* T13b (design fidelity, docs/design-system/screenshots/editor.png):
           `.editor-content` (src/app/globals.css) styles the real
           ProseMirror output against the Cogni type scale instead of

@@ -430,14 +430,19 @@ test.describe("notebooks acceptance", () => {
     await applyMarkTo("tachado", "ControlOrMeta+Shift+s");
     await applyMarkTo("codigoinline", "ControlOrMeta+e");
 
-    // Cogni highlight mark: applied through the bubble menu that appears
-    // on selection (highlight-picker.tsx/highlight-picker-controls.tsx), a
-    // button portalled outside the editor's own DOM. Same triple-click
-    // selection as the inline marks above; a keyboard-only Home/Shift+End
-    // does not reliably make this particular menu appear.
+    // Cogni highlight mark: S6a folded the standalone highlight-picker
+    // BubbleMenu into the shared bubble toolbar (bubble-toolbar.tsx) — the
+    // palette (highlight-picker-controls.tsx) now only appears after
+    // clicking the toolbar's "Resaltar" button, instead of floating on its
+    // own on selection. Same triple-click selection as the inline marks
+    // above; a keyboard-only Home/Shift+End does not reliably make the
+    // toolbar appear.
     await editable
       .getByText("texto resaltado", { exact: true })
       .click({ clickCount: 3 });
+    const bubbleToolbar = page.getByTestId("bubble-toolbar");
+    await expect(bubbleToolbar).toBeVisible();
+    await bubbleToolbar.getByRole("button", { name: "Resaltar" }).click();
     await page
       .getByTestId("highlight-picker")
       .getByRole("button", { name: "Resaltar en verde" })
