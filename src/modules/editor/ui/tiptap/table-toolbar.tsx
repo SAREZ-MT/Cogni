@@ -78,25 +78,37 @@ const ROW_COLUMN_BUTTONS: TableButtonConfig[] = [
     id: "add-row-before",
     label: "Añadir fila arriba",
     icon: ArrowUpToLine,
-    run: (editor) => editor.chain().focus().addRowBefore().run(),
+    run: (editor) => {
+      editor.chain().addRowBefore().run();
+      editor.view.focus();
+    },
   },
   {
     id: "add-row-after",
     label: "Añadir fila abajo",
     icon: ArrowDownToLine,
-    run: (editor) => editor.chain().focus().addRowAfter().run(),
+    run: (editor) => {
+      editor.chain().addRowAfter().run();
+      editor.view.focus();
+    },
   },
   {
     id: "add-column-before",
     label: "Añadir columna izquierda",
     icon: ArrowLeftToLine,
-    run: (editor) => editor.chain().focus().addColumnBefore().run(),
+    run: (editor) => {
+      editor.chain().addColumnBefore().run();
+      editor.view.focus();
+    },
   },
   {
     id: "add-column-after",
     label: "Añadir columna derecha",
     icon: ArrowRightToLine,
-    run: (editor) => editor.chain().focus().addColumnAfter().run(),
+    run: (editor) => {
+      editor.chain().addColumnAfter().run();
+      editor.view.focus();
+    },
   },
 ];
 
@@ -105,19 +117,28 @@ const CELL_BUTTONS: TableButtonConfig[] = [
     id: "merge-cells",
     label: "Combinar celdas",
     icon: TableCellsMerge,
-    run: (editor) => editor.chain().focus().mergeCells().run(),
+    run: (editor) => {
+      editor.chain().mergeCells().run();
+      editor.view.focus();
+    },
   },
   {
     id: "split-cell",
     label: "Separar celdas",
     icon: TableCellsSplit,
-    run: (editor) => editor.chain().focus().splitCell().run(),
+    run: (editor) => {
+      editor.chain().splitCell().run();
+      editor.view.focus();
+    },
   },
   {
     id: "toggle-header-row",
     label: "Alternar fila de encabezado",
     icon: TableProperties,
-    run: (editor) => editor.chain().focus().toggleHeaderRow().run(),
+    run: (editor) => {
+      editor.chain().toggleHeaderRow().run();
+      editor.view.focus();
+    },
   },
 ];
 
@@ -127,21 +148,30 @@ const DELETE_BUTTONS: TableButtonConfig[] = [
     label: "Eliminar fila",
     icon: Rows3,
     destructive: true,
-    run: (editor) => editor.chain().focus().deleteRow().run(),
+    run: (editor) => {
+      editor.chain().deleteRow().run();
+      editor.view.focus();
+    },
   },
   {
     id: "delete-column",
     label: "Eliminar columna",
     icon: Columns3,
     destructive: true,
-    run: (editor) => editor.chain().focus().deleteColumn().run(),
+    run: (editor) => {
+      editor.chain().deleteColumn().run();
+      editor.view.focus();
+    },
   },
   {
     id: "delete-table",
     label: "Eliminar tabla",
     icon: Trash2,
     destructive: true,
-    run: (editor) => editor.chain().focus().deleteTable().run(),
+    run: (editor) => {
+      editor.chain().deleteTable().run();
+      editor.view.focus();
+    },
   },
 ];
 

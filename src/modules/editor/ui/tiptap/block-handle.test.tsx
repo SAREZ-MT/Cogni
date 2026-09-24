@@ -213,6 +213,31 @@ describe("BlockHandle", () => {
     expect(blockSelection.collapseBlockSelection).toHaveBeenCalledWith(editor);
   });
 
+  // E3 follow-up (orchestrator repro, editor-pass-e3.md): the deferred
+  // frame is the one selection-restore this codebase still allows after a
+  // user interaction (drag-and-drop genuinely needs a frame for the drag-
+  // handle plugin's own drop handling to settle first) — but it must still
+  // bail out if something else already moved the selection by the time it
+  // fires (a click, a keystroke), the same hazard that forced block-
+  // context-menu.tsx's own close handling to become fully synchronous.
+  it("does not collapse when the editor's selection already changed before the deferred frame fires", () => {
+    editor = createHeadlessEditor("<p>primero</p><p>segundo</p>");
+    render(<BlockHandle editor={editor} />);
+    expect(capturedOnElementDragEnd).toBeInstanceOf(Function);
+
+    capturedOnElementDragEnd?.({} as DragEvent);
+    // Something else — a click, a keystroke — moves the selection into the
+    // second paragraph before the deferred frame runs (the default initial
+    // selection already sits at the very start of the first one, so this
+    // must land somewhere genuinely different by VALUE, not just a new
+    // object instance).
+    editor.commands.setTextSelection(10);
+
+    vi.runAllTimers();
+
+    expect(blockSelection.collapseBlockSelection).not.toHaveBeenCalled();
+  });
+
   // S7 review follow-up (R3-raf-not-cancelled, odd/tasks/app-shell-
   // restyle.md): unmounting (an App Router navigation away from the page)
   // within the deferred frame used to leave the scheduled

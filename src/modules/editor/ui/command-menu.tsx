@@ -41,7 +41,16 @@ export interface CommandMenuProps {
   query: string;
   onSelect: (item: CommandMenuItem) => void;
   onClose: () => void;
+  // E3 #3 (bug report): every consumer of this shared popup shell (the "/"
+  // slash menu, the ":" emoji popup, the "@" mention popup) showed the same
+  // "no se encontraron bloques" empty state, which only makes sense for the
+  // slash menu — a search that finds no emoji, or no page to mention, isn't
+  // a missing "bloque". Defaults to the slash-menu copy so slash-command.tsx
+  // (the majority consumer) needs no change.
+  emptyText?: string;
 }
+
+const DEFAULT_EMPTY_TEXT = "No se encontraron bloques";
 
 // specs/editor/spec.md, "Menú de comandos `/`": the "/" popup itself never
 // has DOM focus (the user keeps typing in the Tiptap document), so this
@@ -55,6 +64,7 @@ export function CommandMenu({
   query,
   onSelect,
   onClose,
+  emptyText = DEFAULT_EMPTY_TEXT,
 }: CommandMenuProps) {
   const filtered = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -175,7 +185,7 @@ export function CommandMenu({
     >
       <CommandList>
         {filtered.length === 0 ? (
-          <CommandEmpty>no se encontraron bloques</CommandEmpty>
+          <CommandEmpty>{emptyText}</CommandEmpty>
         ) : (
           groups.map(([group, groupItems]) => (
             <CommandGroup

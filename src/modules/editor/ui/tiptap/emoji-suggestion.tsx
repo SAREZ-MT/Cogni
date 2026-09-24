@@ -62,6 +62,7 @@ export function createEmojiSuggestion() {
     items: ({ query }: { query: string }) => filterEmojiItems(query),
     render: createCommandMenuRender<EmojiMenuItem, { name: string }>(
       (item) => ({ name: item.name }),
+      { emptyText: "Sin emojis para esa búsqueda" },
     ),
   };
 }

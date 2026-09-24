@@ -175,12 +175,15 @@ export const SLASH_COMMAND_ITEMS: SlashCommandItem[] = [
     icon: TableIcon,
     group: "Contenido",
     description: "Tabla editable de filas y columnas",
+    // E3 #2 (goal doc §2, Tiptap-template parity): 3×3 with a header row —
+    // matches the Notion-style template's own default table size, a more
+    // useful starting point than a bare 2×2.
     run: (editor, range) =>
       editor
         .chain()
         .focus()
         .deleteRange(range)
-        .insertTable({ rows: 2, cols: 2, withHeaderRow: true })
+        .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
         .run(),
   },
   {

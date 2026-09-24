@@ -467,6 +467,64 @@
   .editor-content sub {
     font-size: 0.75em;
   }
+
+  /* E3 #2 (data-loss-and-table-fix bug report): @tiptap/extension-table's
+     `<div class="tableWrapper"><table>...` had NO rules at all here — the
+     inserted table rendered with zero borders/padding on a `min-width:50px`
+     table, effectively invisible against the page background. Notion/
+     Tiptap-template-style chrome, tokens only (docs/design-system): a
+     scrollable wrapper so a wide table never blows out the page width,
+     bordered/collapsed cells, a tinted header row, and the resize handle
+     hidden since extensions/index.ts configures Table with
+     `resizable: false` (no drag affordance to show). */
+  .editor-content .tableWrapper {
+    overflow-x: auto;
+    margin: 12px 0;
+  }
+
+  .editor-content table {
+    border-collapse: collapse;
+    width: 100%;
+    table-layout: fixed;
+  }
+
+  .editor-content th,
+  .editor-content td {
+    border: 1px solid var(--color-border-default);
+    padding: 6px 10px;
+    min-width: 100px;
+    vertical-align: top;
+    position: relative;
+  }
+
+  .editor-content th {
+    background-color: var(--color-neutral-50);
+    font-weight: 600;
+    text-align: left;
+  }
+
+  /* @tiptap/extension-table's own `.selectedCell` marker class (a cell/
+     range selected with Shift+click or Shift+arrows) — an overlay instead
+     of a background-color so it never hides the cell's own content or the
+     header tint underneath it. */
+  .editor-content .selectedCell::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-color: color-mix(
+      in oklch,
+      var(--color-primary-500) 20%,
+      transparent
+    );
+    pointer-events: none;
+  }
+
+  /* Table(s) configured with `resizable: false` (extensions/index.ts) —
+     the resize-handle element still renders per-column, so hide it here
+     rather than fork the extension config. */
+  .editor-content .column-resize-handle {
+    display: none;
+  }
 }
 
 /* Violet glows for the public auth brand panel. */

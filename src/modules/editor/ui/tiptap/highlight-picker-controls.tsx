@@ -54,7 +54,8 @@ export function HighlightPickerControls({
           data-testid={`highlight-swatch-${color}`}
           className={`size-6 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring ${SWATCH_CLASSES[color]}`}
           onClick={() => {
-            editor.chain().focus().setHighlight({ color }).run();
+            editor.chain().setHighlight({ color }).run();
+            editor.view.focus();
           }}
         />
       ))}
@@ -64,7 +65,8 @@ export function HighlightPickerControls({
         data-testid="highlight-remove"
         className="rounded-md px-2 py-1 text-xs whitespace-nowrap text-fg-muted outline-none focus-visible:ring-2 focus-visible:ring-ring"
         onClick={() => {
-          editor.chain().focus().unsetHighlight().run();
+          editor.chain().unsetHighlight().run();
+          editor.view.focus();
         }}
       >
         quitar resaltado

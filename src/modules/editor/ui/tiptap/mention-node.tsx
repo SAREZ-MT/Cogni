@@ -85,10 +85,13 @@ export function createMentionSuggestion(mentionPort: MentionPort | null) {
     render: createCommandMenuRender<
       MentionMenuItem,
       { id: string; label: string; notebookId: string }
-    >((item) => ({
-      id: item.candidate.id,
-      label: item.candidate.title,
-      notebookId: item.candidate.notebookId,
-    })),
+    >(
+      (item) => ({
+        id: item.candidate.id,
+        label: item.candidate.title,
+        notebookId: item.candidate.notebookId,
+      }),
+      { emptyText: "No hay páginas para mencionar" },
+    ),
   };
 }

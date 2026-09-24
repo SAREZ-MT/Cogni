@@ -160,49 +160,70 @@ const MARK_BUTTONS: MarkButtonConfig[] = [
     label: "Negrita",
     shortcut: "Mod+B",
     icon: Bold,
-    run: (editor) => editor.chain().focus().toggleBold().run(),
+    run: (editor) => {
+      editor.chain().toggleBold().run();
+      editor.view.focus();
+    },
   },
   {
     mark: "italic",
     label: "Cursiva",
     shortcut: "Mod+I",
     icon: Italic,
-    run: (editor) => editor.chain().focus().toggleItalic().run(),
+    run: (editor) => {
+      editor.chain().toggleItalic().run();
+      editor.view.focus();
+    },
   },
   {
     mark: "underline",
     label: "Subrayado",
     shortcut: "Mod+U",
     icon: Underline,
-    run: (editor) => editor.chain().focus().toggleUnderline().run(),
+    run: (editor) => {
+      editor.chain().toggleUnderline().run();
+      editor.view.focus();
+    },
   },
   {
     mark: "strike",
     label: "Tachado",
     shortcut: "Mod+Shift+S",
     icon: Strikethrough,
-    run: (editor) => editor.chain().focus().toggleStrike().run(),
+    run: (editor) => {
+      editor.chain().toggleStrike().run();
+      editor.view.focus();
+    },
   },
   {
     mark: "code",
     label: "Código",
     shortcut: "Mod+E",
     icon: Code,
-    run: (editor) => editor.chain().focus().toggleCode().run(),
+    run: (editor) => {
+      editor.chain().toggleCode().run();
+      editor.view.focus();
+    },
   },
   {
     mark: "superscript",
     label: "Superíndice",
     shortcut: "Mod+.",
     icon: Superscript,
-    run: (editor) => editor.chain().focus().toggleSuperscript().run(),
+    run: (editor) => {
+      editor.chain().toggleSuperscript().run();
+      editor.view.focus();
+    },
   },
   {
     mark: "subscript",
     label: "Subíndice",
     shortcut: "Mod+,",
     icon: Subscript,
-    run: (editor) => editor.chain().focus().toggleSubscript().run(),
+    run: (editor) => {
+      editor.chain().toggleSubscript().run();
+      editor.view.focus();
+    },
   },
 ];
 
@@ -329,7 +350,7 @@ export function BubbleToolbarControls({ editor }: BubbleToolbarControlsProps) {
   // Escape cancels without changing the mark.
   function applyLink() {
     const href = linkValue.trim();
-    const chain = editor.chain().focus().extendMarkRange("link");
+    const chain = editor.chain().extendMarkRange("link");
     if (href) {
       chain.setLink({ href }).run();
     } else {
@@ -410,7 +431,10 @@ export function BubbleToolbarControls({ editor }: BubbleToolbarControlsProps) {
             data-testid="bubble-toolbar-undo"
             disabled={!activeMarks.canUndo}
             className={`${BUTTON_CLASS} ${buttonToneClass(false)} disabled:pointer-events-none disabled:opacity-40`}
-            onClick={() => editor.chain().focus().undo().run()}
+            onClick={() => {
+              editor.chain().undo().run();
+              editor.view.focus();
+            }}
           >
             <Undo2 aria-hidden="true" size={16} strokeWidth={1.75} />
           </button>
@@ -422,7 +446,10 @@ export function BubbleToolbarControls({ editor }: BubbleToolbarControlsProps) {
             data-testid="bubble-toolbar-redo"
             disabled={!activeMarks.canRedo}
             className={`${BUTTON_CLASS} ${buttonToneClass(false)} disabled:pointer-events-none disabled:opacity-40`}
-            onClick={() => editor.chain().focus().redo().run()}
+            onClick={() => {
+              editor.chain().redo().run();
+              editor.view.focus();
+            }}
           >
             <Redo2 aria-hidden="true" size={16} strokeWidth={1.75} />
           </button>
@@ -524,9 +551,10 @@ export function BubbleToolbarControls({ editor }: BubbleToolbarControlsProps) {
               <DropdownMenuItem
                 key={option.id}
                 className="gap-2 text-[13.5px]"
-                onSelect={() =>
-                  editor.chain().focus().setTextAlign(option.id).run()
-                }
+                onSelect={() => {
+                  editor.chain().setTextAlign(option.id).run();
+                  editor.view.focus();
+                }}
               >
                 <option.icon aria-hidden="true" size={16} strokeWidth={1.75} />
                 {option.label}
@@ -619,7 +647,7 @@ export function LinkPopover({ editor }: LinkPopoverProps) {
 
   function applyEdit() {
     const nextHref = value.trim();
-    const chain = editor.chain().focus().extendMarkRange("link");
+    const chain = editor.chain().extendMarkRange("link");
     if (nextHref) {
       chain.setLink({ href: nextHref }).run();
     } else {
@@ -700,7 +728,7 @@ export function LinkPopover({ editor }: LinkPopoverProps) {
         data-testid="link-popover-remove"
         className={LINK_POPOVER_BUTTON_CLASS}
         onClick={() => {
-          editor.chain().focus().extendMarkRange("link").unsetLink().run();
+          editor.chain().extendMarkRange("link").unsetLink().run();
           // S6b defect 2 (focus): see the matching comment on applyLink
           // above. This popover unmounts once `isActive("link")` turns
           // false (the same transaction), so the synchronous refocus must

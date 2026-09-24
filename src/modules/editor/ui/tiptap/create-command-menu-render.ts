@@ -26,6 +26,12 @@ export function createCommandMenuRender<
 >(
   toCommandProps: (item: TItem) => TCommandProps = (item) =>
     item as unknown as TCommandProps,
+  // E3 #3 (bug report): lets each popup (emoji-suggestion.tsx, mention-
+  // node.tsx) override command-menu.tsx's default "No se encontraron
+  // bloques" empty state with copy that actually matches what it's
+  // searching — a slash-menu-flavored message made no sense for "no emoji
+  // matched" or "no page to mention".
+  options: { emptyText?: string } = {},
 ): NonNullable<SuggestionOptions<TItem, TCommandProps>["render"]> {
   return () => {
     let root: Root | null = null;
@@ -47,6 +53,7 @@ export function createCommandMenuRender<
           query: props.query,
           onSelect: (item) => props.command(toCommandProps(item as TItem)),
           onClose: cleanup,
+          emptyText: options.emptyText,
         }),
       );
     }

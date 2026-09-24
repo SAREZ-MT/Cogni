@@ -60,7 +60,7 @@ describe("CommandMenu", () => {
       />,
     );
 
-    expect(screen.getByText("no se encontraron bloques")).toBeInTheDocument();
+    expect(screen.getByText("No se encontraron bloques")).toBeInTheDocument();
 
     fireEvent.keyDown(window, { key: "Enter" });
 

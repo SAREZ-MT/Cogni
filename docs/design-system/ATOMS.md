@@ -121,3 +121,14 @@ color or focus ring — extending `buttonVariants` for a single call site
 would relocate duplication rather than remove it, and reusing `Button` with
 enough overrides to stay pixel-exact would be more fragile than the plain
 element. Left as native elements; not part of this pass's scope.
+
+## DropdownMenu / Popover (`dropdown-menu.tsx`)
+
+E2b token fix: `DropdownMenuContent` was styled with `bg-popover`/
+`text-popover-foreground`, but `--color-popover`/`--color-popover-foreground`
+are never registered in `globals.css`'s `@theme`, so those utilities emitted
+no CSS at all and every dropdown (including the block-context-menu.tsx grip
+menu) rendered with a fully transparent background, letting page content show
+through. Fixed to the real design-system tokens instead: `bg-card`,
+`text-fg`, `border-border-default` (white card, radius 12, shadow-md, same
+chrome as the CommandMenu "/" slash menu atom).
