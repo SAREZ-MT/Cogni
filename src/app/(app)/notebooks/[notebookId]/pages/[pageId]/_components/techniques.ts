@@ -8,17 +8,17 @@ export interface TechniqueDefinition {
   icon: LucideIcon;
   tone: TechniqueTone;
   description: string;
-  meta: string;
-  actionLabel: string;
-  href?: string;
 }
 
 // Study-technique content for the "Técnicas" panel (design/shell-look).
-// None of these techniques are built yet — every action stays disabled and
-// nothing here is wired to a real Server Action — so this is presentation
-// data only. Icons match the ones the main Sidebar's "Técnicas" section
-// already uses for the same three entries (sidebar.tsx's TECNICAS_SECTION),
-// so the icon vocabulary stays consistent across the shell.
+// None of these techniques are built yet — every card's "Generar" action
+// stays disabled and nothing here is wired to a real Server Action, so this
+// is presentation data only (user decision 2026-09-24: no navigation, no
+// meta line, no "pronto" pill — just icon + name + description + a
+// disabled "Generar"). Icons match the ones the main Sidebar's "Técnicas"
+// section already uses for the same three entries (sidebar.tsx's
+// TECNICAS_SECTION), so the icon vocabulary stays consistent across the
+// shell.
 export const TECHNIQUES: readonly TechniqueDefinition[] = [
   {
     id: "flashcards",
@@ -26,9 +26,6 @@ export const TECHNIQUES: readonly TechniqueDefinition[] = [
     icon: Layers,
     tone: "primary",
     description: "Tarjetas con repetición espaciada",
-    meta: "Sin tarjetas todavía",
-    actionLabel: "Ver mazos",
-    href: "/flashcards",
   },
   {
     id: "active-recall",
@@ -36,8 +33,6 @@ export const TECHNIQUES: readonly TechniqueDefinition[] = [
     icon: Brain,
     tone: "green",
     description: "Preguntas abiertas de memoria",
-    meta: "Sin sesiones previas",
-    actionLabel: "Iniciar",
   },
   {
     id: "exam",
@@ -45,7 +40,5 @@ export const TECHNIQUES: readonly TechniqueDefinition[] = [
     icon: ClipboardList,
     tone: "pink",
     description: "Opción múltiple con retroalimentación",
-    meta: "Sin exámenes previos",
-    actionLabel: "Generar examen",
   },
 ] as const;

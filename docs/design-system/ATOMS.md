@@ -189,28 +189,31 @@ refactor; left as a documented follow-up.
 
 The study-technique cards used by the "Técnicas" panel's expanded body and
 its collapsed icon strip (design/shell-look, studyplatform `StudyPanel.tsx`
-anatomy).
+anatomy; simplified per user decision 2026-09-24 — a card has **only** a
+"Generar" action, no navigation).
 
-- `TechniqueCard`: icon tile (`IconTile` size `"30"` — closest existing
-  token to the reference's 32px — radius `"md"`) + name + description, a
-  muted meta line, and a disabled action `Button` + `Pill` "pronto". The
-  button stays the technique's tone color at `disabled:opacity-50` (Button's
-  own disabled state) rather than going fully gray, so the panel still
-  "reads colourful and alive" while every action is inert (no technique is
-  built yet).
+- `TechniqueCard` props: `icon`, `tone`, `name`, `description`, `disabled?`
+  (default `true` — no technique is built yet), `className?`. `href`,
+  `meta`, and `actionLabel` were removed: no card links anywhere anymore,
+  there's no meta line, and the action's label is a fixed "Generar".
+- Anatomy: icon tile (`IconTile` size `"30"` — closest existing token to the
+  reference's 32px — radius `"md"`) + name + description, then one
+  full-width `Button` reading "Generar" with a leading `Sparkles` icon
+  (12px, strokeWidth 2). The button is a **solid** tone-colored fill with
+  white text (`bg-primary-600`/`bg-success-600`/`bg-pastel-pink-fg`, not the
+  pastel `IconTile` pair) — matching studyplatform's `ActiveRecallCard`/
+  `ExamCard` buttons (`#059669`/`#9B2C4A`, both exact token matches) — kept
+  at `disabled:opacity-60` + `disabled:cursor-not-allowed` (explicit
+  `disabled:` variants so they replace, not stack with, Button's own
+  `disabled:opacity-50`) instead of going fully gray, so the panel still
+  "reads colourful and alive" while every action is inert. Disabled cards
+  also get `aria-disabled` and `title="Disponible pronto"`.
 - `TechniqueIconStrip`: the collapsed-state 36x36 tinted tile (`IconTile`
   size `"36"` radius `"input"`) with a native `title` tooltip; `opacity-35`
-  when `available` is false (default).
+  when `available` is false (default). Unchanged by this pass.
 - `TechniqueTone`: `"primary" | "green" | "pink"` — mapped onto **existing**
-  `IconTile`/`Pill` tones, not new ones. `primary` (violet) already matches
-  the reference's flashcards brand color; `green`/`pink` already match its
-  active-recall/exam hex pairs almost exactly (`pastel-pink-fg` is an exact
-  match for the reference's exam color). No new tone was needed.
-- `href?: string` (Flashcards design preview, 2026-09-24): when set,
-  `TechniqueCard` renders an enabled `Button asChild` + `Link` in place of
-  the disabled button + "pronto" `Pill`, for a technique whose screens now
-  exist. Only the Flashcards entry (`techniques.ts`) sets it, to `/flashcards`;
-  Active recall/Exámenes are untouched and stay disabled.
+  `IconTile` tones for the icon tile, and onto `primary-600`/`success-600`/
+  `pastel-pink-fg` for the solid button fill. No new tone was needed.
 
 Used by: `techniques-panel.tsx`.
 
@@ -219,6 +222,41 @@ and exams, which are sample-data previews until their routes land. The page
 route (`pages/[pageId]/page.tsx`) computes `designPreviewsEnabled()` on the
 server and only renders `TechniquesPanel` when it is true, so production
 shows no panel and the layout's `display: contents` slot adds no space.
+
+## StudyItemRow (`study-item-row.tsx`)
+
+A single saved-study-item row inside the "Técnicas" panel (design/
+shell-look, studyplatform `StudyPanel.tsx` "Mazos guardados" row anatomy):
+a `bg-neutral-50`/`border-border-subtle` pill-radius (`rounded-[9px]`) row
+with a 6px tone dot, an 11.5px/500 truncating label, a 10px muted detail
+string, and a muted `ChevronRight` (10/2). The whole row is a `Link` —
+clicking it goes straight to that item's study session.
+
+- `href`, `label`, `detail` (free-form right-aligned text, e.g. "8 tarjetas
+  · 5 pendientes"), `tone: "primary" | "green" | "pink"` (dot color —
+  `primary-600`/`success-600`/`pastel-pink-fg`), `className?`.
+- `StudyItemTone` is its own type (not imported from `technique-card.tsx`)
+  so this atom has no dependency on the technique-card module.
+
+Used by: `saved-study-section.tsx`.
+
+## SavedStudySection (`saved-study-section.tsx`)
+
+One labelled group of `StudyItemRow`s (design/shell-look, studyplatform
+`StudyPanel.tsx` "Mazos guardados" / "Sesiones de Active Recall" /
+"Exámenes recientes" groups): a 1px divider, a 10px/500 uppercase muted
+label (`tracking-[0.06em]`), then the rows. Renders nothing when `items` is
+empty, so a group with no content simply disappears — same behavior as the
+reference.
+
+- `label`, `items: StudyItemRowProps[]`, `className?`.
+
+Used by: `techniques-panel.tsx`, once per technique (`Mazos guardados` /
+`Sesiones de Active Recall` / `Exámenes recientes`), below a "Generado en
+esta página" title + a neutral `Pill` "Vista previa" (the section's data
+comes from `flashcards/_data/sample.ts`'s `getSampleStudyItemsForPage()` —
+fixed sample items, not filtered by the real page, since there's no backend
+yet).
 
 ## ViewToggle (`view-toggle.tsx`)
 
@@ -367,17 +405,26 @@ Used by: `flashcards/_components/flashcard-player.tsx`.
 
 The session-complete panel: 🎉 + "¡Sesión completada!" + a 4-cell
 Again/Hard/Good/Easy stats grid (Spanish sub-labels — Otra vez/Difícil/
-Bien/Fácil, both here and on `RatingButton`) + a "Próxima revisión" panel +
-"Volver al mazo"/"Repasar de nuevo →" actions (`Button` outline/default).
+Bien/Fácil, both here and on `RatingButton`) + a "Retroalimentación de la
+sesión" placeholder + a "Próxima revisión" panel + "Volver al mazo"/
+"Repasar de nuevo →" actions (`Button` outline/default).
 
 A **plain fixed overlay**, not Cogni's Radix `Dialog` (`dialog.tsx`):
 `DialogContent` always renders its own hardcoded `DialogOverlay`
 (`bg-black/10`, no blur, `sm:max-w-sm`) with no prop to reach the darker/
 blurred overlay or the 520px panel the mockups call for, and editing the
 shared `Dialog` atom was out of scope for this design-only pass — the
-task's own fallback clause covers this case.
+task's own fallback clause covers this case. The panel adds
+`max-h-[calc(100dvh-32px)] overflow-y-auto` so the extra feedback block
+still fits at a 720px viewport height instead of overflowing the screen.
 
 - `deckLabel`, `reviewedCount`, `nextReviewCount`, `stats: { again, hard,
   good, easy }`, `backHref`, `onRestart`.
+- `feedback?: ReactNode` (design/shell-look, user decision 2026-09-24):
+  reserves the slot for the future AI session feedback, between the stats
+  grid and "Próxima revisión". Defaults to a tinted `primary-50`/
+  `primary-100` panel — a `Sparkles` `IconTile`, the title
+  "Retroalimentación de la sesión", a "pronto" `Pill`, and placeholder copy
+  — so the real feedback can drop in later without touching the layout.
 
 Used by: `flashcards/_components/flashcard-player.tsx`.

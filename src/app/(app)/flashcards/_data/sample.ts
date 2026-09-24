@@ -310,3 +310,54 @@ export function getSampleDecks(notebookId: string): SampleDeck[] {
 export function getSampleCards(deckId: string): SampleCard[] {
   return SAMPLE_CARDS.filter((card) => card.deckId === deckId);
 }
+
+export interface SampleStudyItem {
+  href: string;
+  label: string;
+  detail: string;
+  tone: "primary" | "green" | "pink";
+}
+
+export interface SampleStudyItemsForPage {
+  flashcards: SampleStudyItem[];
+  activeRecall: SampleStudyItem[];
+  exam: SampleStudyItem[];
+}
+
+// Preview data for the "Técnicas" panel's "Generado en esta página" section
+// (design/shell-look, user decision 2026-09-24: no backend yet, so every
+// page shows the same fixed sample instead of filtering by the real
+// notebook/page). Flashcards items come from the biologia-celular sample
+// notebook's real decks; Active recall/Examen each get one representative
+// sample item so all three techniques appear in the preview.
+export function getSampleStudyItemsForPage(): SampleStudyItemsForPage {
+  const decks = getSampleDecks("biologia-celular");
+
+  return {
+    flashcards: decks.map((deck) => ({
+      href: `/flashcards/biologia-celular/session?deck=${deck.id}`,
+      label: deck.label,
+      detail:
+        deck.dueCount > 0
+          ? `${deck.cardCount} tarjetas · ${deck.dueCount} pendientes`
+          : `${deck.cardCount} tarjetas · al día`,
+      tone: "primary",
+    })),
+    activeRecall: [
+      {
+        href: "#",
+        label: "Sesión · 24 sept",
+        detail: "10 preguntas · 80 %",
+        tone: "green",
+      },
+    ],
+    exam: [
+      {
+        href: "#",
+        label: "Examen de práctica",
+        detail: "10 preguntas · 70 %",
+        tone: "pink",
+      },
+    ],
+  };
+}

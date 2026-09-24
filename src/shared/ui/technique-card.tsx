@@ -1,30 +1,29 @@
 import type { LucideIcon } from "lucide-react";
-import Link from "next/link";
+import { Sparkles } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import { IconTile } from "@/shared/ui/icon-tile";
-import { Pill, type PillProps } from "@/shared/ui/pill";
 import { cn } from "@/shared/ui/utils";
 
 // Study-technique color vocabulary (design/shell-look, studyplatform
-// StudyPanel.tsx palette): mapped onto existing IconTile/Pill tones instead
+// StudyPanel.tsx palette): mapped onto existing IconTile tones instead
 // of adding new ones — `primary` (violet) already matches the reference's
 // flashcards brand color, and `green`/`pink` already match its active-recall
 // and exam hex pairs almost exactly (pastel-green-fg #1b7a43 vs reference
-// #059669; pastel-pink-fg #9b2c4a is an exact match). No new IconTile/Pill
-// tone was needed.
+// #059669; pastel-pink-fg #9b2c4a is an exact match). No new IconTile tone
+// was needed.
 export type TechniqueTone = "primary" | "green" | "pink";
 
+// Solid, tone-colored "Generar" button (user decision 2026-09-24: only a
+// full-width "Generar" action per card, no navigation). `green`/`pink` use
+// success-600/pastel-pink-fg instead of the pastel IconTile pair so the
+// button reads as a solid brand color with white text, matching
+// studyplatform StudyPanel.tsx's ActiveRecallCard/ExamCard buttons
+// (#059669/#9B2C4A, both exact token matches).
 const TONE_BUTTON_CLASS: Record<TechniqueTone, string> = {
-  primary: "bg-primary-100 text-primary-600 hover:bg-primary-100",
-  green: "bg-pastel-green text-pastel-green-fg hover:bg-pastel-green",
-  pink: "bg-pastel-pink text-pastel-pink-fg hover:bg-pastel-pink",
-};
-
-const TONE_PILL_TONE: Record<TechniqueTone, PillProps["tone"]> = {
-  primary: "primary",
-  green: "green",
-  pink: "pink",
+  primary: "bg-primary-600 text-white hover:bg-primary-600",
+  green: "bg-success-600 text-white hover:bg-success-600",
+  pink: "bg-pastel-pink-fg text-white hover:bg-pastel-pink-fg",
 };
 
 export interface TechniqueCardProps {
@@ -32,38 +31,32 @@ export interface TechniqueCardProps {
   tone: TechniqueTone;
   name: string;
   description: string;
-  meta: string;
-  actionLabel: string;
-  // Flashcards design preview (design/shell-look, 2026-09-24): once a
-  // technique's screens actually exist, its card gets a real enabled Link
-  // instead of the disabled button + "pronto" pill below. Added for
-  // Flashcards → /flashcards; the other techniques stay disabled until
-  // they get an `href` of their own.
-  href?: string;
+  // No technique is built yet (design/shell-look, user decision
+  // 2026-09-24): every card's "Generar" action stays disabled until a real
+  // Server Action exists. Kept as a prop rather than hardcoded so a future
+  // technique can flip it once it's actually wired up.
+  disabled?: boolean;
   className?: string;
 }
 
 // Expanded technique card (design/shell-look, studyplatform StudyPanel.tsx
-// anatomy): icon tile + name + description, a muted meta line, and either
-// a disabled action button + "pronto" pill (technique not built yet) or a
-// real enabled Link (`href` provided). The disabled action keeps the
-// technique's tone color at reduced opacity (Button's own
-// `disabled:opacity-50`) instead of going fully gray, so the panel still
-// "reads colourful and alive" per the design brief.
+// anatomy, simplified per user decision 2026-09-24): icon tile + name +
+// description, and a single full-width "Generar" action — no meta line, no
+// navigation, no "pronto" pill. The disabled button keeps the technique's
+// full tone color at `disabled:opacity-60` instead of going fully gray, so
+// the panel still "reads colourful and alive" while every action is inert.
 export function TechniqueCard({
   icon: Icon,
   tone,
   name,
   description,
-  meta,
-  actionLabel,
-  href,
+  disabled = true,
   className,
 }: TechniqueCardProps) {
   return (
     <Card
       padding="none"
-      className={cn("flex flex-col gap-2 rounded-lg p-2.5", className)}
+      className={cn("flex flex-col gap-2.5 rounded-lg p-2.5", className)}
     >
       <div className="flex items-start gap-2.5">
         <IconTile tone={tone} size="30" radius="md">
@@ -74,32 +67,20 @@ export function TechniqueCard({
           <p className="mt-0.5 text-[10.5px] text-fg-muted">{description}</p>
         </div>
       </div>
-      <p className="text-[10px] text-fg-muted">{meta}</p>
-      <div className="flex items-center gap-1.5">
-        {href ? (
-          <Button
-            asChild
-            size="sm"
-            className={cn("flex-1 text-[11.5px]", TONE_BUTTON_CLASS[tone])}
-          >
-            <Link href={href}>{actionLabel}</Link>
-          </Button>
-        ) : (
-          <>
-            <Button
-              type="button"
-              disabled
-              size="sm"
-              className={cn("flex-1 text-[11.5px]", TONE_BUTTON_CLASS[tone])}
-            >
-              {actionLabel}
-            </Button>
-            <Pill size="sm" tone={TONE_PILL_TONE[tone]}>
-              pronto
-            </Pill>
-          </>
+      <Button
+        type="button"
+        disabled={disabled}
+        aria-disabled={disabled}
+        title={disabled ? "Disponible pronto" : undefined}
+        size="sm"
+        className={cn(
+          "w-full text-[11.5px] disabled:cursor-not-allowed disabled:opacity-60",
+          TONE_BUTTON_CLASS[tone],
         )}
-      </div>
+      >
+        <Sparkles aria-hidden="true" size={12} strokeWidth={2} />
+        Generar
+      </Button>
     </Card>
   );
 }

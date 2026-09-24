@@ -3,7 +3,10 @@
 import { PanelRightClose, PanelRightOpen } from "lucide-react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { getSampleStudyItemsForPage } from "@/app/(app)/flashcards/_data/sample";
 import { PanelToggleButton } from "@/shared/ui/panel-toggle-button";
+import { Pill } from "@/shared/ui/pill";
+import { SavedStudySection } from "@/shared/ui/saved-study-section";
 import { SidePanel } from "@/shared/ui/side-panel";
 import { TechniqueCard, TechniqueIconStrip } from "@/shared/ui/technique-card";
 import {
@@ -13,6 +16,12 @@ import {
 } from "../../../../../_components/techniques-panel-cookie";
 import { TECHNIQUES_PANEL_SLOT_ID } from "../../../../../_components/techniques-panel-slot";
 import { TECHNIQUES } from "./techniques";
+
+// Design preview only (user decision 2026-09-24): fixed sample items, not
+// filtered by the real notebookId/pageId this panel is mounted on — see
+// getSampleStudyItemsForPage's own doc comment. `sample.ts` is a plain data
+// module (no server-only imports), so importing it here is safe.
+const STUDY_ITEMS = getSampleStudyItemsForPage();
 
 const ONE_YEAR_IN_SECONDS = 60 * 60 * 24 * 365;
 
@@ -107,11 +116,31 @@ export function TechniquesPanel({ initialCollapsed }: TechniquesPanelProps) {
             tone={t.tone}
             name={t.name}
             description={t.description}
-            meta={t.meta}
-            actionLabel={t.actionLabel}
-            href={t.href}
           />
         ))}
+
+        <div className="mt-1 flex items-center gap-1.5 px-0.5">
+          <p className="font-medium text-[10px] text-fg-muted uppercase tracking-[0.06em]">
+            Generado en esta página
+          </p>
+          <Pill size="sm" tone="neutral">
+            Vista previa
+          </Pill>
+        </div>
+        <div className="flex flex-col gap-2">
+          <SavedStudySection
+            label="Mazos guardados"
+            items={STUDY_ITEMS.flashcards}
+          />
+          <SavedStudySection
+            label="Sesiones de Active Recall"
+            items={STUDY_ITEMS.activeRecall}
+          />
+          <SavedStudySection
+            label="Exámenes recientes"
+            items={STUDY_ITEMS.exam}
+          />
+        </div>
       </div>
     </SidePanel>,
     slotNode,

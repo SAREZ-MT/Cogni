@@ -1,7 +1,11 @@
 "use client";
 
+import { Sparkles } from "lucide-react";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { Button } from "@/shared/ui/button";
+import { IconTile } from "@/shared/ui/icon-tile";
+import { Pill } from "@/shared/ui/pill";
 import { cn } from "@/shared/ui/utils";
 
 export interface SessionSummaryStats {
@@ -29,8 +33,37 @@ export interface SessionSummaryProps {
   stats: SessionSummaryStats;
   backHref: string;
   onRestart: () => void;
+  // Slot for the future AI feedback block (design/shell-look, user decision
+  // 2026-09-24: reserve the place now so the real content can drop in later
+  // without touching the layout). Defaults to the "pronto" placeholder
+  // panel below.
+  feedback?: ReactNode;
   className?: string;
 }
+
+// Default "Retroalimentación de la sesión" placeholder (design/shell-look,
+// user decision 2026-09-24): a tinted primary panel reserving the spot for
+// per-session AI feedback that doesn't exist yet.
+const DEFAULT_FEEDBACK = (
+  <div className="flex items-start gap-3 rounded-xl border border-primary-100 bg-primary-50 p-3.5 text-left">
+    <IconTile tone="primary" size="30" radius="md" className="mt-0.5">
+      <Sparkles aria-hidden="true" size={15} strokeWidth={1.75} />
+    </IconTile>
+    <div className="min-w-0 flex-1">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <p className="font-semibold text-[13px] text-fg">
+          Retroalimentación de la sesión
+        </p>
+        <Pill size="sm" tone="neutral">
+          pronto
+        </Pill>
+      </div>
+      <p className="mt-1 text-[12px] text-fg-muted">
+        Aquí verás qué recordaste bien y qué conviene reforzar.
+      </p>
+    </div>
+  </div>
+);
 
 // Session-complete panel (studyplatform-flashcards-style.md §3 summary
 // modal). A plain fixed overlay rather than Cogni's Radix `Dialog`
@@ -46,6 +79,7 @@ export function SessionSummary({
   stats,
   backHref,
   onRestart,
+  feedback = DEFAULT_FEEDBACK,
   className,
 }: SessionSummaryProps) {
   return (
@@ -57,7 +91,7 @@ export function SessionSummary({
     >
       <div
         className={cn(
-          "w-full max-w-[520px] rounded-3xl bg-card p-8 text-center shadow-card-hover",
+          "max-h-[calc(100dvh-32px)] w-full max-w-[520px] overflow-y-auto rounded-3xl bg-card p-8 text-center shadow-card-hover",
           className,
         )}
       >
@@ -84,6 +118,8 @@ export function SessionSummary({
             </div>
           ))}
         </div>
+
+        <div className="mt-4">{feedback}</div>
 
         <div className="mt-4 rounded-lg bg-neutral-100 px-4 py-3.5">
           <p className="text-[13px] text-fg-muted">Próxima revisión</p>
