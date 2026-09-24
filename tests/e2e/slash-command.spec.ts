@@ -78,7 +78,7 @@ test.describe("slash command menu", () => {
     // Persistence: autosave debounces 800-1500ms, then reload and confirm
     // the blockquote survived a real save/reload round trip through the
     // saveContent/getCurrentContent Server Actions.
-    await expect(editorMount.getByText("guardado")).toBeVisible({
+    await expect(page.getByTestId("autosave-status")).toHaveText("guardado", {
       timeout: 5000,
     });
     await page.reload();
@@ -138,7 +138,7 @@ test.describe("slash command menu", () => {
     await expect(table.locator("td, th")).toHaveCount(4);
     await expect(editable).not.toContainText("/tabla");
 
-    await expect(editorMount.getByText("guardado")).toBeVisible({
+    await expect(page.getByTestId("autosave-status")).toHaveText("guardado", {
       timeout: 5000,
     });
     await page.reload();

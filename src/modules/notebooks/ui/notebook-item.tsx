@@ -141,7 +141,11 @@ export function NotebookItem({
           <button
             type="button"
             onDoubleClick={() => setEditing(true)}
-            className="h-8 min-w-0 flex-1 truncate rounded-input px-2 text-left font-medium text-fg text-sm"
+            // S7 (odd/tasks/app-shell-restyle.md, sidebar-preview.png): a
+            // long title used to `truncate` to "Biología …" at 240px
+            // because the in-flow action buttons reserve width; the
+            // reference wraps to two lines instead of truncating early.
+            className="min-h-8 min-w-0 flex-1 rounded-input px-2 py-1 text-left font-medium text-fg text-sm line-clamp-2 whitespace-normal break-words leading-snug"
           >
             {notebook.title}
           </button>

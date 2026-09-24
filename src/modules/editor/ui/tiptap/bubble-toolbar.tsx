@@ -10,7 +10,9 @@
 // highlight-picker-controls.tsx, whose `HighlightPickerControls` this
 // reuses for "Resaltar" instead of duplicating the palette.
 import type { Editor } from "@tiptap/core";
+import { isNodeRangeSelection } from "@tiptap/extension-node-range";
 import type { EditorState } from "@tiptap/pm/state";
+import { NodeSelection } from "@tiptap/pm/state";
 import { useEditorState } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
 import {
@@ -53,6 +55,13 @@ export function shouldShowBubbleToolbar({
   state,
 }: ShouldShowBubbleToolbarArgs): boolean {
   if (state.selection.empty) return false;
+  // S7 review follow-up (R3-toolbar-over-block-selection, odd/tasks/
+  // app-shell-restyle.md): a whole-block selection left by the drag
+  // handle (block-handle.tsx) — a NodeSelection or a NodeRangeSelection —
+  // has no inline text to format; Notion hides its inline toolbar for
+  // exactly this case instead of floating it over the selected block(s).
+  if (state.selection instanceof NodeSelection) return false;
+  if (isNodeRangeSelection(state.selection)) return false;
   if (editor.isActive("codeBlock")) return false;
   if (editor.isActive("image")) return false;
   return true;

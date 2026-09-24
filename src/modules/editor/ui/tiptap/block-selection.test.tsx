@@ -19,6 +19,30 @@ function createHeadlessEditor(content: string) {
   return new Editor({ extensions: createEditorExtensions(), content });
 }
 
+function findFirstNode(editor: Editor, typeName: string) {
+  const node = editor.$node(typeName);
+  return { pos: node?.pos ?? -1, size: node?.size ?? 0 };
+}
+// R3-container-drop-nodeselection-data-loss
+function expectDropKeepsBlock(editor: Editor, typeName: string) {
+  const { pos, size } = findFirstNode(editor, typeName);
+  editor.commands.setNodeSelection(pos);
+  collapseBlockSelection(editor);
+  expect(editor.state.selection).toBeInstanceOf(TextSelection);
+  const { from } = editor.state.selection;
+  expect(from >= pos && from <= pos + size).toBe(true);
+  editor.commands.insertContent("x");
+  const json = editor.getJSON();
+  expect(json.content?.some((n) => n.type === typeName)).toBe(true);
+  expect(JSON.stringify(json)).toContain("x");
+}
+function toggledEditor(toggle: (e: Editor) => void) {
+  const e = createHeadlessEditor("<p>hola</p>");
+  e.commands.selectAll();
+  toggle(e);
+  return e;
+}
+
 describe("collapseBlockSelection", () => {
   let editor: Editor;
 
@@ -64,6 +88,40 @@ describe("collapseBlockSelection", () => {
 
     expect(editor.state.selection).toBeInstanceOf(TextSelection);
     expect(editor.state.selection.eq(before)).toBe(true);
+  });
+
+  it.each<[string, () => Editor]>([
+    ["bulletList", () => toggledEditor((e) => e.commands.toggleBulletList())],
+    ["blockquote", () => toggledEditor((e) => e.commands.toggleBlockquote())],
+    ["taskList", () => toggledEditor((e) => e.commands.toggleTaskList())],
+    [
+      "callout",
+      () => createHeadlessEditor('<div data-type="callout"><p>h</p></div>'),
+    ],
+  ])("keeps a dropped %s, landing a TextSelection inside it", (typeName, build) => {
+    editor = build();
+    expectDropKeepsBlock(editor, typeName);
+  });
+
+  // Tables normalize setNodeSelection into a CellSelection; NodeRangeSelection is drag-handle's real shape.
+  it("lands a TextSelection inside a dropped table, not a NodeSelection", () => {
+    editor = new Editor({
+      extensions: createEditorExtensions(),
+      content: "<p></p>",
+    });
+    editor
+      .chain()
+      .insertTable({ rows: 1, cols: 1, withHeaderRow: false })
+      .run();
+    const { pos, size } = findFirstNode(editor, "table");
+    const range = NodeRangeSelection.create(editor.state.doc, pos, pos + size);
+    editor.view.dispatch(editor.state.tr.setSelection(range));
+
+    collapseBlockSelection(editor);
+
+    expect(editor.state.selection).toBeInstanceOf(TextSelection);
+    const { from } = editor.state.selection;
+    expect(from >= pos && from <= pos + size).toBe(true);
   });
 
   it("does not throw for an atom node (image block) and leaves a valid selection", () => {

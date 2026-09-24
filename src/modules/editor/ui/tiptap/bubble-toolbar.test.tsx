@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { Editor } from "@tiptap/core";
+import { NodeRangeSelection } from "@tiptap/extension-node-range";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   BubbleToolbar,
@@ -315,6 +316,44 @@ describe("shouldShowBubbleToolbar", () => {
     });
     try {
       editor.commands.setNodeSelection(0);
+      const { from, to } = editor.state.selection;
+      expect(
+        shouldShowBubbleToolbar({ editor, state: editor.state, from, to }),
+      ).toBe(false);
+    } finally {
+      editor.destroy();
+    }
+  });
+
+  // S7 review follow-up (R3-toolbar-over-block-selection, odd/tasks/
+  // app-shell-restyle.md): Notion hides inline formatting entirely while a
+  // whole block is selected (drag-handle NodeSelection/NodeRangeSelection),
+  // not only over a code block or an image.
+  it("returns false for a NodeSelection over a whole block", () => {
+    const editor = createHeadlessEditor("<p>primero</p><p>segundo</p>");
+    try {
+      editor.commands.setNodeSelection(0);
+      const { from, to } = editor.state.selection;
+      expect(
+        shouldShowBubbleToolbar({ editor, state: editor.state, from, to }),
+      ).toBe(false);
+    } finally {
+      editor.destroy();
+    }
+  });
+
+  it("returns false for a NodeRangeSelection over multiple blocks", () => {
+    const editor = createHeadlessEditor(
+      "<p>primero</p><p>segundo</p><p>tercero</p>",
+    );
+    try {
+      const { doc } = editor.state;
+      const nodeRangeSelection = NodeRangeSelection.create(
+        doc,
+        0,
+        doc.content.size,
+      );
+      editor.view.dispatch(editor.state.tr.setSelection(nodeRangeSelection));
       const { from, to } = editor.state.selection;
       expect(
         shouldShowBubbleToolbar({ editor, state: editor.state, from, to }),

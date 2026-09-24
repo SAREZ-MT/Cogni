@@ -60,10 +60,15 @@ export function PageItem({
         // id). Same styling as the link below, minus the href.
         <span
           aria-disabled="true"
-          className="flex h-8 min-w-0 flex-1 items-center gap-2 truncate rounded-input px-2 text-fg-secondary text-sm"
+          className="flex min-h-8 min-w-0 flex-1 items-center gap-2 rounded-input px-2 py-1 text-fg-secondary text-sm"
         >
           <FileText aria-hidden="true" size={16} strokeWidth={1.75} />
-          <span className="truncate">{page.title}</span>
+          {/* S7 (odd/tasks/app-shell-restyle.md, sidebar-preview.png): same
+              two-line clamp treatment as notebook-item.tsx's title instead
+              of truncating early. */}
+          <span className="line-clamp-2 whitespace-normal break-words leading-snug">
+            {page.title}
+          </span>
         </span>
       ) : (
         <Link
@@ -73,11 +78,13 @@ export function PageItem({
             setEditing(true);
           }}
           className={cn(
-            "flex h-8 min-w-0 flex-1 items-center gap-2 truncate rounded-input px-2 text-fg-secondary text-sm hover:bg-active hover:text-fg-active",
+            "flex min-h-8 min-w-0 flex-1 items-center gap-2 rounded-input px-2 py-1 text-fg-secondary text-sm hover:bg-active hover:text-fg-active",
           )}
         >
           <FileText aria-hidden="true" size={16} strokeWidth={1.75} />
-          <span className="truncate">{page.title}</span>
+          <span className="line-clamp-2 whitespace-normal break-words leading-snug">
+            {page.title}
+          </span>
         </Link>
       )}
       {!editing && (

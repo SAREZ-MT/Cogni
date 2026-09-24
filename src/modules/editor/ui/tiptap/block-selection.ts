@@ -36,9 +36,18 @@ export function collapseBlockSelection(editor: Editor): void {
   }
 
   const $start = doc.resolve(Math.min(anchorPos + 1, doc.content.size));
-  const nearSelection = TextSelection.near($start, 1);
-  editor
-    .chain()
-    .setTextSelection({ from: nearSelection.from, to: nearSelection.from })
-    .run();
+  const near = TextSelection.near($start, 1);
+
+  // Fix for R3-container-drop-nodeselection-data-loss: accept `near`
+  // whenever it lands inside the dropped block (true for blockquote,
+  // lists, task lists, callouts, table cells too); only fall back when
+  // it truly escapes the block, keeping the S6b data-loss bug otherwise.
+  const landsInsideBlock =
+    near.from >= selection.from && near.from <= selection.to;
+  if (!landsInsideBlock) {
+    editor.chain().setNodeSelection(anchorPos).run();
+    return;
+  }
+
+  editor.chain().setTextSelection({ from: near.from, to: near.from }).run();
 }

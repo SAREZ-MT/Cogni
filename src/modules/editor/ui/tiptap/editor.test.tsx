@@ -215,6 +215,58 @@ describe("Editor", () => {
     );
   });
 
+  // S7 (odd/tasks/app-shell-restyle.md): the autosave status used to
+  // render as a loose line between the page header's meta row and the
+  // first block (screenshots/editor.png puts it in the meta row next to
+  // "Editada hace X"). `statusPortalId` lets the page route move it into a
+  // slot PageHeader renders, without changing SaveStatus's own testid or
+  // aria-live.
+  it("portals the autosave status into the given slot element when it exists", () => {
+    const slot = document.createElement("span");
+    slot.id = "page-status-slot";
+    document.body.appendChild(slot);
+    const port = new FakeSavePagePort({ content: emptyDoc(), version: 1 });
+
+    try {
+      const { container } = render(
+        <Editor
+          pageId="page-1"
+          initialContent={emptyDoc()}
+          initialVersion={1}
+          port={port}
+          statusPortalId="page-status-slot"
+        />,
+      );
+
+      expect(
+        slot.querySelector('[data-testid="autosave-status"]'),
+      ).toBeInTheDocument();
+      expect(
+        container.querySelector('[data-testid="autosave-status"]'),
+      ).not.toBeInTheDocument();
+    } finally {
+      document.body.removeChild(slot);
+    }
+  });
+
+  it("falls back to rendering the status inline when the slot element does not exist (e.g. a unit test without the slot)", () => {
+    const port = new FakeSavePagePort({ content: emptyDoc(), version: 1 });
+
+    const { container } = render(
+      <Editor
+        pageId="page-1"
+        initialContent={emptyDoc()}
+        initialVersion={1}
+        port={port}
+        statusPortalId="missing-slot"
+      />,
+    );
+
+    expect(
+      container.querySelector('[data-testid="autosave-status"]'),
+    ).toBeInTheDocument();
+  });
+
   it("flushes a pending save on unmount", async () => {
     const user = userEvent.setup();
     const port = new FakeSavePagePort({ content: emptyDoc(), version: 1 });

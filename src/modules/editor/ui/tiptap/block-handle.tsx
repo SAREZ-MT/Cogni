@@ -14,7 +14,7 @@ import type { Editor } from "@tiptap/core";
 import DragHandle from "@tiptap/extension-drag-handle-react";
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import { GripVertical, Plus } from "lucide-react";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { collapseBlockSelection } from "./block-selection";
 
 export interface BlockHandleProps {
@@ -31,11 +31,39 @@ export function BlockHandle({ editor }: BlockHandleProps) {
   const hoveredRef = useRef<{ node: ProseMirrorNode; pos: number } | null>(
     null,
   );
+  // S7 review follow-up (R3-raf-not-cancelled, odd/tasks/app-shell-
+  // restyle.md): the id of the drag-end `requestAnimationFrame`, so an
+  // unmount (an App Router navigation away from the page) between a drop
+  // and the next frame can cancel it instead of leaving it to dispatch
+  // into a by-then-destroyed editor.
+  const dragEndFrameRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (dragEndFrameRef.current !== null) {
+        cancelAnimationFrame(dragEndFrameRef.current);
+        dragEndFrameRef.current = null;
+      }
+    };
+  }, []);
 
   function insertBlockAfterHovered() {
     const hovered = hoveredRef.current;
     if (!hovered) return;
-    const insertPos = hovered.pos + hovered.node.nodeSize;
+    // S7 review follow-up (R3-stale-hovered-block-position, odd/tasks/
+    // app-shell-restyle.md): `onNodeChange` only fires on pointer moves
+    // over the gutter, so `hovered` can be stale by the time "+" is
+    // actually clicked (the user typed elsewhere first, or a remote
+    // reconciliation replaced the document). Re-resolve from the CURRENT
+    // document at that position and refuse to insert unless the same node
+    // type still sits there — inserting against a stale position could
+    // otherwise land mid another block or throw a RangeError once the
+    // document has shrunk past it.
+    const { doc } = editor.state;
+    if (hovered.pos < 0 || hovered.pos >= doc.content.size) return;
+    const current = doc.nodeAt(hovered.pos);
+    if (!current || current.type !== hovered.node.type) return;
+    const insertPos = hovered.pos + current.nodeSize;
     editor
       .chain()
       .focus()
@@ -58,7 +86,8 @@ export function BlockHandle({ editor }: BlockHandleProps) {
   // block selection into a plain caret, so typing right after a drop
   // inserts text instead of replacing the whole moved block.
   function handleDragEnd() {
-    requestAnimationFrame(() => {
+    dragEndFrameRef.current = requestAnimationFrame(() => {
+      dragEndFrameRef.current = null;
       collapseBlockSelection(editor);
     });
   }

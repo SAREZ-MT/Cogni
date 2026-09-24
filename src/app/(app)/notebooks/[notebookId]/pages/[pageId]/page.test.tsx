@@ -1,6 +1,9 @@
 import type { ReactElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { PageHeader } from "../../../../_components/page-header";
+import {
+  PAGE_STATUS_SLOT_ID,
+  PageHeader,
+} from "../../../../_components/page-header";
 
 // T11, design.md "Decision: Vista de página, llamada en curso y polling con
 // TanStack Query": this route now fetches the job status on the server and
@@ -140,6 +143,35 @@ describe("page route ingestion wiring", () => {
     const props = await renderRoute();
 
     expect(props.editor).toBeDefined();
+  });
+
+  // S7 (odd/tasks/app-shell-restyle.md): the autosave status now portals
+  // into a slot PageHeader renders in its meta row (screenshots/editor.png)
+  // instead of sitting between the header and the first block. The route
+  // wires both ends: PageHeader gets a statusSlot with the stable id, and
+  // the Editor mount gets the matching statusPortalId.
+  it("wires PageHeader's status slot id to the Editor's statusPortalId", async () => {
+    getPageForRoute.mockResolvedValue(page());
+    getImportJobStatus.mockResolvedValue({ ok: true, value: null });
+
+    const { default: PageView } = await import("./page");
+    const section = (await PageView({
+      params: Promise.resolve({ notebookId: "nb-1", pageId: "page-1" }),
+    })) as ReactElement<{ children: ReactElement[] }>;
+
+    const header = section.props.children[1] as ReactElement<{
+      statusSlot?: ReactElement<{ id?: string }>;
+    }>;
+    expect(header.props.statusSlot?.props.id).toBe(PAGE_STATUS_SLOT_ID);
+
+    const importView = section.props.children[2] as ReactElement<{
+      editor: ReactElement<{
+        children: ReactElement<{ statusPortalId?: string }>;
+      }>;
+    }>;
+    expect(importView.props.editor.props.children.props.statusPortalId).toBe(
+      PAGE_STATUS_SLOT_ID,
+    );
   });
 
   // S3 breadcrumb: "Cogni › {cuaderno} › {página}" — the notebook title is
