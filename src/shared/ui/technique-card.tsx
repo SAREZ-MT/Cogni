@@ -1,4 +1,5 @@
 import type { LucideIcon } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import { IconTile } from "@/shared/ui/icon-tile";
@@ -33,16 +34,22 @@ export interface TechniqueCardProps {
   description: string;
   meta: string;
   actionLabel: string;
+  // Flashcards design preview (design/shell-look, 2026-09-24): once a
+  // technique's screens actually exist, its card gets a real enabled Link
+  // instead of the disabled button + "pronto" pill below. Added for
+  // Flashcards → /flashcards; the other techniques stay disabled until
+  // they get an `href` of their own.
+  href?: string;
   className?: string;
 }
 
 // Expanded technique card (design/shell-look, studyplatform StudyPanel.tsx
-// anatomy): icon tile + name + description, a muted meta line, and a
-// disabled action button + "pronto" pill. The action stays disabled — the
-// study techniques themselves aren't built yet — but keeps the technique's
-// tone color at reduced opacity (Button's own `disabled:opacity-50`)
-// instead of going fully gray, so the panel still "reads colourful and
-// alive" per the design brief.
+// anatomy): icon tile + name + description, a muted meta line, and either
+// a disabled action button + "pronto" pill (technique not built yet) or a
+// real enabled Link (`href` provided). The disabled action keeps the
+// technique's tone color at reduced opacity (Button's own
+// `disabled:opacity-50`) instead of going fully gray, so the panel still
+// "reads colourful and alive" per the design brief.
 export function TechniqueCard({
   icon: Icon,
   tone,
@@ -50,6 +57,7 @@ export function TechniqueCard({
   description,
   meta,
   actionLabel,
+  href,
   className,
 }: TechniqueCardProps) {
   return (
@@ -68,17 +76,29 @@ export function TechniqueCard({
       </div>
       <p className="text-[10px] text-fg-muted">{meta}</p>
       <div className="flex items-center gap-1.5">
-        <Button
-          type="button"
-          disabled
-          size="sm"
-          className={cn("flex-1 text-[11.5px]", TONE_BUTTON_CLASS[tone])}
-        >
-          {actionLabel}
-        </Button>
-        <Pill size="sm" tone={TONE_PILL_TONE[tone]}>
-          pronto
-        </Pill>
+        {href ? (
+          <Button
+            asChild
+            size="sm"
+            className={cn("flex-1 text-[11.5px]", TONE_BUTTON_CLASS[tone])}
+          >
+            <Link href={href}>{actionLabel}</Link>
+          </Button>
+        ) : (
+          <>
+            <Button
+              type="button"
+              disabled
+              size="sm"
+              className={cn("flex-1 text-[11.5px]", TONE_BUTTON_CLASS[tone])}
+            >
+              {actionLabel}
+            </Button>
+            <Pill size="sm" tone={TONE_PILL_TONE[tone]}>
+              pronto
+            </Pill>
+          </>
+        )}
       </div>
     </Card>
   );

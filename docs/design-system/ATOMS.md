@@ -29,9 +29,11 @@ Used by: `notebook-card.tsx` (interactive, `asChild` article), `stat-card.tsx`,
 
 The pastel/semantic square behind notebook, stat and empty-state icons.
 
-- `size`: literal pixel keys (`"28" | "30" | "36" | "40" | "44" | "52" |
-  "56"`) — the real screens use 7 distinct sizes, not a clean 5-step scale,
-  so the key is the exact px value instead of an idealized sm/md/lg/xl/2xl.
+- `size`: literal pixel keys (`"28" | "30" | "36" | "40" | "44" | "48" |
+  "52" | "56"`) — the real screens use distinct sizes, not a clean 5-step
+  scale, so the key is the exact px value instead of an idealized
+  sm/md/lg/xl/2xl. `"48"` was added for the Flashcards design preview's
+  `DeckSummaryCard` header tile (studyplatform-flashcards-style.md §4).
 - `radius`: `md(8px) | input(10px) | tile(14px) | xl(16px)` — independent of
   `size` (size 36 ships with both `md` and `input` radius on different screens).
 - `tone`: notebook pastel pairs (`purple | pink | green | yellow | orange |
@@ -202,8 +204,13 @@ anatomy).
 - `TechniqueTone`: `"primary" | "green" | "pink"` — mapped onto **existing**
   `IconTile`/`Pill` tones, not new ones. `primary` (violet) already matches
   the reference's flashcards brand color; `green`/`pink` already match its
-  active-recall/exam hex pairs almost exactly (`pastel-pink-fg` #9b2c4a is
-  an exact match for the reference's exam color). No new tone was needed.
+  active-recall/exam hex pairs almost exactly (`pastel-pink-fg` is an exact
+  match for the reference's exam color). No new tone was needed.
+- `href?: string` (Flashcards design preview, 2026-09-24): when set,
+  `TechniqueCard` renders an enabled `Button asChild` + `Link` in place of
+  the disabled button + "pronto" `Pill`, for a technique whose screens now
+  exist. Only the Flashcards entry (`techniques.ts`) sets it, to `/flashcards`;
+  Active recall/Exámenes are untouched and stay disabled.
 
 Used by: `techniques-panel.tsx`.
 
@@ -259,6 +266,7 @@ through. Fixed to the real design-system tokens instead: `bg-card`,
 `text-fg`, `border-border-default` (white card, radius 12, shadow-md, same
 chrome as the CommandMenu "/" slash menu atom).
 
+<<<<<<< HEAD
 Same fix, applied atom by atom (atoms-first rule), so every floating surface
 shares one chrome (`rounded-xl border border-border-default bg-card shadow-md`):
 
@@ -273,3 +281,105 @@ shares one chrome (`rounded-xl border border-border-default bg-card shadow-md`):
 
 Tests: `dropdown-menu.test.tsx`, `popover.test.tsx` and `highlight-picker.test.tsx`
 assert the chrome so the unregistered tokens cannot come back.
+=======
+## Flashcards design preview (2026-09-24)
+
+Six new atoms for the `/flashcards` design-preview screens (user decision:
+"solo vamos a construir esas pantallas para validar el diseño" — sample
+data only, no backend). Style source:
+`studyplatform-flashcards-style.md` (StudyPlatform's built flashcards
+screens) plus `docs/design-system/screenshots/flashcard.png`/`flashcard2.png`
+for the session mockup. `Pill` and `IconTile`'s existing `success`/
+`warning`/`error` tones already covered everything the report needed — no
+new `Pill` tones were required (only the `IconTile` `"48"` size above).
+
+### DeckSummaryCard (`deck-summary-card.tsx`)
+
+Hub grid item (one per notebook that has decks): a pastel-toned header
+(`HEADER_BG`, keyed by `NotebookColor` — always that notebook's own color)
+with a translucent `IconTile` (`size="48"`, `bg-white/[55%]` override) and a
+red due-count badge, then a body with the notebook title and a
+due/al-día meta line (`text-error-600`/`text-success-600`).
+
+- `href`, `tone: NotebookColor`, `title`, `cardCount`, `dueCount`.
+
+Used by: `flashcards/page.tsx` (hub).
+
+### DeckCard (`deck-card.tsx`)
+
+Deck grid item (one per deck on a notebook's `/flashcards/[notebookId]`
+list): a fixed 200px-tall link card with a cycling `DeckTone` border (13%
+alpha) and icon tile (14% alpha), a due/al-día status `Pill`, a centered
+two-line-clamped label and a footer card count.
+
+- `DeckTone`: `"warning" | "info" | "success" | "orange" | "pink"` — the
+  report's amber/blue/green/orange/pink `DECK_COLORS` cycle, mapped onto
+  existing warning/info/success/pastel-orange/pastel-pink tokens instead of
+  new hex literals. Assigned by position in the notebook's deck list.
+- `href`, `tone`, `label`, `cardCount`, `dueCount`.
+
+Used by: `flashcards/[notebookId]/page.tsx`.
+
+### StatDots (`stat-dots.tsx`)
+
+The session header's live rating tally: 4 fixed-order dot+count pairs
+(again `error-500`, hard `warning-500`, good `success-500`, easy
+`primary-600`).
+
+- `counts: { again, hard, good, easy }` (numbers).
+
+Used by: `flashcards/_components/flashcard-player.tsx`.
+
+### FlipCard (`flip-card.tsx`)
+
+The 3D question/answer card: a 660px-wide, 300px-tall perspective card that
+rotates on the Y axis (`rotateY`, 550ms, `cubic-bezier(0.4,0,0.2,1)`)
+between a plain white front face and a `from-primary-50 to-primary-100`
+gradient back face. Renders as a real `<button>` — native Space/Enter
+toggle, `aria-pressed={flipped}` — with `data-testid="flip-card"` and
+`data-flipped`.
+
+- `front`, `back` (`ReactNode`), `flipped`, `onToggle`.
+- `frontEyebrow`/`backEyebrow`/`frontHint`/`backHint`: default to the
+  report's copy ("Frente · Pregunta" / "Reverso · Respuesta" / …), 
+  overridable per call site.
+- The caller `key`s this component per card so a new card starts unflipped
+  without animating in from the previous card's angle.
+
+Used by: `flashcards/_components/flashcard-player.tsx`.
+
+### RatingButton (`rating-button.tsx`)
+
+One of the 4 equal-flex recall-quality buttons below a flipped `FlipCard`:
+tinted bg/border per tone, `-2px` hover lift + `shadow-card-hover`.
+`data-testid="rate-{tone}"`.
+
+- `RatingTone`: `"again" | "hard" | "good" | "easy"`.
+- `tone`, `label`, `hint`, `onClick?`, `disabled?`.
+- Tone → token pairs (`error-500/30` border · `error-50/90` idle ·
+  `error-100/95` hover for `again`; same pattern for `hard`/`warning` and
+  `good`/`success`; `easy`/`primary` sits one step darker —
+  `primary-100/90` idle · `primary-200/95` hover — because that's the
+  report's own pair for that tone).
+
+Used by: `flashcards/_components/flashcard-player.tsx`.
+
+### SessionSummary (`session-summary.tsx`)
+
+The session-complete panel: 🎉 + "¡Sesión completada!" + a 4-cell
+Again/Hard/Good/Easy stats grid (Spanish sub-labels — Otra vez/Difícil/
+Bien/Fácil, both here and on `RatingButton`) + a "Próxima revisión" panel +
+"Volver al mazo"/"Repasar de nuevo →" actions (`Button` outline/default).
+
+A **plain fixed overlay**, not Cogni's Radix `Dialog` (`dialog.tsx`):
+`DialogContent` always renders its own hardcoded `DialogOverlay`
+(`bg-black/10`, no blur, `sm:max-w-sm`) with no prop to reach the darker/
+blurred overlay or the 520px panel the mockups call for, and editing the
+shared `Dialog` atom was out of scope for this design-only pass — the
+task's own fallback clause covers this case.
+
+- `deckLabel`, `reviewedCount`, `nextReviewCount`, `stats: { again, hard,
+  good, easy }`, `backHref`, `onRestart`.
+
+Used by: `flashcards/_components/flashcard-player.tsx`.
+>>>>>>> 8155767 (feat(flashcards): design preview of the hub, deck list and flip-card session with sample data)

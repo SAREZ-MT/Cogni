@@ -10,6 +10,7 @@ export interface TechniqueDefinition {
   description: string;
   meta: string;
   actionLabel: string;
+  href?: string;
 }
 
 // Study-technique content for the "Técnicas" panel (design/shell-look).
@@ -26,7 +27,8 @@ export const TECHNIQUES: readonly TechniqueDefinition[] = [
     tone: "primary",
     description: "Tarjetas con repetición espaciada",
     meta: "Sin tarjetas todavía",
-    actionLabel: "Generar",
+    actionLabel: "Ver mazos",
+    href: "/flashcards",
   },
   {
     id: "active-recall",

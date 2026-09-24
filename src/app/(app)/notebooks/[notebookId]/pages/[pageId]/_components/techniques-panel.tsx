@@ -109,6 +109,7 @@ export function TechniquesPanel({ initialCollapsed }: TechniquesPanelProps) {
             description={t.description}
             meta={t.meta}
             actionLabel={t.actionLabel}
+            href={t.href}
           />
         ))}
       </div>

@@ -84,11 +84,23 @@ describe("Sidebar", () => {
       "page",
     );
 
-    for (const label of ["Flashcards", "Active recall", "Exámenes"]) {
+    for (const label of ["Active recall", "Exámenes"]) {
       expect(
         screen.getByText(label).closest("[aria-disabled]"),
       ).toHaveAttribute("aria-disabled", "true");
     }
+  });
+
+  // Flashcards design preview (design/shell-look, 2026-09-24): "Flashcards"
+  // is no longer a disabled/"pronto" row — it's a real nav item once the
+  // preview screens exist at /flashcards.
+  it("links the Flashcards nav item to /flashcards", () => {
+    render(<Sidebar initialCollapsed={false} user={USER} />);
+
+    expect(screen.getByRole("link", { name: "Flashcards" })).toHaveAttribute(
+      "href",
+      "/flashcards",
+    );
   });
 
   // design pass 2: "Cuadernos" is now a plain nav item to /notebooks
