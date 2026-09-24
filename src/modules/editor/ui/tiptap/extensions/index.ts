@@ -32,7 +32,7 @@ import TextAlign from "@tiptap/extension-text-align";
 import { Color, TextStyle } from "@tiptap/extension-text-style";
 import Typography from "@tiptap/extension-typography";
 import { UniqueID } from "@tiptap/extension-unique-id";
-import { Placeholder } from "@tiptap/extensions";
+import { Placeholder, TrailingNode } from "@tiptap/extensions";
 import StarterKit from "@tiptap/starter-kit";
 // KaTeX's own stylesheet (goal doc §2, "add CSS for math (.katex sizing)"
 // builds on top of this) — required for Mathematics's rendered nodes to
@@ -223,5 +223,14 @@ export function createEditorExtensions(
         return "Escribe / para ver los comandos";
       },
     }),
+    // E2b scope F: always keeps an empty paragraph after the last block
+    // (e.g. after a trailing table/image/callout, which have no "click
+    // below to keep typing" affordance of their own) so the user can
+    // always click past the document's last block. Confirmed present in
+    // `@tiptap/extensions` 3.31.3 (node_modules/@tiptap/extensions/dist/
+    // index.d.ts); no options needed — its default target node falls back
+    // to the schema's own default block type (paragraph here) and it never
+    // duplicates an already-trailing one.
+    TrailingNode,
   ];
 }

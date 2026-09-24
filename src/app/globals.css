@@ -243,6 +243,17 @@
    code-block.tsx) already style themselves with Tailwind utilities and
    need nothing here. */
 @layer components {
+  /* E2b scope F: ProseMirror's own dev-mode console check
+     ("expects the CSS white-space property ... to be set to 'pre-wrap'")
+     warns whenever the editable root doesn't have this, because collapsed
+     runs of spaces/newlines are otherwise real in the document model but
+     invisible in the rendered DOM. `.editor-content` wraps the real
+     `.ProseMirror` root (editor.tsx's `EditorContent`), so this sets it
+     once for the whole document instead of per node view. */
+  .editor-content .ProseMirror {
+    white-space: pre-wrap;
+  }
+
   .editor-content h1 {
     font-size: var(--text-3xl);
     font-weight: 700;
@@ -344,6 +355,14 @@
     display: block;
     max-width: 100%;
     border-radius: var(--radius-2xl);
+  }
+
+  /* E2b scope D (image node polish): the rendered image node wraps its
+     <img> in a <figure> (alignment + a <figcaption> caption input) —
+     browsers give <figure> a default margin (1em 40px) that would nudge
+     the block out of alignment with every other block's flush left edge. */
+  .editor-content figure {
+    margin: 0;
   }
 
   /* E2 (drag-handle "Colores" > "Fondo", bubble toolbar's same row):

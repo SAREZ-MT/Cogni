@@ -24,13 +24,21 @@ export interface EmojiMenuItem extends CommandMenuItem {
   name: string;
 }
 
+// gitHubEmojis names are snake_case English descriptions ("grinning_face");
+// humanized here for the tile's muted secondary line (E2b scope C: "glyph
+// in the tile + `:shortcode:` label (+ English name muted)").
+function humanizeEmojiName(name: string): string {
+  return name.replace(/_/g, " ");
+}
+
 function toMenuItem(emoji: EmojiItem): EmojiMenuItem {
   return {
     id: emoji.name,
     name: emoji.name,
-    label: emoji.emoji ?? `:${emoji.shortcodes[0]}:`,
+    label: `:${emoji.shortcodes[0]}:`,
+    iconGlyph: emoji.emoji,
     keywords: [...emoji.shortcodes, ...(emoji.tags ?? [])],
-    description: `:${emoji.shortcodes[0]}:`,
+    description: humanizeEmojiName(emoji.name),
     group: emoji.group || "Emoji",
   };
 }

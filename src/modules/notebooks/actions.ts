@@ -31,7 +31,7 @@ import {
   setNotebookAppearance as setNotebookAppearanceUseCase,
 } from "./application";
 import { NOTEBOOKS_ERROR } from "./domain/errors";
-import type { Notebook } from "./domain/notebook";
+import type { Notebook, NotebookColor } from "./domain/notebook";
 import type { Page } from "./domain/page";
 import type { PageAsset } from "./domain/page-asset-repository";
 import type { TiptapDoc } from "./domain/plain-text";
@@ -182,6 +182,11 @@ export interface MentionPageCandidate {
   title: string;
   notebookId: string;
   notebookTitle: string;
+  // E2b scope C (mention popup restyle): the notebook's own pastel color
+  // (notebooks/domain/notebook.ts's NotebookColor), so the mention row's
+  // IconTile matches the sidebar/notebook-card tone instead of a generic
+  // neutral tile.
+  notebookColor: NotebookColor | null;
 }
 
 export async function listPagesForMention(): Promise<MentionPageCandidate[]> {
@@ -194,6 +199,7 @@ export async function listPagesForMention(): Promise<MentionPageCandidate[]> {
       title: page.title,
       notebookId: notebook.id,
       notebookTitle: notebook.title,
+      notebookColor: notebook.color,
     })),
   );
 }

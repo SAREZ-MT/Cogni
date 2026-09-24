@@ -64,6 +64,7 @@ import {
 } from "./block-color-palette";
 import { BLOCK_KIND_ITEMS, currentBlockKindLabel } from "./block-kind";
 import { HighlightPickerControls } from "./highlight-picker-controls";
+import { isTableCellSelection } from "./table-selection";
 
 export interface BubbleToolbarProps {
   editor: Editor;
@@ -98,6 +99,14 @@ export function shouldShowBubbleToolbar({
   if (isNodeRangeSelection(state.selection)) return false;
   if (editor.isActive("codeBlock")) return false;
   if (editor.isActive("image")) return false;
+  // E2b scope E (table-toolbar.tsx): a CellSelection (a multi-cell range)
+  // defers entirely to the table toolbar — mergeCells/toggleHeaderRow/etc.
+  // operate on the cells themselves, not inline text marks. A plain caret
+  // or non-empty TextSelection resting inside a single cell still reaches
+  // here (selection.empty already excludes the caret case above), so
+  // formatting actual selected text inside a cell keeps working exactly
+  // as before.
+  if (isTableCellSelection(state.selection)) return false;
   return true;
 }
 

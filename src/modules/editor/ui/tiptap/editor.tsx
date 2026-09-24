@@ -14,6 +14,7 @@ import { collectBlockIds, isBlockIdOnlyChange } from "./block-ids";
 import { BubbleToolbar } from "./bubble-toolbar";
 import { createEditorExtensions } from "./extensions";
 import type { SlashCommandItem } from "./slash-command-items";
+import { TableToolbar } from "./table-toolbar";
 import { toPlainTiptapDoc } from "./to-plain-tiptap-doc";
 
 export interface EditorProps {
@@ -204,6 +205,12 @@ export function Editor({
           HighlightPicker BubbleMenu here — that module and its tests stay
           intact for direct/unit use. */}
       {editor ? <BubbleToolbar editor={editor} /> : null}
+      {/* E2b scope E: floating row/column/cell toolbar shown whenever the
+          selection is inside a table — mutually exclusive with the bubble
+          toolbar above (bubble-toolbar.tsx's shouldShowBubbleToolbar and
+          table-toolbar.tsx's shouldShowTableToolbar both key off
+          table-selection.ts's isTableCellSelection). */}
+      {editor ? <TableToolbar editor={editor} /> : null}
       {/* S6b (odd/tasks/app-shell-restyle.md): per-block "⋮⋮" drag handle +
           "+" insert in the left gutter, matching the Tiptap docs
           Notion-style editor. */}

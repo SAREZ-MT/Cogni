@@ -9,6 +9,8 @@ import {
   CommandItem,
   CommandList,
 } from "@/shared/ui/command";
+import { IconTile, type IconTileProps } from "@/shared/ui/icon-tile";
+import { cn } from "@/shared/ui/utils";
 
 export interface CommandMenuItem {
   id: string;
@@ -22,6 +24,16 @@ export interface CommandMenuItem {
   icon?: LucideIcon;
   description?: string;
   group?: string;
+  // E2b scope C (emoji/mention popups, same CommandMenu chrome as the "/"
+  // menu): a literal glyph (an emoji character) shown inside the tile
+  // instead of a LucideIcon — mutually exclusive with `icon`, `icon` wins
+  // if both are somehow set.
+  iconGlyph?: string;
+  // E2b scope C: tints the tile with a design-system tone (mention rows
+  // use the target page's notebook pastel color) instead of the default
+  // neutral `bg-hover`. Reuses IconTile's own tone union so a caller can
+  // only pass a real design-system tone.
+  iconTone?: IconTileProps["tone"];
 }
 
 export interface CommandMenuProps {
@@ -177,17 +189,29 @@ export function CommandMenu({
                   className="data-[selected=true]:bg-active data-[selected=true]:text-fg-active gap-2"
                   onSelect={() => onSelect(item)}
                 >
-                  {item.icon && (
-                    <span
+                  {(item.icon || item.iconGlyph) && (
+                    <IconTile
                       data-testid={`command-menu-item-icon-${item.id}`}
-                      className="bg-hover flex size-7 shrink-0 items-center justify-center rounded-md"
+                      size="28"
+                      radius="md"
+                      tone={item.iconTone}
+                      className={cn("shrink-0", !item.iconTone && "bg-hover")}
                     >
-                      <item.icon
-                        aria-hidden="true"
-                        size={15}
-                        strokeWidth={1.75}
-                      />
-                    </span>
+                      {item.icon ? (
+                        <item.icon
+                          aria-hidden="true"
+                          size={15}
+                          strokeWidth={1.75}
+                        />
+                      ) : (
+                        <span
+                          aria-hidden="true"
+                          className="text-[15px] leading-none"
+                        >
+                          {item.iconGlyph}
+                        </span>
+                      )}
+                    </IconTile>
                   )}
                   <span className="flex min-w-0 flex-col">
                     <span className="text-[13.5px]">{item.label}</span>
