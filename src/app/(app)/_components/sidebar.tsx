@@ -41,9 +41,8 @@ function SectionLabel({ children }: { children: ReactNode }) {
 }
 
 // Static nav content (design/shell-look, studyplatform obs 140 app shell):
-// no module import needed, so it lives in Sidebar directly rather than
-// being threaded in like `collapsedCreateAction` (which exists only to keep
-// the notebooks module out of this generic component).
+// no module import needed, so it lives in Sidebar directly instead of being
+// threaded in as a prop.
 type NavEntry =
   | {
       href: string;
@@ -65,7 +64,7 @@ const MAIN_SECTION: { label: string; items: NavEntry[] } = {
       shortcut: ["⌘", "H"],
     },
     {
-      href: "/",
+      href: "/notebooks",
       icon: BookOpen,
       label: "Cuadernos",
       isActive: (path) => path.startsWith("/notebooks"),
@@ -100,20 +99,19 @@ const SECTIONS = [MAIN_SECTION, TECNICAS_SECTION, CONFIGURACION_SECTION];
 
 type SidebarProps = {
   initialCollapsed: boolean;
-  // Icon-only "Crear cuaderno" trigger shown in the collapsed column
-  // (notebooks/ui/create-notebook-icon-button.tsx, wired from layout.tsx):
-  // Sidebar itself stays generic and never imports the notebooks module.
-  collapsedCreateAction?: ReactNode;
   user: { id: string; email: string | null };
-  children: ReactNode;
 };
 
-export function Sidebar({
-  initialCollapsed,
-  collapsedCreateAction,
-  user,
-  children,
-}: SidebarProps) {
+// design pass 2 (odd/tasks, user decision "Sidebar = navigation only"):
+// the sidebar is exactly StudyPlatform's Sidebar.tsx anatomy — logo,
+// collapse button, three nav sections, user footer — and nothing else.
+// It no longer renders the notebook/page tree or a "Crear cuaderno" entry
+// point; "Cuadernos" is a plain nav item to /notebooks, and notebook/page
+// creation now lives on that route and on the notebook detail route
+// instead. The tree components themselves (SidebarTree, NotebookItem,
+// PageItem, CreateNotebookIconButton) are untouched and still exported from
+// the notebooks module — only this shell stopped mounting them.
+export function Sidebar({ initialCollapsed, user }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(initialCollapsed);
   const pathname = usePathname();
 
@@ -157,21 +155,6 @@ export function Sidebar({
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto pt-1">
-        {/* Notebook tree section first (S3 sidebar-order fix: logo ->
-            Cuadernos -> Menú principal -> Técnicas -> Configuración -> user
-            card). This outer column already grows/scrolls (flex-1
-            overflow-y-auto above); the tree itself stays sized to its
-            content so the sections below sit directly under it. */}
-        {collapsed && collapsedCreateAction ? (
-          <div className="flex flex-col items-center gap-2 py-2">
-            {collapsedCreateAction}
-          </div>
-        ) : null}
-
-        <div className={cn("flex min-h-0 flex-col", collapsed && "hidden")}>
-          {children}
-        </div>
-
         {SECTIONS.map((section) => (
           <div key={section.label} className="flex flex-col gap-0.5">
             {!collapsed && <SectionLabel>{section.label}</SectionLabel>}

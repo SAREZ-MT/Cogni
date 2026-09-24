@@ -8,6 +8,7 @@ function page(overrides: Partial<HomeRecentPage> = {}): HomeRecentPage {
     id: "p1",
     notebookId: "n1",
     notebookTitle: "Biología Celular",
+    notebookColor: null,
     title: "Mitocondria y respiración",
     updatedAt: new Date("2026-09-23T10:00:00.000Z"),
     ...overrides,

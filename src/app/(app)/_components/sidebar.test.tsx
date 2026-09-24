@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SIDEBAR_COOKIE, Sidebar } from "./sidebar";
@@ -10,6 +10,11 @@ vi.mock("next/navigation", () => ({
 
 const USER = { id: "user-1", email: "jane.doe@example.com" };
 
+// Design pass 2 (odd/tasks, user decision "Sidebar = navigation only"):
+// Sidebar no longer accepts `children`/`collapsedCreateAction` — the
+// notebook/page tree moved off the sidebar entirely (now /notebooks and
+// /notebooks/[id]), so the tests that exercised that slot were removed
+// instead of adapted to a feature that no longer exists here.
 describe("Sidebar", () => {
   beforeEach(() => {
     // biome-ignore lint/suspicious/noDocumentCookie: cookieStore is missing in jsdom
@@ -18,11 +23,7 @@ describe("Sidebar", () => {
   });
 
   it("starts expanded and offers to collapse", () => {
-    render(
-      <Sidebar initialCollapsed={false} user={USER}>
-        contenido
-      </Sidebar>,
-    );
+    render(<Sidebar initialCollapsed={false} user={USER} />);
 
     const toggle = screen.getByRole("button", {
       name: "Contraer barra lateral",
@@ -35,11 +36,7 @@ describe("Sidebar", () => {
 
   it("collapses on click and persists the choice in a cookie", async () => {
     const user = userEvent.setup();
-    render(
-      <Sidebar initialCollapsed={false} user={USER}>
-        contenido
-      </Sidebar>,
-    );
+    render(<Sidebar initialCollapsed={false} user={USER} />);
 
     await user.click(
       screen.getByRole("button", { name: "Contraer barra lateral" }),
@@ -55,172 +52,57 @@ describe("Sidebar", () => {
   });
 
   it("respects the persisted collapsed state on first render", () => {
-    render(
-      <Sidebar initialCollapsed={true} user={USER}>
-        contenido
-      </Sidebar>,
-    );
+    render(<Sidebar initialCollapsed={true} user={USER} />);
 
     expect(
       screen.getByRole("button", { name: "Expandir barra lateral" }),
     ).toBeInTheDocument();
   });
 
-  it("hides the notebook tree slot while collapsed, without unmounting it", () => {
-    render(
-      <Sidebar initialCollapsed={true} user={USER}>
-        contenido del árbol
-      </Sidebar>,
-    );
-
-    const slot = screen.getByText("contenido del árbol");
-    expect(slot).toBeInTheDocument();
-    expect(slot).toHaveClass("hidden");
-  });
-
-  it("shows the notebook tree slot when expanded", () => {
-    render(
-      <Sidebar initialCollapsed={false} user={USER}>
-        contenido del árbol
-      </Sidebar>,
-    );
-
-    expect(screen.getByText("contenido del árbol")).not.toHaveClass("hidden");
-  });
-
   it("always renders the Cogni logo in the header row", () => {
-    render(
-      <Sidebar initialCollapsed={false} user={USER}>
-        contenido
-      </Sidebar>,
-    );
+    render(<Sidebar initialCollapsed={false} user={USER} />);
 
     expect(screen.getByRole("link", { name: "Cogni" })).toBeInTheDocument();
   });
 
-  it("shows the collapsed create-notebook action only while collapsed", () => {
-    const collapsedTrigger = <button type="button">Crear cuaderno</button>;
-
-    const collapsedRender = render(
-      <Sidebar
-        initialCollapsed={true}
-        collapsedCreateAction={collapsedTrigger}
-        user={USER}
-      >
-        contenido
-      </Sidebar>,
-    );
-    expect(
-      within(collapsedRender.container).getByRole("button", {
-        name: "Crear cuaderno",
-      }),
-    ).toBeInTheDocument();
-    collapsedRender.unmount();
-
-    const expandedRender = render(
-      <Sidebar
-        initialCollapsed={false}
-        collapsedCreateAction={collapsedTrigger}
-        user={USER}
-      >
-        contenido
-      </Sidebar>,
-    );
-    expect(
-      within(expandedRender.container).queryByRole("button", {
-        name: "Crear cuaderno",
-      }),
-    ).not.toBeInTheDocument();
-  });
-
-  it("renders the Menú principal, Técnicas and Cuenta sections with an active Inicio", () => {
-    render(
-      <Sidebar initialCollapsed={false} user={USER}>
-        contenido
-      </Sidebar>,
-    );
+  it("renders the Menú principal, Técnicas and Configuración sections with an active Inicio", () => {
+    render(<Sidebar initialCollapsed={false} user={USER} />);
 
     expect(screen.getByText("Menú principal")).toBeInTheDocument();
     expect(screen.getByText("Técnicas")).toBeInTheDocument();
-    expect(screen.getByText("Cuenta")).toBeInTheDocument();
+    // "Configuración" is both the section label and its one (disabled) nav
+    // item's label; scope to the label element specifically.
+    expect(screen.getByText("Configuración", { selector: "p" })).toBeInTheDocument();
 
-    expect(screen.getByRole("link", { name: "Inicio" })).toHaveAttribute(
+    // "Inicio"'s accessible name also includes its "⌘ H" shortcut keycap
+    // (nav-item.tsx renders it whenever the row isn't collapsed, active or
+    // not) — a substring match instead of the stale exact-"Inicio" one.
+    expect(screen.getByRole("link", { name: /Inicio/ })).toHaveAttribute(
       "aria-current",
       "page",
     );
 
-    for (const label of [
-      "Flashcards",
-      "Active recall",
-      "Exámenes",
-      "Configuración",
-    ]) {
+    for (const label of ["Flashcards", "Active recall", "Exámenes"]) {
       expect(
         screen.getByText(label).closest("[aria-disabled]"),
       ).toHaveAttribute("aria-disabled", "true");
     }
   });
 
-  // R3-cuadernos-href-home follow-up: the standalone "Cuadernos" nav item
-  // linked to "/" (same as Inicio) and used a bare `/notebooks` prefix
-  // match, so it never actually pointed anywhere useful; the notebook tree
-  // section (rendered above "Menú principal", see the reorder test below)
-  // replaces it.
-  it("does not render a redundant Cuadernos nav item", () => {
-    render(
-      <Sidebar initialCollapsed={false} user={USER}>
-        contenido
-      </Sidebar>,
+  // design pass 2: "Cuadernos" is now a plain nav item to /notebooks
+  // (no longer a "/" href and no longer a tree section header).
+  it("links the Cuadernos nav item to /notebooks", () => {
+    render(<Sidebar initialCollapsed={false} user={USER} />);
+
+    expect(screen.getByRole("link", { name: "Cuadernos" })).toHaveAttribute(
+      "href",
+      "/notebooks",
     );
-
-    expect(
-      screen.queryByRole("link", { name: "Cuadernos" }),
-    ).not.toBeInTheDocument();
-  });
-
-  // S3 sidebar-order fix (sidebar-preview.png): logo -> notebook tree
-  // section ("Cuadernos" label) -> Menú principal -> Técnicas -> Cuenta ->
-  // user card.
-  it("orders the Cuadernos tree section above Menú principal, Técnicas and Cuenta", () => {
-    render(
-      <Sidebar initialCollapsed={false} user={USER}>
-        contenido del árbol
-      </Sidebar>,
-    );
-
-    const labels = screen
-      .getAllByText(/^(Cuadernos|Menú principal|Técnicas|Cuenta)$/)
-      .map((node) => node.textContent);
-
-    expect(labels).toEqual([
-      "Cuadernos",
-      "Menú principal",
-      "Técnicas",
-      "Cuenta",
-    ]);
-  });
-
-  // S4 sidebar nit: the tree container used to be flex-1, growing to fill
-  // the whole scrollable nav column and pushing "Menú principal" down to
-  // the bottom instead of right below the tree, unlike sidebar-preview.png.
-  it("does not stretch the notebook tree slot to fill the sidebar (sections follow it directly)", () => {
-    render(
-      <Sidebar initialCollapsed={false} user={USER}>
-        contenido del árbol
-      </Sidebar>,
-    );
-
-    const slot = screen.getByText("contenido del árbol");
-    expect(slot).not.toHaveClass("flex-1");
   });
 
   it("pins the user footer card at the bottom with the sign-out menu", async () => {
     const eventUser = userEvent.setup();
-    render(
-      <Sidebar initialCollapsed={false} user={USER}>
-        contenido
-      </Sidebar>,
-    );
+    render(<Sidebar initialCollapsed={false} user={USER} />);
 
     expect(screen.getByText("JD")).toBeInTheDocument();
     await eventUser.click(

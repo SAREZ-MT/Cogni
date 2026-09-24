@@ -18,7 +18,7 @@ export function HomeHeader({ displayName, now = new Date() }: HomeHeaderProps) {
       <div>
         <h1 className="font-bold text-[28px] text-fg">{greeting}</h1>
         <p className="mt-1 text-fg-muted text-sm">
-          Esto es lo que ha pasado en tus cuadernos.
+          Aquí está tu resumen de hoy — ¡sigue así!
         </p>
       </div>
       <CreateNotebookTrigger variant="pill" />
