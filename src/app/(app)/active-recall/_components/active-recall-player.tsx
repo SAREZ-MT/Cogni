@@ -9,13 +9,15 @@ import { DifficultyScale } from "@/shared/ui/difficulty-scale";
 import { FeedbackBlock } from "@/shared/ui/feedback-block";
 import { ProgressBar } from "@/shared/ui/progress-bar";
 import { QuestionCard } from "@/shared/ui/question-card";
-import {
-  FeedbackPlaceholder,
-  SessionSummary,
-  type SessionSummaryStat,
-} from "@/shared/ui/session-summary";
 import { type StatDotItem, StatDots } from "@/shared/ui/stat-dots";
 import type { RecallQuestion } from "../_data/sample";
+import { ActiveRecallResultsView } from "./active-recall-results-view";
+import {
+  type QuestionRecord,
+  SELF_RATING_BUCKET_META,
+  SELF_RATING_BUCKET_ORDER,
+  selfRatingBucketFor,
+} from "./self-rating";
 
 export interface ActiveRecallPlayerProps {
   notebookId: string;
@@ -24,46 +26,16 @@ export interface ActiveRecallPlayerProps {
   questions: RecallQuestion[];
 }
 
-// Self-rating (0-5) → tally tone, documento-maestro §3.3: 0-1 "por
-// reforzar", 2-3 "regular", 4-5 "dominadas".
-type TallyTone = "reforzar" | "regular" | "dominadas";
-
-function tallyToneForRating(rating: number): TallyTone {
-  if (rating <= 1) return "reforzar";
-  if (rating <= 3) return "regular";
-  return "dominadas";
-}
-
-const TALLY_META: Record<
-  TallyTone,
-  { label: string; dotClassName: string; toneClassName: string }
-> = {
-  reforzar: {
-    label: "Por reforzar",
-    dotClassName: "bg-error-500",
-    toneClassName: "text-error-600",
-  },
-  regular: {
-    label: "Regular",
-    dotClassName: "bg-warning-500",
-    toneClassName: "text-warning-600",
-  },
-  dominadas: {
-    label: "Dominadas",
-    dotClassName: "bg-success-500",
-    toneClassName: "text-success-600",
-  },
-};
-
-const TALLY_ORDER: TallyTone[] = ["reforzar", "regular", "dominadas"];
-
 type Phase = "answer" | "review";
 
 // Client Active recall session (design preview, documento-maestro §3.3 +
 // studyplatform-active-recall-style.md, adapted so feedback only shows at
-// the end — never between questions). All state is local and resets on
-// remount; nothing is persisted (no backend yet, same scope as
-// FlashcardPlayer).
+// the end — never between questions). Each answered/skipped question is
+// kept as a `QuestionRecord` so the end-of-session `ActiveRecallResultsView`
+// (documento-maestro §8.5: async evaluation, in-page results instead of an
+// overlay) can render its own per-question feedback list. All state is
+// local and resets on remount; nothing is persisted (no backend yet, same
+// scope as FlashcardPlayer).
 export function ActiveRecallPlayer({
   notebookId,
   notebookTitle,
@@ -74,9 +46,7 @@ export function ActiveRecallPlayer({
   const [phase, setPhase] = useState<Phase>("answer");
   const [answerText, setAnswerText] = useState("");
   const [submittedAnswer, setSubmittedAnswer] = useState("");
-  const [tally, setTally] = useState({ reforzar: 0, regular: 0, dominadas: 0 });
-  const [ratingSum, setRatingSum] = useState(0);
-  const [answeredCount, setAnsweredCount] = useState(0);
+  const [records, setRecords] = useState<QuestionRecord[]>([]);
   const [finished, setFinished] = useState(false);
 
   const total = questions.length;
@@ -84,11 +54,18 @@ export function ActiveRecallPlayer({
   const question = questions[index];
   const sessionsHref = `/active-recall/${notebookId}`;
 
-  function completeQuestion(rating: number) {
-    const tone = tallyToneForRating(rating);
-    setTally((prev) => ({ ...prev, [tone]: prev[tone] + 1 }));
-    setRatingSum((prev) => prev + rating);
-    setAnsweredCount((prev) => prev + 1);
+  function completeQuestion(rating: number, answer: string) {
+    if (question) {
+      setRecords((prev) => [
+        ...prev,
+        {
+          id: question.id,
+          prompt: question.prompt,
+          answer,
+          selfRating: rating,
+        },
+      ]);
+    }
     if (index + 1 >= total) {
       setFinished(true);
       return;
@@ -100,8 +77,9 @@ export function ActiveRecallPlayer({
   }
 
   function handleSkip() {
-    setSubmittedAnswer("(sin respuesta)");
-    completeQuestion(0);
+    const answer = "(sin respuesta)";
+    setSubmittedAnswer(answer);
+    completeQuestion(0, answer);
   }
 
   function handleCalificar() {
@@ -114,28 +92,19 @@ export function ActiveRecallPlayer({
     setPhase("answer");
     setAnswerText("");
     setSubmittedAnswer("");
-    setTally({ reforzar: 0, regular: 0, dominadas: 0 });
-    setRatingSum(0);
-    setAnsweredCount(0);
+    setRecords([]);
     setFinished(false);
   }
 
-  const statDotItems: StatDotItem[] = TALLY_ORDER.map((tone) => ({
-    key: tone,
-    count: tally[tone],
-    dotClassName: TALLY_META[tone].dotClassName,
-  }));
-  const summaryStats: SessionSummaryStat[] = TALLY_ORDER.map((tone) => ({
-    key: tone,
-    label: TALLY_META[tone].label,
-    value: tally[tone],
-    toneClassName: TALLY_META[tone].toneClassName,
-  }));
-  const averageRating = answeredCount > 0 ? ratingSum / answeredCount : 0;
-  const averageRatingLabel = averageRating.toLocaleString("es-ES", {
-    maximumFractionDigits: 1,
-    minimumFractionDigits: 1,
-  });
+  const statDotItems: StatDotItem[] = SELF_RATING_BUCKET_ORDER.map(
+    (bucket) => ({
+      key: bucket,
+      count: records.filter(
+        (record) => selfRatingBucketFor(record.selfRating) === bucket,
+      ).length,
+      dotClassName: SELF_RATING_BUCKET_META[bucket].dotClassName,
+    }),
+  );
 
   if (total === 0 || !question) {
     return (
@@ -145,6 +114,17 @@ export function ActiveRecallPlayer({
           Esta página no tiene preguntas todavía.
         </p>
       </div>
+    );
+  }
+
+  if (finished) {
+    return (
+      <ActiveRecallResultsView
+        pageTitle={pageTitle}
+        records={records}
+        sessionsHref={sessionsHref}
+        onRestart={restart}
+      />
     );
   }
 
@@ -224,43 +204,10 @@ export function ActiveRecallPlayer({
           <FeedbackBlock eyebrowLabel="Tu respuesta">
             {submittedAnswer}
           </FeedbackBlock>
-          <DifficultyScale onSelect={completeQuestion} />
+          <DifficultyScale
+            onSelect={(rating) => completeQuestion(rating, submittedAnswer)}
+          />
         </div>
-      )}
-
-      {finished && (
-        <SessionSummary
-          emoji="🧠"
-          title="Sesión completada"
-          subtitle={`${pageTitle} — ${answeredCount} preguntas respondidas`}
-          stats={summaryStats}
-          highlightBeforeFeedback
-          highlight={
-            <>
-              <p className="text-[13px] text-fg-muted">
-                Autoevaluación promedio
-              </p>
-              <div className="mt-1.5 flex items-center gap-3">
-                <ProgressBar
-                  value={(averageRating / 5) * 100}
-                  className="h-2 flex-1"
-                  fillClassName="bg-success-500"
-                />
-                <span className="font-semibold text-[15px] text-fg">
-                  {averageRatingLabel} / 5
-                </span>
-              </div>
-            </>
-          }
-          feedback={
-            <FeedbackPlaceholder description="La IA evaluará tus respuestas con la rúbrica de la página y te dirá qué reforzar." />
-          }
-          secondaryAction={{
-            label: "Volver a las sesiones",
-            href: sessionsHref,
-          }}
-          primaryAction={{ label: "Nueva sesión →", onClick: restart }}
-        />
       )}
     </div>
   );

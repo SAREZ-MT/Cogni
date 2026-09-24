@@ -24,10 +24,10 @@ export default function ActiveRecallHubPage() {
 
   const totalSessions = allSessions.length;
   const activeNotebookCount = notebooksWithPages.length;
-  const averageAccuracy =
+  const averageMastery =
     allSessions.length > 0
       ? Math.round(
-          allSessions.reduce((sum, session) => sum + session.accuracy, 0) /
+          allSessions.reduce((sum, session) => sum + session.mastery, 0) /
             allSessions.length,
         )
       : 0;
@@ -89,7 +89,7 @@ export default function ActiveRecallHubPage() {
               : `${totalSessions} sesiones guardadas`}
           </Pill>
           <Pill size="md" tone="success" dot>
-            {averageAccuracy}% precisión promedio
+            {averageMastery} % dominio promedio
           </Pill>
           <Pill size="md" tone="neutral">
             {activeNotebookCount} cuaderno{activeNotebookCount === 1 ? "" : "s"}{" "}
@@ -118,7 +118,7 @@ export default function ActiveRecallHubPage() {
               (sum, page) => sum + page.sessions.length,
               0,
             );
-            const latestAccuracy = pages[0]?.sessions[0]?.accuracy ?? 0;
+            const latestMastery = pages[0]?.sessions[0]?.mastery ?? 0;
 
             return (
               <DeckSummaryCard
@@ -126,7 +126,7 @@ export default function ActiveRecallHubPage() {
                 href={`/active-recall/${notebook.id}`}
                 tone={notebook.color}
                 title={notebook.title}
-                meta={`${sessionCount} sesiones · última ${latestAccuracy}%`}
+                meta={`${sessionCount} sesiones · último dominio ${latestMastery} %`}
               />
             );
           })}

@@ -17,10 +17,16 @@ export interface RecallSession {
   // preview, not a real timestamp to reformat client-side.
   date: string;
   questionCount: number;
-  correct: number;
-  partial: number;
-  incorrect: number;
-  accuracy: number;
+  // Derived from the AI score buckets (documento-maestro §7.4 combined
+  // quality, design/shell-look fix 2026-09-24): aiScore >= 4 → aiCorrect,
+  // 2-3 → aiPartial, <= 1 → aiIncorrect. Never the self-rating bucket.
+  aiCorrect: number;
+  aiPartial: number;
+  aiIncorrect: number;
+  // "Dominio" (combined quality, §7.4) — renamed from "accuracy"/"precisión"
+  // (design/shell-look fix 2026-09-24) so the metric name matches what it
+  // actually measures once combined quality lands.
+  mastery: number;
 }
 
 export interface RecallPage {
@@ -46,19 +52,22 @@ const SAMPLE_RECALL_PAGES: readonly RecallPage[] = [
     sessions: [
       {
         date: "24 sept",
-        questionCount: 8,
-        correct: 6,
-        partial: 1,
-        incorrect: 1,
-        accuracy: 80,
+        // N = 10 (documento-maestro §3.3 default session size) — the
+        // reference/quick-start session; the older session below stays a
+        // smaller configured size.
+        questionCount: 10,
+        aiCorrect: 8,
+        aiPartial: 1,
+        aiIncorrect: 1,
+        mastery: 80,
       },
       {
         date: "20 sept",
         questionCount: 8,
-        correct: 5,
-        partial: 2,
-        incorrect: 1,
-        accuracy: 70,
+        aiCorrect: 5,
+        aiPartial: 2,
+        aiIncorrect: 1,
+        mastery: 70,
       },
     ],
   },
@@ -70,10 +79,10 @@ const SAMPLE_RECALL_PAGES: readonly RecallPage[] = [
       {
         date: "18 sept",
         questionCount: 6,
-        correct: 3,
-        partial: 2,
-        incorrect: 1,
-        accuracy: 58,
+        aiCorrect: 3,
+        aiPartial: 2,
+        aiIncorrect: 1,
+        mastery: 58,
       },
     ],
   },
@@ -85,18 +94,18 @@ const SAMPLE_RECALL_PAGES: readonly RecallPage[] = [
       {
         date: "22 sept",
         questionCount: 6,
-        correct: 2,
-        partial: 1,
-        incorrect: 3,
-        accuracy: 33,
+        aiCorrect: 2,
+        aiPartial: 1,
+        aiIncorrect: 3,
+        mastery: 33,
       },
       {
         date: "15 sept",
         questionCount: 6,
-        correct: 3,
-        partial: 2,
-        incorrect: 1,
-        accuracy: 58,
+        aiCorrect: 3,
+        aiPartial: 2,
+        aiIncorrect: 1,
+        mastery: 58,
       },
     ],
   },
@@ -108,26 +117,26 @@ const SAMPLE_RECALL_PAGES: readonly RecallPage[] = [
       {
         date: "23 sept",
         questionCount: 5,
-        correct: 5,
-        partial: 0,
-        incorrect: 0,
-        accuracy: 100,
+        aiCorrect: 5,
+        aiPartial: 0,
+        aiIncorrect: 0,
+        mastery: 100,
       },
       {
         date: "16 sept",
         questionCount: 5,
-        correct: 4,
-        partial: 1,
-        incorrect: 0,
-        accuracy: 90,
+        aiCorrect: 4,
+        aiPartial: 1,
+        aiIncorrect: 0,
+        mastery: 90,
       },
       {
         date: "10 sept",
         questionCount: 5,
-        correct: 3,
-        partial: 1,
-        incorrect: 1,
-        accuracy: 70,
+        aiCorrect: 3,
+        aiPartial: 1,
+        aiIncorrect: 1,
+        mastery: 70,
       },
     ],
   },
@@ -180,6 +189,18 @@ const SAMPLE_RECALL_QUESTIONS: readonly RecallQuestion[] = [
     id: "mitocondria-8",
     pageId: "mitocondria",
     prompt: "Resume el ciclo de Krebs y dónde ocurre dentro de la mitocondria.",
+  },
+  {
+    id: "mitocondria-9",
+    pageId: "mitocondria",
+    prompt:
+      "¿Qué función cumplen las porinas de la membrana externa mitocondrial?",
+  },
+  {
+    id: "mitocondria-10",
+    pageId: "mitocondria",
+    prompt:
+      "¿Por qué se describe a la mitocondria como un organelo semiautónomo?",
   },
   {
     id: "membrana-1",

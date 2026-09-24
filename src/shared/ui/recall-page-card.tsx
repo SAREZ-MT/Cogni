@@ -2,9 +2,9 @@ import Link from "next/link";
 import { Pill } from "@/shared/ui/pill";
 import { cn } from "@/shared/ui/utils";
 
-function accuracyToneClassName(accuracy: number): string {
-  if (accuracy >= 70) return "text-success-600";
-  if (accuracy >= 40) return "text-warning-600";
+function masteryToneClassName(mastery: number): string {
+  if (mastery >= 70) return "text-success-600";
+  if (mastery >= 40) return "text-warning-600";
   return "text-error-600";
 }
 
@@ -17,11 +17,15 @@ export interface RecallPageCardProps {
   lastSessionDate: string;
   questionCount: number;
   sessionCount: number;
-  // Most recent session's accuracy (0-100).
-  accuracy: number;
-  correct: number;
-  partial: number;
-  incorrect: number;
+  // Most recent session's "dominio" (combined quality, documento-maestro
+  // §7.4), 0-100 — renamed from "accuracy" (design/shell-look fix
+  // 2026-09-24) so the metric name matches what it measures.
+  mastery: number;
+  // Derived from the AI score buckets (≥4 aiCorrect, 2-3 aiPartial, ≤1
+  // aiIncorrect), never the self-rating bucket.
+  aiCorrect: number;
+  aiPartial: number;
+  aiIncorrect: number;
   className?: string;
 }
 
@@ -39,10 +43,10 @@ export function RecallPageCard({
   lastSessionDate,
   questionCount,
   sessionCount,
-  accuracy,
-  correct,
-  partial,
-  incorrect,
+  mastery,
+  aiCorrect,
+  aiPartial,
+  aiIncorrect,
   className,
 }: RecallPageCardProps) {
   return (
@@ -71,13 +75,13 @@ export function RecallPageCard({
             <p
               className={cn(
                 "font-bold text-[22px] leading-none",
-                accuracyToneClassName(accuracy),
+                masteryToneClassName(mastery),
               )}
             >
-              {accuracy}%
+              {mastery}%
             </p>
             <p className="mt-1 text-[10px] text-fg-muted">
-              {correct}✓ · {partial}~ · {incorrect}✗
+              {aiCorrect}✓ · {aiPartial}~ · {aiIncorrect}✗
             </p>
           </div>
           <Pill size="sm" tone="success">

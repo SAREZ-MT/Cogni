@@ -88,10 +88,10 @@ export default async function ActiveRecallNotebookPage({
                   lastSessionDate={latest.date}
                   questionCount={latest.questionCount}
                   sessionCount={previous.length + 1}
-                  accuracy={latest.accuracy}
-                  correct={latest.correct}
-                  partial={latest.partial}
-                  incorrect={latest.incorrect}
+                  mastery={latest.mastery}
+                  aiCorrect={latest.aiCorrect}
+                  aiPartial={latest.aiPartial}
+                  aiIncorrect={latest.aiIncorrect}
                 />
               );
             })}
