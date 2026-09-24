@@ -189,6 +189,41 @@ anatomy).
 
 Used by: `techniques-panel.tsx`.
 
+## ViewToggle (`view-toggle.tsx`)
+
+The segmented grid/list control (`LayoutGrid`/`List` icons, `rounded-input`
+border, `bg-neutral-100` track, active option gets `bg-card` + `shadow-xs`).
+Extracted from `notebooks/page.tsx` (design pass 2 atoms-first rule) so
+`notebooks/[notebookId]/page.tsx` could reuse the identical control for its
+page list — zero visual change on `/notebooks`.
+
+- `value`: `"grid" | "list"`.
+- `hrefFor`: `(view) => string` — builds each option's `Link` href, so the
+  choice is server-rendered and persisted in that route's own `?view=` URL
+  param (default grid) instead of client state.
+- `className`: forwarded onto the root via `cn()`.
+- Options (`aria-label` "Ver como cuadrícula"/"Ver como lista",
+  `aria-current`) are fixed at two — grid/list is the only case both
+  screens need — not a generic `options` prop.
+
+Used by: `notebooks/page.tsx`, `notebooks/[notebookId]/page.tsx`.
+
+## List-row molecules: NotebookListRow / PageListRow
+
+`notebook-list-row.tsx` and `page-list-row.tsx` (`app/(app)/_components/`)
+are the Notion/file-explorer-style rows a `ViewToggle`'s `list` option
+renders inside one `Card`: a divider (`border-b border-border-subtle
+last:border-b-0`), `hover:bg-hover`, an `IconTile` (size `28`, radius
+`md`), a stretched-link title, a right-aligned muted meta column, a
+`relative z-10` hover action (`NotebookCardActions` /
+`ArchivePageButton`) so it stays clickable over the stretched link, and a
+trailing muted `ChevronRight` (16/1.75). `PageListRow` reuses
+`formatUpdatedAt` (`_components/format.ts`) for its "Actualizada {d MMM}"
+column, the same formatter the page-card grid uses.
+
+Used by: `notebooks/page.tsx` (`NotebookListRow`),
+`notebooks/[notebookId]/page.tsx` (`PageListRow`).
+
 ## DropdownMenu / Popover (`dropdown-menu.tsx`)
 
 E2b token fix: `DropdownMenuContent` was styled with `bg-popover`/

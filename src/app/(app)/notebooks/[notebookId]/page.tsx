@@ -10,17 +10,16 @@ import { Card } from "@/shared/ui/card";
 import { EmptyState } from "@/shared/ui/empty-state";
 import { IconTile } from "@/shared/ui/icon-tile";
 import { SectionHeader } from "@/shared/ui/section-header";
+import { ViewToggle } from "@/shared/ui/view-toggle";
 import { SetBreadcrumb } from "../../_components/breadcrumb";
+import { formatUpdatedAt } from "../../_components/format";
 import { notebookToneFromColor } from "../../_components/notebook-swatches";
+import { PageListRow } from "../../_components/page-list-row";
 
 interface NotebookPageProps {
   params: Promise<{ notebookId: string }>;
+  searchParams: Promise<{ view?: string }>;
 }
-
-const UPDATED_AT_FORMAT = new Intl.DateTimeFormat("es-ES", {
-  day: "numeric",
-  month: "short",
-});
 
 // A foreign or archived notebookId renders as not-found, never leaking its
 // title or pages (specs/notebooks/spec.md, "Ruta de página ajena"). Design
@@ -28,12 +27,17 @@ const UPDATED_AT_FORMAT = new Intl.DateTimeFormat("es-ES", {
 // restyled after studyplatform-style-report.md §8 (workspace detail) — the
 // notebook's own page tree, which used to render inside the sidebar, now
 // lives on this route as a card grid.
-export default async function NotebookPage({ params }: NotebookPageProps) {
+export default async function NotebookPage({
+  params,
+  searchParams,
+}: NotebookPageProps) {
   const { notebookId } = await params;
-  const view = await getNotebookForRoute(notebookId);
-  if (!view) notFound();
+  const routeView = await getNotebookForRoute(notebookId);
+  if (!routeView) notFound();
 
-  const { notebook, pages } = view;
+  const { notebook, pages } = routeView;
+  const { view: viewParam } = await searchParams;
+  const view = viewParam === "list" ? "list" : "grid";
 
   async function createPage() {
     "use server";
@@ -97,37 +101,60 @@ export default async function NotebookPage({ params }: NotebookPageProps) {
           descriptionClassName="max-w-sm"
         />
       ) : (
-        <ul className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3">
-          {pages.map((page) => (
-            <li key={page.id} className="group relative">
-              <Card
-                asChild
-                padding="sm"
-                interactive
-                className="flex items-center gap-3 rounded-[14px]"
-              >
-                <Link href={`/notebooks/${notebook.id}/pages/${page.id}`}>
-                  <IconTile size="36" radius="input" tone="primary">
-                    <FileText aria-hidden="true" size={18} strokeWidth={1.75} />
-                  </IconTile>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-medium text-[13.5px] text-fg">
-                      {page.title}
-                    </span>
-                    <span className="block text-fg-muted text-xs">
-                      Actualizada {UPDATED_AT_FORMAT.format(page.updatedAt)}
-                    </span>
-                  </span>
-                </Link>
-              </Card>
-              <ArchivePageButton
-                pageId={page.id}
-                title={page.title}
-                className="absolute top-2 right-2 z-10 opacity-0 transition-opacity group-hover:opacity-100"
-              />
-            </li>
-          ))}
-        </ul>
+        <>
+          <ViewToggle
+            value={view}
+            hrefFor={(v) => `/notebooks/${notebook.id}?view=${v}`}
+          />
+
+          {view === "grid" ? (
+            <ul className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3">
+              {pages.map((page) => (
+                <li key={page.id} className="group relative">
+                  <Card
+                    asChild
+                    padding="sm"
+                    interactive
+                    className="flex items-center gap-3 rounded-[14px]"
+                  >
+                    <Link href={`/notebooks/${notebook.id}/pages/${page.id}`}>
+                      <IconTile size="36" radius="input" tone="primary">
+                        <FileText
+                          aria-hidden="true"
+                          size={18}
+                          strokeWidth={1.75}
+                        />
+                      </IconTile>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-medium text-[13.5px] text-fg">
+                          {page.title}
+                        </span>
+                        <span className="block text-fg-muted text-xs">
+                          Actualizada {formatUpdatedAt(page.updatedAt)}
+                        </span>
+                      </span>
+                    </Link>
+                  </Card>
+                  <ArchivePageButton
+                    pageId={page.id}
+                    title={page.title}
+                    className="absolute top-2 right-2 z-10 opacity-0 transition-opacity group-hover:opacity-100"
+                  />
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <Card>
+              {pages.map((page) => (
+                <PageListRow
+                  key={page.id}
+                  page={page}
+                  notebookId={notebook.id}
+                />
+              ))}
+            </Card>
+          )}
+        </>
       )}
     </section>
   );

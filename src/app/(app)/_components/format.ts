@@ -10,6 +10,18 @@
 // the greeting itself); the identity module's profile timezone is not
 // wired into the shell yet, so this uses the server's local hour like the
 // rest of the shell's Date usage.
+const UPDATED_AT_FORMAT = new Intl.DateTimeFormat("es-ES", {
+  day: "numeric",
+  month: "short",
+});
+
+// Short absolute date ("3 sept"), used where a full relative-time bucket
+// (formatTimeAgo below) would be too vague — the notebookId page-card grid
+// and its list-row equivalent (page-list-row.tsx).
+export function formatUpdatedAt(date: Date): string {
+  return UPDATED_AT_FORMAT.format(date);
+}
+
 export function greetingForHour(hour: number, name: string): string {
   if (hour >= 5 && hour < 12) return `Buenos días, ${name}`;
   if (hour >= 12 && hour < 19) return `Buenas tardes, ${name}`;

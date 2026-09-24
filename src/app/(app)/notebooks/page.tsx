@@ -1,5 +1,4 @@
-import { LayoutGrid, List as ListIcon, NotebookPen } from "lucide-react";
-import Link from "next/link";
+import { NotebookPen } from "lucide-react";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/modules/identity";
 import { CreateNotebookTrigger, getHomeOverview } from "@/modules/notebooks";
@@ -7,7 +6,7 @@ import { Card } from "@/shared/ui/card";
 import { EmptyState } from "@/shared/ui/empty-state";
 import { IconTile } from "@/shared/ui/icon-tile";
 import { SectionHeader } from "@/shared/ui/section-header";
-import { cn } from "@/shared/ui/utils";
+import { ViewToggle } from "@/shared/ui/view-toggle";
 import { SetBreadcrumb } from "../_components/breadcrumb";
 import { NotebookCard } from "../_components/notebook-card";
 import { NotebookListRow } from "../_components/notebook-list-row";
@@ -71,30 +70,7 @@ export default async function NotebooksPage({
         />
       ) : (
         <>
-          <div className="flex items-center gap-1 self-start rounded-input border border-border-subtle bg-neutral-100 p-1">
-            <Link
-              href="/notebooks?view=grid"
-              aria-label="Ver como cuadrícula"
-              aria-current={view === "grid" ? "true" : undefined}
-              className={cn(
-                "flex size-7 items-center justify-center rounded-md text-fg-muted transition-colors",
-                view === "grid" && "bg-card text-fg shadow-xs",
-              )}
-            >
-              <LayoutGrid aria-hidden="true" size={15} strokeWidth={1.75} />
-            </Link>
-            <Link
-              href="/notebooks?view=list"
-              aria-label="Ver como lista"
-              aria-current={view === "list" ? "true" : undefined}
-              className={cn(
-                "flex size-7 items-center justify-center rounded-md text-fg-muted transition-colors",
-                view === "list" && "bg-card text-fg shadow-xs",
-              )}
-            >
-              <ListIcon aria-hidden="true" size={15} strokeWidth={1.75} />
-            </Link>
-          </div>
+          <ViewToggle value={view} hrefFor={(v) => `/notebooks?view=${v}`} />
 
           {view === "grid" ? (
             <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4">
