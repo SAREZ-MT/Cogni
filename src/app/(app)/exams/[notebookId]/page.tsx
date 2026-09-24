@@ -76,7 +76,8 @@ export default async function ExamsNotebookPage({
             {pages.map((page) => (
               <ExamPageCard
                 key={page.id}
-                href={`/exams/${notebookId}/${page.id}`}
+                notebookId={notebookId}
+                pageId={page.id}
                 pageTitle={page.title}
                 questionCount={page.questionCount}
                 attempts={page.attempts}

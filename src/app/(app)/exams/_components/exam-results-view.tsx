@@ -2,6 +2,7 @@ import Link from "next/link";
 import { BackLink } from "@/shared/ui/back-link";
 import { Button } from "@/shared/ui/button";
 import { ExamReviewRow } from "@/shared/ui/exam-review-row";
+import { Pill } from "@/shared/ui/pill";
 import { ScoreCard } from "@/shared/ui/score-card";
 import { SectionTitle } from "@/shared/ui/section-header";
 import { StatusBanner } from "@/shared/ui/status-banner";
@@ -14,8 +15,16 @@ export interface ExamResultsViewProps {
   pageTitle: string;
   questions: ExamQuestion[];
   answers: Array<number | null>;
-  seconds: number;
-  onRestart: () => void;
+  durationSeconds: number;
+  // "live": the player just submitted this session in place — "Nuevo
+  // examen" restarts locally (`onRestart`, required). "stored": rendering
+  // a past session from sample data (exams/[notebookId]/[pageId]/
+  // resultados) — "Nuevo examen" links to a fresh session instead.
+  mode: "live" | "stored";
+  // Preformatted date the session was presented on (stored mode only).
+  date?: string;
+  isRetake?: boolean;
+  onRestart?: () => void;
 }
 
 const OPTION_LETTERS = ["A", "B", "C", "D"] as const;
@@ -34,6 +43,12 @@ function formatTime(totalSeconds: number): string {
 // `retake_pending` and the failed questions are rescheduled for tomorrow;
 // AI feedback explaining the failed questions arrives async, so its
 // section always renders pending in this backend-less preview).
+//
+// Reused for stored past sessions since 2026-09-24 (exams/[notebookId]/
+// [pageId]/resultados/page.tsx, documento-maestro §3.3): `mode` switches
+// the closing action between a local restart and a plain link to a new
+// session, and an "Editar preguntas" outline action was added for the new
+// manual question-management screen.
 export function ExamResultsView({
   notebookId,
   pageId,
@@ -41,7 +56,10 @@ export function ExamResultsView({
   pageTitle,
   questions,
   answers,
-  seconds,
+  durationSeconds,
+  mode,
+  date,
+  isRetake = false,
   onRestart,
 }: ExamResultsViewProps) {
   const total = questions.length;
@@ -53,6 +71,8 @@ export function ExamResultsView({
   const score = total > 0 ? Math.round((correctCount / total) * 100) : 0;
   const passed = score >= PASSING_SCORE;
   const sessionsHref = `/exams/${notebookId}`;
+  const newSessionHref = `/exams/${notebookId}/${pageId}`;
+  const questionsHref = `/exams/${notebookId}/${pageId}/preguntas`;
 
   return (
     <div
@@ -61,13 +81,26 @@ export function ExamResultsView({
     >
       <BackLink href={sessionsHref}>Todos los exámenes</BackLink>
 
+      {(date || isRetake) && (
+        <div className="-mb-3 flex flex-wrap items-center gap-2">
+          {date && (
+            <p className="text-fg-muted text-xs">Presentado el {date}</p>
+          )}
+          {isRetake && (
+            <Pill size="sm" tone="rose">
+              Examen de repetición
+            </Pill>
+          )}
+        </div>
+      )}
+
       <ScoreCard
         score={score}
         correct={correctCount}
         incorrect={incorrectCount}
         unanswered={unansweredCount}
         total={total}
-        timeLabel={formatTime(seconds)}
+        timeLabel={formatTime(durationSeconds)}
         pageTitle={pageTitle}
         notebookTitle={notebookTitle}
       />
@@ -137,17 +170,26 @@ export function ExamResultsView({
         </div>
       </div>
 
-      <div className="flex items-center gap-2.5">
-        <Button asChild variant="outline" className="flex-1">
+      <div className="flex flex-wrap items-center gap-2.5">
+        <Button asChild variant="outline" className="min-w-[150px] flex-1">
           <Link href={sessionsHref}>Volver a los exámenes</Link>
         </Button>
-        <Button
-          type="button"
-          className="flex-[2] justify-center"
-          onClick={onRestart}
-        >
-          Nuevo examen →
+        <Button asChild variant="outline" className="min-w-[150px] flex-1">
+          <Link href={questionsHref}>Editar preguntas</Link>
         </Button>
+        {mode === "stored" ? (
+          <Button asChild className="min-w-[170px] flex-[2] justify-center">
+            <Link href={newSessionHref}>Nuevo examen →</Link>
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            className="min-w-[170px] flex-[2] justify-center"
+            onClick={onRestart}
+          >
+            Nuevo examen →
+          </Button>
+        )}
       </div>
     </div>
   );

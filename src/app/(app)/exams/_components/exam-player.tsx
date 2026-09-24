@@ -1,9 +1,17 @@
 "use client";
 
 import { Check, Send } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { BackLink } from "@/shared/ui/back-link";
 import { Button } from "@/shared/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/shared/ui/dialog";
 import { OptionRow } from "@/shared/ui/option-row";
 import { QuestionCard } from "@/shared/ui/question-card";
 import { QuestionProgressDots } from "@/shared/ui/question-progress-dots";
@@ -52,6 +60,7 @@ export function ExamPlayer({
   );
   const [seconds, setSeconds] = useState(0);
   const [submitted, setSubmitted] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   useEffect(() => {
     if (submitted) return;
@@ -91,6 +100,23 @@ export function ExamPlayer({
     setSubmitted(false);
   }
 
+  // "Entregar"/"Enviar examen" (documento-maestro §7.5's async-grading
+  // flow, design fix 2026-09-24): every unanswered question counts as
+  // incorrect and feeds the retake, so submitting with any left blank asks
+  // for confirmation first instead of grading silently.
+  function requestSubmit() {
+    if (answeredCount < total) {
+      setConfirmOpen(true);
+      return;
+    }
+    setSubmitted(true);
+  }
+
+  function confirmSubmit() {
+    setConfirmOpen(false);
+    setSubmitted(true);
+  }
+
   if (total === 0 || !question) {
     return (
       <div className="mx-auto flex w-full max-w-[720px] flex-1 flex-col items-center justify-center gap-6 py-16">
@@ -111,7 +137,9 @@ export function ExamPlayer({
         pageTitle={pageTitle}
         questions={questions}
         answers={answers}
-        seconds={seconds}
+        durationSeconds={seconds}
+        mode="live"
+        isRetake={isRetake}
         onRestart={restart}
       />
     );
@@ -141,7 +169,7 @@ export function ExamPlayer({
             variant="ghost"
             size="sm"
             className="text-fg-muted"
-            onClick={() => setSubmitted(true)}
+            onClick={requestSubmit}
           >
             <Send aria-hidden="true" size={13} strokeWidth={2} />
             Entregar
@@ -154,6 +182,19 @@ export function ExamPlayer({
           tone="rose"
           title="Examen de repetición"
           description={`Preguntas nuevas sobre los conceptos que fallaste: ${MITOCONDRIA_RETAKE_CONCEPTS.join(", ")}.`}
+          action={
+            // Preview-only escape hatch for documento-maestro §7.5 point 5
+            // (blocked retake when variant generation fails on every
+            // provider) — `?variantes=error` is a design-preview-only
+            // query flag documented on the session route, not a real
+            // backend state.
+            <Link
+              href={`/exams/${notebookId}/${pageId}?retake=1&variantes=error`}
+              className="text-[11px] text-fg-muted underline decoration-dotted underline-offset-2 hover:text-fg"
+            >
+              Ver estado de error (vista previa)
+            </Link>
+          }
         />
       )}
 
@@ -206,7 +247,7 @@ export function ExamPlayer({
           <Button
             type="button"
             className="bg-pastel-pink-fg text-white hover:bg-pastel-pink-fg"
-            onClick={() => setSubmitted(true)}
+            onClick={requestSubmit}
           >
             Enviar examen
             <Check aria-hidden="true" size={15} strokeWidth={2.5} />
@@ -221,6 +262,30 @@ export function ExamPlayer({
           </Button>
         )}
       </div>
+
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent data-testid="submit-confirm-dialog">
+          <DialogHeader>
+            <DialogTitle>¿Entregar el examen?</DialogTitle>
+          </DialogHeader>
+          <p className="text-fg-muted text-sm">
+            Tienes {total - answeredCount} preguntas sin responder. Se contarán
+            como incorrectas y entrarán en la repetición si no apruebas.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmOpen(false)}>
+              Seguir respondiendo
+            </Button>
+            <Button
+              type="button"
+              className="bg-pastel-pink-fg text-white hover:bg-pastel-pink-fg"
+              onClick={confirmSubmit}
+            >
+              Entregar igual
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -18,6 +18,13 @@ import { SAMPLE_NOTEBOOKS } from "../../flashcards/_data/sample";
 
 export { SAMPLE_NOTEBOOKS };
 
+// "Preguntas del examen" management screen (2026-09-24, documento-maestro
+// §3.3 "creadas manualmente" / Fase 5 "edición manual de preguntas con
+// concept"): where a question came from. `ai_variant` is a retake's
+// AI-generated replacement for a retired original (§7.5: the student never
+// sees the same wording again).
+export type ExamQuestionOrigin = "ai" | "manual" | "ai_variant";
+
 export interface ExamQuestion {
   id: string;
   pageId: string;
@@ -28,6 +35,19 @@ export interface ExamQuestion {
   // §7.5's `ExamQuestion.concept`) — shown on the results review row and
   // used to group the retake's variants.
   concept: string;
+  // Only populated by `getExamQuestionsForManagement` below — every other
+  // question set (live session, retake, results review) omits these, so
+  // adding them here never changes what a session actually grades.
+  origin?: ExamQuestionOrigin;
+  // The retired original this variant replaces (only set on `ai_variant`
+  // questions that replace a specific original — the retake's "topped up"
+  // extra question has none).
+  variantOf?: string;
+  explanation?: string;
+  // ISO-ish preformatted date string; presence marks the question retired
+  // (§7.5: a variant replaces a retired original in the question *bank*,
+  // it's never deleted — history stays visible, just muted).
+  retiredAt?: string;
 }
 
 export interface ExamPage {
@@ -588,4 +608,121 @@ export function getExamQuestions(
     if (variants.length > 0) return variants;
   }
   return SAMPLE_EXAM_QUESTIONS.filter((question) => question.pageId === pageId);
+}
+
+// --- "Preguntas del examen" management screen (2026-09-24) ---------------
+//
+// Deliberately its own derived list, never reused by getExamQuestions /
+// getExamVariantQuestions above: marking Mitocondria's 4 failed-concept
+// originals `retiredAt` here must never change what the live session or the
+// retake actually serves (documento-maestro §7.5 — a variant replaces a
+// retired original in the question *bank* for management purposes only,
+// never mid-session). `.map()` below always returns fresh objects, so the
+// underlying MITOCONDRIA_QUESTIONS/MITOCONDRIA_VARIANT_QUESTIONS arrays
+// stay untouched.
+
+const MITOCONDRIA_MANUAL_QUESTION_ID = "mitocondria-q6";
+
+// The 4 originals whose concept matches MITOCONDRIA_RETAKE_CONCEPTS — the
+// ones a real retake's AI variants replace.
+const MITOCONDRIA_RETIRED_ORIGINAL_IDS: ReadonlySet<string> = new Set([
+  "mitocondria-q3",
+  "mitocondria-q4",
+  "mitocondria-q9",
+  "mitocondria-q10",
+]);
+
+// Which retired original each variant replaces — variant-5 has none: it's
+// the "topped up" extra question the retake adds to reach 5, not a
+// replacement for any single original (sample.ts's own comment above it).
+const MITOCONDRIA_VARIANT_OF: Readonly<Record<string, string>> = {
+  "mitocondria-variant-1": "mitocondria-q3",
+  "mitocondria-variant-2": "mitocondria-q4",
+  "mitocondria-variant-3": "mitocondria-q9",
+  "mitocondria-variant-4": "mitocondria-q10",
+};
+
+function buildMitocondriaManagementQuestions(): ExamQuestion[] {
+  const originals = MITOCONDRIA_QUESTIONS.map(
+    (question): ExamQuestion => ({
+      ...question,
+      origin: question.id === MITOCONDRIA_MANUAL_QUESTION_ID ? "manual" : "ai",
+      retiredAt: MITOCONDRIA_RETIRED_ORIGINAL_IDS.has(question.id)
+        ? "22 sept"
+        : undefined,
+    }),
+  );
+  const variants = MITOCONDRIA_VARIANT_QUESTIONS.map(
+    (question): ExamQuestion => ({
+      ...question,
+      origin: "ai_variant",
+      variantOf: MITOCONDRIA_VARIANT_OF[question.id],
+    }),
+  );
+  return [...originals, ...variants];
+}
+
+// Question list for the manual creation/editing screen — every other page
+// just gets its plain question set tagged `origin: "ai"` (nothing manual or
+// retired in this preview outside Mitocondria).
+export function getExamQuestionsForManagement(pageId: string): ExamQuestion[] {
+  if (pageId === "mitocondria") return buildMitocondriaManagementQuestions();
+  return getExamQuestions(pageId).map(
+    (question): ExamQuestion => ({ ...question, origin: "ai" }),
+  );
+}
+
+// --- Stored results (2026-09-24) ------------------------------------------
+
+export interface ExamSessionRecord {
+  id: string;
+  pageId: string;
+  isRetake: boolean;
+  // Preformatted, same convention as ExamPage.lastDate.
+  date: string;
+  // One entry per question in that page's (non-retake) question order,
+  // `null` for an unanswered question — same shape ExamPlayer/
+  // ExamResultsView already use at runtime.
+  answers: Array<number | null>;
+  durationSeconds: number;
+}
+
+// Only the page's last attempt is kept (documento-maestro §3.3 doesn't
+// model a full history in this preview) — one record per page that has
+// ever been attempted at least once.
+const SAMPLE_EXAM_SESSION_RECORDS: readonly ExamSessionRecord[] = [
+  {
+    id: "mitocondria-session-2",
+    pageId: "mitocondria",
+    isRetake: false,
+    date: "22 sept",
+    // 6 correct, 2 incorrect (q3, q4), 2 unanswered (q9, q10) — exactly the
+    // 4 concepts in MITOCONDRIA_RETAKE_CONCEPTS. Score 60 % (6/10).
+    answers: [0, 1, 0, 0, 0, 1, 2, 3, null, null],
+    durationSeconds: 540,
+  },
+  {
+    id: "membrana-celular-session-1",
+    pageId: "membrana-celular",
+    isRetake: false,
+    date: "18 sept",
+    // 5 correct, 1 incorrect (q6). Score 83 % (5/6).
+    answers: [0, 1, 2, 3, 0, 0],
+    durationSeconds: 300,
+  },
+  {
+    id: "renacimiento-session-1",
+    pageId: "renacimiento",
+    isRetake: false,
+    date: "16 sept",
+    // All 5 correct. Score 100 %.
+    answers: [0, 1, 2, 3, 0],
+    durationSeconds: 260,
+  },
+];
+
+export function getLastExamSession(
+  pageId: string,
+): ExamSessionRecord | undefined {
+  return SAMPLE_EXAM_SESSION_RECORDS.find((record) => record.pageId === pageId);
 }

@@ -54,7 +54,11 @@ Used by: `notebook-card.tsx`, `notebook-list-row.tsx`, `home/stat-card.tsx`,
 Small rounded-full label (status/count/"pronto" indicators).
 
 - `size`: `sm(10.5px) | md(11.5px)`.
-- `tone`: `neutral | muted` + the same pastel/semantic tones as `IconTile`.
+- `tone`: `neutral | muted` + the same pastel/semantic tones as `IconTile`,
+  plus `rose` (2026-09-24, exams "preguntas" screen: `bg-rose-500/10
+  text-rose-600` — no `--color-rose-100` token exists, so this reuses the
+  existing `rose-500` theme color with an opacity modifier, same pattern
+  `status-banner.tsx`'s `rose` tone border already uses).
 - `dot`: optional leading `currentColor` dot. `icon`: optional leading node.
 
 Used by: `nav-item.tsx` (disabled row's "pronto" badge),
@@ -809,3 +813,123 @@ points at the real preview (`/exams/biologia-celular/mitocondria`,
 placeholder `#` href. The sidebar's "Exámenes" item is no longer disabled
 (`sidebar.tsx`'s `TECNICAS_SECTION`, `href: "/exams"`,
 `isActive: (path) => path.startsWith("/exams")`).
+
+## Exams design audit fixes (2026-09-24)
+
+A follow-up design-only pass against documento-maestro §3.3/§7.5, fixing 5
+gaps found while auditing the exams preview above.
+
+### ExamPageCard — routing fix
+
+`exam-page-card.tsx` no longer takes a single `href`: it takes
+`notebookId`/`pageId` and computes 3 destinations itself — a
+`retakePending` page links straight to `?retake=1` (never the plain
+session), a passed/scored page links to its new `/resultados` route
+instead of re-running the exam, and only a never-attempted page still
+links to the plain session. The root is now a `div` (not one big `Link`),
+because the footer gained a second "Preguntas (N)" link to the new
+`/preguntas` route: the title uses the stretched-link pattern
+(`after:absolute after:inset-0` on a `relative` root, same as
+`page-list-row.tsx`) to keep the whole card clickable, and the footer link
+opts back into its own clickable layer with `relative z-10`.
+
+### Stored results — `/exams/[notebookId]/[pageId]/resultados`
+
+Renders the page's last stored session from sample data through the same
+`ExamResultsView` the live player uses. `ExamResultsView` (`exam-results-
+view.tsx`) gained `mode: "live" | "stored"`, `date?`, `isRetake?`, and
+`durationSeconds` (renamed from `seconds`): `mode="stored"` swaps "Nuevo
+examen" from a local restart into a `Link` to a fresh session, and an
+outline "Editar preguntas" action (→ `/preguntas`) was added next to
+"Volver a los exámenes" in both modes. A `date`/`isRetake` line renders
+above the `ScoreCard` only when provided — the live flow passes neither by
+default (`ExamPlayer` now passes `isRetake` from its own prop), so nothing
+changes visually for a fresh live submission unless it actually was a
+retake.
+
+`exams/_data/sample.ts` gained `ExamSessionRecord { id, pageId, isRetake,
+date, answers, durationSeconds }` and `getLastExamSession(pageId)`: one
+stored record per attempted page (Mitocondria 60 % / 6/10 with 2 wrong + 2
+unanswered, Membrana celular 83 % / 5/6, Renacimiento 100 %). `data-testid`
+stays `exam-results` (reused).
+
+### Manual question creation/editing — `/exams/[notebookId]/[pageId]/preguntas`
+
+New route + client view (`exams/_components/exam-questions-view.tsx`):
+header count "{N} preguntas · {M} generadas por IA · {K} manuales" (N/M/K
+only count non-retired questions), a "Nueva pregunta" `Button` opening the
+new `QuestionFormDialog`, and one `ExamQuestionRow` per question. All state
+is local (saving appends/edits in memory; "Retirar" marks `retiredAt`
+instead of deleting — history stays visible, nothing is persisted past a
+remount).
+
+`exams/_data/sample.ts`'s `ExamQuestion` gained optional `origin: "ai" |
+"manual" | "ai_variant"`, `variantOf?`, `explanation?`, `retiredAt?` —
+populated only by the new `getExamQuestionsForManagement(pageId)`, a
+derived list built with `.map()` (never mutating the underlying arrays),
+so it can never change what `getExamQuestions`/`getExamVariantQuestions`
+serve to the live session or retake. Mitocondria's management list marks
+`mitocondria-q6` `origin: "manual"`, retires its 4 failed-concept originals
+(`retiredAt`), and tags its 5 retake variants `origin: "ai_variant"` (4
+with `variantOf` pointing at the original they replace, the 5th — the
+"topped up" extra question — with none). Every other page's management
+list is just its plain question set tagged `origin: "ai"`.
+
+#### ExamQuestionRow (`exam-question-row.tsx`)
+
+Index + stem, a neutral "Concepto: …" `Pill`, an origin `Pill` ("IA"
+primary / "Manual" success / "Variante" rose), a muted "Retirada" `Pill` +
+`opacity-60` on the whole row once `retiredAt` is set, an A–D options
+preview line with the correct option bold, and "Editar"/"Retirar" ghost
+buttons (`onRetire` omitted, not just disabled, once already retired).
+
+- `index`, `stem`, `concept`, `origin: "ai" | "manual" | "ai_variant"`,
+  `options`, `correctIndex`, `retiredAt?`, `onEdit`, `onRetire?`,
+  `className?`. `data-testid="exam-question-row"`.
+
+Used by: `exams/_components/exam-questions-view.tsx`.
+
+#### QuestionFormDialog (`question-form-dialog.tsx`)
+
+Built on Cogni's `Dialog` atom (same composition as `modules/notebooks/ui/
+create-notebook-dialog.tsx`): "Enunciado" `Textarea`, 4 "Opción A–D" rows
+(each an `Input` + a native radio marking the correct one), "Concepto que
+evalúa" `Input` with a helper line, "Explicación (opcional)" `Textarea`,
+footer "Cancelar" / "Guardar pregunta" ("Guardar cambios" in edit mode) —
+disabled until the stem, all 4 options and the concept are filled. Fully
+controlled (`open`/`onOpenChange`) so the same instance serves both "Nueva
+pregunta" and every row's "Editar"; it re-syncs its local form state from
+`initialValues` on every `open` transition instead of being remounted.
+
+- `open`, `onOpenChange`, `mode: "create" | "edit"`, `initialValues?`,
+  `onSubmit: (values: QuestionFormValues) => void`.
+  `data-testid="question-form-dialog"`.
+
+Used by: `exams/_components/exam-questions-view.tsx`.
+
+### Blocked retake preview — `?retake=1&variantes=error`
+
+documento-maestro §7.5 point 5: when variant generation fails on every
+provider, the retake is blocked and the original session is never reused.
+There's no backend here to actually fail, so `exams/[notebookId]/[pageId]/
+page.tsx` treats `variantes=error` as a design-preview-only query flag
+(documented in a code comment, not a real API contract): instead of
+`ExamPlayer`, it renders an `error`-tone `StatusBanner` ("No pudimos
+preparar tu examen de repetición" / …) with "Reintentar" (→ `?retake=1`)
+and outline "Volver a los exámenes" actions, wrapped in
+`data-testid="retake-blocked"`. `ExamPlayer`'s own "Examen de repetición"
+banner (shown while taking a real retake) gained a small muted link "Ver
+estado de error (vista previa)" pointing at that same flag, so the blocked
+state is reachable from the UI instead of only by hand-typing the URL.
+
+### Submit confirmation — `SubmitConfirmDialog`
+
+`ExamPlayer`'s "Entregar"/"Enviar examen" no longer submit directly: if any
+question is unanswered, a confirm `Dialog` opens first ("¿Entregar el
+examen?" / "Tienes {N} preguntas sin responder…", outline "Seguir
+respondiendo" + rose "Entregar igual"); with everything answered, it
+submits immediately as before. Built inline in `exam-player.tsx` with
+Cogni's `Dialog` atom (not a separate `shared/ui` file — it's a single
+call site with no reuse elsewhere, same reasoning as the plain-element
+buttons documented under Button above). `data-testid=
+"submit-confirm-dialog"`.

@@ -9,7 +9,8 @@ function scoreToneClassName(score: number): string {
 }
 
 export interface ExamPageCardProps {
-  href: string;
+  notebookId: string;
+  pageId: string;
   pageTitle: string;
   questionCount: number;
   attempts: number;
@@ -36,8 +37,20 @@ export interface ExamPageCardProps {
 // line, a score-or-"Sin intentar" row (+ a "Repetir pendiente" pill when
 // applicable), the last attempt date, and a CTA that reads the page's exact
 // state ("Presentar examen" / "Repetir examen" / "Ver resultados").
+//
+// Fixed 2026-09-24 (design audit vs documento-maestro §7.5): the card now
+// computes its own destination from `notebookId`/`pageId` instead of taking
+// a single `href` — a retake-pending page must land on the retake question
+// set (`?retake=1`), never the plain session, and a passed page links to
+// its stored results instead of re-running the exam. The root is a plain
+// `div` (not one big `Link`) so a second "Preguntas (N)" link can sit in
+// the footer: the title uses the stretched-link pattern
+// (`after:absolute after:inset-0`, same as page-list-row.tsx) to keep the
+// whole card clickable, and the footer link opts back into its own
+// clickable layer with `relative z-10`.
 export function ExamPageCard({
-  href,
+  notebookId,
+  pageId,
   pageTitle,
   questionCount,
   attempts,
@@ -46,6 +59,14 @@ export function ExamPageCard({
   lastDate,
   className,
 }: ExamPageCardProps) {
+  const sessionHref = `/exams/${notebookId}/${pageId}`;
+  const primaryHref = retakePending
+    ? `${sessionHref}?retake=1`
+    : lastScore === null
+      ? sessionHref
+      : `${sessionHref}/resultados`;
+  const questionsHref = `${sessionHref}/preguntas`;
+
   const ctaLabel = retakePending
     ? "Repetir examen →"
     : lastScore === null
@@ -53,10 +74,9 @@ export function ExamPageCard({
       : "Ver resultados →";
 
   return (
-    <Link
-      href={href}
+    <div
       className={cn(
-        "block overflow-hidden rounded-2xl border border-border-subtle bg-card shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card-hover",
+        "relative overflow-hidden rounded-2xl border border-border-subtle bg-card shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card-hover",
         className,
       )}
     >
@@ -65,9 +85,12 @@ export function ExamPageCard({
         className="h-1 bg-gradient-to-r from-pastel-pink to-rose-500"
       />
       <div className="px-4 pt-3.5 pb-4">
-        <p className="truncate font-semibold text-[15px] text-fg">
+        <Link
+          href={primaryHref}
+          className="block truncate font-semibold text-[15px] text-fg after:absolute after:inset-0"
+        >
           {pageTitle}
-        </p>
+        </Link>
         <p className="mt-0.5 text-fg-muted text-xs">
           {questionCount} preguntas · {attempts} intento
           {attempts === 1 ? "" : "s"}
@@ -99,7 +122,13 @@ export function ExamPageCard({
             {ctaLabel}
           </span>
         </div>
+        <Link
+          href={questionsHref}
+          className="relative z-10 mt-2 inline-block text-[11px] text-fg-muted underline decoration-dotted underline-offset-2 hover:text-fg"
+        >
+          Preguntas ({questionCount})
+        </Link>
       </div>
-    </Link>
+    </div>
   );
 }
