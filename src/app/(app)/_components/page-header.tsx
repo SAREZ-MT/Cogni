@@ -10,7 +10,11 @@ import { formatTimeAgo } from "./format";
 export const PAGE_STATUS_SLOT_ID = "page-status-slot";
 
 interface PageHeaderProps {
-  title: string;
+  // E1 (editor pass, goal doc §1): the page route now renders a live
+  // PageTitleEditor (notebooks/ui/page-title-editor.tsx) here instead of a
+  // static string — PageHeader itself stays a dumb layout shell, owning
+  // only the meta row underneath, whichever title element is passed in.
+  titleSlot: ReactNode;
   updatedAt: Date;
   // Injected instead of read internally with `new Date()`, so tests don't
   // depend on the real clock (same pattern as HomeHeader/NotebookGrid).
@@ -24,19 +28,19 @@ interface PageHeaderProps {
   statusSlot?: ReactNode;
 }
 
-// screenshots/editor.png, preview/type-scale.html: the page title reads as
-// a large bold heading (h1: --text-3xl / 700 / --leading-tight) over a meta
+// screenshots/editor.png, preview/type-scale.html: the page title area
+// (now PageTitleEditor, 36px/700/1.1 — E1, goal doc §1) sits over a meta
 // row that shows only real data (Product decision 1) — the page's own last
 // edit time, plus an optional status slot for the autosave indicator.
 export function PageHeader({
-  title,
+  titleSlot,
   updatedAt,
   now = new Date(),
   statusSlot,
 }: PageHeaderProps) {
   return (
     <header className="flex flex-col gap-1.5">
-      <h1 className="font-bold text-3xl text-fg leading-tight">{title}</h1>
+      {titleSlot}
       <div className="flex items-center gap-3 text-fg-muted text-xs">
         <span className="flex items-center gap-1">
           <Clock aria-hidden="true" size={14} strokeWidth={1.75} />

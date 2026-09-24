@@ -170,6 +170,34 @@ export async function getSidebarTree(): Promise<SidebarNotebook[]> {
   return listSidebar({ notebooks, pages }, ownerId);
 }
 
+// E1 (editor pass, goal doc §2, "@" mentions): the mention popup's data
+// source, reusing listSidebar (same one the sidebar tree consumes) instead
+// of a new use case — flattened to one page per row since a mention only
+// ever targets a single page, with its notebook's title/id alongside for
+// the popup's description line and the mention node's link target
+// (editor/domain/mention-port.ts, editor/ui/tiptap/mention-node.tsx). No
+// DomainError possible, same as getSidebarTree above.
+export interface MentionPageCandidate {
+  id: string;
+  title: string;
+  notebookId: string;
+  notebookTitle: string;
+}
+
+export async function listPagesForMention(): Promise<MentionPageCandidate[]> {
+  const ownerId = await requireOwnerId();
+  const { notebooks, pages } = deps();
+  const sidebar = await listSidebar({ notebooks, pages }, ownerId);
+  return sidebar.flatMap((notebook) =>
+    notebook.pages.map((page) => ({
+      id: page.id,
+      title: page.title,
+      notebookId: notebook.id,
+      notebookTitle: notebook.title,
+    })),
+  );
+}
+
 // Home's only data dependency (S4, odd/tasks/app-shell-restyle.md): real
 // stats/notebooks/recent pages, never invented metrics.
 export async function getHomeOverview(): Promise<HomeOverview> {

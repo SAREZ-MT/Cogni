@@ -1,5 +1,4 @@
 import { notFound } from "next/navigation";
-import { Editor } from "@/modules/editor";
 import { getImportJobStatus, PageImportView } from "@/modules/ingestion";
 import {
   getAssetReadUrl,
@@ -10,11 +9,12 @@ import {
   requestImageUpload,
   saveContent,
 } from "@/modules/notebooks";
-import { SetBreadcrumb } from "../../../../_components/breadcrumb";
 import {
   PAGE_STATUS_SLOT_ID,
   PageHeader,
 } from "../../../../_components/page-header";
+import { PageEditor } from "./_components/page-editor";
+import { PageTitle } from "./_components/page-title";
 
 // ADR 0002 (Vercel Fluid Compute, no worker, no Trigger.dev) + design.md,
 // "Decision: Procesamiento síncrono en la Server Action con maxDuration":
@@ -48,10 +48,10 @@ export default async function PageView({ params }: PagePageProps) {
   // S3 breadcrumb "{cuaderno} › {página}": a foreign/archived notebookId
   // (or any other lookup failure) degrades to just the page title rather
   // than blocking the route — getNotebookTitleForRoute never throws.
+  // E1 (goal doc §1): PageTitle (the route's client wrapper) is now the
+  // sole publisher of the breadcrumb trail, since it must live-update the
+  // last segment as the title editor saves — see its own header comment.
   const notebookTitle = await getNotebookTitleForRoute(notebookId);
-  const breadcrumbItems = notebookTitle
-    ? [{ label: notebookTitle }, { label: page.title }]
-    : [{ label: page.title }];
 
   // design.md, "Decision: Vista de página, llamada en curso y polling con
   // TanStack Query": this route fetches the job status once on the server
@@ -69,17 +69,23 @@ export default async function PageView({ params }: PagePageProps) {
     // and the editor share one centered column instead of running the full
     // content width; the import cards use the same max-w-2xl.
     <section className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4">
-      <SetBreadcrumb items={breadcrumbItems} />
-      {/* S5/S7 (odd/tasks/app-shell-restyle.md): title 28-36px/700 +
-          meta row (screenshots/editor.png) with the last-edit time and
-          the autosave status. The status itself still lives inside
-          Editor's own top row and keeps its `autosave-status` testid and
-          `aria-live` (notebooks-acceptance.spec.ts's `waitForSaved` /
-          image-upload.spec.ts read it via `page.getByTestId(...)`, not
-          scoped under `editor-mount`) — it is only portaled into this
+      {/* S5/S7 (odd/tasks/app-shell-restyle.md), E1 (goal doc §1): title
+          36px/700/1.1 (PageTitleEditor, live-editable) + meta row
+          (screenshots/editor.png) with the last-edit time and the autosave
+          status. The status itself still lives inside Editor's own top row
+          and keeps its `autosave-status` testid and `aria-live`
+          (notebooks-acceptance.spec.ts's `waitForSaved` / image-
+          upload.spec.ts read it via `page.getByTestId(...)`, not scoped
+          under `editor-mount`) — it is only portaled into this
           `statusSlot` visually, via the matching `statusPortalId` below. */}
       <PageHeader
-        title={page.title}
+        titleSlot={
+          <PageTitle
+            pageId={page.id}
+            initialTitle={page.title}
+            notebookTitle={notebookTitle}
+          />
+        }
         updatedAt={page.updatedAt}
         statusSlot={<span id={PAGE_STATUS_SLOT_ID} />}
       />
@@ -93,7 +99,8 @@ export default async function PageView({ params }: PagePageProps) {
             data-content-version={page.contentVersion}
             className="flex-1"
           >
-            <Editor
+            <PageEditor
+              notebookId={notebookId}
               pageId={page.id}
               initialContent={page.content}
               initialVersion={page.contentVersion}

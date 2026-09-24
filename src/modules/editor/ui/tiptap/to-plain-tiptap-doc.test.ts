@@ -63,7 +63,18 @@ describe("toPlainTiptapDoc", () => {
         content: [
           {
             type: "heading",
-            attrs: { level: 1 },
+            // E1 (editor pass, goal doc §2): `id`/`data-toc-id` (global
+            // attrs @tiptap/extension-table-of-contents adds to every
+            // `anchorTypes` node, "heading" by default) and `textAlign`
+            // (@tiptap/extension-text-align, configured for
+            // heading/paragraph) are new default-valued attrs on headings
+            // now that both extensions are registered.
+            attrs: {
+              level: 1,
+              id: null,
+              "data-toc-id": null,
+              textAlign: null,
+            },
             content: [{ type: "text", text: "hi" }],
           },
           {

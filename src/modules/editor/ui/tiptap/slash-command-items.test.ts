@@ -69,17 +69,28 @@ describe("SLASH_COMMAND_ITEMS", () => {
     }
   });
 
+  // E1 (editor pass, goal doc §2): regrouped to mirror the Tiptap Notion-
+  // like template — "Estilo" (text-level blocks), "Listas", "Contenido"
+  // (media/inserts) and "Callouts" — replacing the earlier "Básicos" /
+  // "Bloques" / "Medios" naming.
   it("keeps the four documented groups in a stable, first-appearance order", () => {
     const order: string[] = [];
     for (const item of SLASH_COMMAND_ITEMS) {
       if (item.group && !order.includes(item.group)) order.push(item.group);
     }
-    expect(order).toEqual(["Básicos", "Listas", "Bloques", "Medios"]);
+    expect(order).toEqual(["Estilo", "Listas", "Contenido", "Callouts"]);
   });
 
-  it("puts every heading and the paragraph in Básicos", () => {
-    for (const id of ["heading-1", "heading-2", "heading-3", "paragraph"]) {
-      expect(findItem(id).group).toBe("Básicos");
+  it("puts every heading, the paragraph, the quote and the code block in Estilo", () => {
+    for (const id of [
+      "heading-1",
+      "heading-2",
+      "heading-3",
+      "paragraph",
+      "blockquote",
+      "code-block",
+    ]) {
+      expect(findItem(id).group).toBe("Estilo");
     }
   });
 
@@ -89,8 +100,18 @@ describe("SLASH_COMMAND_ITEMS", () => {
     }
   });
 
-  it("puts the image entry in Medios", () => {
-    expect(findItem("image").group).toBe("Medios");
+  it("puts image, table, divider, math, toc, emoji and mention in Contenido", () => {
+    for (const id of [
+      "image",
+      "table",
+      "divider",
+      "math-block",
+      "toc",
+      "emoji",
+      "mention",
+    ]) {
+      expect(findItem(id).group).toBe("Contenido");
+    }
   });
 
   // S6a defect fix (docs/design-system SKILL.md, Notion style: "Heading 1"):
@@ -111,6 +132,10 @@ describe("SLASH_COMMAND_ITEMS", () => {
       "code-block": "Bloque de código",
       divider: "Divisor",
       table: "Tabla",
+      "math-block": "Fórmula matemática",
+      toc: "Tabla de contenidos",
+      emoji: "Emoji",
+      mention: "Mención",
       "callout-idea": "Callout de idea",
       "callout-note": "Callout de nota",
       "callout-warning": "Callout de advertencia",
