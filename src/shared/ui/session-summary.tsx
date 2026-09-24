@@ -8,80 +8,138 @@ import { IconTile } from "@/shared/ui/icon-tile";
 import { Pill } from "@/shared/ui/pill";
 import { cn } from "@/shared/ui/utils";
 
-export interface SessionSummaryStats {
-  again: number;
-  hard: number;
-  good: number;
-  easy: number;
+export interface SessionSummaryStat {
+  // React key for this cell (e.g. "again", "reforzar").
+  key: string;
+  label: string;
+  value: number | string;
+  // The value's own text color class (e.g. "text-error-600").
+  toneClassName: string;
 }
 
-const STAT_ORDER: {
-  key: keyof SessionSummaryStats;
-  label: string;
-  toneClassName: string;
-}[] = [
-  { key: "again", label: "Otra vez", toneClassName: "text-error-600" },
-  { key: "hard", label: "Difícil", toneClassName: "text-warning-600" },
-  { key: "good", label: "Bien", toneClassName: "text-success-600" },
-  { key: "easy", label: "Fácil", toneClassName: "text-primary-600" },
-];
+export interface SessionSummaryAction {
+  label: ReactNode;
+  // A Link when `href` is set, a plain button otherwise.
+  href?: string;
+  onClick?: () => void;
+}
 
 export interface SessionSummaryProps {
-  deckLabel: string;
-  reviewedCount: number;
-  nextReviewCount: number;
-  stats: SessionSummaryStats;
-  backHref: string;
-  onRestart: () => void;
-  // Slot for the future AI feedback block (design/shell-look, user decision
+  emoji?: ReactNode;
+  title: ReactNode;
+  subtitle: ReactNode;
+  // A 3- or 4-cell grid (Active recall/Flashcards); any other length falls
+  // back to the 4-column layout.
+  stats: SessionSummaryStat[];
+  // The "Próxima revisión" (Flashcards) / "Autoevaluación promedio" (Active
+  // recall) panel content — the tinted `bg-neutral-100` wrapper stays owned
+  // by this atom, only the inner content is per-technique.
+  highlight?: ReactNode;
+  // Flashcards' original layout is stats → feedback → highlight; Active
+  // recall's documento-maestro flow wants stats → highlight → feedback
+  // instead (the AI feedback is reserved for the very end). A plain layout
+  // switch keeps one component instead of forking it in two.
+  highlightBeforeFeedback?: boolean;
+  // Slot for the AI session feedback (design/shell-look, user decision
   // 2026-09-24: reserve the place now so the real content can drop in later
   // without touching the layout). Defaults to the "pronto" placeholder
   // panel below.
   feedback?: ReactNode;
+  primaryAction: SessionSummaryAction;
+  secondaryAction: SessionSummaryAction;
   className?: string;
 }
 
-// Default "Retroalimentación de la sesión" placeholder (design/shell-look,
-// user decision 2026-09-24): a tinted primary panel reserving the spot for
-// per-session AI feedback that doesn't exist yet.
-const DEFAULT_FEEDBACK = (
-  <div className="flex items-start gap-3 rounded-xl border border-primary-100 bg-primary-50 p-3.5 text-left">
-    <IconTile tone="primary" size="30" radius="md" className="mt-0.5">
-      <Sparkles aria-hidden="true" size={15} strokeWidth={1.75} />
-    </IconTile>
-    <div className="min-w-0 flex-1">
-      <div className="flex flex-wrap items-center gap-1.5">
-        <p className="font-semibold text-[13px] text-fg">
-          Retroalimentación de la sesión
-        </p>
-        <Pill size="sm" tone="neutral">
-          pronto
-        </Pill>
+const STATS_GRID_COLS: Record<number, string> = {
+  3: "grid-cols-3",
+  4: "grid-cols-4",
+};
+
+// Reusable "Retroalimentación de la sesión" tinted placeholder (design/
+// shell-look, user decision 2026-09-24): a Sparkles IconTile, the fixed
+// title + "pronto" Pill, and a per-technique description. Exported so
+// Active recall can reuse the exact same chrome with its own copy instead
+// of duplicating the markup.
+export function FeedbackPlaceholder({
+  description,
+}: {
+  description: ReactNode;
+}) {
+  return (
+    <div className="flex items-start gap-3 rounded-xl border border-primary-100 bg-primary-50 p-3.5 text-left">
+      <IconTile tone="primary" size="30" radius="md" className="mt-0.5">
+        <Sparkles aria-hidden="true" size={15} strokeWidth={1.75} />
+      </IconTile>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <p className="font-semibold text-[13px] text-fg">
+            Retroalimentación de la sesión
+          </p>
+          <Pill size="sm" tone="neutral">
+            pronto
+          </Pill>
+        </div>
+        <p className="mt-1 text-[12px] text-fg-muted">{description}</p>
       </div>
-      <p className="mt-1 text-[12px] text-fg-muted">
-        Aquí verás qué recordaste bien y qué conviene reforzar.
-      </p>
     </div>
-  </div>
+  );
+}
+
+const DEFAULT_FEEDBACK = (
+  <FeedbackPlaceholder description="Aquí verás qué recordaste bien y qué conviene reforzar." />
 );
 
+function renderAction(
+  action: SessionSummaryAction,
+  variant: "outline" | "default",
+  className: string,
+) {
+  if (action.href) {
+    return (
+      <Button asChild variant={variant} className={className}>
+        <Link href={action.href}>{action.label}</Link>
+      </Button>
+    );
+  }
+  return (
+    <Button
+      type="button"
+      variant={variant}
+      className={className}
+      onClick={action.onClick}
+    >
+      {action.label}
+    </Button>
+  );
+}
+
 // Session-complete panel (studyplatform-flashcards-style.md §3 summary
-// modal). A plain fixed overlay rather than Cogni's Radix `Dialog`
-// (`dialog.tsx`): `DialogContent` always renders its own hardcoded
-// `DialogOverlay` (light `bg-black/10`, no blur) with no way for a caller
-// to reach the darker/blurred overlay or the 520px panel width the
-// mockups call for without editing that shared atom, which was out of
+// modal; generalized 2026-09-24 for Active recall's documento-maestro §3.3
+// flow — see each prop's docs above). A plain fixed overlay rather than
+// Cogni's Radix `Dialog` (`dialog.tsx`): `DialogContent` always renders its
+// own hardcoded `DialogOverlay` (light `bg-black/10`, no blur) with no way
+// for a caller to reach the darker/blurred overlay or the 520px panel width
+// the mockups call for without editing that shared atom, which was out of
 // scope for this pass — the task's own fallback clause covers this case.
 export function SessionSummary({
-  deckLabel,
-  reviewedCount,
-  nextReviewCount,
+  emoji = "🎉",
+  title,
+  subtitle,
   stats,
-  backHref,
-  onRestart,
+  highlight,
+  highlightBeforeFeedback = false,
   feedback = DEFAULT_FEEDBACK,
+  primaryAction,
+  secondaryAction,
   className,
 }: SessionSummaryProps) {
+  const highlightPanel = highlight && (
+    <div className="mt-4 rounded-lg bg-neutral-100 px-4 py-3.5">
+      {highlight}
+    </div>
+  );
+  const feedbackPanel = feedback && <div className="mt-4">{feedback}</div>;
+
   return (
     <div
       role="dialog"
@@ -96,45 +154,50 @@ export function SessionSummary({
         )}
       >
         <p aria-hidden="true" className="mb-3 text-[32px] leading-none">
-          🎉
+          {emoji}
         </p>
         <h2
           id="session-summary-title"
           className="font-bold text-[22px] text-fg"
         >
-          ¡Sesión completada!
+          {title}
         </h2>
-        <p className="mt-1.5 text-[13px] text-fg-muted">
-          {deckLabel} — {reviewedCount} tarjetas revisadas
-        </p>
+        <p className="mt-1.5 text-[13px] text-fg-muted">{subtitle}</p>
 
-        <div className="mt-6 grid grid-cols-4 gap-2.5">
-          {STAT_ORDER.map(({ key, label, toneClassName }) => (
-            <div key={key} className="rounded-lg bg-neutral-100 px-2 py-3.5">
-              <p className={cn("font-bold text-[22px]", toneClassName)}>
-                {stats[key]}
+        <div
+          className={cn(
+            "mt-6 grid gap-2.5",
+            STATS_GRID_COLS[stats.length] ?? "grid-cols-4",
+          )}
+        >
+          {stats.map((stat) => (
+            <div
+              key={stat.key}
+              className="rounded-lg bg-neutral-100 px-2 py-3.5"
+            >
+              <p className={cn("font-bold text-[22px]", stat.toneClassName)}>
+                {stat.value}
               </p>
-              <p className="mt-0.5 text-[11px] text-fg-muted">{label}</p>
+              <p className="mt-0.5 text-[11px] text-fg-muted">{stat.label}</p>
             </div>
           ))}
         </div>
 
-        <div className="mt-4">{feedback}</div>
-
-        <div className="mt-4 rounded-lg bg-neutral-100 px-4 py-3.5">
-          <p className="text-[13px] text-fg-muted">Próxima revisión</p>
-          <p className="mt-0.5 font-semibold text-[15px] text-fg">
-            Mañana · {nextReviewCount} tarjetas programadas
-          </p>
-        </div>
+        {highlightBeforeFeedback ? (
+          <>
+            {highlightPanel}
+            {feedbackPanel}
+          </>
+        ) : (
+          <>
+            {feedbackPanel}
+            {highlightPanel}
+          </>
+        )}
 
         <div className="mt-6 flex items-center gap-2.5">
-          <Button asChild variant="outline" className="flex-1">
-            <Link href={backHref}>Volver al mazo</Link>
-          </Button>
-          <Button type="button" className="flex-[2]" onClick={onRestart}>
-            Repasar de nuevo →
-          </Button>
+          {renderAction(secondaryAction, "outline", "flex-1")}
+          {renderAction(primaryAction, "default", "flex-[2]")}
         </div>
       </div>
     </div>

@@ -84,7 +84,7 @@ describe("Sidebar", () => {
       "page",
     );
 
-    for (const label of ["Active recall", "Exámenes"]) {
+    for (const label of ["Exámenes"]) {
       expect(
         screen.getByText(label).closest("[aria-disabled]"),
       ).toHaveAttribute("aria-disabled", "true");
@@ -123,6 +123,18 @@ describe("Sidebar", () => {
     const row = screen.getByText("Flashcards").closest("[aria-disabled]");
     expect(row).toHaveAttribute("aria-disabled", "true");
     expect(row).toHaveTextContent("pronto");
+  });
+
+  // Active recall design preview (design/shell-look, 2026-09-24): same
+  // treatment as Flashcards above — no longer disabled/"pronto" once the
+  // preview screens exist at /active-recall.
+  it("links the Active recall nav item to /active-recall", () => {
+    render(<Sidebar initialCollapsed={false} user={USER} />);
+
+    expect(screen.getByRole("link", { name: "Active recall" })).toHaveAttribute(
+      "href",
+      "/active-recall",
+    );
   });
 
   // design pass 2: "Cuadernos" is now a plain nav item to /notebooks

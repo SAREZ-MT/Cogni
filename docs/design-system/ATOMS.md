@@ -422,11 +422,13 @@ Used by: `flashcards/_components/flashcard-player.tsx`.
 
 ### SessionSummary (`session-summary.tsx`)
 
-The session-complete panel: 🎉 + "¡Sesión completada!" + a 4-cell
-Again/Hard/Good/Easy stats grid (Spanish sub-labels — Otra vez/Difícil/
-Bien/Fácil, both here and on `RatingButton`) + a "Retroalimentación de la
-sesión" placeholder + a "Próxima revisión" panel + "Volver al mazo"/
-"Repasar de nuevo →" actions (`Button` outline/default).
+The session-complete panel: an emoji + title + subtitle + a 3- or 4-cell
+stats grid + an optional "highlight" panel + a "Retroalimentación de la
+sesión" placeholder + two actions (`Button` outline/default). Generalized
+2026-09-24 (Active recall design preview) from a Flashcards-only component
+with a fixed 4-cell again/hard/good/easy shape into a technique-agnostic one
+— Flashcards' own call site was migrated onto the new props with zero
+visual change.
 
 A **plain fixed overlay**, not Cogni's Radix `Dialog` (`dialog.tsx`):
 `DialogContent` always renders its own hardcoded `DialogOverlay`
@@ -437,13 +439,148 @@ task's own fallback clause covers this case. The panel adds
 `max-h-[calc(100dvh-32px)] overflow-y-auto` so the extra feedback block
 still fits at a 720px viewport height instead of overflowing the screen.
 
-- `deckLabel`, `reviewedCount`, `nextReviewCount`, `stats: { again, hard,
-  good, easy }`, `backHref`, `onRestart`.
+- `emoji?` (default `"🎉"`), `title`, `subtitle` (both `ReactNode`, no
+  longer fixed strings — Flashcards passes "¡Sesión completada!", Active
+  recall passes "Sesión completada" + `emoji="🧠"`).
+- `stats: SessionSummaryStat[]` (`{ key, label, value, toneClassName }`) —
+  a 3-cell grid (Active recall: por reforzar/regular/dominadas) or 4-cell
+  grid (Flashcards: again/hard/good/easy) picked from `stats.length`.
+- `highlight?: ReactNode`: the content of the tinted `bg-neutral-100` panel
+  below the stats grid — Flashcards' "Próxima revisión" line, Active
+  recall's "Autoevaluación promedio" line + a success `ProgressBar`. The
+  atom owns the panel's own wrapper/spacing; the caller only supplies the
+  inner content.
+- `highlightBeforeFeedback?` (default `false`): Flashcards' original layout
+  is stats → feedback → highlight; Active recall's documento-maestro §3.3
+  flow wants stats → highlight → feedback instead (the AI feedback is
+  reserved for the very end) — a plain ordering switch instead of forking
+  the component in two.
 - `feedback?: ReactNode` (design/shell-look, user decision 2026-09-24):
-  reserves the slot for the future AI session feedback, between the stats
-  grid and "Próxima revisión". Defaults to a tinted `primary-50`/
-  `primary-100` panel — a `Sparkles` `IconTile`, the title
-  "Retroalimentación de la sesión", a "pronto" `Pill`, and placeholder copy
-  — so the real feedback can drop in later without touching the layout.
+  reserves the slot for the future AI session feedback. Defaults to
+  `FeedbackPlaceholder`'s own default copy ("Aquí verás qué recordaste
+  bien..."); Active recall passes its own `FeedbackPlaceholder` with
+  "La IA evaluará tus respuestas con la rúbrica de la página...".
+- `primaryAction`/`secondaryAction: SessionSummaryAction`
+  (`{ label, href?, onClick? }`) replace the old fixed `backHref`/
+  `onRestart` — renders a `Link`-backed `Button` when `href` is set, a
+  plain `onClick` button otherwise. Flashcards: secondary "Volver al mazo"
+  (href), primary "Repasar de nuevo →" (onClick restart). Active recall:
+  secondary "Volver a las sesiones" (href), primary "Nueva sesión →"
+  (onClick restart).
 
-Used by: `flashcards/_components/flashcard-player.tsx`.
+Also exports `FeedbackPlaceholder({ description })`: the reusable
+Sparkles-`IconTile` + fixed title + "pronto" `Pill` + per-technique
+description markup behind the default `feedback` panel above, so a caller
+can reuse the exact same chrome with its own copy.
+
+Used by: `flashcards/_components/flashcard-player.tsx`,
+`active-recall/_components/active-recall-player.tsx`.
+
+### StatDots (`stat-dots.tsx`) — generalized
+
+Generalized 2026-09-24 (Active recall design preview) from a fixed
+again/hard/good/easy 4-tone tally into `items: StatDotItem[]`
+(`{ key, count, dotClassName }`), so both Flashcards' 4-tone tally and
+Active recall's 3-tone por-reforzar/regular/dominadas tally can reuse the
+same dot+count row instead of duplicating the markup. Flashcards' call site
+now builds its `items` array from a local `TALLY_TONE` lookup instead of
+passing raw counts — zero visual change.
+
+Used by: `flashcards/_components/flashcard-player.tsx`,
+`active-recall/_components/active-recall-player.tsx`.
+
+### DeckSummaryCard (`deck-summary-card.tsx`) — generalized
+
+Generalized 2026-09-24 (Active recall design preview): `cardCount`/
+`dueCount` are now optional, and a new `meta?: ReactNode` prop overrides
+the default "{cardCount} tarjetas · {due|al día}" line entirely — Active
+recall's hub passes `meta="{N} sesiones · última {p}%"` instead (no
+card/due concept). Flashcards' call site is unchanged (still passes
+`cardCount`/`dueCount`, no `meta`) — zero visual change.
+
+Used by: `flashcards/page.tsx`, `active-recall/page.tsx`.
+
+## Active recall design preview (2026-09-24)
+
+Five new atoms for the `/active-recall` design-preview screens (user
+decision: mirror the Flashcards preview, sample data only, no backend), plus
+the `SessionSummary`/`StatDots`/`DeckSummaryCard` generalizations documented
+above. Style source: `studyplatform-active-recall-style.md` (StudyPlatform's
+built Active Recall screens) plus `docs/design-system/screenshots/
+active-recall.png`. Follows documento-maestro §3.3 where it differs from
+StudyPlatform: feedback shows only at the end of the session (never between
+questions), and self-evaluation is a 0–5 scale instead of a 3-option
+correct/partial/incorrect pick.
+
+**Product rule: one study unit per page.** A page owns at most one Active
+recall "deck" — its sessions — with no separate named-session entity, same
+shape as Flashcards' one-deck-per-page rule. `active-recall/_data/sample.ts`
+models this with `RecallPage` (sessions inline) and
+`getRecallPagesWithSessions(notebookId)`, which only returns pages that
+actually have at least one session (no empty sessions).
+
+### QuestionCard (`question-card.tsx`)
+
+The session's open-question card: white, `rounded-2xl` (20px, the closest
+token to the report's 18px), `p-9` (36px), `shadow-md`; a 6px success dot +
+uppercase eyebrow (default "Pregunta") above the question text at 19/600.
+`children` is a reserved extra-content slot below the question, unused by
+the current session.
+
+- `eyebrowLabel?`, `question`, `children?`.
+
+Used by: `active-recall/_components/active-recall-player.tsx`.
+
+### AnswerTextarea (`answer-textarea.tsx`)
+
+The open-answer field: `min-h-[120px]`, `bg-neutral-50`, `border-[1.5px]`,
+`rounded-lg` (12px, exactly the report's radius 12), turning
+`border-success-500` + `ring-success-500/10` + `bg-card` on focus. Built as
+its own atom instead of styling the generic `Textarea` — its shadcn
+defaults conflict with too much of this look to override cleanly, the same
+call `RatingButton`/`DeckCard` already made for their own custom controls.
+
+- Plain `React.ComponentProps<"textarea">` passthrough.
+
+Used by: `active-recall/_components/active-recall-player.tsx`.
+
+### FeedbackBlock (`feedback-block.tsx`)
+
+The post-answer "Tu respuesta" card (documento-maestro §3.3: feedback only
+shows at the end of the session, so the review step shows the student's own
+answer back to them, never an "expected answer"): a `neutral` (white/muted
+eyebrow, current use) or `success` (tinted, reserved for a future
+correct-answer callout) panel with an uppercase eyebrow + body text.
+
+- `eyebrowLabel`, `tone?: "neutral" | "success"` (default `"neutral"`),
+  `children` (body).
+
+Used by: `active-recall/_components/active-recall-player.tsx`.
+
+### DifficultyScale (`difficulty-scale.tsx`)
+
+The post-answer self-evaluation (documento-maestro §3.3 "¿Qué tan difícil te
+resultó?"): 6 equal tinted buttons (0 Imposible → 5 Trivial), grading
+error (0–1) → warning (2–3) → success (4–5) with `RatingButton`'s own
+bg/border/hover pattern, in a responsive grid (3 columns narrow, 6 once
+there's room). Tapping an option both records the rating and advances to
+the next question — there's no separate "Siguiente". `data-testid=
+"self-rate-{n}"`.
+
+- `onSelect: (value: number) => void`, `disabled?`.
+
+Used by: `active-recall/_components/active-recall-player.tsx`.
+
+### RecallPageCard (`recall-page-card.tsx`)
+
+The "Sesiones por página" grid item (one per page with sessions on a
+notebook's `/active-recall/[notebookId]` list): a tinted `success-100/35`
+header (notebook name + page title), a body with the latest session's date
+and a preguntas/sesiones meta line, and a footer with the latest session's
+accuracy (tone by threshold: ≥70 success, ≥40 warning, else error) + its
+correct/partial/incorrect breakdown, plus a "Repasar →" success `Pill`.
+
+- `href`, `notebookTitle`, `pageTitle`, `lastSessionDate`, `questionCount`,
+  `sessionCount`, `accuracy`, `correct`, `partial`, `incorrect`.
+
+Used by: `active-recall/[notebookId]/page.tsx`.
