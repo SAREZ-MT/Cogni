@@ -635,7 +635,7 @@ Toda operación que puede fallar de forma esperada devuelve `Result<T, E>` en ve
 
 > Diagrama a construir con archify a partir de esta descripción.
 
-**Roadmap** — `ai`, `flashcards` y `study-engine` son esquemas vacíos; secuencia especificada en `docs/documento-maestro.md` §3.3, §8.1–§8.4 y el caso de uso CU-06.
+**Roadmap** — `ai`, `flashcards` y `study-engine` son esqueletos vacíos; secuencia especificada en `docs/documento-maestro.md` §3.3, §8.1–§8.4 y el caso de uso CU-06.
 
 1. El estudiante solicita "Generar flashcards" para una página con contenido.
 2. `flashcards.application` invocaría a `ai.application` con el propósito `generate_flashcards` y el `plain_text` de la página.
@@ -648,7 +648,7 @@ Toda operación que puede fallar de forma esperada devuelve `Result<T, E>` en ve
 
 > Diagrama a construir con archify a partir de esta descripción.
 
-**Roadmap** — `ai`, `exams` y `study-engine` son esquemas vacíos; secuencia especificada en `docs/documento-maestro.md` §3.3, §7.5 y el caso de uso CU-08.
+**Roadmap** — `ai`, `exams` y `study-engine` son esqueletos vacíos; secuencia especificada en `docs/documento-maestro.md` §3.3, §7.5 y el caso de uso CU-08.
 
 1. El estudiante inicia una sesión de examen de opción múltiple (10 preguntas por defecto).
 2. `exams.application` generaría o recuperaría preguntas mediante `ai.application` con el propósito `generate_exam_questions`.
@@ -661,7 +661,7 @@ Toda operación que puede fallar de forma esperada devuelve `Result<T, E>` en ve
 
 > Diagrama a construir con archify a partir de esta descripción.
 
-**Roadmap** — `ai`, `active-recall` y `study-engine` son esquemas vacíos; secuencia especificada en `docs/documento-maestro.md` §3.3, §7.4, §8.4 y el caso de uso CU-09.
+**Roadmap** — `ai`, `active-recall` y `study-engine` son esqueletos vacíos; secuencia especificada en `docs/documento-maestro.md` §3.3, §7.4, §8.4 y el caso de uso CU-09.
 
 1. El estudiante responde una pregunta abierta en texto libre.
 2. Inmediatamente después, se autoevalúa en una escala de 0 a 5.
