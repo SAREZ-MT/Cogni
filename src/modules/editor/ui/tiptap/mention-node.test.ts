@@ -92,9 +92,9 @@ describe("CogniMention node", () => {
       '<p><span data-type="mention" data-id="page-1" data-label="Mitosis" data-notebook-id="nb-1">@Mitosis</span></p>',
     );
     try {
-      const mention = editor.getJSON().content?.[0]?.content?.[0];
-      expect(mention?.type).toBe("mention");
-      expect(mention?.attrs?.notebookId).toBe("nb-1");
+      const mention = editor.state.doc.firstChild?.firstChild;
+      expect(mention?.type.name).toBe("mention");
+      expect(mention?.attrs.notebookId).toBe("nb-1");
     } finally {
       editor.destroy();
     }
