@@ -3,8 +3,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   Breadcrumb,
   BreadcrumbProvider,
+  SetBreadcrumb,
 } from "../../../../../_components/breadcrumb";
 import { PageTitle } from "./page-title";
+
+// Spies on SetBreadcrumb while keeping its real behavior.
+vi.mock("../../../../../_components/breadcrumb", async (importOriginal) => {
+  const actual =
+    await importOriginal<
+      typeof import("../../../../../_components/breadcrumb")
+    >();
+  return { ...actual, SetBreadcrumb: vi.fn(actual.SetBreadcrumb) };
+});
 
 const { refresh } = vi.hoisted(() => ({ refresh: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
@@ -72,5 +82,32 @@ describe("PageTitle", () => {
 
     expect(trail()).toEqual(["Cogni", "Biología", "Meiosis"]);
     expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  // Regression ("Maximum update depth exceeded"): a new array literal on every
+  // render re-ran SetBreadcrumb's publish effect forever.
+  it("hands SetBreadcrumb the same array across renders that do not change the trail", () => {
+    vi.mocked(SetBreadcrumb).mockClear();
+    const view = renderTitle({
+      initialTitle: "Mitosis",
+      notebookTitle: "Biología",
+    });
+
+    view.rerender(
+      <BreadcrumbProvider>
+        <Breadcrumb />
+        <PageTitle
+          pageId="p1"
+          initialTitle="Mitosis"
+          notebookTitle="Biología"
+        />
+      </BreadcrumbProvider>,
+    );
+
+    const arrays = new Set(
+      vi.mocked(SetBreadcrumb).mock.calls.map(([props]) => props.items),
+    );
+    expect(vi.mocked(SetBreadcrumb).mock.calls.length).toBeGreaterThan(1);
+    expect(arrays.size).toBe(1);
   });
 });

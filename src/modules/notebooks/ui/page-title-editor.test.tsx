@@ -42,6 +42,29 @@ describe("PageTitleEditor", () => {
     expect(input().placeholder).toBe("Sin título");
   });
 
+  it("starts empty for a page that still has the default title, so typing does not append to it", () => {
+    render(<PageTitleEditor pageId="p1" initialTitle="Sin título" />);
+    expect(input().value).toBe("");
+    expect(input().placeholder).toBe("Sin título");
+  });
+
+  it("does not save the default title back and saves a real one typed over it", async () => {
+    render(<PageTitleEditor pageId="p1" initialTitle="Sin título" />);
+
+    type("Sin título");
+    fireEvent.blur(input());
+    await settle();
+    expect(renamePage).not.toHaveBeenCalled();
+
+    type("Mitosis");
+    fireEvent.blur(input());
+    await settle();
+    expect(renamePage).toHaveBeenCalledExactlyOnceWith({
+      pageId: "p1",
+      title: "Mitosis",
+    });
+  });
+
   it("saves the trimmed title once typing pauses for 600 ms", async () => {
     const onSaved = vi.fn();
     render(<PageTitleEditor pageId="p1" initialTitle="" onSaved={onSaved} />);

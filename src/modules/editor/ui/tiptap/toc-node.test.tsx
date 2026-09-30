@@ -1,8 +1,22 @@
 import { act, render, screen } from "@testing-library/react";
 import { Editor } from "@tiptap/core";
 import { EditorContent } from "@tiptap/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { createElement } from "react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createEditorExtensions } from "./extensions";
+
+// Counts renders of the card: its icon only renders with the card itself.
+const { iconRenders } = vi.hoisted(() => ({ iconRenders: { count: 0 } }));
+vi.mock("lucide-react", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("lucide-react")>();
+  return {
+    ...actual,
+    ListTree: (props: object) => {
+      iconRenders.count++;
+      return createElement(actual.ListTree, props);
+    },
+  };
+});
 
 // The TOC node view computes its own heading list from the document on every
 // `update`/`selectionUpdate`, so these tests drive a real editor through
@@ -97,5 +111,31 @@ describe("TocBlock", () => {
 
     // The caret lands inside the heading, not on the block boundary.
     expect(editor?.state.selection.$from.parent.type.name).toBe("heading");
+  });
+
+  // Regression ("Maximum update depth exceeded" right after load): every
+  // update/selectionUpdate used to hand React a brand-new array even when the
+  // headings were unchanged, re-rendering the card forever.
+  it("does not re-render the card when only the selection moves", async () => {
+    editor = new Editor({
+      extensions: createEditorExtensions(),
+      content: {
+        type: "doc",
+        content: [toc, heading(1, "Célula"), { type: "paragraph" }],
+      },
+    });
+    render(<EditorContent editor={editor} />);
+    await screen.findAllByTestId("toc-block-item");
+    const before = iconRenders.count;
+
+    for (const pos of [3, 4, 3, 4, 3, 4]) {
+      await act(async () => {
+        editor?.commands.setTextSelection(pos);
+      });
+    }
+
+    // Moving the selection never changes the headings: at most the initial
+    // settle may re-render, never one render per move.
+    expect(iconRenders.count - before).toBeLessThanOrEqual(1);
   });
 });
