@@ -180,9 +180,9 @@ export function createEditorExtensions(
     CogniMention.configure({
       suggestion: createMentionSuggestion(mentionPort),
     }),
-    // E1: KaTeX-rendered inline `$…$` / block `$$…$$` math, plus the "/"
-    // menu's "Fórmula matemática" (slash-command-items.ts's
-    // `insertBlockMath`).
+    // E1: KaTeX-rendered inline `$…$` / block `$$…$$` math. Kept
+    // registered so existing math content renders and round-trips; there is
+    // no insert entry point until a math editing UI exists.
     Mathematics.configure({
       katexOptions: { throwOnError: false },
     }),

@@ -14,7 +14,6 @@ import {
   Minus,
   Pilcrow,
   Quote,
-  Sigma,
   SmilePlus,
   StickyNote,
   Table as TableIcon,
@@ -193,21 +192,6 @@ export const SLASH_COMMAND_ITEMS: SlashCommandItem[] = [
     description: "Línea separadora",
     run: (editor, range) =>
       editor.chain().focus().deleteRange(range).setHorizontalRule().run(),
-  },
-  {
-    id: "math-block",
-    label: "Fórmula matemática",
-    keywords: ["math", "latex", "formula"],
-    icon: Sigma,
-    group: "Contenido",
-    description: "Inserta una ecuación en LaTeX",
-    run: (editor, range) =>
-      editor
-        .chain()
-        .focus()
-        .deleteRange(range)
-        .insertBlockMath({ latex: "" })
-        .run(),
   },
   {
     id: "toc",

@@ -124,6 +124,17 @@ describe("SLASH_COMMAND_ITEMS", () => {
   // S6a (odd/tasks/app-shell-restyle.md), Editor directive: the restyled
   // "/" menu renders an icon tile and a group heading per item (command-
   // menu.tsx), so every entry here must declare both.
+  // No math editing UI exists yet: an entry whose insert command is a no-op
+  // (empty LaTeX is rejected by the Mathematics extension) must not be offered.
+  it("does not offer a math entry until math can be edited", () => {
+    expect(SLASH_COMMAND_ITEMS.some((item) => item.id === "math-block")).toBe(
+      false,
+    );
+    expect(
+      SLASH_COMMAND_ITEMS.some((item) => /f[óo]rmula|math/i.test(item.label)),
+    ).toBe(false);
+  });
+
   it("gives every item an icon and a group", () => {
     for (const item of SLASH_COMMAND_ITEMS) {
       expect(item.icon, `missing icon on "${item.id}"`).toBeTruthy();
@@ -162,16 +173,8 @@ describe("SLASH_COMMAND_ITEMS", () => {
     }
   });
 
-  it("puts image, table, divider, math, toc, emoji and mention in Contenido", () => {
-    for (const id of [
-      "image",
-      "table",
-      "divider",
-      "math-block",
-      "toc",
-      "emoji",
-      "mention",
-    ]) {
+  it("puts image, table, divider, toc, emoji and mention in Contenido", () => {
+    for (const id of ["image", "table", "divider", "toc", "emoji", "mention"]) {
       expect(findItem(id).group).toBe("Contenido");
     }
   });
@@ -194,7 +197,6 @@ describe("SLASH_COMMAND_ITEMS", () => {
       "code-block": "Bloque de código",
       divider: "Divisor",
       table: "Tabla",
-      "math-block": "Fórmula matemática",
       toc: "Tabla de contenidos",
       emoji: "Emoji",
       mention: "Mención",
