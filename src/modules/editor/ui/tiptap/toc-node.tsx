@@ -88,7 +88,7 @@ function TocView({ editor }: ReactNodeViewProps) {
                   editor
                     .chain()
                     .focus()
-                    .setTextSelection(heading.pos)
+                    .setTextSelection(heading.pos + 1)
                     .scrollIntoView()
                     .run()
                 }
