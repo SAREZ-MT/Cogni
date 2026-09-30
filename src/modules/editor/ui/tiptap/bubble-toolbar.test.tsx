@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { Editor } from "@tiptap/core";
 import { NodeRangeSelection } from "@tiptap/extension-node-range";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -222,6 +222,80 @@ describe("BubbleToolbarControls", () => {
       (m) => m.type === "textStyle",
     );
     expect(mark?.attrs.color).toBe("var(--color-pastel-purple-fg)");
+  });
+
+  // E2 toolbar additions: block-type dropdown, undo/redo, super/subscript and
+  // alignment.
+  it("shows the current block's name on the 'Convertir en' trigger", () => {
+    editor = createHeadlessEditor("<h2>hola</h2>");
+    editor.commands.setTextSelection({ from: 1, to: 3 });
+    render(<BubbleToolbarControls editor={editor} />);
+
+    expect(screen.getByTestId("bubble-toolbar-block-type")).toHaveTextContent(
+      "Encabezado 2",
+    );
+  });
+
+  it("converts the block through the 'Convertir en' dropdown", async () => {
+    editor = createHeadlessEditor();
+    editor.commands.setTextSelection({ from: 1, to: 3 });
+    render(<BubbleToolbarControls editor={editor} />);
+
+    fireEvent.pointerDown(screen.getByTestId("bubble-toolbar-block-type"), {
+      button: 0,
+      ctrlKey: false,
+    });
+    fireEvent.click(await screen.findByRole("menuitem", { name: /Cita/ }));
+
+    expect(editor.isActive("blockquote")).toBe(true);
+  });
+
+  it("disables undo/redo until there is history, then undoes and redoes", () => {
+    editor = createHeadlessEditor();
+    render(<BubbleToolbarControls editor={editor} />);
+    const undo = screen.getByRole("button", { name: "Deshacer" });
+    const redo = screen.getByRole("button", { name: "Rehacer" });
+    expect(undo).toBeDisabled();
+    expect(redo).toBeDisabled();
+
+    act(() => {
+      editor.chain().toggleBold().run();
+    });
+    expect(undo).toBeEnabled();
+
+    fireEvent.click(undo);
+    expect(editor.isActive("bold")).toBe(false);
+    expect(redo).toBeEnabled();
+
+    fireEvent.click(redo);
+    expect(editor.isActive("bold")).toBe(true);
+  });
+
+  it("toggles superscript and subscript and reflects them in aria-pressed", () => {
+    editor = createHeadlessEditor();
+    render(<BubbleToolbarControls editor={editor} />);
+
+    const sup = screen.getByRole("button", { name: "Superíndice" });
+    fireEvent.click(sup);
+    expect(editor.isActive("superscript")).toBe(true);
+    expect(sup).toHaveAttribute("aria-pressed", "true");
+
+    const sub = screen.getByRole("button", { name: "Subíndice" });
+    fireEvent.click(sub);
+    expect(editor.isActive("subscript")).toBe(true);
+  });
+
+  it("aligns the block through the alignment dropdown", async () => {
+    editor = createHeadlessEditor();
+    render(<BubbleToolbarControls editor={editor} />);
+
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Alineación" }), {
+      button: 0,
+      ctrlKey: false,
+    });
+    fireEvent.click(await screen.findByRole("menuitem", { name: /Centro/ }));
+
+    expect(editor.state.doc.child(0).attrs.textAlign).toBe("center");
   });
 
   // S6b defect 2 (focus, odd/tasks/app-shell-restyle.md): applying a link
