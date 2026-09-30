@@ -388,4 +388,87 @@ describe("useAutosave", () => {
       initialReconcileVersion,
     );
   });
+
+  // `savedContent` is what the server is known to hold: editor UI uses it to
+  // tell persisted block ids from ones still only in the live document.
+  describe("savedContent", () => {
+    function setup(port: FakeSavePagePort) {
+      return renderHook(() =>
+        useAutosave({
+          pageId: PAGE_ID,
+          initialContent: doc("v1"),
+          initialVersion: 1,
+          port,
+        }),
+      );
+    }
+
+    it("starts as the initial content", () => {
+      const port = new FakeSavePagePort({ content: doc("v1"), version: 1 });
+      const { result } = setup(port);
+      expect(result.current.savedContent).toEqual(doc("v1"));
+    });
+
+    it("follows the content that was actually sent once a save succeeds", async () => {
+      const port = new FakeSavePagePort({ content: doc("v1"), version: 1 });
+      const { result } = setup(port);
+
+      act(() => result.current.setContent(doc("v2")));
+      expect(result.current.savedContent).toEqual(doc("v1"));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1500);
+      });
+
+      expect(result.current.savedContent).toEqual(doc("v2"));
+    });
+
+    it("does not claim an edit made while the save was in flight", async () => {
+      const port = new FakeSavePagePort({ content: doc("v1"), version: 1 });
+      port.holdNextSaves(true);
+      const { result } = setup(port);
+
+      act(() => result.current.setContent(doc("sent")));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1500);
+      });
+      act(() => result.current.setContent(doc("typed-during-save")));
+      await act(async () => {
+        port.resolveNextSave({ ok: true, value: { version: 2 } });
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+      expect(result.current.savedContent).toEqual(doc("sent"));
+    });
+
+    it("becomes the server's content after a version conflict is reconciled", async () => {
+      const port = new FakeSavePagePort({ content: doc("v1"), version: 1 });
+      port.setServerState({ content: doc("server"), version: 5 });
+      const { result } = setup(port);
+
+      act(() => result.current.setContent(doc("local")));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1500);
+      });
+
+      expect(result.current.status).toBe("conflict");
+      expect(result.current.savedContent).toEqual(doc("server"));
+    });
+
+    it("keeps the previous value when a save fails", async () => {
+      const port = new FakeSavePagePort({ content: doc("v1"), version: 1 });
+      port.scriptNextSave({
+        ok: false,
+        error: { code: "BOOM", message: "boom" },
+      });
+      const { result } = setup(port);
+
+      act(() => result.current.setContent(doc("v2")));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1500);
+      });
+
+      expect(result.current.status).toBe("error");
+      expect(result.current.savedContent).toEqual(doc("v1"));
+    });
+  });
 });

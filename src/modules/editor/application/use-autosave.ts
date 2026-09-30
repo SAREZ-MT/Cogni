@@ -43,6 +43,10 @@ export interface UseAutosaveResult {
   // every keystroke, so the Tiptap document is only ever resynced for a
   // real server-driven change (PR3b review advisory).
   reconcileVersion: number;
+  // The document the server is known to hold: the initial content, then the
+  // exact document of each successful save (never a newer local edit) or the
+  // server's content after a conflict reconciliation.
+  savedContent: TiptapDoc;
   setContent: (content: TiptapDoc) => void;
   // Cancels the pending debounce (if any) and saves immediately with the
   // latest content. Used for an explicit save shortcut (editor/ui,
@@ -72,6 +76,7 @@ export function useAutosave({
   const [content, setContentState] = useState<TiptapDoc>(initialContent);
   const [conflictDraft, setConflictDraft] = useState<TiptapDoc | null>(null);
   const [reconcileVersion, setReconcileVersion] = useState(0);
+  const [savedContent, setSavedContent] = useState<TiptapDoc>(initialContent);
 
   const versionRef = useRef(initialVersion);
   const contentRef = useRef(initialContent);
@@ -100,14 +105,16 @@ export function useAutosave({
     // failed save: keep the draft, show "error" and retry on the next
     // pause. The finally block guarantees savingRef is always released.
     try {
+      const sent = contentRef.current;
       const result = await port.save({
         pageId,
-        content: contentRef.current,
+        content: sent,
         expectedVersion: versionRef.current,
       });
 
       if (result.ok) {
         versionRef.current = result.value.version;
+        setSavedContent(sent);
         setStatus("saved");
       } else if (
         isDomainErrorLike(result.error) &&
@@ -119,6 +126,7 @@ export function useAutosave({
           contentRef.current = current.value.content;
           versionRef.current = current.value.version;
           setContentState(current.value.content);
+          setSavedContent(current.value.content);
           setReconcileVersion((v) => v + 1);
           setStatus("conflict");
         } else {
@@ -207,6 +215,7 @@ export function useAutosave({
     content,
     conflictDraft,
     reconcileVersion,
+    savedContent,
     setContent,
     flush,
     restoreDraft,
