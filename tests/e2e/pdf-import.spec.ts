@@ -55,12 +55,9 @@ function chapterPages(count: number): string[] {
   });
 }
 
-// Opens the PDF import from the notebook's card on /notebooks. Design pass 2
-// left the card kebab ("Acciones de {título}": Renombrar, Cambiar apariencia,
-// Archivar) without an "Importar PDF" item and the editor has no slash
-// command for it in this slice, so the import has no UI entry point at all
-// until a later slice of the design integration restores one. Only this
-// helper has to change then.
+// Opens the PDF import from the notebook's card on /notebooks: the "Importar
+// PDF" item of its "Acciones de {título}" kebab (injected by ingestion through
+// the notebook actions slot, src/app/(app)/_components/notebook-actions.tsx).
 async function openPdfImport(page: Page, title: string) {
   await page.getByRole("button", { name: `Acciones de ${title}` }).click();
   await page.getByRole("menuitem", { name: "Importar PDF" }).click();
@@ -68,10 +65,6 @@ async function openPdfImport(page: Page, title: string) {
 
 test.describe("pdf import acceptance", () => {
   test.skip(!hasSupabaseEnv, "Supabase env (cogni-dev) is not configured");
-  test.fixme(
-    true,
-    "PDF import has no UI entry point in the design shell yet (notebook card kebab and slash menu lack 'Importar PDF')",
-  );
 
   test("imports a 30-page text PDF end to end and the content survives a reload", async ({
     page,
