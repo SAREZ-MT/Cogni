@@ -4,9 +4,9 @@ import {
   type HomeNotebookSummary,
   NotebookCardActions,
 } from "@/modules/notebooks";
-import { cn } from "@/shared/ui/utils";
+import { IconTile } from "@/shared/ui/icon-tile";
 import { formatTimeAgo } from "./format";
-import { NOTEBOOK_SWATCH_CLASSES } from "./notebook-swatches";
+import { notebookToneFromColor } from "./notebook-swatches";
 
 interface NotebookListRowProps {
   notebook: HomeNotebookSummary;
@@ -22,19 +22,16 @@ export function NotebookListRow({
 }: NotebookListRowProps) {
   return (
     <div className="group relative flex items-center gap-3 border-border-subtle border-b px-3 py-3 last:border-b-0 hover:bg-hover">
-      <span
-        className={cn(
-          "flex size-7 shrink-0 items-center justify-center rounded-md text-sm",
-          // Legacy notebooks created before random colors were assigned on
-          // creation have no stored color; fall back to violet rather than
-          // a flat neutral tile (user decision, design pass 2).
-          NOTEBOOK_SWATCH_CLASSES[notebook.color ?? "purple"],
-        )}
+      <IconTile
+        size="28"
+        radius="md"
+        className="text-sm"
+        tone={notebookToneFromColor(notebook.color)}
       >
         {notebook.icon ?? (
           <NotebookIcon aria-hidden="true" size={15} strokeWidth={1.75} />
         )}
-      </span>
+      </IconTile>
       <Link
         href={`/notebooks/${notebook.id}`}
         className="min-w-0 flex-1 font-medium text-fg text-sm after:absolute after:inset-0"

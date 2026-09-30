@@ -1,6 +1,10 @@
 import { CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import type { HomeReadyToReview } from "@/modules/notebooks";
+import { Card } from "@/shared/ui/card";
+import { EmptyState } from "@/shared/ui/empty-state";
+import { IconTile } from "@/shared/ui/icon-tile";
+import { SectionTitle } from "@/shared/ui/section-header";
 import { cn } from "@/shared/ui/utils";
 import { formatTimeAgo } from "../format";
 import { NEUTRAL_DOT_CLASS, NOTEBOOK_DOT_CLASSES } from "../notebook-swatches";
@@ -20,20 +24,23 @@ export function ReadyToReview({
   now = new Date(),
 }: ReadyToReviewProps) {
   return (
-    <div className="flex flex-col rounded-xl border border-border-subtle bg-card p-5 shadow-xs">
-      <h2 className="mb-3.5 font-semibold text-fg text-sm">
-        Notas listas para repasar
-      </h2>
+    <Card padding="md" className="flex flex-col">
+      <SectionTitle>Notas listas para repasar</SectionTitle>
       {readyToReview.items.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-2 rounded-lg border border-success-500/20 bg-success-50 px-5 py-6 text-center">
-          <span className="flex size-10 items-center justify-center rounded-tile bg-success-100 text-success-600">
-            <CheckCircle2 aria-hidden="true" size={20} strokeWidth={1.75} />
-          </span>
-          <p className="font-semibold text-fg text-sm">¡Todo al día!</p>
-          <p className="text-fg-muted text-xs">
-            No tienes notas pendientes de repaso por ahora.
-          </p>
-        </div>
+        <EmptyState
+          variant="success"
+          fill
+          icon={
+            <IconTile size="40" tone="success">
+              <CheckCircle2 aria-hidden="true" size={20} strokeWidth={1.75} />
+            </IconTile>
+          }
+          title="¡Todo al día!"
+          titleAs="p"
+          titleClassName="text-sm"
+          description="No tienes notas pendientes de repaso por ahora."
+          descriptionClassName="text-xs"
+        />
       ) : (
         <ul className="flex flex-col">
           {readyToReview.items.map((page) => (
@@ -71,6 +78,6 @@ export function ReadyToReview({
           ))}
         </ul>
       )}
-    </div>
+    </Card>
   );
 }

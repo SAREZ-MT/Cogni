@@ -50,4 +50,51 @@ describe("StatCard", () => {
     const fill = container.querySelector('[data-slot="progress-fill"]');
     expect(fill).toHaveStyle({ width: "100%" });
   });
+
+  it("names the progress bar after the stat label", () => {
+    render(
+      <StatCard
+        label="Editadas esta semana"
+        icon={<NotebookPen aria-hidden="true" size={14} />}
+        iconBgClass="bg-pastel-green text-pastel-green-fg"
+        value="2"
+        progress={60}
+      />,
+    );
+
+    const bar = screen.getByRole("progressbar", {
+      name: "Editadas esta semana",
+    });
+    expect(bar).toHaveAttribute("aria-valuenow", "60");
+  });
+
+  it("gives each card's bar its own label reference", () => {
+    render(
+      <>
+        <StatCard
+          label="Uno"
+          icon={null}
+          iconBgClass=""
+          value="1"
+          progress={10}
+        />
+        <StatCard
+          label="Dos"
+          icon={null}
+          iconBgClass=""
+          value="2"
+          progress={20}
+        />
+      </>,
+    );
+
+    expect(screen.getByRole("progressbar", { name: "Uno" })).toHaveAttribute(
+      "aria-valuenow",
+      "10",
+    );
+    expect(screen.getByRole("progressbar", { name: "Dos" })).toHaveAttribute(
+      "aria-valuenow",
+      "20",
+    );
+  });
 });

@@ -1,5 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
+import { Keycap } from "@/shared/ui/keycap";
+import { Pill } from "@/shared/ui/pill";
 import {
   Tooltip,
   TooltipContent,
@@ -62,9 +64,13 @@ export function NavItem({
       {!collapsed && (
         <>
           <span className="flex-1">{label}</span>
-          <span className="ml-auto shrink-0 rounded-full bg-neutral-200/50 px-2 py-0.5 font-semibold text-[10px] text-fg-muted">
+          <Pill
+            size="sm"
+            tone="neutral"
+            className="ml-auto shrink-0 bg-neutral-200/50 text-[10px]"
+          >
             pronto
-          </span>
+          </Pill>
         </>
       )}
     </div>
@@ -88,12 +94,7 @@ export function NavItem({
           {shortcut && shortcut.length > 0 && (
             <span className="flex shrink-0 gap-[3px]">
               {shortcut.map((key) => (
-                <span
-                  key={key}
-                  className="rounded-[5px] border border-neutral-200/60 bg-neutral-200/50 px-[5px] py-[2px] font-medium text-[10px] text-fg-muted"
-                >
-                  {key}
-                </span>
+                <Keycap key={key}>{key}</Keycap>
               ))}
             </span>
           )}

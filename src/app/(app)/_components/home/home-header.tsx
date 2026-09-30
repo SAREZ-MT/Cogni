@@ -1,4 +1,5 @@
 import { CreateNotebookTrigger } from "@/modules/notebooks";
+import { SectionHeader } from "@/shared/ui/section-header";
 import { greetingForHour } from "../format";
 
 interface HomeHeaderProps {
@@ -14,14 +15,11 @@ export function HomeHeader({ displayName, now = new Date() }: HomeHeaderProps) {
   const greeting = greetingForHour(now.getHours(), displayName);
 
   return (
-    <div className="flex items-start justify-between gap-4">
-      <div>
-        <h1 className="font-bold text-[28px] text-fg">{greeting}</h1>
-        <p className="mt-1 text-fg-muted text-sm">
-          Aquí está tu resumen de hoy — ¡sigue así!
-        </p>
-      </div>
-      <CreateNotebookTrigger variant="pill" />
-    </div>
+    <SectionHeader
+      title={greeting}
+      titleClassName="text-[28px]"
+      description="Aquí está tu resumen de hoy — ¡sigue así!"
+      actions={<CreateNotebookTrigger variant="pill" />}
+    />
   );
 }

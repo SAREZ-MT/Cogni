@@ -3,6 +3,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/modules/identity";
 import { CreateNotebookTrigger, getHomeOverview } from "@/modules/notebooks";
+import { Card } from "@/shared/ui/card";
+import { EmptyState } from "@/shared/ui/empty-state";
+import { IconTile } from "@/shared/ui/icon-tile";
+import { SectionHeader } from "@/shared/ui/section-header";
 import { cn } from "@/shared/ui/utils";
 import { SetBreadcrumb } from "../_components/breadcrumb";
 import { NotebookCard } from "../_components/notebook-card";
@@ -38,36 +42,33 @@ export default async function NotebooksPage({
     <section className="flex flex-1 flex-col gap-6">
       <SetBreadcrumb items={[{ label: "Cuadernos" }]} />
 
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="font-medium text-[11px] text-fg-muted uppercase tracking-wider">
-            Biblioteca
-          </p>
-          <h1 className="mt-1 font-bold text-2xl text-fg">Cuadernos</h1>
-          <p className="mt-1 text-fg-muted text-sm">
-            {notebooks.length === 0
-              ? "Aún no tienes cuadernos. Crea uno para empezar."
-              : notebooks.length === 1
-                ? "1 cuaderno"
-                : `${notebooks.length} cuadernos`}
-          </p>
-        </div>
-        <CreateNotebookTrigger variant="pill" />
-      </div>
+      <SectionHeader
+        eyebrow="Biblioteca"
+        title="Cuadernos"
+        description={
+          notebooks.length === 0
+            ? "Aún no tienes cuadernos. Crea uno para empezar."
+            : notebooks.length === 1
+              ? "1 cuaderno"
+              : `${notebooks.length} cuadernos`
+        }
+        actions={<CreateNotebookTrigger variant="pill" />}
+      />
 
       {notebooks.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-2 rounded-[20px] border border-neutral-300 border-dashed px-14 py-14 text-center">
-          <span className="flex size-14 items-center justify-center rounded-tile bg-primary-100 text-primary-600">
-            <NotebookPen aria-hidden="true" size={26} strokeWidth={1.5} />
-          </span>
-          <h2 className="font-semibold text-base text-fg">
-            Crea tu primer cuaderno
-          </h2>
-          <p className="max-w-sm text-fg-muted text-sm">
-            Los cuadernos organizan tus apuntes por materia, semestre o
-            proyecto.
-          </p>
-        </div>
+        <EmptyState
+          variant="dashed"
+          fill
+          icon={
+            <IconTile size="56" tone="primary">
+              <NotebookPen aria-hidden="true" size={26} strokeWidth={1.5} />
+            </IconTile>
+          }
+          title="Crea tu primer cuaderno"
+          titleClassName="text-base"
+          description="Los cuadernos organizan tus apuntes por materia, semestre o proyecto."
+          descriptionClassName="max-w-sm"
+        />
       ) : (
         <>
           <div className="flex items-center gap-1 self-start rounded-input border border-border-subtle bg-neutral-100 p-1">
@@ -103,7 +104,7 @@ export default async function NotebooksPage({
               <CreateNotebookTrigger variant="tile" />
             </div>
           ) : (
-            <div className="rounded-xl border border-border-subtle bg-card shadow-xs">
+            <Card>
               {notebooks.map((notebook) => (
                 <NotebookListRow
                   key={notebook.id}
@@ -111,7 +112,7 @@ export default async function NotebooksPage({
                   now={now}
                 />
               ))}
-            </div>
+            </Card>
           )}
         </>
       )}

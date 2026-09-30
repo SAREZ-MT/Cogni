@@ -1,5 +1,7 @@
 import Link from "next/link";
 import type { HomeRecentPage } from "@/modules/notebooks";
+import { Card } from "@/shared/ui/card";
+import { SectionTitle } from "@/shared/ui/section-header";
 import { cn } from "@/shared/ui/utils";
 import { formatTimeAgo } from "../format";
 import { NEUTRAL_DOT_CLASS, NOTEBOOK_DOT_CLASSES } from "../notebook-swatches";
@@ -14,10 +16,8 @@ interface RecentPagesProps {
 // "flashcards pendientes" panel next to it.
 export function RecentPages({ pages, now = new Date() }: RecentPagesProps) {
   return (
-    <div className="rounded-xl border border-border-subtle bg-card p-5 shadow-xs">
-      <h2 className="mb-3.5 font-semibold text-fg text-sm">
-        Páginas recientes
-      </h2>
+    <Card padding="md">
+      <SectionTitle>Páginas recientes</SectionTitle>
       {pages.length === 0 ? (
         <p className="text-fg-muted text-sm">
           Todavía no hay páginas editadas.
@@ -58,6 +58,6 @@ export function RecentPages({ pages, now = new Date() }: RecentPagesProps) {
           ))}
         </ul>
       )}
-    </div>
+    </Card>
   );
 }
