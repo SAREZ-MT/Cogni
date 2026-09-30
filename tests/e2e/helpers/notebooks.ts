@@ -24,10 +24,25 @@ import { expect } from "../fixtures/auth";
 // to a successful (2xx) response still waiting on the exact click keeps the
 // timing guarantee while catching a failed action instead of silently
 // racing past it.
-export async function clickAndWaitForAction(page: Page, locator: Locator) {
+//
+// Pass `bodyIncludes` whenever other Server Actions can fire around the click:
+// the shell polls actions of its own right after a refresh (an argument-less
+// POST to the same pathname), and matching that one instead of the click's
+// action lets the next step (e.g. a reload) abort the real mutation in
+// flight. The action's serialized arguments carry its input, so matching a
+// fragment of it (`"color":"purple"`) pins the exact request.
+export async function clickAndWaitForAction(
+  page: Page,
+  locator: Locator,
+  bodyIncludes?: string,
+) {
   const [response] = await Promise.all([
     page.waitForResponse(
-      (candidate) => candidate.request().method() === "POST" && candidate.ok(),
+      (candidate) =>
+        candidate.request().method() === "POST" &&
+        candidate.ok() &&
+        (bodyIncludes === undefined ||
+          (candidate.request().postData() ?? "").includes(bodyIncludes)),
     ),
     locator.click(),
   ]);
