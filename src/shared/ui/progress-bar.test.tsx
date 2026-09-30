@@ -16,6 +16,19 @@ describe("ProgressBar", () => {
     expect(bar).toHaveAttribute("aria-valuemax", "100");
   });
 
+  it("can be named through aria-labelledby", () => {
+    render(
+      <>
+        <span id="lbl">Constancia</span>
+        <ProgressBar value={10} aria-labelledby="lbl" />
+      </>,
+    );
+
+    expect(
+      screen.getByRole("progressbar", { name: "Constancia" }),
+    ).toBeInTheDocument();
+  });
+
   it("sets the fill width from the value through an inline style", () => {
     const { container } = render(<ProgressBar value={37} />);
 

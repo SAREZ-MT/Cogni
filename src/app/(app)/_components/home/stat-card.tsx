@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useId } from "react";
 import { Card } from "@/shared/ui/card";
 import { IconTile } from "@/shared/ui/icon-tile";
 import { ProgressBar } from "@/shared/ui/progress-bar";
@@ -47,6 +47,7 @@ export function StatCard({
   muted = false,
   footer,
 }: StatCardProps) {
+  const labelId = useId();
   return (
     <Card
       padding="none"
@@ -56,7 +57,9 @@ export function StatCard({
         <IconTile size="30" radius="md" className={iconBgClass}>
           {icon}
         </IconTile>
-        <span className="font-medium text-fg-muted text-xs">{label}</span>
+        <span id={labelId} className="font-medium text-fg-muted text-xs">
+          {label}
+        </span>
         {action && <span className="ml-auto shrink-0">{action}</span>}
       </div>
       <p className="font-bold text-[26px] text-fg leading-tight">{value}</p>
@@ -64,6 +67,7 @@ export function StatCard({
       {progress != null && (
         <ProgressBar
           value={progress}
+          aria-labelledby={labelId}
           className="mt-3"
           fillClassName={progressClassName}
         />

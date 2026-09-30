@@ -80,9 +80,11 @@ description/actions shape without restructuring it — left as-is.
 Thin rounded-pill track + fill. `value` (0-100, clamped; non-finite counts as
 0), `fillClassName` (e.g. `"gradient-streak"`). The fill width is set through
 an inline `style`. The track exposes `role="progressbar"` with
-`aria-valuenow` (clamped) / `aria-valuemin=0` / `aria-valuemax=100`; name it
-with `aria-label`, or pass `role="presentation" aria-hidden` when a label next
-to it already says the same thing. `data-slot="progress-bar"`/`"progress-fill"`
+`aria-valuenow` (clamped) / `aria-valuemin=0` / `aria-valuemax=100`; a name
+is required whenever the bar is not decorative (axe `aria-progressbar-name`):
+pass `aria-label`, or `aria-labelledby` pointing at a visible label (StatCard
+uses `useId` + the stat's label). Only a purely decorative bar may opt out with
+`role="presentation" aria-hidden`. `data-slot="progress-bar"`/`"progress-fill"`
 are unchanged so existing test queries still work.
 
 Used by: `home/stat-card.tsx`.
