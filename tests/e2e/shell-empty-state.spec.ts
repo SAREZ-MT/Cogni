@@ -27,14 +27,16 @@ test.describe("app shell", () => {
 
     const content = page.getByTestId("content-area");
     await expect(content).toHaveCSS("background-color", "rgb(255, 255, 255)");
-    await expect(content).toHaveCSS("border-top-left-radius", "20px");
+    await expect(content).toHaveCSS("border-top-left-radius", "16px");
   });
 
   // Scenario "Reescritura de shell-empty-state.spec.ts"
   // (specs/design-tokens-and-shell/spec.md): a fresh owner without
-  // notebooks sees notebooks' own empty-state message and a control to
-  // create the first one, inside the sidebar tree.
-  test("sidebar shows the notebooks empty state and a control to create the first notebook", async ({
+  // notebooks sees the empty-state message and a control to create the
+  // first one. Since design pass 2 the sidebar is navigation only, so both
+  // live in Home's content area (the "Nuevo cuaderno" pill, whose dialog
+  // confirms with "Crear cuaderno").
+  test("home shows the empty state and a control to create the first notebook", async ({
     page,
     freshUser,
   }) => {
@@ -46,13 +48,45 @@ test.describe("app shell", () => {
     await signIn(page, freshUser);
     await page.goto("/");
 
+    const content = page.getByTestId("content-area");
+    await expect(
+      content.getByText("Aún no tienes cuadernos. Crea uno para empezar."),
+    ).toBeVisible();
+    await expect(
+      content.getByRole("button", { name: "Nuevo cuaderno" }),
+    ).toBeVisible();
+
+    // The sidebar no longer carries the notebook tree or its empty state.
     const sidebar = page.getByRole("navigation", { name: "Barra lateral" });
     await expect(
       sidebar.getByText("Aún no tienes cuadernos. Crea uno para empezar."),
-    ).toBeVisible();
+    ).toHaveCount(0);
+  });
+
+  // Design previews (Dashboard, Flashcards, Active recall, Exámenes) are
+  // hidden in production builds, which is what this suite runs against
+  // (`next build && next start`): they render as disabled "pronto" rows
+  // instead of links.
+  test("sidebar lists the preview areas as disabled 'pronto' entries", async ({
+    page,
+  }) => {
+    await page.goto("/");
+
+    const sidebar = page.getByRole("navigation", { name: "Barra lateral" });
+    for (const label of [
+      "Dashboard",
+      "Flashcards",
+      "Active recall",
+      "Exámenes",
+    ]) {
+      await expect(sidebar.getByRole("link", { name: label })).toHaveCount(0);
+      await expect(
+        sidebar.locator('[aria-disabled="true"]').filter({ hasText: label }),
+      ).toContainText("pronto");
+    }
     await expect(
-      sidebar.getByRole("button", { name: "Crear cuaderno" }),
-    ).toBeVisible();
+      sidebar.getByRole("link", { name: "Cuadernos" }),
+    ).toHaveAttribute("href", "/notebooks");
   });
 
   test("collapses the sidebar to 64px and keeps the choice after navigating", async ({

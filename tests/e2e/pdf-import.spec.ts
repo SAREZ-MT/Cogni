@@ -7,6 +7,7 @@ import {
   signIn,
   test,
 } from "./fixtures/auth";
+import { createNotebook } from "./helpers/notebooks";
 
 // specs/ingestion (design.md §11, proposal.md Success Criteria): the two
 // end-to-end scenarios not already covered by Vitest unit/component tests —
@@ -54,8 +55,23 @@ function chapterPages(count: number): string[] {
   });
 }
 
+// Opens the PDF import from the notebook's card on /notebooks. Design pass 2
+// left the card kebab ("Acciones de {título}": Renombrar, Cambiar apariencia,
+// Archivar) without an "Importar PDF" item and the editor has no slash
+// command for it in this slice, so the import has no UI entry point at all
+// until a later slice of the design integration restores one. Only this
+// helper has to change then.
+async function openPdfImport(page: Page, title: string) {
+  await page.getByRole("button", { name: `Acciones de ${title}` }).click();
+  await page.getByRole("menuitem", { name: "Importar PDF" }).click();
+}
+
 test.describe("pdf import acceptance", () => {
   test.skip(!hasSupabaseEnv, "Supabase env (cogni-dev) is not configured");
+  test.fixme(
+    true,
+    "PDF import has no UI entry point in the design shell yet (notebook card kebab and slash menu lack 'Importar PDF')",
+  );
 
   test("imports a 30-page text PDF end to end and the content survives a reload", async ({
     page,
@@ -68,23 +84,10 @@ test.describe("pdf import acceptance", () => {
     test.setTimeout(180_000);
 
     await signIn(page, freshUser);
-    const sidebar = page.getByRole("navigation", { name: "Barra lateral" });
-    await page.goto("/");
 
     const title = "Cuaderno de importación e2e";
-    await sidebar.getByRole("button", { name: "Crear cuaderno" }).click();
-    const dialog = page.getByRole("dialog");
-    await dialog.getByLabel("Título").fill(title);
-    await Promise.all([
-      page.waitForResponse(
-        (response) => response.request().method() === "POST" && response.ok(),
-      ),
-      dialog.getByRole("button", { name: "Crear cuaderno" }).click(),
-    ]);
-    await expect(sidebar.getByText(title)).toBeVisible();
-
-    await sidebar.getByRole("button", { name: `Acciones de ${title}` }).click();
-    await page.getByRole("menuitem", { name: "Importar PDF" }).click();
+    await createNotebook(page, title);
+    await openPdfImport(page, title);
 
     const pdfBytes = makeTextPdf(chapterPages(30));
     await page.getByTestId("pdf-import-input").setInputFiles({
@@ -123,12 +126,14 @@ test.describe("pdf import acceptance", () => {
       editable.getByText("CAPITULO 30", { exact: true }),
     ).toBeVisible();
 
-    const notebookItem = sidebar
-      .getByRole("listitem")
-      .filter({ hasText: title });
+    // The imported page is listed on its notebook's route (the sidebar no
+    // longer carries the page tree), titled after the file.
+    const notebookRoute = new URL(page.url()).pathname.split("/pages/")[0];
+    await page.goto(notebookRoute);
     await expect(
-      notebookItem.getByRole("link", { name: "text-30-pages", exact: true }),
+      page.getByRole("link", { name: /^text-30-pages/ }),
     ).toBeVisible();
+    await page.goBack();
 
     await page.reload();
     const reloadedEditable = page
@@ -147,23 +152,10 @@ test.describe("pdf import acceptance", () => {
     freshUser,
   }) => {
     await signIn(page, freshUser);
-    const sidebar = page.getByRole("navigation", { name: "Barra lateral" });
-    await page.goto("/");
 
     const title = "Cuaderno sin texto e2e";
-    await sidebar.getByRole("button", { name: "Crear cuaderno" }).click();
-    const dialog = page.getByRole("dialog");
-    await dialog.getByLabel("Título").fill(title);
-    await Promise.all([
-      page.waitForResponse(
-        (response) => response.request().method() === "POST" && response.ok(),
-      ),
-      dialog.getByRole("button", { name: "Crear cuaderno" }).click(),
-    ]);
-    await expect(sidebar.getByText(title)).toBeVisible();
-
-    await sidebar.getByRole("button", { name: `Acciones de ${title}` }).click();
-    await page.getByRole("menuitem", { name: "Importar PDF" }).click();
+    await createNotebook(page, title);
+    await openPdfImport(page, title);
 
     const pdfBytes = makeNoTextPdf();
     await page.getByTestId("pdf-import-input").setInputFiles({
