@@ -16,6 +16,7 @@ import type { ReactNode } from "react";
 import { useState } from "react";
 import { cn } from "@/shared/ui/utils";
 import { Logo } from "./logo";
+import { type NavEntry, resolveNavEntry } from "./nav-entries";
 import { NavItem } from "./nav-item";
 import {
   SIDEBAR_COLLAPSED,
@@ -42,17 +43,10 @@ function SectionLabel({ children }: { children: ReactNode }) {
 
 // Static nav content (design/shell-look, studyplatform obs 140 app shell):
 // no module import needed, so it lives in Sidebar directly instead of being
-// threaded in as a prop.
-type NavEntry =
-  | {
-      href: string;
-      icon: typeof Home;
-      label: string;
-      isActive: (path: string) => boolean;
-      shortcut?: string[];
-    }
-  | { icon: typeof Home; label: string; disabled: true; hint: string };
-
+// threaded in as a prop. Entries for areas that are sample-data design
+// previews (Dashboard, Flashcards, Active recall, Exámenes) get a `preview`
+// route once that route ships; until then, and whenever design previews are
+// disabled, they render as disabled "pronto" rows (nav-entries.ts).
 const MAIN_SECTION: { label: string; items: NavEntry[] } = {
   label: "Menú principal",
   items: [
@@ -100,6 +94,9 @@ const SECTIONS = [MAIN_SECTION, TECNICAS_SECTION, CONFIGURACION_SECTION];
 type SidebarProps = {
   initialCollapsed: boolean;
   user: { id: string; email: string | null };
+  // Resolved on the server (shared/config/design-previews.ts) and passed
+  // down: the env var it reads is not available to client components.
+  previewsEnabled: boolean;
 };
 
 // design pass 2 (odd/tasks, user decision "Sidebar = navigation only"):
@@ -111,7 +108,11 @@ type SidebarProps = {
 // instead. The tree components themselves (SidebarTree, NotebookItem,
 // PageItem, CreateNotebookIconButton) are untouched and still exported from
 // the notebooks module — only this shell stopped mounting them.
-export function Sidebar({ initialCollapsed, user }: SidebarProps) {
+export function Sidebar({
+  initialCollapsed,
+  user,
+  previewsEnabled,
+}: SidebarProps) {
   const [collapsed, setCollapsed] = useState(initialCollapsed);
   const pathname = usePathname();
 
@@ -158,8 +159,13 @@ export function Sidebar({ initialCollapsed, user }: SidebarProps) {
         {SECTIONS.map((section) => (
           <div key={section.label} className="flex flex-col gap-0.5">
             {!collapsed && <SectionLabel>{section.label}</SectionLabel>}
-            {section.items.map((item) =>
-              "disabled" in item ? (
+            {section.items.map((entry) => {
+              const item = resolveNavEntry(
+                entry,
+                previewsEnabled,
+                pathname ?? "/",
+              );
+              return item.disabled ? (
                 <NavItem
                   key={item.label}
                   href="#"
@@ -175,12 +181,12 @@ export function Sidebar({ initialCollapsed, user }: SidebarProps) {
                   href={item.href}
                   icon={item.icon}
                   label={item.label}
-                  active={item.isActive(pathname ?? "/")}
+                  active={item.active}
                   shortcut={item.shortcut}
                   collapsed={collapsed}
                 />
-              ),
-            )}
+              );
+            })}
           </div>
         ))}
       </div>

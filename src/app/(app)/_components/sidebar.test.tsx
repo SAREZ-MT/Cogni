@@ -23,7 +23,7 @@ describe("Sidebar", () => {
   });
 
   it("starts expanded and offers to collapse", () => {
-    render(<Sidebar initialCollapsed={false} user={USER} />);
+    render(<Sidebar initialCollapsed={false} user={USER} previewsEnabled />);
 
     const toggle = screen.getByRole("button", {
       name: "Contraer barra lateral",
@@ -36,7 +36,7 @@ describe("Sidebar", () => {
 
   it("collapses on click and persists the choice in a cookie", async () => {
     const user = userEvent.setup();
-    render(<Sidebar initialCollapsed={false} user={USER} />);
+    render(<Sidebar initialCollapsed={false} user={USER} previewsEnabled />);
 
     await user.click(
       screen.getByRole("button", { name: "Contraer barra lateral" }),
@@ -52,7 +52,7 @@ describe("Sidebar", () => {
   });
 
   it("respects the persisted collapsed state on first render", () => {
-    render(<Sidebar initialCollapsed={true} user={USER} />);
+    render(<Sidebar initialCollapsed={true} user={USER} previewsEnabled />);
 
     expect(
       screen.getByRole("button", { name: "Expandir barra lateral" }),
@@ -60,19 +60,21 @@ describe("Sidebar", () => {
   });
 
   it("always renders the Cogni logo in the header row", () => {
-    render(<Sidebar initialCollapsed={false} user={USER} />);
+    render(<Sidebar initialCollapsed={false} user={USER} previewsEnabled />);
 
     expect(screen.getByRole("link", { name: "Cogni" })).toBeInTheDocument();
   });
 
   it("renders the Menú principal, Técnicas and Configuración sections with an active Inicio", () => {
-    render(<Sidebar initialCollapsed={false} user={USER} />);
+    render(<Sidebar initialCollapsed={false} user={USER} previewsEnabled />);
 
     expect(screen.getByText("Menú principal")).toBeInTheDocument();
     expect(screen.getByText("Técnicas")).toBeInTheDocument();
     // "Configuración" is both the section label and its one (disabled) nav
     // item's label; scope to the label element specifically.
-    expect(screen.getByText("Configuración", { selector: "p" })).toBeInTheDocument();
+    expect(
+      screen.getByText("Configuración", { selector: "p" }),
+    ).toBeInTheDocument();
 
     // "Inicio"'s accessible name also includes its "⌘ H" shortcut keycap
     // (nav-item.tsx renders it whenever the row isn't collapsed, active or
@@ -92,7 +94,7 @@ describe("Sidebar", () => {
   // design pass 2: "Cuadernos" is now a plain nav item to /notebooks
   // (no longer a "/" href and no longer a tree section header).
   it("links the Cuadernos nav item to /notebooks", () => {
-    render(<Sidebar initialCollapsed={false} user={USER} />);
+    render(<Sidebar initialCollapsed={false} user={USER} previewsEnabled />);
 
     expect(screen.getByRole("link", { name: "Cuadernos" })).toHaveAttribute(
       "href",
@@ -102,7 +104,7 @@ describe("Sidebar", () => {
 
   it("pins the user footer card at the bottom with the sign-out menu", async () => {
     const eventUser = userEvent.setup();
-    render(<Sidebar initialCollapsed={false} user={USER} />);
+    render(<Sidebar initialCollapsed={false} user={USER} previewsEnabled />);
 
     expect(screen.getByText("JD")).toBeInTheDocument();
     await eventUser.click(
@@ -111,5 +113,55 @@ describe("Sidebar", () => {
     expect(
       screen.getByRole("menuitem", { name: "Cerrar sesión" }),
     ).toBeInTheDocument();
+  });
+
+  // Design previews (Dashboard, Flashcards, Active recall, Exámenes) are
+  // sample-data screens whose routes ship in later slices; until then every
+  // one of them is a disabled "pronto" row, whatever the server-computed
+  // flag says, so a link never points at a missing route.
+  describe.each([
+    ["enabled", true],
+    ["disabled", false],
+  ])("with design previews %s", (_state, previewsEnabled) => {
+    it.each([
+      "Dashboard",
+      "Flashcards",
+      "Active recall",
+      "Exámenes",
+    ])("renders %s as a disabled 'pronto' row", (label) => {
+      render(
+        <Sidebar
+          initialCollapsed={false}
+          user={USER}
+          previewsEnabled={previewsEnabled}
+        />,
+      );
+
+      const row = screen.getByText(label).closest("[aria-disabled]");
+      expect(row).toHaveAttribute("aria-disabled", "true");
+      expect(row).toHaveTextContent("pronto");
+      expect(
+        screen.queryByRole("link", { name: new RegExp(label) }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("keeps the real routes (Inicio, Cuadernos) as links", () => {
+      render(
+        <Sidebar
+          initialCollapsed={false}
+          user={USER}
+          previewsEnabled={previewsEnabled}
+        />,
+      );
+
+      expect(screen.getByRole("link", { name: /Inicio/ })).toHaveAttribute(
+        "href",
+        "/",
+      );
+      expect(screen.getByRole("link", { name: "Cuadernos" })).toHaveAttribute(
+        "href",
+        "/notebooks",
+      );
+    });
   });
 });

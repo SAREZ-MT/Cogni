@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { ensureProfileForUser, getCurrentUser } from "@/modules/identity";
 import { getActiveImports } from "@/modules/ingestion";
+import { designPreviewsEnabled } from "@/shared/config/design-previews";
 import { BreadcrumbProvider } from "./_components/breadcrumb";
 import { NotebookActions } from "./_components/notebook-actions";
 import { QueryProvider } from "./_components/query-provider";
@@ -49,7 +50,11 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
             need a bounded height to scroll internally instead of growing
             the whole shell past the viewport. */}
         <div className="flex h-dvh gap-2 bg-canvas p-2">
-          <Sidebar initialCollapsed={collapsed} user={user} />
+          <Sidebar
+            initialCollapsed={collapsed}
+            user={user}
+            previewsEnabled={designPreviewsEnabled()}
+          />
           <div
             data-testid="content-area"
             className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl bg-card shadow-card"
