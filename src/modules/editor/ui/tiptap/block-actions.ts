@@ -113,9 +113,14 @@ export function resetBlockFormatting(editor: Editor, ref: BlockRef): void {
 // of a type UniqueID isn't configured for) has no blockId yet — the caller
 // (block-context-menu.tsx) hides "Copiar enlace" in that case rather than
 // copying a broken link.
-export function blockLinkFragment(ref: BlockRef): string | null {
+export function blockLinkId(ref: BlockRef): string | null {
   const id = ref.node.attrs.blockId;
-  return typeof id === "string" && id ? `#block-${id}` : null;
+  return typeof id === "string" && id ? id : null;
+}
+
+export function blockLinkFragment(ref: BlockRef): string | null {
+  const id = blockLinkId(ref);
+  return id ? `#block-${id}` : null;
 }
 
 export function copyBlockLink(ref: BlockRef): void {

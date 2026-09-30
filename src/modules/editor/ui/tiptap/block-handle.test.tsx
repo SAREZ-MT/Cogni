@@ -1,4 +1,5 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { Editor } from "@tiptap/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BlockHandle } from "./block-handle";
@@ -80,6 +81,38 @@ describe("BlockHandle", () => {
     expect(
       screen.getByRole("button", { name: "Opciones del bloque" }),
     ).toHaveAttribute("data-testid", "block-drag-handle");
+  });
+
+  it("hands the persisted-id predicate to its context menu, which gates Copiar enlace on it", async () => {
+    vi.useRealTimers();
+    editor = createHeadlessEditor();
+    await waitFor(() =>
+      expect(editor.state.doc.firstChild?.attrs.blockId).toEqual(
+        expect.any(String),
+      ),
+    );
+    const id = editor.state.doc.firstChild?.attrs.blockId as string;
+    const user = userEvent.setup();
+    const { unmount } = render(
+      <BlockHandle editor={editor} isBlockIdPersisted={(c) => c === id} />,
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: "Opciones del bloque" }),
+    );
+    expect(
+      await screen.findByRole("menuitem", { name: /Copiar enlace/ }),
+    ).toBeVisible();
+    unmount();
+
+    render(<BlockHandle editor={editor} />);
+    await user.click(
+      screen.getByRole("button", { name: "Opciones del bloque" }),
+    );
+    await screen.findByRole("menuitem", { name: /Duplicar/ });
+    expect(
+      screen.queryByRole("menuitem", { name: /Copiar enlace/ }),
+    ).toBeNull();
   });
 
   it("gives the drag control a grab cursor", () => {

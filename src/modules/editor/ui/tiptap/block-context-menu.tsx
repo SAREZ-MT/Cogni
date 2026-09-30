@@ -31,6 +31,7 @@ import {
 } from "@/shared/ui/dropdown-menu";
 import {
   type BlockRef,
+  blockLinkId,
   copyBlock,
   copyBlockLink,
   deleteBlock,
@@ -54,6 +55,10 @@ export interface BlockContextMenuProps {
   // hover time — the menu can stay open for a while, well past whatever
   // was true the moment the grip was clicked.
   getHoveredPos: () => number | null;
+  // "Copiar enlace" points at a block id, which only means something once the
+  // id is stored: ids labeled in the live document but not yet saved would
+  // yield a link that breaks on reload. Unknown counts as not persisted.
+  isBlockIdPersisted?: (blockId: string) => boolean;
   children: ReactNode;
 }
 
@@ -69,6 +74,7 @@ function SwatchDot({ swatch }: { swatch: ColorSwatch }) {
 export function BlockContextMenu({
   editor,
   getHoveredPos,
+  isBlockIdPersisted = () => false,
   children,
 }: BlockContextMenuProps) {
   const [open, setOpen] = useState(false);
@@ -93,6 +99,8 @@ export function BlockContextMenu({
   }
 
   const isImage = ref?.node.type.name === "image";
+  const blockId = ref ? blockLinkId(ref) : null;
+  const canCopyLink = blockId !== null && isBlockIdPersisted(blockId);
 
   return (
     <DropdownMenu open={open} onOpenChange={handleOpenChange}>
@@ -201,13 +209,15 @@ export function BlockContextMenu({
           Duplicar
           <DropdownMenuShortcut>⌘D</DropdownMenuShortcut>
         </DropdownMenuItem>
-        <DropdownMenuItem
-          className="gap-2 text-[13.5px]"
-          onSelect={() => withFreshRef((fresh) => copyBlockLink(fresh))}
-        >
-          <LinkIcon aria-hidden="true" size={16} strokeWidth={1.75} />
-          Copiar enlace
-        </DropdownMenuItem>
+        {canCopyLink && (
+          <DropdownMenuItem
+            className="gap-2 text-[13.5px]"
+            onSelect={() => withFreshRef((fresh) => copyBlockLink(fresh))}
+          >
+            <LinkIcon aria-hidden="true" size={16} strokeWidth={1.75} />
+            Copiar enlace
+          </DropdownMenuItem>
+        )}
         {isImage && (
           <DropdownMenuItem
             className="gap-2 text-[13.5px]"

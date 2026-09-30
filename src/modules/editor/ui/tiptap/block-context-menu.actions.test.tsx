@@ -34,10 +34,14 @@ describe("BlockContextMenu rows", () => {
     vi.unstubAllGlobals();
   });
 
-  async function openMenu() {
+  async function openMenu(isBlockIdPersisted?: (id: string) => boolean) {
     const user = userEvent.setup();
     render(
-      <BlockContextMenu editor={editor} getHoveredPos={() => hoveredPos}>
+      <BlockContextMenu
+        editor={editor}
+        getHoveredPos={() => hoveredPos}
+        isBlockIdPersisted={isBlockIdPersisted}
+      >
         <button type="button">Opciones del bloque</button>
       </BlockContextMenu>,
     );
@@ -48,8 +52,17 @@ describe("BlockContextMenu rows", () => {
     return user;
   }
 
+  async function waitForBlockIds() {
+    await waitFor(() =>
+      expect(editor.state.doc.firstChild?.attrs.blockId).toEqual(
+        expect.any(String),
+      ),
+    );
+  }
+
   it("lists the block actions with their shortcuts", async () => {
-    await openMenu();
+    await waitForBlockIds();
+    await openMenu(() => true);
 
     for (const name of [
       /Convertir en/,
@@ -62,6 +75,59 @@ describe("BlockContextMenu rows", () => {
     ]) {
       expect(screen.getByRole("menuitem", { name })).toBeVisible();
     }
+  });
+
+  describe("Copiar enlace", () => {
+    it("is offered for a block whose id is already persisted", async () => {
+      await waitForBlockIds();
+      const id = editor.state.doc.child(0).attrs.blockId as string;
+      const persisted = vi.fn((candidate: string) => candidate === id);
+
+      await openMenu(persisted);
+
+      expect(
+        screen.getByRole("menuitem", { name: /Copiar enlace/ }),
+      ).toBeVisible();
+      expect(persisted).toHaveBeenCalledWith(id);
+    });
+
+    it("is hidden for a block whose id only exists in the live document", async () => {
+      await waitForBlockIds();
+
+      await openMenu(() => false);
+
+      expect(
+        screen.queryByRole("menuitem", { name: /Copiar enlace/ }),
+      ).toBeNull();
+    });
+
+    it("is hidden when nothing is known to be persisted", async () => {
+      await waitForBlockIds();
+
+      await openMenu();
+
+      expect(
+        screen.queryByRole("menuitem", { name: /Copiar enlace/ }),
+      ).toBeNull();
+    });
+
+    it("is hidden for a block that has no id yet", async () => {
+      // An editor without UniqueID: the blocks never get an id.
+      editor.destroy();
+      editor = new Editor({
+        extensions: createEditorExtensions().filter(
+          (extension) => extension.name !== "uniqueID",
+        ),
+        content: "<p>uno</p>",
+      });
+      expect(editor.state.doc.child(0).attrs.blockId).toBeUndefined();
+
+      await openMenu(() => true);
+
+      expect(
+        screen.queryByRole("menuitem", { name: /Copiar enlace/ }),
+      ).toBeNull();
+    });
   });
 
   it("only offers Descargar on an image block", async () => {

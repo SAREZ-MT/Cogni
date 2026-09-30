@@ -20,12 +20,14 @@ import { collapseBlockSelection } from "./block-selection";
 
 export interface BlockHandleProps {
   editor: Editor;
+  // See BlockContextMenuProps.isBlockIdPersisted.
+  isBlockIdPersisted?: (blockId: string) => boolean;
 }
 
 const HANDLE_BUTTON_CLASS =
   "flex size-6 items-center justify-center rounded-md text-fg-muted outline-none transition-colors hover:bg-hover focus-visible:ring-2 focus-visible:ring-ring";
 
-export function BlockHandle({ editor }: BlockHandleProps) {
+export function BlockHandle({ editor, isBlockIdPersisted }: BlockHandleProps) {
   // Tracked via a ref, not state: `onNodeChange` fires on every pointer
   // move over the gutter, and this value is only read once, on the "+"
   // click — a re-render per hover frame would be wasted work.
@@ -121,6 +123,7 @@ export function BlockHandle({ editor }: BlockHandleProps) {
         <BlockContextMenu
           editor={editor}
           getHoveredPos={() => hoveredRef.current?.pos ?? null}
+          isBlockIdPersisted={isBlockIdPersisted}
         >
           <button
             type="button"

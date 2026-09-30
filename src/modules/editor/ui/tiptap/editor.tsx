@@ -1,7 +1,7 @@
 "use client";
 
 import { EditorContent, useEditor } from "@tiptap/react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useAutosave } from "../../application/use-autosave";
 import type { ImageUploadPort } from "../../domain/image-upload-port";
@@ -10,7 +10,7 @@ import type { SavePagePort, TiptapDoc } from "../../domain/save-page-port";
 import { ConflictBanner } from "../conflict-banner";
 import { SaveStatus } from "../save-status";
 import { BlockHandle } from "./block-handle";
-import { isBlockIdOnlyChange } from "./block-ids";
+import { collectBlockIds, isBlockIdOnlyChange } from "./block-ids";
 import { BubbleToolbar } from "./bubble-toolbar";
 import { createEditorExtensions } from "./extensions";
 import type { SlashCommandItem } from "./slash-command-items";
@@ -79,6 +79,7 @@ export function Editor({
     content,
     conflictDraft,
     reconcileVersion,
+    savedContent,
     setContent,
     flush,
     restoreDraft,
@@ -89,6 +90,18 @@ export function Editor({
     initialVersion,
     port,
   });
+
+  // Ids already stored on the server: "Copiar enlace" is only offered for
+  // those. Read through a ref so the predicate handed down stays stable.
+  const persistedBlockIdsRef = useRef<Set<string>>(new Set());
+  persistedBlockIdsRef.current = useMemo(
+    () => collectBlockIds(savedContent),
+    [savedContent],
+  );
+  const isBlockIdPersisted = useCallback(
+    (blockId: string) => persistedBlockIdsRef.current.has(blockId),
+    [],
+  );
 
   const editor = useEditor({
     extensions: createEditorExtensions({
@@ -194,7 +207,9 @@ export function Editor({
       {/* S6b (odd/tasks/app-shell-restyle.md): per-block "⋮⋮" drag handle +
           "+" insert in the left gutter, matching the Tiptap docs
           Notion-style editor. */}
-      {editor ? <BlockHandle editor={editor} /> : null}
+      {editor ? (
+        <BlockHandle editor={editor} isBlockIdPersisted={isBlockIdPersisted} />
+      ) : null}
       {/* T13b (design fidelity, docs/design-system/screenshots/editor.png):
           `.editor-content` (src/app/globals.css) styles the real
           ProseMirror output against the Cogni type scale instead of

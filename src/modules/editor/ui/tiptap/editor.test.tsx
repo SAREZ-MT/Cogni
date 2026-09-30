@@ -1,9 +1,25 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { FakeSavePagePort } from "../../application/testing/fake-save-page-port";
 import type { TiptapDoc } from "../../domain/save-page-port";
 import { Editor } from "./editor";
+
+// BlockHandle needs floating-ui layout; only the persisted-id predicate the
+// editor hands it is under test here.
+const { handleProps } = vi.hoisted(() => ({
+  handleProps: {
+    current: undefined as
+      | { isBlockIdPersisted?: (id: string) => boolean }
+      | undefined,
+  },
+}));
+vi.mock("./block-handle", () => ({
+  BlockHandle: (props: { isBlockIdPersisted?: (id: string) => boolean }) => {
+    handleProps.current = props;
+    return null;
+  },
+}));
 
 function emptyDoc(): TiptapDoc {
   return { type: "doc", content: [{ type: "paragraph" }] };
@@ -373,6 +389,76 @@ describe("Editor", () => {
       const ids = blockIdsIn(saved);
       expect(ids).toHaveLength(2);
       expect(new Set(ids).size).toBe(2);
+    });
+  });
+
+  describe("persisted block ids (Copiar enlace)", () => {
+    const withIds: TiptapDoc = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          attrs: { blockId: "saved-id" },
+          content: [{ type: "text", text: "uno" }],
+        },
+      ],
+    };
+
+    it("treats ids present in the initial document as persisted", async () => {
+      const port = new FakeSavePagePort({ content: withIds, version: 1 });
+      render(
+        <Editor
+          pageId="page-1"
+          initialContent={withIds}
+          initialVersion={1}
+          port={port}
+        />,
+      );
+      await waitFor(() => expect(handleProps.current).toBeDefined());
+
+      expect(handleProps.current?.isBlockIdPersisted?.("saved-id")).toBe(true);
+      expect(handleProps.current?.isBlockIdPersisted?.("other")).toBe(false);
+    });
+
+    it("keeps an id unpersisted until a save that contains it succeeds", async () => {
+      const user = userEvent.setup();
+      const legacy: TiptapDoc = {
+        type: "doc",
+        content: [
+          { type: "paragraph", content: [{ type: "text", text: "uno" }] },
+        ],
+      };
+      const port = new FakeSavePagePort({ content: legacy, version: 1 });
+      render(
+        <Editor
+          pageId="page-1"
+          initialContent={legacy}
+          initialVersion={1}
+          port={port}
+        />,
+      );
+      await waitFor(() =>
+        expect(document.querySelector("[data-blockid]")).not.toBeNull(),
+      );
+      const liveId = document
+        .querySelector("[data-blockid]")
+        ?.getAttribute("data-blockid") as string;
+
+      expect(handleProps.current?.isBlockIdPersisted?.(liveId)).toBe(false);
+
+      const editable = document.querySelector(
+        '[contenteditable="true"]',
+      ) as HTMLElement;
+      await user.click(editable);
+      await user.type(editable, "!");
+      // Edited and labeled, but the debounce has not fired: still not stored.
+      expect(port.saveCalls).toHaveLength(0);
+      expect(handleProps.current?.isBlockIdPersisted?.(liveId)).toBe(false);
+      await waitFor(
+        () =>
+          expect(handleProps.current?.isBlockIdPersisted?.(liveId)).toBe(true),
+        { timeout: 4000 },
+      );
     });
   });
 });
