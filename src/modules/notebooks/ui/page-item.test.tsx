@@ -31,10 +31,10 @@ describe("PageItem", () => {
     ).toBeInTheDocument();
   });
 
-  // S7 (odd/tasks/app-shell-restyle.md, sidebar-preview.png): page titles
-  // get the same two-line clamp treatment as notebook titles instead of
-  // truncating to a single line.
-  it("clamps the title to two lines and wraps instead of truncating", () => {
+  // Design pass 2 (5b87e25, sidebar as a floating card): the tree rows went
+  // back to a single-line truncated title inside the narrower card, replacing
+  // the S7 two-line clamp.
+  it("truncates the title to a single line instead of wrapping", () => {
     render(
       <ul>
         <PageItem
@@ -46,13 +46,10 @@ describe("PageItem", () => {
       </ul>,
     );
 
-    const link = screen.getByRole("link", { name: "Capítulo 1" });
-    expect(link.className).not.toContain("truncate");
-
     const titleSpan = screen.getByText("Capítulo 1");
-    expect(titleSpan.className).toContain("line-clamp-2");
-    expect(titleSpan.className).toContain("whitespace-normal");
-    expect(titleSpan.className).not.toContain("truncate");
+    expect(titleSpan.className).toContain("truncate");
+    expect(titleSpan.className).not.toContain("line-clamp-2");
+    expect(titleSpan.className).not.toContain("whitespace-normal");
   });
 
   it("renders no badge by default", () => {
