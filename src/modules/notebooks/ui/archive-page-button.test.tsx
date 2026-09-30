@@ -36,9 +36,7 @@ describe("ArchivePageButton", () => {
     await user.click(
       screen.getByRole("button", { name: "Archivar página Mitocondria" }),
     );
-    await user.click(
-      await screen.findByRole("button", { name: "Archivar", exact: true }),
-    );
+    await user.click(await screen.findByRole("button", { name: /^Archivar$/ }));
 
     await waitFor(() =>
       expect(archivePage).toHaveBeenCalledWith({ pageId: "p1" }),
