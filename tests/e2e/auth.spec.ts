@@ -76,9 +76,9 @@ test.describe("authentication", () => {
     const user = await createVerifiedUser();
     try {
       await signIn(page, user);
-      // Both the sidebar tree and the home content area show this same
-      // empty-state copy (notebooks/design-tokens-and-shell specs), so it
-      // must be scoped to one of them to avoid a strict-mode ambiguity.
+      // Home's content area shows the empty-state copy (the sidebar is
+      // navigation only since design pass 2); scoping to it keeps the
+      // assertion independent of any other surface that may repeat the copy.
       await expect(
         page
           .getByTestId("content-area")

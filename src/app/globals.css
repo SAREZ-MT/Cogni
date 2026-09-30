@@ -50,19 +50,33 @@
   --color-pastel-mint: #d1fae5;
   --color-pastel-mint-fg: #065f46;
 
-  /* Semantic status */
+  /* Semantic status: *-50 stays the near-white tint, *-100 is the stronger
+     pastel tint used for metric/stat icon tiles and badges (design pass 2,
+     figma-make-design-system.md diff §"tokens to add/align" — error-100 was
+     the only *-100 shade missing; success/warning/info-100 already existed
+     as pastel-mint/-yellow/-blue). *-700 is the accessible dark text pair
+     for text-on-tint (success/warning/info already had one via
+     pastel-mint-fg/-yellow-fg/-blue-fg; error-700 was missing). */
   --color-success-50: #ecfdf5;
+  --color-success-100: #d1fae5;
   --color-success-500: #10b981;
   --color-success-600: #059669;
+  --color-success-700: #065f46;
   --color-warning-50: #fffbeb;
+  --color-warning-100: #fef3c7;
   --color-warning-500: #f59e0b;
   --color-warning-600: #d97706;
+  --color-warning-700: #92400e;
   --color-error-50: #fef2f2;
+  --color-error-100: #fee2e2;
   --color-error-500: #ef4444;
   --color-error-600: #dc2626;
+  --color-error-700: #991b1b;
   --color-info-50: #eff6ff;
+  --color-info-100: #dbeafe;
   --color-info-500: #3b82f6;
   --color-info-600: #2563eb;
+  --color-info-700: #1e40af;
 
   /* Typography: families come from next/font in the root layout */
   --font-sans:
@@ -100,6 +114,10 @@
   --radius-3xl: 24px;
   --radius-pill: 9999px;
   --radius-content: 20px;
+  /* Icon tiles (design pass 2, figma-make-design-system.md "radii 10
+     (buttons/nav), 14 (tiles)"): the 36-44px pastel/violet squares on stat
+     cards, notebook cards and empty-state icons. */
+  --radius-tile: 14px;
 
   /* Shadows: very subtle */
   --shadow-xs: 0 1px 2px rgb(0 0 0 / 0.04);
@@ -107,6 +125,16 @@
   --shadow-md: 0 4px 12px rgb(0 0 0 / 0.08);
   --shadow-lg: 0 8px 24px rgb(0 0 0 / 0.1);
   --shadow-xl: 0 16px 48px rgb(0 0 0 / 0.12);
+  /* Floating shell cards (design/shell-look, Engram studyplatform obs 140):
+     shared by the sidebar and content cards in the app shell (layout.tsx,
+     sidebar.tsx) — both use the same 16px radius (--radius-xl above) and
+     this shadow. */
+  --shadow-card: 0 2px 12px rgb(0 0 0 / 0.06);
+  /* Interactive card hover lift (design pass 2, figma-make-design-system.md
+     CardsSection): notebook/workspace cards raise into this on hover
+     alongside a -translate-y-0.5, replacing the flatter --shadow-md they
+     used to reach for. */
+  --shadow-card-hover: 0 6px 20px rgb(0 0 0 / 0.08);
 
   /* Motion */
   --ease-default: cubic-bezier(0.4, 0, 0.2, 1);
@@ -128,13 +156,20 @@
   --bg-hover: var(--color-neutral-50);
   --bg-active: var(--color-primary-50);
   --bg-muted: var(--color-neutral-100);
-  --bg-glass: rgb(255 255 255 / 0.85);
+  /* Topbar glass (design/shell-look, studyplatform obs 140): 0.92 opacity,
+     blur-12 (topbar.tsx). Only consumer is the topbar itself. */
+  --bg-glass: rgb(255 255 255 / 0.92);
 
   --fg-default: var(--color-neutral-900);
   --fg-secondary: var(--color-neutral-500);
   --fg-muted: var(--color-neutral-400);
   --fg-on-primary: var(--color-neutral-0);
   --fg-active: var(--color-primary-700);
+
+  /* Stronger active tone for top-level sidebar nav items only (design/
+     shell-look, studyplatform obs 140): notebook/page rows keep the
+     original --bg-active (primary-50); nav-item.tsx uses this instead. */
+  --bg-active-strong: var(--color-primary-100);
 
   --border-default: var(--color-neutral-200);
   --border-subtle: var(--color-neutral-150);
@@ -171,6 +206,7 @@
   --color-fg-secondary: var(--fg-secondary);
   --color-fg-muted: var(--fg-muted);
   --color-fg-active: var(--fg-active);
+  --color-active-strong: var(--bg-active-strong);
   --color-border-default: var(--border-default);
   --color-border-subtle: var(--border-subtle);
 
@@ -397,13 +433,38 @@
 
 /* Gradient avatar background (sidebar user card and topbar trigger, S2/S3;
    docs/design-system/preview/comp-sidebar.html `.avatar`): tokens only, no
-   inline hex. */
+   inline hex. design/shell-look: primary-400 (not -300) matches the
+   reference's #A78BFA exactly. */
 @layer utilities {
   .avatar-gradient {
     background-image: linear-gradient(
       135deg,
-      var(--color-primary-300),
+      var(--color-primary-400),
       var(--color-primary-600)
+    );
+  }
+
+  /* Streak progress fill (design pass 2, "Índice de constancia" stat card,
+     figma-make-design-system.md Progress "streak gradient"): only applied
+     once the two-week streak is at least half full — a low streak keeps the
+     flat violet fill instead (home page.tsx). */
+  .gradient-streak {
+    background-image: linear-gradient(
+      90deg,
+      var(--color-warning-500),
+      var(--color-error-500)
+    );
+  }
+
+  /* Reserved for a future achievement/celebration card (figma-make-design-
+     system.md CardsSection "Achievement card"): not consumed yet in this
+     pass (Home has no achievements feature), added alongside the other
+     design-pass-2 tokens per the token diff instructions. */
+  .gradient-achievement {
+    background-image: linear-gradient(
+      135deg,
+      var(--color-primary-50),
+      var(--color-primary-100)
     );
   }
 }

@@ -32,11 +32,14 @@ export {
   createNotebookSchema,
   createPage,
   createPageSchema,
+  DEFAULT_WEEKLY_GOAL_DAYS,
   getAssetReadUrlSchema,
   getPage,
   getPageSchema,
+  type HomeActivityWindow,
   type HomeNotebookSummary,
   type HomeOverview,
+  type HomeReadyToReview,
   type HomeRecentPage,
   type ImageUploadGrant,
   listSidebar,
@@ -84,6 +87,7 @@ export {
   createNotebooksServerApi,
   type NotebooksServerApi,
 } from "./server-api";
+export { ArchivePageButton } from "./ui/archive-page-button";
 export { CreateNotebookIconButton } from "./ui/create-notebook-icon-button";
 export { CreateNotebookTrigger } from "./ui/create-notebook-trigger";
 export {
@@ -93,4 +97,5 @@ export {
   type NotebookActionsSlotValue,
   type PageActionsSlotTarget,
 } from "./ui/notebook-actions-slot";
+export { NotebookCardActions } from "./ui/notebook-card-actions";
 export { SidebarTree } from "./ui/sidebar-tree";

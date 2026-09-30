@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { HomeRecentPage } from "@/modules/notebooks";
+import { cn } from "@/shared/ui/utils";
 import { formatTimeAgo } from "../format";
+import { NEUTRAL_DOT_CLASS, NOTEBOOK_DOT_CLASSES } from "../notebook-swatches";
 
 interface RecentPagesProps {
   pages: HomeRecentPage[];
@@ -31,6 +33,15 @@ export function RecentPages({ pages, now = new Date() }: RecentPagesProps) {
                 href={`/notebooks/${page.notebookId}/pages/${page.id}`}
                 className="flex items-center gap-2.5 rounded-md px-1 py-2 hover:bg-hover"
               >
+                <span
+                  aria-hidden="true"
+                  className={cn(
+                    "size-2 shrink-0 rounded-full",
+                    page.notebookColor
+                      ? NOTEBOOK_DOT_CLASSES[page.notebookColor]
+                      : NEUTRAL_DOT_CLASS,
+                  )}
+                />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-medium text-[13px] text-fg">
                     {page.title}

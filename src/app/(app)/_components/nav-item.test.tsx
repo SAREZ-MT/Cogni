@@ -22,14 +22,14 @@ describe("NavItem", () => {
     );
   });
 
-  it("renders a disabled entry as non-interactive with a visible hint", () => {
+  it("renders a disabled entry as non-interactive with a visible 'pronto' pill", () => {
     render(
       <NavItem
         href="/flashcards"
         icon={Home}
         label="Flashcards"
         disabled
-        hint="próximamente"
+        hint="pronto"
       />,
     );
 
@@ -38,7 +38,7 @@ describe("NavItem", () => {
     ).not.toBeInTheDocument();
     const item = screen.getByText("Flashcards").closest("[aria-disabled]");
     expect(item).toHaveAttribute("aria-disabled", "true");
-    expect(screen.getByText("próximamente")).toBeInTheDocument();
+    expect(screen.getByText("pronto")).toBeInTheDocument();
   });
 
   it("collapses to an icon-only link with a tooltip of the label", async () => {
@@ -63,20 +63,20 @@ describe("NavItem", () => {
         icon={Home}
         label="Flashcards"
         disabled
-        hint="próximamente"
+        hint="pronto"
         collapsed
       />,
     );
 
     expect(screen.queryByText("Flashcards")).not.toBeInTheDocument();
-    expect(screen.queryByText("próximamente")).not.toBeInTheDocument();
+    expect(screen.queryByText("pronto")).not.toBeInTheDocument();
     const item = container.querySelector('[aria-disabled="true"]');
     expect(item).toBeInTheDocument();
 
     await user.hover(item as HTMLElement);
     await waitFor(() => {
       expect(screen.getAllByText(/Flashcards/).length).toBeGreaterThan(0);
-      expect(screen.getAllByText(/próximamente/).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/pronto/).length).toBeGreaterThan(0);
     });
   });
 });

@@ -5,6 +5,10 @@ import { NotebookGrid } from "./notebook-grid";
 
 vi.mock("@/modules/notebooks", () => ({
   CreateNotebookTrigger: () => <button type="button">Nuevo cuaderno</button>,
+  // design pass 2: notebook-card.tsx (used by NotebookGrid) renders the
+  // kebab menu inline — stubbed out here the same way CreateNotebookTrigger
+  // already was, so this stays a presentational-only test of the grid.
+  NotebookCardActions: () => null,
 }));
 
 function notebook(

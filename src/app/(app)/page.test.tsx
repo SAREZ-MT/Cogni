@@ -16,6 +16,9 @@ vi.mock("next/navigation", () => ({ redirect }));
 const { getHomeOverview } = vi.hoisted(() => ({ getHomeOverview: vi.fn() }));
 vi.mock("@/modules/notebooks", () => ({
   getHomeOverview,
+  // The per-card kebab menu needs server actions and the router; it is not
+  // what this page-level test is about.
+  NotebookCardActions: () => null,
   CreateNotebookTrigger: ({ variant }: { variant?: string }) => (
     <button type="button">
       {variant === "tile" ? "Nuevo cuaderno (tile)" : "Nuevo cuaderno"}
@@ -31,8 +34,20 @@ function emptyOverview() {
     lastActivityAt: null,
     notebooks: [],
     recentPages: [],
+    readyToReview: { items: [], totalReady: 0, totalRich: 0 },
+    streak: { activeDays: 0, days: Array(14).fill(false) },
+    weeklyGoal: { activeDays: 0, days: Array(7).fill(false), goal: 5 },
   };
 }
+
+const READY_PAGE = {
+  id: "p1",
+  notebookId: "n1",
+  notebookTitle: "Biología Celular",
+  notebookColor: "purple",
+  title: "Mitocondria",
+  updatedAt: new Date("2026-09-23T10:00:00.000Z"),
+};
 
 function populatedOverview() {
   return {
@@ -50,15 +65,17 @@ function populatedOverview() {
         updatedAt: new Date("2026-09-23T10:00:00.000Z"),
       },
     ],
-    recentPages: [
-      {
-        id: "p1",
-        notebookId: "n1",
-        notebookTitle: "Biología Celular",
-        title: "Mitocondria",
-        updatedAt: new Date("2026-09-23T10:00:00.000Z"),
-      },
-    ],
+    recentPages: [READY_PAGE],
+    readyToReview: { items: [READY_PAGE], totalReady: 1, totalRich: 4 },
+    streak: {
+      activeDays: 3,
+      days: [...Array(11).fill(false), true, false, true],
+    },
+    weeklyGoal: {
+      activeDays: 2,
+      days: [false, false, false, false, false, true, true],
+      goal: 5,
+    },
   };
 }
 
@@ -141,16 +158,60 @@ describe("HomePage", () => {
       getHomeOverview.mockResolvedValue(populatedOverview());
     });
 
-    it("greets the user and shows the four real stats", async () => {
+    it("greets the user by the name derived from their email", async () => {
       await renderHome();
 
       expect(
         screen.getByText(/^Buen(os días|as tardes|as noches), Ana$/),
       ).toBeInTheDocument();
-      expect(screen.getByText("Cuadernos")).toBeInTheDocument();
-      expect(screen.getByText("Páginas")).toBeInTheDocument();
-      expect(screen.getByText("Editadas esta semana")).toBeInTheDocument();
-      expect(screen.getByText("Última actividad")).toBeInTheDocument();
+    });
+
+    it("shows the four study-metric cards with the values derived from the overview", async () => {
+      await renderHome();
+
+      // The ready-to-review label is also the heading of the panel below.
+      expect(
+        screen.getAllByText("Notas listas para repasar").length,
+      ).toBeGreaterThanOrEqual(1);
+      expect(screen.getByText("Índice de constancia")).toBeInTheDocument();
+      expect(screen.getByText("3/14 días")).toBeInTheDocument();
+      expect(screen.getByText("Meta semanal de estudio")).toBeInTheDocument();
+      expect(screen.getByText("meta: 5 días por semana")).toBeInTheDocument();
+      expect(screen.getByText("Repasos pendientes hoy")).toBeInTheDocument();
+    });
+
+    it("points the ready-to-review card at the most urgent page", async () => {
+      await renderHome();
+
+      expect(
+        screen.getByText("la más urgente: Mitocondria"),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Repasar →" })).toHaveAttribute(
+        "href",
+        "/notebooks/n1/pages/p1",
+      );
+    });
+
+    it("says nothing is ready and offers no review link when no page qualifies", async () => {
+      getHomeOverview.mockResolvedValue({
+        ...populatedOverview(),
+        readyToReview: { items: [], totalReady: 0, totalRich: 0 },
+      });
+
+      await renderHome();
+
+      expect(
+        screen.getByText("Ninguna nota lista todavía"),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole("link", { name: "Repasar →" }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("keeps the flashcards card as an explicit muted placeholder until they ship", async () => {
+      await renderHome();
+
+      expect(screen.getByText("Flashcards llegan pronto")).toBeInTheDocument();
     });
 
     it("renders the notebook grid and the recent pages list from real data", async () => {
@@ -161,11 +222,15 @@ describe("HomePage", () => {
       const notebookLink = links.find(
         (link) => link.getAttribute("href") === "/notebooks/n1",
       );
+      // The same page is linked from the review card and the review panel
+      // ("Repasar") as well as the recent-pages list (by title).
       const pageLink = links.find(
-        (link) => link.getAttribute("href") === "/notebooks/n1/pages/p1",
+        (link) =>
+          link.getAttribute("href") === "/notebooks/n1/pages/p1" &&
+          link.textContent?.includes("Mitocondria"),
       );
       expect(notebookLink).toHaveTextContent("Biología Celular");
-      expect(pageLink).toHaveTextContent("Mitocondria");
+      expect(pageLink).toBeDefined();
     });
 
     it("never shows the empty-state copy", async () => {

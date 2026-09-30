@@ -54,7 +54,7 @@ export function SidebarUserCard({
     return (
       <div
         ref={rootRef}
-        className="relative mt-auto flex justify-center border-border-subtle border-t px-3 py-3"
+        className="relative mt-auto flex justify-center border-neutral-200/60 border-t px-2 pt-3"
       >
         <TooltipProvider>
           <Tooltip>
@@ -84,7 +84,7 @@ export function SidebarUserCard({
   return (
     <div
       ref={rootRef}
-      className="relative mt-auto flex items-center gap-2.5 border-border-subtle border-t px-3 py-3"
+      className="relative mt-auto flex items-center gap-2.5 border-neutral-200/60 border-t px-2 pt-3"
     >
       {avatar}
       <div className="flex min-w-0 flex-1 flex-col">

@@ -1,7 +1,8 @@
 "use client";
 
-import { FileText, Trash2 } from "lucide-react";
+import { ChevronRight, FileText, Trash2 } from "lucide-react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/shared/ui/button";
 import { cn } from "@/shared/ui/utils";
@@ -26,6 +27,9 @@ export function PageItem({
   const [title, setTitle] = useState(page.title);
   const slot = useNotebookActionsSlot();
   const badge = slot.pageBadge?.({ id: page.id });
+  const pathname = usePathname();
+  const href = `/notebooks/${notebookId}/pages/${page.id}`;
+  const active = pathname === href;
 
   function commit() {
     setEditing(false);
@@ -34,8 +38,23 @@ export function PageItem({
     else setTitle(page.title);
   }
 
+  // Decorative connector + 14px file icon (design/shell-look, studyplatform
+  // obs 142 PageTree): purely visual, the same on every row regardless of
+  // state.
+  const rowIcon = (
+    <>
+      <ChevronRight
+        aria-hidden="true"
+        size={12}
+        strokeWidth={1.75}
+        className="shrink-0 text-fg-muted"
+      />
+      <FileText aria-hidden="true" size={14} strokeWidth={1.75} />
+    </>
+  );
+
   return (
-    <li className="group/page flex items-center gap-1 pl-6">
+    <li className="group/page flex items-center gap-1">
       {editing ? (
         <input
           // biome-ignore lint/a11y/noAutofocus: user just triggered inline rename by double-clicking the title; focus must move to the new input
@@ -60,31 +79,26 @@ export function PageItem({
         // id). Same styling as the link below, minus the href.
         <span
           aria-disabled="true"
-          className="flex min-h-8 min-w-0 flex-1 items-center gap-2 rounded-input px-2 py-1 text-fg-secondary text-sm"
+          className="flex min-h-8 min-w-0 flex-1 items-center gap-1.5 rounded-input px-2 py-1 text-fg-secondary text-sm"
         >
-          <FileText aria-hidden="true" size={16} strokeWidth={1.75} />
-          {/* S7 (odd/tasks/app-shell-restyle.md, sidebar-preview.png): same
-              two-line clamp treatment as notebook-item.tsx's title instead
-              of truncating early. */}
-          <span className="line-clamp-2 whitespace-normal break-words leading-snug">
-            {page.title}
-          </span>
+          {rowIcon}
+          <span className="truncate text-[13px]">{page.title}</span>
         </span>
       ) : (
         <Link
-          href={`/notebooks/${notebookId}/pages/${page.id}`}
+          href={href}
+          aria-current={active ? "page" : undefined}
           onDoubleClick={(event) => {
             event.preventDefault();
             setEditing(true);
           }}
           className={cn(
-            "flex min-h-8 min-w-0 flex-1 items-center gap-2 rounded-input px-2 py-1 text-fg-secondary text-sm hover:bg-active hover:text-fg-active",
+            "flex min-h-8 min-w-0 flex-1 items-center gap-1.5 rounded-input px-2 py-1 text-fg-secondary text-sm hover:bg-active hover:text-fg-active",
+            active && "bg-active font-medium text-fg-active",
           )}
         >
-          <FileText aria-hidden="true" size={16} strokeWidth={1.75} />
-          <span className="line-clamp-2 whitespace-normal break-words leading-snug">
-            {page.title}
-          </span>
+          {rowIcon}
+          <span className="truncate text-[13px]">{page.title}</span>
         </Link>
       )}
       {!editing && (

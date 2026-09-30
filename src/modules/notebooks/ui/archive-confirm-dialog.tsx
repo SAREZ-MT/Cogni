@@ -16,6 +16,10 @@ interface ArchiveConfirmDialogProps {
   itemLabel: string;
   onConfirm: () => void;
   trigger: React.ReactNode;
+  // Fires on every open/close, including the programmatic close after
+  // confirming or cancelling: a host that nests this dialog inside a menu
+  // (notebook-card-actions.tsx) uses it to close that menu too.
+  onOpenChange?: (open: boolean) => void;
 }
 
 // Archiving is not reversible from the UI (specs/notebooks/spec.md,
@@ -25,8 +29,14 @@ export function ArchiveConfirmDialog({
   itemLabel,
   onConfirm,
   trigger,
+  onOpenChange,
 }: ArchiveConfirmDialogProps) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpenState] = useState(false);
+
+  function setOpen(next: boolean) {
+    setOpenState(next);
+    onOpenChange?.(next);
+  }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

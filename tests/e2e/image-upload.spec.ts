@@ -12,6 +12,7 @@ import {
   type TestUser,
   test,
 } from "./fixtures/auth";
+import { createNotebookWithOpenPage } from "./helpers/notebooks";
 import { buildPng } from "./helpers/png";
 
 // specs/page-assets/spec.md: "Subida y renderizado", "Lectura entre
@@ -38,33 +39,8 @@ async function signedInClient(user: TestUser) {
 }
 
 async function createNotebookAndPage(page: import("@playwright/test").Page) {
-  const sidebar = page.getByRole("navigation", { name: "Barra lateral" });
-  await page.goto("/");
   const title = `Imagenes ${randomUUID().slice(0, 8)}`;
-
-  await sidebar.getByRole("button", { name: "Crear cuaderno" }).click();
-  const dialog = page.getByRole("dialog");
-  await dialog.getByLabel("Título").fill(title);
-  await Promise.all([
-    page.waitForResponse(
-      (response) => response.request().method() === "POST" && response.ok(),
-    ),
-    dialog.getByRole("button", { name: "Crear cuaderno" }).click(),
-  ]);
-  await expect(sidebar.getByText(title)).toBeVisible();
-
-  await Promise.all([
-    page.waitForResponse(
-      (response) => response.request().method() === "POST" && response.ok(),
-    ),
-    sidebar.getByRole("button", { name: `Crear página en ${title}` }).click(),
-  ]);
-  const pageLink = sidebar
-    .getByRole("listitem")
-    .filter({ hasText: title })
-    .getByRole("link", { name: "Sin título" });
-  await expect(pageLink).toBeVisible();
-  await pageLink.click();
+  await createNotebookWithOpenPage(page, title);
 
   const editorMount = page.getByTestId("editor-mount");
   await expect(editorMount).toBeVisible();

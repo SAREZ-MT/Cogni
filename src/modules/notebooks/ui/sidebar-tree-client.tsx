@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Plus } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { createId } from "@/shared/kernel/id";
 import {
@@ -255,25 +256,45 @@ export function SidebarTreeClient({
     onSettled: invalidate,
   });
 
+  // "Cuadernos" eyebrow + inline "+" trigger (design/shell-look, studyplatform
+  // obs 142 PageTree): replaces the old full-width "Crear cuaderno" button.
+  // Sits above both the empty state and the tree so it's always the single
+  // way to create the first (or next) notebook. Same label classes as
+  // sidebar.tsx's SectionLabel, replicated here to keep this module decoupled
+  // from the app shell component.
+  const header = (
+    <div className="flex items-center justify-between px-2.5 pt-3.5 pb-1">
+      <span className="font-medium text-[11px] text-fg-muted">Cuadernos</span>
+      <CreateNotebookDialog
+        onCreate={(title) => createNotebook.mutate(title)}
+        trigger={
+          <button
+            type="button"
+            aria-label="Crear cuaderno"
+            className="flex size-5 shrink-0 items-center justify-center rounded-md text-fg-muted transition-colors duration-200 ease-default hover:bg-neutral-100/90 hover:text-fg"
+          >
+            <Plus aria-hidden="true" size={14} strokeWidth={1.75} />
+          </button>
+        }
+      />
+    </div>
+  );
+
   if (notebooks.length === 0) {
     return (
-      <div className="flex flex-col gap-3 px-3 py-4 text-center">
-        <p className="text-fg-secondary text-sm">
+      <div className="flex flex-col gap-3">
+        {header}
+        <p className="px-2.5 text-fg-secondary text-sm">
           Aún no tienes cuadernos. Crea uno para empezar.
         </p>
-        <CreateNotebookDialog
-          onCreate={(title) => createNotebook.mutate(title)}
-        />
       </div>
     );
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-2 overflow-y-auto px-3">
-      <CreateNotebookDialog
-        onCreate={(title) => createNotebook.mutate(title)}
-      />
-      <ul className="flex flex-col gap-1">
+    <div className="flex flex-1 flex-col overflow-y-auto">
+      {header}
+      <ul className="flex flex-col gap-1 px-2.5">
         {notebooks.map((notebook) => (
           <NotebookItem
             key={notebook.id}
