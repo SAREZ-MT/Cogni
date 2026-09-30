@@ -72,30 +72,45 @@ test.describe("notebooks acceptance", () => {
     await clickAndWaitForAction(
       page,
       renameDialog.getByRole("button", { name: "Guardar" }),
+      '"title":"Cuaderno renombrado"',
     );
     await expect(notebookCard(page, "Cuaderno renombrado")).toBeVisible();
     await expect(notebookCard(page, "Cuaderno e2e")).toHaveCount(0);
     await page.reload();
     await expect(notebookCard(page, "Cuaderno renombrado")).toBeVisible();
 
-    // Cambiar color: the dialog's "Color purple" swatch, which must still be
-    // the highlighted one after a reload (the change was persisted, not just
-    // an optimistic client update).
+    // Cambiar color: the starting color is random, so pick a target that
+    // differs from the current one (otherwise the check proves nothing). The
+    // card's tile must switch without a reload, and the dialog must highlight
+    // the new color after one (it was persisted, not just updated on screen).
+    const tile = notebookCard(page, "Cuaderno renombrado")
+      .locator("span")
+      .first();
+    const currentColor = (await tile.getAttribute("class"))?.match(
+      /bg-pastel-(\w+)/,
+    )?.[1];
+    const targetColor = currentColor === "purple" ? "mint" : "purple";
     await page
       .getByRole("button", { name: "Acciones de Cuaderno renombrado" })
       .click();
     await page.getByRole("menuitem", { name: "Cambiar apariencia" }).click();
     await clickAndWaitForAction(
       page,
-      page.getByRole("dialog").getByRole("button", { name: "Color purple" }),
+      page
+        .getByRole("dialog")
+        .getByRole("button", { name: `Color ${targetColor}` }),
+      `"color":"${targetColor}"`,
     );
+    await expect(tile).toHaveClass(new RegExp(`bg-pastel-${targetColor}`));
     await page.reload();
     await page
       .getByRole("button", { name: "Acciones de Cuaderno renombrado" })
       .click();
     await page.getByRole("menuitem", { name: "Cambiar apariencia" }).click();
     await expect(
-      page.getByRole("dialog").getByRole("button", { name: "Color purple" }),
+      page
+        .getByRole("dialog")
+        .getByRole("button", { name: `Color ${targetColor}` }),
     ).toHaveClass(/ring-2/);
     await page.keyboard.press("Escape");
 
@@ -117,6 +132,7 @@ test.describe("notebooks acceptance", () => {
         name: "Archivar",
         exact: true,
       }),
+      '"notebookId"',
     );
     await expect(notebookCard(page, "Cuaderno renombrado")).toHaveCount(0);
 
@@ -145,6 +161,8 @@ test.describe("notebooks acceptance", () => {
     await openNotebook(page, title);
     await expect(page.getByRole("link", { name: /^Sin título/ })).toBeVisible();
 
+    // The trash button only opens the confirmation dialog; the mutation
+    // fires when it is confirmed.
     await page
       .getByRole("button", { name: "Archivar página Sin título" })
       .click();
@@ -154,6 +172,7 @@ test.describe("notebooks acceptance", () => {
         name: "Archivar",
         exact: true,
       }),
+      '"pageId"',
     );
     await expect(page.getByRole("link", { name: /^Sin título/ })).toHaveCount(
       0,
