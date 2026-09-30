@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createFixedClock } from "@/shared/kernel/clock";
 import { COLOR_PALETTE } from "../domain/notebook";
 import { createNotebook } from "./create-notebook";
@@ -27,29 +27,79 @@ describe("createNotebook use case", () => {
     expect(await deps.notebooks.findById(result.value.id)).not.toBeNull();
   });
 
-  it("assigns a random palette color when none is supplied (design pass 2: no flat neutral tile on creation)", async () => {
-    const deps = makeDeps();
+  describe("color (design pass 2: no flat neutral tile on creation)", () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
 
-    const result = await createNotebook({ title: "Calculo I" }, deps, OWNER_ID);
+    it("picks the palette entry selected by Math.random when no color is supplied", async () => {
+      const deps = makeDeps();
+      const last = COLOR_PALETTE.length - 1;
+      const random = vi.spyOn(Math, "random");
 
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.value.color).not.toBeNull();
-    expect(COLOR_PALETTE).toContain(result.value.color);
-  });
+      random.mockReturnValue(0);
+      const first = await createNotebook({ title: "Uno" }, deps, OWNER_ID);
+      random.mockReturnValue(0.999999);
+      const final = await createNotebook({ title: "Dos" }, deps, OWNER_ID);
 
-  it("keeps an explicitly supplied color instead of picking a random one", async () => {
-    const deps = makeDeps();
+      expect(first.ok && first.value.color).toBe(COLOR_PALETTE[0]);
+      expect(final.ok && final.value.color).toBe(COLOR_PALETTE[last]);
+    });
 
-    const result = await createNotebook(
-      { title: "Calculo I", color: "mint" },
-      deps,
-      OWNER_ID,
-    );
+    it("persists the picked color, never a null one", async () => {
+      const deps = makeDeps();
+      vi.spyOn(Math, "random").mockReturnValue(0.5);
 
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.value.color).toBe("mint");
+      const result = await createNotebook({ title: "Uno" }, deps, OWNER_ID);
+
+      if (!result.ok) throw new Error("setup failed");
+      const stored = await deps.notebooks.findById(result.value.id);
+      expect(stored?.color).toBe(
+        COLOR_PALETTE[Math.floor(0.5 * COLOR_PALETTE.length)],
+      );
+    });
+
+    it("treats an explicit null color as not supplied", async () => {
+      const deps = makeDeps();
+      vi.spyOn(Math, "random").mockReturnValue(0);
+
+      const result = await createNotebook(
+        { title: "Uno", color: null },
+        deps,
+        OWNER_ID,
+      );
+
+      expect(result.ok && result.value.color).toBe(COLOR_PALETTE[0]);
+    });
+
+    it("keeps an explicitly supplied color instead of picking a random one", async () => {
+      const deps = makeDeps();
+      const suppliedColor = COLOR_PALETTE[COLOR_PALETTE.length - 1];
+      // Would select the first palette entry if the supplied color were ignored.
+      vi.spyOn(Math, "random").mockReturnValue(0);
+
+      const result = await createNotebook(
+        { title: "Calculo I", color: suppliedColor },
+        deps,
+        OWNER_ID,
+      );
+
+      expect(result.ok && result.value.color).toBe(suppliedColor);
+    });
+
+    it("rejects an unknown supplied color instead of replacing it with a random one", async () => {
+      const deps = makeDeps();
+      vi.spyOn(Math, "random").mockReturnValue(0);
+
+      const result = await createNotebook(
+        { title: "Calculo I", color: "neon" },
+        deps,
+        OWNER_ID,
+      );
+
+      expect(result.ok).toBe(false);
+      expect(deps.notebooks.count()).toBe(0);
+    });
   });
 
   it("rejects a blank title and persists nothing (Scenario: Titulo vacio rechazado)", async () => {
