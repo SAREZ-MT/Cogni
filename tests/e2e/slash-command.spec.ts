@@ -1,22 +1,11 @@
-import type { Locator, Page } from "@playwright/test";
 import { expect, hasSupabaseEnv, signIn, test } from "./fixtures/auth";
+import { createNotebookWithOpenPage } from "./helpers/notebooks";
 
 // specs/editor/spec.md, "Menú de comandos `/`", Scenario "Inserción por
 // comando" (e2e): typing "/cita" and pressing Enter inserts a blockquote
 // and the "/cita" text disappears. tasks.md, 3b.11: this slice covers a
 // block already available (blockquote); the "/tabla" variant is added in
 // slice 5a once the table extension exists.
-
-// Hardened per PR3b review: scope to a successful (2xx) response so a
-// failed action is not silently raced past by an unscoped "any POST".
-async function clickAndWaitForAction(page: Page, locator: Locator) {
-  await Promise.all([
-    page.waitForResponse(
-      (response) => response.request().method() === "POST" && response.ok(),
-    ),
-    locator.click(),
-  ]);
-}
 
 test.describe("slash command menu", () => {
   test.skip(!hasSupabaseEnv, "Supabase env (cogni-dev) is not configured");
@@ -28,31 +17,7 @@ test.describe("slash command menu", () => {
   test("typing /cita and pressing Enter inserts a blockquote and removes the command text", async ({
     page,
   }) => {
-    const sidebar = page.getByRole("navigation", { name: "Barra lateral" });
-    await page.goto("/");
-
-    await sidebar.getByRole("button", { name: "Crear cuaderno" }).click();
-    const dialog = page.getByRole("dialog");
-    await dialog.getByLabel("Título").fill("Cuaderno slash");
-    await clickAndWaitForAction(
-      page,
-      dialog.getByRole("button", { name: "Crear cuaderno" }),
-    );
-    await expect(sidebar.getByText("Cuaderno slash")).toBeVisible();
-
-    await clickAndWaitForAction(
-      page,
-      sidebar.getByRole("button", { name: "Crear página en Cuaderno slash" }),
-    );
-    // Scoped to this test's notebook: other notebooks created by earlier
-    // tests in the same worker (shared `verifiedUser`) also have a "Sin
-    // título" page and may be expanded in the sidebar at the same time.
-    const pageLink = sidebar
-      .getByRole("listitem")
-      .filter({ hasText: "Cuaderno slash" })
-      .getByRole("link", { name: "Sin título" });
-    await expect(pageLink).toBeVisible();
-    await pageLink.click();
+    await createNotebookWithOpenPage(page, "Cuaderno slash");
 
     const editorMount = page.getByTestId("editor-mount");
     await expect(editorMount).toBeVisible();
@@ -91,31 +56,7 @@ test.describe("slash command menu", () => {
   // "Tabla editable" (e2e), and "Menú de comandos `/`": "/tabla" + Enter
   // inserts a table now that the table extension exists (tasks.md, 5a.3).
   test("typing /tabla and pressing Enter inserts a table", async ({ page }) => {
-    const sidebar = page.getByRole("navigation", { name: "Barra lateral" });
-    await page.goto("/");
-
-    await sidebar.getByRole("button", { name: "Crear cuaderno" }).click();
-    const dialog = page.getByRole("dialog");
-    await dialog.getByLabel("Título").fill("Cuaderno tabla");
-    await clickAndWaitForAction(
-      page,
-      dialog.getByRole("button", { name: "Crear cuaderno" }),
-    );
-    await expect(sidebar.getByText("Cuaderno tabla")).toBeVisible();
-
-    await clickAndWaitForAction(
-      page,
-      sidebar.getByRole("button", { name: "Crear página en Cuaderno tabla" }),
-    );
-    // Scoped to this test's notebook: other notebooks created by earlier
-    // tests in the same worker (shared `verifiedUser`) also have a "Sin
-    // título" page and may be expanded in the sidebar at the same time.
-    const pageLink = sidebar
-      .getByRole("listitem")
-      .filter({ hasText: "Cuaderno tabla" })
-      .getByRole("link", { name: "Sin título" });
-    await expect(pageLink).toBeVisible();
-    await pageLink.click();
+    await createNotebookWithOpenPage(page, "Cuaderno tabla");
 
     const editorMount = page.getByTestId("editor-mount");
     await expect(editorMount).toBeVisible();
@@ -152,30 +93,7 @@ test.describe("slash command menu", () => {
   test("typing /advertencia and pressing Enter inserts a warning callout", async ({
     page,
   }) => {
-    const sidebar = page.getByRole("navigation", { name: "Barra lateral" });
-    await page.goto("/");
-
-    await sidebar.getByRole("button", { name: "Crear cuaderno" }).click();
-    const dialog = page.getByRole("dialog");
-    await dialog.getByLabel("Título").fill("Cuaderno callout");
-    await clickAndWaitForAction(
-      page,
-      dialog.getByRole("button", { name: "Crear cuaderno" }),
-    );
-    await expect(sidebar.getByText("Cuaderno callout")).toBeVisible();
-
-    await clickAndWaitForAction(
-      page,
-      sidebar.getByRole("button", {
-        name: "Crear página en Cuaderno callout",
-      }),
-    );
-    const pageLink = sidebar
-      .getByRole("listitem")
-      .filter({ hasText: "Cuaderno callout" })
-      .getByRole("link", { name: "Sin título" });
-    await expect(pageLink).toBeVisible();
-    await pageLink.click();
+    await createNotebookWithOpenPage(page, "Cuaderno callout");
 
     const editorMount = page.getByTestId("editor-mount");
     await expect(editorMount).toBeVisible();
