@@ -59,6 +59,62 @@ describe("SLASH_COMMAND_ITEMS", () => {
     }
   });
 
+  // E1 template block set: each "/" entry replaces the typed "/xyz" range
+  // and inserts its block (or trigger character) in its place.
+  describe("template block entries", () => {
+    function runOnTypedCommand(id: string, typed: string) {
+      const editor = new Editor({
+        extensions: createEditorExtensions(),
+        content: `<p>${typed}</p>`,
+      });
+      findItem(id).run(editor, { from: 1, to: 1 + typed.length });
+      return editor;
+    }
+
+    it("toc inserts a table-of-contents block and removes the typed command", () => {
+      const editor = runOnTypedCommand("toc", "/toc");
+      try {
+        const json = editor.getJSON();
+        expect(json.content?.some((node) => node.type === "tocBlock")).toBe(
+          true,
+        );
+        expect(editor.getText()).not.toContain("/toc");
+      } finally {
+        editor.destroy();
+      }
+    });
+
+    it("emoji types the ':' trigger so the emoji popup takes over", () => {
+      const editor = runOnTypedCommand("emoji", "/emoji");
+      try {
+        expect(editor.getText()).toBe(":");
+      } finally {
+        editor.destroy();
+      }
+    });
+
+    it("mention types the '@' trigger so the mention popup takes over", () => {
+      const editor = runOnTypedCommand("mention", "/mencion");
+      try {
+        expect(editor.getText()).toBe("@");
+      } finally {
+        editor.destroy();
+      }
+    });
+
+    it("image inserts an empty image block awaiting an upload", () => {
+      const editor = runOnTypedCommand("image", "/imagen");
+      try {
+        const image = editor
+          .getJSON()
+          .content?.find((node) => node.type === "image");
+        expect(image?.attrs?.assetId).toBeNull();
+      } finally {
+        editor.destroy();
+      }
+    });
+  });
+
   // S6a (odd/tasks/app-shell-restyle.md), Editor directive: the restyled
   // "/" menu renders an icon tile and a group heading per item (command-
   // menu.tsx), so every entry here must declare both.
