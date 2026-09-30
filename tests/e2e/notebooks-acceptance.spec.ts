@@ -10,34 +10,21 @@ import {
   test,
 } from "./fixtures/auth";
 
-// Task 2.12 skeleton: create notebook -> create page -> rename -> icon/color
-// -> archive -> disappears from sidebar -> route not found. Extended in
-// PR4 (specs/notebooks/spec.md, §13 acceptance flow) once the editor is
-// wired for real content.
+import {
+  clickAndWaitForAction,
+  createNotebook,
+  createNotebookWithOpenPage,
+  createPageAndOpen,
+  notebookCard,
+  openNotebook,
+} from "./helpers/notebooks";
 
-// Server Actions POST to the current pathname; `page.waitForLoadState
-// ("networkidle")` is unreliable here (background beacons/tunnels keep the
-// network "non-idle" or resolve the wait before the action's own response
-// arrives). Waiting for the exact POST response guarantees the mutation
-// actually settled — with its real, server-assigned id — before the next
-// step reads DOM state that depends on it (specs/notebooks/spec.md,
-// "Guardado de contenido con comparar-e-intercambiar" applies the same
-// atomic-write discipline the UI must not race ahead of).
-// Hardened per PR3b review: an unscoped "any POST" predicate can match an
-// unrelated in-flight request (analytics, a previous action's retry) and
-// resolve before this click's own Server Action response arrives. Scoping
-// to a successful (2xx) response still waiting on the exact click keeps the
-// timing guarantee while catching a failed action instead of silently
-// racing past it.
-async function clickAndWaitForAction(page: Page, locator: Locator) {
-  const [response] = await Promise.all([
-    page.waitForResponse(
-      (candidate) => candidate.request().method() === "POST" && candidate.ok(),
-    ),
-    locator.click(),
-  ]);
-  return response;
-}
+// Task 2.12 skeleton: create notebook -> create page -> rename -> icon/color
+// -> archive -> disappears from the library -> route not found. Extended in
+// PR4 (specs/notebooks/spec.md, §13 acceptance flow) once the editor is
+// wired for real content. Since design pass 2 the sidebar is navigation only:
+// notebooks live on /notebooks (cards with an "Acciones de {título}" kebab)
+// and pages on /notebooks/[notebookId] (see helpers/notebooks.ts).
 
 // specs/editor/spec.md, "Autosave con debounce...": waits for the exact
 // terminal status the spec promises after a save settles. No retry: a real
@@ -68,88 +55,114 @@ test.describe("notebooks acceptance", () => {
     await signIn(page, verifiedUser);
   });
 
-  test("create, rename, recolor, add a page and archive a notebook from the sidebar", async ({
+  test("create, rename, recolor, add a page and archive a notebook from the library", async ({
     page,
   }) => {
-    const sidebar = page.getByRole("navigation", { name: "Barra lateral" });
-    await page.goto("/");
-
     // Crear cuaderno
-    await sidebar.getByRole("button", { name: "Crear cuaderno" }).click();
-    const dialog = page.getByRole("dialog");
-    await dialog.getByLabel("Título").fill("Cuaderno e2e");
-    await clickAndWaitForAction(
-      page,
-      dialog.getByRole("button", { name: "Crear cuaderno" }),
-    );
-    const notebookRow = sidebar.getByText("Cuaderno e2e");
-    await expect(notebookRow).toBeVisible();
+    await createNotebook(page, "Cuaderno e2e");
 
-    // Renombrar (Scenario "Renombrar y cambiar ícono desde el sidebar")
-    await notebookRow.dblclick();
-    const renameInput = sidebar.locator("input").first();
-    await renameInput.fill("Cuaderno renombrado");
-    await Promise.all([
-      page.waitForResponse(
-        (response) => response.request().method() === "POST",
-      ),
-      renameInput.press("Enter"),
-    ]);
-    await expect(sidebar.getByText("Cuaderno renombrado")).toBeVisible();
-    await page.reload();
-    await expect(sidebar.getByText("Cuaderno renombrado")).toBeVisible();
-
-    // Cambiar color
-    await sidebar
-      .getByRole("button", {
-        name: "Cambiar apariencia de Cuaderno renombrado",
-      })
+    // Renombrar (Scenario "Renombrar y cambiar ícono desde el sidebar", now
+    // the "Renombrar" item of the card's kebab menu).
+    await page
+      .getByRole("button", { name: "Acciones de Cuaderno e2e" })
       .click();
+    await page.getByRole("menuitem", { name: "Renombrar" }).click();
+    const renameDialog = page.getByRole("dialog");
+    await renameDialog.getByLabel("Título").fill("Cuaderno renombrado");
     await clickAndWaitForAction(
       page,
-      page.getByRole("button", { name: "Color purple" }),
+      renameDialog.getByRole("button", { name: "Guardar" }),
+    );
+    await expect(notebookCard(page, "Cuaderno renombrado")).toBeVisible();
+    await expect(notebookCard(page, "Cuaderno e2e")).toHaveCount(0);
+    await page.reload();
+    await expect(notebookCard(page, "Cuaderno renombrado")).toBeVisible();
+
+    // Cambiar color: the dialog's "Color purple" swatch, which must still be
+    // the highlighted one after a reload (the change was persisted, not just
+    // an optimistic client update).
+    await page
+      .getByRole("button", { name: "Acciones de Cuaderno renombrado" })
+      .click();
+    await page.getByRole("menuitem", { name: "Cambiar apariencia" }).click();
+    await clickAndWaitForAction(
+      page,
+      page.getByRole("dialog").getByRole("button", { name: "Color purple" }),
     );
     await page.reload();
+    await page
+      .getByRole("button", { name: "Acciones de Cuaderno renombrado" })
+      .click();
+    await page.getByRole("menuitem", { name: "Cambiar apariencia" }).click();
     await expect(
-      sidebar.getByRole("button", {
-        name: "Cambiar apariencia de Cuaderno renombrado",
-      }),
-    ).toBeVisible();
+      page.getByRole("dialog").getByRole("button", { name: "Color purple" }),
+    ).toHaveClass(/ring-2/);
+    await page.keyboard.press("Escape");
 
-    // Crear y abrir una página (Scenario "Crear y abrir una página")
-    await clickAndWaitForAction(
-      page,
-      sidebar.getByRole("button", {
-        name: "Crear página en Cuaderno renombrado",
-      }),
-    );
-    // Scoped to this notebook's own sidebar item: the worker-scoped
-    // verifiedUser accumulates notebooks (and "Sin título" pages) across
-    // the spec files that share the single worker.
-    const pageLink = sidebar
-      .getByRole("listitem")
-      .filter({ hasText: "Cuaderno renombrado" })
-      .getByRole("link", { name: "Sin título" });
-    await expect(pageLink).toBeVisible();
-    await pageLink.click();
-    await expect(page.getByTestId("editor-mount")).toBeVisible();
+    // Crear y abrir una página (Scenario "Crear y abrir una página"): the
+    // notebook's own route replaces the sidebar's "Crear página en…" button.
+    const notebookId = await openNotebook(page, "Cuaderno renombrado");
+    await createPageAndOpen(page);
 
-    // Archivar (Scenario "Archivar desde el sidebar")
-    await page.goto("/");
-    await sidebar
-      .getByRole("button", { name: "Archivar cuaderno Cuaderno renombrado" })
+    // Archivar (Scenario "Archivar desde el sidebar", now the card's
+    // "Archivar" item plus its confirmation dialog).
+    await page.goto("/notebooks");
+    await page
+      .getByRole("button", { name: "Acciones de Cuaderno renombrado" })
       .click();
+    await page.getByRole("menuitem", { name: "Archivar" }).click();
     await clickAndWaitForAction(
       page,
-      page.getByRole("button", { name: "Archivar" }),
+      page.getByRole("dialog").getByRole("button", {
+        name: "Archivar",
+        exact: true,
+      }),
     );
-    await expect(sidebar.getByText("Cuaderno renombrado")).toHaveCount(0);
+    await expect(notebookCard(page, "Cuaderno renombrado")).toHaveCount(0);
 
     // Archiving is not just an optimistic client update: it must survive a
     // reload (Scenario "Archivado lógico sin restauración" reads from the
-    // server-side sidebar tree on every request).
+    // server on every request).
     await page.reload();
-    await expect(sidebar.getByText("Cuaderno renombrado")).toHaveCount(0);
+    await expect(notebookCard(page, "Cuaderno renombrado")).toHaveCount(0);
+
+    // The archived notebook's own route is gone too (Scenario "Ruta de
+    // página ajena" applies to archived ids as well).
+    const archivedRoute = await page.goto(`/notebooks/${notebookId}`);
+    expect(archivedRoute?.status()).toBe(404);
+  });
+
+  // New entry point (design pass 2): pages are archived from their card on
+  // the notebook's route ("Archivar página {título}"), replacing the sidebar
+  // tree row's trash button.
+  test("archives a page from the notebook route and it stays gone after a reload", async ({
+    page,
+  }) => {
+    const title = `Cuaderno de páginas ${randomUUID().slice(0, 8)}`;
+    await createNotebook(page, title);
+    await openNotebook(page, title);
+    await createPageAndOpen(page);
+    await openNotebook(page, title);
+    await expect(page.getByRole("link", { name: /^Sin título/ })).toBeVisible();
+
+    await page
+      .getByRole("button", { name: "Archivar página Sin título" })
+      .click();
+    await clickAndWaitForAction(
+      page,
+      page.getByRole("dialog").getByRole("button", {
+        name: "Archivar",
+        exact: true,
+      }),
+    );
+    await expect(page.getByRole("link", { name: /^Sin título/ })).toHaveCount(
+      0,
+    );
+
+    await page.reload();
+    await expect(page.getByRole("link", { name: /^Sin título/ })).toHaveCount(
+      0,
+    );
   });
 
   test("a foreign page route renders not-found (Scenario 'Ruta de página ajena')", async ({
@@ -158,28 +171,7 @@ test.describe("notebooks acceptance", () => {
     verifiedUser,
   }) => {
     // Owner A creates a notebook and a page.
-    await page.goto("/");
-    const sidebar = page.getByRole("navigation", { name: "Barra lateral" });
-    await sidebar.getByRole("button", { name: "Crear cuaderno" }).click();
-    const dialog = page.getByRole("dialog");
-    await dialog.getByLabel("Título").fill("Privado de A");
-    await clickAndWaitForAction(
-      page,
-      dialog.getByRole("button", { name: "Crear cuaderno" }),
-    );
-    await expect(sidebar.getByText("Privado de A")).toBeVisible();
-
-    await clickAndWaitForAction(
-      page,
-      sidebar.getByRole("button", { name: "Crear página en Privado de A" }),
-    );
-    const pageLink = sidebar
-      .getByRole("listitem")
-      .filter({ hasText: "Privado de A" })
-      .getByRole("link", { name: "Sin título" });
-    await expect(pageLink).toBeVisible();
-    await pageLink.click();
-    await expect(page.getByTestId("editor-mount")).toBeVisible();
+    await createNotebookWithOpenPage(page, "Privado de A");
     const foreignUrl = page.url();
 
     // Owner B (a second verified user, own browser context) opens the same URL.
@@ -205,33 +197,7 @@ test.describe("notebooks acceptance", () => {
   test("writes every available block family, saves and survives a reload", async ({
     page,
   }) => {
-    const sidebar = page.getByRole("navigation", { name: "Barra lateral" });
-    await page.goto("/");
-
-    await sidebar.getByRole("button", { name: "Crear cuaderno" }).click();
-    const dialog = page.getByRole("dialog");
-    await dialog.getByLabel("Título").fill("Cuaderno de aceptación");
-    await clickAndWaitForAction(
-      page,
-      dialog.getByRole("button", { name: "Crear cuaderno" }),
-    );
-    await expect(sidebar.getByText("Cuaderno de aceptación")).toBeVisible();
-
-    await clickAndWaitForAction(
-      page,
-      sidebar.getByRole("button", {
-        name: "Crear página en Cuaderno de aceptación",
-      }),
-    );
-    // The worker-scoped verifiedUser fixture accumulates notebooks across
-    // tests in the same worker, so "Sin título" is scoped to this
-    // notebook's own sidebar item to avoid a strict-mode ambiguity.
-    const notebookItem = sidebar
-      .getByRole("listitem")
-      .filter({ hasText: "Cuaderno de aceptación" });
-    const pageLink = notebookItem.getByRole("link", { name: "Sin título" });
-    await expect(pageLink).toBeVisible();
-    await pageLink.click();
+    await createNotebookWithOpenPage(page, "Cuaderno de aceptación");
 
     const editorMount = page.getByTestId("editor-mount");
     await expect(editorMount).toBeVisible();
@@ -330,29 +296,8 @@ test.describe("notebooks acceptance", () => {
   test("writes the remaining block families (H2/H3, ordered list, divider, callouts, highlight, inline marks), saves and survives a reload", async ({
     page,
   }) => {
-    const sidebar = page.getByRole("navigation", { name: "Barra lateral" });
-    await page.goto("/");
-
     const title = `Cuaderno de bloques ${randomUUID().slice(0, 8)}`;
-    await sidebar.getByRole("button", { name: "Crear cuaderno" }).click();
-    const dialog = page.getByRole("dialog");
-    await dialog.getByLabel("Título").fill(title);
-    await clickAndWaitForAction(
-      page,
-      dialog.getByRole("button", { name: "Crear cuaderno" }),
-    );
-    await expect(sidebar.getByText(title)).toBeVisible();
-
-    await clickAndWaitForAction(
-      page,
-      sidebar.getByRole("button", { name: `Crear página en ${title}` }),
-    );
-    const notebookItem = sidebar
-      .getByRole("listitem")
-      .filter({ hasText: title });
-    const pageLink = notebookItem.getByRole("link", { name: "Sin título" });
-    await expect(pageLink).toBeVisible();
-    await pageLink.click();
+    await createNotebookWithOpenPage(page, title);
 
     const editorMount = page.getByTestId("editor-mount");
     await expect(editorMount).toBeVisible();
@@ -501,31 +446,7 @@ test.describe("notebooks acceptance", () => {
     browser,
     verifiedUser,
   }) => {
-    const sidebar = page.getByRole("navigation", { name: "Barra lateral" });
-    await page.goto("/");
-
-    await sidebar.getByRole("button", { name: "Crear cuaderno" }).click();
-    const dialog = page.getByRole("dialog");
-    await dialog.getByLabel("Título").fill("Cuaderno dos pestañas");
-    await clickAndWaitForAction(
-      page,
-      dialog.getByRole("button", { name: "Crear cuaderno" }),
-    );
-    await expect(sidebar.getByText("Cuaderno dos pestañas")).toBeVisible();
-
-    await clickAndWaitForAction(
-      page,
-      sidebar.getByRole("button", {
-        name: "Crear página en Cuaderno dos pestañas",
-      }),
-    );
-    const notebookItem = sidebar
-      .getByRole("listitem")
-      .filter({ hasText: "Cuaderno dos pestañas" });
-    const pageLink = notebookItem.getByRole("link", { name: "Sin título" });
-    await expect(pageLink).toBeVisible();
-    await pageLink.click();
-    await expect(page.getByTestId("editor-mount")).toBeVisible();
+    await createNotebookWithOpenPage(page, "Cuaderno dos pestañas");
     const sharedUrl = page.url();
 
     // Tab B: same user, own BrowserContext, opens the page while it still
