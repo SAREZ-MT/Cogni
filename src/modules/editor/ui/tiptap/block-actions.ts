@@ -3,7 +3,7 @@
 // keyboard shortcuts registered on the editor, extensions/block-
 // shortcuts.ts) — one implementation of each so the menu and the shortcut
 // can never drift apart.
-import type { Editor } from "@tiptap/core";
+import type { Editor, JSONContent } from "@tiptap/core";
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import { NODE_BACKGROUND_TYPES } from "./extensions/node-background";
 
@@ -58,9 +58,23 @@ export function copyBlock(editor: Editor, ref: BlockRef): void {
   nav.clipboard.writeText(text).catch(() => {});
 }
 
+// A copied node would carry the original's `blockId` (and so would every
+// nested block), leaving two blocks that answer to the same "Copiar enlace"
+// fragment. Dropping the ids lets UniqueID mint fresh ones for the copy.
+function withoutBlockIds(node: JSONContent): JSONContent {
+  const { blockId: _blockId, ...attrs } = node.attrs ?? {};
+  const copy: JSONContent = { ...node, attrs };
+  if (node.content) copy.content = node.content.map(withoutBlockIds);
+  return copy;
+}
+
 export function duplicateBlock(editor: Editor, ref: BlockRef): void {
   const after = ref.pos + ref.node.nodeSize;
-  editor.chain().focus().insertContentAt(after, ref.node.toJSON()).run();
+  editor
+    .chain()
+    .focus()
+    .insertContentAt(after, withoutBlockIds(ref.node.toJSON()))
+    .run();
 }
 
 export function deleteBlock(editor: Editor, ref: BlockRef): void {
