@@ -67,19 +67,31 @@ describe("securityHeaders", () => {
 // Requirement "Nonces de CSP" (specs/observability-and-delivery/spec.md):
 // src/proxy.ts calls buildSecurityHeaders(nonce) once per request.
 describe("buildSecurityHeaders(nonce)", () => {
-  it("replaces 'unsafe-inline' in script-src and style-src with the given nonce and 'strict-dynamic'", () => {
+  it("replaces 'unsafe-inline' in script-src with the given nonce and 'strict-dynamic'", () => {
     const csp =
       buildSecurityHeaders("abc123").find(
         (h) => h.key === "Content-Security-Policy",
       )?.value ?? "";
 
     const script = directive(csp, "script-src");
-    const style = directive(csp, "style-src");
     expect(script).toContain("'nonce-abc123'");
     expect(script).toContain("'strict-dynamic'");
     expect(script).not.toContain("'unsafe-inline'");
-    expect(style).toContain("'nonce-abc123'");
-    expect(style).not.toContain("'unsafe-inline'");
+  });
+
+  // A nonce never covers style="" attributes, so a nonce-based style-src
+  // blocks every server-rendered inline style on a hard load (progress bar
+  // widths render at 100 %). Styles keep 'unsafe-inline'; the nonce only
+  // protects scripts.
+  it("keeps style-src on 'self' 'unsafe-inline' without the nonce so SSR inline styles apply", () => {
+    const csp =
+      buildSecurityHeaders("abc123").find(
+        (h) => h.key === "Content-Security-Policy",
+      )?.value ?? "";
+
+    expect(directive(csp, "style-src")).toBe(
+      "style-src 'self' 'unsafe-inline'",
+    );
   });
 
   it("produces a different script-src directive for a different nonce (triangulation)", () => {

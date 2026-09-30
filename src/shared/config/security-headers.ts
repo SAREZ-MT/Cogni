@@ -1,11 +1,11 @@
 const isDev = process.env.NODE_ENV === "development";
 
-// script-src and style-src switch from 'unsafe-inline' to a per-request
-// nonce ('nonce-{value}' 'strict-dynamic') once src/proxy.ts generates one
+// script-src switches from 'unsafe-inline' to a per-request nonce
+// ('nonce-{value}' 'strict-dynamic') once src/proxy.ts generates one
 // (design.md, "Nonce de CSP generado por petición en src/proxy.ts y
 // propagado vía x-nonce"; node_modules/next/dist/docs/01-app/02-guides/
 // content-security-policy.md, "Adding a nonce with Proxy"). Without a
-// nonce, script-src/style-src fall back to 'unsafe-inline': next.config.ts's
+// nonce, script-src falls back to 'unsafe-inline': next.config.ts's
 // static headers() keeps working as a safety net for any route the proxy
 // does not process (Requirement "Nonces de CSP" only forbids 'unsafe-inline'
 // for scripts once a nonce is available).
@@ -17,17 +17,18 @@ function scriptSrc(nonce: string | undefined): string {
   return `script-src ${base} https://*.posthog.com${isDev ? " 'unsafe-eval'" : ""}`;
 }
 
-function styleSrc(nonce: string | undefined): string {
-  return nonce
-    ? `style-src 'self' 'nonce-${nonce}' 'strict-dynamic'`
-    : "style-src 'self' 'unsafe-inline'";
+// style-src never carries the nonce: nonces do not cover style=""
+// attributes, so a nonce-based style-src blocks every server-rendered inline
+// style on a hard load (progress bar widths, for instance, render at 100 %).
+function styleSrc(): string {
+  return "style-src 'self' 'unsafe-inline'";
 }
 
 function buildContentSecurityPolicy(nonce: string | undefined): string {
   return [
     "default-src 'self'",
     scriptSrc(nonce),
-    styleSrc(nonce),
+    styleSrc(),
     // https://*.supabase.co matches connect-src's existing pattern for "the
     // configured Supabase project" (design.md, "images.remotePatterns y
     // img-src de CSP en el mismo pase"): getAssetReadUrl's signed read URLs

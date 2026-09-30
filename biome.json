@@ -18,6 +18,7 @@
       "!drizzle/meta",
       "!.agents",
       "!.atl",
+      "!.claude",
       "!pnpm-lock.yaml"
     ]
   },
