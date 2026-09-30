@@ -2,7 +2,7 @@
 
 import { MoreHorizontal } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { Button } from "@/shared/ui/button";
 import {
   DropdownMenu,
@@ -18,6 +18,7 @@ import {
 import type { NotebookColor } from "../domain/notebook";
 import { ArchiveConfirmDialog } from "./archive-confirm-dialog";
 import { ChangeAppearanceDialog } from "./change-appearance-dialog";
+import { useNotebookActionsSlot } from "./notebook-actions-slot";
 import { RenameNotebookDialog } from "./rename-notebook-dialog";
 
 interface NotebookCardActionsProps {
@@ -50,6 +51,15 @@ export function NotebookCardActions({
 }: NotebookCardActionsProps) {
   const router = useRouter();
   const [, startTransition] = useTransition();
+  const slot = useNotebookActionsSlot();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  // The dialogs below live inside the menu content and keep it open while
+  // they are showing (see the preventDefault note above), so the menu has to
+  // be closed explicitly once a dialog goes away.
+  function closeMenuWhenDialogCloses(open: boolean) {
+    if (!open) setMenuOpen(false);
+  }
 
   function rename(title: string) {
     startTransition(async () => {
@@ -77,7 +87,7 @@ export function NotebookCardActions({
   }
 
   return (
-    <DropdownMenu>
+    <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
       <DropdownMenuTrigger asChild>
         <Button
           type="button"
@@ -100,6 +110,7 @@ export function NotebookCardActions({
         <RenameNotebookDialog
           initialTitle={notebook.title}
           onRename={rename}
+          onOpenChange={closeMenuWhenDialogCloses}
           trigger={
             <DropdownMenuItem onSelect={(event) => event.preventDefault()}>
               Renombrar
@@ -110,15 +121,26 @@ export function NotebookCardActions({
           notebookTitle={notebook.title}
           currentColor={notebook.color}
           onChange={changeAppearance}
+          onOpenChange={closeMenuWhenDialogCloses}
           trigger={
             <DropdownMenuItem onSelect={(event) => event.preventDefault()}>
               Cambiar apariencia
             </DropdownMenuItem>
           }
         />
+        {/* Items other modules inject through the slot (PDF import from
+            `ingestion`, wired in src/app/(app)/_components/notebook-actions.tsx);
+            `notebooks` never imports them. */}
+        {slot.menuItems?.(
+          { id: notebook.id, title: notebook.title },
+          {
+            refreshTree: () => router.refresh(),
+          },
+        )}
         <ArchiveConfirmDialog
           itemLabel={`el cuaderno "${notebook.title}"`}
           onConfirm={archive}
+          onOpenChange={closeMenuWhenDialogCloses}
           trigger={
             <DropdownMenuItem
               variant="destructive"

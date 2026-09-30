@@ -15,6 +15,9 @@ interface RenameNotebookDialogProps {
   initialTitle: string;
   onRename: (title: string) => void;
   trigger: React.ReactNode;
+  // Fires on every open/close, including the close after saving or
+  // cancelling, so a host menu can close together with the dialog.
+  onOpenChange?: (open: boolean) => void;
 }
 
 // Design pass 2: the /notebooks grid/list and Home's "Mis cuadernos" grid
@@ -25,8 +28,14 @@ export function RenameNotebookDialog({
   initialTitle,
   onRename,
   trigger,
+  onOpenChange,
 }: RenameNotebookDialogProps) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpenState] = useState(false);
+
+  function setOpen(next: boolean) {
+    setOpenState(next);
+    onOpenChange?.(next);
+  }
   const [title, setTitle] = useState(initialTitle);
   const titleId = useId();
 

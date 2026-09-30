@@ -29,6 +29,9 @@ interface ChangeAppearanceDialogProps {
   currentColor: NotebookColor | null;
   onChange: (color: NotebookColor) => void;
   trigger: React.ReactNode;
+  // Fires on every open/close, including the close after picking a color, so
+  // a host menu can close together with the dialog.
+  onOpenChange?: (open: boolean) => void;
 }
 
 // Design pass 2: a Dialog (not notebook-item.tsx's Popover) so it composes
@@ -41,8 +44,14 @@ export function ChangeAppearanceDialog({
   currentColor,
   onChange,
   trigger,
+  onOpenChange,
 }: ChangeAppearanceDialogProps) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpenState] = useState(false);
+
+  function setOpen(next: boolean) {
+    setOpenState(next);
+    onOpenChange?.(next);
+  }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
