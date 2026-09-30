@@ -32,7 +32,9 @@ test.describe("editor accessibility with reduced motion", () => {
 
     const menu = page.getByTestId("command-menu");
     await expect(menu).toBeVisible();
-    await expect(menu.getByText("párrafo")).toBeVisible();
+    // The paragraph entry is labeled "Texto" in the template block set; its
+    // description ("Texto normal") also contains the word, hence exact.
+    await expect(menu.getByText("Texto", { exact: true })).toBeVisible();
 
     await page.keyboard.press("Escape");
     await expect(menu).toHaveCount(0);

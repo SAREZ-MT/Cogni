@@ -400,7 +400,8 @@ test.describe("notebooks acceptance", () => {
     // Cogni highlight mark: S6a folded the standalone highlight-picker
     // BubbleMenu into the shared bubble toolbar (bubble-toolbar.tsx) — the
     // palette (highlight-picker-controls.tsx) now only appears after
-    // clicking the toolbar's "Resaltar" button, instead of floating on its
+    // opening the toolbar's color popover ("Color de texto", whose
+    // "Fondo/Resaltado" row reuses it unchanged), instead of floating on its
     // own on selection. Same triple-click selection as the inline marks
     // above; a keyboard-only Home/Shift+End does not reliably make the
     // toolbar appear.
@@ -409,7 +410,7 @@ test.describe("notebooks acceptance", () => {
       .click({ clickCount: 3 });
     const bubbleToolbar = page.getByTestId("bubble-toolbar");
     await expect(bubbleToolbar).toBeVisible();
-    await bubbleToolbar.getByRole("button", { name: "Resaltar" }).click();
+    await bubbleToolbar.getByRole("button", { name: "Color de texto" }).click();
     await page
       .getByTestId("highlight-picker")
       .getByRole("button", { name: "Resaltar en verde" })
