@@ -295,4 +295,84 @@ describe("Editor", () => {
       { timeout: 200 },
     );
   });
+
+  // Opening a page is not editing it: `updatedAt` feeds "Páginas recientes"
+  // and "Notas listas para repasar", so the UniqueID transaction that labels
+  // legacy blocks must never reach the autosave.
+  describe("block ids", () => {
+    function legacyDoc(): TiptapDoc {
+      return {
+        type: "doc",
+        content: [
+          { type: "paragraph", content: [{ type: "text", text: "uno" }] },
+          { type: "paragraph", content: [{ type: "text", text: "dos" }] },
+        ],
+      };
+    }
+
+    function blockIdsIn(doc: TiptapDoc): string[] {
+      return [...JSON.stringify(doc).matchAll(/"blockId":"([^"]+)"/g)].map(
+        (match) => match[1],
+      );
+    }
+
+    it("does not save when a legacy page without ids is merely opened", async () => {
+      const port = new FakeSavePagePort({ content: legacyDoc(), version: 1 });
+
+      render(
+        <Editor
+          pageId="page-1"
+          initialContent={legacyDoc()}
+          initialVersion={1}
+          port={port}
+        />,
+      );
+
+      // The ids really were assigned to the live document...
+      await waitFor(() =>
+        expect(document.querySelector("[data-blockid]")).not.toBeNull(),
+      );
+      // ...and well past the 1000 ms debounce nothing was sent.
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      expect(port.saveCalls).toHaveLength(0);
+      expect(screen.getByTestId("autosave-status")).not.toHaveTextContent(
+        /guard/,
+      );
+    });
+
+    it("saves once after a real edit and persists the ids with the content", async () => {
+      const user = userEvent.setup();
+      const port = new FakeSavePagePort({ content: legacyDoc(), version: 1 });
+
+      render(
+        <Editor
+          pageId="page-1"
+          initialContent={legacyDoc()}
+          initialVersion={1}
+          port={port}
+        />,
+      );
+      await waitFor(() =>
+        expect(document.querySelector("[data-blockid]")).not.toBeNull(),
+      );
+
+      const editable = document.querySelector(
+        '[contenteditable="true"]',
+      ) as HTMLElement;
+      await user.click(editable);
+      await user.type(editable, " editado");
+
+      await waitFor(() => expect(port.saveCalls).toHaveLength(1), {
+        timeout: 4000,
+      });
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      expect(port.saveCalls).toHaveLength(1);
+
+      const saved = port.saveCalls[0].content;
+      expect(JSON.stringify(saved)).toContain("editado");
+      const ids = blockIdsIn(saved);
+      expect(ids).toHaveLength(2);
+      expect(new Set(ids).size).toBe(2);
+    });
+  });
 });

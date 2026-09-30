@@ -10,6 +10,7 @@ import type { SavePagePort, TiptapDoc } from "../../domain/save-page-port";
 import { ConflictBanner } from "../conflict-banner";
 import { SaveStatus } from "../save-status";
 import { BlockHandle } from "./block-handle";
+import { isBlockIdOnlyChange } from "./block-ids";
 import { BubbleToolbar } from "./bubble-toolbar";
 import { createEditorExtensions } from "./extensions";
 import type { SlashCommandItem } from "./slash-command-items";
@@ -98,7 +99,13 @@ export function Editor({
     }),
     content: initialContent as unknown as Record<string, unknown>,
     immediatelyRender: false,
-    onUpdate: ({ editor: current }) => {
+    onUpdate: ({ editor: current, transaction }) => {
+      // Opening a page is not editing it: the transaction UniqueID
+      // dispatches to label legacy blocks changes nothing but ids, and
+      // saving it would bump `updatedAt` (Home's recency metrics). The ids
+      // reach the server with the next real edit, which always sends the
+      // whole live document.
+      if (isBlockIdOnlyChange(transaction.before, current.state.doc)) return;
       setContent(toPlainTiptapDoc(current.getJSON()));
     },
   });
