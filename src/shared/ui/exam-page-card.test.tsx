@@ -3,7 +3,8 @@ import { describe, expect, it } from "vitest";
 import { ExamPageCard, type ExamPageCardProps } from "./exam-page-card";
 
 const BASE: ExamPageCardProps = {
-  href: "/exams/nb/p",
+  notebookId: "nb",
+  pageId: "p",
   pageTitle: "Mitocondria",
   questionCount: 10,
   attempts: 2,
@@ -13,10 +14,40 @@ const BASE: ExamPageCardProps = {
 };
 
 describe("ExamPageCard", () => {
-  it("links to the page's exam", () => {
+  it("sends a never-attempted page to a fresh session", () => {
+    render(<ExamPageCard {...BASE} attempts={0} lastScore={null} />);
+
+    expect(screen.getByRole("link", { name: "Mitocondria" })).toHaveAttribute(
+      "href",
+      "/exams/nb/p",
+    );
+  });
+
+  it("sends a passed page to its stored results instead of re-running the exam", () => {
     render(<ExamPageCard {...BASE} />);
 
-    expect(screen.getByRole("link")).toHaveAttribute("href", "/exams/nb/p");
+    expect(screen.getByRole("link", { name: "Mitocondria" })).toHaveAttribute(
+      "href",
+      "/exams/nb/p/resultados",
+    );
+  });
+
+  it("sends a retake-pending page to the retake question set, never the plain session", () => {
+    render(<ExamPageCard {...BASE} lastScore={60} retakePending />);
+
+    expect(screen.getByRole("link", { name: "Mitocondria" })).toHaveAttribute(
+      "href",
+      "/exams/nb/p?retake=1",
+    );
+  });
+
+  it("links the question management screen with the question count", () => {
+    render(<ExamPageCard {...BASE} questionCount={7} />);
+
+    expect(screen.getByRole("link", { name: "Preguntas (7)" })).toHaveAttribute(
+      "href",
+      "/exams/nb/p/preguntas",
+    );
   });
 
   it("shows title, question count, attempts and the last date", () => {

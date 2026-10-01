@@ -44,6 +44,7 @@ describe("Pill", () => {
     ["warning", "bg-warning-100"],
     ["error", "bg-error-100"],
     ["info", "bg-info-100"],
+    ["rose", "bg-rose-500/10"],
     ["muted", "bg-transparent"],
   ] as const)("maps tone %s to %s", (tone, expected) => {
     render(
