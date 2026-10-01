@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -345,16 +345,35 @@ describe("PageImportView", () => {
     expect(getImportJobStatus.mock.calls.length).toBe(callsBeforeUnmount);
   }, 10_000);
 
+  // F6 (odd/tasks/review-followups.md): flaky under CPU load (4 of 25 runs
+  // with every core busy). Two causes: `shouldAdvanceTime` let real elapsed
+  // time leak into the fake clock, and the timers were advanced OUTSIDE
+  // `act`, so React rendered the `setDelayed(true)` update on a real
+  // macrotask that could land after the assertion. Pure fake timers, advanced
+  // inside an async `act`, make the render flush part of the advance.
   it("shows the slow-import notice after 90s and keeps polling", async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.useFakeTimers();
     getImportJobStatus.mockResolvedValue(ok(job({ status: "processing" })));
 
     renderView({ initial: job({ status: "processing" }) });
 
-    await vi.advanceTimersByTimeAsync(90_000);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(89_999);
+    });
+    expect(
+      screen.queryByText(INGESTION_COPY.progress.delay),
+    ).not.toBeInTheDocument();
 
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
     expect(screen.getByText(INGESTION_COPY.progress.delay)).toBeInTheDocument();
-    vi.useRealTimers();
+
+    const callsAtNotice = getImportJobStatus.mock.calls.length;
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(4_000);
+    });
+    expect(getImportJobStatus.mock.calls.length).toBeGreaterThan(callsAtNotice);
   });
 
   // T11 review follow-up (folded into T13a): render the editor only after
