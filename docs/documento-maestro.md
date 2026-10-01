@@ -2,11 +2,12 @@
 
 | Campo | Valor |
 |---|---|
-| Versión del documento | 1.0.1 (ADR 0002: Fase 2 diferida) |
-| Fecha | 2026-09-14 (actualizado 2026-09-22) |
+| Versión del documento | 1.1.0 |
+| Fecha | 2026-09-14 (actualizado 2026-10-01) |
+| Cambios de la versión 1.1.0 | ADR 0003: Vercel Fluid Compute y Vercel Cron reemplazan a Trigger.dev. Fase 2 (importación de PDF) implementada y fuera de "Próximamente". La métrica por técnica "tiempo de estudio" se reemplaza por "repasos completados". |
 | Estado | Aprobado. Fuente de verdad para todas las fases. |
 | Autor | Javier Sarez |
-| Metodología de construcción | Spec-Driven Development (SDD) con gentle-ai, un change por unidad de trabajo |
+| Metodología de construcción | Fases 0 y 1: Spec-Driven Development (SDD) con gentle-ai. Desde 2026-09-22: Organic Driven Development (ODD); SDD sigue disponible si se elige explícitamente. Ver §15. |
 
 Este documento fija **qué** se construye, **con qué** se construye, **cómo** se organiza y **en qué orden**. Toda decisión aquí registrada se considera cerrada. Cambiarla requiere un ADR nuevo en `docs/adr/` que la reemplace explícitamente.
 
@@ -132,7 +133,7 @@ Decisión cerrada (opción C):
 ### 3.6 Dashboard
 
 - Progreso por cuaderno y por página: nivel de dominio, tendencia, ítems totales y vencidos.
-- Métricas por técnica: tasa de acierto, racha de días con repasos, tiempo de estudio.
+- Métricas por técnica: tasa de acierto, racha de días con repasos, repasos completados.
 - Calibración metacognitiva: comparación entre autoevaluación y resultado real. Detecta exceso y falta de confianza.
 - Gráficos con los componentes de gráficos de shadcn/ui (Recharts).
 
@@ -176,7 +177,7 @@ Regla de versiones: en la Fase 0 se instala **la última versión estable** de c
 | Supabase | Postgres, Auth (correo + Google), Storage (PDF e imágenes) | Free | Pausa tras 7 días sin actividad; 500 MB DB; 1 GB Storage | Cron diario de keep-alive. Con usuarios recurrentes: Pro. |
 | Cloudflare | Registrador de dominio y DNS | Registrar a costo | — | Solo DNS. Sin proxy delante de Vercel. |
 | Upstash Redis | Rate limiting por usuario y contadores de cuota por proveedor de IA | Free | Comandos/día del plan free | No se usa como caché genérica. |
-| Trigger.dev | Jobs: procesar PDF, generación por lotes con IA, cálculo diario de repasos, keep-alive | Free | USD 5 de crédito/mes, 20 ejecuciones concurrentes | Alternativa: Supabase Edge Functions + pg_cron. |
+| Vercel Functions (Fluid Compute) + Vercel Cron | Trabajo síncrono acotado (procesar PDF, generación con IA, evaluación) y tareas programadas diarias (keep-alive, cálculo de repasos) | Hobby | 300 s por función con `maxDuration` explícito; crons diarios | ADR 0003. Si un trabajo supera los 300 s, se reintroduce un servicio de jobs con un ADR nuevo. |
 | Sentry | Errores en cliente y servidor | Free | Eventos/mes del plan free | Muestreo si se acerca al límite. |
 | PostHog | Analítica de producto | Free | Eventos/mes del plan free | Eventos definidos explícitamente, sin autocaptura masiva. |
 | Better Stack | Logs centralizados | Free | — | **Diferido a Fase 8.** Se conecta con log drain de Vercel. |
@@ -205,7 +206,7 @@ Restricción conocida: los modelos Pro de Gemini no están en el tier gratuito. 
 | CI | GitHub Actions en cada PR: instalación, Biome, `tsc --noEmit`, Vitest. Playwright en main. |
 | Deploy | Integración Git de Vercel. Preview por rama, producción desde `main`. |
 | Documentación de código | TSDoc en puertos, entidades y servicios de aplicación. |
-| Documentación de proyecto | Este documento, ADRs en `docs/adr/`, artefactos SDD de gentle-ai en `openspec/` por cada change. |
+| Documentación de proyecto | Este documento, ADRs en `docs/adr/`, artefactos SDD de gentle-ai en `openspec/` (Fases 0 y 1) y documentos de feature ODD en `odd/tasks/`. |
 | Diagramas | archify, generados desde el agente hacia `docs/diagramas/`. |
 | Manual de usuario | Fase 8. |
 | Swagger / Scalar / Mintlify | No aplica en esta etapa. No hay API pública. |
@@ -226,7 +227,7 @@ Restricción conocida: los modelos Pro de Gemini no están en el tier gratuito. 
 | `identity` | Perfil de usuario, sesión, preferencias | Supabase Auth |
 | `notebooks` | Cuadernos, páginas, contenido, `plain_text` | `identity` |
 | `editor` | Extensiones Tiptap, bloques, menú `/`, resaltados, autoguardado | `notebooks` (por puerto de guardado) |
-| `ingestion` | Subida de PDF, extracción, conversión a bloques | `notebooks`, Trigger.dev, Storage |
+| `ingestion` | Subida de PDF, extracción, conversión a bloques | `notebooks`, Storage |
 | `ai` | Registro de proveedores, rotación por cuota, salida estructurada, prompts versionados, rate limiting | Upstash, proveedores |
 | `study-engine` | Estado SM-2 por ítem, nivel de dominio por página, cálculo de vencimientos | Nadie del dominio de estudio |
 | `flashcards` | Tarjetas, sesiones, retroalimentación | `study-engine`, `ai`, `notebooks` |
@@ -239,7 +240,7 @@ Restricción conocida: los modelos Pro de Gemini no están en el tier gratuito. 
 
 1. `domain` no importa nada externo: ni Next.js, ni Drizzle, ni AI SDK, ni React.
 2. `application` depende solo de `domain` y de puertos (interfaces) definidos en `domain` o `application`.
-3. `infrastructure` implementa puertos. Es el único lugar con Drizzle, Supabase, AI SDK, Upstash, Trigger.dev.
+3. `infrastructure` implementa puertos. Es el único lugar con Drizzle, Supabase, AI SDK, Upstash.
 4. `ui` consume `application` a través de Server Actions o route handlers. Nunca toca `infrastructure` directamente.
 5. Un módulo solo importa de otro módulo a través de su `index.ts` público. Nunca de rutas internas.
 6. `study-engine` no conoce las técnicas. Las técnicas le envían resultados por el puerto `RecordReview` y le consultan vencimientos por `GetDueItems`.
@@ -276,7 +277,6 @@ cogni/
 │   │   ├── db/                   # cliente Drizzle, esquema compartido
 │   │   ├── ui/                   # shadcn/ui y primitivas del design system
 │   │   └── config/               # env validado con Zod
-│   └── trigger/                  # tareas Trigger.dev (delgadas, llaman a application)
 ├── drizzle/                      # migraciones generadas
 ├── tests/
 │   └── e2e/                      # Playwright
@@ -298,13 +298,12 @@ Usuario edita página
   → notebooks.infrastructure.PageRepository (Drizzle)
   → Postgres (content JSON + plain_text)
 
-Usuario pide "Generar flashcards"
-  → flashcards.ui → Server Action → flashcards.application.RequestGeneration
-  → encola tarea Trigger.dev
-  → tarea → ai.application.GenerateStructured (rotación de proveedor)
+Usuario pide "Generar flashcards" (planificado, Fase 3; aún no hay código de generación)
+  → flashcards.ui → Server Action (maxDuration acotado) → flashcards.application.RequestGeneration
+  → ai.application.GenerateStructured (rotación de proveedor)
   → flashcards.infrastructure guarda tarjetas
   → study-engine.RegisterItems crea estado SM-2 por tarjeta
-  → UI recibe resultado por polling/realtime de TanStack Query
+  → la Server Action responde con el resultado y la UI lo muestra (sin cola ni polling: el trabajo cabe en `maxDuration`)
 
 Usuario califica una tarjeta
   → flashcards.application.RateCard
@@ -327,7 +326,7 @@ Convenciones comunes a todas las entidades de usuario: `id` (UUID v7), `owner_id
 | `Notebook` | notebooks | `title`, `icon` (emoji elegido por el usuario), `color`, `position`, `archived_at` |
 | `Page` | notebooks | `notebook_id`, `title`, `content` (jsonb Tiptap), `plain_text`, `content_version`, `position`, `archived_at` |
 | `PageAsset` | notebooks | `page_id`, `storage_path`, `mime`, `size_bytes` |
-| `ImportJob` | ingestion | `page_id`, `storage_path`, `file_name`, `status` (queued/processing/done/failed), `page_count`, `error`, `trigger_run_id` |
+| `ImportJob` | ingestion | `page_id`, `storage_path`, `file_name`, `status` (queued/processing/done/failed), `page_count`, `error` |
 | `StudyItem` | study-engine | `page_id`, `kind` (flashcard/exam_question/recall_question), `source_id` (id de la Flashcard, de la `ExamQuestion` raíz o de la `RecallQuestion`), `easiness` (≥1.3, inicial 2.5), `interval_days`, `repetitions`, `due_at`, `last_quality`, `last_reviewed_at`, `lapses`, `suspended_at` |
 | `ReviewLog` | study-engine | `item_id`, `quality`, `reviewed_at`, `interval_before`, `interval_after`, `easiness_after`, `session_kind`, `session_id` |
 | `PageMastery` | study-engine | `page_id`, `level` (Nuevo/Aprendiendo/Consolidando/Dominado), `score` (0–1), `items_total`, `items_due`, `computed_at` |
@@ -341,7 +340,7 @@ Convenciones comunes a todas las entidades de usuario: `id` (UUID v7), `owner_id
 | `RecallSession` | active-recall | `page_id`, `started_at`, `finished_at`, `evaluation_status` (pending/done/partial) |
 | `RecallAnswer` | active-recall | `session_id`, `question_id`, `answer_text`, `self_rating` (0–5), `evaluation_status` (pending/done/failed), `ai_evaluation` (jsonb crudo), `ai_score` (0–5), `combined_quality` (0–5), `generation_id`, `disagreed` (bool) |
 | `SessionFeedback` | técnicas | `session_kind`, `session_id`, `content` (jsonb), `generation_id`, `status` (pending/done/failed) |
-| `AiGeneration` | ai | `page_id` (nulo si no aplica), `purpose`, `provider`, `model`, `prompt_version`, `input_tokens`, `output_tokens`, `latency_ms`, `status` (queued/running/done/failed), `error`, `trigger_run_id` |
+| `AiGeneration` | ai | `page_id` (nulo si no aplica), `purpose`, `provider`, `model`, `prompt_version`, `input_tokens`, `output_tokens`, `latency_ms`, `status` (queued/running/done/failed), `error` |
 
 Relaciones que importan:
 
@@ -462,7 +461,7 @@ Las preguntas falladas vencen al día siguiente (q = 1), así la página aparece
 2. Toda salida es estructurada: `generateObject` con esquema Zod. Si el proveedor no cumple el esquema, se reintenta una vez con otro proveedor; si falla, la operación se marca `failed` y el usuario ve un mensaje claro. Nunca se inventa un resultado.
 3. Los prompts son versionados en código (`prompts/<purpose>/v1.ts`). Cada `AiGeneration` registra la versión usada.
 4. Temperatura baja (≤ 0.3) para evaluación; moderada (≤ 0.7) para generación.
-5. Todo se ejecuta en tareas de Trigger.dev cuando puede tardar más de unos segundos. Las Server Actions solo encolan y consultan.
+5. Todo se ejecuta dentro del presupuesto de una función de Vercel (máximo 300 segundos, con `maxDuration` explícito). Las tareas programadas usan Vercel Cron. (ADR 0003) Si una función se interrumpe a mitad de un trabajo, el estado persistido queda como estaba: en la importación de PDF (Fase 2), una consulta de estado reporta como `failed` (tiempo agotado) un trabajo no terminal sin escrituras desde hace `maxDuration` + 30 s, sin reescribir la fila ni reintentarlo; no existe un mecanismo de recuperación automática.
 
 ### 8.2 Registro de proveedores y rotación
 
@@ -542,10 +541,10 @@ Merge a main
 
 ### 10.3 Operación de costo cero
 
-- Keep-alive: tarea programada diaria (Trigger.dev) que ejecuta `select 1` contra Supabase de producción.
+- Keep-alive: Vercel Cron diario (`vercel.json` → `/api/keep-alive`, protegido con `CRON_SECRET`) que ejecuta `select 1` contra Supabase de producción.
 - Job diario de vencimientos: recalcula `PageMastery` y materializa la vista "Hoy".
 - Alertas: Sentry a correo. PostHog con eventos: `page_created`, `pdf_imported`, `generation_requested`, `session_started`, `session_finished`, `item_rated`.
-- Presupuesto vigilado: si Trigger.dev supera el 80 % del crédito, se degrada la generación por lotes a colas más pequeñas.
+- Presupuesto vigilado: la generación por lotes se trocea en unidades que quepan en los 300 s de una función; si el uso de funciones de Vercel se acerca al límite del plan Hobby, se reducen los lotes.
 
 ---
 
@@ -557,6 +556,7 @@ Merge a main
 - Copy de interfaz: español, "tú", oración en minúscula inicial salvo nombres propios, sin emoji salvo íconos de cuaderno elegidos por el usuario.
 - Accesibilidad objetivo: WCAG 2.1 AA, objetivos táctiles de 44 px, `prefers-reduced-motion` respetado.
 - Las pantallas de referencia en `docs/design-system/ui_kits/` son guía estética, no contrato. Cualquier contradicción con este documento se resuelve a favor de este documento.
+- La iteración visual de las pantallas de flashcards, exámenes, recordación activa y dashboard está integrada en `main` como vistas previas ocultas en producción, con datos de muestra locales a cada ruta (`requireDesignPreviews()` en `src/shared/config/design-previews.ts`; visibles en desarrollo o con `COGNI_DESIGN_PREVIEWS=1`). Sus capas de dominio y aplicación siguen vacías: las Fases 4 a 7 reemplazan los datos de muestra por puertos de aplicación reales. Si una pantalla y este documento se contradicen, prevalece este documento.
 - Se creará una skill de diseño para el agente (`cogni-design`) que apunte a esta carpeta, registrada en el registro de skills de gentle-ai.
 
 ---
@@ -570,7 +570,7 @@ Merge a main
 | Interfaz de usuario | Español, "tú". |
 | Documentación técnica | Español neutro profesional. |
 | Commits | Conventional Commits: `feat`, `fix`, `chore`, `docs`, `test`, `refactor`. Sin atribución a IA. |
-| Ramas | `main` protegida. `feat/<change>`, `fix/<tema>`. Una rama por change SDD. |
+| Ramas | `main` protegida. `feat/<change>`, `fix/<tema>`. Una rama por change o feature. |
 | PRs | Máximo 400 líneas netas; si crece, se divide en PRs encadenadas. |
 | Nombres de módulos | kebab-case en carpetas, PascalCase en tipos, camelCase en funciones. |
 | Errores | `Result<T, DomainError>` en dominio y aplicación. Excepciones solo en infraestructura, traducidas en el borde. |
@@ -581,7 +581,7 @@ Merge a main
 
 ## 13. Fases de construcción
 
-Cada fase es uno o más changes SDD de gentle-ai. Una fase se considera terminada solo cuando está desplegada en producción y cumple su criterio de "hecho".
+Las Fases 0 y 1 se construyeron como changes SDD de gentle-ai (artefactos archivados en `openspec/`); desde 2026-09-22 cada fase se construye con ODD (ver §15). Una fase se considera terminada solo cuando está desplegada en producción y cumple su criterio de "hecho".
 
 ### Fase 0 — Cimientos
 
@@ -593,11 +593,11 @@ Hecho cuando: un usuario se registra, verifica correo, inicia sesión con Google
 Entregables: CRUD de cuadernos y páginas, sidebar, editor Tiptap con todos los bloques de 3.2, menú `/`, resaltados con paleta Cogni, imágenes a Storage, autoguardado optimista, `plain_text` materializado.
 Hecho cuando: un usuario toma apuntes completos de una clase sin salir de Cogni y los recupera al volver a entrar.
 
-### Fase 2 — Importación de PDF (diferida, ver "Próximamente")
+### Fase 2 — Importación de PDF
 
-> **Diferida el 2026-09-22 por ADR 0002.** Se implementa después de la Fase 8. La planificación SDD ya hecha se conserva en `openspec/changes/proximamente/phase-2-pdf-import/`.
+> **Implementada y fusionada en `main` el 2026-09-23**, construida con ODD. El procesamiento es síncrono dentro de una Server Action acotada por `maxDuration` (ADR 0003), sin Trigger.dev. El diferimiento del 2026-09-22 (ADR 0002) quedó revertido al reinstaurarse la fase.
 
-Entregables: subida a Storage, `ImportJob`, tarea Trigger.dev con unpdf, conversión de texto a bloques (títulos por heurística, párrafos, listas), estado de progreso en UI, manejo de PDF sin texto.
+Entregables: subida a Storage, `ImportJob`, procesamiento síncrono con unpdf en una Server Action acotada por `maxDuration`, conversión de texto a bloques (títulos por heurística, párrafos, listas), estado de progreso en UI, manejo de PDF sin texto.
 Hecho cuando: un PDF de 30 páginas con capa de texto termina como página editable en menos de 60 segundos.
 
 ### Fase 3 — Capa de IA
@@ -632,13 +632,7 @@ Hecho cuando: la plataforma se publica para uso abierto.
 
 ### Próximamente
 
-Fases diferidas por decisión registrada en ADR. Se retoman cuando todas las fases activas estén desplegadas y usables, en el orden de esta lista.
-
-| Fase | Diferida el | ADR | Estado de la planificación | Dónde está |
-|---|---|---|---|---|
-| Fase 2 — Importación de PDF | 2026-09-22 | ADR 0002 | Exploración, propuesta aprobada, specs y diseño validados; sin tasks ni código | `openspec/changes/proximamente/phase-2-pdf-import/` (README con pasos para reanudar) |
-
-Mientras una fase esté diferida, el texto de las fases activas que mencione "contenido importado" se lee como "contenido escrito en el editor".
+No hay fases diferidas por ahora. Una fase diferida por ADR se listaría aquí con su fecha, su ADR y el estado de su planificación.
 
 ---
 
@@ -652,17 +646,17 @@ Mientras una fase esté diferida, el texto de las fases activas que mencione "co
 | Evaluación de IA inconsistente en recordación activa | Alta | Medio | Sección 8.5 completa |
 | Editor Tiptap: complejidad de bloques personalizados | Media | Medio | Extensiones oficiales primero; bloques propios solo para lo diferencial |
 | Alcance crece a mitad de fase | Alta | Alto | Sección 1.2 y este documento; cambios solo por ADR |
-| Una sola persona desarrollando | Cierta | Medio | Fases chicas, SDD, TDD en dominio, CI estricta |
+| Una sola persona desarrollando | Cierta | Medio | Fases chicas, ODD con tareas rastreadas, TDD en dominio, CI estricta |
 
 ---
 
 ## 15. Flujo de trabajo con gentle-ai
 
-1. **Fase 0** arranca con `sdd init` sobre este repositorio para bootstrapear el contexto SDD.
-2. Cada entregable de cada fase se ejecuta como un **change SDD**: `sdd new` → exploración → propuesta → spec → diseño → tareas → apply → verify → archive.
-3. Este documento se pasa como contexto a cada fase de exploración y propuesta. Las specs no lo contradicen; si necesitan hacerlo, primero un ADR.
+1. Las Fases 0 y 1 se construyeron con SDD: `sdd init` bootstrapeó el contexto y cada entregable fue un change (`sdd new` → exploración → propuesta → spec → diseño → tareas → apply → verify → archive). Sus artefactos archivados están en `openspec/`.
+2. Desde 2026-09-22 el flujo activo es Organic Driven Development (ODD): un documento de feature en `odd/tasks/` con tareas rastreadas, TDD estricto, commits por unidad de trabajo, PRs pequeñas encadenadas y revisión nativa (RDD) por porción. SDD sigue disponible cuando se elige explícitamente.
+3. Este documento se pasa como contexto a cada fase de exploración. Las specs y los documentos de feature no lo contradicen; si necesitan hacerlo, primero un ADR.
 4. `sdd-research` se ejecuta en Fase 3 (proveedores de IA y límites vigentes) y en Fase 4 (evidencia de SM-2 y ciencia cognitiva).
-5. Las decisiones de arquitectura de cada change se registran como ADR en `docs/adr/` con el formato `NNNN-titulo.md`.
+5. Las decisiones de arquitectura se registran como ADR en `docs/adr/` con el formato `NNNN-titulo.md`.
 6. Solo se usan herramientas y skills provistas por gentle-ai y las skills propias del proyecto (`cogni-design`). No se usan skills externas instaladas en el cliente.
 7. Modo TDD estricto habilitado.
 
@@ -691,4 +685,4 @@ Mientras una fase esté diferida, el texto de las fases activas que mencione "co
 - Bjork, E. L., y Bjork, R. A. (2011). Making things hard on yourself, but in a good way: Creating desirable difficulties to enhance learning.
 - Sweller, J. (1988). Cognitive load during problem solving. *Cognitive Science*, 12(2).
 - Wozniak, P. A. (1990). Optimization of learning. Algoritmo SM-2, SuperMemo.
-- Documentación de Vercel AI SDK, Tiptap, Drizzle ORM, Supabase, Trigger.dev, Upstash (consultar versión vigente al iniciar cada fase).
+- Documentación de Vercel AI SDK, Tiptap, Drizzle ORM, Supabase, Vercel Functions y Cron, Upstash (consultar versión vigente al iniciar cada fase).
