@@ -76,4 +76,32 @@ describe("SessionSummary", () => {
 
     expect(onRestart).toHaveBeenCalledTimes(1);
   });
+
+  it("reserves a 'pronto' feedback placeholder by default", () => {
+    setup();
+
+    expect(
+      screen.getByText("Retroalimentación de la sesión"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("pronto")).toBeInTheDocument();
+  });
+
+  it("lets the caller replace the feedback slot", () => {
+    render(
+      <SessionSummary
+        deckLabel="Mi mazo"
+        reviewedCount={1}
+        nextReviewCount={1}
+        stats={STATS}
+        backHref="/x"
+        onRestart={() => {}}
+        feedback={<p>Resumen de IA</p>}
+      />,
+    );
+
+    expect(screen.getByText("Resumen de IA")).toBeInTheDocument();
+    expect(
+      screen.queryByText("Retroalimentación de la sesión"),
+    ).not.toBeInTheDocument();
+  });
 });

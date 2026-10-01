@@ -4,62 +4,49 @@ import { describe, expect, it } from "vitest";
 import { TechniqueCard, TechniqueIconStrip } from "./technique-card";
 
 describe("TechniqueCard", () => {
-  function renderCard() {
+  function renderCard(props: { disabled?: boolean } = {}) {
     return render(
       <TechniqueCard
         icon={Layers}
         tone="primary"
         name="Flashcards"
         description="Tarjetas con repetición espaciada"
-        meta="Sin tarjetas todavía"
-        actionLabel="Generar"
+        {...props}
       />,
     );
   }
 
-  it("shows the name, description and meta", () => {
+  it("shows the name and description", () => {
     renderCard();
 
     expect(screen.getByText("Flashcards")).toBeInTheDocument();
     expect(
       screen.getByText("Tarjetas con repetición espaciada"),
     ).toBeInTheDocument();
-    expect(screen.getByText("Sin tarjetas todavía")).toBeInTheDocument();
   });
 
-  it("keeps the action disabled and flags the technique as coming soon", () => {
+  it("offers a single 'Generar' action that is disabled and flagged as coming soon by default", () => {
     renderCard();
 
-    expect(screen.getByRole("button", { name: "Generar" })).toBeDisabled();
-    expect(screen.getByText("pronto")).toBeInTheDocument();
+    const action = screen.getByRole("button", { name: "Generar" });
+    expect(action).toBeDisabled();
+    expect(action).toHaveAttribute("aria-disabled", "true");
+    expect(action).toHaveAttribute("title", "Disponible pronto");
+    expect(screen.getAllByRole("button")).toHaveLength(1);
   });
 
-  it("is not a link: it never navigates to a route that may not exist", () => {
+  it("enables the action once the technique is wired up", () => {
+    renderCard({ disabled: false });
+
+    const action = screen.getByRole("button", { name: "Generar" });
+    expect(action).toBeEnabled();
+    expect(action).not.toHaveAttribute("title");
+  });
+
+  it("is not a link: generating never navigates to a route that may not exist", () => {
     renderCard();
 
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
-  });
-});
-
-describe("TechniqueCard with an href", () => {
-  it("renders the action as an enabled link and drops the 'pronto' pill", () => {
-    render(
-      <TechniqueCard
-        icon={Layers}
-        tone="primary"
-        name="Flashcards"
-        description="d"
-        meta="m"
-        actionLabel="Ver mazos"
-        href="/flashcards"
-      />,
-    );
-
-    expect(screen.getByRole("link", { name: "Ver mazos" })).toHaveAttribute(
-      "href",
-      "/flashcards",
-    );
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
     expect(screen.queryByText("pronto")).not.toBeInTheDocument();
   });
 });
