@@ -298,12 +298,12 @@ Usuario edita página
   → notebooks.infrastructure.PageRepository (Drizzle)
   → Postgres (content JSON + plain_text)
 
-Usuario pide "Generar flashcards"
+Usuario pide "Generar flashcards" (planificado, Fase 3; aún no hay código de generación)
   → flashcards.ui → Server Action (maxDuration acotado) → flashcards.application.RequestGeneration
   → ai.application.GenerateStructured (rotación de proveedor)
   → flashcards.infrastructure guarda tarjetas
   → study-engine.RegisterItems crea estado SM-2 por tarjeta
-  → UI recibe resultado por polling/realtime de TanStack Query
+  → la Server Action responde con el resultado y la UI lo muestra (sin cola ni polling: el trabajo cabe en `maxDuration`)
 
 Usuario califica una tarjeta
   → flashcards.application.RateCard
@@ -461,7 +461,7 @@ Las preguntas falladas vencen al día siguiente (q = 1), así la página aparece
 2. Toda salida es estructurada: `generateObject` con esquema Zod. Si el proveedor no cumple el esquema, se reintenta una vez con otro proveedor; si falla, la operación se marca `failed` y el usuario ve un mensaje claro. Nunca se inventa un resultado.
 3. Los prompts son versionados en código (`prompts/<purpose>/v1.ts`). Cada `AiGeneration` registra la versión usada.
 4. Temperatura baja (≤ 0.3) para evaluación; moderada (≤ 0.7) para generación.
-5. Todo se ejecuta dentro del presupuesto de una función de Vercel (máximo 300 segundos, con `maxDuration` explícito). Las tareas programadas usan Vercel Cron. (ADR 0003)
+5. Todo se ejecuta dentro del presupuesto de una función de Vercel (máximo 300 segundos, con `maxDuration` explícito). Las tareas programadas usan Vercel Cron. (ADR 0003) Si una función se interrumpe a mitad de un trabajo, el estado persistido queda como estaba: en la importación de PDF (Fase 2), una consulta de estado reporta como `failed` (tiempo agotado) un trabajo no terminal sin escrituras desde hace `maxDuration` + 30 s, sin reescribir la fila ni reintentarlo; no existe un mecanismo de recuperación automática.
 
 ### 8.2 Registro de proveedores y rotación
 
