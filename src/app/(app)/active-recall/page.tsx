@@ -1,5 +1,6 @@
 import { Brain, Zap } from "lucide-react";
 import Link from "next/link";
+import { requireDesignPreviews } from "@/shared/config/design-previews";
 import { DeckSummaryCard } from "@/shared/ui/deck-summary-card";
 import { EmptyState } from "@/shared/ui/empty-state";
 import { IconTile } from "@/shared/ui/icon-tile";
@@ -13,6 +14,7 @@ import { getRecallPagesWithSessions, SAMPLE_NOTEBOOKS } from "./_data/sample";
 // el diseño"). Every notebook, page and session below comes from
 // ./_data/sample.ts, never a real query.
 export default function ActiveRecallHubPage() {
+  requireDesignPreviews();
   const notebooksWithPages = SAMPLE_NOTEBOOKS.map((notebook) => ({
     notebook,
     pages: getRecallPagesWithSessions(notebook.id),

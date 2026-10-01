@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { requireDesignPreviews } from "@/shared/config/design-previews";
 import { SetBreadcrumb } from "../../../_components/breadcrumb";
 import { getSampleNotebook } from "../../../flashcards/_data/sample";
 import { ActiveRecallPlayer } from "../../_components/active-recall-player";
@@ -16,6 +17,7 @@ interface ActiveRecallSessionPageProps {
 export default async function ActiveRecallSessionPage({
   params,
 }: ActiveRecallSessionPageProps) {
+  requireDesignPreviews();
   const { notebookId, pageId } = await params;
   const notebook = getSampleNotebook(notebookId);
   if (!notebook) notFound();

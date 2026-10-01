@@ -125,16 +125,37 @@ describe("Sidebar", () => {
     expect(row).toHaveTextContent("pronto");
   });
 
-  // Active recall design preview (design/shell-look, 2026-09-24): same
-  // treatment as Flashcards above — no longer disabled/"pronto" once the
-  // preview screens exist at /active-recall.
-  it("links the Active recall nav item to /active-recall", () => {
-    render(<Sidebar initialCollapsed={false} user={USER} />);
+  // Active recall is a design preview too: same treatment as Flashcards.
+  it("links the Active recall nav item to /active-recall while previews are enabled", () => {
+    render(<Sidebar initialCollapsed={false} user={USER} previewsEnabled />);
 
     expect(screen.getByRole("link", { name: "Active recall" })).toHaveAttribute(
       "href",
       "/active-recall",
     );
+  });
+
+  it("marks Active recall active on its own routes", () => {
+    pathname.current = "/active-recall/biologia-celular/mitocondria";
+    render(<Sidebar initialCollapsed={false} user={USER} previewsEnabled />);
+
+    expect(screen.getByRole("link", { name: "Active recall" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+  });
+
+  it("keeps Active recall as a disabled 'pronto' row when previews are disabled", () => {
+    render(
+      <Sidebar initialCollapsed={false} user={USER} previewsEnabled={false} />,
+    );
+
+    expect(
+      screen.queryByRole("link", { name: "Active recall" }),
+    ).not.toBeInTheDocument();
+    const row = screen.getByText("Active recall").closest("[aria-disabled]");
+    expect(row).toHaveAttribute("aria-disabled", "true");
+    expect(row).toHaveTextContent("pronto");
   });
 
   // design pass 2: "Cuadernos" is now a plain nav item to /notebooks
@@ -162,18 +183,17 @@ describe("Sidebar", () => {
   });
 
   // Design previews (Dashboard, Flashcards, Active recall, Exámenes) are
-  // sample-data screens whose routes ship in later slices; until then every
-  // one of them is a disabled "pronto" row, whatever the server-computed
-  // flag says, so a link never points at a missing route.
+  // sample-data screens whose routes ship in later slices; a preview without
+  // a route yet is a disabled "pronto" row whatever the server-computed flag
+  // says, so a link never points at a missing route.
   describe.each([
     ["enabled", true],
     ["disabled", false],
   ])("with design previews %s", (_state, previewsEnabled) => {
-    // Flashcards has a preview route now; its enabled/disabled states are
-    // covered by the dedicated Flashcards tests above.
+    // Flashcards and Active recall have preview routes now; their
+    // enabled/disabled states are covered by the dedicated tests above.
     it.each([
       "Dashboard",
-      "Active recall",
       "Exámenes",
     ])("renders %s as a disabled 'pronto' row", (label) => {
       render(

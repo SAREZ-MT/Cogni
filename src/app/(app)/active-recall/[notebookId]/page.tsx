@@ -1,5 +1,6 @@
 import { Brain } from "lucide-react";
 import { notFound } from "next/navigation";
+import { requireDesignPreviews } from "@/shared/config/design-previews";
 import { BackLink } from "@/shared/ui/back-link";
 import { EmptyState } from "@/shared/ui/empty-state";
 import { IconTile } from "@/shared/ui/icon-tile";
@@ -19,6 +20,7 @@ interface ActiveRecallNotebookPageProps {
 export default async function ActiveRecallNotebookPage({
   params,
 }: ActiveRecallNotebookPageProps) {
+  requireDesignPreviews();
   const { notebookId } = await params;
   const notebook = getSampleNotebook(notebookId);
   if (!notebook) notFound();

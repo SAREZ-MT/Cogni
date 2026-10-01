@@ -83,10 +83,14 @@ const TECNICAS_SECTION: { label: string; items: NavEntry[] } = {
       },
     },
     {
-      href: "/active-recall",
       icon: Brain,
       label: "Active recall",
-      isActive: (path) => path.startsWith("/active-recall"),
+      disabled: true,
+      hint: "pronto",
+      preview: {
+        href: "/active-recall",
+        isActive: (path) => path.startsWith("/active-recall"),
+      },
     },
     {
       icon: ClipboardList,
