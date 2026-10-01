@@ -68,7 +68,7 @@ export function ExamResultsView({
   ).length;
   const unansweredCount = answers.filter((answer) => answer === null).length;
   const incorrectCount = total - correctCount - unansweredCount;
-  const score = total > 0 ? Math.round((correctCount / total) * 100) : 0;
+  const score = total > 0 ? Math.floor((correctCount * 100) / total) : 0;
   // documento-maestro §7.5 grades the raw ratio (`score < 0.70` retakes), so
   // compare in integers: the rounded `score` above is display-only and would
   // pass 23/33 (69.7 %) as 70.

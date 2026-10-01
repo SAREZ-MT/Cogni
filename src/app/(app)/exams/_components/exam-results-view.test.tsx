@@ -124,14 +124,21 @@ describe("ExamResultsView 70 percent rule", () => {
 
 describe("ExamResultsView exact 70 percent boundary (documento-maestro 7.5)", () => {
   // The master document grades on the raw ratio: retake iff correct / total
-  // < 0.70. 23/33 is 69.7 %, which only reaches 70 once it is rounded for
-  // display, so the pass decision must not use the rounded score.
-  it("requires a retake at 23/33 even though the card rounds the score to 70", () => {
+  // < 0.70. 23/33 is 69.7 %, so the card must floor it to 69 % and never
+  // display 70 for a failed exam.
+  it("shows 69 % and the retake banner at 23/33", () => {
     setup({ total: 33, correct: 23, wrong: 10 });
 
-    expect(screen.getByTestId("exam-score")).toHaveTextContent("70%");
+    expect(screen.getByTestId("exam-score")).toHaveTextContent("69%");
     expect(screen.getByText("Nota menor a 70 %")).toBeInTheDocument();
     expect(screen.queryByText("Aprobado")).not.toBeInTheDocument();
+  });
+
+  it("shows exactly 70 % and passes at 7/10", () => {
+    setup({ total: 10, correct: 7, wrong: 3 });
+
+    expect(screen.getByTestId("exam-score")).toHaveTextContent("70%");
+    expect(screen.getByText("Aprobado")).toBeInTheDocument();
   });
 
   it("passes at 21/30, exactly 70 percent", () => {

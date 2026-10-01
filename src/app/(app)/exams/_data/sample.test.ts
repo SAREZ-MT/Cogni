@@ -222,7 +222,7 @@ describe("stored exam sessions", () => {
         (question, index) => session.answers[index] === question.correctIndex,
       ).length;
 
-      expect(Math.round((correct / questions.length) * 100), page.id).toBe(
+      expect(Math.floor((correct * 100) / questions.length), page.id).toBe(
         page.lastScore,
       );
       expect(session.date, page.id).toBe(page.lastDate);
