@@ -72,6 +72,8 @@ describe("ExamResultsView scoring", () => {
     setup({ total: 0, correct: 0 });
 
     expect(screen.getByTestId("exam-score")).toHaveTextContent("0%");
+    expect(screen.getByText("Nota menor a 70 %")).toBeInTheDocument();
+    expect(screen.queryByText("Aprobado")).not.toBeInTheDocument();
   });
 
   it("formats the elapsed time as MM:SS", () => {

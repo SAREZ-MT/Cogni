@@ -134,6 +134,7 @@ describe("ExamPlayer session flow", () => {
 
     await user.click(screen.getByTestId("exam-option-0")); // q1 correct
     await user.click(screen.getByRole("button", { name: "Entregar" }));
+    await user.click(screen.getByRole("button", { name: "Entregar igual" }));
 
     expect(screen.getByTestId("exam-results")).toBeInTheDocument();
     expect(screen.getByTestId("exam-score")).toHaveTextContent("33%");
@@ -145,6 +146,7 @@ describe("ExamPlayer session flow", () => {
 
     await user.click(screen.getByTestId("exam-option-0"));
     await user.click(screen.getByRole("button", { name: "Entregar" }));
+    await user.click(screen.getByRole("button", { name: "Entregar igual" }));
     await user.click(screen.getByRole("button", { name: /Nuevo examen/ }));
 
     expect(screen.getByTestId("exam-session")).toBeInTheDocument();
@@ -180,6 +182,101 @@ describe("ExamPlayer session flow", () => {
   });
 });
 
+describe("ExamPlayer submit confirmation", () => {
+  it("submits straight away when every question is answered", async () => {
+    const user = setup();
+
+    await user.click(screen.getByTestId("exam-option-0"));
+    await user.click(screen.getByRole("button", { name: "Siguiente" }));
+    await user.click(screen.getByTestId("exam-option-1"));
+    await user.click(screen.getByRole("button", { name: "Siguiente" }));
+    await user.click(screen.getByTestId("exam-option-2"));
+    await user.click(screen.getByRole("button", { name: /Enviar examen/ }));
+
+    expect(
+      screen.queryByTestId("submit-confirm-dialog"),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("exam-results")).toBeInTheDocument();
+    expect(screen.getByTestId("exam-score")).toHaveTextContent("100%");
+  });
+
+  it("asks first when questions are left blank, counting them", async () => {
+    const user = setup();
+
+    await user.click(screen.getByTestId("exam-option-0"));
+    await user.click(screen.getByRole("button", { name: "Entregar" }));
+
+    expect(screen.getByTestId("submit-confirm-dialog")).toBeInTheDocument();
+    expect(screen.getByText("¿Entregar el examen?")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Tienes 2 preguntas sin responder/),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId("exam-results")).not.toBeInTheDocument();
+  });
+
+  it("asks from 'Enviar examen' on the last question too", async () => {
+    const user = setup();
+
+    await user.click(
+      screen.getByRole("button", { name: "Ir a la pregunta 3" }),
+    );
+    await user.click(screen.getByRole("button", { name: /Enviar examen/ }));
+
+    expect(screen.getByTestId("submit-confirm-dialog")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Tienes 3 preguntas sin responder/),
+    ).toBeInTheDocument();
+  });
+
+  it("'Seguir respondiendo' closes the dialog and keeps the session and answers", async () => {
+    const user = setup();
+
+    await user.click(screen.getByTestId("exam-option-0"));
+    await user.click(screen.getByRole("button", { name: "Entregar" }));
+    await user.click(
+      screen.getByRole("button", { name: "Seguir respondiendo" }),
+    );
+
+    expect(
+      screen.queryByTestId("submit-confirm-dialog"),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("exam-session")).toBeInTheDocument();
+    expect(screen.getByText("1 respondidas")).toBeInTheDocument();
+    expect(screen.getByTestId("exam-option-0")).toHaveClass("border-rose-500");
+  });
+
+  it("'Entregar igual' grades the exam with blanks counted as incorrect", async () => {
+    const user = setup();
+
+    await user.click(screen.getByTestId("exam-option-0"));
+    await user.click(screen.getByRole("button", { name: "Entregar" }));
+    await user.click(screen.getByRole("button", { name: "Entregar igual" }));
+
+    expect(screen.getByTestId("exam-results")).toBeInTheDocument();
+    expect(screen.getByTestId("exam-score")).toHaveTextContent("33%");
+    expect(screen.getByText("Nota menor a 70 %")).toBeInTheDocument();
+  });
+
+  it("passes the retake flag on to the results", async () => {
+    const user = setup({ isRetake: true });
+
+    await user.click(screen.getByRole("button", { name: "Entregar" }));
+    await user.click(screen.getByRole("button", { name: "Entregar igual" }));
+
+    expect(
+      screen.getByText("Examen de repetición", { selector: "span" }),
+    ).toBeInTheDocument();
+  });
+
+  it("links the retake banner to the blocked-retake preview state", () => {
+    setup({ isRetake: true });
+
+    expect(
+      screen.getByRole("link", { name: "Ver estado de error (vista previa)" }),
+    ).toHaveAttribute("href", "/exams/nb/pg?retake=1&variantes=error");
+  });
+});
+
 describe("ExamPlayer timer", () => {
   afterEach(() => {
     vi.useRealTimers();
@@ -207,6 +304,9 @@ describe("ExamPlayer timer", () => {
       screen.getByRole("button", { name: "Entregar" }).click();
     });
     act(() => {
+      screen.getByRole("button", { name: "Entregar igual" }).click();
+    });
+    act(() => {
       vi.advanceTimersByTime(30_000);
     });
 
@@ -231,6 +331,9 @@ describe("ExamPlayer timer", () => {
     });
     act(() => {
       screen.getByRole("button", { name: "Entregar" }).click();
+    });
+    act(() => {
+      screen.getByRole("button", { name: "Entregar igual" }).click();
     });
     act(() => {
       screen.getByRole("button", { name: /Nuevo examen/ }).click();

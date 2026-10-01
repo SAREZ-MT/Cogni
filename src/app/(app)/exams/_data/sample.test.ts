@@ -3,6 +3,8 @@ import {
   getExamPage,
   getExamPagesWithQuestions,
   getExamQuestions,
+  getExamQuestionsForManagement,
+  getLastExamSession,
   getExamVariantQuestions,
   MITOCONDRIA_RETAKE_CONCEPTS,
   SAMPLE_NOTEBOOKS,
@@ -128,5 +130,107 @@ describe("exam retake variants", () => {
     expect(getExamQuestions("renacimiento", { retake: true })).toEqual(
       getExamQuestions("renacimiento"),
     );
+  });
+});
+
+describe("exam question management list", () => {
+  it("tags every question of a plain page as AI generated and active", () => {
+    const questions = getExamQuestionsForManagement("renacimiento");
+
+    expect(questions).toHaveLength(getExamQuestions("renacimiento").length);
+    for (const question of questions) {
+      expect(question.origin).toBe("ai");
+      expect(question.retiredAt).toBeUndefined();
+    }
+  });
+
+  it("mixes AI, manual and variant origins for Mitocondria", () => {
+    const origins = new Set(
+      getExamQuestionsForManagement("mitocondria").map((q) => q.origin),
+    );
+
+    expect(origins).toEqual(new Set(["ai", "manual", "ai_variant"]));
+  });
+
+  it("retires exactly the originals whose concepts the retake replaces", () => {
+    const questions = getExamQuestionsForManagement("mitocondria");
+    const retired = questions.filter((question) => question.retiredAt);
+
+    expect(retired.map((question) => question.concept).sort()).toEqual(
+      [...MITOCONDRIA_RETAKE_CONCEPTS].sort(),
+    );
+  });
+
+  it("links each replacement variant to the retired original of the same concept", () => {
+    const questions = getExamQuestionsForManagement("mitocondria");
+    const byId = new Map(questions.map((question) => [question.id, question]));
+    const replacements = questions.filter((question) => question.variantOf);
+
+    expect(replacements).toHaveLength(MITOCONDRIA_RETAKE_CONCEPTS.length);
+    for (const variant of replacements) {
+      const original = byId.get(variant.variantOf as string);
+      expect(original?.retiredAt, variant.id).toBeDefined();
+      expect(original?.concept, variant.id).toBe(variant.concept);
+    }
+  });
+
+  it("never alters what a live session or a retake serves", () => {
+    const live = getExamQuestions("mitocondria");
+    const retake = getExamQuestions("mitocondria", { retake: true });
+
+    getExamQuestionsForManagement("mitocondria");
+
+    expect(live.every((question) => question.retiredAt === undefined)).toBe(
+      true,
+    );
+    expect(live.every((question) => question.origin === undefined)).toBe(true);
+    expect(retake.every((question) => question.origin === undefined)).toBe(
+      true,
+    );
+    expect(getExamQuestions("mitocondria")).toEqual(live);
+  });
+});
+
+describe("stored exam sessions", () => {
+  it("has a stored session exactly for the attempted pages", () => {
+    for (const page of ALL_PAGES) {
+      expect(getLastExamSession(page.id) !== undefined, page.id).toBe(
+        page.attempts > 0,
+      );
+    }
+  });
+
+  it("answers every question of the session, with valid option indexes", () => {
+    for (const page of ALL_PAGES) {
+      const session = getLastExamSession(page.id);
+      if (!session) continue;
+      const questions = getExamQuestions(page.id, { retake: session.isRetake });
+
+      expect(session.answers, page.id).toHaveLength(questions.length);
+      for (const answer of session.answers) {
+        expect([null, 0, 1, 2, 3]).toContain(answer);
+      }
+    }
+  });
+
+  it("agrees with the page's last score and date", () => {
+    for (const page of ALL_PAGES) {
+      const session = getLastExamSession(page.id);
+      if (!session) continue;
+      const questions = getExamQuestions(page.id, { retake: session.isRetake });
+      const correct = questions.filter(
+        (question, index) => session.answers[index] === question.correctIndex,
+      ).length;
+
+      expect(Math.round((correct / questions.length) * 100), page.id).toBe(
+        page.lastScore,
+      );
+      expect(session.date, page.id).toBe(page.lastDate);
+    }
+  });
+
+  it("has no session for a page never attempted", () => {
+    expect(getLastExamSession("derivadas-parciales")).toBeUndefined();
+    expect(getLastExamSession("no-such-page")).toBeUndefined();
   });
 });

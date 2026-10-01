@@ -47,9 +47,9 @@ describe("ExamsNotebookPage", () => {
     expect(
       screen.getByText("3 exámenes · 2 páginas con preguntas"),
     ).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Mitocondria/ })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Mitocondria" })).toHaveAttribute(
       "href",
-      "/exams/biologia-celular/mitocondria",
+      "/exams/biologia-celular/mitocondria?retake=1",
     );
     expect(screen.getByText("Repetir pendiente")).toBeInTheDocument();
     expect(
