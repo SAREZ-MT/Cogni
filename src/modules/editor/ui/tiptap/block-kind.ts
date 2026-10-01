@@ -19,6 +19,7 @@ import {
   Pilcrow,
   Quote,
 } from "lucide-react";
+import { focusEditorView } from "./focus-editor-view";
 
 export interface BlockKindItem {
   id: string;
@@ -36,7 +37,7 @@ export const BLOCK_KIND_ITEMS: BlockKindItem[] = [
     isActive: (editor) => editor.isActive("paragraph"),
     run: (editor) => {
       editor.chain().setParagraph().run();
-      editor.view.focus();
+      focusEditorView(editor);
     },
   },
   {
@@ -46,7 +47,7 @@ export const BLOCK_KIND_ITEMS: BlockKindItem[] = [
     isActive: (editor) => editor.isActive("heading", { level: 1 }),
     run: (editor) => {
       editor.chain().setNode("heading", { level: 1 }).run();
-      editor.view.focus();
+      focusEditorView(editor);
     },
   },
   {
@@ -56,7 +57,7 @@ export const BLOCK_KIND_ITEMS: BlockKindItem[] = [
     isActive: (editor) => editor.isActive("heading", { level: 2 }),
     run: (editor) => {
       editor.chain().setNode("heading", { level: 2 }).run();
-      editor.view.focus();
+      focusEditorView(editor);
     },
   },
   {
@@ -66,7 +67,7 @@ export const BLOCK_KIND_ITEMS: BlockKindItem[] = [
     isActive: (editor) => editor.isActive("heading", { level: 3 }),
     run: (editor) => {
       editor.chain().setNode("heading", { level: 3 }).run();
-      editor.view.focus();
+      focusEditorView(editor);
     },
   },
   {
@@ -76,7 +77,7 @@ export const BLOCK_KIND_ITEMS: BlockKindItem[] = [
     isActive: (editor) => editor.isActive("bulletList"),
     run: (editor) => {
       editor.chain().toggleBulletList().run();
-      editor.view.focus();
+      focusEditorView(editor);
     },
   },
   {
@@ -86,7 +87,7 @@ export const BLOCK_KIND_ITEMS: BlockKindItem[] = [
     isActive: (editor) => editor.isActive("orderedList"),
     run: (editor) => {
       editor.chain().toggleOrderedList().run();
-      editor.view.focus();
+      focusEditorView(editor);
     },
   },
   {
@@ -96,7 +97,7 @@ export const BLOCK_KIND_ITEMS: BlockKindItem[] = [
     isActive: (editor) => editor.isActive("taskList"),
     run: (editor) => {
       editor.chain().toggleTaskList().run();
-      editor.view.focus();
+      focusEditorView(editor);
     },
   },
   {
@@ -106,7 +107,7 @@ export const BLOCK_KIND_ITEMS: BlockKindItem[] = [
     isActive: (editor) => editor.isActive("blockquote"),
     run: (editor) => {
       editor.chain().toggleBlockquote().run();
-      editor.view.focus();
+      focusEditorView(editor);
     },
   },
   {
@@ -116,7 +117,7 @@ export const BLOCK_KIND_ITEMS: BlockKindItem[] = [
     isActive: (editor) => editor.isActive("codeBlock"),
     run: (editor) => {
       editor.chain().toggleCodeBlock().run();
-      editor.view.focus();
+      focusEditorView(editor);
     },
   },
 ];

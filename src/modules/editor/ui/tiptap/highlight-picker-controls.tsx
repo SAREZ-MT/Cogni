@@ -8,6 +8,7 @@
 // swatch-click behaviour is testable without floating-ui's layout math —
 // `highlight-picker.tsx` wraps it in a `BubbleMenu` for real usage.
 import type { Editor } from "@tiptap/core";
+import { focusEditorView } from "./focus-editor-view";
 import { HIGHLIGHT_PALETTE, type HighlightColor } from "./highlight-palette";
 
 // Spanish labels for the seven Cogni palette colors (design.md, "Paleta de
@@ -55,7 +56,7 @@ export function HighlightPickerControls({
           className={`size-6 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring ${SWATCH_CLASSES[color]}`}
           onClick={() => {
             editor.chain().setHighlight({ color }).run();
-            editor.view.focus();
+            focusEditorView(editor);
           }}
         />
       ))}
@@ -66,7 +67,7 @@ export function HighlightPickerControls({
         className="rounded-md px-2 py-1 text-xs whitespace-nowrap text-fg-muted outline-none focus-visible:ring-2 focus-visible:ring-ring"
         onClick={() => {
           editor.chain().unsetHighlight().run();
-          editor.view.focus();
+          focusEditorView(editor);
         }}
       >
         quitar resaltado

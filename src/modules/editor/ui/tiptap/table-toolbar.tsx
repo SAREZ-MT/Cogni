@@ -28,6 +28,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/shared/ui/tooltip";
+import { focusEditorView } from "./focus-editor-view";
 import { isTableCellSelection } from "./table-selection";
 
 export interface TableToolbarProps {
@@ -80,7 +81,7 @@ const ROW_COLUMN_BUTTONS: TableButtonConfig[] = [
     icon: ArrowUpToLine,
     run: (editor) => {
       editor.chain().addRowBefore().run();
-      editor.view.focus();
+      focusEditorView(editor);
     },
   },
   {
@@ -89,7 +90,7 @@ const ROW_COLUMN_BUTTONS: TableButtonConfig[] = [
     icon: ArrowDownToLine,
     run: (editor) => {
       editor.chain().addRowAfter().run();
-      editor.view.focus();
+      focusEditorView(editor);
     },
   },
   {
@@ -98,7 +99,7 @@ const ROW_COLUMN_BUTTONS: TableButtonConfig[] = [
     icon: ArrowLeftToLine,
     run: (editor) => {
       editor.chain().addColumnBefore().run();
-      editor.view.focus();
+      focusEditorView(editor);
     },
   },
   {
@@ -107,7 +108,7 @@ const ROW_COLUMN_BUTTONS: TableButtonConfig[] = [
     icon: ArrowRightToLine,
     run: (editor) => {
       editor.chain().addColumnAfter().run();
-      editor.view.focus();
+      focusEditorView(editor);
     },
   },
 ];
@@ -119,7 +120,7 @@ const CELL_BUTTONS: TableButtonConfig[] = [
     icon: TableCellsMerge,
     run: (editor) => {
       editor.chain().mergeCells().run();
-      editor.view.focus();
+      focusEditorView(editor);
     },
   },
   {
@@ -128,7 +129,7 @@ const CELL_BUTTONS: TableButtonConfig[] = [
     icon: TableCellsSplit,
     run: (editor) => {
       editor.chain().splitCell().run();
-      editor.view.focus();
+      focusEditorView(editor);
     },
   },
   {
@@ -137,7 +138,7 @@ const CELL_BUTTONS: TableButtonConfig[] = [
     icon: TableProperties,
     run: (editor) => {
       editor.chain().toggleHeaderRow().run();
-      editor.view.focus();
+      focusEditorView(editor);
     },
   },
 ];
@@ -150,7 +151,7 @@ const DELETE_BUTTONS: TableButtonConfig[] = [
     destructive: true,
     run: (editor) => {
       editor.chain().deleteRow().run();
-      editor.view.focus();
+      focusEditorView(editor);
     },
   },
   {
@@ -160,7 +161,7 @@ const DELETE_BUTTONS: TableButtonConfig[] = [
     destructive: true,
     run: (editor) => {
       editor.chain().deleteColumn().run();
-      editor.view.focus();
+      focusEditorView(editor);
     },
   },
   {
@@ -170,7 +171,7 @@ const DELETE_BUTTONS: TableButtonConfig[] = [
     destructive: true,
     run: (editor) => {
       editor.chain().deleteTable().run();
-      editor.view.focus();
+      focusEditorView(editor);
     },
   },
 ];

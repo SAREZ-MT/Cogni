@@ -6,6 +6,7 @@
 import type { Editor, JSONContent } from "@tiptap/core";
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import { NODE_BACKGROUND_TYPES } from "./extensions/node-background";
+import { focusEditorView } from "./focus-editor-view";
 
 export interface BlockRef {
   node: ProseMirrorNode;
@@ -74,7 +75,7 @@ export function duplicateBlock(editor: Editor, ref: BlockRef): void {
     .chain()
     .insertContentAt(after, withoutBlockIds(ref.node.toJSON()))
     .run();
-  editor.view.focus();
+  focusEditorView(editor);
 }
 
 export function deleteBlock(editor: Editor, ref: BlockRef): void {
@@ -82,7 +83,7 @@ export function deleteBlock(editor: Editor, ref: BlockRef): void {
     .chain()
     .deleteRange({ from: ref.pos, to: ref.pos + ref.node.nodeSize })
     .run();
-  editor.view.focus();
+  focusEditorView(editor);
 }
 
 // Clears every inline mark (bold/italic/color/…) over the block's content
@@ -102,7 +103,7 @@ export function resetBlockFormatting(editor: Editor, ref: BlockRef): void {
       .updateAttributes(typeName, { nodeBackground: null })
       .run();
   }
-  editor.view.focus();
+  focusEditorView(editor);
 }
 
 // `blockId` comes from extensions/index.ts's UniqueID registration (E2

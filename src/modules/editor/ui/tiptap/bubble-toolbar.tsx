@@ -63,6 +63,7 @@ import {
   TEXT_COLOR_SWATCHES,
 } from "./block-color-palette";
 import { BLOCK_KIND_ITEMS, currentBlockKindLabel } from "./block-kind";
+import { focusEditorView } from "./focus-editor-view";
 import { HighlightPickerControls } from "./highlight-picker-controls";
 import { isTableCellSelection } from "./table-selection";
 
@@ -162,7 +163,7 @@ const MARK_BUTTONS: MarkButtonConfig[] = [
     icon: Bold,
     run: (editor) => {
       editor.chain().toggleBold().run();
-      editor.view.focus();
+      focusEditorView(editor);
     },
   },
   {
@@ -172,7 +173,7 @@ const MARK_BUTTONS: MarkButtonConfig[] = [
     icon: Italic,
     run: (editor) => {
       editor.chain().toggleItalic().run();
-      editor.view.focus();
+      focusEditorView(editor);
     },
   },
   {
@@ -182,7 +183,7 @@ const MARK_BUTTONS: MarkButtonConfig[] = [
     icon: Underline,
     run: (editor) => {
       editor.chain().toggleUnderline().run();
-      editor.view.focus();
+      focusEditorView(editor);
     },
   },
   {
@@ -192,7 +193,7 @@ const MARK_BUTTONS: MarkButtonConfig[] = [
     icon: Strikethrough,
     run: (editor) => {
       editor.chain().toggleStrike().run();
-      editor.view.focus();
+      focusEditorView(editor);
     },
   },
   {
@@ -202,7 +203,7 @@ const MARK_BUTTONS: MarkButtonConfig[] = [
     icon: Code,
     run: (editor) => {
       editor.chain().toggleCode().run();
-      editor.view.focus();
+      focusEditorView(editor);
     },
   },
   {
@@ -212,7 +213,7 @@ const MARK_BUTTONS: MarkButtonConfig[] = [
     icon: Superscript,
     run: (editor) => {
       editor.chain().toggleSuperscript().run();
-      editor.view.focus();
+      focusEditorView(editor);
     },
   },
   {
@@ -222,7 +223,7 @@ const MARK_BUTTONS: MarkButtonConfig[] = [
     icon: Subscript,
     run: (editor) => {
       editor.chain().toggleSubscript().run();
-      editor.view.focus();
+      focusEditorView(editor);
     },
   },
 ];
@@ -364,7 +365,7 @@ export function BubbleToolbarControls({ editor }: BubbleToolbarControlsProps) {
     // `document.body` in between. `editor.view.focus()` is ProseMirror's
     // own synchronous focus, called here before the input unmounts so the
     // browser never has a focused-then-removed element to blur.
-    editor.view.focus();
+    focusEditorView(editor);
     setLinkOpen(false);
   }
 
@@ -433,7 +434,7 @@ export function BubbleToolbarControls({ editor }: BubbleToolbarControlsProps) {
             className={`${BUTTON_CLASS} ${buttonToneClass(false)} disabled:pointer-events-none disabled:opacity-40`}
             onClick={() => {
               editor.chain().undo().run();
-              editor.view.focus();
+              focusEditorView(editor);
             }}
           >
             <Undo2 aria-hidden="true" size={16} strokeWidth={1.75} />
@@ -448,7 +449,7 @@ export function BubbleToolbarControls({ editor }: BubbleToolbarControlsProps) {
             className={`${BUTTON_CLASS} ${buttonToneClass(false)} disabled:pointer-events-none disabled:opacity-40`}
             onClick={() => {
               editor.chain().redo().run();
-              editor.view.focus();
+              focusEditorView(editor);
             }}
           >
             <Redo2 aria-hidden="true" size={16} strokeWidth={1.75} />
@@ -553,7 +554,7 @@ export function BubbleToolbarControls({ editor }: BubbleToolbarControlsProps) {
                 className="gap-2 text-[13.5px]"
                 onSelect={() => {
                   editor.chain().setTextAlign(option.id).run();
-                  editor.view.focus();
+                  focusEditorView(editor);
                 }}
               >
                 <option.icon aria-hidden="true" size={16} strokeWidth={1.75} />
@@ -656,7 +657,7 @@ export function LinkPopover({ editor }: LinkPopoverProps) {
     // S6b defect 2 (focus): see the matching comment on applyLink above —
     // `editor.view.focus()` runs synchronously, before `setEditing(false)`
     // removes this input from the DOM.
-    editor.view.focus();
+    focusEditorView(editor);
     setEditing(false);
   }
 
@@ -733,7 +734,7 @@ export function LinkPopover({ editor }: LinkPopoverProps) {
           // above. This popover unmounts once `isActive("link")` turns
           // false (the same transaction), so the synchronous refocus must
           // happen before that removal blurs to `document.body`.
-          editor.view.focus();
+          focusEditorView(editor);
         }}
       >
         <Unlink aria-hidden="true" size={14} strokeWidth={1.75} />

@@ -48,6 +48,7 @@ import {
   TEXT_COLOR_SWATCHES,
 } from "./block-color-palette";
 import { BLOCK_KIND_ITEMS } from "./block-kind";
+import { focusEditorView } from "./focus-editor-view";
 
 export interface BlockContextMenuProps {
   editor: Editor;
@@ -106,7 +107,7 @@ export function applyBlockSelection(
     ? NodeSelection.create(view.state.doc, ref.pos)
     : TextSelection.create(view.state.doc, ref.pos + 1);
   view.dispatch(view.state.tr.setSelection(selection));
-  if (options.focus) view.focus();
+  if (options.focus) focusEditorView(editor);
 }
 
 // 7e2f2ae follow-up (orchestrator activeElement probe): the ENTIRE body of
@@ -128,7 +129,7 @@ export function handleGripMenuCloseAutoFocus(
   event: Pick<Event, "preventDefault">,
 ): void {
   event.preventDefault();
-  editor.view.focus();
+  focusEditorView(editor);
 }
 
 export function BlockContextMenu({
@@ -242,7 +243,7 @@ export function BlockContextMenu({
     // (block-actions.ts's own functions do, for their OTHER caller —
     // extensions/block-shortcuts.ts's keyboard shortcuts, which never go
     // through this menu at all): `view.focus()` is idempotent.
-    editor.view.focus();
+    focusEditorView(editor);
   }
 
   const isImage = ref?.node.type.name === "image";

@@ -17,6 +17,7 @@ import { GripVertical, Plus } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { BlockContextMenu } from "./block-context-menu";
 import { collapseBlockSelection } from "./block-selection";
+import { focusEditorView } from "./focus-editor-view";
 
 export interface BlockHandleProps {
   editor: Editor;
@@ -79,7 +80,7 @@ export function BlockHandle({ editor, isBlockIdPersisted }: BlockHandleProps) {
       .setTextSelection(insertPos + 1)
       .insertContent("/")
       .run();
-    editor.view.focus();
+    focusEditorView(editor);
   }
 
   // S6b defect 1 (data loss, odd/tasks/app-shell-restyle.md): after a
