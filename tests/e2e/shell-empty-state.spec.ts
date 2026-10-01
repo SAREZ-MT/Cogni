@@ -105,6 +105,23 @@ test.describe("app shell", () => {
     }
   });
 
+  test("hides the active recall preview routes: /active-recall answers not-found", async ({
+    page,
+  }) => {
+    for (const path of [
+      "/active-recall",
+      "/active-recall/biologia-celular",
+      "/active-recall/biologia-celular/mitocondria",
+    ]) {
+      const response = await page.goto(path);
+
+      expect(response?.status(), path).toBe(404);
+      await expect(page.getByText("Active recall — Biología")).toHaveCount(0);
+      await expect(page.getByText("Pregunta 1 de")).toHaveCount(0);
+      await expect(page.getByText("Sesiones por página")).toHaveCount(0);
+    }
+  });
+
   test("collapses the sidebar to 64px and keeps the choice after navigating", async ({
     page,
   }) => {
