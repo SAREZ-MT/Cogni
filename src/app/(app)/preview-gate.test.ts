@@ -3,8 +3,15 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 // Route trees that are design previews backed by route-local sample data.
-// Add a tree here when a new preview ships (dashboard).
-const PREVIEW_TREES = ["flashcards", "active-recall", "exams"];
+// Add a tree here when a new preview ships. `routes` is the number of pages
+// the tree must keep, so a deleted or renamed page cannot silently shrink
+// the guarded surface.
+const PREVIEW_TREES: [tree: string, routes: number][] = [
+  ["flashcards", 3],
+  ["active-recall", 3],
+  ["exams", 3],
+  ["dashboard", 1],
+];
 
 function pageFiles(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -31,11 +38,11 @@ function firstStatement(source: string): string {
 // Every route under a preview tree serves sample data. A page added later
 // without the guard would leak it into production, so the guard is enforced
 // structurally here instead of by review.
-describe.each(PREVIEW_TREES)("%s preview gate", (tree) => {
+describe.each(PREVIEW_TREES)("%s preview gate", (tree, routes) => {
   const pages = pageFiles(path.join(import.meta.dirname, tree));
 
   it("finds the routes of the tree", () => {
-    expect(pages.length).toBeGreaterThanOrEqual(3);
+    expect(pages.length).toBeGreaterThanOrEqual(routes);
   });
 
   it.each(

@@ -146,6 +146,19 @@ test.describe("app shell", () => {
     }
   });
 
+  test("hides the dashboard preview route: /dashboard answers not-found", async ({
+    page,
+  }) => {
+    for (const path of ["/dashboard", "/dashboard?range=30"]) {
+      const response = await page.goto(path);
+
+      expect(response?.status(), path).toBe(404);
+      await expect(page.getByText("Actividad de repaso")).toHaveCount(0);
+      await expect(page.getByText("Tasa de acierto")).toHaveCount(0);
+      await expect(page.getByText("Dominio global")).toHaveCount(0);
+    }
+  });
+
   test("collapses the sidebar to 64px and keeps the choice after navigating", async ({
     page,
   }) => {
