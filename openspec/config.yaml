@@ -7,7 +7,7 @@ schema: spec-driven
 context: |
   Producto: Cogni, plataforma web de estudio con editor de bloques (Tiptap) y tres técnicas de estudio (flashcards SM-2, exámenes, recordación activa) unificadas por un motor de repetición espaciada transversal.
   Stack declarado (sin código aún): pnpm, Next.js App Router + TypeScript estricto, Tailwind + shadcn/ui, Tiptap, TanStack Query, Zustand, Zod, Drizzle, Biome, unpdf, Vercel AI SDK.
-  Infraestructura: Vercel Hobby, Supabase (Postgres/Auth/Storage), Cloudflare DNS, Upstash Redis, Trigger.dev, Sentry, PostHog.
+  Infraestructura: Vercel Hobby (Fluid Compute + Cron), Supabase (Postgres/Auth/Storage), Cloudflare DNS, Upstash Redis, Sentry, PostHog. Sin Trigger.dev desde ADR 0003 (2026-09-22).
   Arquitectura: monolito modular con hexagonal por módulo en src/modules/{identity,notebooks,editor,ingestion,ai,study-engine,flashcards,exams,active-recall,scheduling,analytics}; solo study-engine calcula repasos.
   Testing objetivo: Vitest + Testing Library + Playwright; SM-2 y dominio con cobertura 100 %.
   Convenciones: código e identificadores en inglés, comentarios en inglés simple (B1), UI en español "tú", documentación técnica y artefactos SDD en español neutro, Conventional Commits sin atribución a IA, PRs de máximo 400 líneas.
@@ -49,7 +49,7 @@ rules:
   design:
     - Respetar la arquitectura hexagonal por módulo y las reglas de dependencia de la sección 5.3 del documento maestro.
     - Documentar cada decisión de arquitectura con su justificación; si cambia una decisión cerrada, crear ADR.
-    - Incluir diagramas de secuencia para flujos que crucen módulos o usen Trigger.dev.
+    - Incluir diagramas de secuencia para flujos que crucen módulos o ejecuten trabajo acotado por maxDuration o Vercel Cron.
   tasks:
     - Agrupar por fase con numeración jerárquica.
     - Cada tarea completable en una sesión; toda tarea de dominio empieza por su test.
