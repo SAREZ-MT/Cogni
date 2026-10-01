@@ -158,6 +158,36 @@ describe("page route ingestion wiring", () => {
     expect(props.initial).toBeNull();
   });
 
+  // F5a (odd/tasks/review-followups.md): when the notebook lookup yields
+  // nothing (archived/foreign notebook, or a failed lookup) the old link
+  // still pointed at `/notebooks/{id}`, a route that then renders not-found.
+  it("links the back link to the notebook when its lookup succeeds", async () => {
+    getPageForRoute.mockResolvedValue(page());
+    getImportJobStatus.mockResolvedValue({ ok: true, value: null });
+
+    const section = (await renderSection()) as ReactElement<{
+      children: ReactElement<{ href: string; children: string }>[];
+    }>;
+    const back = section.props.children[0];
+
+    expect(back.props.href).toBe("/notebooks/nb-1");
+    expect(back.props.children).toBe("Biología Celular");
+  });
+
+  it("falls back to the notebooks list when the notebook lookup yields nothing", async () => {
+    getPageForRoute.mockResolvedValue(page());
+    getImportJobStatus.mockResolvedValue({ ok: true, value: null });
+    getNotebookTitleForRoute.mockResolvedValue(null);
+
+    const section = (await renderSection()) as ReactElement<{
+      children: ReactElement<{ href: string; children: string }>[];
+    }>;
+    const back = section.props.children[0];
+
+    expect(back.props.href).toBe("/notebooks");
+    expect(back.props.children).toBe("Cuadernos");
+  });
+
   // S5 (odd/tasks/app-shell-restyle.md), E1 (goal doc §1): the route renders
   // PageHeader with a `titleSlot` instead of a plain title string — the
   // real title editor/breadcrumb wiring lives in `<PageTitle>` (mocked
