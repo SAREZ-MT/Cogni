@@ -335,8 +335,8 @@ new `Pill` tones were required (only the `IconTile` `"48"` size above).
 **Preview gate.** Every `/flashcards/**` page calls
 `requireDesignPreviews()` (`shared/config/design-previews.ts`) first, so it
 answers 404 in production unless `COGNI_DESIGN_PREVIEWS=1`; a structural test
-(`flashcards/preview-gate.test.ts`) fails when a page is added without the
-guard. The sidebar "Flashcards" entry carries `preview: { href, isActive }`:
+(`src/app/(app)/preview-gate.test.ts`, which walks every preview route tree
+listed in it) fails when a page is added without the guard. The sidebar "Flashcards" entry carries `preview: { href, isActive }`:
 a link while previews are enabled, a disabled "pronto" row otherwise.
 
 **Product rule (2026-09-24): one flashcard deck per page.** A page owns at
@@ -378,11 +378,12 @@ Used by: `flashcards/[notebookId]/page.tsx`.
 
 ### StatDots (`stat-dots.tsx`)
 
-The session header's live rating tally: 4 fixed-order dot+count pairs
-(again `error-500`, hard `warning-500`, good `success-500`, easy
-`primary-600`).
+The session header's live tally: a row of dot+count pairs (Flashcards:
+again `error-500`, hard `warning-500`, good `success-500`, easy
+`primary-600`). Generalized to caller-owned items, see "StatDots —
+generalized" below.
 
-- `counts: { again, hard, good, easy }` (numbers).
+- `items: { key, count, dotClassName }[]`.
 
 Used by: `flashcards/_components/flashcard-player.tsx`.
 
@@ -511,6 +512,13 @@ active-recall.png`. Follows documento-maestro §3.3 where it differs from
 StudyPlatform: feedback shows only at the end of the session (never between
 questions), and self-evaluation is a 0–5 scale instead of a 3-option
 correct/partial/incorrect pick.
+
+**Preview gate.** Every `/active-recall/**` page calls
+`requireDesignPreviews()` as its first statement, so it answers 404 in
+production unless `COGNI_DESIGN_PREVIEWS=1` (same structural test as
+Flashcards, `src/app/(app)/preview-gate.test.ts`). The sidebar "Active
+recall" entry carries `preview: { href: "/active-recall", isActive }`: a
+link while previews are enabled, a disabled "pronto" row otherwise.
 
 **Product rule: one study unit per page.** A page owns at most one Active
 recall "deck" — its sessions — with no separate named-session entity, same
