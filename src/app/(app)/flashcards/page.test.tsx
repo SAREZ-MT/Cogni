@@ -76,4 +76,16 @@ describe("FlashcardsHubPage", () => {
       screen.getByText("14 pendientes hoy", { selector: "span.block" }),
     ).toBeInTheDocument();
   });
+
+  it("summarises pending, up-to-date decks and active notebooks in pills", () => {
+    vi.stubEnv("NODE_ENV", "development");
+
+    render(<FlashcardsHubPage />);
+
+    expect(
+      screen.getByText("14 pendientes hoy", { selector: "span:not(.block)" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("1 al día")).toBeInTheDocument();
+    expect(screen.getByText("3 cuadernos activos")).toBeInTheDocument();
+  });
 });
