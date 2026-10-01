@@ -97,16 +97,10 @@ test.describe("pdf import acceptance", () => {
 
     const importView = page.getByTestId("page-import-view");
     await expect(importView).toBeVisible();
-    // Best-effort, not a hard requirement: the editor only ever swaps in
-    // once the job is terminal (page-import-view.tsx), so this should
-    // still be true right after navigation. On a machine fast enough to
-    // finish processing before this check runs, it would time out instead
-    // of racing false — kept short on purpose so that case fails fast
-    // rather than eating into the 120s budget below. Orchestrator: watch
-    // this line first if the spec is flaky.
-    await expect(page.locator('[contenteditable="true"]')).toHaveCount(0, {
-      timeout: 2_000,
-    });
+    // "The editor only swaps in once the job is terminal" is pinned by
+    // page-import-view.test.tsx. Asserting it here raced the pipeline: a
+    // fast CI runner finished the import before a short no-editor check
+    // ran, failing a correct build.
 
     await waitForImportState(page, "done", 120_000);
 
@@ -121,14 +115,17 @@ test.describe("pdf import acceptance", () => {
 
     // The imported page is listed on its notebook's route (the sidebar no
     // longer carries the page tree), titled after the file.
-    const notebookRoute = new URL(page.url()).pathname.split("/pages/")[0];
+    const pagePath = new URL(page.url()).pathname;
+    const notebookRoute = pagePath.split("/pages/")[0];
     await page.goto(notebookRoute);
     await expect(
       page.getByRole("link", { name: /^text-30-pages/ }),
     ).toBeVisible();
-    await page.goBack();
 
-    await page.reload();
+    // A fresh full load of the page proves the content survived; going
+    // back and reloading immediately aborted the in-flight history
+    // navigation (net::ERR_ABORTED) on CI.
+    await page.goto(pagePath);
     const reloadedEditable = page
       .getByTestId("editor-mount")
       .locator('[contenteditable="true"]');
