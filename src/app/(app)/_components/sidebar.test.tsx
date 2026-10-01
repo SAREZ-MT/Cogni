@@ -221,9 +221,7 @@ describe("Sidebar", () => {
   ])("with design previews %s", (_state, previewsEnabled) => {
     // Flashcards, Active recall and Exámenes have preview routes now; their
     // enabled/disabled states are covered by the dedicated tests above.
-    it.each([
-      "Dashboard",
-    ])("renders %s as a disabled 'pronto' row", (label) => {
+    it.each(["Dashboard"])("renders %s as a disabled 'pronto' row", (label) => {
       render(
         <Sidebar
           initialCollapsed={false}
