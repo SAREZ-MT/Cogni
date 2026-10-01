@@ -4,8 +4,8 @@ import {
   getExamPagesWithQuestions,
   getExamQuestions,
   getExamQuestionsForManagement,
-  getLastExamSession,
   getExamVariantQuestions,
+  getLastExamSession,
   MITOCONDRIA_RETAKE_CONCEPTS,
   SAMPLE_NOTEBOOKS,
 } from "./sample";
