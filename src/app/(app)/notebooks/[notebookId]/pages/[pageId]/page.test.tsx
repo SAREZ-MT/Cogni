@@ -118,7 +118,9 @@ describe("page route ingestion wiring", () => {
   it("constrains the title and the editor to the design system reading measure (max-w-2xl, centered)", async () => {
     getPageForRoute.mockResolvedValue(page());
     getImportJobStatus.mockResolvedValue({ ok: true, value: null });
-    const section = (await renderSection()) as ReactElement<{ className: string }>;
+    const section = (await renderSection()) as ReactElement<{
+      className: string;
+    }>;
     expect(section.props.className).toContain("max-w-2xl");
     expect(section.props.className).toContain("mx-auto");
   });
@@ -166,7 +168,9 @@ describe("page route ingestion wiring", () => {
     getPageForRoute.mockResolvedValue(page());
     getImportJobStatus.mockResolvedValue({ ok: true, value: null });
 
-    const section = (await renderSection()) as ReactElement<{ children: ReactElement[] }>;
+    const section = (await renderSection()) as ReactElement<{
+      children: ReactElement[];
+    }>;
 
     // children[0] is now the BackLink to the notebook (user feedback: no
     // way back from the editor except the sidebar) — PageHeader shifted to
@@ -199,7 +203,9 @@ describe("page route ingestion wiring", () => {
     getImportJobStatus.mockResolvedValue({ ok: true, value: null });
     getNotebookTitleForRoute.mockResolvedValue(null);
 
-    const section = (await renderSection()) as ReactElement<{ children: ReactElement[] }>;
+    const section = (await renderSection()) as ReactElement<{
+      children: ReactElement[];
+    }>;
 
     const header = section.props.children[1] as ReactElement<{
       titleSlot: ReactElement<{ notebookTitle: string | null }>;
@@ -225,7 +231,9 @@ describe("page route ingestion wiring", () => {
     getPageForRoute.mockResolvedValue(page());
     getImportJobStatus.mockResolvedValue({ ok: true, value: null });
 
-    const section = (await renderSection()) as ReactElement<{ children: ReactElement[] }>;
+    const section = (await renderSection()) as ReactElement<{
+      children: ReactElement[];
+    }>;
 
     const header = section.props.children[1] as ReactElement<{
       statusSlot?: ReactElement<{ id?: string }>;
@@ -250,7 +258,9 @@ describe("page route ingestion wiring", () => {
     getPageForRoute.mockResolvedValue(page());
     getImportJobStatus.mockResolvedValue({ ok: true, value: null });
 
-    const section = (await renderSection()) as ReactElement<{ children: ReactElement[] }>;
+    const section = (await renderSection()) as ReactElement<{
+      children: ReactElement[];
+    }>;
 
     const importView = section.props.children[2] as ReactElement<{
       editor: ReactElement<{

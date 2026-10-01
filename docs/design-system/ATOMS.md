@@ -207,6 +207,12 @@ anatomy).
 
 Used by: `techniques-panel.tsx`.
 
+**Preview gate.** The "Técnicas" panel advertises flashcards, active recall
+and exams, which are sample-data previews until their routes land. The page
+route (`pages/[pageId]/page.tsx`) computes `designPreviewsEnabled()` on the
+server and only renders `TechniquesPanel` when it is true, so production
+shows no panel and the layout's `display: contents` slot adds no space.
+
 ## ViewToggle (`view-toggle.tsx`)
 
 The segmented grid/list control (`LayoutGrid`/`List` icons, `rounded-input`
