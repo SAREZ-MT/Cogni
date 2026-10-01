@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { requireDesignPreviews } from "@/shared/config/design-previews";
 import { SetBreadcrumb } from "../../../../_components/breadcrumb";
 import { getSampleNotebook } from "../../../../flashcards/_data/sample";
 import { ExamQuestionsView } from "../../../_components/exam-questions-view";
@@ -20,6 +21,7 @@ interface ExamQuestionsPageProps {
 export default async function ExamQuestionsPage({
   params,
 }: ExamQuestionsPageProps) {
+  requireDesignPreviews();
   const { notebookId, pageId } = await params;
   const notebook = getSampleNotebook(notebookId);
   if (!notebook) notFound();
