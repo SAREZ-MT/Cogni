@@ -760,7 +760,7 @@ const CALIBRATION_SEEDS: readonly CalibrationSeed[] = [
 // documento-maestro §7.4: self ≥4 & ai ≤2 → exceso de confianza; self ≤1 &
 // ai ≥4 → falta de confianza; otherwise calibrado. Applied to the
 // per-page AVERAGE self/ai ratings below (table rows are one per page).
-function calibrationZone(self: number, ai: number): CalibrationZone {
+export function calibrationZone(self: number, ai: number): CalibrationZone {
   if (self >= 4 && ai <= 2) return "exceso";
   if (self <= 1 && ai >= 4) return "falta";
   return "calibrado";
