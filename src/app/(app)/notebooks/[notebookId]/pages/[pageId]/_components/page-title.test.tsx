@@ -42,7 +42,7 @@ function renderTitle(props: {
   return render(
     <BreadcrumbProvider>
       <Breadcrumb />
-      <PageTitle pageId="p1" {...props} />
+      <PageTitle pageId="p1" notebookId="nb1" {...props} />
     </BreadcrumbProvider>,
   );
 }
@@ -61,18 +61,18 @@ describe("PageTitle", () => {
   it("publishes notebook › page as the breadcrumb and mounts the title editor for the page", () => {
     renderTitle({ initialTitle: "Mitosis", notebookTitle: "Biología" });
 
-    expect(trail()).toEqual(["Cogni", "Biología", "Mitosis"]);
+    expect(trail()).toEqual(["Cogni", "Cuadernos", "Biología", "Mitosis"]);
     expect(screen.getByTestId("title-editor")).toHaveTextContent("p1");
   });
 
   it("omits the notebook crumb when the notebook title is unknown", () => {
     renderTitle({ initialTitle: "Mitosis", notebookTitle: null });
-    expect(trail()).toEqual(["Cogni", "Mitosis"]);
+    expect(trail()).toEqual(["Cogni", "Cuadernos", "Mitosis"]);
   });
 
   it("falls back to 'Sin título' for a blank title", () => {
     renderTitle({ initialTitle: "   ", notebookTitle: "Biología" });
-    expect(trail()).toEqual(["Cogni", "Biología", "Sin título"]);
+    expect(trail()).toEqual(["Cogni", "Cuadernos", "Biología", "Sin título"]);
   });
 
   it("updates the crumb and refreshes the router after a successful save", () => {
@@ -80,7 +80,7 @@ describe("PageTitle", () => {
 
     act(() => capture.onSaved?.("Meiosis"));
 
-    expect(trail()).toEqual(["Cogni", "Biología", "Meiosis"]);
+    expect(trail()).toEqual(["Cogni", "Cuadernos", "Biología", "Meiosis"]);
     expect(refresh).toHaveBeenCalledTimes(1);
   });
 
@@ -98,6 +98,7 @@ describe("PageTitle", () => {
         <Breadcrumb />
         <PageTitle
           pageId="p1"
+          notebookId="nb1"
           initialTitle="Mitosis"
           notebookTitle="Biología"
         />
