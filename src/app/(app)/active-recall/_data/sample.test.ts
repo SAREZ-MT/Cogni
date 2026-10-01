@@ -47,4 +47,37 @@ describe("active recall sample data", () => {
     expect(questions.every((q) => q.pageId === "membrana-celular")).toBe(true);
     expect(getRecallQuestions("nope")).toEqual([]);
   });
+
+  it("splits every session's questions into AI-score buckets with no remainder", () => {
+    for (const notebook of SAMPLE_NOTEBOOKS) {
+      for (const page of getRecallPagesWithSessions(notebook.id)) {
+        for (const session of page.sessions) {
+          expect(
+            session.aiCorrect + session.aiPartial + session.aiIncorrect,
+          ).toBe(session.questionCount);
+        }
+      }
+    }
+  });
+
+  it("keeps mastery a 0-100 percentage", () => {
+    for (const notebook of SAMPLE_NOTEBOOKS) {
+      for (const page of getRecallPagesWithSessions(notebook.id)) {
+        for (const session of page.sessions) {
+          expect(session.mastery).toBeGreaterThanOrEqual(0);
+          expect(session.mastery).toBeLessThanOrEqual(100);
+        }
+      }
+    }
+  });
+
+  it("has as many questions for a page as its latest session asked", () => {
+    for (const notebook of SAMPLE_NOTEBOOKS) {
+      for (const page of getRecallPagesWithSessions(notebook.id)) {
+        expect(getRecallQuestions(page.id)).toHaveLength(
+          page.sessions[0]?.questionCount ?? -1,
+        );
+      }
+    }
+  });
 });
