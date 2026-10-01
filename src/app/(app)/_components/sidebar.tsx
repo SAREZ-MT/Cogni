@@ -72,7 +72,16 @@ const MAIN_SECTION: { label: string; items: NavEntry[] } = {
 const TECNICAS_SECTION: { label: string; items: NavEntry[] } = {
   label: "Técnicas",
   items: [
-    { icon: Layers, label: "Flashcards", disabled: true, hint: "pronto" },
+    {
+      icon: Layers,
+      label: "Flashcards",
+      disabled: true,
+      hint: "pronto",
+      preview: {
+        href: "/flashcards",
+        isActive: (path) => path.startsWith("/flashcards"),
+      },
+    },
     { icon: Brain, label: "Active recall", disabled: true, hint: "pronto" },
     {
       icon: ClipboardList,

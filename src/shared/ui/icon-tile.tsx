@@ -18,6 +18,12 @@ import { cn } from "@/shared/ui/utils";
 // usage pairs size 36 with both `rounded-md` (create-notebook-trigger's
 // dashed-tile icon) and `rounded-input` (the notebookId page-card icon),
 // so radius cannot be inferred from size alone without changing one of them.
+//
+// "48" added for the Flashcards design preview (design/shell-look,
+// studyplatform-flashcards-style.md §4 WorkspaceFlashcardCard's 48×48
+// translucent icon tile) — the existing 44/52 steps were each a deliberate
+// px value for their own screen, not close enough to approximate 48
+// without a visible size change.
 const iconTileVariants = cva("flex shrink-0 items-center justify-center", {
   variants: {
     size: {
@@ -26,6 +32,7 @@ const iconTileVariants = cva("flex shrink-0 items-center justify-center", {
       "36": "size-9",
       "40": "size-10",
       "44": "size-11",
+      "48": "size-12",
       "52": "size-[52px]",
       "56": "size-14",
     },

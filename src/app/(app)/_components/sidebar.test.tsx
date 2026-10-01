@@ -84,11 +84,45 @@ describe("Sidebar", () => {
       "page",
     );
 
-    for (const label of ["Flashcards", "Active recall", "Exámenes"]) {
+    for (const label of ["Active recall", "Exámenes"]) {
       expect(
         screen.getByText(label).closest("[aria-disabled]"),
       ).toHaveAttribute("aria-disabled", "true");
     }
+  });
+
+  // Flashcards is a design preview: a link to /flashcards while previews are
+  // enabled, a disabled "pronto" row otherwise (its route 404s in production).
+  it("links the Flashcards nav item to /flashcards while previews are enabled", () => {
+    render(<Sidebar initialCollapsed={false} user={USER} previewsEnabled />);
+
+    expect(screen.getByRole("link", { name: "Flashcards" })).toHaveAttribute(
+      "href",
+      "/flashcards",
+    );
+  });
+
+  it("marks Flashcards active on its own routes", () => {
+    pathname.current = "/flashcards/biologia-celular";
+    render(<Sidebar initialCollapsed={false} user={USER} previewsEnabled />);
+
+    expect(screen.getByRole("link", { name: "Flashcards" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+  });
+
+  it("keeps Flashcards as a disabled 'pronto' row when previews are disabled", () => {
+    render(
+      <Sidebar initialCollapsed={false} user={USER} previewsEnabled={false} />,
+    );
+
+    expect(
+      screen.queryByRole("link", { name: "Flashcards" }),
+    ).not.toBeInTheDocument();
+    const row = screen.getByText("Flashcards").closest("[aria-disabled]");
+    expect(row).toHaveAttribute("aria-disabled", "true");
+    expect(row).toHaveTextContent("pronto");
   });
 
   // design pass 2: "Cuadernos" is now a plain nav item to /notebooks
@@ -123,9 +157,10 @@ describe("Sidebar", () => {
     ["enabled", true],
     ["disabled", false],
   ])("with design previews %s", (_state, previewsEnabled) => {
+    // Flashcards has a preview route now; its enabled/disabled states are
+    // covered by the dedicated Flashcards tests above.
     it.each([
       "Dashboard",
-      "Flashcards",
       "Active recall",
       "Exámenes",
     ])("renders %s as a disabled 'pronto' row", (label) => {

@@ -1,4 +1,5 @@
 import "server-only";
+import { notFound } from "next/navigation";
 
 // Design previews are screens backed by route-local sample data (dashboard,
 // flashcards, active recall, exams) that ship ahead of the real data layer.
@@ -13,4 +14,12 @@ export function designPreviewsEnabled(
   env: Readonly<Record<string, string | undefined>> = process.env,
 ): boolean {
   return env.NODE_ENV !== "production" || env.COGNI_DESIGN_PREVIEWS === "1";
+}
+
+// Guard for the first line of every design-preview route: answers 404 while
+// previews are disabled, so sample data never reaches a production visitor.
+export function requireDesignPreviews(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): void {
+  if (!designPreviewsEnabled(env)) notFound();
 }

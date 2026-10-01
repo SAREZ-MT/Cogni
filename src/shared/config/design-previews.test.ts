@@ -3,7 +3,17 @@ import { describe, expect, it, vi } from "vitest";
 // The real `server-only` package throws outside a Server Component bundle.
 vi.mock("server-only", () => ({}));
 
-import { designPreviewsEnabled } from "./design-previews";
+const { notFound } = vi.hoisted(() => ({
+  notFound: vi.fn(() => {
+    throw new Error("NEXT_NOT_FOUND");
+  }),
+}));
+vi.mock("next/navigation", () => ({ notFound }));
+
+import {
+  designPreviewsEnabled,
+  requireDesignPreviews,
+} from "./design-previews";
 
 describe("designPreviewsEnabled", () => {
   it("is enabled in development", () => {
@@ -44,5 +54,36 @@ describe("designPreviewsEnabled", () => {
         COGNI_DESIGN_PREVIEWS: value,
       }),
     ).toBe(false);
+  });
+});
+
+describe("requireDesignPreviews", () => {
+  it("lets a preview route render while previews are enabled", () => {
+    notFound.mockClear();
+
+    expect(() =>
+      requireDesignPreviews({ NODE_ENV: "development" }),
+    ).not.toThrow();
+    expect(notFound).not.toHaveBeenCalled();
+  });
+
+  it("answers 404 for a preview route in production", () => {
+    notFound.mockClear();
+
+    expect(() => requireDesignPreviews({ NODE_ENV: "production" })).toThrow(
+      "NEXT_NOT_FOUND",
+    );
+    expect(notFound).toHaveBeenCalledTimes(1);
+  });
+
+  it("lets a preview route render in production when the opt-in is set", () => {
+    notFound.mockClear();
+
+    expect(() =>
+      requireDesignPreviews({
+        NODE_ENV: "production",
+        COGNI_DESIGN_PREVIEWS: "1",
+      }),
+    ).not.toThrow();
   });
 });
