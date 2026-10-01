@@ -10,6 +10,7 @@ import {
   requestImageUpload,
   saveContent,
 } from "@/modules/notebooks";
+import { designPreviewsEnabled } from "@/shared/config/design-previews";
 import { BackLink } from "@/shared/ui/back-link";
 import {
   PAGE_STATUS_SLOT_ID,
@@ -70,6 +71,13 @@ export default async function PageView({ params }: PagePageProps) {
   // (actions.ts's withBoundary) — rather than 500ing this route.
   const jobResult = await getImportJobStatus({ pageId: page.id });
   const initialJob = jobResult.ok ? jobResult.value : null;
+
+  // Preview gate: the "Técnicas" panel advertises flashcards, active recall
+  // and exams, which are sample-data previews. Decided on the server and
+  // simply not rendered when previews are off (production); the layout's
+  // portal slot stays an empty `display: contents` box, so the editor page
+  // keeps its single centered column with no dead space.
+  const showTechniquesPanel = designPreviewsEnabled();
 
   // design/shell-look: the "Técnicas" panel's collapsed state, read
   // server-side (same pattern as AppLayout's SIDEBAR_COOKIE) so
@@ -137,7 +145,9 @@ export default async function PageView({ params }: PagePageProps) {
           }
         />
       </section>
-      <TechniquesPanel initialCollapsed={techniquesPanelCollapsed} />
+      {showTechniquesPanel && (
+        <TechniquesPanel initialCollapsed={techniquesPanelCollapsed} />
+      )}
     </>
   );
 }

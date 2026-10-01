@@ -25,6 +25,21 @@ import {
 // coverage is a known gap noted in the E1 report, not added in this pass).
 vi.mock("server-only", () => ({}));
 
+const { cookieGet } = vi.hoisted(() => ({ cookieGet: vi.fn() }));
+vi.mock("next/headers", () => ({
+  cookies: async () => ({ get: cookieGet }),
+}));
+
+const { designPreviewsEnabled } = vi.hoisted(() => ({
+  designPreviewsEnabled: vi.fn(() => true),
+}));
+vi.mock("@/shared/config/design-previews", () => ({ designPreviewsEnabled }));
+
+const { TechniquesPanel } = vi.hoisted(() => ({
+  TechniquesPanel: vi.fn(() => null),
+}));
+vi.mock("./_components/techniques-panel", () => ({ TechniquesPanel }));
+
 const { PageEditor } = vi.hoisted(() => ({ PageEditor: vi.fn(() => null) }));
 vi.mock("./_components/page-editor", () => ({ PageEditor }));
 
@@ -61,11 +76,24 @@ function page() {
   };
 }
 
-async function renderRoute() {
+// The route returns a fragment: [content section, techniques panel | false].
+async function renderFragment() {
   const { default: PageView } = await import("./page");
-  const section = (await PageView({
+  const fragment = (await PageView({
     params: Promise.resolve({ notebookId: "nb-1", pageId: "page-1" }),
-  })) as ReactElement<{ children: ReactElement[] }>;
+  })) as ReactElement<{ children: [ReactElement, ReactElement | false] }>;
+  return fragment.props.children;
+}
+
+async function renderSection() {
+  const [section] = await renderFragment();
+  return section;
+}
+
+async function renderRoute() {
+  const section = (await renderSection()) as ReactElement<{
+    children: ReactElement[];
+  }>;
   // Section children are now [BackLink, PageHeader, PageImportView] — a
   // BackLink to the notebook was added as the first child (user feedback:
   // no way back from the editor except the sidebar).
@@ -80,6 +108,9 @@ async function renderRoute() {
 
 describe("page route ingestion wiring", () => {
   beforeEach(() => {
+    cookieGet.mockReset();
+    designPreviewsEnabled.mockReset();
+    designPreviewsEnabled.mockReturnValue(true);
     getNotebookTitleForRoute.mockReset();
     getNotebookTitleForRoute.mockResolvedValue("Biología Celular");
   });
@@ -87,10 +118,7 @@ describe("page route ingestion wiring", () => {
   it("constrains the title and the editor to the design system reading measure (max-w-2xl, centered)", async () => {
     getPageForRoute.mockResolvedValue(page());
     getImportJobStatus.mockResolvedValue({ ok: true, value: null });
-    const { default: PageView } = await import("./page");
-    const section = (await PageView({
-      params: Promise.resolve({ notebookId: "nb-1", pageId: "page-1" }),
-    })) as ReactElement<{ className: string }>;
+    const section = (await renderSection()) as ReactElement<{ className: string }>;
     expect(section.props.className).toContain("max-w-2xl");
     expect(section.props.className).toContain("mx-auto");
   });
@@ -138,10 +166,7 @@ describe("page route ingestion wiring", () => {
     getPageForRoute.mockResolvedValue(page());
     getImportJobStatus.mockResolvedValue({ ok: true, value: null });
 
-    const { default: PageView } = await import("./page");
-    const section = (await PageView({
-      params: Promise.resolve({ notebookId: "nb-1", pageId: "page-1" }),
-    })) as ReactElement<{ children: ReactElement[] }>;
+    const section = (await renderSection()) as ReactElement<{ children: ReactElement[] }>;
 
     // children[0] is now the BackLink to the notebook (user feedback: no
     // way back from the editor except the sidebar) — PageHeader shifted to
@@ -174,10 +199,7 @@ describe("page route ingestion wiring", () => {
     getImportJobStatus.mockResolvedValue({ ok: true, value: null });
     getNotebookTitleForRoute.mockResolvedValue(null);
 
-    const { default: PageView } = await import("./page");
-    const section = (await PageView({
-      params: Promise.resolve({ notebookId: "nb-1", pageId: "page-1" }),
-    })) as ReactElement<{ children: ReactElement[] }>;
+    const section = (await renderSection()) as ReactElement<{ children: ReactElement[] }>;
 
     const header = section.props.children[1] as ReactElement<{
       titleSlot: ReactElement<{ notebookTitle: string | null }>;
@@ -203,10 +225,7 @@ describe("page route ingestion wiring", () => {
     getPageForRoute.mockResolvedValue(page());
     getImportJobStatus.mockResolvedValue({ ok: true, value: null });
 
-    const { default: PageView } = await import("./page");
-    const section = (await PageView({
-      params: Promise.resolve({ notebookId: "nb-1", pageId: "page-1" }),
-    })) as ReactElement<{ children: ReactElement[] }>;
+    const section = (await renderSection()) as ReactElement<{ children: ReactElement[] }>;
 
     const header = section.props.children[1] as ReactElement<{
       statusSlot?: ReactElement<{ id?: string }>;
@@ -231,10 +250,7 @@ describe("page route ingestion wiring", () => {
     getPageForRoute.mockResolvedValue(page());
     getImportJobStatus.mockResolvedValue({ ok: true, value: null });
 
-    const { default: PageView } = await import("./page");
-    const section = (await PageView({
-      params: Promise.resolve({ notebookId: "nb-1", pageId: "page-1" }),
-    })) as ReactElement<{ children: ReactElement[] }>;
+    const section = (await renderSection()) as ReactElement<{ children: ReactElement[] }>;
 
     const importView = section.props.children[2] as ReactElement<{
       editor: ReactElement<{
@@ -244,5 +260,59 @@ describe("page route ingestion wiring", () => {
     expect(importView.props.editor.props.children.props.notebookId).toBe(
       "nb-1",
     );
+  });
+
+  // Preview gate (design-integration T5): the techniques panel links to
+  // flashcards / active recall / exams, which are sample-data previews. The
+  // gate is computed on the server and the panel is simply not rendered when
+  // previews are off, so production never shows it.
+  describe("techniques panel preview gate", () => {
+    beforeEach(() => {
+      getPageForRoute.mockResolvedValue(page());
+      getImportJobStatus.mockResolvedValue({ ok: true, value: null });
+    });
+
+    it("renders the techniques panel when design previews are enabled", async () => {
+      designPreviewsEnabled.mockReturnValue(true);
+
+      const [, panel] = await renderFragment();
+
+      expect(panel).toBeTruthy();
+      expect((panel as ReactElement).type).toBe(TechniquesPanel);
+    });
+
+    it("renders no techniques panel when design previews are disabled", async () => {
+      designPreviewsEnabled.mockReturnValue(false);
+
+      const [section, panel] = await renderFragment();
+
+      expect(panel).toBeFalsy();
+      // The content column is unaffected: it is still the only child.
+      expect((section.props as { className: string }).className).toContain(
+        "max-w-2xl",
+      );
+    });
+
+    it("starts the panel collapsed when the visitor's cookie says so", async () => {
+      cookieGet.mockReturnValue({ value: "collapsed" });
+
+      const [, panel] = await renderFragment();
+
+      expect(
+        (panel as ReactElement<{ initialCollapsed: boolean }>).props
+          .initialCollapsed,
+      ).toBe(true);
+    });
+
+    it("starts the panel expanded without a cookie", async () => {
+      cookieGet.mockReturnValue(undefined);
+
+      const [, panel] = await renderFragment();
+
+      expect(
+        (panel as ReactElement<{ initialCollapsed: boolean }>).props
+          .initialCollapsed,
+      ).toBe(false);
+    });
   });
 });
