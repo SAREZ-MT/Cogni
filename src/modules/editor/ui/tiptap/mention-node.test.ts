@@ -1,6 +1,8 @@
+import { act, cleanup, screen } from "@testing-library/react";
 import { Editor } from "@tiptap/core";
+import type { SuggestionProps } from "@tiptap/suggestion";
 import { FileText } from "lucide-react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { MentionCandidate } from "../../domain/mention-port";
 import { createEditorExtensions } from "./extensions";
 import { createMentionSuggestion } from "./mention-node";
@@ -47,6 +49,33 @@ describe("createMentionSuggestion", () => {
     const items = await suggestion.items({ query: "mi" });
 
     expect(items[0].iconTone).toBeUndefined();
+  });
+});
+
+describe("mention popup empty state", () => {
+  afterEach(() => {
+    cleanup();
+    document.body.innerHTML = "";
+  });
+
+  it("says there are no pages to mention, not that no block was found", async () => {
+    const renderer = createMentionSuggestion(null).render?.();
+    const props = {
+      items: [],
+      query: "zzz",
+      command: vi.fn(),
+      mount: vi.fn((element: HTMLElement) => {
+        document.body.appendChild(element);
+        return () => element.remove();
+      }),
+    } as unknown as SuggestionProps;
+
+    await act(async () => renderer?.onStart?.(props));
+
+    expect(screen.getByText("No hay páginas para mencionar")).toBeVisible();
+    expect(
+      screen.queryByText("No se encontraron bloques"),
+    ).not.toBeInTheDocument();
   });
 });
 

@@ -38,6 +38,22 @@ describe("SLASH_COMMAND_ITEMS", () => {
     }
   });
 
+  it("inserts a 3x3 table whose first row is a header", () => {
+    const editor = createHeadlessEditor();
+    try {
+      findItem("table").run(editor, { from: 1, to: 1 });
+
+      const table = editor.state.doc.firstChild;
+      expect(table?.type.name).toBe("table");
+      expect(table?.childCount).toBe(3);
+      expect(table?.firstChild?.childCount).toBe(3);
+      expect(table?.firstChild?.firstChild?.type.name).toBe("tableHeader");
+      expect(table?.lastChild?.firstChild?.type.name).toBe("tableCell");
+    } finally {
+      editor.destroy();
+    }
+  });
+
   it("includes the three callout kinds with Spanish labels", () => {
     const idea = findItem("callout-idea");
     const note = findItem("callout-note");

@@ -67,6 +67,25 @@ describe("CommandMenu", () => {
     expect(onSelect).not.toHaveBeenCalled();
   });
 
+  it("shows a caller-provided empty state instead of the slash-menu copy", () => {
+    render(
+      <CommandMenu
+        items={ITEMS}
+        query="zzz-no-existe"
+        emptyText="Sin emojis para esa búsqueda"
+        onSelect={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByText("Sin emojis para esa búsqueda"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("No se encontraron bloques"),
+    ).not.toBeInTheDocument();
+  });
+
   it("closes on Escape without calling onSelect, leaving the caller to keep the / character", () => {
     const onSelect = vi.fn();
     const onClose = vi.fn();
