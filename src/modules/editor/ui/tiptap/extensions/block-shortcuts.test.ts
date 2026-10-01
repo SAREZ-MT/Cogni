@@ -92,5 +92,123 @@ describe("BlockShortcuts", () => {
       expect(texts(editor)).toHaveLength(2);
       expect(texts(editor)[1]).toBe("dos");
     });
+
+    describe("inside a container block", () => {
+      function setup(html: string): Editor {
+        const e = new Editor({
+          extensions: createEditorExtensions(),
+          content: html,
+        });
+        return e;
+      }
+
+      // Position of the first character of the first text node whose content
+      // starts with `needle` (the caret at the very start of that textblock).
+      function startOf(e: Editor, needle: string): number {
+        let found = -1;
+        e.state.doc.descendants((node, pos) => {
+          if (found < 0 && node.isText && node.text?.startsWith(needle)) {
+            found = pos;
+          }
+        });
+        return found;
+      }
+
+      it("deletes only the current bullet list item, not the whole list", () => {
+        const e = setup("<ul><li><p>uno</p></li><li><p>dos</p></li></ul>");
+        e.commands.setTextSelection(startOf(e, "dos"));
+
+        expect(press(e, { key: "Backspace" })).toBe(true);
+
+        expect(e.state.doc.textContent).toBe("uno");
+        expect(e.state.doc.child(0).type.name).toBe("bulletList");
+        expect(e.state.doc.child(0).childCount).toBe(1);
+        e.destroy();
+      });
+
+      it("deletes the whole list once its last item is the one removed", () => {
+        const e = setup("<ul><li><p>solo</p></li></ul><p>fin</p>");
+        e.commands.setTextSelection(startOf(e, "solo"));
+
+        expect(press(e, { key: "Backspace" })).toBe(true);
+
+        expect(texts(e)).toEqual(["fin"]);
+        e.destroy();
+      });
+
+      it("deletes only the current task item", () => {
+        const e = setup(
+          '<ul data-type="taskList"><li data-type="taskItem" data-checked="false"><p>a</p></li><li data-type="taskItem" data-checked="false"><p>b</p></li></ul>',
+        );
+        e.commands.setTextSelection(startOf(e, "a"));
+
+        expect(press(e, { key: "Backspace" })).toBe(true);
+
+        expect(e.state.doc.child(0).type.name).toBe("taskList");
+        expect(e.state.doc.child(0).childCount).toBe(1);
+        expect(e.state.doc.textContent).toBe("b");
+        e.destroy();
+      });
+
+      it("deletes the item with its nested sublist, keeping its siblings", () => {
+        const e = setup(
+          "<ul><li><p>uno</p><ul><li><p>hijo</p></li></ul></li><li><p>dos</p></li></ul>",
+        );
+        e.commands.setTextSelection(startOf(e, "uno"));
+
+        expect(press(e, { key: "Backspace" })).toBe(true);
+
+        expect(e.state.doc.textContent).toBe("dos");
+        e.destroy();
+      });
+
+      it("deletes only the current paragraph inside a blockquote", () => {
+        const e = setup("<blockquote><p>uno</p><p>dos</p></blockquote>");
+        e.commands.setTextSelection(startOf(e, "dos"));
+
+        expect(press(e, { key: "Backspace" })).toBe(true);
+
+        expect(e.state.doc.child(0).type.name).toBe("blockquote");
+        expect(e.state.doc.child(0).childCount).toBe(1);
+        expect(e.state.doc.textContent).toBe("uno");
+        e.destroy();
+      });
+
+      it("deletes only the current paragraph inside a callout", () => {
+        const e = setup(
+          '<div data-type="callout"><p>uno</p><p>dos</p></div><p>fuera</p>',
+        );
+        e.commands.setTextSelection(startOf(e, "dos"));
+
+        expect(press(e, { key: "Backspace" })).toBe(true);
+
+        expect(e.state.doc.child(0).type.name).toBe("callout");
+        expect(e.state.doc.child(0).childCount).toBe(1);
+        expect(texts(e)).toEqual(["uno", "fuera"]);
+        e.destroy();
+      });
+
+      it("removes the container when its only child is deleted", () => {
+        const e = setup("<blockquote><p>solo</p></blockquote><p>fin</p>");
+        e.commands.setTextSelection(startOf(e, "solo"));
+
+        expect(press(e, { key: "Backspace" })).toBe(true);
+
+        expect(texts(e)).toEqual(["fin"]);
+        e.destroy();
+      });
+
+      it("leaves a table cell alone instead of deleting the table", () => {
+        const e = setup(
+          "<table><tbody><tr><td><p>a</p></td><td><p>b</p></td></tr></tbody></table>",
+        );
+        e.commands.setTextSelection(startOf(e, "b"));
+
+        expect(press(e, { key: "Backspace" })).toBe(false);
+
+        expect(e.state.doc.child(0).type.name).toBe("table");
+        e.destroy();
+      });
+    });
   });
 });

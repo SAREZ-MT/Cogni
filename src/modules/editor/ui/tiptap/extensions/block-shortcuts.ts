@@ -7,7 +7,10 @@
 // `Mod-Backspace` is deliberately narrower than the other two: browsers/
 // Tiptap's own keymap already bind it to "delete the previous word" while
 // typing, and stealing it unconditionally would break that everywhere in
-// the document, not just at a block boundary. This only takes over when
+// the document, not just at a block boundary. It also deletes only the
+// caret's own block (one list/task item, one paragraph inside a quote or
+// callout; see `currentDeletableBlock`), never the whole container. This
+// only takes over when
 // the selection is empty AND sits at the very start of the block's own
 // content — the one place "delete word backward" has nothing left to do
 // in this block anyway — and lets every other Mod-Backspace fall through
@@ -16,6 +19,7 @@ import { Extension } from "@tiptap/core";
 import {
   copyBlock,
   currentBlock,
+  currentDeletableBlock,
   deleteBlock,
   duplicateBlock,
 } from "../block-actions";
@@ -40,7 +44,7 @@ export const BlockShortcuts = Extension.create({
       "Mod-Backspace": () => {
         const { selection } = this.editor.state;
         if (!selection.empty) return false;
-        const ref = currentBlock(this.editor);
+        const ref = currentDeletableBlock(this.editor);
         if (!ref) return false;
         const atBlockStart = selection.$from.parentOffset === 0;
         if (!atBlockStart) return false;
