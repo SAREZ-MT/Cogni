@@ -249,24 +249,22 @@ function dayKey(date: Date): string {
 }
 
 // Trailing `windowDays` window ending today (inclusive), UTC calendar days.
+// The window and the buckets share ONE definition: the list of UTC day keys.
+// A page counts when its own day key is in that list, never by comparing raw
+// timestamps (a cut-off of `now - (windowDays - 1) x 24 h` would drop an
+// edit made earlier on the window's first day than the current time of day).
 function activeDaysInWindow(
   pages: Page[],
   now: Date,
   windowDays: number,
 ): HomeActivityWindow {
-  const windowStart = now.getTime() - (windowDays - 1) * DAY_IN_MS;
-  const activeDayKeys = new Set<string>();
-  for (const page of pages) {
-    if (page.updatedAt.getTime() >= windowStart) {
-      activeDayKeys.add(dayKey(page.updatedAt));
-    }
+  const windowKeys: string[] = [];
+  for (let offset = windowDays - 1; offset >= 0; offset -= 1) {
+    windowKeys.push(dayKey(new Date(now.getTime() - offset * DAY_IN_MS)));
   }
 
-  const days: boolean[] = [];
-  for (let offset = windowDays - 1; offset >= 0; offset -= 1) {
-    const day = new Date(now.getTime() - offset * DAY_IN_MS);
-    days.push(activeDayKeys.has(dayKey(day)));
-  }
+  const activeDayKeys = new Set(pages.map((page) => dayKey(page.updatedAt)));
+  const days = windowKeys.map((key) => activeDayKeys.has(key));
 
   return { activeDays: days.filter(Boolean).length, days };
 }

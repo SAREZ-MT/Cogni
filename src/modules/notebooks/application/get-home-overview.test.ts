@@ -433,6 +433,56 @@ describe("getHomeOverview use case", () => {
       expect(weeklyGoal.days[0]).toBe(true);
     });
 
+    // F5c (odd/tasks/review-followups.md): the window used a raw timestamp
+    // cut-off (now - 6 x 24 h) while the days are UTC calendar-day buckets,
+    // so an edit on the window's first UTC day but earlier in the day than
+    // `now` was dropped although its day is shown in `days`.
+    describe("window edges are whole UTC days", () => {
+      function depsAt(now: Date): Deps {
+        return { ...makeDeps(), clock: createFixedClock(now) };
+      }
+
+      it("counts an edit earlier on the first day of the window than the current time of day", async () => {
+        const deps = depsAt(new Date("2026-09-23T15:00:00.000Z"));
+        const notebook = await seedNotebook(deps);
+        await seedPage(deps, notebook.id, {
+          updatedAt: new Date("2026-09-17T00:30:00.000Z"),
+        });
+
+        const { weeklyGoal, streak } = await getHomeOverview(deps, OWNER_ID);
+
+        expect(weeklyGoal.days[0]).toBe(true);
+        expect(weeklyGoal.activeDays).toBe(1);
+        expect(streak.days[streak.days.length - 7]).toBe(true);
+      });
+
+      it("drops an edit on the last UTC day before the window, even a minute before midnight", async () => {
+        const deps = depsAt(new Date("2026-09-23T15:00:00.000Z"));
+        const notebook = await seedNotebook(deps);
+        await seedPage(deps, notebook.id, {
+          updatedAt: new Date("2026-09-16T23:59:00.000Z"),
+        });
+
+        const { weeklyGoal } = await getHomeOverview(deps, OWNER_ID);
+
+        expect(weeklyGoal.activeDays).toBe(0);
+        expect(weeklyGoal.days.every((day) => !day)).toBe(true);
+      });
+
+      it("keeps today's edit in the last day when it happened just after midnight UTC", async () => {
+        const deps = depsAt(new Date("2026-09-23T00:10:00.000Z"));
+        const notebook = await seedNotebook(deps);
+        await seedPage(deps, notebook.id, {
+          updatedAt: new Date("2026-09-23T00:05:00.000Z"),
+        });
+
+        const { weeklyGoal } = await getHomeOverview(deps, OWNER_ID);
+
+        expect(weeklyGoal.days[6]).toBe(true);
+        expect(weeklyGoal.activeDays).toBe(1);
+      });
+    });
+
     it("sets the weekly goal to 5 days", async () => {
       const deps = makeDeps();
 
