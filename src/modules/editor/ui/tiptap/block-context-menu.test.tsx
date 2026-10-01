@@ -1,5 +1,5 @@
 import { Editor } from "@tiptap/core";
-import { TextSelection } from "@tiptap/pm/state";
+import { NodeSelection, TextSelection } from "@tiptap/pm/state";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { type BlockRef, resolveBlockAt } from "./block-actions";
 import {
@@ -168,6 +168,50 @@ describe("applyBlockSelection", () => {
 
     expect(editor.state.selection.empty).toBe(true);
     expect(editor.state.selection.from).toBe(thirdPos + 1);
+  });
+
+  // F3a (odd/tasks/review-followups.md): a container's `pos + 1` sits BETWEEN
+  // its children, not inside a textblock, so a TextSelection there is invalid
+  // (ProseMirror warns "TextSelection endpoint not pointing into a node with
+  // inline content" and later edits misbehave). The selection must be a text
+  // caret inside inline content, or a NodeSelection on the block.
+  it.each([
+    [
+      "a bullet list",
+      "<p>antes</p><ul><li><p>uno</p></li><li><p>dos</p></li></ul>",
+    ],
+    [
+      "a task list",
+      '<p>antes</p><ul data-type="taskList"><li data-type="taskItem" data-checked="false"><p>uno</p></li></ul>',
+    ],
+    [
+      "a blockquote",
+      "<p>antes</p><blockquote><p>uno</p><p>dos</p></blockquote>",
+    ],
+    ["a callout", '<p>antes</p><div data-type="callout"><p>uno</p></div>'],
+    [
+      "a table",
+      "<p>antes</p><table><tbody><tr><td><p>a</p></td><td><p>b</p></td></tr></tbody></table>",
+    ],
+  ])("never leaves an invalid selection on %s", (_name, html) => {
+    editor = createHeadlessEditor(html);
+    const pos = editor.state.doc.child(0).nodeSize;
+    const ref = requireBlockRef(resolveBlockAt(editor, pos));
+    const dispatch = vi.spyOn(editor.view, "dispatch");
+
+    applyBlockSelection(editor, ref);
+
+    // The selection the helper itself asked for, before any plugin or view
+    // normalization could repair it (the dispatched transaction's own).
+    const requested = dispatch.mock.calls[0]?.[0].selection;
+    const valid =
+      requested instanceof NodeSelection
+        ? requested.from === pos
+        : requested?.empty &&
+          requested.$from.parent.inlineContent &&
+          requested.from > pos &&
+          requested.from < pos + ref.node.nodeSize;
+    expect(valid).toBe(true);
   });
 
   it("focuses the editor view synchronously when asked to (the handleOpenChange(false) recovery path) — never a deferred requestAnimationFrame focus", () => {

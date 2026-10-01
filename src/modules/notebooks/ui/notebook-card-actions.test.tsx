@@ -161,4 +161,75 @@ describe("NotebookCardActions", () => {
       expect(screen.queryByRole("menu")).not.toBeInTheDocument();
     });
   });
+
+  // F4b (odd/tasks/review-followups.md): the actions throw on failure and the
+  // transitions used to swallow it, so nothing told the user and the menu
+  // simply closed as if it had worked.
+  describe("when an action fails", () => {
+    it("announces a failed rename and does not refresh", async () => {
+      renameNotebook.mockRejectedValueOnce(new Error("boom"));
+      const user = userEvent.setup();
+      render(<NotebookCardActions notebook={notebook} />);
+
+      await openMenu(user);
+      await user.click(screen.getByRole("menuitem", { name: "Renombrar" }));
+      await user.clear(screen.getByLabelText("Título"));
+      await user.type(screen.getByLabelText("Título"), "Química");
+      await user.click(screen.getByRole("button", { name: "Guardar" }));
+
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        "No se pudo renombrar el cuaderno",
+      );
+      expect(refresh).not.toHaveBeenCalled();
+    });
+
+    it("announces a failed appearance change", async () => {
+      setNotebookAppearance.mockRejectedValueOnce(new Error("boom"));
+      const user = userEvent.setup();
+      render(<NotebookCardActions notebook={notebook} />);
+
+      await openMenu(user);
+      await user.click(
+        screen.getByRole("menuitem", { name: "Cambiar apariencia" }),
+      );
+      await user.click(screen.getByRole("button", { name: "Color mint" }));
+
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        "No se pudo cambiar la apariencia del cuaderno",
+      );
+      expect(refresh).not.toHaveBeenCalled();
+    });
+
+    it("announces a failed archive, then clears the message when dismissed", async () => {
+      archiveNotebook.mockRejectedValueOnce(new Error("boom"));
+      const user = userEvent.setup();
+      render(<NotebookCardActions notebook={notebook} />);
+
+      await openMenu(user);
+      await user.click(screen.getByRole("menuitem", { name: "Archivar" }));
+      await user.click(screen.getByRole("button", { name: "Archivar" }));
+
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        "No se pudo archivar el cuaderno",
+      );
+      expect(refresh).not.toHaveBeenCalled();
+
+      await user.click(screen.getByRole("button", { name: "Cerrar aviso" }));
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    });
+
+    it("does not announce anything when the action succeeds", async () => {
+      const user = userEvent.setup();
+      render(<NotebookCardActions notebook={notebook} />);
+
+      await openMenu(user);
+      await user.click(
+        screen.getByRole("menuitem", { name: "Cambiar apariencia" }),
+      );
+      await user.click(screen.getByRole("button", { name: "Color mint" }));
+
+      await waitFor(() => expect(refresh).toHaveBeenCalledTimes(1));
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    });
+  });
 });

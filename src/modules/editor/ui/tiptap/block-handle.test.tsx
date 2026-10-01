@@ -238,6 +238,27 @@ describe("BlockHandle", () => {
     expect(blockSelection.collapseBlockSelection).not.toHaveBeenCalled();
   });
 
+  // F3b (odd/tasks/review-followups.md): an unrelated transaction that only
+  // shifts positions (a remote edit, an id assignment, an autosave patch
+  // earlier in the document) leaves the user's selection untouched. The
+  // dragend guard used to compare positions before/after, so such a shift
+  // read as "the user moved the selection" and the collapse was skipped,
+  // leaving a block selection armed for the next keystroke to replace.
+  it("still collapses when only an unrelated edit before the block shifted the selection's positions", () => {
+    editor = createHeadlessEditor("<p>primero</p><p>segundo</p>");
+    render(<BlockHandle editor={editor} />);
+    const secondPos = editor.state.doc.child(0).nodeSize;
+    editor.commands.setNodeSelection(secondPos);
+
+    capturedOnElementDragEnd?.({} as DragEvent);
+    editor.view.dispatch(editor.state.tr.insertText("!!", 1));
+    expect(editor.state.selection.from).toBe(secondPos + 2);
+
+    vi.runAllTimers();
+
+    expect(blockSelection.collapseBlockSelection).toHaveBeenCalledTimes(1);
+  });
+
   // S7 review follow-up (R3-raf-not-cancelled, odd/tasks/app-shell-
   // restyle.md): unmounting (an App Router navigation away from the page)
   // within the deferred frame used to leave the scheduled

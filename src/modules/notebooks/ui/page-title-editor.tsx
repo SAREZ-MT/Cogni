@@ -68,10 +68,29 @@ export function PageTitleEditor({
   const lastSavedRef = useRef(initialTitle);
   const pendingRef = useRef<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The last value the user typed (raw), or null before the first edit.
+  const typedRef = useRef<string | null>(null);
+  // The trimmed value whose save failed and is still unsaved: blur (flush)
+  // resends it, so a transient failure is retried without another edit.
+  const failedRef = useRef<string | null>(null);
+  const inflightRef = useRef(0);
 
+  // Adopts a new `initialTitle` from the server (a refresh after navigation
+  // or revalidation) ONLY while the user has nothing of their own in play:
+  // no pending debounce, no save in flight, and no typed value that differs
+  // from what is stored. Otherwise the refresh would overwrite typing.
   useEffect(() => {
+    const typed = typedRef.current;
+    const hasLocalEdit =
+      timerRef.current !== null ||
+      pendingRef.current !== null ||
+      inflightRef.current > 0 ||
+      failedRef.current !== null ||
+      (typed !== null && typed.trim() !== displayTitle(lastSavedRef.current));
+    if (hasLocalEdit) return;
     setTitle(displayTitle(initialTitle));
     lastSavedRef.current = initialTitle;
+    typedRef.current = null;
   }, [initialTitle]);
 
   // Auto-grow to fit a long title instead of scrolling inside a fixed
@@ -90,14 +109,22 @@ export function PageTitleEditor({
     // `placeholder` already renders the muted "Sin título" copy whenever
     // the field is empty, so this only has to skip the network call.
     if (!trimmed || trimmed === lastSavedRef.current) return;
+    inflightRef.current += 1;
     renamePageAction({ pageId, title: trimmed })
       .then(() => {
         lastSavedRef.current = trimmed;
+        // A success supersedes any older failure: never resend a stale value.
+        failedRef.current = null;
         onSaved?.(trimmed);
       })
       .catch(() => {
-        // Best-effort: leave lastSavedRef unadvanced so the next
-        // debounce/blur retries this exact value instead of losing it.
+        // Best-effort: leave lastSavedRef unadvanced and remember the value,
+        // so the next blur/Enter/unmount (flush) resends this exact value
+        // instead of losing it, and a server refresh cannot overwrite it.
+        if (typedRef.current?.trim() === trimmed) failedRef.current = trimmed;
+      })
+      .finally(() => {
+        inflightRef.current -= 1;
       });
   }
 
@@ -105,6 +132,7 @@ export function PageTitleEditor({
     pendingRef.current = value;
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
+      timerRef.current = null;
       const next = pendingRef.current;
       pendingRef.current = null;
       if (next !== null) save(next);
@@ -116,7 +144,8 @@ export function PageTitleEditor({
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }
-    const next = pendingRef.current;
+    // A newer typed value wins; otherwise resend the value whose save failed.
+    const next = pendingRef.current ?? failedRef.current;
     pendingRef.current = null;
     if (next !== null) save(next);
   }
@@ -133,6 +162,10 @@ export function PageTitleEditor({
     // A title is always a single logical line — strips a literal newline
     // from a paste, on top of Enter itself being prevented below.
     const value = event.target.value.replace(/\n/g, "");
+    typedRef.current = value;
+    // A newer edit supersedes an older failed value: flushing must never
+    // resend the stale one (it could land after the newer save).
+    failedRef.current = null;
     setTitle(value);
     scheduleSave(value);
   }

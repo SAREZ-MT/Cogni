@@ -38,6 +38,14 @@ export const CogniMention = Mention.extend({
     };
   },
 
+  // The stock parser only matches `span[data-type=mention]`, but this node
+  // renders an `<a>` (below), so copy-paste/`setContent` must parse that
+  // anchor back too (mention-node.test.ts proves the round-trip with the
+  // Link mark's own `a[href]` rule registered).
+  parseHTML() {
+    return [{ tag: 'a[data-type="mention"]' }, ...(this.parent?.() ?? [])];
+  },
+
   renderHTML({ node, HTMLAttributes }) {
     const label = (node.attrs.label as string | null) ?? node.attrs.id;
     const notebookId = node.attrs.notebookId as string | null;

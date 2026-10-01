@@ -103,8 +103,13 @@ export default async function PageView({ params }: PagePageProps) {
             upload.spec.ts read it via `page.getByTestId(...)`, not scoped
             under `editor-mount`) — it is only portaled into this
             `statusSlot` visually, via the matching `statusPortalId` below. */}
-        <BackLink href={`/notebooks/${notebookId}`}>
-          {notebookTitle ?? "Cuaderno"}
+        {/* Without a resolvable notebook (archived, foreign or a failed
+            lookup) `/notebooks/{id}` would render not-found, so the link
+            falls back to the notebooks list. */}
+        <BackLink
+          href={notebookTitle ? `/notebooks/${notebookId}` : "/notebooks"}
+        >
+          {notebookTitle ?? "Cuadernos"}
         </BackLink>
         <PageHeader
           titleSlot={

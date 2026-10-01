@@ -144,3 +144,46 @@ describe("CogniMention node", () => {
     }
   });
 });
+
+// F5b (odd/tasks/review-followups.md): the node renders `a[data-type=mention]`
+// but the stock parser only matches `span[data-type=mention]`, so a copied
+// mention pasted back as plain text instead of a mention.
+describe("mention HTML round-trip", () => {
+  it("parses its own rendered anchor back into a mention node with its attributes", () => {
+    const source = new Editor({
+      extensions: createEditorExtensions(),
+      content: {
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [
+              {
+                type: "mention",
+                attrs: { id: "page-1", label: "Mitosis", notebookId: "nb-1" },
+              },
+            ],
+          },
+        ],
+      },
+    });
+    const html = source.getHTML();
+    expect(html).toContain("<a ");
+    expect(html).toContain('data-type="mention"');
+    source.destroy();
+
+    const target = new Editor({
+      extensions: createEditorExtensions(),
+      content: html,
+    });
+    const mention = target.state.doc.firstChild?.firstChild;
+
+    expect(mention?.type.name).toBe("mention");
+    expect(mention?.attrs).toMatchObject({
+      id: "page-1",
+      label: "Mitosis",
+      notebookId: "nb-1",
+    });
+    target.destroy();
+  });
+});

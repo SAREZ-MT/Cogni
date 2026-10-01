@@ -6,7 +6,7 @@
 // shadow-md), matching the rest of the design system rather than a
 // hand-rolled popup.
 import type { Editor } from "@tiptap/core";
-import { NodeSelection, TextSelection } from "@tiptap/pm/state";
+import { NodeSelection, Selection } from "@tiptap/pm/state";
 import {
   ClipboardCopy,
   Copy,
@@ -79,7 +79,8 @@ function SwatchDot({ swatch }: { swatch: ColorSwatch }) {
 // text caret could sit inside, so they get a NodeSelection on themselves —
 // the same atom check block-selection.ts's collapseBlockSelection already
 // uses for the drag-and-drop version of this same selection hazard.
-// Everything else gets a plain collapsed caret at the start of its content.
+// Everything else gets a plain collapsed caret at the start of its first
+// inline content (see below for containers).
 //
 // E3 follow-up (orchestrator repro on dadf45c): built directly from `ref` +
 // `view.state.doc` and dispatched via the raw ProseMirror view, on purpose
@@ -103,9 +104,20 @@ export function applyBlockSelection(
   options: { focus?: boolean } = {},
 ): void {
   const { view } = editor;
-  const selection = ref.node.isAtom
-    ? NodeSelection.create(view.state.doc, ref.pos)
-    : TextSelection.create(view.state.doc, ref.pos + 1);
+  const { doc } = view.state;
+  // F3a (odd/tasks/review-followups.md): `ref.pos + 1` is only a valid text
+  // position for a textblock. In a container (list, task list, quote,
+  // callout, table) it sits between children, so a TextSelection there is
+  // invalid. Search forward for the first position with inline content and
+  // accept it only when it stays inside this block; otherwise (atoms, or a
+  // container with no inline content) select the block itself.
+  const found = ref.node.isAtom
+    ? null
+    : Selection.findFrom(doc.resolve(ref.pos + 1), 1, true);
+  const selection =
+    found && found.from < ref.pos + ref.node.nodeSize
+      ? found
+      : NodeSelection.create(doc, ref.pos);
   view.dispatch(view.state.tr.setSelection(selection));
   if (options.focus) focusEditorView(editor);
 }

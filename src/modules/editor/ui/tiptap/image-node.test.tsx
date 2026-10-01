@@ -570,6 +570,59 @@ describe("Image node", () => {
       expect(screen.getByTestId("image-node-img")).toBeInTheDocument();
     });
 
+    // F4a (odd/tasks/review-followups.md): a failed or rejected replacement
+    // used to set an error that only the placeholder/unloaded branches
+    // rendered, so over a loaded image nothing told the user.
+    it("announces a failed replacement while keeping the current image", async () => {
+      const content = loadedDoc;
+      const port = new FakeSavePagePort({ content, version: 1 });
+      const good = new FakeImageUploadPort();
+      render(
+        <Editor
+          pageId="page-1"
+          initialContent={content}
+          initialVersion={1}
+          port={port}
+          imagePort={{
+            requestUpload: (input) =>
+              failingImageUploadPort().requestUpload(input),
+            register: good.register.bind(good),
+            getReadUrl: good.getReadUrl.bind(good),
+          }}
+        />,
+      );
+
+      await screen.findByTestId("image-node-img");
+      fireEvent.change(screen.getByTestId("image-node-replace-input"), {
+        target: { files: [makeFile("new.png", "image/png", 1024)] },
+      });
+
+      const alert = await screen.findByRole("alert");
+      expect(alert).toHaveTextContent(/no pudimos subir la imagen/i);
+      expect(screen.getByTestId("image-node-img")).toBeInTheDocument();
+    });
+
+    it("announces a rejected replacement file and clears it on the next attempt", async () => {
+      renderLoaded();
+
+      await screen.findByTestId("image-node-img");
+      fireEvent.change(screen.getByTestId("image-node-replace-input"), {
+        target: {
+          files: [makeFile("big.png", "image/png", 12 * 1024 * 1024)],
+        },
+      });
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        /tamaño máximo/i,
+      );
+
+      fireEvent.change(screen.getByTestId("image-node-replace-input"), {
+        target: { files: [makeFile("ok.png", "image/png", 1024)] },
+      });
+      await waitFor(() =>
+        expect(screen.queryByRole("alert")).not.toBeInTheDocument(),
+      );
+    });
+
     it("downloads the resolved URL in a new, opener-isolated tab", async () => {
       renderLoaded();
       await screen.findByTestId("image-node-img");

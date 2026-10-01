@@ -288,6 +288,17 @@ function ImageNodeView({
         <figure className="group relative m-0">
           {url ? (
             <>
+              {/* A failed/rejected "reemplazar" leaves the current image in
+                  place but must still tell the user, accessibly. */}
+              {error ? (
+                <p
+                  role="alert"
+                  data-testid="image-node-replace-error"
+                  className="mb-1.5 text-error-600 text-xs"
+                >
+                  {error}
+                </p>
+              ) : null}
               <div className={cn("flex", ALIGN_JUSTIFY_CLASS[align])}>
                 {/* Signed URLs expire and are per-request; next/image would
                     need per-URL remotePatterns re-validation for no real
@@ -389,6 +400,7 @@ function ImageNodeView({
             </>
           ) : error ? (
             <p
+              role="alert"
               data-testid="image-node-error"
               className="text-error-600 text-xs"
             >

@@ -214,6 +214,120 @@ describe("PageTitleEditor", () => {
     });
   });
 
+  it("does not overwrite what the user is typing when the server sends a new initialTitle mid-debounce", async () => {
+    const { rerender } = render(
+      <PageTitleEditor pageId="p1" initialTitle="Uno" />,
+    );
+    type("Uno y medio");
+    rerender(<PageTitleEditor pageId="p1" initialTitle="Dos" />);
+    expect(input().value).toBe("Uno y medio");
+
+    act(() => vi.advanceTimersByTime(600));
+    await settle();
+    expect(renamePage).toHaveBeenCalledExactlyOnceWith({
+      pageId: "p1",
+      title: "Uno y medio",
+    });
+  });
+
+  it("does not overwrite the text while a save is in flight", async () => {
+    let resolveSave: () => void = () => {};
+    renamePage.mockReturnValueOnce(
+      new Promise<void>((resolve) => {
+        resolveSave = resolve;
+      }),
+    );
+    const { rerender } = render(
+      <PageTitleEditor pageId="p1" initialTitle="Uno" />,
+    );
+    type("Tres");
+    fireEvent.blur(input());
+    rerender(<PageTitleEditor pageId="p1" initialTitle="Uno" />);
+    rerender(<PageTitleEditor pageId="p1" initialTitle="Dos" />);
+    expect(input().value).toBe("Tres");
+
+    resolveSave();
+    await settle();
+    expect(input().value).toBe("Tres");
+  });
+
+  it("does not overwrite an unsaved edit after a failed save", async () => {
+    renamePage.mockRejectedValueOnce(new Error("boom"));
+    const { rerender } = render(
+      <PageTitleEditor pageId="p1" initialTitle="Uno" />,
+    );
+    type("Fallido");
+    fireEvent.blur(input());
+    await settle();
+    rerender(<PageTitleEditor pageId="p1" initialTitle="Dos" />);
+    expect(input().value).toBe("Fallido");
+  });
+
+  it("retries a failed save with the same value on blur, without another edit", async () => {
+    const onSaved = vi.fn();
+    renamePage.mockRejectedValueOnce(new Error("boom"));
+    render(<PageTitleEditor pageId="p1" initialTitle="" onSaved={onSaved} />);
+
+    type("Reintento");
+    fireEvent.blur(input());
+    await settle();
+    expect(onSaved).not.toHaveBeenCalled();
+
+    fireEvent.blur(input());
+    await settle();
+
+    expect(renamePage).toHaveBeenCalledTimes(2);
+    expect(renamePage).toHaveBeenLastCalledWith({
+      pageId: "p1",
+      title: "Reintento",
+    });
+    expect(onSaved).toHaveBeenCalledExactlyOnceWith("Reintento");
+
+    fireEvent.blur(input());
+    await settle();
+    expect(renamePage).toHaveBeenCalledTimes(2);
+  });
+
+  it("never resends an older failed value while a newer save is still in flight", async () => {
+    renamePage.mockRejectedValueOnce(new Error("boom"));
+    renamePage.mockReturnValueOnce(new Promise<void>(() => {}));
+    render(<PageTitleEditor pageId="p1" initialTitle="" />);
+
+    type("Viejo");
+    fireEvent.blur(input());
+    await settle();
+    type("Nuevo");
+    fireEvent.blur(input());
+    fireEvent.blur(input());
+    await settle();
+
+    expect(renamePage).toHaveBeenCalledTimes(2);
+    expect(renamePage).not.toHaveBeenLastCalledWith({
+      pageId: "p1",
+      title: "Viejo",
+    });
+  });
+
+  it("never resends an older failed value after a newer one saved", async () => {
+    renamePage.mockRejectedValueOnce(new Error("boom"));
+    render(<PageTitleEditor pageId="p1" initialTitle="" />);
+
+    type("Viejo");
+    fireEvent.blur(input());
+    await settle();
+    type("Nuevo");
+    fireEvent.blur(input());
+    await settle();
+    fireEvent.blur(input());
+    await settle();
+
+    expect(renamePage).toHaveBeenCalledTimes(2);
+    expect(renamePage).toHaveBeenLastCalledWith({
+      pageId: "p1",
+      title: "Nuevo",
+    });
+  });
+
   it("follows a new initialTitle from the server", () => {
     const { rerender } = render(
       <PageTitleEditor pageId="p1" initialTitle="Uno" />,

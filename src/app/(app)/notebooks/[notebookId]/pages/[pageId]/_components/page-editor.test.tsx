@@ -91,6 +91,27 @@ describe("PageEditor", () => {
       expect(listPagesForMention).toHaveBeenCalledTimes(1);
     });
 
+    // F4c (odd/tasks/review-followups.md): a rejected lookup used to stay
+    // cached, so every later "@" re-threw the same error until a reload.
+    it("retries the lookup after a rejection instead of caching the failure", async () => {
+      listPagesForMention.mockRejectedValueOnce(new Error("offline"));
+      const { mentionPort } = mountEditor();
+
+      await expect(mentionPort.search("")).rejects.toThrow("offline");
+      await expect(mentionPort.search("")).resolves.toEqual(pages);
+
+      expect(listPagesForMention).toHaveBeenCalledTimes(2);
+    });
+
+    it("shares one in-flight lookup between concurrent searches, then caches the success", async () => {
+      const { mentionPort } = mountEditor();
+
+      await Promise.all([mentionPort.search("a"), mentionPort.search("b")]);
+      await mentionPort.search("c");
+
+      expect(listPagesForMention).toHaveBeenCalledTimes(1);
+    });
+
     it("caps the result list at 20 candidates", async () => {
       listPagesForMention.mockResolvedValue(
         Array.from({ length: 30 }, (_, i) => ({

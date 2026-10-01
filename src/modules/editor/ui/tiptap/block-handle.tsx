@@ -13,6 +13,8 @@
 import type { Editor } from "@tiptap/core";
 import DragHandle from "@tiptap/extension-drag-handle-react";
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
+import type { Transaction } from "@tiptap/pm/state";
+import { Mapping } from "@tiptap/pm/transform";
 import { GripVertical, Plus } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { BlockContextMenu } from "./block-context-menu";
@@ -41,15 +43,20 @@ export function BlockHandle({ editor, isBlockIdPersisted }: BlockHandleProps) {
   // and the next frame can cancel it instead of leaving it to dispatch
   // into a by-then-destroyed editor.
   const dragEndFrameRef = useRef<number | null>(null);
+  // Detaches the drag-end transaction listener (see `handleDragEnd`).
+  const stopTrackingRef = useRef<(() => void) | null>(null);
 
-  useEffect(() => {
-    return () => {
-      if (dragEndFrameRef.current !== null) {
-        cancelAnimationFrame(dragEndFrameRef.current);
-        dragEndFrameRef.current = null;
-      }
-    };
-  }, []);
+  function cancelPendingDragEnd() {
+    if (dragEndFrameRef.current !== null) {
+      cancelAnimationFrame(dragEndFrameRef.current);
+      dragEndFrameRef.current = null;
+    }
+    stopTrackingRef.current?.();
+    stopTrackingRef.current = null;
+  }
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only the unmount cleanup matters; `cancelPendingDragEnd` reads refs only.
+  useEffect(() => cancelPendingDragEnd, []);
 
   function insertBlockAfterHovered() {
     const hovered = hoveredRef.current;
@@ -111,10 +118,26 @@ export function BlockHandle({ editor, isBlockIdPersisted }: BlockHandleProps) {
   // lands — a real value change here means something else (a click, a
   // keystroke) already moved it.
   function handleDragEnd() {
+    cancelPendingDragEnd();
     const selectionAtDragEnd = editor.state.selection;
+    // F3b (odd/tasks/review-followups.md): an unrelated document change in
+    // this window (a remote edit, an id assignment) shifts positions without
+    // the user touching the selection; comparing raw positions read that as
+    // "the user moved it" and skipped the collapse, leaving a block selection
+    // armed for the next keystroke. Map the captured selection through every
+    // document change since drag end and compare THAT to the live one.
+    const mapping = new Mapping();
+    const trackChanges = ({ transaction }: { transaction: Transaction }) => {
+      if (transaction.docChanged) mapping.appendMapping(transaction.mapping);
+    };
+    editor.on("transaction", trackChanges);
+    stopTrackingRef.current = () => editor.off("transaction", trackChanges);
     dragEndFrameRef.current = requestAnimationFrame(() => {
       dragEndFrameRef.current = null;
-      if (!editor.state.selection.eq(selectionAtDragEnd)) return;
+      stopTrackingRef.current?.();
+      stopTrackingRef.current = null;
+      const expected = selectionAtDragEnd.map(editor.state.doc, mapping);
+      if (!editor.state.selection.eq(expected)) return;
       collapseBlockSelection(editor);
     });
   }

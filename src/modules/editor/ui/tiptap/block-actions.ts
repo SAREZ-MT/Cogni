@@ -33,6 +33,39 @@ export function currentBlock(editor: Editor): BlockRef | null {
   return resolveBlockAt(editor, $from.before(1));
 }
 
+const LIST_ITEM_TYPES = ["listItem", "taskItem"];
+// Cells cannot be removed on their own without breaking the table grid.
+const TABLE_CELL_TYPES = ["tableCell", "tableHeader"];
+
+// "The block under the caret" for a DESTRUCTIVE keyboard shortcut
+// (Mod-Backspace): the smallest unit whose removal leaves a valid document,
+// instead of `currentBlock`'s top-level container (which would take a whole
+// list, quote or callout with it). That unit is:
+//   - the caret's textblock, or its whole list/task item when it is the
+//     item's first paragraph (so an item goes together with its sublist);
+//   - widened to the parent while the unit is its parent's only child (an
+//     emptied list, quote or callout cannot stay behind).
+// The block handle and context menu keep acting on the top-level block the
+// user points at; only the caret-driven shortcut narrows. Returns null in a
+// table cell (let the default key handling run: a cell is not a block).
+export function currentDeletableBlock(editor: Editor): BlockRef | null {
+  const { $from } = editor.state.selection;
+  for (let d = $from.depth; d > 0; d--) {
+    if (TABLE_CELL_TYPES.includes($from.node(d).type.name)) return null;
+  }
+  let depth = $from.depth;
+  if (
+    depth > 1 &&
+    LIST_ITEM_TYPES.includes($from.node(depth - 1).type.name) &&
+    $from.index(depth - 1) === 0
+  ) {
+    depth -= 1;
+  }
+  while (depth > 1 && $from.node(depth - 1).childCount === 1) depth -= 1;
+  if (depth < 1) return null;
+  return resolveBlockAt(editor, $from.before(depth));
+}
+
 function contentRange(ref: BlockRef): { from: number; to: number } {
   return { from: ref.pos + 1, to: ref.pos + ref.node.nodeSize - 1 };
 }

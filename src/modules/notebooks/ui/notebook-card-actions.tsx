@@ -1,8 +1,9 @@
 "use client";
 
-import { MoreHorizontal } from "lucide-react";
+import { MoreHorizontal, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { Button } from "@/shared/ui/button";
 import {
   DropdownMenu,
@@ -10,6 +11,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu";
+import { StatusBanner } from "@/shared/ui/status-banner";
 import {
   archiveNotebook as archiveNotebookAction,
   renameNotebook as renameNotebookAction,
@@ -20,6 +22,15 @@ import { ArchiveConfirmDialog } from "./archive-confirm-dialog";
 import { ChangeAppearanceDialog } from "./change-appearance-dialog";
 import { useNotebookActionsSlot } from "./notebook-actions-slot";
 import { RenameNotebookDialog } from "./rename-notebook-dialog";
+
+// The notebook Server Actions throw when they fail. Each failure becomes this
+// message (Spanish product copy) in an accessible alert, instead of an
+// unhandled transition rejection that bubbled to the error boundary.
+const FAILURE_COPY = {
+  rename: "No se pudo renombrar el cuaderno",
+  appearance: "No se pudo cambiar la apariencia del cuaderno",
+  archive: "No se pudo archivar el cuaderno",
+} as const;
 
 interface NotebookCardActionsProps {
   notebook: {
@@ -61,96 +72,137 @@ export function NotebookCardActions({
     if (!open) setMenuOpen(false);
   }
 
-  function rename(title: string) {
+  const [failure, setFailure] = useState<string | null>(null);
+
+  // Runs one mutation inside a transition; a rejection is shown, not thrown,
+  // and only a success refreshes the Server Component data.
+  function run(failureTitle: string, action: () => Promise<unknown>) {
+    setFailure(null);
     startTransition(async () => {
-      await renameNotebookAction({ notebookId: notebook.id, title });
+      try {
+        await action();
+      } catch {
+        setFailure(failureTitle);
+        return;
+      }
       router.refresh();
     });
+  }
+
+  function rename(title: string) {
+    run(FAILURE_COPY.rename, () =>
+      renameNotebookAction({ notebookId: notebook.id, title }),
+    );
   }
 
   function changeAppearance(color: NotebookColor) {
-    startTransition(async () => {
-      await setNotebookAppearanceAction({
+    run(FAILURE_COPY.appearance, () =>
+      setNotebookAppearanceAction({
         notebookId: notebook.id,
         icon: notebook.icon,
         color,
-      });
-      router.refresh();
-    });
+      }),
+    );
   }
 
   function archive() {
-    startTransition(async () => {
-      await archiveNotebookAction({ notebookId: notebook.id });
-      router.refresh();
-    });
+    run(FAILURE_COPY.archive, () =>
+      archiveNotebookAction({ notebookId: notebook.id }),
+    );
   }
 
   return (
-    <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-      <DropdownMenuTrigger asChild>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-xs"
-          aria-label={`Acciones de ${notebook.title}`}
-          className={className}
-          onClick={(event) => {
-            // notebook-card.tsx/notebook-list-row.tsx render this inside a
-            // Link wrapping the whole card: stop the click from also
-            // triggering navigation.
-            event.preventDefault();
-            event.stopPropagation();
-          }}
-        >
-          <MoreHorizontal aria-hidden="true" size={14} strokeWidth={1.75} />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <RenameNotebookDialog
-          initialTitle={notebook.title}
-          onRename={rename}
-          onOpenChange={closeMenuWhenDialogCloses}
-          trigger={
-            <DropdownMenuItem onSelect={(event) => event.preventDefault()}>
-              Renombrar
-            </DropdownMenuItem>
-          }
-        />
-        <ChangeAppearanceDialog
-          notebookTitle={notebook.title}
-          currentColor={notebook.color}
-          onChange={changeAppearance}
-          onOpenChange={closeMenuWhenDialogCloses}
-          trigger={
-            <DropdownMenuItem onSelect={(event) => event.preventDefault()}>
-              Cambiar apariencia
-            </DropdownMenuItem>
-          }
-        />
-        {/* Items other modules inject through the slot (PDF import from
+    <>
+      {failure
+        ? // Portaled to <body>: the card lifts with a transform on hover,
+          // which would otherwise anchor a `fixed` banner to the card.
+          createPortal(
+            <StatusBanner
+              role="alert"
+              tone="error"
+              title={failure}
+              description="Inténtalo de nuevo en unos segundos."
+              className="fixed right-4 bottom-4 z-50 w-80 max-w-[calc(100vw-2rem)] bg-card shadow-md"
+              action={
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-xs"
+                  aria-label="Cerrar aviso"
+                  onClick={() => setFailure(null)}
+                >
+                  <X aria-hidden="true" size={14} strokeWidth={1.75} />
+                </Button>
+              }
+            />,
+            document.body,
+          )
+        : null}
+      <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+        <DropdownMenuTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            aria-label={`Acciones de ${notebook.title}`}
+            className={className}
+            onClick={(event) => {
+              // notebook-card.tsx/notebook-list-row.tsx render this inside a
+              // Link wrapping the whole card: stop the click from also
+              // triggering navigation.
+              event.preventDefault();
+              event.stopPropagation();
+            }}
+          >
+            <MoreHorizontal aria-hidden="true" size={14} strokeWidth={1.75} />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <RenameNotebookDialog
+            initialTitle={notebook.title}
+            onRename={rename}
+            onOpenChange={closeMenuWhenDialogCloses}
+            trigger={
+              <DropdownMenuItem onSelect={(event) => event.preventDefault()}>
+                Renombrar
+              </DropdownMenuItem>
+            }
+          />
+          <ChangeAppearanceDialog
+            notebookTitle={notebook.title}
+            currentColor={notebook.color}
+            onChange={changeAppearance}
+            onOpenChange={closeMenuWhenDialogCloses}
+            trigger={
+              <DropdownMenuItem onSelect={(event) => event.preventDefault()}>
+                Cambiar apariencia
+              </DropdownMenuItem>
+            }
+          />
+          {/* Items other modules inject through the slot (PDF import from
             `ingestion`, wired in src/app/(app)/_components/notebook-actions.tsx);
             `notebooks` never imports them. */}
-        {slot.menuItems?.(
-          { id: notebook.id, title: notebook.title },
-          {
-            refreshTree: () => router.refresh(),
-          },
-        )}
-        <ArchiveConfirmDialog
-          itemLabel={`el cuaderno "${notebook.title}"`}
-          onConfirm={archive}
-          onOpenChange={closeMenuWhenDialogCloses}
-          trigger={
-            <DropdownMenuItem
-              variant="destructive"
-              onSelect={(event) => event.preventDefault()}
-            >
-              Archivar
-            </DropdownMenuItem>
-          }
-        />
-      </DropdownMenuContent>
-    </DropdownMenu>
+          {slot.menuItems?.(
+            { id: notebook.id, title: notebook.title },
+            {
+              refreshTree: () => router.refresh(),
+            },
+          )}
+          <ArchiveConfirmDialog
+            itemLabel={`el cuaderno "${notebook.title}"`}
+            onConfirm={archive}
+            onOpenChange={closeMenuWhenDialogCloses}
+            trigger={
+              <DropdownMenuItem
+                variant="destructive"
+                onSelect={(event) => event.preventDefault()}
+              >
+                Archivar
+              </DropdownMenuItem>
+            }
+          />
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </>
   );
 }
