@@ -176,9 +176,9 @@ describe("mention HTML round-trip", () => {
       extensions: createEditorExtensions(),
       content: html,
     });
-    const mention = target.getJSON().content?.[0]?.content?.[0];
+    const mention = target.state.doc.firstChild?.firstChild;
 
-    expect(mention?.type).toBe("mention");
+    expect(mention?.type.name).toBe("mention");
     expect(mention?.attrs).toMatchObject({
       id: "page-1",
       label: "Mitosis",
