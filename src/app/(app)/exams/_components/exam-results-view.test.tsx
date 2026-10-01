@@ -29,6 +29,9 @@ function setup(options: {
   wrong?: number;
   seconds?: number;
   onRestart?: () => void;
+  mode?: "live" | "stored";
+  date?: string;
+  isRetake?: boolean;
 }) {
   const total = options.total ?? 10;
   render(
@@ -39,7 +42,10 @@ function setup(options: {
       pageTitle="Mitocondria"
       questions={makeQuestions(total)}
       answers={answersFor(total, options.correct, options.wrong ?? 0)}
-      seconds={options.seconds ?? 0}
+      durationSeconds={options.seconds ?? 0}
+      mode={options.mode ?? "live"}
+      date={options.date}
+      isRetake={options.isRetake}
       onRestart={options.onRestart ?? (() => {})}
     />,
   );
@@ -114,6 +120,31 @@ describe("ExamResultsView 70 percent rule", () => {
   });
 });
 
+describe("ExamResultsView exact 70 percent boundary (documento-maestro 7.5)", () => {
+  // The master document grades on the raw ratio: retake iff correct / total
+  // < 0.70. 23/33 is 69.7 %, which only reaches 70 once it is rounded for
+  // display, so the pass decision must not use the rounded score.
+  it("requires a retake at 23/33 even though the card rounds the score to 70", () => {
+    setup({ total: 33, correct: 23, wrong: 10 });
+
+    expect(screen.getByTestId("exam-score")).toHaveTextContent("70%");
+    expect(screen.getByText("Nota menor a 70 %")).toBeInTheDocument();
+    expect(screen.queryByText("Aprobado")).not.toBeInTheDocument();
+  });
+
+  it("passes at 21/30, exactly 70 percent", () => {
+    setup({ total: 30, correct: 21, wrong: 9 });
+
+    expect(screen.getByText("Aprobado")).toBeInTheDocument();
+  });
+
+  it("passes at 24/33, just above 70 percent", () => {
+    setup({ total: 33, correct: 24, wrong: 9 });
+
+    expect(screen.getByText("Aprobado")).toBeInTheDocument();
+  });
+});
+
 describe("ExamResultsView review and feedback", () => {
   it("lists every question with its own status", () => {
     setup({ total: 3, correct: 1, wrong: 1 });
@@ -169,5 +200,57 @@ describe("ExamResultsView review and feedback", () => {
     expect(
       screen.getByRole("link", { name: "Volver a los exámenes" }),
     ).toHaveAttribute("href", "/exams/nb");
+  });
+
+  it("links the closing actions to the question management screen", () => {
+    setup({ correct: 7 });
+
+    expect(
+      screen.getByRole("link", { name: "Editar preguntas" }),
+    ).toHaveAttribute("href", "/exams/nb/pg/preguntas");
+  });
+});
+
+describe("ExamResultsView stored mode", () => {
+  it("starts a new exam through a link instead of a local restart", () => {
+    setup({ correct: 7, mode: "stored" });
+
+    expect(screen.getByRole("link", { name: /Nuevo examen/ })).toHaveAttribute(
+      "href",
+      "/exams/nb/pg",
+    );
+    expect(
+      screen.queryByRole("button", { name: /Nuevo examen/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("restarts locally in live mode", () => {
+    setup({ correct: 7, mode: "live" });
+
+    expect(
+      screen.getByRole("button", { name: /Nuevo examen/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: /Nuevo examen/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows the date the session was presented on", () => {
+    setup({ correct: 7, mode: "stored", date: "22 sept" });
+
+    expect(screen.getByText("Presentado el 22 sept")).toBeInTheDocument();
+  });
+
+  it("flags a stored retake session", () => {
+    setup({ correct: 7, mode: "stored", isRetake: true });
+
+    expect(screen.getByText("Examen de repetición")).toBeInTheDocument();
+  });
+
+  it("shows neither header line for a live, non-retake session", () => {
+    setup({ correct: 7 });
+
+    expect(screen.queryByText(/Presentado el/)).not.toBeInTheDocument();
+    expect(screen.queryByText("Examen de repetición")).not.toBeInTheDocument();
   });
 });

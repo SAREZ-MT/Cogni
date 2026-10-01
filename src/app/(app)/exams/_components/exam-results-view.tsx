@@ -69,7 +69,10 @@ export function ExamResultsView({
   const unansweredCount = answers.filter((answer) => answer === null).length;
   const incorrectCount = total - correctCount - unansweredCount;
   const score = total > 0 ? Math.round((correctCount / total) * 100) : 0;
-  const passed = score >= PASSING_SCORE;
+  // documento-maestro §7.5 grades the raw ratio (`score < 0.70` retakes), so
+  // compare in integers: the rounded `score` above is display-only and would
+  // pass 23/33 (69.7 %) as 70.
+  const passed = total > 0 && correctCount * 100 >= PASSING_SCORE * total;
   const sessionsHref = `/exams/${notebookId}`;
   const newSessionHref = `/exams/${notebookId}/${pageId}`;
   const questionsHref = `/exams/${notebookId}/${pageId}/preguntas`;
