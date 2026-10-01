@@ -89,6 +89,22 @@ test.describe("app shell", () => {
     ).toHaveAttribute("href", "/notebooks");
   });
 
+  test("hides the flashcards preview routes: /flashcards answers not-found", async ({
+    page,
+  }) => {
+    for (const path of [
+      "/flashcards",
+      "/flashcards/biologia-celular",
+      "/flashcards/biologia-celular/session?deck=mitocondria-semana-3",
+    ]) {
+      const response = await page.goto(path);
+
+      expect(response?.status(), path).toBe(404);
+      await expect(page.getByText("Estudiar ahora")).toHaveCount(0);
+      await expect(page.getByText("Biología Celular")).toHaveCount(0);
+    }
+  });
+
   test("collapses the sidebar to 64px and keeps the choice after navigating", async ({
     page,
   }) => {

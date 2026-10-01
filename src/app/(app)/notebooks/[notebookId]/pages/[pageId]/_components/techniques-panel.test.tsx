@@ -42,16 +42,20 @@ describe("TechniquesPanel", () => {
     expect(screen.queryByTestId("techniques-panel")).not.toBeInTheDocument();
   });
 
-  it("lists the three techniques when expanded, all with disabled actions and no links", async () => {
+  it("lists the three techniques when expanded: Flashcards links to its screens, the others stay disabled", async () => {
     await renderPanel(false);
 
     expect(screen.getByText("Flashcards")).toBeInTheDocument();
     expect(screen.getByText("Active recall")).toBeInTheDocument();
     expect(screen.getByText("Examen")).toBeInTheDocument();
-    for (const name of ["Generar", "Iniciar", "Generar examen"]) {
+    for (const name of ["Iniciar", "Generar examen"]) {
       expect(screen.getByRole("button", { name })).toBeDisabled();
     }
-    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Ver mazos" })).toHaveAttribute(
+      "href",
+      "/flashcards",
+    );
+    expect(screen.getAllByRole("link")).toHaveLength(1);
   });
 
   it("starts collapsed from the server-read cookie and offers to expand", async () => {
@@ -64,7 +68,7 @@ describe("TechniquesPanel", () => {
     expect(
       screen.getByRole("button", { name: "Expandir panel de técnicas" }),
     ).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByText("Generar")).not.toBeInTheDocument();
+    expect(screen.queryByText("Ver mazos")).not.toBeInTheDocument();
   });
 
   it("collapses on click and persists the choice in a cookie", async () => {

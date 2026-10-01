@@ -41,6 +41,29 @@ describe("TechniqueCard", () => {
   });
 });
 
+describe("TechniqueCard with an href", () => {
+  it("renders the action as an enabled link and drops the 'pronto' pill", () => {
+    render(
+      <TechniqueCard
+        icon={Layers}
+        tone="primary"
+        name="Flashcards"
+        description="d"
+        meta="m"
+        actionLabel="Ver mazos"
+        href="/flashcards"
+      />,
+    );
+
+    expect(screen.getByRole("link", { name: "Ver mazos" })).toHaveAttribute(
+      "href",
+      "/flashcards",
+    );
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(screen.queryByText("pronto")).not.toBeInTheDocument();
+  });
+});
+
 describe("TechniqueIconStrip", () => {
   it("exposes the technique name as a tooltip title", () => {
     render(
