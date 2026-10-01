@@ -1,5 +1,6 @@
 import { Layers, Zap } from "lucide-react";
 import Link from "next/link";
+import { requireDesignPreviews } from "@/shared/config/design-previews";
 import { DeckSummaryCard } from "@/shared/ui/deck-summary-card";
 import { EmptyState } from "@/shared/ui/empty-state";
 import { IconTile } from "@/shared/ui/icon-tile";
@@ -14,6 +15,7 @@ import { getSampleDecks, SAMPLE_NOTEBOOKS } from "./_data/sample";
 // "Vista previa" pill next to the title is the only signal that this
 // isn't live data yet.
 export default function FlashcardsHubPage() {
+  requireDesignPreviews();
   const notebooksWithDecks = SAMPLE_NOTEBOOKS.map((notebook) => ({
     notebook,
     decks: getSampleDecks(notebook.id),

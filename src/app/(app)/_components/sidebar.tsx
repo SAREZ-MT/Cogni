@@ -73,10 +73,14 @@ const TECNICAS_SECTION: { label: string; items: NavEntry[] } = {
   label: "Técnicas",
   items: [
     {
-      href: "/flashcards",
       icon: Layers,
       label: "Flashcards",
-      isActive: (path) => path.startsWith("/flashcards"),
+      disabled: true,
+      hint: "pronto",
+      preview: {
+        href: "/flashcards",
+        isActive: (path) => path.startsWith("/flashcards"),
+      },
     },
     { icon: Brain, label: "Active recall", disabled: true, hint: "pronto" },
     {

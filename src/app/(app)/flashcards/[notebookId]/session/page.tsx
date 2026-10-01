@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { requireDesignPreviews } from "@/shared/config/design-previews";
 import { SetBreadcrumb } from "../../../_components/breadcrumb";
 import { FlashcardPlayer } from "../../_components/flashcard-player";
 import {
@@ -21,6 +22,7 @@ export default async function FlashcardsSessionPage({
   params,
   searchParams,
 }: FlashcardsSessionPageProps) {
+  requireDesignPreviews();
   const { notebookId } = await params;
   const notebook = getSampleNotebook(notebookId);
   if (!notebook) notFound();

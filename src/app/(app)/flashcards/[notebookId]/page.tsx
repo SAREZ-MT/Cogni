@@ -1,5 +1,6 @@
 import { BookOpen, Plus } from "lucide-react";
 import { notFound } from "next/navigation";
+import { requireDesignPreviews } from "@/shared/config/design-previews";
 import { BackLink } from "@/shared/ui/back-link";
 import { Button } from "@/shared/ui/button";
 import { DeckCard, type DeckTone } from "@/shared/ui/deck-card";
@@ -30,6 +31,7 @@ interface FlashcardsNotebookPageProps {
 export default async function FlashcardsNotebookPage({
   params,
 }: FlashcardsNotebookPageProps) {
+  requireDesignPreviews();
   const { notebookId } = await params;
   const notebook = getSampleNotebook(notebookId);
   if (!notebook) notFound();
