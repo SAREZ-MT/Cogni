@@ -102,12 +102,12 @@ describe("getSampleStudyItemsForPage", () => {
       expect.objectContaining({
         href: "/active-recall/biologia-celular/mitocondria",
         label: "Sesión · 24 sept",
-        detail: "8 preguntas · 80 %",
+        detail: "10 preguntas · dominio 80 %",
       }),
       expect.objectContaining({
         href: "/active-recall/biologia-celular/mitocondria",
         label: "Sesión · 20 sept",
-        detail: "8 preguntas · 70 %",
+        detail: "8 preguntas · dominio 70 %",
       }),
     ]);
   });

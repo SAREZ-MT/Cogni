@@ -56,14 +56,14 @@ describe("ActiveRecallHubPage", () => {
     expect(screen.getByText("8 sesiones · 3 cuadernos")).toBeInTheDocument();
   });
 
-  it("summarises sessions, average accuracy and notebooks in pills", () => {
+  it("summarises sessions, average mastery and notebooks in pills", () => {
     vi.stubEnv("NODE_ENV", "development");
 
     render(<ActiveRecallHubPage />);
 
     // (80 + 70 + 58 + 33 + 58 + 100 + 90 + 70) / 8 = 69.9
     expect(screen.getByText("8 sesiones guardadas")).toBeInTheDocument();
-    expect(screen.getByText("70% precisión promedio")).toBeInTheDocument();
+    expect(screen.getByText("70 % dominio promedio")).toBeInTheDocument();
     expect(screen.getByText("3 cuadernos activos")).toBeInTheDocument();
   });
 
@@ -87,7 +87,9 @@ describe("ActiveRecallHubPage", () => {
 
     const biologia = screen.getByRole("link", { name: /Biología Celular/ });
     expect(biologia).toHaveAttribute("href", "/active-recall/biologia-celular");
-    expect(within(biologia).getByText(/3 sesiones/)).toBeInTheDocument();
+    expect(
+      within(biologia).getByText("3 sesiones · último dominio 80 %"),
+    ).toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: /sesiones ·/ })).toHaveLength(3);
   });
 });

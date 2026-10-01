@@ -105,8 +105,11 @@ describe("ActiveRecallPlayer session flow", () => {
     expect(screen.getByText("33%")).toBeInTheDocument();
   });
 
-  it("buckets self-ratings in the live tally: 0-1 reforzar, 2-3 regular, 4-5 dominadas", async () => {
-    const user = setup();
+  it("buckets self-ratings in the live tally: 0-1 difícil, 2-3 regular, 4-5 fácil", async () => {
+    const user = setup([
+      ...QUESTIONS,
+      { id: "q4", pageId: "p", prompt: "Cuarta" },
+    ]);
     expect(tally()).toEqual(["0", "0", "0"]);
 
     await answerWith(user, "a", 1);
@@ -119,7 +122,7 @@ describe("ActiveRecallPlayer session flow", () => {
     expect(tally()).toEqual(["1", "2", "0"]);
   });
 
-  it("counts a 4 and a 5 as dominadas", async () => {
+  it("counts a 4 and a 5 as fácil", async () => {
     const user = setup();
 
     await answerWith(user, "a", 4);
@@ -138,23 +141,39 @@ describe("ActiveRecallPlayer session flow", () => {
     expect(tally()).toEqual(["1", "0", "0"]);
   });
 
-  it("shows the end-of-session summary after the last question", async () => {
+  it("shows the end-of-session results in the page after the last question", async () => {
     const user = setup();
 
     await answerWith(user, "a", 5);
     await answerWith(user, "b", 4);
     await answerWith(user, "c", 0);
 
-    const dialog = screen.getByRole("dialog", { name: "Sesión completada" });
-    expect(dialog).toHaveTextContent("Mitocondria — 3 preguntas respondidas");
+    const results = screen.getByTestId("active-recall-results");
+    expect(
+      within(results).getByRole("heading", { name: "Resultados de la sesión" }),
+    ).toBeInTheDocument();
+    expect(results).toHaveTextContent("Mitocondria — 3 preguntas respondidas");
+    expect(
+      screen.queryByTestId("active-recall-session"),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("buckets the end-of-session counts by self-rating: Difícil, Regular, Fácil", async () => {
+    const user = setup();
+
+    await answerWith(user, "a", 5);
+    await answerWith(user, "b", 4);
+    await answerWith(user, "c", 0);
+
+    const results = screen.getByTestId("active-recall-results");
     for (const [label, count] of [
-      ["Por reforzar", "1"],
+      ["Difícil", "1"],
       ["Regular", "0"],
-      ["Dominadas", "2"],
-    ]) {
-      expect(
-        within(dialog).getByText(label as string).parentElement,
-      ).toHaveTextContent(count as string);
+      ["Fácil", "2"],
+    ] as const) {
+      const tile = within(results).getAllByText(label)[0]?.parentElement;
+      expect(tile).toHaveTextContent(count);
     }
   });
 
@@ -169,40 +188,48 @@ describe("ActiveRecallPlayer session flow", () => {
     expect(screen.getByText("4,0 / 5")).toBeInTheDocument();
   });
 
-  it("reserves the AI feedback slot at the end of the session only", async () => {
-    const user = setup([QUESTIONS[0] as RecallQuestion]);
-
-    await answerWith(user, "a", 2);
-
-    const dialog = screen.getByRole("dialog");
-    expect(
-      within(dialog).getByText("Retroalimentación de la sesión"),
-    ).toBeInTheDocument();
-    expect(within(dialog).getByText("pronto")).toBeInTheDocument();
-  });
-
-  it("shows the self-evaluation average before the AI feedback slot", async () => {
-    const user = setup([QUESTIONS[0] as RecallQuestion]);
-
-    await answerWith(user, "a", 2);
-
-    const average = screen.getByText("Autoevaluación promedio");
-    const feedback = screen.getByText("Retroalimentación de la sesión");
-    expect(
-      average.compareDocumentPosition(feedback) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-  });
-
   it("'Terminar' ends the session early with what was answered", async () => {
     const user = setup();
     await answerWith(user, "a", 5);
 
     await user.click(screen.getByRole("button", { name: /Terminar/ }));
 
-    const dialog = screen.getByRole("dialog");
-    expect(dialog).toHaveTextContent("1 preguntas respondidas");
-    expect(within(dialog).getByText("5,0 / 5")).toBeInTheDocument();
+    const results = screen.getByTestId("active-recall-results");
+    expect(results).toHaveTextContent("1 preguntas respondidas");
+    expect(within(results).getByText("5,0 / 5")).toBeInTheDocument();
+    expect(screen.getAllByTestId("question-feedback-item")).toHaveLength(1);
+  });
+
+  it("'Terminar' before answering shows an empty result without per-question feedback", async () => {
+    const user = setup();
+
+    await user.click(screen.getByRole("button", { name: /Terminar/ }));
+
+    const results = screen.getByTestId("active-recall-results");
+    expect(results).toHaveTextContent("0 preguntas respondidas");
+    expect(within(results).getByText("0,0 / 5")).toBeInTheDocument();
+    expect(
+      screen.queryByText("Retroalimentación por pregunta"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps a record per question, in order, for the per-question feedback", async () => {
+    const user = setup();
+
+    await answerWith(user, "Respuesta uno", 4);
+    await user.click(screen.getByRole("button", { name: "Saltar" }));
+    await answerWith(user, "Respuesta tres", 2);
+
+    const items = screen.getAllByTestId("question-feedback-item");
+    expect(items).toHaveLength(3);
+    expect(items[0]).toHaveTextContent("1. Primera pregunta");
+    expect(items[0]).toHaveTextContent("Respuesta uno");
+    expect(items[0]).toHaveTextContent("Autoevaluación 4 · Fácil");
+    expect(items[1]).toHaveTextContent("2. Segunda pregunta");
+    expect(items[1]).toHaveTextContent("(sin respuesta)");
+    expect(items[1]).toHaveTextContent("Autoevaluación 0 · Difícil");
+    expect(items[2]).toHaveTextContent("3. Tercera pregunta");
+    expect(items[2]).toHaveTextContent("Autoevaluación 2 · Regular");
   });
 
   it("links back to the page's sessions", async () => {
@@ -214,15 +241,22 @@ describe("ActiveRecallPlayer session flow", () => {
     ).toHaveAttribute("href", "/active-recall/nb");
   });
 
-  it("'Nueva sesión' restarts from the first question with a clean tally", async () => {
+  it("'Nueva sesión' restarts from the first question with a clean tally and records", async () => {
     const user = setup([QUESTIONS[0] as RecallQuestion]);
     await answerWith(user, "a", 5);
 
     await user.click(screen.getByRole("button", { name: /Nueva sesión/ }));
 
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("active-recall-results"),
+    ).not.toBeInTheDocument();
     expect(screen.getByText("Pregunta 1 de 1")).toBeInTheDocument();
     expect(tally()).toEqual(["0", "0", "0"]);
+
+    await user.click(screen.getByRole("button", { name: /Terminar/ }));
+    expect(
+      screen.queryByTestId("question-feedback-item"),
+    ).not.toBeInTheDocument();
   });
 
   it("explains that a page without questions has nothing to review", () => {

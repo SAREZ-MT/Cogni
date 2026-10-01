@@ -9,10 +9,10 @@ const BASE: RecallPageCardProps = {
   lastSessionDate: "24 sept",
   questionCount: 8,
   sessionCount: 2,
-  accuracy: 80,
-  correct: 6,
-  partial: 1,
-  incorrect: 1,
+  mastery: 80,
+  aiCorrect: 6,
+  aiPartial: 1,
+  aiIncorrect: 1,
 };
 
 describe("RecallPageCard", () => {
@@ -34,7 +34,7 @@ describe("RecallPageCard", () => {
     expect(screen.getByText("8 preguntas · 2 sesiones")).toBeInTheDocument();
   });
 
-  it("shows the latest accuracy and its breakdown", () => {
+  it("shows the latest mastery and the AI-score breakdown", () => {
     render(<RecallPageCard {...BASE} />);
 
     expect(screen.getByText("80%")).toBeInTheDocument();
@@ -47,9 +47,9 @@ describe("RecallPageCard", () => {
     [69, "text-warning-600"],
     [40, "text-warning-600"],
     [39, "text-error-600"],
-  ])("tones %i%% accuracy as %s", (accuracy, tone) => {
-    render(<RecallPageCard {...BASE} accuracy={accuracy} />);
+  ])("tones %i%% mastery as %s", (mastery, tone) => {
+    render(<RecallPageCard {...BASE} mastery={mastery} />);
 
-    expect(screen.getByText(`${accuracy}%`)).toHaveClass(tone);
+    expect(screen.getByText(`${mastery}%`)).toHaveClass(tone);
   });
 });
