@@ -3,7 +3,8 @@
 | Campo | Valor |
 |---|---|
 | Fecha | 2026-09-22 |
-| Estado | Aceptado |
+| Estado | Revertido el 2026-09-23 (Fase 2 reincorporada e implementada) |
+| Revertido por | Entrega de la Fase 2 bajo ODD, fusionada en `main` el 2026-09-23 (PR5 a PR13); ver documento maestro §13, Fase 2 |
 | Reemplaza | Parcialmente el punto 7 del ADR 0001 (orden de las fases) |
 
 ## Contexto
