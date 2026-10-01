@@ -9,12 +9,12 @@
 
 ---
 
-## 0. Nota de estado actual (2026-09-25)
+## 0. Nota de estado actual (2026-10-01)
 
 - Fase 0 (Cimientos) y Fase 1 (Cuadernos y editor) están desplegadas en producción.
 - Fase 2 (Importación de PDF) fue implementada bajo Organic Driven Development (ODD) el 2026-09-23; el módulo `src/modules/ingestion` es real, no un esqueleto.
 - Fase 3 (Capa de IA) no ha iniciado: el módulo `src/modules/ai` es un esqueleto vacío (`export {};`).
-- Las Fases 4 a 7 (flashcards, exámenes, recordación activa, calendario y dashboard) existen únicamente como diseño visual con datos de muestra en la rama `design/shell-look`, no integrada a `main`; los módulos `flashcards`, `study-engine`, `exams`, `active-recall`, `scheduling` y `analytics` siguen siendo esqueletos vacíos en el código base de este documento.
+- Las Fases 4 a 7 (flashcards, exámenes, recordación activa, calendario y dashboard) existen únicamente como vistas previas visuales con datos de muestra, integradas en `main` pero ocultas en producción tras `requireDesignPreviews()` (las rutas responden 404 y la barra lateral muestra "pronto"); los módulos `flashcards`, `study-engine`, `exams`, `active-recall`, `scheduling` y `analytics` siguen siendo esqueletos vacíos en el código base de este documento.
 - Fase 8 (Endurecimiento) está parcialmente cubierta: la Content Security Policy con nonce por petición, la redirección del dominio apex y la protección de sesión ya existen en `src/proxy.ts` y `src/shared/config/security-headers.ts`; el resto de los entregables (registro de logs externo, pruebas de carga, auditoría de accesibilidad, manual de usuario) no se han iniciado.
 - En este documento: las secciones 1, 2, 4 y 5 describen tanto lo implementado como lo planeado, marcado explícitamente por su columna Estado; la sección 3 (casos de uso) sigue el mismo criterio caso por caso.
 
@@ -52,13 +52,13 @@ Cogni organiza su dominio en 11 módulos bajo `src/modules/`, cada uno con una �
 | `ingestion` | Importación de un PDF a una página editable, con seguimiento de estado (`ImportJob`). | Implementado |
 | `ai` | Registro de proveedores de IA, rotación por cuota, salida estructurada y prompts versionados. | Roadmap |
 | `study-engine` | Estado SM-2 por ítem, nivel de dominio por página y cálculo de vencimientos. | Roadmap |
-| `flashcards` | Tarjetas de estudio, sesiones de repaso con SM-2 y retroalimentación. | Diseño visual (rama no integrada) |
-| `exams` | Preguntas de opción múltiple, sesiones de examen, corrección y repetición. | Diseño visual (rama no integrada) |
-| `active-recall` | Preguntas abiertas, sesiones de respuesta y evaluación combinada IA + autoevaluación. | Diseño visual (rama no integrada) |
+| `flashcards` | Tarjetas de estudio, sesiones de repaso con SM-2 y retroalimentación. | Vista previa integrada (oculta en producción) |
+| `exams` | Preguntas de opción múltiple, sesiones de examen, corrección y repetición. | Vista previa integrada (oculta en producción) |
+| `active-recall` | Preguntas abiertas, sesiones de respuesta y evaluación combinada IA + autoevaluación. | Vista previa integrada (oculta en producción) |
 | `scheduling` | Calendario y vista "Hoy" de repasos vencidos. | Roadmap |
-| `analytics` | Dashboard de progreso, métricas por técnica y calibración metacognitiva. | Diseño visual (rama no integrada) |
+| `analytics` | Dashboard de progreso, métricas por técnica y calibración metacognitiva. | Vista previa integrada (oculta en producción) |
 
-Las cuatro filas marcadas "Diseño visual (rama no integrada)" tienen una versión visual con datos de muestra en la rama `design/shell-look` (no fusionada a `main`); su dominio y aplicación siguen siendo esqueletos vacíos en este código base.
+Las cuatro filas marcadas "Vista previa integrada (oculta en producción)" tienen una versión visual con datos de muestra locales a cada ruta, ya integrada en `main` y protegida por `requireDesignPreviews()` (`src/shared/config/design-previews.ts`): en producción las rutas responden 404 y la barra lateral muestra "pronto"; se ven en desarrollo o con `COGNI_DESIGN_PREVIEWS=1`. Su dominio y aplicación siguen siendo esqueletos vacíos en este código base.
 
 ### 1.3 Definiciones y acrónimos
 
@@ -170,7 +170,7 @@ Además del Estudiante, Cogni se apoya en los siguientes servicios para funciona
 | Flujo principal | 1) El estudiante solicita "Generar flashcards" para una página.<br>2) La capa de IA invoca al proveedor activo con el propósito `generate_flashcards` y valida la salida contra el esquema `{cards:[{front,back}]}`.<br>2a) Si el proveedor falla el esquema, se reintenta una vez con otro proveedor de la rotación.<br>2b) Si todos los proveedores fallan, la generación se marca `failed` con un mensaje claro; no se inventa contenido.<br>3) El módulo `flashcards` guarda las tarjetas generadas, asociadas a la página.<br>4) `study-engine` registra un ítem SM-2 por cada tarjeta nueva. |
 | Postcondición | La página tiene un mazo de flashcards, asociado uno a uno con esa página, listo para repasar. |
 | Flujo alternativo | El estudiante edita o agrega tarjetas manualmente en lugar de generarlas por IA. |
-| Estado | Roadmap — diseño visual con datos de muestra en la rama `design/shell-look`; en este código base los módulos `ai`, `flashcards` y `study-engine` son esqueletos vacíos (`docs/documento-maestro.md` §3.1, §3.3, §3.7, §8.4). |
+| Estado | Roadmap — vista previa visual con datos de muestra integrada en `main` (oculta en producción); en este código base los módulos `ai`, `flashcards` y `study-engine` son esqueletos vacíos (`docs/documento-maestro.md` §3.1, §3.3, §3.7, §8.4). |
 
 ### CU-07 — Repasar flashcards con SM-2 (roadmap)
 
@@ -192,7 +192,7 @@ Además del Estudiante, Cogni se apoya en los siguientes servicios para funciona
 | Flujo principal | 1) El estudiante inicia una sesión de examen de opción múltiple (4 alternativas, 10 preguntas por defecto).<br>2) Responde cada pregunta; la corrección es determinista (correcta → q=4, incorrecta → q=1).<br>3) Al finalizar, se calcula la puntuación = correctas / total.<br>3a) Si la puntuación es igual o mayor al 70 %, el estado de repetición se limpia.<br>3b) Si es menor al 70 %, la sesión queda marcada para repetirse junto con las preguntas falladas, y el sistema pide confirmación antes de aceptar el resultado.<br>4) Para repetir, la IA genera una variante distinta de cada pregunta fallada sobre el mismo concepto raíz; la pregunta original queda retirada.<br>5) El estudiante repite el examen solo sobre las preguntas falladas (hasta 5 si hay menos). |
 | Postcondición | El ítem de estudio de cada pregunta raíz recibe una nueva revisión SM-2; el estado de repetición de la página refleja el resultado más reciente. |
 | Flujo alternativo | La generación de variantes falla en todos los proveedores de IA → el sistema bloquea la repetición con un mensaje claro. |
-| Estado | Roadmap — diseño visual en `design/shell-look`; `exams` y `study-engine` son esqueletos vacíos en este código base (`docs/documento-maestro.md` §3.3, §7.5). |
+| Estado | Roadmap — vista previa visual integrada en `main` (oculta en producción); `exams` y `study-engine` son esqueletos vacíos en este código base (`docs/documento-maestro.md` §3.3, §7.5). |
 
 ### CU-09 — Sesión de recordación activa (roadmap)
 
@@ -222,10 +222,10 @@ Además del Estudiante, Cogni se apoya en los siguientes servicios para funciona
 |---|---|
 | Actor principal | Estudiante |
 | Precondición | El estudiante tiene al menos un cuaderno con contenido. |
-| Flujo principal | 1) El estudiante abre el dashboard.<br>2) El sistema muestra el progreso por cuaderno y por página (nivel de dominio, tendencia, ítems totales y vencidos).<br>3) El sistema muestra métricas por técnica (tasa de acierto, racha, tiempo de estudio) y una tabla de calibración metacognitiva (autoevaluación frente a resultado real). |
+| Flujo principal | 1) El estudiante abre el dashboard.<br>2) El sistema muestra el progreso por cuaderno y por página (nivel de dominio, tendencia, ítems totales y vencidos).<br>3) El sistema muestra métricas por técnica (tasa de acierto, racha, repasos completados) y una tabla de calibración metacognitiva (autoevaluación frente a resultado real). |
 | Postcondición | Ninguna (vista de solo lectura). |
 | Flujo alternativo | Sin datos suficientes, el sistema muestra un estado vacío orientador en lugar de gráficos sin datos. |
-| Estado | Roadmap — existe una versión de diseño visual (v2) con datos de muestra en la rama `design/shell-look`, no integrada a `main`; `analytics` y `study-engine` son esqueletos vacíos en este código base (`docs/documento-maestro.md` §3.6). |
+| Estado | Roadmap — existe una vista previa visual (v2) con datos de muestra integrada en `main` y oculta en producción; `analytics` y `study-engine` son esqueletos vacíos en este código base (`docs/documento-maestro.md` §3.6). |
 
 ---
 
@@ -306,34 +306,34 @@ Prioridad: **Alta** (el producto queda incompleto sin él), **Media** (mejora re
 
 | ID | Requisito | Prioridad | Estado |
 |---|---|---|---|
-| RF-FC-01 | El sistema debe asociar cada mazo de flashcards a exactamente una página, generado a partir de su contenido (`docs/documento-maestro.md` §3.1, §3.3). | Alta | Diseño visual (rama no integrada) |
-| RF-FC-02 | El sistema debe permitir generar tarjetas anverso/reverso con IA o crearlas manualmente (`docs/documento-maestro.md` §3.3). | Alta | Diseño visual (rama no integrada) |
-| RF-FC-03 | El sistema debe calificar cada tarjeta repasada con una escala de 4 botones mapeada a la calidad SM-2 (Otra vez=1, Difícil=3, Bien=4, Fácil=5) (`docs/documento-maestro.md` §7.2). | Alta | Diseño visual (rama no integrada) |
-| RF-FC-04 | El sistema debe mostrar una retroalimentación generada por IA al finalizar la sesión de repaso, no pregunta por pregunta (`docs/documento-maestro.md` §3.3). | Media | Diseño visual (rama no integrada) |
-| RF-FC-05 | El sistema debe mantener el conteo de tarjetas de un mazo derivado de las tarjetas realmente existentes en el dominio, sin un contador independiente (`docs/documento-maestro.md` §3.1). | Media | Diseño visual (rama no integrada) |
+| RF-FC-01 | El sistema debe asociar cada mazo de flashcards a exactamente una página, generado a partir de su contenido (`docs/documento-maestro.md` §3.1, §3.3). | Alta | Vista previa integrada (oculta en producción) |
+| RF-FC-02 | El sistema debe permitir generar tarjetas anverso/reverso con IA o crearlas manualmente (`docs/documento-maestro.md` §3.3). | Alta | Vista previa integrada (oculta en producción) |
+| RF-FC-03 | El sistema debe calificar cada tarjeta repasada con una escala de 4 botones mapeada a la calidad SM-2 (Otra vez=1, Difícil=3, Bien=4, Fácil=5) (`docs/documento-maestro.md` §7.2). | Alta | Vista previa integrada (oculta en producción) |
+| RF-FC-04 | El sistema debe mostrar una retroalimentación generada por IA al finalizar la sesión de repaso, no pregunta por pregunta (`docs/documento-maestro.md` §3.3). | Media | Vista previa integrada (oculta en producción) |
+| RF-FC-05 | El sistema debe mantener el conteo de tarjetas de un mazo derivado de las tarjetas realmente existentes en el dominio, sin un contador independiente (`docs/documento-maestro.md` §3.1). | Media | Vista previa integrada (oculta en producción) |
 
 ### 4.8 `exams` (EX)
 
 | ID | Requisito | Prioridad | Estado |
 |---|---|---|---|
-| RF-EX-01 | El sistema debe generar o permitir crear manualmente preguntas de opción múltiple con 4 alternativas y un concepto asociado por pregunta (`docs/documento-maestro.md` §3.3, §7.5). | Alta | Diseño visual (rama no integrada) |
-| RF-EX-02 | El sistema debe presentar exámenes de 10 preguntas por defecto (`docs/documento-maestro.md` §3.3). | Media | Diseño visual (rama no integrada) |
-| RF-EX-03 | El sistema debe corregir cada examen de forma determinista, mapeando cada respuesta correcta a calidad q=4 y cada incorrecta a q=1 (`docs/documento-maestro.md` §3.3, §7.5). | Alta | Diseño visual (rama no integrada) |
-| RF-EX-04 | El sistema debe marcar un examen para repetición cuando la puntuación sea menor al 70 %, y limpiar ese estado cuando sea igual o mayor (`docs/documento-maestro.md` §7.5). | Alta | Diseño visual (rama no integrada) |
-| RF-EX-05 | El sistema debe generar, para la repetición, una variante distinta de cada pregunta fallada sobre el mismo concepto raíz, sin repetir la redacción original (`docs/documento-maestro.md` §7.5). | Alta | Diseño visual (rama no integrada) |
-| RF-EX-06 | El sistema debe bloquear la repetición del examen con un mensaje claro si la generación de variantes falla en todos los proveedores de IA (`docs/documento-maestro.md` §7.5). | Media | Diseño visual (rama no integrada) |
-| RF-EX-07 | El sistema debe pedir confirmación explícita antes de aceptar el envío final de un examen. | Media | Diseño visual (rama no integrada) |
+| RF-EX-01 | El sistema debe generar o permitir crear manualmente preguntas de opción múltiple con 4 alternativas y un concepto asociado por pregunta (`docs/documento-maestro.md` §3.3, §7.5). | Alta | Vista previa integrada (oculta en producción) |
+| RF-EX-02 | El sistema debe presentar exámenes de 10 preguntas por defecto (`docs/documento-maestro.md` §3.3). | Media | Vista previa integrada (oculta en producción) |
+| RF-EX-03 | El sistema debe corregir cada examen de forma determinista, mapeando cada respuesta correcta a calidad q=4 y cada incorrecta a q=1 (`docs/documento-maestro.md` §3.3, §7.5). | Alta | Vista previa integrada (oculta en producción) |
+| RF-EX-04 | El sistema debe marcar un examen para repetición cuando la puntuación sea menor al 70 %, y limpiar ese estado cuando sea igual o mayor (`docs/documento-maestro.md` §7.5). | Alta | Vista previa integrada (oculta en producción) |
+| RF-EX-05 | El sistema debe generar, para la repetición, una variante distinta de cada pregunta fallada sobre el mismo concepto raíz, sin repetir la redacción original (`docs/documento-maestro.md` §7.5). | Alta | Vista previa integrada (oculta en producción) |
+| RF-EX-06 | El sistema debe bloquear la repetición del examen con un mensaje claro si la generación de variantes falla en todos los proveedores de IA (`docs/documento-maestro.md` §7.5). | Media | Vista previa integrada (oculta en producción) |
+| RF-EX-07 | El sistema debe pedir confirmación explícita antes de aceptar el envío final de un examen. | Media | Vista previa integrada (oculta en producción) |
 
 ### 4.9 `active-recall` (AR)
 
 | ID | Requisito | Prioridad | Estado |
 |---|---|---|---|
-| RF-AR-01 | El sistema debe generar preguntas abiertas de recordación activa con una rúbrica de evaluación por pregunta (`docs/documento-maestro.md` §3.3, §8.4). | Alta | Diseño visual (rama no integrada) |
-| RF-AR-02 | El sistema debe solicitar al estudiante una autoevaluación de 0 a 5 inmediatamente después de responder cada pregunta (`docs/documento-maestro.md` §3.3, §7.4). | Alta | Diseño visual (rama no integrada) |
-| RF-AR-03 | El sistema debe evaluar cada respuesta abierta de forma asíncrona contra la rúbrica mediante IA, devolviendo un puntaje y una justificación en un formato validado (`docs/documento-maestro.md` §3.7, §8.4). | Alta | Diseño visual (rama no integrada) |
-| RF-AR-04 | El sistema debe calcular la calidad combinada como `combined = round(0.6·puntaje_IA + 0.4·autoevaluación)` y registrar las tres señales (cruda, autoevaluación, combinada) (`docs/documento-maestro.md` §7.4). | Alta | Diseño visual (rama no integrada) |
-| RF-AR-05 | El sistema debe señalar exceso de confianza cuando la autoevaluación sea ≥4 y el puntaje de IA sea ≤2, y falta de confianza en el caso inverso (`docs/documento-maestro.md` §7.4). | Media | Diseño visual (rama no integrada) |
-| RF-AR-06 | El sistema debe mostrar la retroalimentación individual únicamente al final de la sesión, no después de cada pregunta (`docs/documento-maestro.md` §3.3). | Media | Diseño visual (rama no integrada) |
+| RF-AR-01 | El sistema debe generar preguntas abiertas de recordación activa con una rúbrica de evaluación por pregunta (`docs/documento-maestro.md` §3.3, §8.4). | Alta | Vista previa integrada (oculta en producción) |
+| RF-AR-02 | El sistema debe solicitar al estudiante una autoevaluación de 0 a 5 inmediatamente después de responder cada pregunta (`docs/documento-maestro.md` §3.3, §7.4). | Alta | Vista previa integrada (oculta en producción) |
+| RF-AR-03 | El sistema debe evaluar cada respuesta abierta de forma asíncrona contra la rúbrica mediante IA, devolviendo un puntaje y una justificación en un formato validado (`docs/documento-maestro.md` §3.7, §8.4). | Alta | Vista previa integrada (oculta en producción) |
+| RF-AR-04 | El sistema debe calcular la calidad combinada como `combined = round(0.6·puntaje_IA + 0.4·autoevaluación)` y registrar las tres señales (cruda, autoevaluación, combinada) (`docs/documento-maestro.md` §7.4). | Alta | Vista previa integrada (oculta en producción) |
+| RF-AR-05 | El sistema debe señalar exceso de confianza cuando la autoevaluación sea ≥4 y el puntaje de IA sea ≤2, y falta de confianza en el caso inverso (`docs/documento-maestro.md` §7.4). | Media | Vista previa integrada (oculta en producción) |
+| RF-AR-06 | El sistema debe mostrar la retroalimentación individual únicamente al final de la sesión, no después de cada pregunta (`docs/documento-maestro.md` §3.3). | Media | Vista previa integrada (oculta en producción) |
 
 ### 4.10 `scheduling` (SC)
 
@@ -348,11 +348,11 @@ Prioridad: **Alta** (el producto queda incompleto sin él), **Media** (mejora re
 
 | ID | Requisito | Prioridad | Estado |
 |---|---|---|---|
-| RF-AN-01 | El sistema debe mostrar el progreso por cuaderno y por página, incluyendo nivel de dominio, tendencia y conteo de ítems totales y vencidos (`docs/documento-maestro.md` §3.6). | Alta | Diseño visual (rama no integrada) |
-| RF-AN-02 | El sistema debe mostrar métricas por técnica de estudio: tasa de acierto, racha y tiempo de estudio (`docs/documento-maestro.md` §3.6). | Media | Diseño visual (rama no integrada) |
-| RF-AN-03 | El sistema debe mostrar una tabla de calibración metacognitiva que compare la autoevaluación del estudiante contra el resultado real de la evaluación de IA (`docs/documento-maestro.md` §3.6, §7.4). | Media | Diseño visual (rama no integrada) |
-| RF-AN-04 | El sistema debe presentar los gráficos del dashboard mediante componentes de gráficos de shadcn/ui (`docs/documento-maestro.md` §3.6, §4.1). | Baja | Diseño visual (rama no integrada) |
-| RF-AN-05 | El sistema debe limitar sus lecturas a los datos ya calculados por `study-engine` y las técnicas, sin realizar cálculos propios de vencimiento o dominio (`docs/documento-maestro.md` §5.2). | Alta | Diseño visual (rama no integrada) |
+| RF-AN-01 | El sistema debe mostrar el progreso por cuaderno y por página, incluyendo nivel de dominio, tendencia y conteo de ítems totales y vencidos (`docs/documento-maestro.md` §3.6). | Alta | Vista previa integrada (oculta en producción) |
+| RF-AN-02 | El sistema debe mostrar métricas por técnica de estudio: tasa de acierto, racha y repasos completados (`docs/documento-maestro.md` §3.6). | Media | Vista previa integrada (oculta en producción) |
+| RF-AN-03 | El sistema debe mostrar una tabla de calibración metacognitiva que compare la autoevaluación del estudiante contra el resultado real de la evaluación de IA (`docs/documento-maestro.md` §3.6, §7.4). | Media | Vista previa integrada (oculta en producción) |
+| RF-AN-04 | El sistema debe presentar los gráficos del dashboard mediante componentes de gráficos de shadcn/ui (`docs/documento-maestro.md` §3.6, §4.1). | Baja | Vista previa integrada (oculta en producción) |
+| RF-AN-05 | El sistema debe limitar sus lecturas a los datos ya calculados por `study-engine` y las técnicas, sin realizar cálculos propios de vencimiento o dominio (`docs/documento-maestro.md` §5.2). | Alta | Vista previa integrada (oculta en producción) |
 
 ---
 
