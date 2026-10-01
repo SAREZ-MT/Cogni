@@ -12,7 +12,7 @@ import { createNotebook } from "./helpers/notebooks";
 // specs/ingestion (design.md §11, proposal.md Success Criteria): the two
 // end-to-end scenarios not already covered by Vitest unit/component tests —
 // a full happy-path import against the real pipeline (download, extract,
-// convert, persist, all inside one Server Action call — ADR 0002, no
+// convert, persist, all inside one Server Action call — ADR 0003, no
 // worker) and the "no text layer" failure, which must still leave a usable
 // empty page. Both PDFs are built in-test with
 // tests/fixtures/pdf/make-minimal-pdf.ts's byte-exact writer (T12 extends

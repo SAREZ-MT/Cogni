@@ -351,8 +351,10 @@ export interface SampleStudyItemsForPage {
 // notebook/page). One page owns at most one deck, so the flashcards group
 // always has exactly one item — the deck of "this page" (fixed to the
 // biologia-celular sample notebook's "Mitocondria" page for the preview).
-// Active recall/Examen each get one representative sample item so all
-// three techniques appear in the preview.
+// Active recall now points at the same page's real sessions
+// (active-recall/_data/sample.ts, Active recall design preview 2026-09-24)
+// instead of a placeholder "#" href. Examen still has no screens yet, so it
+// keeps its representative sample item.
 export function getSampleStudyItemsForPage(): SampleStudyItemsForPage {
   const page = getSamplePage("biologia-celular", "mitocondria");
 
@@ -372,9 +374,15 @@ export function getSampleStudyItemsForPage(): SampleStudyItemsForPage {
       : [],
     activeRecall: [
       {
-        href: "#",
+        href: "/active-recall/biologia-celular/mitocondria",
         label: "Sesión · 24 sept",
-        detail: "10 preguntas · 80 %",
+        detail: "10 preguntas · dominio 80 %",
+        tone: "green",
+      },
+      {
+        href: "/active-recall/biologia-celular/mitocondria",
+        label: "Sesión · 20 sept",
+        detail: "8 preguntas · dominio 70 %",
         tone: "green",
       },
     ],

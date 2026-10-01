@@ -95,10 +95,26 @@ describe("getSampleStudyItemsForPage", () => {
     ]);
   });
 
-  it("offers one active recall and one exam sample item", () => {
-    const { activeRecall, exam } = getSampleStudyItemsForPage();
+  it("offers the sample page's two active recall sessions, linking to its session route", () => {
+    const { activeRecall } = getSampleStudyItemsForPage();
 
-    expect(activeRecall).toHaveLength(1);
+    expect(activeRecall).toEqual([
+      expect.objectContaining({
+        href: "/active-recall/biologia-celular/mitocondria",
+        label: "Sesión · 24 sept",
+        detail: "10 preguntas · dominio 80 %",
+      }),
+      expect.objectContaining({
+        href: "/active-recall/biologia-celular/mitocondria",
+        label: "Sesión · 20 sept",
+        detail: "8 preguntas · dominio 70 %",
+      }),
+    ]);
+  });
+
+  it("offers one exam sample item", () => {
+    const { exam } = getSampleStudyItemsForPage();
+
     expect(exam).toHaveLength(1);
   });
 });

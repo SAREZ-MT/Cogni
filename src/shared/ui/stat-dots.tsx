@@ -1,47 +1,39 @@
 import { cn } from "@/shared/ui/utils";
 
-export interface StatDotsCounts {
-  again: number;
-  hard: number;
-  good: number;
-  easy: number;
+export interface StatDotItem {
+  // React key for this dot+count pair (e.g. "again", "reforzar").
+  key: string;
+  count: number;
+  // The dot's own bg color class (e.g. "bg-error-500") — generalized from a
+  // fixed 4-tone lookup (design/shell-look, Active recall preview
+  // 2026-09-24) so both Flashcards' again/hard/good/easy tally and Active
+  // recall's 3-tone por-reforzar/regular/dominadas tally can reuse this
+  // atom instead of hand-rolling the same dot+count markup twice.
+  dotClassName: string;
 }
 
-// Rating-tone dot color per key (studyplatform-flashcards-style.md §3
-// session header tally: again/hard/good/easy map to error/warning/success/
-// primary respectively — the same tone vocabulary RatingButton uses).
-const DOT_CLASS: Record<keyof StatDotsCounts, string> = {
-  again: "bg-error-500",
-  hard: "bg-warning-500",
-  good: "bg-success-500",
-  easy: "bg-primary-600",
-};
-
-const ORDER: (keyof StatDotsCounts)[] = ["again", "hard", "good", "easy"];
-
 export interface StatDotsProps {
-  counts: StatDotsCounts;
+  items: StatDotItem[];
   className?: string;
 }
 
-// Live session tally (Flashcards design preview): 4 fixed-order dot+count
-// pairs next to the "Terminar" action, purely presentational — the caller
-// (FlashcardPlayer) owns incrementing the counts as the learner rates
-// cards.
-export function StatDots({ counts, className }: StatDotsProps) {
+// Live session tally (Flashcards/Active recall design previews): a row of
+// dot+count pairs next to the "Terminar" action, purely presentational —
+// the caller owns incrementing the counts and choosing each dot's tone.
+export function StatDots({ items, className }: StatDotsProps) {
   return (
     <div
       data-testid="stat-dots"
       className={cn("flex items-center gap-3", className)}
     >
-      {ORDER.map((tone) => (
-        <span key={tone} className="flex items-center gap-1.5">
+      {items.map((item) => (
+        <span key={item.key} className="flex items-center gap-1.5">
           <span
             aria-hidden="true"
-            className={cn("size-2 rounded-full", DOT_CLASS[tone])}
+            className={cn("size-2 rounded-full", item.dotClassName)}
           />
           <span className="font-medium text-[12px] text-fg-secondary">
-            {counts[tone]}
+            {item.count}
           </span>
         </span>
       ))}

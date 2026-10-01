@@ -10,8 +10,11 @@ import { FlipCard } from "@/shared/ui/flip-card";
 import { IconTile } from "@/shared/ui/icon-tile";
 import { ProgressBar } from "@/shared/ui/progress-bar";
 import { RatingButton, type RatingTone } from "@/shared/ui/rating-button";
-import { SessionSummary } from "@/shared/ui/session-summary";
-import { StatDots } from "@/shared/ui/stat-dots";
+import {
+  SessionSummary,
+  type SessionSummaryStat,
+} from "@/shared/ui/session-summary";
+import { type StatDotItem, StatDots } from "@/shared/ui/stat-dots";
 import type { SampleCard } from "../_data/sample";
 
 export interface FlashcardPlayerProps {
@@ -25,6 +28,41 @@ const RATINGS: { tone: RatingTone; label: string; hint: string }[] = [
   { tone: "hard", label: "Difícil", hint: "Repasar pronto" },
   { tone: "good", label: "Bien", hint: "Mañana" },
   { tone: "easy", label: "Fácil", hint: "4 días" },
+];
+
+// Tally tone lookup shared by the header StatDots and the SessionSummary
+// stats grid (StatDots/SessionSummary generalized 2026-09-24 so both
+// Flashcards and Active recall can reuse them — see each atom's own docs).
+const TALLY_TONE: {
+  tone: RatingTone;
+  label: string;
+  dotClassName: string;
+  toneClassName: string;
+}[] = [
+  {
+    tone: "again",
+    label: "Otra vez",
+    dotClassName: "bg-error-500",
+    toneClassName: "text-error-600",
+  },
+  {
+    tone: "hard",
+    label: "Difícil",
+    dotClassName: "bg-warning-500",
+    toneClassName: "text-warning-600",
+  },
+  {
+    tone: "good",
+    label: "Bien",
+    dotClassName: "bg-success-500",
+    toneClassName: "text-success-600",
+  },
+  {
+    tone: "easy",
+    label: "Fácil",
+    dotClassName: "bg-primary-600",
+    toneClassName: "text-primary-600",
+  },
 ];
 
 // Client flip-card study session (design preview, mockups flashcard.png/
@@ -46,6 +84,22 @@ export function FlashcardPlayer({
   const progress = total > 0 ? Math.round((index / total) * 100) : 0;
   const card = cards[index];
   const decksHref = `/flashcards/${notebookId}`;
+
+  const statDotItems: StatDotItem[] = TALLY_TONE.map(
+    ({ tone, dotClassName }) => ({
+      key: tone,
+      count: tally[tone],
+      dotClassName,
+    }),
+  );
+  const summaryStats: SessionSummaryStat[] = TALLY_TONE.map(
+    ({ tone, label, toneClassName }) => ({
+      key: tone,
+      label,
+      value: tally[tone],
+      toneClassName,
+    }),
+  );
 
   function rate(tone: RatingTone) {
     setTally((prev) => ({ ...prev, [tone]: prev[tone] + 1 }));
@@ -103,7 +157,7 @@ export function FlashcardPlayer({
           </p>
         </div>
         <div className="flex items-center gap-4">
-          <StatDots counts={tally} />
+          <StatDots items={statDotItems} />
           <Button
             type="button"
             variant="ghost"
@@ -178,12 +232,19 @@ export function FlashcardPlayer({
 
       {finished && (
         <SessionSummary
-          deckLabel={deckLabel}
-          reviewedCount={reviewed}
-          nextReviewCount={total}
-          stats={tally}
-          backHref={decksHref}
-          onRestart={restart}
+          title="¡Sesión completada!"
+          subtitle={`${deckLabel} — ${reviewed} tarjetas revisadas`}
+          stats={summaryStats}
+          highlight={
+            <>
+              <p className="text-[13px] text-fg-muted">Próxima revisión</p>
+              <p className="mt-0.5 font-semibold text-[15px] text-fg">
+                Mañana · {total} tarjetas programadas
+              </p>
+            </>
+          }
+          secondaryAction={{ label: "Volver al mazo", href: decksHref }}
+          primaryAction={{ label: "Repasar de nuevo →", onClick: restart }}
         />
       )}
     </div>

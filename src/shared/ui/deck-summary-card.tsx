@@ -1,5 +1,6 @@
 import { BookOpen } from "lucide-react";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import type { NotebookColor } from "@/modules/notebooks";
 import { IconTile } from "@/shared/ui/icon-tile";
 import { cn } from "@/shared/ui/utils";
@@ -21,8 +22,16 @@ export interface DeckSummaryCardProps {
   href: string;
   tone: NotebookColor;
   title: string;
-  cardCount: number;
-  dueCount: number;
+  // Flashcards' own "{N} tarjetas · {due|al día}" meta line. Optional (and
+  // ignored when `meta` is set) so a technique with a different meta shape
+  // (Active recall's "{N} sesiones · última {p} %") can reuse this atom.
+  cardCount?: number;
+  dueCount?: number;
+  // Overrides the default cardCount/dueCount meta line entirely (Active
+  // recall design preview, 2026-09-24: "{N} sesiones · última {p} %" has no
+  // card/due concept). The due-count badge above still only renders from
+  // `dueCount`.
+  meta?: ReactNode;
   className?: string;
 }
 
@@ -35,7 +44,8 @@ export function DeckSummaryCard({
   tone,
   title,
   cardCount,
-  dueCount,
+  dueCount = 0,
+  meta,
   className,
 }: DeckSummaryCardProps) {
   return (
@@ -66,14 +76,21 @@ export function DeckSummaryCard({
       <div className="px-4 pt-3.5 pb-4">
         <p className="truncate font-semibold text-fg text-sm">{title}</p>
         <p className="mt-1 text-fg-muted text-xs">
-          {cardCount} tarjetas
-          {dueCount > 0 ? (
-            <span className="font-medium text-error-600">
-              {" "}
-              · {dueCount} pendientes
-            </span>
-          ) : (
-            <span className="font-medium text-success-600"> · al día ✓</span>
+          {meta ?? (
+            <>
+              {cardCount} tarjetas
+              {dueCount > 0 ? (
+                <span className="font-medium text-error-600">
+                  {" "}
+                  · {dueCount} pendientes
+                </span>
+              ) : (
+                <span className="font-medium text-success-600">
+                  {" "}
+                  · al día ✓
+                </span>
+              )}
+            </>
           )}
         </p>
       </div>

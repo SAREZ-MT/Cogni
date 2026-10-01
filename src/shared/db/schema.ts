@@ -143,7 +143,7 @@ export type ImportJobStatusValue = (typeof IMPORT_JOB_STATUSES)[number];
 // One row per PDF import (design.md, "Tabla `import_jobs` solo accesible
 // desde el servidor"). RLS is on with no policies, like pages: only the
 // server connection reads or writes it. There is no external run id
-// column: processing runs inside the app itself (ADR 0002).
+// column: processing runs inside the app itself (ADR 0003).
 export const importJobs = pgTable(
   "import_jobs",
   {

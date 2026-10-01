@@ -82,7 +82,16 @@ const TECNICAS_SECTION: { label: string; items: NavEntry[] } = {
         isActive: (path) => path.startsWith("/flashcards"),
       },
     },
-    { icon: Brain, label: "Active recall", disabled: true, hint: "pronto" },
+    {
+      icon: Brain,
+      label: "Active recall",
+      disabled: true,
+      hint: "pronto",
+      preview: {
+        href: "/active-recall",
+        isActive: (path) => path.startsWith("/active-recall"),
+      },
+    },
     {
       icon: ClipboardList,
       label: "Exámenes",
