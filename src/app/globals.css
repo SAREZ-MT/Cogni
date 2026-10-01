@@ -57,6 +57,15 @@
      as pastel-mint/-yellow/-blue). *-700 is the accessible dark text pair
      for text-on-tint (success/warning/info already had one via
      pastel-mint-fg/-yellow-fg/-blue-fg; error-700 was missing). */
+  /* Exams accent: rose. Not part of the pastel-pair system above — this is
+     a single-technique accent (option selection border, current-question
+     progress dot, ExamPageCard's gradient bar end) layered on top of the
+     existing pastel-pink/pastel-pink-fg pair (exams design preview,
+     2026-09-24, studyplatform-exams-style.md). */
+  --color-rose-400: #fb7185;
+  --color-rose-500: #f43f5e;
+  --color-rose-600: #e11d48;
+
   --color-success-50: #ecfdf5;
   --color-success-100: #d1fae5;
   --color-success-500: #10b981;

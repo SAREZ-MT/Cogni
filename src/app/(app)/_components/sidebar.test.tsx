@@ -84,7 +84,11 @@ describe("Sidebar", () => {
       "page",
     );
 
-    for (const label of ["Exámenes"]) {
+    // Exams design preview (2026-09-24): "Exámenes" is no longer disabled —
+    // moved to its own "links the Exámenes nav item" test below, same
+    // treatment Flashcards/Active recall already got. The remaining
+    // "pronto" items in Menú principal stay disabled.
+    for (const label of ["Dashboard", "Horarios"]) {
       expect(
         screen.getByText(label).closest("[aria-disabled]"),
       ).toHaveAttribute("aria-disabled", "true");
@@ -160,6 +164,31 @@ describe("Sidebar", () => {
 
   // design pass 2: "Cuadernos" is now a plain nav item to /notebooks
   // (no longer a "/" href and no longer a tree section header).
+  // Exams is a design preview like Flashcards/Active recall: a link to /exams
+  // while previews are enabled, a disabled "pronto" row otherwise (its routes
+  // 404 in production).
+  it("links the Exámenes nav item to /exams while previews are enabled", () => {
+    render(<Sidebar initialCollapsed={false} user={USER} previewsEnabled />);
+
+    expect(screen.getByRole("link", { name: "Exámenes" })).toHaveAttribute(
+      "href",
+      "/exams",
+    );
+  });
+
+  it("keeps Exámenes as a disabled 'pronto' row when previews are disabled", () => {
+    render(
+      <Sidebar initialCollapsed={false} user={USER} previewsEnabled={false} />,
+    );
+
+    const row = screen.getByText("Exámenes").closest("[aria-disabled]");
+    expect(row).toHaveAttribute("aria-disabled", "true");
+    expect(row).toHaveTextContent("pronto");
+    expect(
+      screen.queryByRole("link", { name: "Exámenes" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("links the Cuadernos nav item to /notebooks", () => {
     render(<Sidebar initialCollapsed={false} user={USER} previewsEnabled />);
 
@@ -190,12 +219,9 @@ describe("Sidebar", () => {
     ["enabled", true],
     ["disabled", false],
   ])("with design previews %s", (_state, previewsEnabled) => {
-    // Flashcards and Active recall have preview routes now; their
+    // Flashcards, Active recall and Exámenes have preview routes now; their
     // enabled/disabled states are covered by the dedicated tests above.
-    it.each([
-      "Dashboard",
-      "Exámenes",
-    ])("renders %s as a disabled 'pronto' row", (label) => {
+    it.each(["Dashboard"])("renders %s as a disabled 'pronto' row", (label) => {
       render(
         <Sidebar
           initialCollapsed={false}

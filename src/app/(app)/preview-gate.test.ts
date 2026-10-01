@@ -3,8 +3,8 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 // Route trees that are design previews backed by route-local sample data.
-// Add a tree here when a new preview ships (exams, dashboard).
-const PREVIEW_TREES = ["flashcards", "active-recall"];
+// Add a tree here when a new preview ships (dashboard).
+const PREVIEW_TREES = ["flashcards", "active-recall", "exams"];
 
 function pageFiles(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {

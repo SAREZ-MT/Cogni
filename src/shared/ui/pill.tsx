@@ -32,6 +32,12 @@ const pillVariants = cva(
         warning: "bg-warning-100 text-warning-700",
         error: "bg-error-100 text-error-700",
         info: "bg-info-100 text-info-700",
+        // Exams "preguntas" management screen (2026-09-24): the exam
+        // accent for a "Variante" origin pill. No `--color-rose-100` token
+        // exists yet, so this uses the existing `rose-500` theme color with
+        // an opacity modifier — the same pattern status-banner.tsx already
+        // uses for its `rose` tone border.
+        rose: "bg-rose-500/10 text-rose-600",
       },
     },
     defaultVariants: {

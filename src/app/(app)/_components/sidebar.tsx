@@ -97,6 +97,10 @@ const TECNICAS_SECTION: { label: string; items: NavEntry[] } = {
       label: "Exámenes",
       disabled: true,
       hint: "pronto",
+      preview: {
+        href: "/exams",
+        isActive: (path) => path.startsWith("/exams"),
+      },
     },
   ],
 };

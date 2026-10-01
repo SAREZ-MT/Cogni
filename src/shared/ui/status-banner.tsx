@@ -1,16 +1,20 @@
-import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, Loader2, RotateCcw } from "lucide-react";
 import type * as React from "react";
 import type { ReactNode } from "react";
 import { IconTile } from "@/shared/ui/icon-tile";
 import { cn } from "@/shared/ui/utils";
 
-export type StatusBannerTone = "pending" | "success" | "error";
+export type StatusBannerTone = "pending" | "success" | "error" | "rose";
 
 const TONE_CONFIG: Record<
   StatusBannerTone,
   {
     panelClassName: string;
-    iconTone: "warning" | "success" | "error";
+    // Only "rose" overrides the title color so far (pastel-pink-fg instead
+    // of the default text-fg) — every other tone keeps the original plain
+    // title color.
+    titleClassName?: string;
+    iconTone: "warning" | "success" | "error" | "pink";
     icon: ReactNode;
   }
 > = {
@@ -36,6 +40,18 @@ const TONE_CONFIG: Record<
     iconTone: "error",
     icon: <AlertCircle aria-hidden="true" size={15} strokeWidth={1.75} />,
   },
+  // Exams design preview (2026-09-24): the retake banner (hub + results
+  // view) and the "in a retake session" notice both need the exam
+  // technique's own rose/pink accent instead of the semantic warning/error
+  // tones — reuses the existing `pink` IconTile tone (pastel-pink/-fg is
+  // already an exact match for the style source's wine `#9B2C4A`) paired
+  // with the new rose-500 border.
+  rose: {
+    panelClassName: "border border-rose-500/25 bg-pastel-pink/50",
+    titleClassName: "text-pastel-pink-fg",
+    iconTone: "pink",
+    icon: <RotateCcw aria-hidden="true" size={15} strokeWidth={1.75} />,
+  },
 };
 
 export interface StatusBannerProps
@@ -43,6 +59,10 @@ export interface StatusBannerProps
   tone: StatusBannerTone;
   title: ReactNode;
   description: ReactNode;
+  // Optional action slot below the description (exams design preview,
+  // 2026-09-24: the retake banner's "Repetir examen" button) — absent by
+  // default so every existing pending/success/error call site is unchanged.
+  action?: ReactNode;
 }
 
 // Async-evaluation status banner (design/shell-look fix, 2026-09-24;
@@ -52,11 +72,14 @@ export interface StatusBannerProps
 // renders this in its `pending` tone for as long as that evaluation is in
 // flight — this design preview has no backend, so it always renders
 // pending. `success`/`error` are reserved for when a real evaluation
-// pipeline lands.
+// pipeline lands. `rose` (exams design preview, 2026-09-24) covers the
+// exam-specific retake notices, which need the exam accent rather than a
+// semantic tone.
 export function StatusBanner({
   tone,
   title,
   description,
+  action,
   className,
   ...props
 }: StatusBannerProps) {
@@ -76,8 +99,16 @@ export function StatusBanner({
         {config.icon}
       </IconTile>
       <div className="min-w-0 flex-1">
-        <p className="font-semibold text-[13px] text-fg">{title}</p>
+        <p
+          className={cn(
+            "font-semibold text-[13px]",
+            config.titleClassName ?? "text-fg",
+          )}
+        >
+          {title}
+        </p>
         <p className="mt-1 text-[12px] text-fg-muted">{description}</p>
+        {action && <div className="mt-2.5">{action}</div>}
       </div>
     </div>
   );

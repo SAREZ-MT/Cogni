@@ -20,6 +20,7 @@ describe("StatusBanner", () => {
     ["pending", "bg-warning-50"],
     ["success", "bg-success-50"],
     ["error", "bg-error-50"],
+    ["rose", "bg-pastel-pink/50"],
   ] as const)("paints the %s tone with %s", (tone, className) => {
     render(
       <StatusBanner
@@ -59,5 +60,32 @@ describe("StatusBanner", () => {
     );
 
     expect(screen.getByTestId("banner")).toHaveClass("mt-5");
+  });
+
+  it("colours only the rose title with the exam accent", () => {
+    const { rerender } = render(
+      <StatusBanner tone="rose" title="Repetir" description="d" />,
+    );
+    expect(screen.getByText("Repetir")).toHaveClass("text-pastel-pink-fg");
+
+    rerender(<StatusBanner tone="success" title="Repetir" description="d" />);
+    expect(screen.getByText("Repetir")).not.toHaveClass("text-pastel-pink-fg");
+  });
+
+  it("renders the optional action below the description", () => {
+    const { rerender } = render(
+      <StatusBanner
+        tone="rose"
+        title="t"
+        description="d"
+        action={<button type="button">Repetir examen</button>}
+      />,
+    );
+    expect(
+      screen.getByRole("button", { name: "Repetir examen" }),
+    ).toBeInTheDocument();
+
+    rerender(<StatusBanner tone="rose" title="t" description="d" />);
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 });
