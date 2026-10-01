@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { requireDesignPreviews } from "@/shared/config/design-previews";
 import { SetBreadcrumb } from "../../../_components/breadcrumb";
 import { getSampleNotebook } from "../../../flashcards/_data/sample";
 import { ExamPlayer } from "../../_components/exam-player";
@@ -21,6 +22,7 @@ export default async function ExamSessionPage({
   params,
   searchParams,
 }: ExamSessionPageProps) {
+  requireDesignPreviews();
   const { notebookId, pageId } = await params;
   const { retake } = await searchParams;
   const notebook = getSampleNotebook(notebookId);

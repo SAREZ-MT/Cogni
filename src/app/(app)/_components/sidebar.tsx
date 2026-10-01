@@ -93,10 +93,14 @@ const TECNICAS_SECTION: { label: string; items: NavEntry[] } = {
       },
     },
     {
-      href: "/exams",
       icon: ClipboardList,
       label: "Exámenes",
-      isActive: (path) => path.startsWith("/exams"),
+      disabled: true,
+      hint: "pronto",
+      preview: {
+        href: "/exams",
+        isActive: (path) => path.startsWith("/exams"),
+      },
     },
   ],
 };

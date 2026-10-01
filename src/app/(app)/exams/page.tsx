@@ -1,5 +1,6 @@
 import { ClipboardList, Zap } from "lucide-react";
 import Link from "next/link";
+import { requireDesignPreviews } from "@/shared/config/design-previews";
 import { Button } from "@/shared/ui/button";
 import { DeckSummaryCard } from "@/shared/ui/deck-summary-card";
 import { EmptyState } from "@/shared/ui/empty-state";
@@ -19,6 +20,7 @@ import { getExamPagesWithQuestions, SAMPLE_NOTEBOOKS } from "./_data/sample";
 // attempted yet — so "Derivadas parciales" (0 attempts) still shows up,
 // with a "Sin intentar" pill instead of a score.
 export default function ExamsHubPage() {
+  requireDesignPreviews();
   const notebooksWithPages = SAMPLE_NOTEBOOKS.map((notebook) => ({
     notebook,
     pages: getExamPagesWithQuestions(notebook.id),

@@ -122,6 +122,23 @@ test.describe("app shell", () => {
     }
   });
 
+  test("hides the exams preview routes: /exams answers not-found", async ({
+    page,
+  }) => {
+    for (const path of [
+      "/exams",
+      "/exams/biologia-celular",
+      "/exams/biologia-celular/mitocondria",
+      "/exams/biologia-celular/mitocondria?retake=1",
+    ]) {
+      const response = await page.goto(path);
+
+      expect(response?.status(), path).toBe(404);
+      await expect(page.getByText("Exámenes presentados")).toHaveCount(0);
+      await expect(page.getByText("Pregunta 1 de")).toHaveCount(0);
+    }
+  });
+
   test("collapses the sidebar to 64px and keeps the choice after navigating", async ({
     page,
   }) => {
