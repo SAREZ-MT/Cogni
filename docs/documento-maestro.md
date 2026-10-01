@@ -7,7 +7,7 @@
 | Cambios de la versión 1.1.0 | ADR 0003: Vercel Fluid Compute y Vercel Cron reemplazan a Trigger.dev. Fase 2 (importación de PDF) implementada y fuera de "Próximamente". La métrica por técnica "tiempo de estudio" se reemplaza por "repasos completados". |
 | Estado | Aprobado. Fuente de verdad para todas las fases. |
 | Autor | Javier Sarez |
-| Metodología de construcción | Spec-Driven Development (SDD) con gentle-ai, un change por unidad de trabajo |
+| Metodología de construcción | Fases 0 y 1: Spec-Driven Development (SDD) con gentle-ai. Desde 2026-09-22: Organic Driven Development (ODD); SDD sigue disponible si se elige explícitamente. Ver §15. |
 
 Este documento fija **qué** se construye, **con qué** se construye, **cómo** se organiza y **en qué orden**. Toda decisión aquí registrada se considera cerrada. Cambiarla requiere un ADR nuevo en `docs/adr/` que la reemplace explícitamente.
 
@@ -206,7 +206,7 @@ Restricción conocida: los modelos Pro de Gemini no están en el tier gratuito. 
 | CI | GitHub Actions en cada PR: instalación, Biome, `tsc --noEmit`, Vitest. Playwright en main. |
 | Deploy | Integración Git de Vercel. Preview por rama, producción desde `main`. |
 | Documentación de código | TSDoc en puertos, entidades y servicios de aplicación. |
-| Documentación de proyecto | Este documento, ADRs en `docs/adr/`, artefactos SDD de gentle-ai en `openspec/` por cada change. |
+| Documentación de proyecto | Este documento, ADRs en `docs/adr/`, artefactos SDD de gentle-ai en `openspec/` (Fases 0 y 1) y documentos de feature ODD en `odd/tasks/`. |
 | Diagramas | archify, generados desde el agente hacia `docs/diagramas/`. |
 | Manual de usuario | Fase 8. |
 | Swagger / Scalar / Mintlify | No aplica en esta etapa. No hay API pública. |
@@ -570,7 +570,7 @@ Merge a main
 | Interfaz de usuario | Español, "tú". |
 | Documentación técnica | Español neutro profesional. |
 | Commits | Conventional Commits: `feat`, `fix`, `chore`, `docs`, `test`, `refactor`. Sin atribución a IA. |
-| Ramas | `main` protegida. `feat/<change>`, `fix/<tema>`. Una rama por change SDD. |
+| Ramas | `main` protegida. `feat/<change>`, `fix/<tema>`. Una rama por change o feature. |
 | PRs | Máximo 400 líneas netas; si crece, se divide en PRs encadenadas. |
 | Nombres de módulos | kebab-case en carpetas, PascalCase en tipos, camelCase en funciones. |
 | Errores | `Result<T, DomainError>` en dominio y aplicación. Excepciones solo en infraestructura, traducidas en el borde. |
@@ -581,7 +581,7 @@ Merge a main
 
 ## 13. Fases de construcción
 
-Cada fase es uno o más changes SDD de gentle-ai. Una fase se considera terminada solo cuando está desplegada en producción y cumple su criterio de "hecho".
+Las Fases 0 y 1 se construyeron como changes SDD de gentle-ai (artefactos archivados en `openspec/`); desde 2026-09-22 cada fase se construye con ODD (ver §15). Una fase se considera terminada solo cuando está desplegada en producción y cumple su criterio de "hecho".
 
 ### Fase 0 — Cimientos
 
@@ -646,17 +646,17 @@ No hay fases diferidas por ahora. Una fase diferida por ADR se listaría aquí c
 | Evaluación de IA inconsistente en recordación activa | Alta | Medio | Sección 8.5 completa |
 | Editor Tiptap: complejidad de bloques personalizados | Media | Medio | Extensiones oficiales primero; bloques propios solo para lo diferencial |
 | Alcance crece a mitad de fase | Alta | Alto | Sección 1.2 y este documento; cambios solo por ADR |
-| Una sola persona desarrollando | Cierta | Medio | Fases chicas, SDD, TDD en dominio, CI estricta |
+| Una sola persona desarrollando | Cierta | Medio | Fases chicas, ODD con tareas rastreadas, TDD en dominio, CI estricta |
 
 ---
 
 ## 15. Flujo de trabajo con gentle-ai
 
-1. **Fase 0** arranca con `sdd init` sobre este repositorio para bootstrapear el contexto SDD.
-2. Cada entregable de cada fase se ejecuta como un **change SDD**: `sdd new` → exploración → propuesta → spec → diseño → tareas → apply → verify → archive.
-3. Este documento se pasa como contexto a cada fase de exploración y propuesta. Las specs no lo contradicen; si necesitan hacerlo, primero un ADR.
+1. Las Fases 0 y 1 se construyeron con SDD: `sdd init` bootstrapeó el contexto y cada entregable fue un change (`sdd new` → exploración → propuesta → spec → diseño → tareas → apply → verify → archive). Sus artefactos archivados están en `openspec/`.
+2. Desde 2026-09-22 el flujo activo es Organic Driven Development (ODD): un documento de feature en `odd/tasks/` con tareas rastreadas, TDD estricto, commits por unidad de trabajo, PRs pequeñas encadenadas y revisión nativa (RDD) por porción. SDD sigue disponible cuando se elige explícitamente.
+3. Este documento se pasa como contexto a cada fase de exploración. Las specs y los documentos de feature no lo contradicen; si necesitan hacerlo, primero un ADR.
 4. `sdd-research` se ejecuta en Fase 3 (proveedores de IA y límites vigentes) y en Fase 4 (evidencia de SM-2 y ciencia cognitiva).
-5. Las decisiones de arquitectura de cada change se registran como ADR en `docs/adr/` con el formato `NNNN-titulo.md`.
+5. Las decisiones de arquitectura se registran como ADR en `docs/adr/` con el formato `NNNN-titulo.md`.
 6. Solo se usan herramientas y skills provistas por gentle-ai y las skills propias del proyecto (`cogni-design`). No se usan skills externas instaladas en el cliente.
 7. Modo TDD estricto habilitado.
 
