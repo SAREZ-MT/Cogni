@@ -49,23 +49,37 @@ describe("FlashcardsNotebookPage", () => {
     ).rejects.toThrow("NEXT_NOT_FOUND");
   });
 
-  it("lists each deck of the notebook with its derived card count and a session link", async () => {
+  it("lists one deck per page of the notebook, titled by the page, with its derived card count and a session link", async () => {
     vi.stubEnv("NODE_ENV", "development");
 
     render(
       await FlashcardsNotebookPage({ params: params("biologia-celular") }),
     );
 
-    const deck = screen.getByRole("link", { name: /Mitocondria · Semana 3/ });
+    const deck = screen.getByRole("link", { name: /Mitocondria/ });
     expect(deck).toHaveAttribute(
       "href",
-      "/flashcards/biologia-celular/session?deck=mitocondria-semana-3",
+      "/flashcards/biologia-celular/mitocondria",
     );
     expect(deck).toHaveTextContent("8 tarjetas");
     expect(deck).toHaveTextContent("5 pendientes");
     expect(
       screen.getByRole("link", { name: /Membrana celular/ }),
     ).toHaveTextContent("Al día");
-    expect(screen.getByText("20 tarjetas · 2 mazos")).toBeInTheDocument();
+    expect(
+      screen.getByText("20 tarjetas · 2 páginas con flashcards"),
+    ).toBeInTheDocument();
+  });
+
+  it("offers no notebook-level card creation: cards are created from a page", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+
+    render(
+      await FlashcardsNotebookPage({ params: params("biologia-celular") }),
+    );
+
+    expect(
+      screen.queryByRole("button", { name: /Nueva tarjeta/ }),
+    ).not.toBeInTheDocument();
   });
 });

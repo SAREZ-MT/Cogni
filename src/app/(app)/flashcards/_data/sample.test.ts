@@ -1,61 +1,104 @@
 import { describe, expect, it } from "vitest";
 import {
   getSampleCards,
-  getSampleDecks,
   getSampleNotebook,
-  SAMPLE_DECKS,
+  getSamplePage,
+  getSamplePagesWithCards,
+  getSampleStudyItemsForPage,
+  SAMPLE_CARDS,
   SAMPLE_NOTEBOOKS,
+  SAMPLE_PAGES,
 } from "./sample";
 
 describe("flashcards sample data", () => {
-  it("never has an empty deck", () => {
-    for (const deck of SAMPLE_DECKS) {
-      expect(getSampleCards(deck.id).length).toBeGreaterThan(0);
+  it("never has a page without cards: a deck exists only when it has cards", () => {
+    for (const page of SAMPLE_PAGES) {
+      expect(getSampleCards(page.id).length).toBeGreaterThan(0);
     }
   });
 
-  it("derives each deck's card count from the cards it holds", () => {
+  it("derives each page's card count from the cards it holds", () => {
     for (const notebook of SAMPLE_NOTEBOOKS) {
-      for (const deck of getSampleDecks(notebook.id)) {
-        expect(deck.cardCount).toBe(getSampleCards(deck.id).length);
+      for (const page of getSamplePagesWithCards(notebook.id)) {
+        expect(page.cardCount).toBe(getSampleCards(page.id).length);
       }
     }
   });
 
-  it("never reports more pending cards than the deck holds", () => {
+  it("never reports more pending cards than the page holds", () => {
     for (const notebook of SAMPLE_NOTEBOOKS) {
-      for (const deck of getSampleDecks(notebook.id)) {
-        expect(deck.dueCount).toBeLessThanOrEqual(deck.cardCount);
+      for (const page of getSamplePagesWithCards(notebook.id)) {
+        expect(page.dueCount).toBeLessThanOrEqual(page.cardCount);
       }
     }
   });
 
-  it("returns only the decks of the requested notebook", () => {
-    const decks = getSampleDecks("biologia-celular");
+  it("gives every page one deck: page ids are unique and every card belongs to a page", () => {
+    const ids = SAMPLE_PAGES.map((page) => page.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const card of SAMPLE_CARDS) {
+      expect(ids).toContain(card.pageId);
+    }
+  });
 
-    expect(decks.map((deck) => deck.id)).toEqual([
-      "mitocondria-semana-3",
+  it("returns only the pages of the requested notebook", () => {
+    const pages = getSamplePagesWithCards("biologia-celular");
+
+    expect(pages.map((page) => page.id)).toEqual([
+      "mitocondria",
       "membrana-celular",
     ]);
-    expect(decks.every((deck) => deck.notebookId === "biologia-celular")).toBe(
+    expect(pages.every((page) => page.notebookId === "biologia-celular")).toBe(
       true,
     );
   });
 
-  it("returns only the cards of the requested deck", () => {
+  it("returns only the cards of the requested page", () => {
     const cards = getSampleCards("renacimiento");
 
     expect(cards).toHaveLength(6);
-    expect(cards.every((card) => card.deckId === "renacimiento")).toBe(true);
+    expect(cards.every((card) => card.pageId === "renacimiento")).toBe(true);
   });
 
-  it("returns no decks or cards for an unknown id", () => {
-    expect(getSampleDecks("no-existe")).toEqual([]);
+  it("returns nothing for an unknown id", () => {
+    expect(getSamplePagesWithCards("no-existe")).toEqual([]);
     expect(getSampleCards("no-existe")).toEqual([]);
     expect(getSampleNotebook("no-existe")).toBeUndefined();
+    expect(getSamplePage("biologia-celular", "no-existe")).toBeUndefined();
   });
 
   it("finds a notebook by id", () => {
     expect(getSampleNotebook("calculo-iii")?.title).toBe("Cálculo III");
+  });
+
+  it("finds a page only inside its own notebook, with its derived card count", () => {
+    expect(getSamplePage("biologia-celular", "mitocondria")).toMatchObject({
+      title: "Mitocondria",
+      cardCount: 8,
+      dueCount: 5,
+    });
+    expect(getSamplePage("calculo-iii", "mitocondria")).toBeUndefined();
+  });
+});
+
+describe("getSampleStudyItemsForPage", () => {
+  it("offers exactly one flashcards deck, the one of the sample page, linking to its session", () => {
+    const { flashcards } = getSampleStudyItemsForPage();
+
+    expect(flashcards).toEqual([
+      {
+        href: "/flashcards/biologia-celular/mitocondria",
+        label: "Mitocondria",
+        detail: "8 tarjetas · 5 pendientes",
+        tone: "primary",
+      },
+    ]);
+  });
+
+  it("offers one active recall and one exam sample item", () => {
+    const { activeRecall, exam } = getSampleStudyItemsForPage();
+
+    expect(activeRecall).toHaveLength(1);
+    expect(exam).toHaveLength(1);
   });
 });

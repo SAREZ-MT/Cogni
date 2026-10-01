@@ -61,17 +61,14 @@ describe("FlashcardsHubPage", () => {
     expect(within(biologia).getByText(/5 pendientes/)).toBeInTheDocument();
   });
 
-  it("offers a quick start into the first deck that has due cards", () => {
+  it("offers a quick start into the first page deck that has due cards", () => {
     vi.stubEnv("NODE_ENV", "development");
 
     render(<FlashcardsHubPage />);
 
     expect(
       screen.getByRole("link", { name: /Estudiar ahora/ }),
-    ).toHaveAttribute(
-      "href",
-      "/flashcards/biologia-celular/session?deck=mitocondria-semana-3",
-    );
+    ).toHaveAttribute("href", "/flashcards/biologia-celular/mitocondria");
     expect(
       screen.getByText("14 pendientes hoy", { selector: "span.block" }),
     ).toBeInTheDocument();

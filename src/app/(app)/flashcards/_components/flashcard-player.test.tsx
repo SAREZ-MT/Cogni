@@ -5,9 +5,9 @@ import type { SampleCard } from "../_data/sample";
 import { FlashcardPlayer } from "./flashcard-player";
 
 const CARDS: SampleCard[] = [
-  { id: "c1", deckId: "d", front: "Pregunta 1", back: "Respuesta 1" },
-  { id: "c2", deckId: "d", front: "Pregunta 2", back: "Respuesta 2" },
-  { id: "c3", deckId: "d", front: "Pregunta 3", back: "Respuesta 3" },
+  { id: "c1", pageId: "p", front: "Pregunta 1", back: "Respuesta 1" },
+  { id: "c2", pageId: "p", front: "Pregunta 2", back: "Respuesta 2" },
+  { id: "c3", pageId: "p", front: "Pregunta 3", back: "Respuesta 3" },
 ];
 
 function setup(cards: SampleCard[] = CARDS) {
