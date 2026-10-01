@@ -6,6 +6,7 @@
 import type { Editor, JSONContent } from "@tiptap/core";
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import { NODE_BACKGROUND_TYPES } from "./extensions/node-background";
+import { focusEditorView } from "./focus-editor-view";
 
 export interface BlockRef {
   node: ProseMirrorNode;
@@ -72,17 +73,17 @@ export function duplicateBlock(editor: Editor, ref: BlockRef): void {
   const after = ref.pos + ref.node.nodeSize;
   editor
     .chain()
-    .focus()
     .insertContentAt(after, withoutBlockIds(ref.node.toJSON()))
     .run();
+  focusEditorView(editor);
 }
 
 export function deleteBlock(editor: Editor, ref: BlockRef): void {
   editor
     .chain()
-    .focus()
     .deleteRange({ from: ref.pos, to: ref.pos + ref.node.nodeSize })
     .run();
+  focusEditorView(editor);
 }
 
 // Clears every inline mark (bold/italic/color/…) over the block's content
@@ -93,16 +94,16 @@ export function deleteBlock(editor: Editor, ref: BlockRef): void {
 // and a chain can't hold both at once.
 export function resetBlockFormatting(editor: Editor, ref: BlockRef): void {
   const { from, to } = contentRange(ref);
-  editor.chain().focus().setTextSelection({ from, to }).unsetAllMarks().run();
+  editor.chain().setTextSelection({ from, to }).unsetAllMarks().run();
   const typeName = ref.node.type.name;
   if ((NODE_BACKGROUND_TYPES as readonly string[]).includes(typeName)) {
     editor
       .chain()
-      .focus()
       .setNodeSelection(ref.pos)
       .updateAttributes(typeName, { nodeBackground: null })
       .run();
   }
+  focusEditorView(editor);
 }
 
 // `blockId` comes from extensions/index.ts's UniqueID registration (E2

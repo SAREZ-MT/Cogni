@@ -17,6 +17,7 @@ import { GripVertical, Plus } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { BlockContextMenu } from "./block-context-menu";
 import { collapseBlockSelection } from "./block-selection";
+import { focusEditorView } from "./focus-editor-view";
 
 export interface BlockHandleProps {
   editor: Editor;
@@ -67,13 +68,19 @@ export function BlockHandle({ editor, isBlockIdPersisted }: BlockHandleProps) {
     const current = doc.nodeAt(hovered.pos);
     if (!current || current.type !== hovered.node.type) return;
     const insertPos = hovered.pos + current.nodeSize;
+    // No `.focus()` in this chain — see block-context-menu.tsx's
+    // `applyBlockSelection` comment: Tiptap's own `focus` command defers the
+    // real DOM `view.focus()` to a `requestAnimationFrame` callback, one
+    // frame late enough for a fast subsequent interaction to land while the
+    // editor still doesn't have it. `editor.view.focus()` right after
+    // `.run()` is ProseMirror's own synchronous focus instead.
     editor
       .chain()
-      .focus()
       .insertContentAt(insertPos, { type: "paragraph" })
       .setTextSelection(insertPos + 1)
       .insertContent("/")
       .run();
+    focusEditorView(editor);
   }
 
   // S6b defect 1 (data loss, odd/tasks/app-shell-restyle.md): after a
@@ -88,9 +95,26 @@ export function BlockHandle({ editor, isBlockIdPersisted }: BlockHandleProps) {
   // `collapseBlockSelection` (block-selection.ts) then turns that leftover
   // block selection into a plain caret, so typing right after a drop
   // inserts text instead of replacing the whole moved block.
+  //
+  // E3 follow-up (orchestrator repro, editor-pass-e3.md): this is the ONE
+  // deferred selection-restore this codebase still allows — drag-and-drop
+  // genuinely needs a frame for the drag-handle plugin's own drop handling
+  // to settle first — but the same class of bug applies here too: if the
+  // user has ALREADY clicked (or typed) somewhere else by the time this
+  // callback fires, blindly collapsing would clobber that. Capture the
+  // selection's VALUE (not object reference — an unrelated transaction any
+  // other extension dispatches in this window, touching nothing near this
+  // selection, still produces a structurally new Selection instance via
+  // ProseMirror's own position-mapping, so reference equality alone false-
+  // positived on every such transaction in testing) synchronously when the
+  // drag actually ends, and bail if it no longer matches when the frame
+  // lands — a real value change here means something else (a click, a
+  // keystroke) already moved it.
   function handleDragEnd() {
+    const selectionAtDragEnd = editor.state.selection;
     dragEndFrameRef.current = requestAnimationFrame(() => {
       dragEndFrameRef.current = null;
+      if (!editor.state.selection.eq(selectionAtDragEnd)) return;
       collapseBlockSelection(editor);
     });
   }
@@ -130,6 +154,24 @@ export function BlockHandle({ editor, isBlockIdPersisted }: BlockHandleProps) {
             aria-label="Opciones del bloque"
             data-testid="block-drag-handle"
             className={`${HANDLE_BUTTON_CLASS} cursor-grab`}
+            // E3 defect 1 (data loss, odd/tasks/editor-pass-e3.md): this
+            // grip lives outside the editor's contentEditable DOM subtree
+            // (it's rendered inside @tiptap/extension-drag-handle-react's
+            // own floating wrapper). A mouse click on a native <button>
+            // focuses it by default, and Radix's dropdown, once closed,
+            // would otherwise auto-focus this same trigger — parking DOM
+            // focus outside the editor with no text-selectable content
+            // under it. tabIndex={-1} keeps it out of Tab order (Notion-
+            // style: discovered by hover, not keyboard tabbing), and
+            // preventDefault on mousedown suppresses the browser's default
+            // "focus the button on mousedown" action so a click here never
+            // steals focus from the editor to begin with — the dropdown
+            // still opens (Radix's own open logic runs on pointerdown, a
+            // separate event untouched by this), and block-context-menu.tsx's
+            // `handleOpenChange` is what returns focus into the editor,
+            // synchronously, once the menu closes.
+            tabIndex={-1}
+            onMouseDown={(event) => event.preventDefault()}
           >
             <GripVertical aria-hidden="true" size={16} strokeWidth={1.75} />
           </button>

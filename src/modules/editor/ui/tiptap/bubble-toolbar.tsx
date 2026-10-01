@@ -63,7 +63,9 @@ import {
   TEXT_COLOR_SWATCHES,
 } from "./block-color-palette";
 import { BLOCK_KIND_ITEMS, currentBlockKindLabel } from "./block-kind";
+import { focusEditorView } from "./focus-editor-view";
 import { HighlightPickerControls } from "./highlight-picker-controls";
+import { isTableCellSelection } from "./table-selection";
 
 export interface BubbleToolbarProps {
   editor: Editor;
@@ -98,6 +100,14 @@ export function shouldShowBubbleToolbar({
   if (isNodeRangeSelection(state.selection)) return false;
   if (editor.isActive("codeBlock")) return false;
   if (editor.isActive("image")) return false;
+  // E2b scope E (table-toolbar.tsx): a CellSelection (a multi-cell range)
+  // defers entirely to the table toolbar — mergeCells/toggleHeaderRow/etc.
+  // operate on the cells themselves, not inline text marks. A plain caret
+  // or non-empty TextSelection resting inside a single cell still reaches
+  // here (selection.empty already excludes the caret case above), so
+  // formatting actual selected text inside a cell keeps working exactly
+  // as before.
+  if (isTableCellSelection(state.selection)) return false;
   return true;
 }
 
@@ -151,49 +161,70 @@ const MARK_BUTTONS: MarkButtonConfig[] = [
     label: "Negrita",
     shortcut: "Mod+B",
     icon: Bold,
-    run: (editor) => editor.chain().focus().toggleBold().run(),
+    run: (editor) => {
+      editor.chain().toggleBold().run();
+      focusEditorView(editor);
+    },
   },
   {
     mark: "italic",
     label: "Cursiva",
     shortcut: "Mod+I",
     icon: Italic,
-    run: (editor) => editor.chain().focus().toggleItalic().run(),
+    run: (editor) => {
+      editor.chain().toggleItalic().run();
+      focusEditorView(editor);
+    },
   },
   {
     mark: "underline",
     label: "Subrayado",
     shortcut: "Mod+U",
     icon: Underline,
-    run: (editor) => editor.chain().focus().toggleUnderline().run(),
+    run: (editor) => {
+      editor.chain().toggleUnderline().run();
+      focusEditorView(editor);
+    },
   },
   {
     mark: "strike",
     label: "Tachado",
     shortcut: "Mod+Shift+S",
     icon: Strikethrough,
-    run: (editor) => editor.chain().focus().toggleStrike().run(),
+    run: (editor) => {
+      editor.chain().toggleStrike().run();
+      focusEditorView(editor);
+    },
   },
   {
     mark: "code",
     label: "Código",
     shortcut: "Mod+E",
     icon: Code,
-    run: (editor) => editor.chain().focus().toggleCode().run(),
+    run: (editor) => {
+      editor.chain().toggleCode().run();
+      focusEditorView(editor);
+    },
   },
   {
     mark: "superscript",
     label: "Superíndice",
     shortcut: "Mod+.",
     icon: Superscript,
-    run: (editor) => editor.chain().focus().toggleSuperscript().run(),
+    run: (editor) => {
+      editor.chain().toggleSuperscript().run();
+      focusEditorView(editor);
+    },
   },
   {
     mark: "subscript",
     label: "Subíndice",
     shortcut: "Mod+,",
     icon: Subscript,
-    run: (editor) => editor.chain().focus().toggleSubscript().run(),
+    run: (editor) => {
+      editor.chain().toggleSubscript().run();
+      focusEditorView(editor);
+    },
   },
 ];
 
@@ -320,7 +351,7 @@ export function BubbleToolbarControls({ editor }: BubbleToolbarControlsProps) {
   // Escape cancels without changing the mark.
   function applyLink() {
     const href = linkValue.trim();
-    const chain = editor.chain().focus().extendMarkRange("link");
+    const chain = editor.chain().extendMarkRange("link");
     if (href) {
       chain.setLink({ href }).run();
     } else {
@@ -334,7 +365,7 @@ export function BubbleToolbarControls({ editor }: BubbleToolbarControlsProps) {
     // `document.body` in between. `editor.view.focus()` is ProseMirror's
     // own synchronous focus, called here before the input unmounts so the
     // browser never has a focused-then-removed element to blur.
-    editor.view.focus();
+    focusEditorView(editor);
     setLinkOpen(false);
   }
 
@@ -401,7 +432,10 @@ export function BubbleToolbarControls({ editor }: BubbleToolbarControlsProps) {
             data-testid="bubble-toolbar-undo"
             disabled={!activeMarks.canUndo}
             className={`${BUTTON_CLASS} ${buttonToneClass(false)} disabled:pointer-events-none disabled:opacity-40`}
-            onClick={() => editor.chain().focus().undo().run()}
+            onClick={() => {
+              editor.chain().undo().run();
+              focusEditorView(editor);
+            }}
           >
             <Undo2 aria-hidden="true" size={16} strokeWidth={1.75} />
           </button>
@@ -413,7 +447,10 @@ export function BubbleToolbarControls({ editor }: BubbleToolbarControlsProps) {
             data-testid="bubble-toolbar-redo"
             disabled={!activeMarks.canRedo}
             className={`${BUTTON_CLASS} ${buttonToneClass(false)} disabled:pointer-events-none disabled:opacity-40`}
-            onClick={() => editor.chain().focus().redo().run()}
+            onClick={() => {
+              editor.chain().redo().run();
+              focusEditorView(editor);
+            }}
           >
             <Redo2 aria-hidden="true" size={16} strokeWidth={1.75} />
           </button>
@@ -515,9 +552,10 @@ export function BubbleToolbarControls({ editor }: BubbleToolbarControlsProps) {
               <DropdownMenuItem
                 key={option.id}
                 className="gap-2 text-[13.5px]"
-                onSelect={() =>
-                  editor.chain().focus().setTextAlign(option.id).run()
-                }
+                onSelect={() => {
+                  editor.chain().setTextAlign(option.id).run();
+                  focusEditorView(editor);
+                }}
               >
                 <option.icon aria-hidden="true" size={16} strokeWidth={1.75} />
                 {option.label}
@@ -610,7 +648,7 @@ export function LinkPopover({ editor }: LinkPopoverProps) {
 
   function applyEdit() {
     const nextHref = value.trim();
-    const chain = editor.chain().focus().extendMarkRange("link");
+    const chain = editor.chain().extendMarkRange("link");
     if (nextHref) {
       chain.setLink({ href: nextHref }).run();
     } else {
@@ -619,7 +657,7 @@ export function LinkPopover({ editor }: LinkPopoverProps) {
     // S6b defect 2 (focus): see the matching comment on applyLink above —
     // `editor.view.focus()` runs synchronously, before `setEditing(false)`
     // removes this input from the DOM.
-    editor.view.focus();
+    focusEditorView(editor);
     setEditing(false);
   }
 
@@ -691,12 +729,12 @@ export function LinkPopover({ editor }: LinkPopoverProps) {
         data-testid="link-popover-remove"
         className={LINK_POPOVER_BUTTON_CLASS}
         onClick={() => {
-          editor.chain().focus().extendMarkRange("link").unsetLink().run();
+          editor.chain().extendMarkRange("link").unsetLink().run();
           // S6b defect 2 (focus): see the matching comment on applyLink
           // above. This popover unmounts once `isActive("link")` turns
           // false (the same transaction), so the synchronous refocus must
           // happen before that removal blurs to `document.body`.
-          editor.view.focus();
+          focusEditorView(editor);
         }}
       >
         <Unlink aria-hidden="true" size={14} strokeWidth={1.75} />

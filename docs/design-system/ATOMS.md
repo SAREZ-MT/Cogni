@@ -121,3 +121,29 @@ color or focus ring — extending `buttonVariants` for a single call site
 would relocate duplication rather than remove it, and reusing `Button` with
 enough overrides to stay pixel-exact would be more fragile than the plain
 element. Left as native elements; not part of this pass's scope.
+
+## DropdownMenu / Popover (`dropdown-menu.tsx`)
+
+E2b token fix: `DropdownMenuContent` was styled with `bg-popover`/
+`text-popover-foreground`, but `--color-popover`/`--color-popover-foreground`
+are never registered in `globals.css`'s `@theme`, so those utilities emitted
+no CSS at all and every dropdown (including the block-context-menu.tsx grip
+menu) rendered with a fully transparent background, letting page content show
+through. Fixed to the real design-system tokens instead: `bg-card`,
+`text-fg`, `border-border-default` (white card, radius 12, shadow-md, same
+chrome as the CommandMenu "/" slash menu atom).
+
+Same fix, applied atom by atom (atoms-first rule), so every floating surface
+shares one chrome (`rounded-xl border border-border-default bg-card shadow-md`):
+
+- `DropdownMenuContent` / `DropdownMenuSubContent`: card chrome, `min-w-52`.
+- `DropdownMenuItem` / `CheckboxItem` / `RadioItem` / `SubTrigger`: `text-[13.5px]`,
+  `px-2.5 py-1.5`, highlighted with the `hover` token (`hover:bg-hover`,
+  `focus:bg-hover`) instead of the unregistered `accent`; the destructive
+  variant uses `error-700` text and an `error-50` highlight.
+- `PopoverContent` (`popover.tsx`): same card chrome, `text-fg`.
+- `HighlightPickerControls` (editor): same card chrome instead of
+  `bg-popover`/`border-border`.
+
+Tests: `dropdown-menu.test.tsx`, `popover.test.tsx` and `highlight-picker.test.tsx`
+assert the chrome so the unregistered tokens cannot come back.

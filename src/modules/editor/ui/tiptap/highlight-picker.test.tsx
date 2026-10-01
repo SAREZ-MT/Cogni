@@ -39,6 +39,19 @@ describe("HighlightPickerControls", () => {
     expect(mark?.attrs).toEqual({ color: "purple" });
   });
 
+  it("renders on the design-system card chrome, not on unregistered tokens", () => {
+    editor = createHeadlessEditor();
+    render(<HighlightPickerControls editor={editor} />);
+
+    const { className } = screen.getByTestId("highlight-picker");
+    expect(className).toContain("bg-card");
+    expect(className).toContain("border-border-default");
+    expect(className).toContain("rounded-xl");
+    expect(className).toContain("shadow-md");
+    expect(className).not.toContain("bg-popover");
+    expect(className).not.toMatch(/(^|\s)border-border(\s|$)/);
+  });
+
   it("removes the highlight when 'quitar resaltado' is chosen", () => {
     editor = createHeadlessEditor();
     editor.commands.setHighlight({ color: "purple" });

@@ -101,4 +101,24 @@ describe("createCommandMenuRender", () => {
     await act(async () => renderer.onUpdate?.(props));
     expect(screen.queryByText("Alfa")).toBeNull();
   });
+
+  it("forwards a custom empty-state text to the menu", async () => {
+    const renderer = createCommandMenuRender<Item, unknown>(undefined, {
+      emptyText: "Nada por aquí",
+    })();
+    const { props } = buildProps({ items: [], query: "zzz" });
+
+    await act(async () => renderer.onStart?.(props));
+
+    expect(screen.getByText("Nada por aquí")).toBeVisible();
+  });
+
+  it("keeps the slash-menu empty state when no text is given", async () => {
+    const renderer = createCommandMenuRender<Item, unknown>()();
+    const { props } = buildProps({ items: [], query: "zzz" });
+
+    await act(async () => renderer.onStart?.(props));
+
+    expect(screen.getByText("No se encontraron bloques")).toBeVisible();
+  });
 });

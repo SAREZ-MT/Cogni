@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { Heading1, Quote } from "lucide-react";
 import { describe, expect, it, vi } from "vitest";
-import { CommandMenu } from "./command-menu";
+import { CommandMenu, type CommandMenuItem } from "./command-menu";
 
 const ITEMS = [
   { id: "heading1", label: "encabezado 1", keywords: ["h1", "titulo"] },
@@ -60,11 +60,30 @@ describe("CommandMenu", () => {
       />,
     );
 
-    expect(screen.getByText("no se encontraron bloques")).toBeInTheDocument();
+    expect(screen.getByText("No se encontraron bloques")).toBeInTheDocument();
 
     fireEvent.keyDown(window, { key: "Enter" });
 
     expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it("shows a caller-provided empty state instead of the slash-menu copy", () => {
+    render(
+      <CommandMenu
+        items={ITEMS}
+        query="zzz-no-existe"
+        emptyText="Sin emojis para esa búsqueda"
+        onSelect={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByText("Sin emojis para esa búsqueda"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("No se encontraron bloques"),
+    ).not.toBeInTheDocument();
   });
 
   it("closes on Escape without calling onSelect, leaving the caller to keep the / character", () => {
@@ -337,5 +356,64 @@ describe("CommandMenu", () => {
 
     expect(within(container).getByText("cita")).toBeInTheDocument();
     expect(container.querySelector("[cmdk-group-heading]")).toBeNull();
+  });
+
+  // E2b scope C: the emoji/mention popups reuse this chrome with a glyph in
+  // the tile or a notebook-tinted tile.
+  describe("icon tile variants", () => {
+    function renderItems(items: CommandMenuItem[]) {
+      render(
+        <CommandMenu
+          items={items}
+          query=""
+          onSelect={vi.fn()}
+          onClose={vi.fn()}
+        />,
+      );
+    }
+
+    it("renders a literal glyph inside the tile when the item has no icon", () => {
+      renderItems([{ id: "smile", label: ":smile:", iconGlyph: "😄" }]);
+
+      expect(
+        screen.getByTestId("command-menu-item-icon-smile"),
+      ).toHaveTextContent("😄");
+    });
+
+    it("prefers the icon over the glyph when both are set", () => {
+      renderItems([
+        { id: "both", label: "ambos", icon: Quote, iconGlyph: "😄" },
+      ]);
+
+      const tile = screen.getByTestId("command-menu-item-icon-both");
+      expect(tile).not.toHaveTextContent("😄");
+      expect(tile.querySelector("svg")).not.toBeNull();
+    });
+
+    it("tints the tile with the item's tone instead of the neutral background", () => {
+      renderItems([
+        { id: "page", label: "Mitosis", icon: Quote, iconTone: "mint" },
+      ]);
+
+      const tile = screen.getByTestId("command-menu-item-icon-page");
+      expect(tile.className).toContain("bg-pastel-mint");
+      expect(tile.className).not.toMatch(/(^|\s)bg-hover(\s|$)/);
+    });
+
+    it("falls back to the neutral tile when the item has no tone", () => {
+      renderItems([{ id: "plain", label: "Plano", icon: Quote }]);
+
+      expect(
+        screen.getByTestId("command-menu-item-icon-plain").className,
+      ).toMatch(/(^|\s)bg-hover(\s|$)/);
+    });
+
+    it("renders no tile for an item without icon or glyph", () => {
+      renderItems([{ id: "bare", label: "Sin icono" }]);
+
+      expect(
+        screen.queryByTestId("command-menu-item-icon-bare"),
+      ).not.toBeInTheDocument();
+    });
   });
 });

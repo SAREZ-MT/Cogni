@@ -14,6 +14,7 @@
 import type { Editor } from "@tiptap/core";
 import type { BlockRef } from "./block-actions";
 import { NODE_BACKGROUND_TYPES } from "./extensions/node-background";
+import { focusEditorView } from "./focus-editor-view";
 import { HIGHLIGHT_PALETTE, type HighlightColor } from "./highlight-palette";
 
 export interface ColorSwatch {
@@ -105,10 +106,11 @@ export function applySelectionTextColor(
   editor: Editor,
   swatch: ColorSwatch["id"],
 ): void {
-  const chain = editor.chain().focus();
+  const chain = editor.chain();
   if (swatch === "default") chain.unsetColor();
   else chain.setColor(TEXT_COLOR_VALUES[swatch]);
   chain.run();
+  focusEditorView(editor);
 }
 
 // Applies to a whole BLOCK (block-context-menu.tsx's "Colores" > "Texto"):
@@ -121,10 +123,11 @@ export function applyBlockTextColor(
 ): void {
   const from = ref.pos + 1;
   const to = ref.pos + ref.node.nodeSize - 1;
-  const chain = editor.chain().focus().setTextSelection({ from, to });
+  const chain = editor.chain().setTextSelection({ from, to });
   if (swatch === "default") chain.unsetColor();
   else chain.setColor(TEXT_COLOR_VALUES[swatch]);
   chain.run();
+  focusEditorView(editor);
 }
 
 export function applyBlockBackground(
@@ -136,10 +139,10 @@ export function applyBlockBackground(
   if (!(NODE_BACKGROUND_TYPES as readonly string[]).includes(typeName)) return;
   editor
     .chain()
-    .focus()
     .setNodeSelection(ref.pos)
     .updateAttributes(typeName, {
       nodeBackground: swatch === "default" ? null : swatch,
     })
     .run();
+  focusEditorView(editor);
 }

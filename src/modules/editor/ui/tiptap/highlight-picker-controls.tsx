@@ -8,6 +8,7 @@
 // swatch-click behaviour is testable without floating-ui's layout math —
 // `highlight-picker.tsx` wraps it in a `BubbleMenu` for real usage.
 import type { Editor } from "@tiptap/core";
+import { focusEditorView } from "./focus-editor-view";
 import { HIGHLIGHT_PALETTE, type HighlightColor } from "./highlight-palette";
 
 // Spanish labels for the seven Cogni palette colors (design.md, "Paleta de
@@ -44,7 +45,7 @@ export function HighlightPickerControls({
       role="toolbar"
       aria-label="Resaltado"
       data-testid="highlight-picker"
-      className="flex items-center gap-1 rounded-lg border border-border bg-popover p-1 shadow-lg"
+      className="flex items-center gap-1 rounded-xl border border-border-default bg-card p-1 shadow-md"
     >
       {HIGHLIGHT_PALETTE.map((color) => (
         <button
@@ -54,7 +55,8 @@ export function HighlightPickerControls({
           data-testid={`highlight-swatch-${color}`}
           className={`size-6 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring ${SWATCH_CLASSES[color]}`}
           onClick={() => {
-            editor.chain().focus().setHighlight({ color }).run();
+            editor.chain().setHighlight({ color }).run();
+            focusEditorView(editor);
           }}
         />
       ))}
@@ -64,7 +66,8 @@ export function HighlightPickerControls({
         data-testid="highlight-remove"
         className="rounded-md px-2 py-1 text-xs whitespace-nowrap text-fg-muted outline-none focus-visible:ring-2 focus-visible:ring-ring"
         onClick={() => {
-          editor.chain().focus().unsetHighlight().run();
+          editor.chain().unsetHighlight().run();
+          focusEditorView(editor);
         }}
       >
         quitar resaltado

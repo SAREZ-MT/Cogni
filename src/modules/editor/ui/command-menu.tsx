@@ -9,6 +9,8 @@ import {
   CommandItem,
   CommandList,
 } from "@/shared/ui/command";
+import { IconTile, type IconTileProps } from "@/shared/ui/icon-tile";
+import { cn } from "@/shared/ui/utils";
 
 export interface CommandMenuItem {
   id: string;
@@ -22,6 +24,16 @@ export interface CommandMenuItem {
   icon?: LucideIcon;
   description?: string;
   group?: string;
+  // E2b scope C (emoji/mention popups, same CommandMenu chrome as the "/"
+  // menu): a literal glyph (an emoji character) shown inside the tile
+  // instead of a LucideIcon — mutually exclusive with `icon`, `icon` wins
+  // if both are somehow set.
+  iconGlyph?: string;
+  // E2b scope C: tints the tile with a design-system tone (mention rows
+  // use the target page's notebook pastel color) instead of the default
+  // neutral `bg-hover`. Reuses IconTile's own tone union so a caller can
+  // only pass a real design-system tone.
+  iconTone?: IconTileProps["tone"];
 }
 
 export interface CommandMenuProps {
@@ -29,7 +41,16 @@ export interface CommandMenuProps {
   query: string;
   onSelect: (item: CommandMenuItem) => void;
   onClose: () => void;
+  // E3 #3 (bug report): every consumer of this shared popup shell (the "/"
+  // slash menu, the ":" emoji popup, the "@" mention popup) showed the same
+  // "no se encontraron bloques" empty state, which only makes sense for the
+  // slash menu — a search that finds no emoji, or no page to mention, isn't
+  // a missing "bloque". Defaults to the slash-menu copy so slash-command.tsx
+  // (the majority consumer) needs no change.
+  emptyText?: string;
 }
+
+const DEFAULT_EMPTY_TEXT = "No se encontraron bloques";
 
 // specs/editor/spec.md, "Menú de comandos `/`": the "/" popup itself never
 // has DOM focus (the user keeps typing in the Tiptap document), so this
@@ -43,6 +64,7 @@ export function CommandMenu({
   query,
   onSelect,
   onClose,
+  emptyText = DEFAULT_EMPTY_TEXT,
 }: CommandMenuProps) {
   const filtered = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -163,7 +185,7 @@ export function CommandMenu({
     >
       <CommandList>
         {filtered.length === 0 ? (
-          <CommandEmpty>no se encontraron bloques</CommandEmpty>
+          <CommandEmpty>{emptyText}</CommandEmpty>
         ) : (
           groups.map(([group, groupItems]) => (
             <CommandGroup
@@ -177,17 +199,29 @@ export function CommandMenu({
                   className="data-[selected=true]:bg-active data-[selected=true]:text-fg-active gap-2"
                   onSelect={() => onSelect(item)}
                 >
-                  {item.icon && (
-                    <span
+                  {(item.icon || item.iconGlyph) && (
+                    <IconTile
                       data-testid={`command-menu-item-icon-${item.id}`}
-                      className="bg-hover flex size-7 shrink-0 items-center justify-center rounded-md"
+                      size="28"
+                      radius="md"
+                      tone={item.iconTone}
+                      className={cn("shrink-0", !item.iconTone && "bg-hover")}
                     >
-                      <item.icon
-                        aria-hidden="true"
-                        size={15}
-                        strokeWidth={1.75}
-                      />
-                    </span>
+                      {item.icon ? (
+                        <item.icon
+                          aria-hidden="true"
+                          size={15}
+                          strokeWidth={1.75}
+                        />
+                      ) : (
+                        <span
+                          aria-hidden="true"
+                          className="text-[15px] leading-none"
+                        >
+                          {item.iconGlyph}
+                        </span>
+                      )}
+                    </IconTile>
                   )}
                   <span className="flex min-w-0 flex-col">
                     <span className="text-[13.5px]">{item.label}</span>

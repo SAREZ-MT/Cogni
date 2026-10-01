@@ -19,6 +19,7 @@ import {
   Pilcrow,
   Quote,
 } from "lucide-react";
+import { focusEditorView } from "./focus-editor-view";
 
 export interface BlockKindItem {
   id: string;
@@ -34,66 +35,90 @@ export const BLOCK_KIND_ITEMS: BlockKindItem[] = [
     label: "Texto",
     icon: Pilcrow,
     isActive: (editor) => editor.isActive("paragraph"),
-    run: (editor) => editor.chain().focus().setParagraph().run(),
+    run: (editor) => {
+      editor.chain().setParagraph().run();
+      focusEditorView(editor);
+    },
   },
   {
     id: "heading-1",
     label: "Encabezado 1",
     icon: Heading1,
     isActive: (editor) => editor.isActive("heading", { level: 1 }),
-    run: (editor) =>
-      editor.chain().focus().setNode("heading", { level: 1 }).run(),
+    run: (editor) => {
+      editor.chain().setNode("heading", { level: 1 }).run();
+      focusEditorView(editor);
+    },
   },
   {
     id: "heading-2",
     label: "Encabezado 2",
     icon: Heading2,
     isActive: (editor) => editor.isActive("heading", { level: 2 }),
-    run: (editor) =>
-      editor.chain().focus().setNode("heading", { level: 2 }).run(),
+    run: (editor) => {
+      editor.chain().setNode("heading", { level: 2 }).run();
+      focusEditorView(editor);
+    },
   },
   {
     id: "heading-3",
     label: "Encabezado 3",
     icon: Heading3,
     isActive: (editor) => editor.isActive("heading", { level: 3 }),
-    run: (editor) =>
-      editor.chain().focus().setNode("heading", { level: 3 }).run(),
+    run: (editor) => {
+      editor.chain().setNode("heading", { level: 3 }).run();
+      focusEditorView(editor);
+    },
   },
   {
     id: "bullet-list",
     label: "Lista con viñetas",
     icon: List,
     isActive: (editor) => editor.isActive("bulletList"),
-    run: (editor) => editor.chain().focus().toggleBulletList().run(),
+    run: (editor) => {
+      editor.chain().toggleBulletList().run();
+      focusEditorView(editor);
+    },
   },
   {
     id: "ordered-list",
     label: "Lista numerada",
     icon: ListOrdered,
     isActive: (editor) => editor.isActive("orderedList"),
-    run: (editor) => editor.chain().focus().toggleOrderedList().run(),
+    run: (editor) => {
+      editor.chain().toggleOrderedList().run();
+      focusEditorView(editor);
+    },
   },
   {
     id: "task-list",
     label: "Lista de tareas",
     icon: ListChecks,
     isActive: (editor) => editor.isActive("taskList"),
-    run: (editor) => editor.chain().focus().toggleTaskList().run(),
+    run: (editor) => {
+      editor.chain().toggleTaskList().run();
+      focusEditorView(editor);
+    },
   },
   {
     id: "blockquote",
     label: "Cita",
     icon: Quote,
     isActive: (editor) => editor.isActive("blockquote"),
-    run: (editor) => editor.chain().focus().toggleBlockquote().run(),
+    run: (editor) => {
+      editor.chain().toggleBlockquote().run();
+      focusEditorView(editor);
+    },
   },
   {
     id: "code-block",
     label: "Bloque de código",
     icon: Code2,
     isActive: (editor) => editor.isActive("codeBlock"),
-    run: (editor) => editor.chain().focus().toggleCodeBlock().run(),
+    run: (editor) => {
+      editor.chain().toggleCodeBlock().run();
+      focusEditorView(editor);
+    },
   },
 ];
 

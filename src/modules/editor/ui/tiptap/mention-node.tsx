@@ -13,6 +13,7 @@
 // component is paid-template chrome, deferred to E2.
 import { mergeAttributes } from "@tiptap/core";
 import Mention from "@tiptap/extension-mention";
+import { FileText } from "lucide-react";
 import type { MentionCandidate, MentionPort } from "../../domain/mention-port";
 import type { CommandMenuItem } from "../command-menu";
 import { createCommandMenuRender } from "./create-command-menu-render";
@@ -54,11 +55,18 @@ export const CogniMention = Mention.extend({
   },
 });
 
+// E2b scope C (mention popup restyle): "IconTile with the notebook's pastel
+// tone + page title + notebook name muted". The generic FileText icon
+// (rather than an emoji glyph) marks the row as "a page", tinted by
+// IconTile's own tone class — a null notebookColor (no color set on that
+// notebook) falls back to command-menu.tsx's default neutral `bg-hover`.
 function toMenuItem(candidate: MentionCandidate): MentionMenuItem {
   return {
     id: candidate.id,
     label: candidate.title,
     description: candidate.notebookTitle,
+    icon: FileText,
+    iconTone: candidate.notebookColor ?? undefined,
     candidate,
   };
 }
@@ -77,10 +85,13 @@ export function createMentionSuggestion(mentionPort: MentionPort | null) {
     render: createCommandMenuRender<
       MentionMenuItem,
       { id: string; label: string; notebookId: string }
-    >((item) => ({
-      id: item.candidate.id,
-      label: item.candidate.title,
-      notebookId: item.candidate.notebookId,
-    })),
+    >(
+      (item) => ({
+        id: item.candidate.id,
+        label: item.candidate.title,
+        notebookId: item.candidate.notebookId,
+      }),
+      { emptyText: "No hay páginas para mencionar" },
+    ),
   };
 }

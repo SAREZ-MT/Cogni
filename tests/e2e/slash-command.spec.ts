@@ -79,7 +79,10 @@ test.describe("slash command menu", () => {
     await expect(menu).toHaveCount(0);
     const table = editable.locator("table");
     await expect(table).toBeVisible();
-    await expect(table.locator("td, th")).toHaveCount(4);
+    // 3x3 with a header row (the Notion-style template's default size).
+    await expect(table.locator("tr")).toHaveCount(3);
+    await expect(table.locator("th")).toHaveCount(3);
+    await expect(table.locator("td")).toHaveCount(6);
     await expect(editable).not.toContainText("/tabla");
 
     await expect(page.getByTestId("autosave-status")).toHaveText("guardado", {

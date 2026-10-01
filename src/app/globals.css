@@ -243,6 +243,17 @@
    code-block.tsx) already style themselves with Tailwind utilities and
    need nothing here. */
 @layer components {
+  /* E2b scope F: ProseMirror's own dev-mode console check
+     ("expects the CSS white-space property ... to be set to 'pre-wrap'")
+     warns whenever the editable root doesn't have this, because collapsed
+     runs of spaces/newlines are otherwise real in the document model but
+     invisible in the rendered DOM. `.editor-content` wraps the real
+     `.ProseMirror` root (editor.tsx's `EditorContent`), so this sets it
+     once for the whole document instead of per node view. */
+  .editor-content .ProseMirror {
+    white-space: pre-wrap;
+  }
+
   .editor-content h1 {
     font-size: var(--text-3xl);
     font-weight: 700;
@@ -346,6 +357,14 @@
     border-radius: var(--radius-2xl);
   }
 
+  /* E2b scope D (image node polish): the rendered image node wraps its
+     <img> in a <figure> (alignment + a <figcaption> caption input) —
+     browsers give <figure> a default margin (1em 40px) that would nudge
+     the block out of alignment with every other block's flush left edge. */
+  .editor-content figure {
+    margin: 0;
+  }
+
   /* E2 (drag-handle "Colores" > "Fondo", bubble toolbar's same row):
      extensions/node-background.ts's `nodeBackground` attribute only ever
      contributes the `bg-pastel-*` color utility (Tailwind scanner needs a
@@ -447,6 +466,64 @@
   .editor-content sup,
   .editor-content sub {
     font-size: 0.75em;
+  }
+
+  /* E3 #2 (data-loss-and-table-fix bug report): @tiptap/extension-table's
+     `<div class="tableWrapper"><table>...` had NO rules at all here — the
+     inserted table rendered with zero borders/padding on a `min-width:50px`
+     table, effectively invisible against the page background. Notion/
+     Tiptap-template-style chrome, tokens only (docs/design-system): a
+     scrollable wrapper so a wide table never blows out the page width,
+     bordered/collapsed cells, a tinted header row, and the resize handle
+     hidden since extensions/index.ts configures Table with
+     `resizable: false` (no drag affordance to show). */
+  .editor-content .tableWrapper {
+    overflow-x: auto;
+    margin: 12px 0;
+  }
+
+  .editor-content table {
+    border-collapse: collapse;
+    width: 100%;
+    table-layout: fixed;
+  }
+
+  .editor-content th,
+  .editor-content td {
+    border: 1px solid var(--color-border-default);
+    padding: 6px 10px;
+    min-width: 100px;
+    vertical-align: top;
+    position: relative;
+  }
+
+  .editor-content th {
+    background-color: var(--color-neutral-50);
+    font-weight: 600;
+    text-align: left;
+  }
+
+  /* @tiptap/extension-table's own `.selectedCell` marker class (a cell/
+     range selected with Shift+click or Shift+arrows) — an overlay instead
+     of a background-color so it never hides the cell's own content or the
+     header tint underneath it. */
+  .editor-content .selectedCell::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-color: color-mix(
+      in oklch,
+      var(--color-primary-500) 20%,
+      transparent
+    );
+    pointer-events: none;
+  }
+
+  /* Table(s) configured with `resizable: false` (extensions/index.ts) —
+     the resize-handle element still renders per-column, so hide it here
+     rather than fork the extension config. */
+  .editor-content .column-resize-handle {
+    display: none;
   }
 }
 
