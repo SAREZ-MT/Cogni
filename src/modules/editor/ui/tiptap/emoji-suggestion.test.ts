@@ -22,13 +22,14 @@ describe("filterEmojiItems", () => {
     expect(filterEmojiItems("zzzz-no-such-emoji")).toEqual([]);
   });
 
-  it("maps an emoji to a menu item with its glyph, shortcode hint and group", () => {
+  it("maps an emoji to a menu item with the glyph in the tile, the shortcode as label and the humanized name muted", () => {
     const [smile] = filterEmojiItems("smile").filter(
       (item) => item.name === "smile",
     );
     expect(smile.id).toBe("smile");
-    expect(smile.label).toBe("😄");
-    expect(smile.description).toMatch(/^:.+:$/);
+    expect(smile.iconGlyph).toBe("😄");
+    expect(smile.label).toMatch(/^:.+:$/);
+    expect(smile.description).toBe("smile");
     expect(smile.keywords).toContain("smile");
     expect(smile.group).toBeTruthy();
   });

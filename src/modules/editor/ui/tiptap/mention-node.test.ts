@@ -1,4 +1,5 @@
 import { Editor } from "@tiptap/core";
+import { FileText } from "lucide-react";
 import { describe, expect, it, vi } from "vitest";
 import type { MentionCandidate } from "../../domain/mention-port";
 import { createEditorExtensions } from "./extensions";
@@ -9,6 +10,7 @@ const candidate: MentionCandidate = {
   title: "Mitosis",
   notebookId: "nb-1",
   notebookTitle: "Biología",
+  notebookColor: "mint",
 };
 
 describe("createMentionSuggestion", () => {
@@ -17,7 +19,7 @@ describe("createMentionSuggestion", () => {
     await expect(suggestion.items({ query: "mi" })).resolves.toEqual([]);
   });
 
-  it("maps port candidates to menu items (title as label, notebook as hint)", async () => {
+  it("maps port candidates to menu items (title as label, notebook as hint, page icon tinted by the notebook color)", async () => {
     const search = vi.fn().mockResolvedValue([candidate]);
     const suggestion = createMentionSuggestion({ search });
 
@@ -29,9 +31,22 @@ describe("createMentionSuggestion", () => {
         id: "page-1",
         label: "Mitosis",
         description: "Biología",
+        icon: FileText,
+        iconTone: "mint",
         candidate,
       },
     ]);
+  });
+
+  it("leaves the icon tone unset when the notebook has no color", async () => {
+    const search = vi
+      .fn()
+      .mockResolvedValue([{ ...candidate, notebookColor: null }]);
+    const suggestion = createMentionSuggestion({ search });
+
+    const items = await suggestion.items({ query: "mi" });
+
+    expect(items[0].iconTone).toBeUndefined();
   });
 });
 

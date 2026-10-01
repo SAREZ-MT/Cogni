@@ -227,7 +227,7 @@ describe("notebooks Server Actions", () => {
       getCurrentUser.mockResolvedValue({ id: OWNER_ID, email: "a@b.com" });
     });
 
-    it("flattens the owner's pages with their notebook's id and title", async () => {
+    it("flattens the owner's pages with their notebook's id, title and color", async () => {
       const { createNotebook, createPage, listPagesForMention } = await import(
         "./actions"
       );
@@ -241,6 +241,7 @@ describe("notebooks Server Actions", () => {
         title: page.title,
         notebookId: notebook.id,
         notebookTitle: "Cuaderno mención",
+        notebookColor: notebook.color,
       });
     });
 
