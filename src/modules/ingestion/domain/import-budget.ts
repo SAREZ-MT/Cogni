@@ -4,7 +4,7 @@
 
 // The Vercel function `maxDuration` (seconds) declared as a literal on the
 // page route that invokes `processPdfImport` (documento maestro v1.1.0
-// §8.1 regla 5; ADR 0002 — everything happens inside one Vercel function
+// §8.1 regla 5; ADR 0003 — everything happens inside one Vercel function
 // call, no background job service). A unit test (T8) compares that page
 // route literal against this constant; keep them equal.
 export const MAX_DURATION_S = 120;

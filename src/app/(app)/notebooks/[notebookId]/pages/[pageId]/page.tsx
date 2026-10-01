@@ -24,7 +24,7 @@ import { PageEditor } from "./_components/page-editor";
 import { PageTitle } from "./_components/page-title";
 import { TechniquesPanel } from "./_components/techniques-panel";
 
-// ADR 0002 (Vercel Fluid Compute, no worker, no Trigger.dev) + design.md,
+// ADR 0003 (Vercel Fluid Compute, no worker, no Trigger.dev) + design.md,
 // "Decision: Procesamiento síncrono en la Server Action con maxDuration":
 // Next applies a Server Action's `maxDuration` from the page segment it is
 // invoked from, not from the module that defines it. `processPdfImport`

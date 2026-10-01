@@ -92,7 +92,7 @@ download, no write, no second `pdf_imported`).
 ## `maxDuration`
 
 `processPdfImport` runs `processImportJob` synchronously inside the same
-Vercel function invocation (Fluid Compute; ADR 0002 — no worker, no
+Vercel function invocation (Fluid Compute; ADR 0003 — no worker, no
 Trigger.dev). Next.js applies a Server Action's `maxDuration` from the page
 segment it is invoked from, not from the module that defines the action:
 `processPdfImport` is only ever invoked from
