@@ -15,7 +15,7 @@ export interface PeriodFilterProps {
   className?: string;
 }
 
-// Segmented 7/30/90-day control (chart spec §Widgets I). Same server-
+// Segmented 7/15/30-day control (chart spec §Widgets I). Same server-
 // rendered `Link` pattern as `ViewToggle` — the choice lives in the `?range=`
 // URL param, not client state, so filtering never needs its own "use
 // client" boundary.
