@@ -346,6 +346,21 @@
     border-radius: var(--radius-2xl);
   }
 
+  /* E2 (drag-handle "Colores" > "Fondo", bubble toolbar's same row):
+     extensions/node-background.ts's `nodeBackground` attribute only ever
+     contributes the `bg-pastel-*` color utility (Tailwind scanner needs a
+     literal class name, so it can't add the padding/radius itself) — this
+     one shared rule turns that flush rectangle into a card that reads as
+     "this whole block", matching CogniHighlight's own `mark` padding
+     above. `-mx-2` compensates the `px-2` so the tint's left/right edges
+     still line up with the untinted text either side of it. */
+  .editor-content [data-node-background] {
+    border-radius: var(--radius-lg);
+    margin-inline: -0.5rem;
+    padding-inline: 0.5rem;
+    padding-block: 0.125rem;
+  }
+
   /* Inline code only — the code-block node view (extensions/code-block.tsx)
      renders its own `pre`/`code` with its own classes. */
   .editor-content :not(pre) > code {
@@ -399,6 +414,39 @@
     background-color: var(--color-active);
     border-radius: var(--radius-md);
     outline: none;
+  }
+
+  /* E1 (editor pass, goal doc §2): the Tiptap template's now-MIT block set.
+     TocBlock (toc-node.tsx), the emoji fallback image (`@tiptap/extension-
+     emoji`'s own `img` markup when a system doesn't support an emoji
+     glyph) and CogniMention's `<a>` (mention-node.tsx) all style
+     themselves with Tailwind utilities already, like the callout/code-
+     block node views above them — this only covers the pieces that render
+     from third-party markup (KaTeX) or a plain data-attribute selector
+     (mention, sup/sub) with no node-view classes to attach to. */
+  .editor-content .katex {
+    font-size: 1.05em;
+  }
+
+  .editor-content span[data-type="emoji"] img {
+    display: inline-block;
+    height: 1em;
+    width: 1em;
+    vertical-align: -0.15em;
+  }
+
+  .editor-content [data-type="mention"] {
+    border-radius: var(--radius-sm);
+    padding: 0 0.25rem;
+    background-color: var(--color-active);
+    color: var(--color-fg-active);
+    font-weight: 500;
+    text-decoration: none;
+  }
+
+  .editor-content sup,
+  .editor-content sub {
+    font-size: 0.75em;
   }
 }
 

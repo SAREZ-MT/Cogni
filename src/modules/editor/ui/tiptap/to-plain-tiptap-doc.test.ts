@@ -63,12 +63,31 @@ describe("toPlainTiptapDoc", () => {
         content: [
           {
             type: "heading",
-            attrs: { level: 1 },
+            // E1 (editor pass, goal doc §2): `id`/`data-toc-id` (global
+            // attrs @tiptap/extension-table-of-contents adds to every
+            // `anchorTypes` node, "heading" by default) and `textAlign`
+            // (@tiptap/extension-text-align, configured for
+            // heading/paragraph) are new default-valued attrs on headings
+            // now that both extensions are registered. E2 adds
+            // `blockId` (`@tiptap/extension-unique-id`, extensions/
+            // index.ts's UNIQUE_ID_TYPES — a deliberately different attrs
+            // key than table-of-contents's own `id`, see that
+            // registration's comment) and `nodeBackground` (extensions/
+            // node-background.ts, also targeting "heading").
+            attrs: {
+              level: 1,
+              id: null,
+              "data-toc-id": null,
+              textAlign: null,
+              nodeBackground: null,
+              blockId: null,
+            },
             content: [{ type: "text", text: "hi" }],
           },
           {
             type: "codeBlock",
-            attrs: { language: null },
+            // E2: codeBlock is also in UNIQUE_ID_TYPES.
+            attrs: { language: null, blockId: null },
             content: [{ type: "text", text: "x" }],
           },
         ],

@@ -12,8 +12,24 @@ import {
 // and the page component is called directly (never rendered) so this stays
 // a fast unit test with no DOM/Server Action wiring for PageImportView
 // itself (that behavior is covered by page-import-view.test.tsx).
+//
+// E1 (editor pass, goal doc §1/§2): PageHeader no longer takes a plain
+// `title` string — it takes a `titleSlot`, and the route now renders that
+// slot as `<PageTitle>` (the client wrapper that owns PageTitleEditor +
+// breadcrumb publishing) and the editor mount as `<PageEditor>` (the client
+// wrapper that injects the mention port / "Importar PDF" slash item).
+// Both are mocked wholesale here, same as `Editor` used to be — their own
+// internals (which pull in Server Actions, `usePdfImport`, etc.) are never
+// executed by this non-rendering, server-component-only test, and are
+// covered by their own behavior elsewhere (page-title-editor.test.tsx-style
+// coverage is a known gap noted in the E1 report, not added in this pass).
 vi.mock("server-only", () => ({}));
-vi.mock("@/modules/editor", () => ({ Editor: () => null }));
+
+const { PageEditor } = vi.hoisted(() => ({ PageEditor: vi.fn(() => null) }));
+vi.mock("./_components/page-editor", () => ({ PageEditor }));
+
+const { PageTitle } = vi.hoisted(() => ({ PageTitle: vi.fn(() => null) }));
+vi.mock("./_components/page-title", () => ({ PageTitle }));
 
 const { getPageForRoute, getNotebookTitleForRoute } = vi.hoisted(() => ({
   getPageForRoute: vi.fn(),
@@ -51,7 +67,7 @@ async function renderRoute() {
     params: Promise.resolve({ notebookId: "nb-1", pageId: "page-1" }),
   })) as ReactElement<{ children: ReactElement[] }>;
   const children = section.props.children;
-  const importView = children[2] as ReactElement<{
+  const importView = children[1] as ReactElement<{
     initial: unknown;
     pageId: string;
     editor: unknown;
@@ -109,13 +125,13 @@ describe("page route ingestion wiring", () => {
     expect(props.initial).toBeNull();
   });
 
-  // S5 (odd/tasks/app-shell-restyle.md): the route renders PageHeader
-  // instead of a bare <h1>, passing the page's own title and updatedAt for
-  // the meta row's last-edit item. R3-002 (review follow-up folded into
-  // S6a): assert the element's actual type, not only its props by
-  // position — a future reorder of `section`'s children would otherwise
-  // silently start asserting props against the wrong element.
-  it("renders PageHeader with the page's title and updatedAt", async () => {
+  // S5 (odd/tasks/app-shell-restyle.md), E1 (goal doc §1): the route renders
+  // PageHeader with a `titleSlot` instead of a plain title string — the
+  // real title editor/breadcrumb wiring lives in `<PageTitle>` (mocked
+  // above), so this only asserts the route hands it the right data.
+  // R3-002 (review follow-up folded into S6a): assert the element's actual
+  // type, not only its props by position.
+  it("renders PageHeader with a PageTitle slot carrying the page's title/notebook, and updatedAt", async () => {
     getPageForRoute.mockResolvedValue(page());
     getImportJobStatus.mockResolvedValue({ ok: true, value: null });
 
@@ -124,19 +140,44 @@ describe("page route ingestion wiring", () => {
       params: Promise.resolve({ notebookId: "nb-1", pageId: "page-1" }),
     })) as ReactElement<{ children: ReactElement[] }>;
 
-    const header = section.props.children[1] as ReactElement<{
-      title: string;
+    const header = section.props.children[0] as ReactElement<{
+      titleSlot: ReactElement<{
+        pageId: string;
+        initialTitle: string;
+        notebookTitle: string | null;
+      }>;
       updatedAt: Date;
     }>;
 
     expect(header.type).toBe(PageHeader);
-    expect(header.props.title).toBe("Apuntes");
+    expect(header.props.titleSlot.type).toBe(PageTitle);
+    expect(header.props.titleSlot.props).toEqual({
+      pageId: "page-1",
+      initialTitle: "Apuntes",
+      notebookTitle: "Biología Celular",
+    });
     expect(header.props.updatedAt).toEqual(
       new Date("2026-09-23T10:00:00.000Z"),
     );
   });
 
-  it("passes the Editor mount as the editor prop", async () => {
+  it("degrades PageTitle's notebookTitle to null when the notebook lookup fails", async () => {
+    getPageForRoute.mockResolvedValue(page());
+    getImportJobStatus.mockResolvedValue({ ok: true, value: null });
+    getNotebookTitleForRoute.mockResolvedValue(null);
+
+    const { default: PageView } = await import("./page");
+    const section = (await PageView({
+      params: Promise.resolve({ notebookId: "nb-1", pageId: "page-1" }),
+    })) as ReactElement<{ children: ReactElement[] }>;
+
+    const header = section.props.children[0] as ReactElement<{
+      titleSlot: ReactElement<{ notebookTitle: string | null }>;
+    }>;
+    expect(header.props.titleSlot.props.notebookTitle).toBeNull();
+  });
+
+  it("passes the PageEditor mount as the editor prop", async () => {
     getPageForRoute.mockResolvedValue(page());
     getImportJobStatus.mockResolvedValue({ ok: true, value: null });
 
@@ -149,8 +190,8 @@ describe("page route ingestion wiring", () => {
   // into a slot PageHeader renders in its meta row (screenshots/editor.png)
   // instead of sitting between the header and the first block. The route
   // wires both ends: PageHeader gets a statusSlot with the stable id, and
-  // the Editor mount gets the matching statusPortalId.
-  it("wires PageHeader's status slot id to the Editor's statusPortalId", async () => {
+  // the PageEditor mount gets the matching statusPortalId.
+  it("wires PageHeader's status slot id to the PageEditor's statusPortalId", async () => {
     getPageForRoute.mockResolvedValue(page());
     getImportJobStatus.mockResolvedValue({ ok: true, value: null });
 
@@ -159,12 +200,12 @@ describe("page route ingestion wiring", () => {
       params: Promise.resolve({ notebookId: "nb-1", pageId: "page-1" }),
     })) as ReactElement<{ children: ReactElement[] }>;
 
-    const header = section.props.children[1] as ReactElement<{
+    const header = section.props.children[0] as ReactElement<{
       statusSlot?: ReactElement<{ id?: string }>;
     }>;
     expect(header.props.statusSlot?.props.id).toBe(PAGE_STATUS_SLOT_ID);
 
-    const importView = section.props.children[2] as ReactElement<{
+    const importView = section.props.children[1] as ReactElement<{
       editor: ReactElement<{
         children: ReactElement<{ statusPortalId?: string }>;
       }>;
@@ -174,44 +215,26 @@ describe("page route ingestion wiring", () => {
     );
   });
 
-  // S3 breadcrumb: "Cogni › {cuaderno} › {página}" — the notebook title is
-  // read server-side via getNotebookTitleForRoute so SetBreadcrumb can
-  // publish both segments.
-  it("publishes '{cuaderno} › {página}' as the breadcrumb trail", async () => {
+  // E1 (goal doc §2, "Importar PDF"): the composition root wires the
+  // current route's notebookId into PageEditor, which is what its own
+  // extraSlashItems bridge (page-editor.tsx) closes over for `start({
+  // notebookId })`.
+  it("passes the route's notebookId to PageEditor", async () => {
     getPageForRoute.mockResolvedValue(page());
     getImportJobStatus.mockResolvedValue({ ok: true, value: null });
-    getNotebookTitleForRoute.mockResolvedValue("Biología Celular");
 
     const { default: PageView } = await import("./page");
     const section = (await PageView({
       params: Promise.resolve({ notebookId: "nb-1", pageId: "page-1" }),
     })) as ReactElement<{ children: ReactElement[] }>;
 
-    const setBreadcrumb = section.props.children[0] as ReactElement<{
-      items: { label: string }[];
+    const importView = section.props.children[1] as ReactElement<{
+      editor: ReactElement<{
+        children: ReactElement<{ notebookId?: string }>;
+      }>;
     }>;
-
-    expect(getNotebookTitleForRoute).toHaveBeenCalledWith("nb-1");
-    expect(setBreadcrumb.props.items).toEqual([
-      { label: "Biología Celular" },
-      { label: "Apuntes" },
-    ]);
-  });
-
-  it("degrades to just the page title when the notebook lookup fails", async () => {
-    getPageForRoute.mockResolvedValue(page());
-    getImportJobStatus.mockResolvedValue({ ok: true, value: null });
-    getNotebookTitleForRoute.mockResolvedValue(null);
-
-    const { default: PageView } = await import("./page");
-    const section = (await PageView({
-      params: Promise.resolve({ notebookId: "nb-1", pageId: "page-1" }),
-    })) as ReactElement<{ children: ReactElement[] }>;
-
-    const setBreadcrumb = section.props.children[0] as ReactElement<{
-      items: { label: string }[];
-    }>;
-
-    expect(setBreadcrumb.props.items).toEqual([{ label: "Apuntes" }]);
+    expect(importView.props.editor.props.children.props.notebookId).toBe(
+      "nb-1",
+    );
   });
 });

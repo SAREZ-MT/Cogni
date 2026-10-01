@@ -9,15 +9,29 @@ import {
   type SlashCommandItem,
 } from "./slash-command-items";
 
-export function filterItems(query: string): SlashCommandItem[] {
+// E1 (editor pass, goal doc §2): factored out of `filterItems` so
+// SlashCommand's own `items`/`onUpdate` can filter over
+// SLASH_COMMAND_ITEMS + the composition root's `extraItems`
+// (SlashCommandOptions below) without duplicating the match logic —
+// `filterItems` itself stays over the base list only, unchanged, since
+// slash-command-items.test.ts and this file's own tests assert against it
+// directly.
+export function filterItemsFrom(
+  items: SlashCommandItem[],
+  query: string,
+): SlashCommandItem[] {
   const normalized = query.trim().toLowerCase();
-  if (!normalized) return SLASH_COMMAND_ITEMS;
-  return SLASH_COMMAND_ITEMS.filter((item) => {
+  if (!normalized) return items;
+  return items.filter((item) => {
     const haystack = [item.label, ...(item.keywords ?? [])]
       .join(" ")
       .toLowerCase();
     return haystack.includes(normalized);
   });
+}
+
+export function filterItems(query: string): SlashCommandItem[] {
+  return filterItemsFrom(SLASH_COMMAND_ITEMS, query);
 }
 
 // S7 (odd/tasks/app-shell-restyle.md, drift #3): once `allowSpaces: true`
@@ -44,6 +58,17 @@ export function shouldCloseSlashMenu(
 // `exitSuggestion` below can target this exact plugin instance.
 const SlashCommandPluginKey = new PluginKey("slashCommand");
 
+export interface SlashCommandOptions {
+  // E1 (editor pass, goal doc §2's "Importar PDF" addition): items the
+  // composition root injects on top of the base SLASH_COMMAND_ITEMS
+  // (editor.tsx's `extraSlashItems` prop, threaded through
+  // extensions/index.ts's `createEditorExtensions`) — editor/ui must never
+  // import a sibling module (e.g. ingestion) directly, so this is how an
+  // app-composition-root-only slash item (one whose `run` closes over a
+  // Server Action from another module) reaches the menu.
+  extraItems: SlashCommandItem[];
+}
+
 // specs/editor/spec.md, "Menú de comandos `/`": writing "/" at the start of
 // a line or after a space opens the menu; arrows move the selection, Enter
 // inserts and removes the command text, Escape closes without changes.
@@ -51,11 +76,29 @@ const SlashCommandPluginKey = new PluginKey("slashCommand");
 // framework-agnostic editor/ui/command-menu.tsx as the actual popup — this
 // file is the only bridge between the two, and lives under editor/ui/tiptap
 // as required by the editor-tiptap-only-in-ui dependency-cruiser rule.
-export const SlashCommand = Extension.create({
+export const SlashCommand = Extension.create<SlashCommandOptions>({
   name: "slashCommand",
+
+  addOptions() {
+    return { extraItems: [] };
+  },
 
   addProseMirrorPlugins() {
     const { editor } = this;
+    // slash-command.test.ts's "onUpdate close decision" suite calls this
+    // method directly via `.call({ editor: fakeEditor })`, bypassing
+    // Tiptap's Extension instance machinery entirely (no `this.options`) —
+    // the `?.` keeps that test working unchanged with no extra items.
+    const extraItems = (this as { options?: SlashCommandOptions }).options
+      ?.extraItems;
+    const allItems: SlashCommandItem[] = extraItems?.length
+      ? [...SLASH_COMMAND_ITEMS, ...extraItems]
+      : SLASH_COMMAND_ITEMS;
+    function resolveItems(query: string): SlashCommandItem[] {
+      return allItems === SLASH_COMMAND_ITEMS
+        ? filterItems(query)
+        : filterItemsFrom(allItems, query);
+    }
     let root: Root | null = null;
     let element: HTMLDivElement | null = null;
     let unmount: (() => void) | null = null;
@@ -89,7 +132,7 @@ export const SlashCommand = Extension.create({
         // first space, instead of the default `allowSpaces: false`
         // closing the menu right there.
         allowSpaces: true,
-        items: ({ query }) => filterItems(query),
+        items: ({ query }) => resolveItems(query),
         command: ({ editor: activeEditor, range, props }) => {
           (props as SlashCommandItem).run(activeEditor, range);
         },
@@ -120,7 +163,7 @@ export const SlashCommand = Extension.create({
             // `props.query` is always consistent with what `props.items`
             // settles to once @tiptap/suggestion's second call lands — it
             // just isn't stale in between.
-            const items = filterItems(props.query);
+            const items = resolveItems(props.query);
             if (shouldCloseSlashMenu(props.query, items)) {
               cleanup();
               exitSuggestion(editor.view, SlashCommandPluginKey);

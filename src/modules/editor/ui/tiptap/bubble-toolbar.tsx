@@ -1,14 +1,14 @@
 "use client";
 
 // Bubble toolbar for inline formatting on a non-empty text selection
-// (S6a, odd/tasks/app-shell-restyle.md; Editor directive,
+// (S6a/E2, odd/tasks/app-shell-restyle.md; Editor directive,
 // .agents/skills/cogni-design/SKILL.md "Editor"): matches the Tiptap docs
 // Notion-style editor's floating toolbar. `BubbleToolbarControls` is the
 // plain presentational piece (testable with fireEvent, no floating-ui
 // layout math) and `BubbleToolbar` wraps it in the real `BubbleMenu` for
 // the editor — same split as highlight-picker.tsx/
 // highlight-picker-controls.tsx, whose `HighlightPickerControls` this
-// reuses for "Resaltar" instead of duplicating the palette.
+// still reuses unchanged for the color popover's "Fondo/Resaltado" row.
 import type { Editor } from "@tiptap/core";
 import { isNodeRangeSelection } from "@tiptap/extension-node-range";
 import type { EditorState } from "@tiptap/pm/state";
@@ -16,19 +16,53 @@ import { NodeSelection } from "@tiptap/pm/state";
 import { useEditorState } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
 import {
+  AlignCenter,
+  AlignJustify,
+  AlignLeft,
+  AlignRight,
+  Baseline,
   Bold,
+  ChevronDown,
   Code,
   ExternalLink,
-  Highlighter,
   Italic,
   Link as LinkIcon,
   type LucideIcon,
   Pencil,
+  Redo2,
   Strikethrough,
+  Subscript,
+  Superscript,
   Underline,
+  Undo2,
   Unlink,
 } from "lucide-react";
-import { type KeyboardEvent, useEffect, useRef, useState } from "react";
+import {
+  type KeyboardEvent,
+  type ReactElement,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuShortcut,
+  DropdownMenuTrigger,
+} from "@/shared/ui/dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/shared/ui/tooltip";
+import {
+  applySelectionTextColor,
+  TEXT_COLOR_SWATCHES,
+} from "./block-color-palette";
+import { BLOCK_KIND_ITEMS, currentBlockKindLabel } from "./block-kind";
 import { HighlightPickerControls } from "./highlight-picker-controls";
 
 export interface BubbleToolbarProps {
@@ -106,6 +140,7 @@ export function BubbleToolbar({ editor }: BubbleToolbarProps) {
 interface MarkButtonConfig {
   mark: string;
   label: string;
+  shortcut: string;
   icon: LucideIcon;
   run: (editor: Editor) => void;
 }
@@ -114,33 +149,59 @@ const MARK_BUTTONS: MarkButtonConfig[] = [
   {
     mark: "bold",
     label: "Negrita",
+    shortcut: "Mod+B",
     icon: Bold,
     run: (editor) => editor.chain().focus().toggleBold().run(),
   },
   {
     mark: "italic",
     label: "Cursiva",
+    shortcut: "Mod+I",
     icon: Italic,
     run: (editor) => editor.chain().focus().toggleItalic().run(),
   },
   {
     mark: "underline",
     label: "Subrayado",
+    shortcut: "Mod+U",
     icon: Underline,
     run: (editor) => editor.chain().focus().toggleUnderline().run(),
   },
   {
     mark: "strike",
     label: "Tachado",
+    shortcut: "Mod+Shift+S",
     icon: Strikethrough,
     run: (editor) => editor.chain().focus().toggleStrike().run(),
   },
   {
     mark: "code",
     label: "Código",
+    shortcut: "Mod+E",
     icon: Code,
     run: (editor) => editor.chain().focus().toggleCode().run(),
   },
+  {
+    mark: "superscript",
+    label: "Superíndice",
+    shortcut: "Mod+.",
+    icon: Superscript,
+    run: (editor) => editor.chain().focus().toggleSuperscript().run(),
+  },
+  {
+    mark: "subscript",
+    label: "Subíndice",
+    shortcut: "Mod+,",
+    icon: Subscript,
+    run: (editor) => editor.chain().focus().toggleSubscript().run(),
+  },
+];
+
+const ALIGN_OPTIONS: { id: string; label: string; icon: LucideIcon }[] = [
+  { id: "left", label: "Izquierda", icon: AlignLeft },
+  { id: "center", label: "Centro", icon: AlignCenter },
+  { id: "right", label: "Derecha", icon: AlignRight },
+  { id: "justify", label: "Justificado", icon: AlignJustify },
 ];
 
 const BUTTON_CLASS =
@@ -152,6 +213,40 @@ function buttonToneClass(active: boolean) {
     : "text-fg-secondary hover:bg-hover";
 }
 
+function ToolbarSeparator() {
+  return (
+    <span
+      aria-hidden="true"
+      className="bg-border-default mx-1 h-5 w-px shrink-0"
+    />
+  );
+}
+
+// Wraps a toolbar button with a tooltip showing its label + shortcut (E2
+// brief: "32 px icon buttons ... tooltips with the shortcut"). `asChild`
+// forwards the tooltip's a11y wiring onto the real button instead of
+// adding an extra wrapper element, so `data-testid`/`aria-pressed` on the
+// button itself stay exactly where the existing tests already look.
+function ToolbarButton({
+  label,
+  shortcut,
+  children,
+}: {
+  label: string;
+  shortcut?: string;
+  children: ReactElement;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{children}</TooltipTrigger>
+      <TooltipContent>
+        {label}
+        {shortcut ? ` · ${shortcut}` : ""}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 export interface BubbleToolbarControlsProps {
   editor: Editor;
 }
@@ -159,7 +254,6 @@ export interface BubbleToolbarControlsProps {
 export function BubbleToolbarControls({ editor }: BubbleToolbarControlsProps) {
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkValue, setLinkValue] = useState("");
-  const [highlightOpen, setHighlightOpen] = useState(false);
   const linkInputRef = useRef<HTMLInputElement>(null);
 
   // `editor.isActive(...)` alone does not trigger a re-render: it reads a
@@ -176,8 +270,16 @@ export function BubbleToolbarControls({ editor }: BubbleToolbarControlsProps) {
       underline: current.isActive("underline"),
       strike: current.isActive("strike"),
       code: current.isActive("code"),
+      superscript: current.isActive("superscript"),
+      subscript: current.isActive("subscript"),
       link: current.isActive("link"),
       highlight: current.isActive("highlight"),
+      canUndo: current.can().undo(),
+      canRedo: current.can().redo(),
+      blockLabel: currentBlockKindLabel(current),
+      align: ALIGN_OPTIONS.find((option) =>
+        current.isActive({ textAlign: option.id }),
+      )?.id,
     }),
   });
 
@@ -199,7 +301,6 @@ export function BubbleToolbarControls({ editor }: BubbleToolbarControlsProps) {
   useEffect(() => {
     setLinkOpen(false);
     setLinkValue("");
-    setHighlightOpen(false);
   }, [selectionKey]);
 
   // Focuses the inline URL input as soon as it mounts, without the
@@ -211,7 +312,6 @@ export function BubbleToolbarControls({ editor }: BubbleToolbarControlsProps) {
   function openLinkInput() {
     const currentHref = editor.getAttributes("link").href as string | undefined;
     setLinkValue(currentHref ?? "");
-    setHighlightOpen(false);
     setLinkOpen(true);
   }
 
@@ -250,81 +350,216 @@ export function BubbleToolbarControls({ editor }: BubbleToolbarControlsProps) {
   }
 
   return (
-    <div
-      role="toolbar"
-      aria-label="Formato de texto"
-      data-testid="bubble-toolbar"
-      className="flex items-center gap-0.5 rounded-lg border border-border-default bg-card p-1 shadow-md"
-    >
-      {MARK_BUTTONS.map(({ mark, label, icon: Icon, run }) => {
-        const active = activeMarks[mark as keyof typeof activeMarks] ?? false;
-        return (
-          <button
-            key={mark}
-            type="button"
-            aria-label={label}
-            aria-pressed={active}
-            data-testid={`bubble-toolbar-${mark}`}
-            className={`${BUTTON_CLASS} ${buttonToneClass(active)}`}
-            onClick={() => run(editor)}
+    <TooltipProvider>
+      <div
+        role="toolbar"
+        aria-label="Formato de texto"
+        data-testid="bubble-toolbar"
+        className="flex items-center gap-0.5 rounded-lg border border-border-default bg-card p-1 shadow-md"
+      >
+        {/* E2 scope B: "Convertir en" — same catalogue and commands as
+            block-context-menu.tsx's own submenu, applied to whatever block
+            the current selection sits in instead of a hovered one. */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              aria-label="Convertir en"
+              data-testid="bubble-toolbar-block-type"
+              className={`${BUTTON_CLASS} w-auto gap-1 px-2 text-fg-secondary hover:bg-hover`}
+            >
+              <span className="text-[13px]">{activeMarks.blockLabel}</span>
+              <ChevronDown aria-hidden="true" size={14} strokeWidth={1.75} />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            align="start"
+            className="min-w-48 rounded-xl p-1"
           >
-            <Icon aria-hidden="true" size={16} strokeWidth={1.75} />
+            {BLOCK_KIND_ITEMS.map((kind) => (
+              <DropdownMenuItem
+                key={kind.id}
+                className="gap-2 text-[13.5px]"
+                onSelect={() => kind.run(editor)}
+              >
+                <kind.icon aria-hidden="true" size={16} strokeWidth={1.75} />
+                {kind.label}
+                {kind.isActive(editor) && (
+                  <DropdownMenuShortcut>✓</DropdownMenuShortcut>
+                )}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <ToolbarSeparator />
+
+        <ToolbarButton label="Deshacer" shortcut="Mod+Z">
+          <button
+            type="button"
+            aria-label="Deshacer"
+            data-testid="bubble-toolbar-undo"
+            disabled={!activeMarks.canUndo}
+            className={`${BUTTON_CLASS} ${buttonToneClass(false)} disabled:pointer-events-none disabled:opacity-40`}
+            onClick={() => editor.chain().focus().undo().run()}
+          >
+            <Undo2 aria-hidden="true" size={16} strokeWidth={1.75} />
           </button>
-        );
-      })}
+        </ToolbarButton>
+        <ToolbarButton label="Rehacer" shortcut="Mod+Shift+Z">
+          <button
+            type="button"
+            aria-label="Rehacer"
+            data-testid="bubble-toolbar-redo"
+            disabled={!activeMarks.canRedo}
+            className={`${BUTTON_CLASS} ${buttonToneClass(false)} disabled:pointer-events-none disabled:opacity-40`}
+            onClick={() => editor.chain().focus().redo().run()}
+          >
+            <Redo2 aria-hidden="true" size={16} strokeWidth={1.75} />
+          </button>
+        </ToolbarButton>
 
-      <span
-        aria-hidden="true"
-        className="bg-border-default mx-1 h-5 w-px shrink-0"
-      />
+        <ToolbarSeparator />
 
-      <div className="relative">
-        <button
-          type="button"
-          aria-label="Enlace"
-          aria-pressed={activeMarks.link}
-          data-testid="bubble-toolbar-link"
-          className={`${BUTTON_CLASS} ${buttonToneClass(activeMarks.link)}`}
-          onClick={() => (linkOpen ? setLinkOpen(false) : openLinkInput())}
-        >
-          <LinkIcon aria-hidden="true" size={16} strokeWidth={1.75} />
-        </button>
-        {linkOpen && (
-          <input
-            ref={linkInputRef}
-            type="text"
-            value={linkValue}
-            placeholder="https://…"
-            aria-label="URL del enlace"
-            data-testid="bubble-toolbar-link-input"
-            onChange={(event) => setLinkValue(event.target.value)}
-            onKeyDown={handleLinkKeyDown}
-            className="border-border-default bg-card text-fg absolute top-full left-0 z-10 mt-1 w-48 rounded-md border px-2 py-1 text-xs shadow-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          />
-        )}
-      </div>
+        {MARK_BUTTONS.map(({ mark, label, shortcut, icon: Icon, run }) => {
+          const active = activeMarks[mark as keyof typeof activeMarks] ?? false;
+          return (
+            <ToolbarButton key={mark} label={label} shortcut={shortcut}>
+              <button
+                type="button"
+                aria-label={label}
+                aria-pressed={Boolean(active)}
+                data-testid={`bubble-toolbar-${mark}`}
+                className={`${BUTTON_CLASS} ${buttonToneClass(Boolean(active))}`}
+                onClick={() => run(editor)}
+              >
+                <Icon aria-hidden="true" size={16} strokeWidth={1.75} />
+              </button>
+            </ToolbarButton>
+          );
+        })}
 
-      <div className="relative">
-        <button
-          type="button"
-          aria-label="Resaltar"
-          aria-pressed={activeMarks.highlight}
-          data-testid="bubble-toolbar-highlight"
-          className={`${BUTTON_CLASS} ${buttonToneClass(activeMarks.highlight)}`}
-          onClick={() => {
-            setLinkOpen(false);
-            setHighlightOpen((open) => !open);
-          }}
-        >
-          <Highlighter aria-hidden="true" size={16} strokeWidth={1.75} />
-        </button>
-        {highlightOpen && (
-          <div className="absolute top-full left-0 z-10 mt-1">
+        <ToolbarSeparator />
+
+        {/* E2 scope B: one popover, two swatch rows — "Texto" (inline
+            Color/TextStyle mark, block-color-palette.ts) and
+            "Fondo/Resaltado" (the existing CogniHighlight mark, unchanged
+            — HighlightPickerControls keeps its own `highlight-picker`
+            testid and "Resaltar en <color>" swatch names). */}
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              aria-label="Color de texto"
+              aria-pressed={activeMarks.highlight}
+              data-testid="bubble-toolbar-color"
+              className={`${BUTTON_CLASS} ${buttonToneClass(activeMarks.highlight)}`}
+            >
+              <Baseline aria-hidden="true" size={16} strokeWidth={1.75} />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-auto gap-2 p-2">
+            <p className="px-0.5 text-fg-muted text-xs font-medium">Texto</p>
+            <div className="flex flex-wrap gap-1 px-0.5">
+              {TEXT_COLOR_SWATCHES.map((swatch) => (
+                <button
+                  key={swatch.id}
+                  type="button"
+                  aria-label={swatch.label}
+                  title={swatch.label}
+                  data-testid={`bubble-toolbar-text-color-${swatch.id}`}
+                  className="flex size-7 items-center justify-center rounded-md outline-none transition-colors hover:bg-hover focus-visible:ring-2 focus-visible:ring-ring"
+                  onClick={() => applySelectionTextColor(editor, swatch.id)}
+                >
+                  <span
+                    aria-hidden="true"
+                    className={`size-3.5 shrink-0 rounded-full ${swatch.swatchClass}`}
+                  />
+                </button>
+              ))}
+            </div>
+            <p className="px-0.5 text-fg-muted text-xs font-medium">
+              Fondo / Resaltado
+            </p>
             <HighlightPickerControls editor={editor} />
-          </div>
-        )}
+          </PopoverContent>
+        </Popover>
+
+        <ToolbarSeparator />
+
+        {/* E2 scope B: alineación (dropdown, not a segmented row — matches
+            "Convertir en"'s trigger shape). */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              aria-label="Alineación"
+              data-testid="bubble-toolbar-align"
+              className={`${BUTTON_CLASS} w-auto gap-1 px-1.5 ${buttonToneClass(Boolean(activeMarks.align))}`}
+            >
+              {(() => {
+                const Icon =
+                  ALIGN_OPTIONS.find(
+                    (option) => option.id === activeMarks.align,
+                  )?.icon ?? AlignLeft;
+                return <Icon aria-hidden="true" size={16} strokeWidth={1.75} />;
+              })()}
+              <ChevronDown aria-hidden="true" size={12} strokeWidth={1.75} />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            align="start"
+            className="min-w-40 rounded-xl p-1"
+          >
+            {ALIGN_OPTIONS.map((option) => (
+              <DropdownMenuItem
+                key={option.id}
+                className="gap-2 text-[13.5px]"
+                onSelect={() =>
+                  editor.chain().focus().setTextAlign(option.id).run()
+                }
+              >
+                <option.icon aria-hidden="true" size={16} strokeWidth={1.75} />
+                {option.label}
+                {activeMarks.align === option.id && (
+                  <DropdownMenuShortcut>✓</DropdownMenuShortcut>
+                )}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <ToolbarSeparator />
+
+        <div className="relative">
+          <ToolbarButton label="Enlace" shortcut="Mod+K">
+            <button
+              type="button"
+              aria-label="Enlace"
+              aria-pressed={activeMarks.link}
+              data-testid="bubble-toolbar-link"
+              className={`${BUTTON_CLASS} ${buttonToneClass(activeMarks.link)}`}
+              onClick={() => (linkOpen ? setLinkOpen(false) : openLinkInput())}
+            >
+              <LinkIcon aria-hidden="true" size={16} strokeWidth={1.75} />
+            </button>
+          </ToolbarButton>
+          {linkOpen && (
+            <input
+              ref={linkInputRef}
+              type="text"
+              value={linkValue}
+              placeholder="https://…"
+              aria-label="URL del enlace"
+              data-testid="bubble-toolbar-link-input"
+              onChange={(event) => setLinkValue(event.target.value)}
+              onKeyDown={handleLinkKeyDown}
+              className="border-border-default bg-card text-fg absolute top-full left-0 z-10 mt-1 w-48 rounded-md border px-2 py-1 text-xs shadow-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
+          )}
+        </div>
       </div>
-    </div>
+    </TooltipProvider>
   );
 }
 

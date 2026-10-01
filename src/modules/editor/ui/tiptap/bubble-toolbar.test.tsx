@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { Editor } from "@tiptap/core";
 import { NodeRangeSelection } from "@tiptap/extension-node-range";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -62,13 +62,19 @@ describe("BubbleToolbarControls", () => {
     render(<BubbleToolbarControls editor={editor} />);
 
     for (const name of [
+      "Convertir en",
+      "Deshacer",
+      "Rehacer",
       "Negrita",
       "Cursiva",
       "Subrayado",
       "Tachado",
       "Código",
+      "Superíndice",
+      "Subíndice",
+      "Color de texto",
+      "Alineación",
       "Enlace",
-      "Resaltar",
     ]) {
       expect(screen.getByRole("button", { name })).toBeInTheDocument();
     }
@@ -182,18 +188,114 @@ describe("BubbleToolbarControls", () => {
     expect(screen.getByTestId("bubble-toolbar-link-input")).toHaveValue("");
   });
 
-  it("opens the highlight palette and applies a color through it", () => {
+  // E2: "Resaltar" is now one row ("Fondo / Resaltado") inside the
+  // combined color popover opened by "Color de texto" — HighlightPickerControls
+  // itself is unchanged (same `highlight-picker` testid, same "Resaltar en
+  // <color>" swatch names).
+  it("opens the color popover and applies a highlight through its Fondo/Resaltado row", async () => {
     editor = createHeadlessEditor();
     render(<BubbleToolbarControls editor={editor} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Resaltar" }));
-    fireEvent.click(screen.getByTestId("highlight-swatch-purple"));
+    fireEvent.click(screen.getByRole("button", { name: "Color de texto" }));
+    fireEvent.click(await screen.findByTestId("highlight-swatch-purple"));
 
     const json = editor.getJSON();
     const mark = json.content?.[0]?.content?.[0]?.marks?.find(
       (m) => m.type === "highlight",
     );
     expect(mark?.attrs).toEqual({ color: "purple" });
+  });
+
+  // E2: the "Texto" row of the same popover applies the inline Color mark
+  // (block-color-palette.ts) to the current selection.
+  it("opens the color popover and applies a text color through its Texto row", async () => {
+    editor = createHeadlessEditor();
+    render(<BubbleToolbarControls editor={editor} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Color de texto" }));
+    fireEvent.click(
+      await screen.findByTestId("bubble-toolbar-text-color-purple"),
+    );
+
+    const json = editor.getJSON();
+    const mark = json.content?.[0]?.content?.[0]?.marks?.find(
+      (m) => m.type === "textStyle",
+    );
+    expect(mark?.attrs.color).toBe("var(--color-pastel-purple-fg)");
+  });
+
+  // E2 toolbar additions: block-type dropdown, undo/redo, super/subscript and
+  // alignment.
+  it("shows the current block's name on the 'Convertir en' trigger", () => {
+    editor = createHeadlessEditor("<h2>hola</h2>");
+    editor.commands.setTextSelection({ from: 1, to: 3 });
+    render(<BubbleToolbarControls editor={editor} />);
+
+    expect(screen.getByTestId("bubble-toolbar-block-type")).toHaveTextContent(
+      "Encabezado 2",
+    );
+  });
+
+  it("converts the block through the 'Convertir en' dropdown", async () => {
+    editor = createHeadlessEditor();
+    editor.commands.setTextSelection({ from: 1, to: 3 });
+    render(<BubbleToolbarControls editor={editor} />);
+
+    fireEvent.pointerDown(screen.getByTestId("bubble-toolbar-block-type"), {
+      button: 0,
+      ctrlKey: false,
+    });
+    fireEvent.click(await screen.findByRole("menuitem", { name: /Cita/ }));
+
+    expect(editor.isActive("blockquote")).toBe(true);
+  });
+
+  it("disables undo/redo until there is history, then undoes and redoes", () => {
+    editor = createHeadlessEditor();
+    render(<BubbleToolbarControls editor={editor} />);
+    const undo = screen.getByRole("button", { name: "Deshacer" });
+    const redo = screen.getByRole("button", { name: "Rehacer" });
+    expect(undo).toBeDisabled();
+    expect(redo).toBeDisabled();
+
+    act(() => {
+      editor.chain().toggleBold().run();
+    });
+    expect(undo).toBeEnabled();
+
+    fireEvent.click(undo);
+    expect(editor.isActive("bold")).toBe(false);
+    expect(redo).toBeEnabled();
+
+    fireEvent.click(redo);
+    expect(editor.isActive("bold")).toBe(true);
+  });
+
+  it("toggles superscript and subscript and reflects them in aria-pressed", () => {
+    editor = createHeadlessEditor();
+    render(<BubbleToolbarControls editor={editor} />);
+
+    const sup = screen.getByRole("button", { name: "Superíndice" });
+    fireEvent.click(sup);
+    expect(editor.isActive("superscript")).toBe(true);
+    expect(sup).toHaveAttribute("aria-pressed", "true");
+
+    const sub = screen.getByRole("button", { name: "Subíndice" });
+    fireEvent.click(sub);
+    expect(editor.isActive("subscript")).toBe(true);
+  });
+
+  it("aligns the block through the alignment dropdown", async () => {
+    editor = createHeadlessEditor();
+    render(<BubbleToolbarControls editor={editor} />);
+
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Alineación" }), {
+      button: 0,
+      ctrlKey: false,
+    });
+    fireEvent.click(await screen.findByRole("menuitem", { name: /Centro/ }));
+
+    expect(editor.state.doc.child(0).attrs.textAlign).toBe("center");
   });
 
   // S6b defect 2 (focus, odd/tasks/app-shell-restyle.md): applying a link

@@ -15,16 +15,19 @@ import DragHandle from "@tiptap/extension-drag-handle-react";
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import { GripVertical, Plus } from "lucide-react";
 import { useEffect, useRef } from "react";
+import { BlockContextMenu } from "./block-context-menu";
 import { collapseBlockSelection } from "./block-selection";
 
 export interface BlockHandleProps {
   editor: Editor;
+  // See BlockContextMenuProps.isBlockIdPersisted.
+  isBlockIdPersisted?: (blockId: string) => boolean;
 }
 
 const HANDLE_BUTTON_CLASS =
   "flex size-6 items-center justify-center rounded-md text-fg-muted outline-none transition-colors hover:bg-hover focus-visible:ring-2 focus-visible:ring-ring";
 
-export function BlockHandle({ editor }: BlockHandleProps) {
+export function BlockHandle({ editor, isBlockIdPersisted }: BlockHandleProps) {
   // Tracked via a ref, not state: `onNodeChange` fires on every pointer
   // move over the gutter, and this value is only read once, on the "+"
   // click — a re-render per hover frame would be wasted work.
@@ -110,14 +113,27 @@ export function BlockHandle({ editor }: BlockHandleProps) {
         >
           <Plus aria-hidden="true" size={16} strokeWidth={1.75} />
         </button>
-        <button
-          type="button"
-          aria-label="Arrastrar bloque"
-          data-testid="block-drag-handle"
-          className={`${HANDLE_BUTTON_CLASS} cursor-grab`}
+        {/* E2 scope A: the SAME grip both drags (native HTML5 drag,
+            @tiptap/extension-drag-handle-react's own behavior on this
+            element) and, on a plain click (no pointer movement — browsers
+            fire "click" instead of "dragstart" for that), opens the block
+            context menu below. `getHoveredPos` re-reads `hoveredRef` at
+            open time rather than closing over a stale value from whenever
+            this render happened. */}
+        <BlockContextMenu
+          editor={editor}
+          getHoveredPos={() => hoveredRef.current?.pos ?? null}
+          isBlockIdPersisted={isBlockIdPersisted}
         >
-          <GripVertical aria-hidden="true" size={16} strokeWidth={1.75} />
-        </button>
+          <button
+            type="button"
+            aria-label="Opciones del bloque"
+            data-testid="block-drag-handle"
+            className={`${HANDLE_BUTTON_CLASS} cursor-grab`}
+          >
+            <GripVertical aria-hidden="true" size={16} strokeWidth={1.75} />
+          </button>
+        </BlockContextMenu>
       </div>
     </DragHandle>
   );

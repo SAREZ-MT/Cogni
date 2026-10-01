@@ -22,8 +22,11 @@ describe("placeholder extension", () => {
     try {
       const paragraph = editor.view.dom.querySelector("p");
       expect(paragraph?.classList.contains("is-empty")).toBe(true);
+      // E1 (editor pass, goal doc §2): "Type / for commands" is the Tiptap
+      // Notion-like template's own standard copy — updated from the older
+      // "Escribe algo o presiona / para insertar un bloque".
       expect(paragraph?.getAttribute("data-placeholder")).toBe(
-        "Escribe algo o presiona / para insertar un bloque",
+        "Escribe / para ver los comandos",
       );
     } finally {
       editor.destroy();

@@ -16,6 +16,8 @@ export {
   getNotebookTitleForRoute,
   getPageForRoute,
   getSidebarTree,
+  listPagesForMention,
+  type MentionPageCandidate,
   registerPageAsset,
   renameNotebook as renameNotebookAction,
   renamePage as renamePageAction,
@@ -98,4 +100,8 @@ export {
   type PageActionsSlotTarget,
 } from "./ui/notebook-actions-slot";
 export { NotebookCardActions } from "./ui/notebook-card-actions";
+export {
+  PageTitleEditor,
+  type PageTitleEditorProps,
+} from "./ui/page-title-editor";
 export { SidebarTree } from "./ui/sidebar-tree";

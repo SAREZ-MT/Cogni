@@ -68,8 +68,11 @@ test.describe("slash command menu", () => {
     await expect(menu).toBeVisible();
     // S6a defect fix: same strict-mode collision as "/cita" above — the
     // description "Tabla editable de filas y columnas" also contains
-    // "tabla".
-    await expect(menu.getByRole("option", { name: /^Tabla/ })).toBeVisible();
+    // "tabla", and the template block set adds "Tabla de contenidos",
+    // which also starts with "Tabla".
+    await expect(
+      menu.getByRole("option", { name: /^Tabla(?! de contenidos)/ }),
+    ).toBeVisible();
 
     await page.keyboard.press("Enter");
 

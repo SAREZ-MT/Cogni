@@ -222,6 +222,56 @@ describe("notebooks Server Actions", () => {
     });
   });
 
+  describe("listPagesForMention", () => {
+    beforeEach(() => {
+      getCurrentUser.mockResolvedValue({ id: OWNER_ID, email: "a@b.com" });
+    });
+
+    it("flattens the owner's pages with their notebook's id and title", async () => {
+      const { createNotebook, createPage, listPagesForMention } = await import(
+        "./actions"
+      );
+      const notebook = await createNotebook({ title: "Cuaderno mención" });
+      const page = await createPage({ notebookId: notebook.id });
+
+      const candidates = await listPagesForMention();
+
+      expect(candidates).toContainEqual({
+        id: page.id,
+        title: page.title,
+        notebookId: notebook.id,
+        notebookTitle: "Cuaderno mención",
+      });
+    });
+
+    it("does not list pages owned by another user", async () => {
+      const { createNotebook, createPage, listPagesForMention } = await import(
+        "./actions"
+      );
+      const notebook = await createNotebook({ title: "Cuaderno ajeno" });
+      const page = await createPage({ notebookId: notebook.id });
+
+      getCurrentUser.mockResolvedValue({
+        id: "9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d",
+        email: "otro@b.com",
+      });
+      const candidates = await listPagesForMention();
+
+      expect(candidates.map((candidate) => candidate.id)).not.toContain(
+        page.id,
+      );
+    });
+
+    it("rejects without a session, like every other notebooks Server Action", async () => {
+      getCurrentUser.mockResolvedValue(null);
+      const { listPagesForMention } = await import("./actions");
+
+      await expect(listPagesForMention()).rejects.toThrow(
+        "Debes iniciar sesión para continuar.",
+      );
+    });
+  });
+
   // design.md, "notebooks como único puerto de persistencia hacia el
   // editor": saveContent/getCurrentContent must structurally satisfy
   // SavePagePort (Result-returning, never throwing on a domain error) so

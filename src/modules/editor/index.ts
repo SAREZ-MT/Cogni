@@ -15,6 +15,7 @@ export type {
   ImageUploadPort,
   PageAssetSummary,
 } from "./domain/image-upload-port";
+export type { MentionCandidate, MentionPort } from "./domain/mention-port";
 export type {
   SavePagePort,
   TiptapDoc,
@@ -22,3 +23,4 @@ export type {
 } from "./domain/save-page-port";
 export type { EditorProps } from "./ui/tiptap/editor";
 export { Editor } from "./ui/tiptap/editor";
+export type { SlashCommandItem } from "./ui/tiptap/slash-command-items";

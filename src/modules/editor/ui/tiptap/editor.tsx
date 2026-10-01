@@ -1,16 +1,19 @@
 "use client";
 
 import { EditorContent, useEditor } from "@tiptap/react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useAutosave } from "../../application/use-autosave";
 import type { ImageUploadPort } from "../../domain/image-upload-port";
+import type { MentionPort } from "../../domain/mention-port";
 import type { SavePagePort, TiptapDoc } from "../../domain/save-page-port";
 import { ConflictBanner } from "../conflict-banner";
 import { SaveStatus } from "../save-status";
 import { BlockHandle } from "./block-handle";
+import { collectBlockIds, isBlockIdOnlyChange } from "./block-ids";
 import { BubbleToolbar } from "./bubble-toolbar";
 import { createEditorExtensions } from "./extensions";
+import type { SlashCommandItem } from "./slash-command-items";
 import { toPlainTiptapDoc } from "./to-plain-tiptap-doc";
 
 export interface EditorProps {
@@ -22,6 +25,16 @@ export interface EditorProps {
   // read-only view) can omit it; the image block then shows a friendly
   // error instead of throwing (image-node.tsx).
   imagePort?: ImageUploadPort;
+  // E1 (goal doc §2, "@" mentions): injected by the app composition root
+  // (mention-port.ts's header comment explains why editor/ui can't import
+  // notebooks directly). Omitted (or a unit test rendering Editor alone)
+  // means the "@" popup always resolves an empty list.
+  mentionPort?: MentionPort;
+  // E1 (coordinator addition, "Importar PDF" slash item): extra items
+  // appended to SLASH_COMMAND_ITEMS, e.g. the composition root's PDF import
+  // bridge (page-editor.tsx) — see slash-command.tsx's SlashCommandOptions
+  // for why this can't just live inside slash-command-items.ts.
+  extraSlashItems?: SlashCommandItem[];
   // S7 (odd/tasks/app-shell-restyle.md, drift #1): id of a DOM element
   // (rendered by PageHeader's statusSlot) to portal the autosave
   // SaveStatus into, so it sits in the page header's meta row next to
@@ -43,6 +56,8 @@ export function Editor({
   initialVersion,
   port,
   imagePort,
+  mentionPort,
+  extraSlashItems,
   statusPortalId,
 }: EditorProps) {
   // The slot element (rendered by PageHeader) doesn't exist yet on the
@@ -64,6 +79,7 @@ export function Editor({
     content,
     conflictDraft,
     reconcileVersion,
+    savedContent,
     setContent,
     flush,
     restoreDraft,
@@ -75,14 +91,34 @@ export function Editor({
     port,
   });
 
+  // Ids already stored on the server: "Copiar enlace" is only offered for
+  // those. Read through a ref so the predicate handed down stays stable.
+  const persistedBlockIdsRef = useRef<Set<string>>(new Set());
+  persistedBlockIdsRef.current = useMemo(
+    () => collectBlockIds(savedContent),
+    [savedContent],
+  );
+  const isBlockIdPersisted = useCallback(
+    (blockId: string) => persistedBlockIdsRef.current.has(blockId),
+    [],
+  );
+
   const editor = useEditor({
     extensions: createEditorExtensions({
       pageId,
       imagePort: imagePort ?? null,
+      mentionPort: mentionPort ?? null,
+      extraSlashItems: extraSlashItems ?? [],
     }),
     content: initialContent as unknown as Record<string, unknown>,
     immediatelyRender: false,
-    onUpdate: ({ editor: current }) => {
+    onUpdate: ({ editor: current, transaction }) => {
+      // Opening a page is not editing it: the transaction UniqueID
+      // dispatches to label legacy blocks changes nothing but ids, and
+      // saving it would bump `updatedAt` (Home's recency metrics). The ids
+      // reach the server with the next real edit, which always sends the
+      // whole live document.
+      if (isBlockIdOnlyChange(transaction.before, current.state.doc)) return;
       setContent(toPlainTiptapDoc(current.getJSON()));
     },
   });
@@ -171,7 +207,9 @@ export function Editor({
       {/* S6b (odd/tasks/app-shell-restyle.md): per-block "⋮⋮" drag handle +
           "+" insert in the left gutter, matching the Tiptap docs
           Notion-style editor. */}
-      {editor ? <BlockHandle editor={editor} /> : null}
+      {editor ? (
+        <BlockHandle editor={editor} isBlockIdPersisted={isBlockIdPersisted} />
+      ) : null}
       {/* T13b (design fidelity, docs/design-system/screenshots/editor.png):
           `.editor-content` (src/app/globals.css) styles the real
           ProseMirror output against the Cogni type scale instead of
