@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { requireDesignPreviews } from "@/shared/config/design-previews";
 import { SetBreadcrumb } from "../../../_components/breadcrumb";
 import { FlashcardPlayer } from "../../_components/flashcard-player";
 import {
@@ -20,6 +21,7 @@ interface FlashcardsSessionPageProps {
 export default async function FlashcardsSessionPage({
   params,
 }: FlashcardsSessionPageProps) {
+  requireDesignPreviews();
   const { notebookId, pageId } = await params;
   const notebook = getSampleNotebook(notebookId);
   if (!notebook) notFound();
