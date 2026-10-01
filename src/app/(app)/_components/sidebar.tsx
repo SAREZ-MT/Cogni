@@ -14,6 +14,7 @@ import {
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { useState } from "react";
+import { PanelToggleButton } from "@/shared/ui/panel-toggle-button";
 import { cn } from "@/shared/ui/utils";
 import { Logo } from "./logo";
 import { type NavEntry, resolveNavEntry } from "./nav-entries";
@@ -142,17 +143,14 @@ export function Sidebar({
         )}
       >
         <Logo collapsed={collapsed} />
-        <button
-          type="button"
+        <PanelToggleButton
+          icon={PanelLeft}
           onClick={toggle}
           aria-expanded={!collapsed}
           aria-label={
             collapsed ? "Expandir barra lateral" : "Contraer barra lateral"
           }
-          className="flex size-[26px] shrink-0 items-center justify-center rounded-md border border-neutral-200/70 bg-neutral-0/60 text-fg-muted transition-colors duration-200 ease-default hover:bg-neutral-0/90 hover:text-fg-secondary"
-        >
-          <PanelLeft aria-hidden="true" size={15} strokeWidth={1.75} />
-        </button>
+        />
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto pt-1">

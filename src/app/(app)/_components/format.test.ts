@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatTimeAgo, greetingForHour } from "./format";
+import { formatTimeAgo, formatUpdatedAt, greetingForHour } from "./format";
 
 describe("greetingForHour", () => {
   it.each([
@@ -74,5 +74,11 @@ describe("formatTimeAgo", () => {
     expect(formatTimeAgo(new Date("2020-01-01T12:00:00.000Z"), now)).toBe(
       "hace 6 años",
     );
+  });
+});
+
+describe("formatUpdatedAt", () => {
+  it("formats a short Spanish day and month", () => {
+    expect(formatUpdatedAt(new Date(2026, 8, 3, 12))).toBe("3 sept");
   });
 });

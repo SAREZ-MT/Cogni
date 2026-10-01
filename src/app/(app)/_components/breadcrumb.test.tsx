@@ -132,3 +132,73 @@ describe("Breadcrumb", () => {
     expect(renders).toEqual(["Inicio", "Biología"]);
   });
 });
+
+describe("Breadcrumb links", () => {
+  function renderTrail() {
+    return render(
+      <BreadcrumbProvider>
+        <SetBreadcrumb
+          items={[
+            { label: "Cuadernos", href: "/notebooks" },
+            { label: "Biología", href: "/notebooks/nb1" },
+            { label: "Mitosis" },
+          ]}
+        />
+        <Breadcrumb />
+      </BreadcrumbProvider>,
+    );
+  }
+
+  it("links the root and every intermediate segment to its screen", () => {
+    renderTrail();
+
+    expect(screen.getByRole("link", { name: "Cogni" })).toHaveAttribute(
+      "href",
+      "/",
+    );
+    expect(screen.getByRole("link", { name: "Cuadernos" })).toHaveAttribute(
+      "href",
+      "/notebooks",
+    );
+    expect(screen.getByRole("link", { name: "Biología" })).toHaveAttribute(
+      "href",
+      "/notebooks/nb1",
+    );
+  });
+
+  it("never links the current (last) segment and marks it aria-current=page", () => {
+    renderTrail();
+
+    expect(
+      screen.queryByRole("link", { name: "Mitosis" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("Mitosis")).toHaveAttribute("aria-current", "page");
+  });
+
+  it("does not link the last segment even when it carries an href", () => {
+    render(
+      <BreadcrumbProvider>
+        <SetBreadcrumb items={[{ label: "Cuadernos", href: "/notebooks" }]} />
+        <Breadcrumb />
+      </BreadcrumbProvider>,
+    );
+
+    expect(
+      screen.queryByRole("link", { name: "Cuadernos" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("renders a segment without href as plain text", () => {
+    render(
+      <BreadcrumbProvider>
+        <SetBreadcrumb items={[{ label: "Biología" }, { label: "Mitosis" }]} />
+        <Breadcrumb />
+      </BreadcrumbProvider>,
+    );
+
+    expect(
+      screen.queryByRole("link", { name: "Biología" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("Biología")).toBeInTheDocument();
+  });
+});

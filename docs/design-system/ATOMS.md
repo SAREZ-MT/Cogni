@@ -108,6 +108,24 @@ Used by: `app/(app)/page.tsx` (zero-notebooks, `plain`), `notebooks/page.tsx`
 The ⌘/H shortcut chip. Used by `nav-item.tsx` (once per key in a shortcut
 array).
 
+## BackLink (`back-link.tsx`)
+
+Eyebrow-row "back" affordance (user feedback, design/shell-look: the notebook
+detail screen and the editor had no way back except the sidebar). A muted
+`next/link` with a leading `ArrowLeft` (Lucide, size 15, strokeWidth 1.75)
+that only picks up `text-fg` contrast on hover/focus — Notion-style, never a
+full button.
+
+- `href`, `children` (the label), `className?` (forwarded via `cn()`).
+- Style: `inline-flex items-center gap-1.5`, 13px, `text-fg-muted
+  hover:text-fg`, `-ml-1 rounded-md px-1 py-0.5 transition-colors`,
+  `self-start`, `focus-visible:ring-2 focus-visible:ring-ring`.
+
+Used by: `notebooks/[notebookId]/page.tsx` (`<BackLink href="/notebooks">`,
+first child of the section, above `SectionHeader`), `notebooks/[notebookId]/
+pages/[pageId]/page.tsx` (`<BackLink href={/notebooks/${notebookId}}>`, first
+child of the centered `max-w-2xl` column, above `PageHeader`).
+
 ## Button
 
 Audited for hand-rolled duplication; the existing `default | outline |
@@ -121,6 +139,114 @@ color or focus ring — extending `buttonVariants` for a single call site
 would relocate duplication rather than remove it, and reusing `Button` with
 enough overrides to stay pixel-exact would be more fragile than the plain
 element. Left as native elements; not part of this pass's scope.
+
+## PanelToggleButton (`panel-toggle-button.tsx`)
+
+The 26x26 bordered collapse/expand button (`rounded-md`, `border-neutral-200/70`,
+`bg-neutral-0/60`, muted icon). Extracted from `sidebar.tsx`, which inlined
+this exact markup for its own `PanelLeft` toggle — the refactor is
+zero-visual-change (same classes/DOM, only the icon and aria attributes now
+come in as props).
+
+- `icon`: any `LucideIcon`. `size`/`strokeWidth`: default `15`/`1.75`
+  (Sidebar's size); the techniques panel passes `size={12}` to match its
+  smaller reference chrome.
+- Forwards `onClick`, `aria-expanded`, `aria-label`, `data-testid`, etc. via
+  `React.ComponentProps<"button">` (minus `children`/`type`, which the atom
+  owns).
+
+Used by: `sidebar.tsx` (`PanelLeft`), `techniques-panel.tsx`
+(`PanelRightOpen`/`PanelRightClose`).
+
+## SidePanel (`side-panel.tsx`)
+
+The floating collapsible card shell behind the "Técnicas" panel
+(design/shell-look, studyplatform `StudyPanel.tsx` style reference: 264px
+expanded / 52px collapsed, `rounded-xl`, 220ms width transition). Reuses the
+exact chrome classes the main Sidebar/content-area cards already use
+(`border-neutral-200/60 bg-card shadow-card`) instead of the reference's raw
+box-shadow literal.
+
+- `collapsed`, `width`/`collapsedWidth` (px numbers, default 264/52), `side`
+  (`"left" | "right"`, default `"right"`; only `"right"` is currently styled
+  — a left-side variant is a follow-up if a future panel needs one).
+- `header`/`collapsedContent`/`children` are raw slots: the shell owns only
+  the header row's alignment/padding/border (centered when collapsed,
+  space-between when expanded) and the scrollable body wrapper — the caller
+  builds the actual header content for each state and the body content.
+- Root is a semantic `<aside>`; `aria-label`/`data-testid` forward onto it,
+  and `data-collapsed`/`data-side` are set from props automatically.
+
+Used by: `techniques-panel.tsx` (only consumer so far). The main `Sidebar`
+was **not** migrated onto `SidePanel` in this pass — its collapse/expand,
+cookie, and section-list anatomy differ enough (nav sections, user footer,
+sticky positioning) that migrating it is a separate, not-zero-visual-change
+refactor; left as a documented follow-up.
+
+## TechniqueCard / TechniqueIconStrip (`technique-card.tsx`)
+
+The study-technique cards used by the "Técnicas" panel's expanded body and
+its collapsed icon strip (design/shell-look, studyplatform `StudyPanel.tsx`
+anatomy).
+
+- `TechniqueCard`: icon tile (`IconTile` size `"30"` — closest existing
+  token to the reference's 32px — radius `"md"`) + name + description, a
+  muted meta line, and a disabled action `Button` + `Pill` "pronto". The
+  button stays the technique's tone color at `disabled:opacity-50` (Button's
+  own disabled state) rather than going fully gray, so the panel still
+  "reads colourful and alive" while every action is inert (no technique is
+  built yet).
+- `TechniqueIconStrip`: the collapsed-state 36x36 tinted tile (`IconTile`
+  size `"36"` radius `"input"`) with a native `title` tooltip; `opacity-35`
+  when `available` is false (default).
+- `TechniqueTone`: `"primary" | "green" | "pink"` — mapped onto **existing**
+  `IconTile`/`Pill` tones, not new ones. `primary` (violet) already matches
+  the reference's flashcards brand color; `green`/`pink` already match its
+  active-recall/exam hex pairs almost exactly (`pastel-pink-fg` #9b2c4a is
+  an exact match for the reference's exam color). No new tone was needed.
+
+Used by: `techniques-panel.tsx`.
+
+**Preview gate.** The "Técnicas" panel advertises flashcards, active recall
+and exams, which are sample-data previews until their routes land. The page
+route (`pages/[pageId]/page.tsx`) computes `designPreviewsEnabled()` on the
+server and only renders `TechniquesPanel` when it is true, so production
+shows no panel and the layout's `display: contents` slot adds no space.
+
+## ViewToggle (`view-toggle.tsx`)
+
+The segmented grid/list control (`LayoutGrid`/`List` icons, `rounded-input`
+border, `bg-neutral-100` track, active option gets `bg-card` + `shadow-xs`).
+Extracted from `notebooks/page.tsx` (design pass 2 atoms-first rule) so
+`notebooks/[notebookId]/page.tsx` could reuse the identical control for its
+page list — zero visual change on `/notebooks`.
+
+- `value`: `"grid" | "list"`.
+- `hrefFor`: `(view) => string` — builds each option's `Link` href, so the
+  choice is server-rendered and persisted in that route's own `?view=` URL
+  param (default grid) instead of client state.
+- `className`: forwarded onto the root via `cn()`.
+- Options (`aria-label` "Ver como cuadrícula"/"Ver como lista",
+  `aria-current`) are fixed at two — grid/list is the only case both
+  screens need — not a generic `options` prop.
+
+Used by: `notebooks/page.tsx`, `notebooks/[notebookId]/page.tsx`.
+
+## List-row molecules: NotebookListRow / PageListRow
+
+`notebook-list-row.tsx` and `page-list-row.tsx` (`app/(app)/_components/`)
+are the Notion/file-explorer-style rows a `ViewToggle`'s `list` option
+renders inside one `Card`: a divider (`border-b border-border-subtle
+last:border-b-0`), `hover:bg-hover`, an `IconTile` (size `28`, radius
+`md`), a stretched-link title, a right-aligned muted meta column, a
+`relative z-10` hover action (`NotebookCardActions` /
+`ArchivePageButton`) so it stays clickable over the stretched link, and a
+trailing muted `ChevronRight` (16/1.75). `PageListRow` reuses
+`formatUpdatedAt` (`_components/format.ts`) for its "Actualizada {d MMM}"
+column, the same formatter the page-card grid uses.
+
+Used by: `notebooks/page.tsx` (`NotebookListRow`),
+`notebooks/[notebookId]/page.tsx` (`PageListRow`).
 
 ## DropdownMenu / Popover (`dropdown-menu.tsx`)
 

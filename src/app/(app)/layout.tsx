@@ -12,6 +12,7 @@ import {
   SIDEBAR_COLLAPSED,
   SIDEBAR_COOKIE,
 } from "./_components/sidebar-cookie";
+import { TechniquesPanelSlot } from "./_components/techniques-panel-slot";
 import { Topbar } from "./_components/topbar";
 
 // Authenticated shell. The proxy already redirects anonymous visitors; the
@@ -66,6 +67,14 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
               </NotebookActions>
             </main>
           </div>
+          {/* design/shell-look: portal target for the page-editor route's
+              "Técnicas" panel (TechniquesPanel) — a sibling after the
+              content card, at the same flex level as Sidebar, so a
+              portaled panel renders as a third floating card. Empty/
+              `contents` on every other route; see techniques-panel-slot.tsx
+              for why this accepts a brief client-side reflow instead of
+              server-detecting the active route here. */}
+          <TechniquesPanelSlot />
         </div>
       </BreadcrumbProvider>
     </QueryProvider>

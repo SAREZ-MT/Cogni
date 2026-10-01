@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   createContext,
   type ReactNode,
@@ -12,6 +13,11 @@ import { cn } from "@/shared/ui/utils";
 
 export interface BreadcrumbItem {
   label: string;
+  // Intermediate segments (e.g. "Cuadernos", a notebook's own title) link
+  // back to that screen — user feedback: the only way back used to be the
+  // sidebar. The trail's last segment never gets one; it stays the
+  // `aria-current="page"` plain-text label for where you already are.
+  href?: string;
 }
 
 // Fallback trail when no page route has published its own yet (comp-
@@ -88,7 +94,10 @@ export function SetBreadcrumb({ items }: SetBreadcrumbProps) {
 // (decorative), last segment `text-fg` weight 500.
 export function Breadcrumb() {
   const published = useBreadcrumb();
-  const segments: BreadcrumbItem[] = [{ label: "Cogni" }, ...published];
+  const segments: BreadcrumbItem[] = [
+    { label: "Cogni", href: "/" },
+    ...published,
+  ];
 
   return (
     <nav aria-label="Ruta de navegación">
@@ -101,9 +110,21 @@ export function Breadcrumb() {
               className="flex items-center gap-1.5"
             >
               {index > 0 && <span aria-hidden="true">›</span>}
-              <span className={cn(isLast && "font-medium text-fg")}>
-                {segment.label}
-              </span>
+              {!isLast && segment.href ? (
+                <Link
+                  href={segment.href}
+                  className="rounded-sm transition-colors hover:text-fg"
+                >
+                  {segment.label}
+                </Link>
+              ) : (
+                <span
+                  className={cn(isLast && "font-medium text-fg")}
+                  aria-current={isLast ? "page" : undefined}
+                >
+                  {segment.label}
+                </span>
+              )}
             </li>
           );
         })}
