@@ -266,7 +266,6 @@ through. Fixed to the real design-system tokens instead: `bg-card`,
 `text-fg`, `border-border-default` (white card, radius 12, shadow-md, same
 chrome as the CommandMenu "/" slash menu atom).
 
-<<<<<<< HEAD
 Same fix, applied atom by atom (atoms-first rule), so every floating surface
 shares one chrome (`rounded-xl border border-border-default bg-card shadow-md`):
 
@@ -281,7 +280,7 @@ shares one chrome (`rounded-xl border border-border-default bg-card shadow-md`):
 
 Tests: `dropdown-menu.test.tsx`, `popover.test.tsx` and `highlight-picker.test.tsx`
 assert the chrome so the unregistered tokens cannot come back.
-=======
+
 ## Flashcards design preview (2026-09-24)
 
 Six new atoms for the `/flashcards` design-preview screens (user decision:
@@ -382,4 +381,3 @@ task's own fallback clause covers this case.
   good, easy }`, `backHref`, `onRestart`.
 
 Used by: `flashcards/_components/flashcard-player.tsx`.
->>>>>>> 8155767 (feat(flashcards): design preview of the hub, deck list and flip-card session with sample data)
