@@ -51,12 +51,12 @@ export function ExamQuestionsView({
     : undefined;
 
   const activeQuestions = questions.filter((question) => !question.retiredAt);
-  const aiCount = activeQuestions.filter(
-    (question) => question.origin === "ai" || question.origin === "ai_variant",
-  ).length;
+  // A question with no origin renders as "IA" in its row, so the header
+  // counts it the same way.
   const manualCount = activeQuestions.filter(
     (question) => question.origin === "manual",
   ).length;
+  const aiCount = activeQuestions.length - manualCount;
 
   function openCreateDialog() {
     setEditingId(null);
