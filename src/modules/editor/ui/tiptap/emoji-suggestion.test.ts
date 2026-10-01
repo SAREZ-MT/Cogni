@@ -35,6 +35,15 @@ describe("filterEmojiItems", () => {
   });
 });
 
+describe("emoji menu item description", () => {
+  it("humanizes snake_case names into spaced words", () => {
+    const item = filterEmojiItems("smiley").find((i) => i.name.includes("_"));
+    expect(item).toBeDefined();
+    expect(item?.description).toBe(item?.name.replace(/_/g, " "));
+    expect(item?.description).not.toContain("_");
+  });
+});
+
 describe("createEmojiSuggestion", () => {
   it("resolves items from the query through the same filter", () => {
     const suggestion = createEmojiSuggestion();
