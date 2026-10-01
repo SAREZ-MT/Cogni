@@ -10,7 +10,7 @@
 //
 // - `mentionPort` (goal doc §2, "@" mentions): backed by notebooks'
 //   `listPagesForMention` Server Action, fetched once and cached for the
-//   life of this component — mentioning a page rarely needs live results,
+//   life of this component (a failed fetch is never cached) — mentioning a page rarely needs live results,
 //   and this avoids a network round-trip per keystroke after "@".
 // - `extraSlashItems` (coordinator addition, "Importar PDF"): reuses
 //   ingestion's *existing* `usePdfImport()` hook (already mounted app-wide
@@ -56,7 +56,15 @@ export function PageEditor({ notebookId, ...editorProps }: PageEditorProps) {
   const mentionPort: MentionPort = useMemo(
     () => ({
       async search(query) {
-        candidatesRef.current ??= listPagesForMention();
+        if (!candidatesRef.current) {
+          const lookup = listPagesForMention();
+          candidatesRef.current = lookup;
+          // A failed lookup must not stay cached: drop it (only if it is
+          // still the cached one) so the next "@" tries again.
+          lookup.catch(() => {
+            if (candidatesRef.current === lookup) candidatesRef.current = null;
+          });
+        }
         const all = await candidatesRef.current;
         const normalized = query.trim().toLowerCase();
         const matches = normalized
