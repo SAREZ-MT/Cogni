@@ -288,6 +288,26 @@ describe("PageTitleEditor", () => {
     expect(renamePage).toHaveBeenCalledTimes(2);
   });
 
+  it("never resends an older failed value while a newer save is still in flight", async () => {
+    renamePage.mockRejectedValueOnce(new Error("boom"));
+    renamePage.mockReturnValueOnce(new Promise<void>(() => {}));
+    render(<PageTitleEditor pageId="p1" initialTitle="" />);
+
+    type("Viejo");
+    fireEvent.blur(input());
+    await settle();
+    type("Nuevo");
+    fireEvent.blur(input());
+    fireEvent.blur(input());
+    await settle();
+
+    expect(renamePage).toHaveBeenCalledTimes(2);
+    expect(renamePage).not.toHaveBeenLastCalledWith({
+      pageId: "p1",
+      title: "Viejo",
+    });
+  });
+
   it("never resends an older failed value after a newer one saved", async () => {
     renamePage.mockRejectedValueOnce(new Error("boom"));
     render(<PageTitleEditor pageId="p1" initialTitle="" />);

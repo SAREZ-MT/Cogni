@@ -163,6 +163,9 @@ export function PageTitleEditor({
     // from a paste, on top of Enter itself being prevented below.
     const value = event.target.value.replace(/\n/g, "");
     typedRef.current = value;
+    // A newer edit supersedes an older failed value: flushing must never
+    // resend the stale one (it could land after the newer save).
+    failedRef.current = null;
     setTitle(value);
     scheduleSave(value);
   }
