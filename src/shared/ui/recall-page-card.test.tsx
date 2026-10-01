@@ -11,7 +11,7 @@ const BASE: RecallPageCardProps = {
   sessionCount: 2,
   mastery: 80,
   aiCorrect: 6,
-  aiPartial: 1,
+  aiPartial: 2,
   aiIncorrect: 1,
 };
 
@@ -38,7 +38,7 @@ describe("RecallPageCard", () => {
     render(<RecallPageCard {...BASE} />);
 
     expect(screen.getByText("80%")).toBeInTheDocument();
-    expect(screen.getByText("6✓ · 1~ · 1✗")).toBeInTheDocument();
+    expect(screen.getByText("6✓ · 2~ · 1✗")).toBeInTheDocument();
     expect(screen.getByText("Repasar →")).toBeInTheDocument();
   });
 
