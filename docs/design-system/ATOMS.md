@@ -933,3 +933,204 @@ Cogni's `Dialog` atom (not a separate `shared/ui` file — it's a single
 call site with no reuse elsewhere, same reasoning as the plain-element
 buttons documented under Button above). `data-testid=
 "submit-confirm-dialog"`.
+
+## Dashboard v2 (2026-09-25, design/shell-look)
+
+A full rebuild of `/dashboard` (design-only, no backend). The user rejected
+the 2026-09-25 v1 layout ("too many charts, loud colours, not focused on
+week-over-week progress and feedback"). v2 follows the user's reference
+screenshot's grid (a dark analytics dashboard — kept LIGHT with Cogni
+tokens): hero + key insight, main activity chart + accuracy ring, 3 KPI
+tiles, a notebook-progress list + a calibration table, then the
+per-technique cards and the strengths/weaknesses lists carried over from
+v1. Charts stay MONOCHROME (never distinguishing a series by hue alone) —
+the reference's own restraint, not StudyPlatform's.
+
+**Removed** (v1 atoms/components no longer used by any screen):
+`mastery-heatmap.tsx`, `stacked-level-bar.tsx`, `quadrant-scatter.tsx`,
+`notebook-filter.tsx`, `radial-progress.tsx` (`shared/ui/`); `calibration.tsx`,
+`mastery-curve.tsx`, `mastery-heatmap-section.tsx`, `review-load.tsx`,
+`technique-metrics.tsx` (`dashboard/_components/`). The `?notebook=` filter
+is gone entirely — v2 always shows every notebook, so `NotebookFilter` had
+no remaining call site.
+
+**Kept unchanged:** `chart.tsx`, `mastery-level.ts`, `kpi-card.tsx`
+(no longer used by the dashboard itself, but not deleted — still a generic,
+documented atom), `sparkline.tsx`, `dot-streak.tsx`, `concept-bar-list.tsx`.
+
+### ChartCard (`chart-card.tsx`) — extended
+
+Gained two optional props for the v2 icon-header cards
+(`ActivityChart`/`AccuracyRing`/`TechniqueActivity`/`CalibrationTable`):
+`icon` (rendered before eyebrow/title, `flex items-center gap-2.5`) and
+`divider` (a `border-b border-border-subtle` hairline between the header
+row and the `<figure>` body — matches the reference screenshot's header
+rule under "Sales Overview"/"Sales Distribution"). Both default to
+unset/`false`, so every other existing call site is unaffected.
+
+### IconTile (`icon-tile.tsx`) — new `rose` tone
+
+Added `tone="rose"` (`bg-rose-500/10 text-rose-600`) — the exact pair
+`Pill`'s existing `rose` tone already uses (no `--color-rose-100` token
+exists). Needed so the Exámenes technique's icon tile matches its
+established brand colour (used by `TechniqueActivity`'s per-card header).
+
+### PeriodFilter (`period-filter.tsx`) — range values changed
+
+`DashboardRange` is now `7 | 15 | 30` (was `7 | 30 | 90`) per this pass's
+brief. Same segmented 3-option `Link` control, only the values/labels
+changed (`"15 días"` replaces `"90 días"`).
+
+### LevelStrip (`level-strip.tsx`) — new
+
+Row 1 "Dominio global" key-insight strip: one thin (3px) vertical bar per
+page, height proportional to score, coloured by `mastery-level.ts`'s solid
+tone scale — the reference's dense vertical-bar sparkline, kept
+per-level-coloured instead of one flat tone so a glance still shows "how
+many pages at each level". A pure-CSS `group`-hover/focus tooltip (page ·
+nivel · score%) keeps it server-renderable, same pattern `MasteryHeatmap`
+used. A 3-tone legend (Aprendiendo/Consolidando/Dominado — "Nuevo" omitted,
+matching the widget's own 3-tone legend requirement) renders below.
+
+- `bars: { id, label, level, score }[]`, `className?`.
+
+Used by: `dashboard/_components/mastery-insight.tsx`.
+
+### DashedRing (`dashed-ring.tsx`) — new, replaces RadialProgress
+
+Row 3 "Tasa de acierto" ring: a plain SVG (two `<circle>`s, no Recharts) —
+the TRACK is a genuinely dashed circle (`stroke-dasharray="2 6"`), which a
+Recharts `RadialBarChart`'s solid background arc couldn't do; the
+progress arc is a second circle with `stroke-dasharray`/rotated -90deg so
+it starts at 12 o'clock. Centered content: an icon tile, the value
+(22px/700) and an uppercase caption, server-renderable (no chart library
+needed for one static ring).
+
+- `value` (0-100), `icon`, `label`, `colorVar?` (default
+  `var(--color-primary-600)`), `size?` (default 160), `className?`.
+
+Used by: `dashboard/_components/accuracy-ring.tsx`.
+
+### TableHeaderButton (`table-header-button.tsx`) — new
+
+Row 7's sortable `<th>` header button: label + a direction-aware icon
+(`ChevronsUpDown` unsorted, `ArrowUp`/`ArrowDown` when active). The caller
+renders it inside a `<th aria-sort=…>` and owns the actual sort state —
+this atom is presentational only.
+
+- `children`, `direction?: "asc" | "desc"`, `onClick`, `className?`.
+
+Used by: `dashboard/_components/calibration-table.tsx` (4 sortable columns:
+Página, Autoevaluación, Resultado real, Brecha).
+
+### Dashboard route (`dashboard/page.tsx` + `_components/*`)
+
+`?range=` (`7 | 15 | 30`, default 7) is the only URL param now — no
+`?notebook=`. `data-testid`s: `dashboard` (root), `hero`, `mastery-insight`,
+`activity-chart`, `accuracy-ring`, `kpi-row`, `notebook-progress`,
+`calibration-table`, `technique-activity`, `concepts`.
+
+- **`hero.tsx`** (`DashboardHero`, Row 1 wide): "Buenos días, {nombre}" +
+  a feedback sentence built from `heroFeedback()` (the same
+  `dominioGlobalInsight()` delta and the weakest notebook from
+  `notebookProgressRows()` — never a second, independently-typed number),
+  a primary `Button` "Ver repasos de hoy →" to `/`, and a purely decorative
+  inline SVG (`primary-50/100/200` shapes, `aria-hidden`, no emoji).
+- **`mastery-insight.tsx`** (`MasteryInsight`, Row 1 narrow): "Dominio
+  global" — big %, a `success`/`error`-toned delta line, `LevelStrip`.
+- **`activity-chart.tsx`** (`ActivityChart`, Row 3 wide, `"use client"`):
+  "Actividad de repaso" — title, big value + delta line, a 3-dot legend row
+  + `PeriodFilter` (7/15/30), then a stacked `BarChart` — one bar per day,
+  MONOCHROME series (`neutral-900`/`neutral-500`/`neutral-300` for
+  Flashcards/Active recall/Exámenes), `radius=[4,4,0,0]` on the top
+  (Exámenes) segment only, a dashed `CartesianGrid`, and (15/30 días only)
+  a light dashed `ReferenceLine` + "Sem N" label at every Monday so the
+  chart reads day-by-day AND week-by-week. X-axis ticks: every day at 7
+  días; a custom tick component prints a label only every 5th index at
+  15/30 días (`ActivityTick`) so 30 bars never overlap.
+- **`accuracy-ring.tsx`** (`AccuracyRing`, Row 3 narrow): "Tasa de
+  acierto" — a review-volume-weighted overall accuracy inside `DashedRing`,
+  plus a 3-row technique breakdown (dot + label + accuracy% + delta).
+- **`kpi-row.tsx`** (`KpiRow`, Row 5): 3 tiles (racha de repasos / ítems
+  vencidos / páginas dominadas), each label + big value + delta pill +
+  icon tile (`Flame`/`AlarmClock`/`BookCheck`) + outline "Ver detalle →"
+  button. The icon-tile+button tile shape stays a route-local `KpiTile`
+  helper inside `kpi-row.tsx` (3 call sites in one file, same precedent as
+  v1's `TechniqueCard`) rather than a new `shared/ui` atom — `KpiCard`
+  (the existing shared atom) has a different anatomy (sparkline, no
+  icon/button) and stays available for any future KPI row that fits it.
+- **`notebook-progress.tsx`** (`NotebookProgress`, Row 6, simplified):
+  dropped `StackedLevelBar`/`Sparkline` — now icon tile + title +
+  "{items} ítems · {due} vencidos", a mastery `Pill`, a 1-week trend arrow,
+  and a bottom "Ver cuadernos →" button.
+- **`calibration-table.tsx`** (`CalibrationTable`, Row 7, `"use client"`):
+  replaces v1's `QuadrantScatter`. One row per page (every self-evaluated
+  concept on it averaged via `calibrationRows()`): Página (title +
+  notebook), Autoevaluación/Resultado real (0-5 averages), Brecha, a
+  Señal `Pill` (Exceso/Falta de confianza/Calibrado — same §7.4 thresholds
+  as v1, applied to the averages), and a "Repasar" link. Sortable via
+  `TableHeaderButton` (client `useState` sort key/direction), 5 rows per
+  page with Prev/Next pagination.
+- **`technique-activity.tsx`** (`TechniqueActivity`, Row 8, `"use client"`,
+  renamed from v1's `technique-metrics.tsx`): 3 cards, simplified — icon
+  tile + name header (no divider), big "Repasos completados" value + delta,
+  `DotStreak`, a 7-day mini bar chart in the technique's own tone (the only
+  place technique colours are still used strongly), a small "Acierto X%"
+  `Pill`. The per-card `RadialProgress` ring moved to the page-level
+  `AccuracyRing` widget; "tiempo de estudio" was dropped everywhere (it
+  can't be measured honestly without a real study-time log).
+- **`concepts.tsx`** (`Concepts`, Row 9): unchanged from v1 — two
+  `ConceptBarList`s (fortalezas/puntos débiles), now notebook-filter-free
+  (no `notebookId` param).
+
+### `_data/sample.ts` — rebuilt
+
+Deterministic sample data only (no `Math.random()`; the one `Date` object,
+`TODAY_ANCHOR = new Date(2026, 8, 25)`, is a fixed sample-fixture "today",
+never `Date.now()`). Kept from v1: `DASHBOARD_PAGES` (19 pages, unchanged
+scores — reused because their existing `trend` ramps already reproduce
+this pass's target numbers, see Deviations), `NOTEBOOK_WEEKLY_MASTERY` (12
+weekly points × 3 notebooks, unchanged), `TECHNIQUE_METRICS` (unchanged
+accuracy/streak/weekly-activity values — also reproduce this pass's target
+numbers unmodified), `CALIBRATION_SEEDS` (24 seeds, unchanged). New:
+`DAILY_ACTIVITY` (30 deterministic daily per-technique counts — weekday
+base arrays × a linear "recency" ramp factor, `1x` 29 days ago → `2x`
+today), `dominioGlobalInsight()`, `notebookProgressRows()`,
+`heroFeedback()`, `activityChartInsight(range)`, `accuracyRingInsight()`,
+`rachaRepasosKpi()`/`paginasDominadasKpi()`/`itemsVencidosKpi()` (no more
+`notebookId` param — always every notebook), `calibrationRows()`
+(per-page aggregation, replaces v1's per-concept scatter points/jitter).
+
+**Deviations from the brief's illustrative example numbers** (the brief's
+"Metrics per widget" section gave example values like "60% / +6 pts" and
+"128 / +18%" — most emerged exactly from real computation over the
+UNCHANGED v1 data; two are honestly derived instead of force-fit):
+
+- **Matched exactly, unmodified data:** "7 de 19" páginas dominadas (+1),
+  "62" ítems vencidos (−11), "76%" tasa de acierto general (weighted avg of
+  84/71/63 by weekly volume), and the per-technique 84/71/63 accuracy
+  values themselves — all fall out of `DASHBOARD_PAGES`/`TECHNIQUE_METRICS`
+  unchanged from v1.
+- **Derived, doesn't match the brief's illustrative "+6 pts"/"128"/"+18%":**
+  `dominioGlobalInsight()`'s 1-week delta over the real
+  `NOTEBOOK_WEEKLY_MASTERY` curve computes to a smaller delta than "+6";
+  the hero subtitle plugs in that SAME computed number (never a second,
+  independently-typed "6") so the two stay internally consistent. The
+  activity chart's total/delta% are computed from `DAILY_ACTIVITY`'s
+  formula rather than hand-fit to hit "128"/"+18%" exactly — prioritizing
+  derived-not-hardcoded correctness over matching an illustrative example.
+- **Literal sample constants (no deeper model exists yet):** `rachaRepasosKpi()`'s
+  `delta: 2` (the streak itself is derived — the longest of the three
+  technique streaks — but no "streak a week ago" log exists to derive its
+  delta from); `TechniqueMetric.repasosDeltaPct` (+12/+9/−4, one literal
+  per technique — no historical weekly-activity series exists to derive it
+  from, same category as v1's `itemsVencidosKpi` ×1.18 approximation,
+  which IS kept as a real formula since it already reproduces "−11"
+  exactly for due=62).
+
+Verification: `pnpm typecheck`, `pnpm lint` (clean on every file this pass
+touched — pre-existing, unrelated formatting findings remain in the
+untracked `.claude/skills/ui-ux-pro-max/` fixtures, outside this pass's
+scope), `pnpm depcruise`, `pnpm build`, and
+`vitest run src/app/no-inline-hex.test.ts "src/app/(app)/_components/sidebar.test.tsx"`
+— all green.
