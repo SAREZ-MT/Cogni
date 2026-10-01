@@ -88,7 +88,7 @@ describe("Sidebar", () => {
     // moved to its own "links the Exámenes nav item" test below, same
     // treatment Flashcards/Active recall already got. The remaining
     // "pronto" items in Menú principal stay disabled.
-    for (const label of ["Dashboard", "Horarios"]) {
+    for (const label of ["Horarios"]) {
       expect(
         screen.getByText(label).closest("[aria-disabled]"),
       ).toHaveAttribute("aria-disabled", "true");
@@ -189,6 +189,31 @@ describe("Sidebar", () => {
     ).not.toBeInTheDocument();
   });
 
+  // Dashboard is a design preview too: a link to /dashboard while previews
+  // are enabled, a disabled "pronto" row otherwise (its route 404s in
+  // production).
+  it("links the Dashboard nav item to /dashboard while previews are enabled", () => {
+    render(<Sidebar initialCollapsed={false} user={USER} previewsEnabled />);
+
+    expect(screen.getByRole("link", { name: "Dashboard" })).toHaveAttribute(
+      "href",
+      "/dashboard",
+    );
+  });
+
+  it("keeps Dashboard as a disabled 'pronto' row when previews are disabled", () => {
+    render(
+      <Sidebar initialCollapsed={false} user={USER} previewsEnabled={false} />,
+    );
+
+    const row = screen.getByText("Dashboard").closest("[aria-disabled]");
+    expect(row).toHaveAttribute("aria-disabled", "true");
+    expect(row).toHaveTextContent("pronto");
+    expect(
+      screen.queryByRole("link", { name: "Dashboard" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("links the Cuadernos nav item to /notebooks", () => {
     render(<Sidebar initialCollapsed={false} user={USER} previewsEnabled />);
 
@@ -211,17 +236,16 @@ describe("Sidebar", () => {
     ).toBeInTheDocument();
   });
 
-  // Design previews (Dashboard, Flashcards, Active recall, Exámenes) are
-  // sample-data screens whose routes ship in later slices; a preview without
-  // a route yet is a disabled "pronto" row whatever the server-computed flag
-  // says, so a link never points at a missing route.
+  // Every design preview (Dashboard, Flashcards, Active recall, Exámenes)
+  // has its route now; "Horarios" is the only row without one, so it stays a
+  // disabled "pronto" row whatever the server-computed flag says.
   describe.each([
     ["enabled", true],
     ["disabled", false],
   ])("with design previews %s", (_state, previewsEnabled) => {
-    // Flashcards, Active recall and Exámenes have preview routes now; their
-    // enabled/disabled states are covered by the dedicated tests above.
-    it.each(["Dashboard"])("renders %s as a disabled 'pronto' row", (label) => {
+    // The preview rows' enabled/disabled states are covered by the dedicated
+    // tests above.
+    it.each(["Horarios"])("renders %s as a disabled 'pronto' row", (label) => {
       render(
         <Sidebar
           initialCollapsed={false}

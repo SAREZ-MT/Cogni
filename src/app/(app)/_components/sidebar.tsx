@@ -64,7 +64,16 @@ const MAIN_SECTION: { label: string; items: NavEntry[] } = {
       label: "Cuadernos",
       isActive: (path) => path.startsWith("/notebooks"),
     },
-    { icon: BarChart3, label: "Dashboard", disabled: true, hint: "pronto" },
+    {
+      icon: BarChart3,
+      label: "Dashboard",
+      disabled: true,
+      hint: "pronto",
+      preview: {
+        href: "/dashboard",
+        isActive: (path) => path.startsWith("/dashboard"),
+      },
+    },
     { icon: Calendar, label: "Horarios", disabled: true, hint: "pronto" },
   ],
 };

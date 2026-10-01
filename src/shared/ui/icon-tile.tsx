@@ -63,6 +63,11 @@ const iconTileVariants = cva("flex shrink-0 items-center justify-center", {
       warning: "bg-warning-100 text-warning-600",
       error: "bg-error-100 text-error-500",
       info: "bg-info-100 text-info-600",
+      // Exams' brand tone (dashboard v2 technique-activity header tile) —
+      // same `rose-500/10` + `rose-600` pair `Pill`'s `rose` tone already
+      // uses (no `--color-rose-100` token exists), kept identical so the
+      // technique's icon tile and its pills always match.
+      rose: "bg-rose-500/10 text-rose-600",
     },
   },
   defaultVariants: {

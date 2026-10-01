@@ -85,6 +85,7 @@ describe("IconTile", () => {
     ["warning", "bg-warning-100"],
     ["error", "bg-error-100"],
     ["info", "bg-info-100"],
+    ["rose", "bg-rose-500/10"],
   ] as const)("maps the semantic tone %s", (tone, expected) => {
     render(<IconTile data-testid="t" tone={tone} />);
 
