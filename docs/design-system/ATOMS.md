@@ -332,6 +332,13 @@ for the session mockup. `Pill` and `IconTile`'s existing `success`/
 `warning`/`error` tones already covered everything the report needed — no
 new `Pill` tones were required (only the `IconTile` `"48"` size above).
 
+**Preview gate.** Every `/flashcards/**` page calls
+`requireDesignPreviews()` (`shared/config/design-previews.ts`) first, so it
+answers 404 in production unless `COGNI_DESIGN_PREVIEWS=1`; a structural test
+(`flashcards/preview-gate.test.ts`) fails when a page is added without the
+guard. The sidebar "Flashcards" entry carries `preview: { href, isActive }`:
+a link while previews are enabled, a disabled "pronto" row otherwise.
+
 **Product rule (2026-09-24): one flashcard deck per page.** A page owns at
 most one deck; the deck has no name of its own — it's identified by the page
 and titled with the page title. There is no notebook-level deck/card
