@@ -19,7 +19,7 @@ export const clientSchema = z.object({
   NEXT_PUBLIC_POSTHOG_HOST: z.string().url().optional(),
 });
 
-export const serverSchema = clientSchema.extend({
+const serverObject = clientSchema.extend({
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
   DATABASE_URL: z.string().url(),
   // Long enough that a brute force against /api/keep-alive is pointless.
@@ -32,6 +32,60 @@ export const serverSchema = clientSchema.extend({
   // Name of the private bucket for imported PDFs (design.md, "Bucket privado
   // `page-pdfs` por migración"). Server-only, like SUPABASE_STORAGE_BUCKET.
   SUPABASE_PDF_BUCKET: z.string().min(1),
+  // AI layer (documento-maestro §8). Provider keys are individually optional:
+  // the refinement below requires at least one generation provider in live
+  // mode. Server-only, never NEXT_PUBLIC_.
+  GOOGLE_GENERATIVE_AI_API_KEY: z.string().min(1).optional(),
+  GROQ_API_KEY: z.string().min(1).optional(),
+  CLOUDFLARE_ACCOUNT_ID: z.string().min(1).optional(),
+  CLOUDFLARE_API_TOKEN: z.string().min(1).optional(),
+  OPENROUTER_API_KEY: z.string().min(1).optional(),
+  UPSTASH_REDIS_REST_URL: z.string().url().optional(),
+  UPSTASH_REDIS_REST_TOKEN: z.string().min(1).optional(),
+  // Separates dev and prod keys inside the single free Upstash database.
+  REDIS_KEY_PREFIX: z.string().min(1).default("cogni:dev"),
+  // `fake` swaps real providers for a deterministic one (CI, e2e).
+  AI_PROVIDER_MODE: z.enum(["live", "fake"]).default("live"),
+  AI_DAILY_GENERATIONS: z.coerce.number().int().positive().default(6),
+  AI_PAGE_TOKEN_CAP: z.coerce.number().int().positive().default(12000),
+});
+
+export const serverSchema = serverObject.superRefine((env, ctx) => {
+  const missing = (path: string, message: string) =>
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: [path], message });
+
+  // A half-configured Cloudflare pair is always a mistake, in any mode.
+  if (env.CLOUDFLARE_ACCOUNT_ID && !env.CLOUDFLARE_API_TOKEN) {
+    missing(
+      "CLOUDFLARE_API_TOKEN",
+      "required when CLOUDFLARE_ACCOUNT_ID is set",
+    );
+  }
+  if (env.CLOUDFLARE_API_TOKEN && !env.CLOUDFLARE_ACCOUNT_ID) {
+    missing(
+      "CLOUDFLARE_ACCOUNT_ID",
+      "required when CLOUDFLARE_API_TOKEN is set",
+    );
+  }
+
+  if (env.AI_PROVIDER_MODE !== "live") return;
+
+  if (!env.UPSTASH_REDIS_REST_URL) {
+    missing("UPSTASH_REDIS_REST_URL", "required when AI_PROVIDER_MODE=live");
+  }
+  if (!env.UPSTASH_REDIS_REST_TOKEN) {
+    missing("UPSTASH_REDIS_REST_TOKEN", "required when AI_PROVIDER_MODE=live");
+  }
+  const hasProvider =
+    env.GOOGLE_GENERATIVE_AI_API_KEY ||
+    env.OPENROUTER_API_KEY ||
+    (env.CLOUDFLARE_ACCOUNT_ID && env.CLOUDFLARE_API_TOKEN);
+  if (!hasProvider) {
+    missing(
+      "GOOGLE_GENERATIVE_AI_API_KEY",
+      "at least one generation provider is required when AI_PROVIDER_MODE=live (GOOGLE_GENERATIVE_AI_API_KEY, OPENROUTER_API_KEY, or CLOUDFLARE_ACCOUNT_ID + CLOUDFLARE_API_TOKEN)",
+    );
+  }
 });
 
 export type ClientEnv = z.infer<typeof clientSchema>;

@@ -75,6 +75,28 @@ module.exports = {
       },
       to: { path: "node_modules/unpdf" },
     },
+    {
+      name: "ai-sdk-only-in-ai-infra",
+      comment:
+        "The AI SDK and its provider packages may only be imported from ai/infrastructure (documento-maestro §8.1); every other layer and module goes through ai.application. Unanchored for the same pnpm nested node_modules reason as unpdf.",
+      severity: "error",
+      from: {
+        path: "^src/",
+        pathNot: "^src/modules/ai/infrastructure/",
+      },
+      to: { path: "node_modules/(ai|@ai-sdk/[^/]+|@openrouter/[^/]+)/" },
+    },
+    {
+      name: "upstash-only-in-ai-infra",
+      comment:
+        "Upstash packages may only be imported from ai/infrastructure or shared/redis; domain and application depend on ports.",
+      severity: "error",
+      from: {
+        path: "^src/",
+        pathNot: "^src/(modules/ai/infrastructure|shared/redis)/",
+      },
+      to: { path: "node_modules/@upstash/" },
+    },
   ],
   options: {
     tsConfig: { fileName: "tsconfig.json" },
