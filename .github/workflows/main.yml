@@ -45,6 +45,8 @@ jobs:
       SUPABASE_STORAGE_BUCKET: page-assets
       # Same reason: required by the server env schema since phase 2 (0006).
       SUPABASE_PDF_BUCKET: page-pdfs
+      # Fake AI provider: CI needs no provider keys nor Upstash.
+      AI_PROVIDER_MODE: fake
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

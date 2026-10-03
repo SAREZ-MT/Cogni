@@ -14,6 +14,16 @@ const server = {
   CRON_SECRET: "0123456789abcdef0123456789abcdef",
   SUPABASE_STORAGE_BUCKET: "page-assets",
   SUPABASE_PDF_BUCKET: "page-pdfs",
+  // Fake mode keeps the AI provider keys optional for the non-AI tests.
+  AI_PROVIDER_MODE: "fake",
+};
+
+const live = {
+  ...server,
+  AI_PROVIDER_MODE: "live",
+  UPSTASH_REDIS_REST_URL: "https://redis.upstash.io",
+  UPSTASH_REDIS_REST_TOKEN: "token",
+  GOOGLE_GENERATIVE_AI_API_KEY: "g-key",
 };
 
 describe("parseClientEnv", () => {
@@ -106,5 +116,88 @@ describe("parseServerEnv", () => {
         SENTRY_DSN: "https://k@o.ingest.sentry.io/1",
       }).SENTRY_DSN,
     ).toBe("https://k@o.ingest.sentry.io/1");
+  });
+});
+
+describe("parseServerEnv AI layer", () => {
+  it("applies the AI defaults in fake mode", () => {
+    const { AI_PROVIDER_MODE: _, ...noMode } = server;
+    const parsed = parseServerEnv({ ...noMode, AI_PROVIDER_MODE: "fake" });
+    expect(parsed).toMatchObject({
+      AI_PROVIDER_MODE: "fake",
+      AI_DAILY_GENERATIONS: 6,
+      AI_PAGE_TOKEN_CAP: 12000,
+      REDIS_KEY_PREFIX: "cogni:dev",
+    });
+  });
+
+  it("defaults to live mode and fails naming every missing live variable", () => {
+    const { AI_PROVIDER_MODE: _, ...noMode } = server;
+    let message = "";
+    try {
+      parseServerEnv(noMode);
+    } catch (error) {
+      message = (error as Error).message;
+    }
+    expect(message).toMatch(/UPSTASH_REDIS_REST_URL/);
+    expect(message).toMatch(/UPSTASH_REDIS_REST_TOKEN/);
+    expect(message).toMatch(/GOOGLE_GENERATIVE_AI_API_KEY/);
+  });
+
+  it("passes in fake mode with no provider or Upstash variables", () => {
+    expect(() => parseServerEnv(server)).not.toThrow();
+  });
+
+  it("passes in live mode with Upstash and one provider key", () => {
+    expect(parseServerEnv(live).GOOGLE_GENERATIVE_AI_API_KEY).toBe("g-key");
+  });
+
+  it("accepts OpenRouter alone as the generation provider", () => {
+    const { GOOGLE_GENERATIVE_AI_API_KEY: _, ...noGoogle } = live;
+    expect(() =>
+      parseServerEnv({ ...noGoogle, OPENROUTER_API_KEY: "or-key" }),
+    ).not.toThrow();
+  });
+
+  it("requires both Cloudflare variables together", () => {
+    const { GOOGLE_GENERATIVE_AI_API_KEY: _, ...noGoogle } = live;
+    expect(() =>
+      parseServerEnv({ ...noGoogle, CLOUDFLARE_ACCOUNT_ID: "acc" }),
+    ).toThrow(/CLOUDFLARE_API_TOKEN/);
+    expect(() =>
+      parseServerEnv({ ...noGoogle, CLOUDFLARE_API_TOKEN: "tok" }),
+    ).toThrow(/CLOUDFLARE_ACCOUNT_ID/);
+    expect(() =>
+      parseServerEnv({
+        ...noGoogle,
+        CLOUDFLARE_ACCOUNT_ID: "acc",
+        CLOUDFLARE_API_TOKEN: "tok",
+      }),
+    ).not.toThrow();
+  });
+
+  it("requires Cloudflare pairs even when another provider is set", () => {
+    expect(() =>
+      parseServerEnv({ ...live, CLOUDFLARE_ACCOUNT_ID: "acc" }),
+    ).toThrow(/CLOUDFLARE_API_TOKEN/);
+  });
+
+  it("coerces and bounds the numeric limits", () => {
+    const parsed = parseServerEnv({
+      ...live,
+      AI_DAILY_GENERATIONS: "10",
+      AI_PAGE_TOKEN_CAP: "8000",
+    });
+    expect(parsed.AI_DAILY_GENERATIONS).toBe(10);
+    expect(parsed.AI_PAGE_TOKEN_CAP).toBe(8000);
+    expect(() =>
+      parseServerEnv({ ...live, AI_DAILY_GENERATIONS: "0" }),
+    ).toThrow(/AI_DAILY_GENERATIONS/);
+  });
+
+  it("rejects an unknown provider mode", () => {
+    expect(() =>
+      parseServerEnv({ ...server, AI_PROVIDER_MODE: "mock" }),
+    ).toThrow(/AI_PROVIDER_MODE/);
   });
 });

@@ -8,7 +8,8 @@ import { PostHog } from "posthog-node";
 export type AnalyticsEvent =
   | "user_signed_up"
   | "user_signed_in"
-  | "pdf_imported";
+  | "pdf_imported"
+  | "generation_requested";
 
 export type AnalyticsProperties = Record<
   string,

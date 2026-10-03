@@ -21,6 +21,10 @@
     "db:migrate": "drizzle-kit migrate"
   },
   "dependencies": {
+    "@ai-sdk/google": "4.0.87",
+    "@ai-sdk/groq": "4.0.54",
+    "@ai-sdk/openai-compatible": "3.0.62",
+    "@openrouter/ai-sdk-provider": "3.1.0",
     "@sentry/nextjs": "^10.75.0",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.116.0",
@@ -52,6 +56,9 @@
     "@tiptap/react": "^3.31.3",
     "@tiptap/starter-kit": "^3.31.3",
     "@tiptap/suggestion": "^3.31.3",
+    "@upstash/ratelimit": "2.2.0",
+    "@upstash/redis": "1.39.0",
+    "ai": "7.0.127",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
