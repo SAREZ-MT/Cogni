@@ -1,3 +1,5 @@
-// Public API of the "ai" module. Empty until Fase 3 — Capa de IA implements it.
-// No cross-module import may reach past this file (documento-maestro §5.3.5).
-export {};
+// Public API of the "ai" module. No cross-module import may reach past this
+// file (documento-maestro §5.3.5). Use cases and infrastructure are added by
+// later Fase 3 tasks.
+export * from "./application/schemas";
+export * from "./domain";

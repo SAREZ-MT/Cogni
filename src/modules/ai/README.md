@@ -1,19 +1,23 @@
-# Módulo `ai`
+# Module `ai`
 
-## Responsabilidad
+Provider registry, quota-aware rotation, structured output, versioned prompts
+and rate limiting (documento-maestro §8).
 
-Registro de proveedores, rotación por cuota, salida estructurada, prompts versionados y rate limiting.
+## Layout
 
-## Estado
+- `domain/` pure rules, no npm imports at all (`domain-is-pure` rejects even
+  `zod`):
+  - `purpose.ts` the six `AiPurpose` values.
+  - `generation.ts` `AiGeneration` entity (§6.1) with guarded status
+    transitions (`startGeneration`, `completeGeneration`, `failGeneration`).
+  - `provider.ts` `ProviderEntry`, `selectProvider`, `nextProviders`.
+  - `circuit-breaker.ts` 3 failures open a provider for 10 minutes (§8.2).
+  - `truncate.ts` `truncateToTokenCap`, word-based page cap.
+  - `errors.ts` `AI_ERROR` codes.
+- `application/` `schemas/` holds the Zod output schema per purpose (§8.4)
+  and `outputSchemaFor`; ports and the `generateStructured` use case are
+  planned.
+- `infrastructure/` (planned) AI SDK providers and Upstash adapters; the only
+  place those packages may be imported (enforced by `pnpm depcruise`).
 
-Pendiente. Este módulo es un esqueleto sin lógica de dominio: solo existe
-`index.ts` (API pública vacía) y este `README.md`.
-
-## Fase pendiente
-
-Fase 3 — Capa de IA (ver `docs/documento-maestro.md` §13).
-
-## Dependencias declaradas
-
-Ver `docs/documento-maestro.md` §5.2 (mapa de módulos) para las dependencias
-permitidas de este módulo una vez implementado.
+Other modules import only from `index.ts`.
