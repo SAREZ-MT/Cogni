@@ -15,12 +15,33 @@ import {
   type SessionSummaryStat,
 } from "@/shared/ui/session-summary";
 import { type StatDotItem, StatDots } from "@/shared/ui/stat-dots";
-import type { SampleCard } from "../_data/sample";
+import { plural } from "../_lib/plural";
+// One card of the session. `hints` overrides the default hint under each
+// rating button (a real session shows the days SM-2 would schedule).
+export interface PlayerCard {
+  id: string;
+  front: string;
+  back: string;
+  hints?: Partial<Record<RatingTone, string>>;
+}
+
+export type RateOutcome =
+  | { ok: true; masteryLevel?: string }
+  | { ok: false; message: string };
 
 export interface FlashcardPlayerProps {
   notebookId: string;
   deckLabel: string;
-  cards: SampleCard[];
+  cards: PlayerCard[];
+  // Graded session: every answer goes through onRate and the player
+  // advances only when it resolves ok. Without it the session is local
+  // (design preview on sample data).
+  onRate?: (card: PlayerCard, tone: RatingTone) => Promise<RateOutcome>;
+  // Called once when the session ends (last card graded or "Terminar").
+  onFinish?: () => void | Promise<void>;
+  // Graded session: the summary's primary action leaves the player instead
+  // of restarting it (graded cards are no longer due).
+  onExit?: () => void;
 }
 
 const RATINGS: { tone: RatingTone; label: string; hint: string }[] = [
@@ -65,19 +86,26 @@ const TALLY_TONE: {
   },
 ];
 
-// Client flip-card study session (design preview, mockups flashcard.png/
-// flashcard2.png). All state — current card, flip, rating tally, whether
-// the summary is showing — is local and resets on remount; nothing is
-// persisted, matching the "validar el diseño" scope (no backend yet).
+// Client flip-card study session (mockups flashcard.png/flashcard2.png).
+// Presentational: the current card, flip, tally and summary state are local;
+// persistence is the caller's, through onRate/onFinish (the page deck's
+// DeckReview wires them to the review-session Server Actions). Without
+// them it plays the design-preview sample deck locally.
 export function FlashcardPlayer({
   notebookId,
   deckLabel,
   cards,
+  onRate,
+  onFinish,
+  onExit,
 }: FlashcardPlayerProps) {
   const [index, setIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const [tally, setTally] = useState({ again: 0, hard: 0, good: 0, easy: 0 });
   const [finished, setFinished] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [masteryLevel, setMasteryLevel] = useState<string | null>(null);
 
   const total = cards.length;
   const reviewed = tally.again + tally.hard + tally.good + tally.easy;
@@ -101,10 +129,27 @@ export function FlashcardPlayer({
     }),
   );
 
-  function rate(tone: RatingTone) {
+  function finish() {
+    setFinished(true);
+    void onFinish?.();
+  }
+
+  async function rate(tone: RatingTone) {
+    if (!card || saving) return;
+    if (onRate) {
+      setSaving(true);
+      setError(null);
+      const outcome = await onRate(card, tone);
+      setSaving(false);
+      if (!outcome.ok) {
+        setError(outcome.message);
+        return;
+      }
+      if (outcome.masteryLevel) setMasteryLevel(outcome.masteryLevel);
+    }
     setTally((prev) => ({ ...prev, [tone]: prev[tone] + 1 }));
     if (index + 1 >= total) {
-      setFinished(true);
+      finish();
       return;
     }
     setIndex((prev) => prev + 1);
@@ -153,7 +198,7 @@ export function FlashcardPlayer({
         <div>
           <p className="font-semibold text-[16px] text-fg">{deckLabel}</p>
           <p className="mt-0.5 text-fg-muted text-xs">
-            {total} tarjetas en esta sesión
+            {plural(total, "tarjeta", "tarjetas")} en esta sesión
           </p>
         </div>
         <div className="flex items-center gap-4">
@@ -163,7 +208,8 @@ export function FlashcardPlayer({
             variant="ghost"
             size="sm"
             className="text-fg-muted"
-            onClick={() => setFinished(true)}
+            disabled={saving || finished}
+            onClick={finish}
           >
             <X aria-hidden="true" size={13} strokeWidth={2} />
             Terminar
@@ -212,11 +258,17 @@ export function FlashcardPlayer({
                 key={rating.tone}
                 tone={rating.tone}
                 label={rating.label}
-                hint={rating.hint}
-                onClick={() => rate(rating.tone)}
+                hint={card?.hints?.[rating.tone] ?? rating.hint}
+                disabled={saving}
+                onClick={() => void rate(rating.tone)}
               />
             ))}
           </div>
+          {error && (
+            <p role="alert" className="text-center text-error-600 text-xs">
+              {error}
+            </p>
+          )}
         </div>
       ) : (
         <Button
@@ -233,18 +285,39 @@ export function FlashcardPlayer({
       {finished && (
         <SessionSummary
           title="¡Sesión completada!"
-          subtitle={`${deckLabel} — ${reviewed} tarjetas revisadas`}
+          subtitle={`${deckLabel} — ${plural(reviewed, "tarjeta revisada", "tarjetas revisadas")}`}
           stats={summaryStats}
           highlight={
-            <>
-              <p className="text-[13px] text-fg-muted">Próxima revisión</p>
-              <p className="mt-0.5 font-semibold text-[15px] text-fg">
-                Mañana · {total} tarjetas programadas
-              </p>
-            </>
+            onRate ? (
+              masteryLevel && (
+                <>
+                  <p className="text-[13px] text-fg-muted">
+                    Nivel de dominio de la página
+                  </p>
+                  <p className="mt-0.5 font-semibold text-[15px] text-fg">
+                    {masteryLevel}
+                  </p>
+                </>
+              )
+            ) : (
+              <>
+                <p className="text-[13px] text-fg-muted">Próxima revisión</p>
+                <p className="mt-0.5 font-semibold text-[15px] text-fg">
+                  Mañana · {total} tarjetas programadas
+                </p>
+              </>
+            )
           }
-          secondaryAction={{ label: "Volver al mazo", href: decksHref }}
-          primaryAction={{ label: "Repasar de nuevo →", onClick: restart }}
+          secondaryAction={
+            onExit
+              ? { label: "Todos los mazos", href: decksHref }
+              : { label: "Volver al mazo", href: decksHref }
+          }
+          primaryAction={
+            onExit
+              ? { label: "Volver al mazo", onClick: onExit }
+              : { label: "Repasar de nuevo →", onClick: restart }
+          }
         />
       )}
     </div>

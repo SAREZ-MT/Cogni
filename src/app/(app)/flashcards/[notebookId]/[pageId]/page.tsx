@@ -3,11 +3,10 @@ import { notFound } from "next/navigation";
 import { listFlashcardsAction } from "@/modules/flashcards";
 import { getNotebookTitleForRoute, getPageForRoute } from "@/modules/notebooks";
 import { designPreviewsEnabled } from "@/shared/config/design-previews";
-import { BackLink } from "@/shared/ui/back-link";
 import { EmptyState } from "@/shared/ui/empty-state";
 import { IconTile } from "@/shared/ui/icon-tile";
-import { SectionHeader } from "@/shared/ui/section-header";
 import { SetBreadcrumb } from "../../../_components/breadcrumb";
+import { DeckReview } from "../../_components/deck-review";
 import { FlashcardPlayer } from "../../_components/flashcard-player";
 import { FlashcardReviewList } from "../../_components/flashcard-review-list";
 import { NewFlashcardDialog } from "../../_components/new-flashcard-dialog";
@@ -26,12 +25,13 @@ interface FlashcardsSessionPageProps {
 // the deck is identified by [notebookId]/[pageId] instead of a `?deck=`
 // query param.
 //
-// - Design previews on and a sample notebook/page id: the graded study
-//   player on sample data (grading and SM-2 scheduling are Phase 4).
-// - Otherwise: the page's real cards as an ungraded flip-card review list,
-//   with "Nueva tarjeta" and a per-card archive action. A page that is
-//   unknown, archived or not the caller's 404s. A page without cards has no
-//   deck yet (a deck is never empty): it shows an empty state whose
+// - Design previews on and a sample notebook/page id: the study player on
+//   sample data, ungraded and local.
+// - Otherwise: the page's real cards as a flip-card review list, with
+//   "Nueva tarjeta", a per-card archive action and "Repasar", which runs the
+//   graded SM-2 session over the page's due cards (DeckReview). A page that
+//   is unknown, archived or not the caller's 404s. A page without cards has
+//   no deck yet (a deck is never empty): it shows an empty state whose
 //   "Nueva tarjeta" creates the first card and with it the deck.
 export default async function FlashcardsSessionPage({
   params,
@@ -82,36 +82,36 @@ export default async function FlashcardsSessionPage({
           { label: page.title },
         ]}
       />
-      <div className="flex flex-col gap-3">
-        <BackLink href={`/flashcards/${notebookId}`}>{notebookTitle}</BackLink>
-        <SectionHeader
-          eyebrow="Flashcards"
-          title={page.title}
-          titleClassName="text-xl"
-          description={
-            cards.value.length === 0
-              ? "Sin tarjetas todavía"
-              : plural(cards.value.length, "tarjeta", "tarjetas")
-          }
-          actions={<NewFlashcardDialog pageId={page.id} />}
-        />
-      </div>
-      {cards.value.length === 0 ? (
-        <EmptyState
-          fill
-          icon={
-            <IconTile size="56" tone="warning">
-              <Layers aria-hidden="true" size={28} strokeWidth={1.75} />
-            </IconTile>
-          }
-          title="Esta página aún no tiene tarjetas"
-          titleClassName="text-base"
-          description="Crea la primera con Nueva tarjeta o genera un mazo desde la página con Técnicas → Flashcards."
-          descriptionClassName="max-w-[360px]"
-        />
-      ) : (
-        <FlashcardReviewList cards={cards.value} archivable />
-      )}
+      <DeckReview
+        notebookId={notebookId}
+        notebookTitle={notebookTitle}
+        pageId={page.id}
+        deckLabel={page.title}
+        description={
+          cards.value.length === 0
+            ? "Sin tarjetas todavía"
+            : plural(cards.value.length, "tarjeta", "tarjetas")
+        }
+        canReview={cards.value.length > 0}
+        actions={<NewFlashcardDialog pageId={page.id} />}
+      >
+        {cards.value.length === 0 ? (
+          <EmptyState
+            fill
+            icon={
+              <IconTile size="56" tone="warning">
+                <Layers aria-hidden="true" size={28} strokeWidth={1.75} />
+              </IconTile>
+            }
+            title="Esta página aún no tiene tarjetas"
+            titleClassName="text-base"
+            description="Crea la primera con Nueva tarjeta o genera un mazo desde la página con Técnicas → Flashcards."
+            descriptionClassName="max-w-[360px]"
+          />
+        ) : (
+          <FlashcardReviewList cards={cards.value} archivable />
+        )}
+      </DeckReview>
     </section>
   );
 }
