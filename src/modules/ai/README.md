@@ -14,9 +14,16 @@ and rate limiting (documento-maestro §8).
   - `circuit-breaker.ts` 3 failures open a provider for 10 minutes (§8.2).
   - `truncate.ts` `truncateToTokenCap`, word-based page cap.
   - `errors.ts` `AI_ERROR` codes.
-- `application/` `schemas/` holds the Zod output schema per purpose (§8.4)
-  and `outputSchemaFor`; ports and the `generateStructured` use case are
-  planned.
+- `application/`
+  - `ports.ts` `AiProvider`, `QuotaStore`, `BreakerStore`,
+    `AiGenerationRepository`, `IdGenerator`. They live here, not in `domain/`,
+    because `AiProvider` needs the Zod type and `domain-is-pure` forbids npm.
+  - `generate-structured.ts` the single entry point for model calls: select
+    provider, call, validate with the purpose schema, audit every attempt,
+    retry once on the next provider, never a third call.
+  - `prompts/<purpose>/v1.ts` versioned prompt builders (`generate_flashcards`).
+  - `schemas/` Zod output schema per purpose (§8.4) and `outputSchemaFor`.
+  - `testing/` in-memory fakes, re-exported by `src/modules/ai/testing.ts`.
 - `infrastructure/` (planned) AI SDK providers and Upstash adapters; the only
   place those packages may be imported (enforced by `pnpm depcruise`).
 
