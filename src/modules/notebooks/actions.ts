@@ -10,6 +10,7 @@ import {
   DomainError,
   toActionError,
 } from "@/shared/kernel/domain-error";
+import { isValidId } from "@/shared/kernel/id";
 import { err, ok, type Result } from "@/shared/kernel/result";
 import {
   archiveNotebook as archiveNotebookUseCase,
@@ -46,11 +47,13 @@ import {
   NOTEBOOKS_COPY,
 } from "./ui/notebooks-copy";
 
-// Same shape as the other actions' Zod schemas (application/*.ts): plain
-// `z.string()` ids, rejecting malformed shapes before touching the repos.
+// Route params come straight from the URL, so both ids are validated with
+// the kernel's id shape before touching the repos: Postgres rejects a
+// non-uuid with an error (a 500 page), and a malformed id must 404 instead.
+const routeIdSchema = z.string().refine(isValidId, "must be a valid id");
 const routePageParamsSchema = z.object({
-  notebookId: z.string(),
-  pageId: z.string(),
+  notebookId: routeIdSchema,
+  pageId: routeIdSchema,
 });
 
 // Server Actions are the only client-reachable entry point of this module
