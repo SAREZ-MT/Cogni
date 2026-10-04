@@ -12,6 +12,8 @@ function profile(overrides: { displayName?: string | null; updatedAt?: Date }) {
     locale: "es",
     timezone: "UTC",
     onboardingCompletedAt: null,
+    termsAcceptedVersion: null,
+    termsAcceptedAt: null,
     createdAt: NOW,
     updatedAt: overrides.updatedAt ?? NOW,
   };
@@ -48,5 +50,44 @@ describe("InMemoryProfileRepository.upsert", () => {
       displayName: "Beto",
     });
     expect(repository.count()).toBe(1);
+  });
+});
+
+describe("InMemoryProfileRepository.acceptTerms", () => {
+  const AT = new Date("2026-10-04T12:00:00.000Z");
+
+  it("sets version, timestamp and updatedAt on the existing row", async () => {
+    const repository = new InMemoryProfileRepository();
+    await repository.upsert(profile({ displayName: "Ana" }));
+
+    const accepted = await repository.acceptTerms(OWNER_ID, "2026-10-04", AT);
+
+    expect(accepted).toMatchObject({
+      displayName: "Ana",
+      termsAcceptedVersion: "2026-10-04",
+      termsAcceptedAt: AT,
+      updatedAt: AT,
+    });
+    expect(await repository.findById(OWNER_ID)).toEqual(accepted);
+  });
+
+  it("keeps the latest acceptance when accepting twice", async () => {
+    const repository = new InMemoryProfileRepository();
+    await repository.upsert(profile({}));
+    const later = new Date("2026-11-01T00:00:00.000Z");
+
+    await repository.acceptTerms(OWNER_ID, "2026-10-04", AT);
+    await repository.acceptTerms(OWNER_ID, "2026-11-01", later);
+
+    expect(await repository.findById(OWNER_ID)).toMatchObject({
+      termsAcceptedVersion: "2026-11-01",
+      termsAcceptedAt: later,
+    });
+  });
+
+  it("returns null for an unknown id", async () => {
+    const repository = new InMemoryProfileRepository();
+    expect(await repository.acceptTerms(OWNER_ID, "2026-10-04", AT)).toBeNull();
+    expect(repository.count()).toBe(0);
   });
 });

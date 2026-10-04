@@ -13,6 +13,7 @@ import {
 // Client code uses ./actions (Server Actions) and ./ui (components) instead:
 // this file pulls server-only modules and cannot enter a client bundle.
 export { safeNext } from "./application";
+export { hasAcceptedCurrentTerms, TERMS_VERSION } from "./domain";
 export type { SessionUser };
 
 export async function getCurrentUser(): Promise<SessionUser | null> {

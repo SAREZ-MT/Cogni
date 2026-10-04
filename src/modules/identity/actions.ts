@@ -3,16 +3,20 @@
 import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { clientEnv } from "@/shared/config/env.client";
+import { systemClock } from "@/shared/kernel/clock";
 import { createServerAnalytics } from "@/shared/observability/analytics";
 import {
   AUTH_CALLBACK_PATH,
+  acceptTerms,
   requestPasswordReset,
+  safeNext,
   signIn,
   signUp,
   updatePassword,
 } from "./application";
 import {
   createSupabaseServerClient,
+  DrizzleProfileRepository,
   SupabaseAuthGateway,
 } from "./infrastructure";
 import { AUTH_COPY, messageForCode } from "./ui/auth-copy";
@@ -120,4 +124,33 @@ export async function signInWithGoogleAction(): Promise<void> {
   });
   if (!result.ok) redirect("/login?error=google");
   redirect(result.value.url);
+}
+
+// Terms gate form: `accept` is the checkbox ("on" when ticked), `next` the
+// path the gate interrupted. Needs a session; anonymous callers go to login.
+export async function acceptTermsAction(
+  _previous: AuthFormState,
+  formData: FormData,
+): Promise<AuthFormState> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return redirect("/login");
+
+  // Loaded lazily: the db client is server-only, and client components
+  // import this file's action references (their tests resolve it eagerly).
+  const { getDb } = await import("@/shared/db/client");
+  const result = await acceptTerms(
+    { accepted: formData.get("accept") === "on" },
+    { profiles: new DrizzleProfileRepository(getDb()), clock: systemClock },
+    user.id,
+  );
+  if (!result.ok)
+    return { status: "error", message: messageForCode(result.error.code) };
+
+  const version = result.value.termsAcceptedVersion;
+  after(() => analytics().track("terms_accepted", user.id, { version }));
+  const next = formData.get("next");
+  return redirect(safeNext(typeof next === "string" ? next : null));
 }

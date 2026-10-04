@@ -17,6 +17,8 @@ describe("createProfile", () => {
       locale: DEFAULT_LOCALE,
       timezone: DEFAULT_TIMEZONE,
       onboardingCompletedAt: null,
+      termsAcceptedVersion: null,
+      termsAcceptedAt: null,
       createdAt: NOW,
       updatedAt: NOW,
     });

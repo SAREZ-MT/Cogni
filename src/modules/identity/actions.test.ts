@@ -26,6 +26,16 @@ vi.mock("@/shared/config/env.client", () => ({
   }),
 }));
 
+const { acceptTermsUseCase } = vi.hoisted(() => ({
+  acceptTermsUseCase: vi.fn(),
+}));
+vi.mock("./application", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./application")>();
+  return { ...actual, acceptTerms: acceptTermsUseCase };
+});
+
+vi.mock("@/shared/db/client", () => ({ getDb: () => ({}) }));
+
 const { getUser, signInWithPasswordMock, signOutMock } = vi.hoisted(() => ({
   getUser: vi.fn(),
   signInWithPasswordMock: vi.fn(),
@@ -108,5 +118,93 @@ describe("signOutAction", () => {
       message:
         "No pudimos completar la acción. Inténtalo de nuevo en unos minutos.",
     });
+  });
+});
+
+describe("acceptTermsAction", () => {
+  beforeEach(() => {
+    redirect.mockClear();
+    track.mockClear();
+    getUser.mockReset();
+    acceptTermsUseCase.mockReset();
+  });
+
+  it("sends an anonymous visitor to /login without touching the use case", async () => {
+    getUser.mockResolvedValue({ data: { user: null } });
+    const { acceptTermsAction } = await import("./actions");
+
+    await acceptTermsAction(
+      { status: "idle" },
+      formData({ accept: "on", next: "/notebooks" }),
+    );
+
+    expect(redirect).toHaveBeenCalledWith("/login");
+    expect(acceptTermsUseCase).not.toHaveBeenCalled();
+  });
+
+  it("returns the Spanish error and does not redirect when the box is unticked", async () => {
+    getUser.mockResolvedValue({ data: { user: { id: "u-42" } } });
+    acceptTermsUseCase.mockResolvedValue({
+      ok: false,
+      error: { code: "TERMS_NOT_ACCEPTED" },
+    });
+    const { acceptTermsAction } = await import("./actions");
+
+    const result = await acceptTermsAction(
+      { status: "idle" },
+      formData({ next: "/notebooks" }),
+    );
+
+    expect(acceptTermsUseCase).toHaveBeenCalledWith(
+      { accepted: false },
+      expect.anything(),
+      "u-42",
+    );
+    expect(result).toEqual({
+      status: "error",
+      message: "Debes aceptar los términos para continuar.",
+    });
+    expect(redirect).not.toHaveBeenCalled();
+    expect(track).not.toHaveBeenCalled();
+  });
+
+  it("records the acceptance, tracks terms_accepted and redirects to the sanitised next", async () => {
+    getUser.mockResolvedValue({ data: { user: { id: "u-42" } } });
+    acceptTermsUseCase.mockResolvedValue({
+      ok: true,
+      value: { termsAcceptedVersion: "2026-10-04" },
+    });
+    const { acceptTermsAction } = await import("./actions");
+
+    await acceptTermsAction(
+      { status: "idle" },
+      formData({ accept: "on", next: "/notebooks" }),
+    );
+
+    expect(acceptTermsUseCase).toHaveBeenCalledWith(
+      { accepted: true },
+      expect.anything(),
+      "u-42",
+    );
+    expect(track).toHaveBeenCalledWith("terms_accepted", "u-42", {
+      version: "2026-10-04",
+    });
+    expect(redirect).toHaveBeenCalledWith("/notebooks");
+  });
+
+  it("falls back to / when next is an open redirect", async () => {
+    getUser.mockResolvedValue({ data: { user: { id: "u-42" } } });
+    acceptTermsUseCase.mockResolvedValue({
+      ok: true,
+      value: { termsAcceptedVersion: "2026-10-04" },
+    });
+    const { acceptTermsAction } = await import("./actions");
+
+    await acceptTermsAction(
+      { status: "idle" },
+      formData({ accept: "on", next: "//evil.example" }),
+    );
+
+    expect(redirect).toHaveBeenCalledWith("/");
   });
 });

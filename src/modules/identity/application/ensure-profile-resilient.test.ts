@@ -29,6 +29,14 @@ class FlakyProfileRepository implements ProfileRepository {
   async upsert(profile: Profile): Promise<void> {
     return this.inner.upsert(profile);
   }
+
+  async acceptTerms(
+    id: string,
+    version: string,
+    at: Date,
+  ): Promise<Profile | null> {
+    return this.inner.acceptTerms(id, version, at);
+  }
 }
 
 describe("ensureProfileResilient", () => {
