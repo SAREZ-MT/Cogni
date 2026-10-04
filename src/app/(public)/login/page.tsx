@@ -1,5 +1,10 @@
 import Link from "next/link";
-import { AUTH_COPY, GoogleButton, SignInForm } from "@/modules/identity/ui";
+import {
+  AUTH_COPY,
+  GoogleButton,
+  SignInForm,
+  TermsNotice,
+} from "@/modules/identity/ui";
 
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   const { error } = await searchParams;
@@ -18,6 +23,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
       )}
       <SignInForm />
       <GoogleButton />
+      <TermsNotice />
       <p className="text-center text-fg-secondary text-sm">
         <Link href="/forgot-password">¿Olvidaste tu contraseña?</Link>
       </p>

@@ -1,3 +1,4 @@
+import type { Profile } from "../domain/profile";
 import { type EnsureProfileDeps, ensureProfile } from "./ensure-profile";
 
 export interface EnsureProfileResilientDeps extends EnsureProfileDeps {
@@ -17,9 +18,10 @@ function wait(ms: number): Promise<void> {
 async function runEnsureProfile(
   input: { ownerId: string },
   deps: EnsureProfileDeps,
-): Promise<void> {
+): Promise<Profile> {
   const result = await ensureProfile(input, deps);
   if (!result.ok) throw result.error;
+  return result.value;
 }
 
 // Wraps EnsureProfile with one bounded retry and non-throwing degradation
@@ -29,13 +31,14 @@ async function runEnsureProfile(
 // bloquear el acceso al shell en el siguiente intento"). The upsert's own
 // `onConflictDoNothing` already covers the concurrent-write race; this
 // wrapper covers a distinct failure mode: a transient network/DB error.
+// Returns the profile, or null when both attempts failed: callers (the
+// terms gate) treat null as "unknown" and fail open.
 export async function ensureProfileResilient(
   input: { ownerId: string },
   deps: EnsureProfileResilientDeps,
-): Promise<void> {
+): Promise<Profile | null> {
   try {
-    await runEnsureProfile(input, deps);
-    return;
+    return await runEnsureProfile(input, deps);
   } catch {
     // First attempt failed transiently; retry once after a short backoff.
   }
@@ -43,10 +46,11 @@ export async function ensureProfileResilient(
   await wait(deps.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS);
 
   try {
-    await runEnsureProfile(input, deps);
+    return await runEnsureProfile(input, deps);
   } catch (error) {
     deps.onTransientFailure?.(error);
     // Never rethrow: the (app) layout must keep rendering. EnsureProfile
     // runs again on the user's next request.
+    return null;
   }
 }

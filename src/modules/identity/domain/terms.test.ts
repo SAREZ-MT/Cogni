@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { createFixedClock } from "@/shared/kernel/clock";
 import { createProfile, type Profile } from "./profile";
-import { acceptTerms, hasAcceptedCurrentTerms, TERMS_VERSION } from "./terms";
+import {
+  acceptTerms,
+  hasAcceptedCurrentTerms,
+  TERMS_PATH,
+  TERMS_VERSION,
+  termsRedirectFor,
+} from "./terms";
 
 const NOW = new Date("2026-10-04T10:00:00.000Z");
 const LATER = new Date("2026-10-05T10:00:00.000Z");
@@ -53,5 +59,32 @@ describe("acceptTerms", () => {
     const profile = freshProfile();
     acceptTerms(profile, TERMS_VERSION, createFixedClock(LATER));
     expect(profile.termsAcceptedVersion).toBeNull();
+  });
+});
+
+describe("termsRedirectFor", () => {
+  const accepted = { ...freshProfile(), termsAcceptedVersion: TERMS_VERSION };
+
+  it("sends a pending profile to the terms page carrying the current path", () => {
+    expect(termsRedirectFor(freshProfile(), "/notebooks/abc?tab=1")).toBe(
+      `${TERMS_PATH}?next=%2Fnotebooks%2Fabc%3Ftab%3D1`,
+    );
+  });
+
+  it("falls back to the root when the current path is unknown or not a local path", () => {
+    const expected = `${TERMS_PATH}?next=%2F`;
+    expect(termsRedirectFor(freshProfile(), null)).toBe(expected);
+    expect(termsRedirectFor(freshProfile(), "")).toBe(expected);
+    expect(termsRedirectFor(freshProfile(), "https://evil.test")).toBe(
+      expected,
+    );
+  });
+
+  it("does not redirect a profile that accepted the current version", () => {
+    expect(termsRedirectFor(accepted, "/")).toBeNull();
+  });
+
+  it("fails open when the profile could not be loaded", () => {
+    expect(termsRedirectFor(null, "/")).toBeNull();
   });
 });

@@ -1,7 +1,9 @@
 "use client";
 
+import { FileText } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { SignOutButton } from "@/modules/identity/ui";
+import { SignOutButton, TERMS_COPY } from "@/modules/identity/ui";
 import { cn } from "@/shared/ui/utils";
 
 import { displayNameFromEmail, initialsFrom } from "./account-name";
@@ -57,6 +59,14 @@ export function AccountMenuPanel({ className }: { className?: string }) {
         className,
       )}
     >
+      <Link
+        href="/terminos"
+        role="menuitem"
+        className="flex min-h-11 w-full items-center gap-2 rounded-input px-3 text-fg text-sm hover:bg-hover"
+      >
+        <FileText aria-hidden="true" size={16} strokeWidth={1.75} />
+        {TERMS_COPY.links.menu}
+      </Link>
       <SignOutButton className="flex min-h-11 w-full items-center gap-2 rounded-input px-3 text-fg text-sm hover:bg-hover" />
     </div>
   );

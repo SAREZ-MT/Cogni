@@ -43,6 +43,17 @@ describe("UserMenu", () => {
     ).toBeInTheDocument();
   });
 
+  it("links to the terms of use from the menu", async () => {
+    const user = userEvent.setup();
+    render(<UserMenu user={USER} />);
+
+    await user.click(screen.getByRole("button", { name: "Menú de usuario" }));
+
+    expect(
+      screen.getByRole("menuitem", { name: "Términos de uso" }),
+    ).toHaveAttribute("href", "/terminos");
+  });
+
   it("closes with Escape", async () => {
     const user = userEvent.setup();
     render(<UserMenu user={USER} />);

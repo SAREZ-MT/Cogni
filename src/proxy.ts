@@ -7,6 +7,10 @@ import { buildSecurityHeaders } from "@/shared/config/security-headers";
 // before any route handler or Server Action runs, sends visitors without a
 // session to /login and keeps signed-in users away from the auth screens.
 const AUTH_PATHS = new Set(["/login", "/register", "/forgot-password"]);
+// Always reachable, signed in or not: the terms of use are read before
+// signing up and are where the (app) gate sends accounts that still have to
+// accept them. Unlike AUTH_PATHS, signed-in users are not bounced from here.
+const OPEN_PATHS = new Set(["/terminos"]);
 
 function bareHost(host: string): string {
   return host.replace(/^www\./, "");
@@ -59,6 +63,12 @@ export async function proxy(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-nonce", nonce);
   requestHeaders.set("Content-Security-Policy", csp);
+  // Layouts cannot read the pathname; the (app) terms gate needs it to send
+  // the visitor back where they were (`next`) after accepting.
+  requestHeaders.set(
+    "x-pathname",
+    `${request.nextUrl.pathname}${request.nextUrl.search}`,
+  );
   const requestWithNonce = new NextRequest(request, {
     headers: requestHeaders,
   });
@@ -69,8 +79,9 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isAuthPath = AUTH_PATHS.has(pathname);
   const isCallback = pathname.startsWith("/auth/");
+  const isOpenPath = OPEN_PATHS.has(pathname);
 
-  if (!user && !isAuthPath && !isCallback) {
+  if (!user && !isAuthPath && !isCallback && !isOpenPath) {
     const redirect = withCookies(new URL("/login", request.url), response);
     redirect.headers.set("Content-Security-Policy", csp);
     return redirect;

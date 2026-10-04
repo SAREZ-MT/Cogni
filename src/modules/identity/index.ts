@@ -3,6 +3,7 @@ import * as Sentry from "@sentry/nextjs";
 import { getDb } from "@/shared/db/client";
 import { systemClock } from "@/shared/kernel/clock";
 import { ensureProfileResilient } from "./application";
+import type { Profile } from "./domain";
 import {
   createSupabaseServerClient,
   DrizzleProfileRepository,
@@ -13,8 +14,13 @@ import {
 // Client code uses ./actions (Server Actions) and ./ui (components) instead:
 // this file pulls server-only modules and cannot enter a client bundle.
 export { safeNext } from "./application";
-export { hasAcceptedCurrentTerms, TERMS_VERSION } from "./domain";
-export type { SessionUser };
+export {
+  hasAcceptedCurrentTerms,
+  TERMS_PATH,
+  TERMS_VERSION,
+  termsRedirectFor,
+} from "./domain";
+export type { Profile, SessionUser };
 
 export async function getCurrentUser(): Promise<SessionUser | null> {
   const supabase = await createSupabaseServerClient();
@@ -29,8 +35,12 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
 // Resilient to one transient repository failure (retries once, then
 // degrades to a Sentry report instead of blocking the shell — see
 // ensureProfileResilient in application/).
-export async function ensureProfileForUser(ownerId: string): Promise<void> {
-  await ensureProfileResilient(
+// Returns the profile (the terms gate reads it) or null on a transient
+// failure.
+export async function ensureProfileForUser(
+  ownerId: string,
+): Promise<Profile | null> {
+  return ensureProfileResilient(
     { ownerId },
     {
       profiles: new DrizzleProfileRepository(getDb()),
