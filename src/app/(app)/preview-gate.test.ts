@@ -5,9 +5,10 @@ import { describe, expect, it } from "vitest";
 // Route trees that are design previews backed by route-local sample data.
 // Add a tree here when a new preview ships. `routes` is the number of pages
 // the tree must keep, so a deleted or renamed page cannot silently shrink
-// the guarded surface.
+// the guarded surface. `flashcards` is not listed: its list routes run on real
+// data since Phase 3, and its deck route serves the sample player only behind
+// `designPreviewsEnabled()` (covered by that route's own test).
 const PREVIEW_TREES: [tree: string, routes: number][] = [
-  ["flashcards", 3],
   ["active-recall", 3],
   ["exams", 3],
   ["dashboard", 1],

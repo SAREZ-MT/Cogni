@@ -19,6 +19,7 @@ import { createServerAnalytics } from "@/shared/observability/analytics";
 import {
   DailyLimitReachedError,
   getGenerationStatus as getGenerationStatusUseCase,
+  listDecks as listDecksUseCase,
   listFlashcardsByPage as listFlashcardsByPageUseCase,
   MAX_CARD_COUNT,
   MIN_CARD_COUNT,
@@ -50,6 +51,16 @@ export interface GenerationView {
   truncated: boolean;
   wordsUsed: number;
   wordsTotal: number;
+}
+
+// One deck = one page with cards (no due count until the Phase 4 scheduler).
+export interface DeckView {
+  pageId: string;
+  notebookId: string;
+  pageTitle: string;
+  notebookTitle: string;
+  notebookColor: string | null;
+  count: number;
 }
 
 export interface GenerationStatusView {
@@ -251,5 +262,19 @@ export async function getGenerationStatusAction(): Promise<
       remainingToday: result.value.remainingToday,
       resetAt: result.value.resetAt.toISOString(),
     });
+  });
+}
+
+export async function listDecksAction(): Promise<
+  Result<DeckView[], ActionError>
+> {
+  return withBoundary(async () => {
+    const ownerId = await requireOwnerId();
+    if (!ownerId.ok) return ownerId;
+
+    const { flashcards } = deps();
+    const result = await listDecksUseCase({ flashcards }, ownerId.value);
+    if (!result.ok) return err(toActionError(result.error));
+    return ok(result.value.map((deck) => ({ ...deck })));
   });
 }

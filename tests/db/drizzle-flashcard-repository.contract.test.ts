@@ -31,16 +31,20 @@ if (process.env.DATABASE_URL) {
     id: notebookId,
     ownerId: owner.id,
     title: "Cuaderno del contrato de flashcards",
+    color: "purple",
     position: 1,
   });
 
+  const pageTitles = new Map<string, string>();
+
   async function newPage(): Promise<string> {
     const id = randomUUID();
+    pageTitles.set(id, `Página ${id}`);
     await db.insert(pages).values({
       id,
       ownerId: owner.id,
       notebookId,
-      title: "Página con tarjetas",
+      title: `Página ${id}`,
       content: { type: "doc", content: [] },
       position: nextPagePosition++,
     });
@@ -54,6 +58,18 @@ if (process.env.DATABASE_URL) {
       otherOwnerId: otherOwner.id,
       newPageId: newPage,
       newId: () => randomUUID(),
+      pageInfo: (pageId) => ({
+        notebookId,
+        pageTitle: pageTitles.get(pageId) ?? "",
+        notebookTitle: "Cuaderno del contrato de flashcards",
+        notebookColor: "purple",
+      }),
+      archivePage: async (pageId) => {
+        await db
+          .update(pages)
+          .set({ archivedAt: new Date() })
+          .where(eq(pages.id, pageId));
+      },
     }),
   });
 

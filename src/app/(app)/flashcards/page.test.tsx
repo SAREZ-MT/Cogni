@@ -1,88 +1,125 @@
 import { render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("server-only", () => ({}));
-
-const { notFound } = vi.hoisted(() => ({
-  notFound: vi.fn(() => {
-    throw new Error("NEXT_NOT_FOUND");
-  }),
+const { listDecksAction } = vi.hoisted(() => ({ listDecksAction: vi.fn() }));
+vi.mock("@/modules/flashcards", () => ({ listDecksAction }));
+vi.mock("@/modules/notebooks", () => ({
+  COLOR_PALETTE: [
+    "pink",
+    "green",
+    "yellow",
+    "purple",
+    "orange",
+    "blue",
+    "mint",
+  ],
 }));
-vi.mock("next/navigation", () => ({ notFound }));
 
 import FlashcardsHubPage from "./page";
 
-describe("FlashcardsHubPage", () => {
-  afterEach(() => {
-    vi.unstubAllEnvs();
-    notFound.mockClear();
+function deck(
+  pageId: string,
+  notebookId: string,
+  notebookTitle: string,
+  count: number,
+  color: string | null = "purple",
+) {
+  return {
+    pageId,
+    notebookId,
+    pageTitle: `Página ${pageId}`,
+    notebookTitle,
+    notebookColor: color,
+    count,
+  };
+}
+
+describe("FlashcardsHubPage (real data)", () => {
+  beforeEach(() => {
+    listDecksAction.mockReset();
   });
 
-  it("renders the hub while design previews are enabled", () => {
-    vi.stubEnv("NODE_ENV", "development");
-
-    render(<FlashcardsHubPage />);
-
-    expect(
-      screen.getByRole("heading", { name: "Flashcards" }),
-    ).toBeInTheDocument();
-    expect(notFound).not.toHaveBeenCalled();
-  });
-
-  it("answers 404 in production so sample decks never reach a visitor", () => {
+  it("is not behind the design-preview gate: it renders in production", async () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("COGNI_DESIGN_PREVIEWS", "");
+    listDecksAction.mockResolvedValue({ ok: true, value: [] });
 
-    expect(() => FlashcardsHubPage()).toThrow("NEXT_NOT_FOUND");
-    expect(notFound).toHaveBeenCalledTimes(1);
-  });
-
-  it("renders in production when the preview opt-in is set", () => {
-    vi.stubEnv("NODE_ENV", "production");
-    vi.stubEnv("COGNI_DESIGN_PREVIEWS", "1");
-
-    render(<FlashcardsHubPage />);
+    render(await FlashcardsHubPage());
 
     expect(
       screen.getByRole("heading", { name: "Flashcards" }),
     ).toBeInTheDocument();
+    vi.unstubAllEnvs();
   });
 
-  it("summarises every sample notebook with the totals derived from its decks", () => {
-    vi.stubEnv("NODE_ENV", "development");
+  it("groups the real decks by notebook with the summed card counts and no due data", async () => {
+    listDecksAction.mockResolvedValue({
+      ok: true,
+      value: [
+        deck("p1", "n1", "Biología", 8),
+        deck("p2", "n1", "Biología", 12),
+        deck("p3", "n2", "Cálculo", 10, "blue"),
+      ],
+    });
 
-    render(<FlashcardsHubPage />);
+    render(await FlashcardsHubPage());
 
-    // 8 + 12 cards in Biología, 10 in Cálculo, 6 in Historia.
-    expect(screen.getByText("36 tarjetas · 3 cuadernos")).toBeInTheDocument();
-    const biologia = screen.getByRole("link", { name: /Biología Celular/ });
-    expect(biologia).toHaveAttribute("href", "/flashcards/biologia-celular");
+    expect(screen.getByText("30 tarjetas · 2 cuadernos")).toBeInTheDocument();
+    const biologia = screen.getByRole("link", { name: /Biología/ });
+    expect(biologia).toHaveAttribute("href", "/flashcards/n1");
     expect(within(biologia).getByText(/20 tarjetas/)).toBeInTheDocument();
-    expect(within(biologia).getByText(/5 pendientes/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Cálculo/ })).toHaveAttribute(
+      "href",
+      "/flashcards/n2",
+    );
+    expect(screen.queryByText(/pendientes/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/al día/i)).not.toBeInTheDocument();
+    expect(screen.queryByText("Vista previa")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: /Estudiar ahora/ }),
+    ).not.toBeInTheDocument();
   });
 
-  it("offers a quick start into the first page deck that has due cards", () => {
-    vi.stubEnv("NODE_ENV", "development");
+  it("uses singular forms for one card in one notebook", async () => {
+    listDecksAction.mockResolvedValue({
+      ok: true,
+      value: [deck("p1", "n1", "Biología", 1)],
+    });
 
-    render(<FlashcardsHubPage />);
+    render(await FlashcardsHubPage());
 
-    expect(
-      screen.getByRole("link", { name: /Estudiar ahora/ }),
-    ).toHaveAttribute("href", "/flashcards/biologia-celular/mitocondria");
-    expect(
-      screen.getByText("14 pendientes hoy", { selector: "span.block" }),
-    ).toBeInTheDocument();
+    expect(screen.getByText("1 tarjeta · 1 cuaderno")).toBeInTheDocument();
   });
 
-  it("summarises pending, up-to-date decks and active notebooks in pills", () => {
-    vi.stubEnv("NODE_ENV", "development");
+  it("falls back to a default tone for a notebook without a known color", async () => {
+    listDecksAction.mockResolvedValue({
+      ok: true,
+      value: [deck("p1", "n1", "Sin color", 2, null)],
+    });
 
-    render(<FlashcardsHubPage />);
+    render(await FlashcardsHubPage());
+
+    expect(screen.getByRole("link", { name: /Sin color/ })).toBeInTheDocument();
+  });
+
+  it("shows the empty state when there are no decks", async () => {
+    listDecksAction.mockResolvedValue({ ok: true, value: [] });
+
+    render(await FlashcardsHubPage());
+
+    expect(screen.getByText("Sin mazos todavía")).toBeInTheDocument();
+  });
+
+  it("tells the student when the decks could not be loaded", async () => {
+    listDecksAction.mockResolvedValue({
+      ok: false,
+      error: { code: "FLASHCARDS_UNEXPECTED", message: "x" },
+    });
+
+    render(await FlashcardsHubPage());
 
     expect(
-      screen.getByText("14 pendientes hoy", { selector: "span:not(.block)" }),
+      screen.getByText("No pudimos cargar tus mazos. Intenta de nuevo."),
     ).toBeInTheDocument();
-    expect(screen.getByText("1 al día")).toBeInTheDocument();
-    expect(screen.getByText("3 cuadernos activos")).toBeInTheDocument();
   });
 });
