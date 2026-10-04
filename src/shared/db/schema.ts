@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   check,
+  doublePrecision,
   index,
   integer,
   jsonb,
@@ -281,6 +282,9 @@ export const flashcards = pgTable(
     back: text("back").notNull(),
     origin: text("origin").notNull().$type<"ai" | "manual">(),
     position: integer("position").notNull(),
+    // Logical delete (documento-maestro §6.1); the card's study item is
+    // suspended at the same time.
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -298,3 +302,241 @@ export const flashcards = pgTable(
 ).enableRLS();
 
 export type FlashcardRow = typeof flashcards.$inferSelect;
+
+// Study-engine literal tuples (same convention as IMPORT_JOB_STATUSES): they
+// mirror StudyItemKind, SessionKind, Quality and MasteryLevel in
+// modules/study-engine/domain and feed both `$type<>()` and the CHECK text.
+export const STUDY_ITEM_KINDS = [
+  "flashcard",
+  "exam_question",
+  "recall_question",
+] as const;
+export type StudyItemKindValue = (typeof STUDY_ITEM_KINDS)[number];
+
+export const REVIEW_SESSION_KINDS = ["flashcards", "exam", "recall"] as const;
+export type ReviewSessionKindValue = (typeof REVIEW_SESSION_KINDS)[number];
+
+export type QualityValue = 0 | 1 | 2 | 3 | 4 | 5;
+
+export const MASTERY_LEVEL_VALUES = [
+  "Nuevo",
+  "Aprendiendo",
+  "Consolidando",
+  "Dominado",
+] as const;
+export type MasteryLevelValue = (typeof MASTERY_LEVEL_VALUES)[number];
+
+export const SESSION_FEEDBACK_STATUSES = ["pending", "done", "failed"] as const;
+export type SessionFeedbackStatusValue =
+  (typeof SESSION_FEEDBACK_STATUSES)[number];
+
+// Per-item SM-2 state (documento-maestro §3.4, §6.1, §7.1). source_id points
+// to a flashcard, a root exam question or a recall question depending on
+// kind, so it carries no foreign key; (kind, source_id) is unique: one item
+// per source. RLS on with no policies, like every table here.
+export const studyItems = pgTable(
+  "study_items",
+  {
+    id: uuid("id").primaryKey(),
+    ownerId: uuid("owner_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    pageId: uuid("page_id")
+      .notNull()
+      .references(() => pages.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull().$type<StudyItemKindValue>(),
+    sourceId: uuid("source_id").notNull(),
+    easiness: doublePrecision("easiness").notNull().default(2.5),
+    intervalDays: integer("interval_days").notNull().default(0),
+    repetitions: integer("repetitions").notNull().default(0),
+    lapses: integer("lapses").notNull().default(0),
+    dueAt: timestamp("due_at", { withTimezone: true }).notNull(),
+    lastQuality: integer("last_quality").$type<QualityValue>(),
+    lastReviewedAt: timestamp("last_reviewed_at", { withTimezone: true }),
+    suspendedAt: timestamp("suspended_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    // Serves "due today" (listDue) for one owner.
+    index("study_items_owner_due_idx").on(table.ownerId, table.dueAt),
+    index("study_items_page_id_idx").on(table.pageId),
+    unique("study_items_kind_source_key").on(table.kind, table.sourceId),
+    check(
+      "study_items_kind_check",
+      sql`${table.kind} in ('flashcard', 'exam_question', 'recall_question')`,
+    ),
+    check("study_items_easiness_min", sql`${table.easiness} >= 1.3`),
+    check(
+      "study_items_counters_non_negative",
+      sql`${table.intervalDays} >= 0 and ${table.repetitions} >= 0 and ${table.lapses} >= 0`,
+    ),
+    check(
+      "study_items_last_quality_range",
+      sql`${table.lastQuality} between 0 and 5`,
+    ),
+  ],
+).enableRLS();
+
+export type StudyItemRow = typeof studyItems.$inferSelect;
+
+// Append-only history of graded answers (§6.1). session_id points to a
+// flashcard, exam or recall session depending on session_kind, so it
+// carries no foreign key; logs go away with their item.
+export const reviewLogs = pgTable(
+  "review_logs",
+  {
+    id: uuid("id").primaryKey(),
+    ownerId: uuid("owner_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    itemId: uuid("item_id")
+      .notNull()
+      .references(() => studyItems.id, { onDelete: "cascade" }),
+    quality: integer("quality").notNull().$type<QualityValue>(),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }).notNull(),
+    intervalBefore: integer("interval_before").notNull(),
+    intervalAfter: integer("interval_after").notNull(),
+    easinessAfter: doublePrecision("easiness_after").notNull(),
+    sessionKind: text("session_kind").notNull().$type<ReviewSessionKindValue>(),
+    sessionId: uuid("session_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("review_logs_item_reviewed_idx").on(table.itemId, table.reviewedAt),
+    index("review_logs_owner_reviewed_idx").on(table.ownerId, table.reviewedAt),
+    check("review_logs_quality_range", sql`${table.quality} between 0 and 5`),
+    check(
+      "review_logs_session_kind_check",
+      sql`${table.sessionKind} in ('flashcards', 'exam', 'recall')`,
+    ),
+  ],
+).enableRLS();
+
+export type ReviewLogRow = typeof reviewLogs.$inferSelect;
+
+// One persisted mastery aggregate per page (§6.1, §7.3), rewritten after
+// every review and by the daily job.
+export const pageMastery = pgTable(
+  "page_mastery",
+  {
+    id: uuid("id").primaryKey(),
+    ownerId: uuid("owner_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    pageId: uuid("page_id")
+      .notNull()
+      .references(() => pages.id, { onDelete: "cascade" }),
+    level: text("level").notNull().$type<MasteryLevelValue>(),
+    score: doublePrecision("score").notNull(),
+    itemsTotal: integer("items_total").notNull(),
+    itemsDue: integer("items_due").notNull(),
+    computedAt: timestamp("computed_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    unique("page_mastery_page_id_key").on(table.pageId),
+    index("page_mastery_owner_id_idx").on(table.ownerId),
+    check(
+      "page_mastery_level_check",
+      sql`${table.level} in ('Nuevo', 'Aprendiendo', 'Consolidando', 'Dominado')`,
+    ),
+    check(
+      "page_mastery_score_range",
+      sql`${table.score} >= 0 and ${table.score} <= 1`,
+    ),
+  ],
+).enableRLS();
+
+export type PageMasteryRow = typeof pageMastery.$inferSelect;
+
+// One flashcard review session (§6.1). page_id is null for the multi-page
+// "Hoy" session; an open session has no finished_at.
+export const flashcardSessions = pgTable(
+  "flashcard_sessions",
+  {
+    id: uuid("id").primaryKey(),
+    ownerId: uuid("owner_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    pageId: uuid("page_id").references(() => pages.id, {
+      onDelete: "cascade",
+    }),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    reviewedCount: integer("reviewed_count").notNull().default(0),
+    againCount: integer("again_count").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("flashcard_sessions_owner_started_idx").on(
+      table.ownerId,
+      table.startedAt,
+    ),
+    index("flashcard_sessions_page_id_idx").on(table.pageId),
+  ],
+).enableRLS();
+
+export type FlashcardSessionRow = typeof flashcardSessions.$inferSelect;
+
+// AI feedback for one finished session of any technique (§6.1): exactly one
+// row per (session_kind, session_id). A failed generation never blocks
+// closing the session; it only marks the row failed.
+export const sessionFeedback = pgTable(
+  "session_feedback",
+  {
+    id: uuid("id").primaryKey(),
+    ownerId: uuid("owner_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    sessionKind: text("session_kind").notNull().$type<ReviewSessionKindValue>(),
+    sessionId: uuid("session_id").notNull(),
+    content: jsonb("content"),
+    generationId: uuid("generation_id").references(() => aiGenerations.id, {
+      onDelete: "set null",
+    }),
+    status: text("status")
+      .notNull()
+      .default("pending")
+      .$type<SessionFeedbackStatusValue>(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    unique("session_feedback_session_key").on(
+      table.sessionKind,
+      table.sessionId,
+    ),
+    index("session_feedback_owner_id_idx").on(table.ownerId),
+    check(
+      "session_feedback_session_kind_check",
+      sql`${table.sessionKind} in ('flashcards', 'exam', 'recall')`,
+    ),
+    check(
+      "session_feedback_status_check",
+      sql`${table.status} in ('pending', 'done', 'failed')`,
+    ),
+  ],
+).enableRLS();
+
+export type SessionFeedbackRow = typeof sessionFeedback.$inferSelect;
