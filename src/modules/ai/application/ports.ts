@@ -64,3 +64,16 @@ export interface AiGenerationRepository {
 export interface IdGenerator {
   next(): string;
 }
+
+// Per-owner daily generation limit (AI_DAILY_GENERATIONS). `check` CONSUMES
+// one unit when it allows the call, so callers invoke it exactly once per
+// generation request, before calling the model.
+export interface GenerationRateLimit {
+  readonly allowed: boolean;
+  readonly remaining: number;
+  readonly resetAt: Date;
+}
+
+export interface GenerationRateLimiter {
+  check(ownerId: string): Promise<GenerationRateLimit>;
+}

@@ -13,6 +13,8 @@ export type {
   BreakerStore,
   GenerateObjectRequest,
   GenerateObjectResponse,
+  GenerationRateLimit,
+  GenerationRateLimiter,
   IdGenerator,
   QuotaStore,
 } from "./ports";
