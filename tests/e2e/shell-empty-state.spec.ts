@@ -63,22 +63,21 @@ test.describe("app shell", () => {
     ).toHaveCount(0);
   });
 
-  // Design previews (Dashboard, Flashcards, Active recall, Exámenes) are
-  // hidden in production builds, which is what this suite runs against
+  // Design previews (Dashboard, Active recall, Exámenes) are hidden in
+  // production builds, which is what this suite runs against
   // (`next build && next start`): they render as disabled "pronto" rows
-  // instead of links.
+  // instead of links. Flashcards left the preview set in Phase 3 (real
+  // decks per page), so it is always a live link.
   test("sidebar lists the preview areas as disabled 'pronto' entries", async ({
     page,
   }) => {
     await page.goto("/");
 
     const sidebar = page.getByRole("navigation", { name: "Barra lateral" });
-    for (const label of [
-      "Dashboard",
-      "Flashcards",
-      "Active recall",
-      "Exámenes",
-    ]) {
+    await expect(
+      sidebar.getByRole("link", { name: "Flashcards" }),
+    ).toHaveAttribute("href", "/flashcards");
+    for (const label of ["Dashboard", "Active recall", "Exámenes"]) {
       await expect(sidebar.getByRole("link", { name: label })).toHaveCount(0);
       await expect(
         sidebar.locator('[aria-disabled="true"]').filter({ hasText: label }),
@@ -89,11 +88,22 @@ test.describe("app shell", () => {
     ).toHaveAttribute("href", "/notebooks");
   });
 
-  test("hides the flashcards preview routes: /flashcards answers not-found", async ({
+  // Phase 3: /flashcards serves the user's real decks and never the sample
+  // data; the sample notebook and player routes stay not-found in production
+  // builds. The verified user is shared by the worker, so another spec may
+  // already have generated a deck: assert the real hub, not the empty state.
+  test("serves /flashcards on real data and hides the sample flashcards routes", async ({
     page,
   }) => {
+    const hub = await page.goto("/flashcards");
+    expect(hub?.status()).toBe(200);
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Flashcards" }),
+    ).toBeVisible();
+    await expect(page.getByText("Estudiar ahora")).toHaveCount(0);
+    await expect(page.getByText("Biología Celular")).toHaveCount(0);
+
     for (const path of [
-      "/flashcards",
       "/flashcards/biologia-celular",
       "/flashcards/biologia-celular/session?deck=mitocondria-semana-3",
     ]) {

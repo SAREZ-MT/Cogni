@@ -63,16 +63,18 @@ const ROWS: readonly RegistryRow[] = [
   {
     entry: {
       id: "gemini-flash-lite",
-      model: "gemini-2.5-flash-lite",
+      model: "gemini-3.5-flash-lite",
       capabilities: [...GENERATION_PURPOSES, ...EVALUATION_PURPOSES],
-      rpm: 10,
-      rpd: 20,
+      // Free-tier limits read by the user in AI Studio on 2026-10-04
+      // (15 RPM, 250K TPM, 500 RPD); Google no longer publishes them.
+      rpm: 15,
+      rpd: 500,
       priority: 1,
     },
     isConfigured: (env) => Boolean(env.GOOGLE_GENERATIVE_AI_API_KEY),
     createModel: (env) =>
       createGoogleGenerativeAI({ apiKey: env.GOOGLE_GENERATIVE_AI_API_KEY })(
-        "gemini-2.5-flash-lite",
+        "gemini-3.5-flash-lite",
       ),
   },
   {
@@ -91,6 +93,9 @@ const ROWS: readonly RegistryRow[] = [
         name: "cloudflare-workers-ai",
         baseURL: `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/ai/v1`,
         apiKey: env.CLOUDFLARE_API_TOKEN,
+        // Without this the provider omits `response_format` and Cloudflare
+        // returns free text instead of the schema-shaped JSON object.
+        supportsStructuredOutputs: true,
       }).chatModel("@cf/meta/llama-3.3-70b-instruct-fp8-fast"),
   },
   {

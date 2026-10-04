@@ -188,7 +188,7 @@ Regla de versiones: en la Fase 0 se instala **la última versión estable** de c
 
 | Proveedor | Paquete AI SDK | Modelo | Rol en la rotación |
 |---|---|---|---|
-| Google AI Studio | `@ai-sdk/google` | `gemini-2.5-flash-lite` | Generación, prioridad 1 |
+| Google AI Studio | `@ai-sdk/google` | `gemini-3.5-flash-lite` | Generación, prioridad 1 |
 | Cloudflare Workers AI | `@ai-sdk/openai-compatible` | `@cf/meta/llama-3.3-70b-instruct-fp8-fast` | Generación, prioridad 2 |
 | OpenRouter | `@openrouter/ai-sdk-provider` | `qwen/qwen3.8-27b:free` | Generación, prioridad 3 |
 | OpenRouter | `@openrouter/ai-sdk-provider` | `nvidia/nemotron-3-super-120b-a12b:free` | Generación, prioridad 4 |

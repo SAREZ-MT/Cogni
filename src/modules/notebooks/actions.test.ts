@@ -108,6 +108,17 @@ describe("notebooks Server Actions", () => {
       expect(result).toBeNull();
     });
 
+    it("returns null for route params that are not ids, before any lookup", async () => {
+      const { getPageForRoute } = await import("./actions");
+
+      // /flashcards/biologia-celular/session reached Postgres with "session"
+      // as a uuid and answered 500 instead of 404.
+      const result = await getPageForRoute("biologia-celular", "session");
+
+      expect(result).toBeNull();
+      expect(getCurrentUser).not.toHaveBeenCalled();
+    });
+
     it("returns the page when it belongs to the notebook in the route param", async () => {
       const { createNotebook, createPage, getPageForRoute } = await import(
         "./actions"

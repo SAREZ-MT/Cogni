@@ -25,7 +25,7 @@ Al implementar la fase se verificó cada proveedor candidato contra su condició
 
    | Prioridad | Proveedor | Modelo | rpm / rpd en el código |
    |---|---|---|---|
-   | 1 | Google AI Studio (`@ai-sdk/google`) | `gemini-2.5-flash-lite` | 10 / 20 |
+   | 1 | Google AI Studio (`@ai-sdk/google`) | `gemini-3.5-flash-lite` | 15 / 500 |
    | 2 | Cloudflare Workers AI (endpoint compatible con OpenAI, `@ai-sdk/openai-compatible`) | `@cf/meta/llama-3.3-70b-instruct-fp8-fast` | 30 / 300 |
    | 3 | OpenRouter (`@openrouter/ai-sdk-provider`) | `qwen/qwen3.8-27b:free` | 20 / 50 |
    | 4 | OpenRouter | `nvidia/nemotron-3-super-120b-a12b:free` | 20 / 50 |
@@ -45,10 +45,11 @@ Al implementar la fase se verificó cada proveedor candidato contra su condició
 
 ## Consecuencias
 
-- Con las cuotas del código, la capacidad diaria de generación es del orden de 20 + 300 + 50 + 50 solicitudes entre todos los usuarios, suficiente para 20 usuarios con 6 generaciones cada uno solo mientras Cloudflare esté disponible.
+- Con las cuotas del código, la capacidad diaria de generación es del orden de 500 + 300 + 50 + 50 solicitudes entre todos los usuarios, holgada para 20 usuarios con 6 generaciones cada uno (120 solicitudes diarias) incluso con un solo proveedor disponible.
 - Si todos los proveedores están agotados o no sanos, el usuario recibe `GENERATION_FAILED`; nunca se inventa un resultado.
 - Los límites por usuario (6 por día) son conservadores y están pendientes de ampliarse; la primera palanca prevista es cargar 10 USD en OpenRouter, que eleva el límite diario de los modelos `:free`. Hacerlo requiere un método de pago y por lo tanto una decisión nueva.
 - Los identificadores de modelo de OpenRouter y los límites `rpm`/`rpd` son valores de código, no leídos del catálogo en tiempo de ejecución; si un proveedor cambia un modelo, se edita la tabla única del registro.
+- El 2026-10-04 Google retiró `gemini-2.5-flash-lite` para cuentas nuevas y el proyecto pasó a `gemini-3.5-flash-lite`; además, Cloudflare Workers AI exige `supportsStructuredOutputs` en el proveedor compatible con OpenAI para producir salidas con esquema JSON. Los límites de Gemini (15 RPM, 250K TPM, 500 RPD) se confirmaron en AI Studio el 2026-10-04.
 - El script de verificación manual consume cuota real (dos llamadas) y marca claves de cuota en Redis que se restauran con `--restore`.
 - Un cambio de proveedor o de modelo no toca los módulos de negocio: todos pasan por `ai.application` y el AI SDK solo puede importarse en `src/modules/ai/infrastructure` (regla de dependency-cruiser).
 
