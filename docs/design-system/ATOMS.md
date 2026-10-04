@@ -337,6 +337,18 @@ shares one chrome (`rounded-xl border border-border-default bg-card shadow-md`):
 Tests: `dropdown-menu.test.tsx`, `popover.test.tsx` and `highlight-picker.test.tsx`
 assert the chrome so the unregistered tokens cannot come back.
 
+## Dialog (`dialog.tsx`)
+
+Radix dialog atom used by every modal form (`CreateNotebookDialog`,
+`QuestionFormDialog`, `NewFlashcardDialog`). Since 2026-10-04 (Phase 4 T3)
+`DialogContent` uses the card surface — `bg-card`, `border-border-default`,
+`text-fg`, `shadow-lg` — instead of `bg-popover` / `text-popover-foreground`.
+`--color-popover` is not registered in `globals.css`, so the old classes
+produced no CSS and every dialog rendered transparent (the same defect the
+DropdownMenu fix handled). Radius stays at the atom's `rounded-xl` (12px);
+the design-system modal mockups use 24px — a known gap, not yet aligned.
+Covered by `dialog.test.tsx` (asserts the `bg-card` surface).
+
 ## Flashcards design preview (2026-09-24)
 
 Six new atoms for the `/flashcards` design-preview screens (user decision:

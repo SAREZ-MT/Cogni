@@ -1,12 +1,16 @@
+import { Layers } from "lucide-react";
 import { notFound } from "next/navigation";
 import { listFlashcardsAction } from "@/modules/flashcards";
 import { getNotebookTitleForRoute, getPageForRoute } from "@/modules/notebooks";
 import { designPreviewsEnabled } from "@/shared/config/design-previews";
 import { BackLink } from "@/shared/ui/back-link";
+import { EmptyState } from "@/shared/ui/empty-state";
+import { IconTile } from "@/shared/ui/icon-tile";
 import { SectionHeader } from "@/shared/ui/section-header";
 import { SetBreadcrumb } from "../../../_components/breadcrumb";
 import { FlashcardPlayer } from "../../_components/flashcard-player";
 import { FlashcardReviewList } from "../../_components/flashcard-review-list";
+import { NewFlashcardDialog } from "../../_components/new-flashcard-dialog";
 import {
   getSampleCards,
   getSampleNotebook,
@@ -24,9 +28,11 @@ interface FlashcardsSessionPageProps {
 //
 // - Design previews on and a sample notebook/page id: the graded study
 //   player on sample data (grading and SM-2 scheduling are Phase 4).
-// - Otherwise: the page's real cards as an ungraded flip-card review list.
-//   A page that is unknown, archived, not the caller's, or that holds no
-//   cards 404s (a deck is never empty).
+// - Otherwise: the page's real cards as an ungraded flip-card review list,
+//   with "Nueva tarjeta" and a per-card archive action. A page that is
+//   unknown, archived or not the caller's 404s. A page without cards has no
+//   deck yet (a deck is never empty): it shows an empty state whose
+//   "Nueva tarjeta" creates the first card and with it the deck.
 export default async function FlashcardsSessionPage({
   params,
 }: FlashcardsSessionPageProps) {
@@ -63,7 +69,7 @@ export default async function FlashcardsSessionPage({
   const page = await getPageForRoute(notebookId, pageId);
   if (!page) notFound();
   const cards = await listFlashcardsAction({ pageId: page.id });
-  if (!cards.ok || cards.value.length === 0) notFound();
+  if (!cards.ok) notFound();
   const notebookTitle =
     (await getNotebookTitleForRoute(notebookId)) ?? "Cuaderno";
 
@@ -82,10 +88,30 @@ export default async function FlashcardsSessionPage({
           eyebrow="Flashcards"
           title={page.title}
           titleClassName="text-xl"
-          description={plural(cards.value.length, "tarjeta", "tarjetas")}
+          description={
+            cards.value.length === 0
+              ? "Sin tarjetas todavía"
+              : plural(cards.value.length, "tarjeta", "tarjetas")
+          }
+          actions={<NewFlashcardDialog pageId={page.id} />}
         />
       </div>
-      <FlashcardReviewList cards={cards.value} />
+      {cards.value.length === 0 ? (
+        <EmptyState
+          fill
+          icon={
+            <IconTile size="56" tone="warning">
+              <Layers aria-hidden="true" size={28} strokeWidth={1.75} />
+            </IconTile>
+          }
+          title="Esta página aún no tiene tarjetas"
+          titleClassName="text-base"
+          description="Crea la primera con Nueva tarjeta o genera un mazo desde la página con Técnicas → Flashcards."
+          descriptionClassName="max-w-[360px]"
+        />
+      ) : (
+        <FlashcardReviewList cards={cards.value} archivable />
+      )}
     </section>
   );
 }

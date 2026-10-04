@@ -9,6 +9,16 @@ export class InMemoryStudyItemRepository implements StudyItemRepository {
   async save(item: StudyItem): Promise<void> {
     const existing = this.rows.get(item.id);
     if (existing && existing.ownerId !== item.ownerId) return;
+    // Mirrors the database's unique (kind, source_id): one item per source.
+    for (const row of this.rows.values()) {
+      if (
+        row.id !== item.id &&
+        row.kind === item.kind &&
+        row.sourceId === item.sourceId
+      ) {
+        throw new Error("duplicate study item for (kind, sourceId)");
+      }
+    }
     this.rows.set(item.id, item);
   }
 

@@ -1,5 +1,5 @@
 import { and, asc, eq, isNull, max, sql } from "drizzle-orm";
-import type { Db } from "@/shared/db/client";
+import type { DbExecutor } from "@/shared/db/client";
 import {
   type FlashcardRow,
   flashcards,
@@ -24,13 +24,24 @@ function toFlashcard(row: FlashcardRow): Flashcard {
     position: row.position,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
+    archivedAt: row.archivedAt,
   };
 }
 
+// Active (not archived) cards of one owner's page.
+function activeOnPage(pageId: string, ownerId: string) {
+  return and(
+    eq(flashcards.pageId, pageId),
+    eq(flashcards.ownerId, ownerId),
+    isNull(flashcards.archivedAt),
+  );
+}
+
 // Drizzle implementation of FlashcardRepository; every query filters by
-// owner_id (documento-maestro §6.1).
+// owner_id (documento-maestro §6.1) and every read but findById and
+// nextPosition skips archived cards.
 export class DrizzleFlashcardRepository implements FlashcardRepository {
-  constructor(private readonly db: Db) {}
+  constructor(private readonly db: DbExecutor) {}
 
   async insertMany(cards: readonly Flashcard[]): Promise<void> {
     if (cards.length === 0) return;
@@ -46,17 +57,24 @@ export class DrizzleFlashcardRepository implements FlashcardRepository {
         position: card.position,
         createdAt: card.createdAt,
         updatedAt: card.updatedAt,
+        archivedAt: card.archivedAt,
       })),
     );
+  }
+
+  async findById(id: string, ownerId: string): Promise<Flashcard | null> {
+    const [row] = await this.db
+      .select()
+      .from(flashcards)
+      .where(and(eq(flashcards.id, id), eq(flashcards.ownerId, ownerId)));
+    return row ? toFlashcard(row) : null;
   }
 
   async listByPage(pageId: string, ownerId: string): Promise<Flashcard[]> {
     const rows = await this.db
       .select()
       .from(flashcards)
-      .where(
-        and(eq(flashcards.pageId, pageId), eq(flashcards.ownerId, ownerId)),
-      )
+      .where(activeOnPage(pageId, ownerId))
       .orderBy(asc(flashcards.position));
     return rows.map(toFlashcard);
   }
@@ -65,9 +83,7 @@ export class DrizzleFlashcardRepository implements FlashcardRepository {
     const [row] = await this.db
       .select({ count: sql<number>`count(*)::int` })
       .from(flashcards)
-      .where(
-        and(eq(flashcards.pageId, pageId), eq(flashcards.ownerId, ownerId)),
-      );
+      .where(activeOnPage(pageId, ownerId));
     return row?.count ?? 0;
   }
 
@@ -100,11 +116,36 @@ export class DrizzleFlashcardRepository implements FlashcardRepository {
       .where(
         and(
           eq(flashcards.ownerId, ownerId),
+          isNull(flashcards.archivedAt),
           isNull(pages.archivedAt),
           isNull(notebooks.archivedAt),
         ),
       )
       .groupBy(pages.id, notebooks.id)
       .orderBy(asc(notebooks.title), asc(pages.title), asc(pages.id));
+  }
+
+  async archive(id: string, ownerId: string, now: Date): Promise<void> {
+    // archived_at IS NULL keeps the first archive instant on a repeat call.
+    await this.db
+      .update(flashcards)
+      .set({ archivedAt: now, updatedAt: now })
+      .where(
+        and(
+          eq(flashcards.id, id),
+          eq(flashcards.ownerId, ownerId),
+          isNull(flashcards.archivedAt),
+        ),
+      );
+  }
+
+  async lockDeck(pageId: string, ownerId: string): Promise<void> {
+    // The page row is the deck's lock: every deck change of the page
+    // queues behind it until the surrounding transaction ends.
+    await this.db
+      .select({ id: pages.id })
+      .from(pages)
+      .where(and(eq(pages.id, pageId), eq(pages.ownerId, ownerId)))
+      .for("update");
   }
 }

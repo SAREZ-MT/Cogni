@@ -96,6 +96,17 @@ export function runStudyItemRepositoryContract(
       expect(await repo.findById(item.id, ctx.otherOwnerId)).toBeNull();
     });
 
+    it("rejects a second item for the same (kind, sourceId)", async () => {
+      const ctx = options.context();
+      const repo = options.createRepository();
+      const item = makeItem(ctx, await ctx.newPageId());
+      await repo.save(item);
+      await expect(repo.save({ ...item, id: ctx.newId() })).rejects.toThrow();
+      expect(
+        await repo.findBySource("flashcard", item.sourceId, ctx.ownerId),
+      ).toEqual(item);
+    });
+
     it("findById returns null for an unknown id", async () => {
       const ctx = options.context();
       const repo = options.createRepository();

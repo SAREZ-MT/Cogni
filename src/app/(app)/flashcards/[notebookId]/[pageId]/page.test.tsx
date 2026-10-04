@@ -8,12 +8,20 @@ const { notFound } = vi.hoisted(() => ({
     throw new Error("NEXT_NOT_FOUND");
   }),
 }));
-vi.mock("next/navigation", () => ({ notFound }));
+vi.mock("next/navigation", () => ({
+  notFound,
+  useRouter: () => ({ refresh: vi.fn() }),
+}));
 
 const { listFlashcardsAction } = vi.hoisted(() => ({
   listFlashcardsAction: vi.fn(),
 }));
-vi.mock("@/modules/flashcards", () => ({ listFlashcardsAction }));
+vi.mock("@/modules/flashcards", () => ({
+  listFlashcardsAction,
+  createFlashcardAction: vi.fn(),
+  archiveFlashcardAction: vi.fn(),
+  MAX_FLASHCARD_SIDE_LENGTH: 1000,
+}));
 const { getPageForRoute, getNotebookTitleForRoute } = vi.hoisted(() => ({
   getPageForRoute: vi.fn(),
   getNotebookTitleForRoute: vi.fn(),
@@ -115,12 +123,33 @@ describe("FlashcardsSessionPage", () => {
       ).rejects.toThrow("NEXT_NOT_FOUND");
     });
 
-    it("answers 404 when the page has no cards: a deck is never empty", async () => {
+    it("offers Nueva tarjeta on the page deck and an archive action per card", async () => {
+      render(await FlashcardsSessionPage(props(NOTEBOOK, PAGE)));
+
+      expect(
+        screen.getByRole("button", { name: "Nueva tarjeta" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getAllByRole("button", { name: "Archivar tarjeta" }),
+      ).toHaveLength(2);
+    });
+
+    it("lets a page without cards start its deck with the first card", async () => {
       listFlashcardsAction.mockResolvedValue({ ok: true, value: [] });
 
-      await expect(
-        FlashcardsSessionPage(props(NOTEBOOK, PAGE)),
-      ).rejects.toThrow("NEXT_NOT_FOUND");
+      render(await FlashcardsSessionPage(props(NOTEBOOK, PAGE)));
+
+      expect(
+        screen.getByRole("heading", { name: "Mitocondria" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText("Esta página aún no tiene tarjetas"),
+      ).toBeInTheDocument();
+      expect(screen.queryByTestId("flip-card")).not.toBeInTheDocument();
+      expect(
+        screen.getAllByRole("button", { name: "Nueva tarjeta" }).length,
+      ).toBeGreaterThan(0);
+      expect(notFound).not.toHaveBeenCalled();
     });
 
     it("answers 404 when the cards cannot be loaded", async () => {

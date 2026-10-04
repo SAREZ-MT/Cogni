@@ -1,31 +1,52 @@
 # Module `flashcards`
 
-Flashcards generated from a page (documento-maestro §3.3, §8). Phase 3 ships
-generation and listing only; review sessions and SM-2 arrive in Phase 4.
+Flashcards generated from a page or written by hand (documento-maestro §3.3,
+§8). Every card owns a `StudyItem` of the `study-engine` module (§3.4),
+created with the card and suspended when the card is archived. Review
+sessions arrive later in Phase 4.
 
 ## Layout
 
 - `domain/`
-  - `flashcard.ts` `Flashcard` entity and `createFlashcard` (trims, rejects an
-    empty front or back with `FLASHCARD_EMPTY`).
+  - `flashcard.ts` `Flashcard` entity (`archivedAt` is the logical delete),
+    `createFlashcard` (trims, rejects an empty front or back with
+    `FLASHCARD_EMPTY`) and `MAX_FLASHCARD_SIDE_LENGTH` (1000, manual cards).
   - `flashcard-repository.ts` `FlashcardRepository` port: `insertMany`,
-    `listByPage`, `countByPage`, `nextPosition`, `countByOwnerGroupedByPage`.
+    `findById`, `listByPage`, `countByPage`, `nextPosition`,
+    `countByOwnerGroupedByPage`, `archive`, `lockDeck`. Every read except
+    `findById` and `nextPosition` ignores archived cards.
   - `errors.ts` error codes.
 - `application/` use cases, `(input, deps, ownerId)` returning `Result`:
+  - `deck-unit-of-work.ts` `DeckUnitOfWork` port: runs a deck change against
+    the flashcard repository and the study items (`DeckStudyItems`, a slice of
+    `StudyItemRepository`) so both commit or roll back together.
+  - `createManualFlashcard` checks the page through `PageTextReader`, enforces
+    the trimmed side limit (`FLASHCARD_TOO_LONG`), and adds the card at the end
+    of the deck with its due study item. A page without cards has no deck; its
+    first card starts it.
+  - `archiveFlashcard` archives the card and suspends its study item. The
+    deck's last active card is refused with `FLASHCARD_LAST_CARD` (a deck is
+    never empty); the deck is locked before counting.
   - `requestGeneration` reads the page text through the notebooks
     `PageTextReader` port, answers `PAGE_EMPTY` for a blank page, consumes one
     unit of the per-user daily limit (`DAILY_LIMIT_REACHED` with `resetAt`),
     truncates to `AI_PAGE_TOKEN_CAP`, calls `ai.generateStructured` with the
     `generate_flashcards/v1` prompt and persists the cards with consecutive
-    positions. The page is read before the limiter, so a missing or blank page
+    positions and their study items in one unit of work. The page is read
+    before the limiter, so a missing or blank page
     never costs a generation. Zero valid cards is `GENERATION_FAILED` and
     nothing is persisted.
   - `listFlashcardsByPage`, `listDecks` (one deck per page, count derived from
     its cards), `getGenerationStatus` (remaining generations, does not consume).
 - `infrastructure/` `DrizzleFlashcardRepository` (table `flashcards`), checked
-  by the same contract as the in-memory fake in `testing.ts`.
+  by the same contract as the in-memory fake in `testing.ts`;
+  `DrizzleDeckUnitOfWork` runs each deck change in one Postgres transaction
+  and builds both repositories on it (`lockDeck` is `SELECT ... FOR UPDATE`
+  on the page row).
 - `actions.ts` (`"use server"`): `generateFlashcardsAction`,
-  `listFlashcardsAction`, `listDecksAction`, `getGenerationStatusAction`. They
+  `listFlashcardsAction`, `listDecksAction`, `getGenerationStatusAction`,
+  `createFlashcardAction`, `archiveFlashcardAction` (both revalidate the
+  `/flashcards` layout). They
   validate session and input, return `Result<T, ActionError>`, report failures
   to Sentry and emit the `generation_requested` event. `maxDuration` is declared
   on the page route that hosts the action.

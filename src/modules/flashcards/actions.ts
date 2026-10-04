@@ -1,6 +1,7 @@
 "use server";
 
 import * as Sentry from "@sentry/nextjs";
+import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { AI_ERROR, createAiServerApi } from "@/modules/ai";
 import { getCurrentUser } from "@/modules/identity";
@@ -17,6 +18,8 @@ import { createId } from "@/shared/kernel/id";
 import { err, ok, type Result } from "@/shared/kernel/result";
 import { createServerAnalytics } from "@/shared/observability/analytics";
 import {
+  archiveFlashcard as archiveFlashcardUseCase,
+  createManualFlashcard as createManualFlashcardUseCase,
   DailyLimitReachedError,
   getGenerationStatus as getGenerationStatusUseCase,
   listDecks as listDecksUseCase,
@@ -26,8 +29,11 @@ import {
   requestGeneration as requestGenerationUseCase,
 } from "./application";
 import { FLASHCARD_ERROR } from "./domain/errors";
-import type { Flashcard } from "./domain/flashcard";
-import { DrizzleFlashcardRepository } from "./infrastructure";
+import { type Flashcard, MAX_FLASHCARD_SIDE_LENGTH } from "./domain/flashcard";
+import {
+  DrizzleDeckUnitOfWork,
+  DrizzleFlashcardRepository,
+} from "./infrastructure";
 
 // Server Actions are the only client-reachable entry point of this module:
 // session first, Zod validation, then the use case, and every DomainError
@@ -51,6 +57,11 @@ export interface GenerationView {
   truncated: boolean;
   wordsUsed: number;
   wordsTotal: number;
+}
+
+export interface ArchiveView {
+  // Active cards left in the page's deck (always >= 1).
+  remaining: number;
 }
 
 // One deck = one page with cards (no due count until the Phase 4 scheduler).
@@ -80,6 +91,13 @@ const generateInput = z.object({
   pageId: z.uuid(),
   count: z.number().int().min(MIN_CARD_COUNT).max(MAX_CARD_COUNT).optional(),
 });
+
+// The raw sides are only bounded here (twice the limit leaves room for
+// surrounding whitespace); createManualFlashcard applies the real limit to
+// the trimmed text and answers FLASHCARD_TOO_LONG.
+const side = z.string().max(MAX_FLASHCARD_SIDE_LENGTH * 2);
+const createInput = z.object({ pageId: z.uuid(), front: side, back: side });
+const archiveInput = z.object({ flashcardId: z.uuid() });
 
 const UNEXPECTED_ERROR: ActionError = {
   code: FLASHCARD_ERROR.UNEXPECTED,
@@ -132,6 +150,7 @@ function deps() {
     ai,
     pages: createNotebooksServerApi({ db, clock: systemClock }),
     flashcards: new DrizzleFlashcardRepository(db),
+    deck: new DrizzleDeckUnitOfWork(db),
     analytics: createServerAnalytics({
       key: env.NEXT_PUBLIC_POSTHOG_KEY,
       host: env.NEXT_PUBLIC_POSTHOG_HOST,
@@ -175,14 +194,14 @@ export async function generateFlashcardsAction(
     const parsed = parseInput(generateInput, input);
     if (!parsed.ok) return parsed;
 
-    const { env, ai, pages, flashcards, analytics } = deps();
+    const { env, ai, pages, deck, analytics } = deps();
     const result = await requestGenerationUseCase(
       parsed.value,
       {
         limiter: ai.generationLimiter,
         pages,
         ai,
-        flashcards,
+        deck,
         clock: systemClock,
         ids: { next: createId },
         tokenCap: env.AI_PAGE_TOKEN_CAP,
@@ -276,5 +295,53 @@ export async function listDecksAction(): Promise<
     const result = await listDecksUseCase({ flashcards }, ownerId.value);
     if (!result.ok) return err(toActionError(result.error));
     return ok(result.value.map((deck) => ({ ...deck })));
+  });
+}
+
+// Every flashcards route (decks list, notebook decks, page deck) reads the
+// cards; revalidating the segment layout refreshes all of them.
+function revalidateDecks(): void {
+  revalidatePath("/flashcards", "layout");
+}
+
+export async function createFlashcardAction(
+  input: unknown,
+): Promise<Result<FlashcardView, ActionError>> {
+  return withBoundary(async () => {
+    const ownerId = await requireOwnerId();
+    if (!ownerId.ok) return ownerId;
+    const parsed = parseInput(createInput, input);
+    if (!parsed.ok) return parsed;
+
+    const { pages, deck } = deps();
+    const result = await createManualFlashcardUseCase(
+      parsed.value,
+      { pages, deck, clock: systemClock, ids: { next: createId } },
+      ownerId.value,
+    );
+    if (!result.ok) return err(toActionError(result.error));
+    revalidateDecks();
+    return ok(toView(result.value));
+  });
+}
+
+export async function archiveFlashcardAction(
+  input: unknown,
+): Promise<Result<ArchiveView, ActionError>> {
+  return withBoundary(async () => {
+    const ownerId = await requireOwnerId();
+    if (!ownerId.ok) return ownerId;
+    const parsed = parseInput(archiveInput, input);
+    if (!parsed.ok) return parsed;
+
+    const { deck } = deps();
+    const result = await archiveFlashcardUseCase(
+      parsed.value,
+      { deck, clock: systemClock },
+      ownerId.value,
+    );
+    if (!result.ok) return err(toActionError(result.error));
+    revalidateDecks();
+    return ok({ remaining: result.value.remaining });
   });
 }
