@@ -68,7 +68,7 @@ describe("buildProviderEntries", () => {
       .sort((a, b) => a.priority - b.priority)
       .map((e) => [e.id, e.model, e.rpm, e.rpd]);
     expect(generation).toEqual([
-      ["gemini-flash-lite", "gemini-3.5-flash-lite", 10, 20],
+      ["gemini-flash-lite", "gemini-3.5-flash-lite", 15, 500],
       [
         "cloudflare-workers-ai",
         "@cf/meta/llama-3.3-70b-instruct-fp8-fast",

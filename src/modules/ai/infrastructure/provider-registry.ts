@@ -65,10 +65,10 @@ const ROWS: readonly RegistryRow[] = [
       id: "gemini-flash-lite",
       model: "gemini-3.5-flash-lite",
       capabilities: [...GENERATION_PURPOSES, ...EVALUATION_PURPOSES],
-      // rpm/rpd are provisional: Google no longer publishes per-model
-      // free-tier limits; confirm them in AI Studio.
-      rpm: 10,
-      rpd: 20,
+      // Free-tier limits read by the user in AI Studio on 2026-10-04
+      // (15 RPM, 250K TPM, 500 RPD); Google no longer publishes them.
+      rpm: 15,
+      rpd: 500,
       priority: 1,
     },
     isConfigured: (env) => Boolean(env.GOOGLE_GENERATIVE_AI_API_KEY),
