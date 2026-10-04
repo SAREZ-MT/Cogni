@@ -1,7 +1,11 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
-import { ensureProfileForUser, getCurrentUser } from "@/modules/identity";
+import {
+  ensureProfileForUser,
+  getCurrentUser,
+  termsRedirectFor,
+} from "@/modules/identity";
 import { getActiveImports } from "@/modules/ingestion";
 import { designPreviewsEnabled } from "@/shared/config/design-previews";
 import { BreadcrumbProvider } from "./_components/breadcrumb";
@@ -20,7 +24,18 @@ import { Topbar } from "./_components/topbar";
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-  await ensureProfileForUser(user.id);
+  const profile = await ensureProfileForUser(user.id);
+
+  // Terms gate: an account that has not accepted the current terms version
+  // cannot use the shell. The proxy forwards the request path as
+  // `x-pathname` so the terms page can send the user back after accepting.
+  // A null profile (transient failure, already reported to Sentry) fails
+  // open and is re-checked on the next render — see termsRedirectFor.
+  const termsRedirect = termsRedirectFor(
+    profile,
+    (await headers()).get("x-pathname"),
+  );
+  if (termsRedirect) redirect(termsRedirect);
 
   const cookieStore = await cookies();
   const collapsed =

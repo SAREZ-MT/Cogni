@@ -17,6 +17,23 @@ export class InMemoryProfileRepository implements ProfileRepository {
     this.rows.set(profile.id, profile);
   }
 
+  async acceptTerms(
+    id: string,
+    version: string,
+    at: Date,
+  ): Promise<Profile | null> {
+    const existing = this.rows.get(id);
+    if (!existing) return null;
+    const updated: Profile = {
+      ...existing,
+      termsAcceptedVersion: version,
+      termsAcceptedAt: at,
+      updatedAt: at,
+    };
+    this.rows.set(id, updated);
+    return updated;
+  }
+
   count(): number {
     return this.rows.size;
   }

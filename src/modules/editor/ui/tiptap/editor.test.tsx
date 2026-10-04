@@ -148,15 +148,18 @@ describe("Editor", () => {
       { timeout: 3000 },
     );
     expect(banner).toHaveTextContent("esta página cambió en otra pestaña");
-    // The server's (empty) document replaced the local draft in the
-    // editor itself.
-    expect(editable).toHaveTextContent("");
+    // The server's (empty) document replaces the local draft in the editor
+    // on the next tick after the banner renders, so poll instead of asserting
+    // synchronously (CI under load read the draft here, 2026-10-04).
+    await waitFor(() => expect(editable.textContent).toBe(""));
 
     await user.click(
       screen.getByRole("button", { name: "recuperar mi borrador" }),
     );
 
-    expect(editable).toHaveTextContent("mi borrador local");
+    await waitFor(() =>
+      expect(editable).toHaveTextContent("mi borrador local"),
+    );
     expect(screen.queryByTestId("conflict-banner")).not.toBeInTheDocument();
   });
 

@@ -1,3 +1,4 @@
+export { acceptTerms } from "./accept-terms";
 export { PASSWORD_MIN_LENGTH } from "./credentials-schema";
 export { type EnsureProfileDeps, ensureProfile } from "./ensure-profile";
 export {

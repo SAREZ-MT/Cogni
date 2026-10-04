@@ -10,6 +10,8 @@ export interface Profile {
   readonly locale: string;
   readonly timezone: string;
   readonly onboardingCompletedAt: Date | null;
+  readonly termsAcceptedVersion: string | null;
+  readonly termsAcceptedAt: Date | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
 }
@@ -45,6 +47,8 @@ export function createProfile(
     locale: DEFAULT_LOCALE,
     timezone: input.timezone ?? DEFAULT_TIMEZONE,
     onboardingCompletedAt: null,
+    termsAcceptedVersion: null,
+    termsAcceptedAt: null,
     createdAt: now,
     updatedAt: now,
   });

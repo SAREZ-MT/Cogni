@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { GoogleButton, SignUpForm } from "@/modules/identity/ui";
+import { GoogleButton, SignUpForm, TermsNotice } from "@/modules/identity/ui";
 
 export default function RegisterPage() {
   return (
@@ -12,6 +12,7 @@ export default function RegisterPage() {
       </div>
       <SignUpForm />
       <GoogleButton />
+      <TermsNotice />
       <p className="text-center text-fg-secondary text-sm">
         ¿Ya tienes cuenta? <Link href="/login">Inicia sesión</Link>
       </p>

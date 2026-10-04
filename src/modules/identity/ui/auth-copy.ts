@@ -14,6 +14,7 @@ export const AUTH_COPY = {
     "Te enviamos un correo de verificación. Revisa tu bandeja para continuar.",
   resetSent:
     "Si el correo existe, recibirás un enlace para restablecer tu contraseña.",
+  termsNotAccepted: "Debes aceptar los términos para continuar.",
   googleCancelled:
     "No se completó el acceso con Google. Puedes intentarlo de nuevo.",
 } as const;
@@ -26,6 +27,8 @@ export function messageForCode(code: string): string {
       return AUTH_COPY.invalidCredentials;
     case AUTH_ERROR.EMAIL_NOT_VERIFIED:
       return AUTH_COPY.emailNotVerified;
+    case AUTH_ERROR.TERMS_NOT_ACCEPTED:
+      return AUTH_COPY.termsNotAccepted;
     default:
       return AUTH_COPY.providerUnavailable;
   }

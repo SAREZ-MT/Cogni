@@ -11,6 +11,8 @@ function toProfile(row: ProfileRow): Profile {
     locale: row.locale,
     timezone: row.timezone,
     onboardingCompletedAt: row.onboardingCompletedAt,
+    termsAcceptedVersion: row.termsAcceptedVersion,
+    termsAcceptedAt: row.termsAcceptedAt,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -48,9 +50,28 @@ export class DrizzleProfileRepository implements ProfileRepository {
         locale: profile.locale,
         timezone: profile.timezone,
         onboardingCompletedAt: profile.onboardingCompletedAt,
+        termsAcceptedVersion: profile.termsAcceptedVersion,
+        termsAcceptedAt: profile.termsAcceptedAt,
         createdAt: profile.createdAt,
         updatedAt: profile.updatedAt,
       })
       .onConflictDoNothing({ target: profiles.id });
+  }
+
+  async acceptTerms(
+    id: string,
+    version: string,
+    at: Date,
+  ): Promise<Profile | null> {
+    const [row] = await this.db
+      .update(profiles)
+      .set({
+        termsAcceptedVersion: version,
+        termsAcceptedAt: at,
+        updatedAt: at,
+      })
+      .where(eq(profiles.id, id))
+      .returning();
+    return row ? toProfile(row) : null;
   }
 }

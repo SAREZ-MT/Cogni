@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { SignInForm } from "@/modules/identity/ui";
+import LoginPage from "./page";
 
 describe("SignInForm", () => {
   it("renders labelled email and password fields with a submit button", () => {
@@ -25,5 +26,18 @@ describe("SignInForm", () => {
 
     expect(form?.getAttribute("method")).not.toBe("get");
     expect(form?.getAttribute("action")).toBeTruthy();
+  });
+});
+
+describe("LoginPage", () => {
+  it("reminds that creating an account requires accepting the terms, with a link to them", async () => {
+    render(await LoginPage({ searchParams: Promise.resolve({}) } as never));
+
+    expect(
+      screen.getByText(/Al crear una cuenta deberás aceptar los/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "términos de uso" }),
+    ).toHaveAttribute("href", "/terminos");
   });
 });

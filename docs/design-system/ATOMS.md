@@ -1148,3 +1148,18 @@ untracked `.claude/skills/ui-ux-pro-max/` fixtures, outside this pass's
 scope), `pnpm depcruise`, `pnpm build`, and
 `vitest run src/app/no-inline-hex.test.ts "src/app/(app)/_components/sidebar.test.tsx"`
 — all green.
+
+## Checkbox (`checkbox.tsx`)
+
+Native `<input type="checkbox">` with a visible label and optional helper
+text (terms-of-use acceptance, 2026-10-04). It stays a real input, so it
+posts `name=on` from a plain `<form action>` and keeps keyboard and
+screen-reader behaviour.
+
+- Props: `label` and `name` (required), `description` (linked through
+  `aria-describedby`), plus any input prop (`required`, `defaultChecked`,
+  `data-testid`, `id`). `className` styles the wrapper (`data-slot="checkbox"`).
+- Look: 20px box, `border-default`, `accent-primary-600`, primary focus ring;
+  label 14px `text-fg`, description 12px `text-fg-secondary`.
+
+Used by: `modules/identity/ui/accept-terms-form.tsx`.

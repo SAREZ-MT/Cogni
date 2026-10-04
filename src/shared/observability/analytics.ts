@@ -9,7 +9,8 @@ export type AnalyticsEvent =
   | "user_signed_up"
   | "user_signed_in"
   | "pdf_imported"
-  | "generation_requested";
+  | "generation_requested"
+  | "terms_accepted";
 
 export type AnalyticsProperties = Record<
   string,

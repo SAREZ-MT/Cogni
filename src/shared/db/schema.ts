@@ -23,6 +23,10 @@ export const profiles = pgTable("profiles", {
   onboardingCompletedAt: timestamp("onboarding_completed_at", {
     withTimezone: true,
   }),
+  // Terms-of-use acceptance: version string (a date) + instant. Both null
+  // until the user accepts; a new TERMS_VERSION re-asks everyone.
+  termsAcceptedVersion: text("terms_accepted_version"),
+  termsAcceptedAt: timestamp("terms_accepted_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

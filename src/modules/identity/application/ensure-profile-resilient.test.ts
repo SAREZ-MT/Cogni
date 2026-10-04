@@ -29,6 +29,14 @@ class FlakyProfileRepository implements ProfileRepository {
   async upsert(profile: Profile): Promise<void> {
     return this.inner.upsert(profile);
   }
+
+  async acceptTerms(
+    id: string,
+    version: string,
+    at: Date,
+  ): Promise<Profile | null> {
+    return this.inner.acceptTerms(id, version, at);
+  }
 }
 
 describe("ensureProfileResilient", () => {
@@ -37,7 +45,7 @@ describe("ensureProfileResilient", () => {
     const profiles = new FlakyProfileRepository(inner, 1);
     const onTransientFailure = vi.fn();
 
-    await ensureProfileResilient(
+    const profile = await ensureProfileResilient(
       { ownerId: OWNER_ID },
       {
         profiles,
@@ -47,11 +55,12 @@ describe("ensureProfileResilient", () => {
       },
     );
 
+    expect(profile).toMatchObject({ id: OWNER_ID });
     expect(await inner.findById(OWNER_ID)).toMatchObject({ id: OWNER_ID });
     expect(onTransientFailure).not.toHaveBeenCalled();
   });
 
-  it("degrades without throwing and reports the error when both attempts fail", async () => {
+  it("degrades to null without throwing and reports the error when both attempts fail", async () => {
     const inner = new InMemoryProfileRepository();
     const profiles = new FlakyProfileRepository(inner, 2);
     const onTransientFailure = vi.fn();
@@ -66,7 +75,7 @@ describe("ensureProfileResilient", () => {
           retryDelayMs: 1,
         },
       ),
-    ).resolves.toBeUndefined();
+    ).resolves.toBeNull();
 
     expect(await inner.findById(OWNER_ID)).toBeNull();
     expect(onTransientFailure).toHaveBeenCalledTimes(1);
