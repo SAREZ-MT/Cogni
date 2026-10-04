@@ -95,8 +95,8 @@ describe("Sidebar", () => {
     }
   });
 
-  // Flashcards is a design preview: a link to /flashcards while previews are
-  // enabled, a disabled "pronto" row otherwise (its route 404s in production).
+  // Flashcards runs on real data (Phase 3): a plain link to /flashcards
+  // whatever the design-preview flag says.
   it("links the Flashcards nav item to /flashcards while previews are enabled", () => {
     render(<Sidebar initialCollapsed={false} user={USER} previewsEnabled />);
 
@@ -116,17 +116,18 @@ describe("Sidebar", () => {
     );
   });
 
-  it("keeps Flashcards as a disabled 'pronto' row when previews are disabled", () => {
+  it("keeps Flashcards a live link when previews are disabled (production)", () => {
     render(
       <Sidebar initialCollapsed={false} user={USER} previewsEnabled={false} />,
     );
 
+    expect(screen.getByRole("link", { name: "Flashcards" })).toHaveAttribute(
+      "href",
+      "/flashcards",
+    );
     expect(
-      screen.queryByRole("link", { name: "Flashcards" }),
-    ).not.toBeInTheDocument();
-    const row = screen.getByText("Flashcards").closest("[aria-disabled]");
-    expect(row).toHaveAttribute("aria-disabled", "true");
-    expect(row).toHaveTextContent("pronto");
+      screen.getByText("Flashcards").closest("[aria-disabled]"),
+    ).toBeNull();
   });
 
   // Active recall is a design preview too: same treatment as Flashcards.

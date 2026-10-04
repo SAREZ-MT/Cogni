@@ -17,6 +17,7 @@
     "test:e2e": "playwright test",
     "test:db": "vitest run --config vitest.db.config.ts",
     "depcruise": "depcruise --config .dependency-cruiser.cjs src",
+    "ai:smoke": "tsx scripts/ai-smoke.mts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate"
   },
@@ -98,6 +99,7 @@
     "jsdom": "^30.0.1",
     "only-allow": "^1.2.2",
     "tailwindcss": "^4",
+    "tsx": "4.23.13",
     "typescript": "^5",
     "vitest": "^5.0.1"
   },

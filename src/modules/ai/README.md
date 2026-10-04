@@ -44,3 +44,51 @@ and rate limiting (documento-maestro §8).
   and limiter state at module level.
 
 Other modules import only from `index.ts`.
+
+## Environment
+
+Server only, never `NEXT_PUBLIC_*` (validated in `src/shared/config/env.schema.ts`):
+
+- `AI_PROVIDER_MODE` `live` (default) or `fake`. Fake mode needs no keys: the
+  registry holds one deterministic provider and quota, breaker and limiter
+  state stay in memory. CI and e2e use it.
+- Live mode needs `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` and at
+  least one generation provider: `GOOGLE_GENERATIVE_AI_API_KEY`,
+  `OPENROUTER_API_KEY`, or `CLOUDFLARE_ACCOUNT_ID` plus `CLOUDFLARE_API_TOKEN`
+  (set together). `GROQ_API_KEY` enables the evaluation-only entry.
+- `REDIS_KEY_PREFIX` (default `cogni:dev`, `cogni:prod` in production),
+  `AI_DAILY_GENERATIONS` (default 6), `AI_PAGE_TOKEN_CAP` (default 12000).
+
+Decisions and dropped providers: `docs/adr/0004-capa-de-ia-con-proveedores-gratuitos.md`.
+
+Known follow-up: `generateObject` is deprecated in `ai@7.0.127` in favor of
+`generateText` with `Output.object`; migrate in `ai-sdk-provider.ts`.
+
+## Manual provider smoke script
+
+`scripts/ai-smoke.mts` proves the Phase 3 done criterion against the real
+providers: with one provider's day quota exhausted, the next one serves. It is
+manual and never runs in CI: it needs real keys in `.env.local` and consumes
+real quota (2 provider calls).
+
+```
+pnpm ai:smoke                          # generate, exhaust gemini-flash-lite, generate again
+pnpm ai:smoke --exhaust <providerId>   # exhaust another registry entry
+pnpm ai:smoke --restore [--exhaust <providerId>]
+pnpm ai:smoke --dry-run                # print the plan, no network, no keys needed
+```
+
+Step 1 generates 3 flashcards from a built-in sample text and prints
+`provider / model / status / tokens / latency`. Step 2 saves the provider's
+current day counter under `{prefix}:ai:smoke:backup:{provider}`, sets the day
+key `{prefix}:ai:quota:{provider}:{yyyy-mm-dd}` to the provider's `rpd` (same
+TTL as the store, key built by the store's `quotaKeys`) and generates again.
+It exits 0 only when the serving provider differs from the exhausted one.
+Generations use an in-memory repository (no `ai_generations` rows) and the
+owner id `smoke`; per-user rate limit keys are never touched.
+
+Always run `pnpm ai:smoke --restore` afterwards: until then the provider looks
+exhausted to the app that shares the same `REDIS_KEY_PREFIX`. Restore puts the
+saved counter back (or deletes the key if there was none). Pure helpers
+(argument parsing, key plan, summary) live in `infrastructure/smoke/lib.ts`
+with unit tests.

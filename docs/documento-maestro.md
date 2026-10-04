@@ -2,8 +2,9 @@
 
 | Campo | Valor |
 |---|---|
-| Versión del documento | 1.1.0 |
-| Fecha | 2026-09-14 (actualizado 2026-10-01) |
+| Versión del documento | 1.2.0 |
+| Fecha | 2026-09-14 (actualizado 2026-10-04) |
+| Cambios de la versión 1.2.0 | ADR 0004: capa de IA con cuatro proveedores gratuitos (Mistral y Cerebras descartados), límite de 6 generaciones por usuario por día y tope de página con truncado. Actualizadas §4.2, §4.3, §8.1, §8.2, §8.3, §8.4, §8.5 y §13 (Fase 3 implementada). |
 | Cambios de la versión 1.1.0 | ADR 0003: Vercel Fluid Compute y Vercel Cron reemplazan a Trigger.dev. Fase 2 (importación de PDF) implementada y fuera de "Próximamente". La métrica por técnica "tiempo de estudio" se reemplaza por "repasos completados". |
 | Estado | Aprobado. Fuente de verdad para todas las fases. |
 | Autor | Javier Sarez |
@@ -176,7 +177,7 @@ Regla de versiones: en la Fase 0 se instala **la última versión estable** de c
 | Vercel | Hosting y deploy de Next.js, previews por rama | Hobby | Solo uso no comercial | Sin anuncios, donaciones ni cobros. Al monetizar: Pro. |
 | Supabase | Postgres, Auth (correo + Google), Storage (PDF e imágenes) | Free | Pausa tras 7 días sin actividad; 500 MB DB; 1 GB Storage | Cron diario de keep-alive. Con usuarios recurrentes: Pro. |
 | Cloudflare | Registrador de dominio y DNS | Registrar a costo | — | Solo DNS. Sin proxy delante de Vercel. |
-| Upstash Redis | Rate limiting por usuario y contadores de cuota por proveedor de IA | Free | Comandos/día del plan free | No se usa como caché genérica. |
+| Upstash Redis | Una única base `cogni` con prefijo `REDIS_KEY_PREFIX`: límites por usuario, cuotas por proveedor de IA y estado del circuit breaker | Free | 500.000 comandos/mes | No se usa como caché genérica. (actualizado en la Fase 3, ADR 0004) |
 | Vercel Functions (Fluid Compute) + Vercel Cron | Trabajo síncrono acotado (procesar PDF, generación con IA, evaluación) y tareas programadas diarias (keep-alive, cálculo de repasos) | Hobby | 300 s por función con `maxDuration` explícito; crons diarios | ADR 0003. Si un trabajo supera los 300 s, se reintroduce un servicio de jobs con un ADR nuevo. |
 | Sentry | Errores en cliente y servidor | Free | Eventos/mes del plan free | Muestreo si se acerca al límite. |
 | PostHog | Analítica de producto | Free | Eventos/mes del plan free | Eventos definidos explícitamente, sin autocaptura masiva. |
@@ -185,13 +186,15 @@ Regla de versiones: en la Fase 0 se instala **la última versión estable** de c
 
 ### 4.3 Proveedores de IA (todos vía Vercel AI SDK)
 
-| Proveedor | Paquete AI SDK | Modelos objetivo | Rol en la rotación |
+| Proveedor | Paquete AI SDK | Modelo | Rol en la rotación |
 |---|---|---|---|
-| Google AI Studio | `@ai-sdk/google` | Gemini Flash (tier gratuito) | Primario para generación |
-| Groq | `@ai-sdk/groq` | Llama / Mixtral gratuitos | Primario para evaluación rápida |
-| Mistral | `@ai-sdk/mistral` | Modelos con tier gratuito | Secundario |
-| OpenRouter | `@openrouter/ai-sdk-provider` | Modelos `:free` | Respaldo |
-| Cerebras | `@ai-sdk/cerebras` | Modelos gratuitos | Respaldo |
+| Google AI Studio | `@ai-sdk/google` | `gemini-2.5-flash-lite` | Generación, prioridad 1 |
+| Cloudflare Workers AI | `@ai-sdk/openai-compatible` | `@cf/meta/llama-3.3-70b-instruct-fp8-fast` | Generación, prioridad 2 |
+| OpenRouter | `@openrouter/ai-sdk-provider` | `qwen/qwen3.8-27b:free` | Generación, prioridad 3 |
+| OpenRouter | `@openrouter/ai-sdk-provider` | `nvidia/nemotron-3-super-120b-a12b:free` | Generación, prioridad 4 |
+| Groq | `@ai-sdk/groq` | `openai/gpt-oss-120b` | Solo evaluación (no se usa en la generación de la Fase 3) |
+
+(actualizado en la Fase 3, ADR 0004) Mistral y Cerebras se descartaron porque exigen método de pago o tarjeta. Nunca se usan varios proyectos de Google por incumplimiento de sus términos de servicio. El detalle y las alternativas descartadas están en `docs/adr/0004-capa-de-ia-con-proveedores-gratuitos.md`.
 
 Restricción conocida: los modelos Pro de Gemini no están en el tier gratuito. Los límites de los tiers gratuitos cambian sin aviso; la capa de IA se diseña asumiendo que cualquier proveedor puede fallar o agotar cuota en cualquier momento. Herramientas descartadas: OmniRoute (proxy local, no desplegable en Vercel; se usa solo como referencia de estrategias de enrutamiento), itsfree.ai (directorio informativo, no un servicio), rosenCharts (sin mantenimiento).
 
@@ -458,7 +461,7 @@ Las preguntas falladas vencen al día siguiente (q = 1), así la página aparece
 ### 8.1 Principios
 
 1. Toda llamada pasa por `ai.application`. Ningún módulo importa el AI SDK directamente.
-2. Toda salida es estructurada: `generateObject` con esquema Zod. Si el proveedor no cumple el esquema, se reintenta una vez con otro proveedor; si falla, la operación se marca `failed` y el usuario ve un mensaje claro. Nunca se inventa un resultado.
+2. Toda salida es estructurada: `generateObject` con esquema Zod (AI SDK v7; `generateObject` figura como obsoleto a favor de `generateText` con `Output.object`, migración pendiente, ver ADR 0004). Si el proveedor no cumple el esquema, se reintenta una vez con otro proveedor; si falla, la operación se marca `failed` y el usuario ve un mensaje claro. Nunca se inventa un resultado.
 3. Los prompts son versionados en código (`prompts/<purpose>/v1.ts`). Cada `AiGeneration` registra la versión usada.
 4. Temperatura baja (≤ 0.3) para evaluación; moderada (≤ 0.7) para generación.
 5. Todo se ejecuta dentro del presupuesto de una función de Vercel (máximo 300 segundos, con `maxDuration` explícito). Las tareas programadas usan Vercel Cron. (ADR 0003) Si una función se interrumpe a mitad de un trabajo, el estado persistido queda como estaba: en la importación de PDF (Fase 2), una consulta de estado reporta como `failed` (tiempo agotado) un trabajo no terminal sin escrituras desde hace `maxDuration` + 30 s, sin reescribir la fila ni reintentarlo; no existe un mecanismo de recuperación automática.
@@ -466,24 +469,33 @@ Las preguntas falladas vencen al día siguiente (q = 1), así la página aparece
 ### 8.2 Registro de proveedores y rotación
 
 ```
-ProviderRegistry
-  ├── entradas: { id, model, capabilities, rpm, rpd, priority, healthy }
-  ├── selectProvider(purpose) → primer proveedor sano con cuota disponible según prioridad
-  └── report(providerId, outcome) → actualiza contadores y salud
+ProviderRegistry (src/modules/ai/infrastructure/provider-registry.ts)
+  ├── entradas: { id, model, capabilities, rpm, rpd, priority }
+  │     solo las de proveedores con clave configurada
+  ├── selectProvider(purpose) → primer proveedor sano con cuota disponible
+  │     por capacidad, luego prioridad, luego cuota restante
+  └── generateStructured → registra cada intento en AiGeneration;
+        ante error o salida inválida reintenta una vez con el siguiente proveedor
 
-Cuotas en Upstash Redis:
-  key: ai:quota:{provider}:{yyyy-mm-dd}   (contador diario, TTL 48 h)
-  key: ai:quota:{provider}:{yyyy-mm-dd-hh-mm} (contador por minuto, TTL 120 s)
+Claves en Upstash Redis (prefijo REDIS_KEY_PREFIX: cogni:dev | cogni:prod):
+  {prefijo}:ai:quota:{provider}:{yyyy-mm-dd}        contador diario, TTL 48 h
+  {prefijo}:ai:quota:{provider}:{yyyy-mm-dd-hh-mm}  contador por minuto, TTL 120 s
+  {prefijo}:ai:breaker:{provider}                   estado del breaker (JSON), TTL 1 h
+  {prefijo}:ai:gen:*                                límite por usuario (Upstash Ratelimit)
 
 Circuit breaker simple:
   3 fallos consecutivos → proveedor marcado no sano por 10 minutos
 ```
 
+`{provider}` es el `id` de la entrada (por ejemplo `gemini-flash-lite`, `cloudflare-workers-ai`, `openrouter-qwen`, `openrouter-nemotron`). Con `AI_PROVIDER_MODE=fake` el registro contiene un único proveedor determinista y cuotas, breaker y límite viven en memoria (CI y e2e).
+
 ### 8.3 Rate limiting por usuario
 
-Upstash Ratelimit. Límites iniciales: 20 generaciones por usuario por día, 60 evaluaciones por usuario por día. Configurables por variable de entorno. Se muestran al usuario como "Te quedan N generaciones hoy".
+Upstash Ratelimit con ventana fija de un día. Límite inicial implementado: 6 generaciones por usuario por día, configurable con `AI_DAILY_GENERATIONS` (antes 20, actualizado en la Fase 3). El límite de evaluaciones por usuario aún no está implementado; su valor se fija en la Fase 6, cuando exista `evaluate_recall_answer`. Se muestra al usuario como "Te quedan N generaciones hoy".
 
 ### 8.4 Propósitos y esquemas
+
+En la Fase 3 solo `generate_flashcards` está cableado de extremo a extremo (prompt `generate_flashcards/v1`); los demás propósitos tienen esquema Zod y tipo, pero ningún caso de uso los invoca todavía.
 
 | Propósito | Entrada | Salida (Zod) |
 |---|---|---|
@@ -499,7 +511,7 @@ Upstash Ratelimit. Límites iniciales: 20 generaciones por usuario por día, 60 
 - La evaluación de texto libre no es determinista. Mitigación: rúbrica explícita, esquema estricto, temperatura baja, fragmento de página como contexto, registro de la evaluación cruda para auditoría.
 - Un modelo puede puntuar mal. Mitigación: la calificación final combina la autoevaluación; el estudiante ve la justificación y puede marcar "no estoy de acuerdo" (se registra, no cambia el puntaje en v1).
 - Un proveedor puede caer a mitad de sesión. Mitigación: las respuestas se guardan primero; la evaluación es asíncrona y se reintenta con otro proveedor; la retroalimentación se muestra cuando todas las evaluaciones terminan.
-- Contenido de página muy largo. Mitigación: se recorta `plain_text` a la ventana del modelo, priorizando el fragmento más similar a la pregunta (búsqueda léxica simple en v1; embeddings quedan fuera de alcance).
+- Contenido de página muy largo. Mitigación implementada en la Fase 3 para la generación: se conserva el inicio del texto hasta el tope `AI_PAGE_TOKEN_CAP` (12.000 por defecto, estimación por palabras) y la interfaz avisa cuántas palabras se usaron; no hay selector de sección ni división en partes. Para recordación activa (Fase 6): se recorta `plain_text` a la ventana del modelo, priorizando el fragmento más similar a la pregunta (búsqueda léxica simple en v1; embeddings quedan fuera de alcance).
 
 ---
 
@@ -602,8 +614,15 @@ Hecho cuando: un PDF de 30 páginas con capa de texto termina como página edita
 
 ### Fase 3 — Capa de IA
 
+> **Implementada el 2026-10-04 en seis PR apiladas (#63–#66 y las dos siguientes), construida con ODD.** Decisiones en `docs/adr/0004-capa-de-ia-con-proveedores-gratuitos.md`.
+
 Entregables: `ProviderRegistry`, rotación por cuota con Upstash, circuit breaker, rate limiting por usuario, prompts versionados, `AiGeneration`, primer caso de uso real: `generate_flashcards` desde una página (sin sesiones de repaso todavía; solo generación y listado).
 Hecho cuando: con la cuota de un proveedor agotada artificialmente, la generación sigue funcionando con el siguiente y el registro lo evidencia.
+
+Estado (actualizado en la Fase 3):
+
+- Entregado: registro de proveedores, rotación por cuota, circuit breaker, límite de 6 generaciones por usuario por día, prompts versionados (`generate_flashcards/v1`), entidad `AiGeneration` (tabla `ai_generations`), generación y listado de flashcards (tabla `flashcards`), interfaz en el panel de técnicas de la página y rutas `/flashcards`, modo `AI_PROVIDER_MODE=fake` para CI y e2e.
+- Pendiente: ejecución manual de `scripts/ai-smoke.mts` con claves reales y cuota agotada artificialmente (criterio de "hecho"); migración de `generateObject` a `generateText` con `Output.object`; términos de uso en el registro (funcionalidad separada).
 
 ### Fase 4 — Motor de repetición espaciada y Flashcards
 

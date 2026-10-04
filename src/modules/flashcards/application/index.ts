@@ -1,4 +1,5 @@
 export { getGenerationStatus } from "./get-generation-status";
+export { listDecks } from "./list-decks";
 export { listFlashcardsByPage } from "./list-flashcards-by-page";
 export {
   DailyLimitReachedError,

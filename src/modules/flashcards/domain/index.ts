@@ -5,4 +5,4 @@ export {
   type FlashcardOrigin,
   type NewFlashcard,
 } from "./flashcard";
-export type { FlashcardRepository } from "./flashcard-repository";
+export type { DeckSummary, FlashcardRepository } from "./flashcard-repository";

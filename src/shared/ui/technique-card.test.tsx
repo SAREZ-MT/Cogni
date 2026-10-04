@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { Layers } from "lucide-react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { TechniqueCard, TechniqueIconStrip } from "./technique-card";
 
 describe("TechniqueCard", () => {
@@ -41,6 +42,68 @@ describe("TechniqueCard", () => {
     const action = screen.getByRole("button", { name: "Generar" });
     expect(action).toBeEnabled();
     expect(action).not.toHaveAttribute("title");
+  });
+
+  describe("wired to an action", () => {
+    function renderWired(
+      props: Partial<React.ComponentProps<typeof TechniqueCard>> = {},
+    ) {
+      return render(
+        <TechniqueCard
+          icon={Layers}
+          tone="primary"
+          name="Flashcards"
+          description="d"
+          onGenerate={() => {}}
+          {...props}
+        />,
+      );
+    }
+
+    it("is enabled by default and calls onGenerate on click", async () => {
+      const onGenerate = vi.fn();
+      renderWired({ onGenerate });
+
+      const action = screen.getByRole("button", { name: "Generar" });
+      expect(action).toBeEnabled();
+      expect(action).not.toHaveAttribute("title");
+      await userEvent.click(action);
+
+      expect(onGenerate).toHaveBeenCalledTimes(1);
+    });
+
+    it("shows a busy, disabled 'Generando…' button while pending", async () => {
+      const onGenerate = vi.fn();
+      renderWired({ onGenerate, pending: true });
+
+      const action = screen.getByRole("button", { name: "Generando…" });
+      expect(action).toBeDisabled();
+      expect(action).toHaveAttribute("aria-busy", "true");
+      await userEvent.click(action);
+      expect(onGenerate).not.toHaveBeenCalled();
+    });
+
+    it("stays disabled without the 'coming soon' hint when the caller disables it", () => {
+      renderWired({ disabled: true });
+
+      const action = screen.getByRole("button", { name: "Generar" });
+      expect(action).toBeDisabled();
+      expect(action).not.toHaveAttribute("title");
+    });
+
+    it("forwards a test id to the button and renders children below it", () => {
+      renderWired({
+        generateTestId: "generate-flashcards",
+        children: <p>Te quedan 4 generaciones hoy</p>,
+      });
+
+      expect(screen.getByTestId("generate-flashcards")).toBe(
+        screen.getByRole("button", { name: "Generar" }),
+      );
+      expect(
+        screen.getByText("Te quedan 4 generaciones hoy"),
+      ).toBeInTheDocument();
+    });
   });
 
   it("is not a link: generating never navigates to a route that may not exist", () => {

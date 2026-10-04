@@ -27,4 +27,21 @@ describe("StudyItemRow", () => {
     rerender(<StudyItemRow href="/x" label="l" detail="d" tone="pink" />);
     expect(container.querySelector(".bg-pastel-pink-fg")).not.toBeNull();
   });
+
+  it("forwards an optional test id and native tooltip to the link", () => {
+    render(
+      <StudyItemRow
+        href="/x"
+        label="l"
+        detail="d"
+        tone="primary"
+        testId="flashcard-item"
+        title="La respuesta"
+      />,
+    );
+
+    const link = screen.getByTestId("flashcard-item");
+    expect(link).toBe(screen.getByRole("link"));
+    expect(link).toHaveAttribute("title", "La respuesta");
+  });
 });

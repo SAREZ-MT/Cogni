@@ -30,7 +30,8 @@ export interface DeckCardProps {
   tone: DeckTone;
   label: string;
   cardCount: number;
-  dueCount: number;
+  // Omitted while no scheduler exists (before Phase 4): no status pill.
+  dueCount?: number;
   className?: string;
 }
 
@@ -68,7 +69,7 @@ export function DeckCard({
         >
           <BookOpen size={15} strokeWidth={1.75} />
         </span>
-        {dueCount > 0 ? (
+        {dueCount === undefined ? null : dueCount > 0 ? (
           <Pill size="sm" tone="error" dot>
             {dueCount} pendientes
           </Pill>
@@ -86,7 +87,7 @@ export function DeckCard({
       <div className="flex items-center justify-between">
         <span className="font-medium text-[11px] text-fg-muted">Página</span>
         <span className="font-semibold text-fg-secondary text-xs">
-          {cardCount} tarjetas
+          {cardCount} {cardCount === 1 ? "tarjeta" : "tarjetas"}
         </span>
       </div>
     </Link>

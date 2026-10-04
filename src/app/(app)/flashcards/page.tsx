@@ -1,99 +1,61 @@
-import { Layers, Zap } from "lucide-react";
-import Link from "next/link";
-import { requireDesignPreviews } from "@/shared/config/design-previews";
+import { Layers } from "lucide-react";
+import { listDecksAction } from "@/modules/flashcards";
+import { COLOR_PALETTE, type NotebookColor } from "@/modules/notebooks";
 import { DeckSummaryCard } from "@/shared/ui/deck-summary-card";
 import { EmptyState } from "@/shared/ui/empty-state";
 import { IconTile } from "@/shared/ui/icon-tile";
-import { Pill } from "@/shared/ui/pill";
 import { SectionHeader } from "@/shared/ui/section-header";
 import { SetBreadcrumb } from "../_components/breadcrumb";
-import { getSamplePagesWithCards, SAMPLE_NOTEBOOKS } from "./_data/sample";
+import { plural } from "./_lib/plural";
 
-// Flashcards hub (design preview, user decision 2026-09-24: "solo vamos a
-// construir esas pantallas para validar el diseño"). Every notebook, deck
-// and count below comes from ./_data/sample.ts, never a real query — the
-// "Vista previa" pill next to the title is the only signal that this
-// isn't live data yet.
-export default function FlashcardsHubPage() {
-  requireDesignPreviews();
-  const notebooksWithPages = SAMPLE_NOTEBOOKS.map((notebook) => ({
-    notebook,
-    pages: getSamplePagesWithCards(notebook.id),
-  })).filter((entry) => entry.pages.length > 0);
-  const allPages = notebooksWithPages.flatMap((entry) => entry.pages);
+const DEFAULT_TONE: NotebookColor = "purple";
 
-  const totalCards = allPages.reduce((sum, page) => sum + page.cardCount, 0);
-  const totalDue = allPages.reduce((sum, page) => sum + page.dueCount, 0);
-  const alDiaCount = allPages.filter((page) => page.dueCount === 0).length;
-  const activeNotebookCount = notebooksWithPages.length;
+function toTone(color: string | null): NotebookColor {
+  return COLOR_PALETTE.find((candidate) => candidate === color) ?? DEFAULT_TONE;
+}
 
-  const dueEntry = notebooksWithPages.find((entry) =>
-    entry.pages.some((page) => page.dueCount > 0),
-  );
-  const duePage = dueEntry?.pages.find((page) => page.dueCount > 0);
-  const quickStartHref =
-    dueEntry && duePage
-      ? `/flashcards/${dueEntry.notebook.id}/${duePage.id}`
-      : undefined;
+// Flashcards hub on real data (Phase 3): one summary card per notebook that
+// holds at least one deck (a deck = a page with cards, named by the page).
+// There is no due/pending data until the Phase 4 scheduler, so the hub shows
+// card counts only: no "Estudiar ahora" quick start and no pending pills.
+export default async function FlashcardsHubPage() {
+  const result = await listDecksAction();
+  const decks = result.ok ? result.value : [];
+
+  const byNotebook = new Map<
+    string,
+    {
+      notebookId: string;
+      title: string;
+      tone: NotebookColor;
+      cardCount: number;
+    }
+  >();
+  for (const deck of decks) {
+    const entry = byNotebook.get(deck.notebookId) ?? {
+      notebookId: deck.notebookId,
+      title: deck.notebookTitle,
+      tone: toTone(deck.notebookColor),
+      cardCount: 0,
+    };
+    entry.cardCount += deck.count;
+    byNotebook.set(deck.notebookId, entry);
+  }
+  const notebooks = [...byNotebook.values()];
+  const totalCards = notebooks.reduce((sum, n) => sum + n.cardCount, 0);
 
   return (
     <section className="flex flex-1 flex-col gap-6">
       <SetBreadcrumb items={[{ label: "Flashcards" }]} />
 
       <SectionHeader
-        eyebrow={
-          <span className="flex items-center gap-2">
-            Técnicas de estudio
-            <Pill size="sm" tone="neutral">
-              Vista previa
-            </Pill>
-          </span>
-        }
+        eyebrow="Técnicas de estudio"
         title="Flashcards"
         titleClassName="text-[26px]"
-        description={`${totalCards} tarjetas · ${activeNotebookCount} cuadernos`}
-        actions={
-          quickStartHref && (
-            <Link
-              href={quickStartHref}
-              className="flex items-center gap-2.5 rounded-[14px] bg-neutral-900 px-4 py-3 transition-transform hover:-translate-y-0.5"
-            >
-              <IconTile
-                size="30"
-                radius="md"
-                className="bg-white/[12%] text-white"
-              >
-                <Zap aria-hidden="true" size={15} strokeWidth={2} />
-              </IconTile>
-              <span className="text-left">
-                <span className="block font-semibold text-white text-xs">
-                  Estudiar ahora
-                </span>
-                <span className="block text-[10.5px] text-white/[55%]">
-                  {totalDue} pendientes hoy
-                </span>
-              </span>
-            </Link>
-          )
-        }
+        description={`${plural(totalCards, "tarjeta", "tarjetas")} · ${plural(notebooks.length, "cuaderno", "cuadernos")}`}
       />
 
-      {notebooksWithPages.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2.5">
-          <Pill size="md" tone={totalDue > 0 ? "error" : "success"} dot>
-            {totalDue} pendiente{totalDue === 1 ? "" : "s"} hoy
-          </Pill>
-          <Pill size="md" tone="success" dot>
-            {alDiaCount} al día
-          </Pill>
-          <Pill size="md" tone="neutral">
-            {activeNotebookCount} cuaderno{activeNotebookCount === 1 ? "" : "s"}{" "}
-            activo{activeNotebookCount === 1 ? "" : "s"}
-          </Pill>
-        </div>
-      )}
-
-      {notebooksWithPages.length === 0 ? (
+      {notebooks.length === 0 ? (
         <EmptyState
           fill
           icon={
@@ -103,19 +65,22 @@ export default function FlashcardsHubPage() {
           }
           title="Sin mazos todavía"
           titleClassName="text-base"
-          description="Abre una página en el editor y usa el panel de Técnicas → Flashcards → Generar para crear tarjetas con IA."
+          description={
+            result.ok
+              ? "Abre una página en el editor y usa el panel de Técnicas → Flashcards → Generar para crear tarjetas con IA."
+              : "No pudimos cargar tus mazos. Intenta de nuevo."
+          }
           descriptionClassName="max-w-[340px]"
         />
       ) : (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3.5">
-          {notebooksWithPages.map(({ notebook, pages }) => (
+          {notebooks.map((notebook) => (
             <DeckSummaryCard
-              key={notebook.id}
-              href={`/flashcards/${notebook.id}`}
-              tone={notebook.color}
+              key={notebook.notebookId}
+              href={`/flashcards/${notebook.notebookId}`}
+              tone={notebook.tone}
               title={notebook.title}
-              cardCount={pages.reduce((sum, page) => sum + page.cardCount, 0)}
-              dueCount={pages.reduce((sum, page) => sum + page.dueCount, 0)}
+              meta={plural(notebook.cardCount, "tarjeta", "tarjetas")}
             />
           ))}
         </div>

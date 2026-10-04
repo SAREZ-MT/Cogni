@@ -31,7 +31,10 @@ export function SavedStudySection({
       </p>
       <div className="flex flex-col gap-1">
         {items.map((item) => (
-          <StudyItemRow key={`${item.tone}-${item.label}`} {...item} />
+          <StudyItemRow
+            key={`${item.tone}-${item.href}-${item.label}`}
+            {...item}
+          />
         ))}
       </div>
     </div>

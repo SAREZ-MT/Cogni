@@ -13,7 +13,7 @@
 
 - Fase 0 (Cimientos) y Fase 1 (Cuadernos y editor) están desplegadas en producción; sus módulos (`identity`, `notebooks`, `editor`) son los únicos, junto con `ingestion`, con capas hexagonales reales.
 - Fase 2 (Importación de PDF) se implementó bajo Organic Driven Development (ODD) el 2026-09-23; `src/modules/ingestion` es el módulo más completo del código base y respalda la única vista de código C4 Nivel 4 con implementación real de este documento.
-- Fase 3 (Capa de IA) no ha iniciado: `src/modules/ai` es un esqueleto (`export {};`). Todo el contenido de este documento sobre proveedores de IA, rotación por cuota y rate limiting es especificación de `docs/documento-maestro.md`, marcada explícitamente Roadmap.
+- Fase 3 (Capa de IA) está implementada (registro de proveedores, rotación por cuota, circuit breaker, límite por usuario y generación de flashcards; ADR 0004 en `docs/adr/`). Esta nota de estado y el resto del documento aún no se han revisado completo contra ese código: hasta entonces, el contenido de este documento sobre proveedores de IA, rotación por cuota y rate limiting es especificación de `docs/documento-maestro.md`, marcada explícitamente Roadmap.
 - Las Fases 4 a 7 (`study-engine`, `flashcards`, `exams`, `active-recall`, `scheduling`, `analytics`) son esqueletos vacíos (`index.ts` con `export {};` y un `README.md`) en este código base. Cuatro de ellas tienen una versión de diseño visual con datos de muestra en la rama `design/shell-look`, no integrada a `main`; este documento describe la arquitectura de `main`, no la de esa rama.
 - Fase 8 (Endurecimiento) está parcialmente cubierta: la Content Security Policy con nonce por petición, la redirección del dominio apex y la protección de sesión en `src/proxy.ts` existen; el resto (registro de logs externo, pruebas de carga, auditoría de accesibilidad) no se ha iniciado.
 - En este documento: las secciones 2 a 4 (vistas de contexto, contenedores y componentes), 5.1 y 5.3 (código de `ingestion`), 7, 9, el flujo 1 de la sección 10, 11, 12 y 13 describen arquitectura implementada y verificable contra el código. La parte de IA en las secciones 2 a 4, la sección 5.2 (código de `study-engine`), la subsección 8.10 y los flujos 2 a 4 de la sección 10 son especificación (Roadmap), tomada de `docs/documento-maestro.md`.
@@ -100,7 +100,7 @@ Este documento describe la arquitectura de software de Cogni usando el modelo C4
 | Almacenamiento de objetos | Supabase Storage (buckets `page-assets`, `page-pdfs`) | Guarda imágenes de página y PDF subidos, con políticas RLS por `owner_id`. | Implementado |
 | Servicio de identidad | Supabase Auth | Emite y valida sesiones (correo/contraseña y Google OAuth). | Implementado |
 | Programador de tareas | Vercel Cron (`vercel.json`) | Dispara `/api/keep-alive` una vez al día (`0 6 * * *`). | Implementado |
-| Registro de proveedores de IA | Vercel AI SDK (lógico, dentro de la aplicación) | Seleccionaría y rotaría entre proveedores de IA por cuota y salud. | Roadmap |
+| Registro de proveedores de IA | Vercel AI SDK (lógico, dentro de la aplicación) | Selecciona y rota entre proveedores de IA por cuota y salud (`src/modules/ai/infrastructure/provider-registry.ts`). | Implementado |
 | Monitoreo de errores | Sentry (`@sentry/nextjs`) | Captura excepciones de servidor y cliente. | Implementado |
 | Analítica de producto | PostHog (`posthog-js`, `posthog-node`) | Registra eventos de producto explícitos. | Implementado |
 

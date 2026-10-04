@@ -48,4 +48,18 @@ describe("DeckCard", () => {
     expect(screen.getByText("Al día")).toBeInTheDocument();
     expect(screen.queryByText(/pendientes/)).not.toBeInTheDocument();
   });
+
+  it("hides the due status entirely when no due count is known", () => {
+    render(<DeckCard href="/x" tone="info" label="L" cardCount={3} />);
+
+    expect(screen.queryByText("Al día")).not.toBeInTheDocument();
+    expect(screen.queryByText(/pendientes/)).not.toBeInTheDocument();
+    expect(screen.getByText("3 tarjetas")).toBeInTheDocument();
+  });
+
+  it("uses the singular for a single card", () => {
+    render(<DeckCard href="/x" tone="info" label="L" cardCount={1} />);
+
+    expect(screen.getByText("1 tarjeta")).toBeInTheDocument();
+  });
 });

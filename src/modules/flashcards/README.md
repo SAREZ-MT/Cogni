@@ -1,39 +1,43 @@
-# Módulo `flashcards`
+# Module `flashcards`
 
-## Responsabilidad
+Flashcards generated from a page (documento-maestro §3.3, §8). Phase 3 ships
+generation and listing only; review sessions and SM-2 arrive in Phase 4.
 
-Tarjetas, sesiones de repaso y retroalimentación.
+## Layout
 
-## Estado
+- `domain/`
+  - `flashcard.ts` `Flashcard` entity and `createFlashcard` (trims, rejects an
+    empty front or back with `FLASHCARD_EMPTY`).
+  - `flashcard-repository.ts` `FlashcardRepository` port: `insertMany`,
+    `listByPage`, `countByPage`, `nextPosition`, `countByOwnerGroupedByPage`.
+  - `errors.ts` error codes.
+- `application/` use cases, `(input, deps, ownerId)` returning `Result`:
+  - `requestGeneration` reads the page text through the notebooks
+    `PageTextReader` port, answers `PAGE_EMPTY` for a blank page, consumes one
+    unit of the per-user daily limit (`DAILY_LIMIT_REACHED` with `resetAt`),
+    truncates to `AI_PAGE_TOKEN_CAP`, calls `ai.generateStructured` with the
+    `generate_flashcards/v1` prompt and persists the cards with consecutive
+    positions. The page is read before the limiter, so a missing or blank page
+    never costs a generation. Zero valid cards is `GENERATION_FAILED` and
+    nothing is persisted.
+  - `listFlashcardsByPage`, `listDecks` (one deck per page, count derived from
+    its cards), `getGenerationStatus` (remaining generations, does not consume).
+- `infrastructure/` `DrizzleFlashcardRepository` (table `flashcards`), checked
+  by the same contract as the in-memory fake in `testing.ts`.
+- `actions.ts` (`"use server"`): `generateFlashcardsAction`,
+  `listFlashcardsAction`, `listDecksAction`, `getGenerationStatusAction`. They
+  validate session and input, return `Result<T, ActionError>`, report failures
+  to Sentry and emit the `generation_requested` event. `maxDuration` is declared
+  on the page route that hosts the action.
 
-Fase 3: entidad `Flashcard` con `createFlashcard` (recorta y rechaza
-anverso/reverso vacíos, `FLASHCARD_EMPTY`), puerto `FlashcardRepository`
-(`insertMany`, `listByPage`, `countByPage`, `nextPosition`), adaptador Drizzle y
-fake en memoria (`testing.ts`), ambos validados por el mismo contrato.
+## Environment
 
-Casos de uso (`application/`, `(input, deps, ownerId)` → `Result`):
+Read through the validated server env: `AI_DAILY_GENERATIONS` (default 6),
+`AI_PAGE_TOKEN_CAP` (default 12000) and `AI_PROVIDER_MODE` (`fake` in CI and
+e2e, no provider keys needed). Provider keys and Redis variables belong to the
+`ai` module; see `src/modules/ai/README.md`, including the manual smoke script
+that exercises real providers.
 
-- `requestGeneration`: lee el texto de la página (`PageTextReader` de
-  notebooks), responde `PAGE_EMPTY` si está en blanco, consume una unidad del
-  límite diario (`DAILY_LIMIT_REACHED` con `resetAt`), trunca al tope de tokens,
-  llama a `ai.generateStructured` con el prompt `generate_flashcards/v1` y
-  persiste las tarjetas con posiciones consecutivas. El orden (página antes que
-  límite) evita gastar una generación en páginas inexistentes o vacías. Cero
-  tarjetas válidas = `GENERATION_FAILED` y nada persistido.
-- `listFlashcardsByPage`: tarjetas del dueño ordenadas por posición.
-- `getGenerationStatus`: generaciones restantes con `peek` (no consume).
+## Next phase
 
-Acciones (`actions.ts`, `"use server"`): `generateFlashcardsAction`,
-`listFlashcardsAction`, `getGenerationStatusAction`. Validan sesión y entrada
-con Zod, devuelven `Result<T, ActionError>` y emiten el evento
-`generation_requested`. `maxDuration` se declara en la ruta de página que las
-aloja. Las sesiones de repaso llegan en la Fase 4.
-
-## Fase pendiente
-
-Fase 4 — Motor de repetición espaciada y Flashcards (ver `docs/documento-maestro.md` §13).
-
-## Dependencias declaradas
-
-Ver `docs/documento-maestro.md` §5.2 (mapa de módulos) para las dependencias
-permitidas de este módulo una vez implementado.
+Phase 4: spaced repetition engine and review sessions (documento-maestro §13).

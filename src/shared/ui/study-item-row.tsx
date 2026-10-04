@@ -18,6 +18,9 @@ export interface StudyItemRowProps {
   label: string;
   detail: string;
   tone: StudyItemTone;
+  testId?: string;
+  // Native tooltip (e.g. the answer side of a flashcard row).
+  title?: string;
   className?: string;
 }
 
@@ -30,11 +33,15 @@ export function StudyItemRow({
   label,
   detail,
   tone,
+  testId,
+  title,
   className,
 }: StudyItemRowProps) {
   return (
     <Link
       href={href}
+      data-testid={testId}
+      title={title}
       className={cn(
         "flex items-center gap-2 rounded-[9px] border border-border-subtle bg-neutral-50 px-[9px] py-[7px] no-underline transition-colors hover:bg-hover",
         className,

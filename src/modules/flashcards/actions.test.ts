@@ -283,4 +283,56 @@ describe("flashcards Server Actions", () => {
       expect(current.checks).toBe(0);
     });
   });
+
+  describe("listDecksAction", () => {
+    it("rejects an unauthenticated caller", async () => {
+      getCurrentUser.mockResolvedValue(null);
+      const { listDecksAction } = await actions();
+      const result = await listDecksAction();
+      expect(!result.ok && result.error.code).toBe(
+        "FLASHCARDS_SESSION_REQUIRED",
+      );
+    });
+
+    it("lists the caller's decks as plain views with the derived counts", async () => {
+      current.flashcards = new InMemoryFlashcardRepository(() => ({
+        notebookId: "n1",
+        pageTitle: "Mitocondria",
+        notebookTitle: "Biología",
+        notebookColor: "purple",
+      }));
+      const { generateFlashcardsAction, listDecksAction } = await actions();
+      await generateFlashcardsAction({ pageId: PAGE });
+
+      const result = await listDecksAction();
+
+      expect(result).toEqual({
+        ok: true,
+        value: [
+          {
+            pageId: PAGE,
+            notebookId: "n1",
+            pageTitle: "Mitocondria",
+            notebookTitle: "Biología",
+            notebookColor: "purple",
+            count: 1,
+          },
+        ],
+      });
+    });
+
+    it("never throws: an unexpected failure is reported to Sentry", async () => {
+      current.flashcards = {
+        countByOwnerGroupedByPage: async () => {
+          throw new Error("db down");
+        },
+      } as unknown as InMemoryFlashcardRepository;
+      const { listDecksAction } = await actions();
+
+      const result = await listDecksAction();
+
+      expect(!result.ok && result.error.code).toBe("FLASHCARDS_UNEXPECTED");
+      expect(captureException).toHaveBeenCalledTimes(1);
+    });
+  });
 });

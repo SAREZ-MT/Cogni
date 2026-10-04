@@ -1,8 +1,16 @@
-import { and, asc, eq, max, sql } from "drizzle-orm";
+import { and, asc, eq, isNull, max, sql } from "drizzle-orm";
 import type { Db } from "@/shared/db/client";
-import { type FlashcardRow, flashcards } from "@/shared/db/schema";
+import {
+  type FlashcardRow,
+  flashcards,
+  notebooks,
+  pages,
+} from "@/shared/db/schema";
 import type { Flashcard } from "../domain/flashcard";
-import type { FlashcardRepository } from "../domain/flashcard-repository";
+import type {
+  DeckSummary,
+  FlashcardRepository,
+} from "../domain/flashcard-repository";
 
 function toFlashcard(row: FlashcardRow): Flashcard {
   return {
@@ -73,5 +81,30 @@ export class DrizzleFlashcardRepository implements FlashcardRepository {
     return row?.highest === null || row?.highest === undefined
       ? 0
       : row.highest + 1;
+  }
+
+  async countByOwnerGroupedByPage(ownerId: string): Promise<DeckSummary[]> {
+    const count = sql<number>`count(${flashcards.id})::int`;
+    return this.db
+      .select({
+        pageId: pages.id,
+        notebookId: notebooks.id,
+        pageTitle: pages.title,
+        notebookTitle: notebooks.title,
+        notebookColor: notebooks.color,
+        count,
+      })
+      .from(flashcards)
+      .innerJoin(pages, eq(pages.id, flashcards.pageId))
+      .innerJoin(notebooks, eq(notebooks.id, pages.notebookId))
+      .where(
+        and(
+          eq(flashcards.ownerId, ownerId),
+          isNull(pages.archivedAt),
+          isNull(notebooks.archivedAt),
+        ),
+      )
+      .groupBy(pages.id, notebooks.id)
+      .orderBy(asc(notebooks.title), asc(pages.title), asc(pages.id));
   }
 }

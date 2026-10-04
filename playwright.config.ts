@@ -45,6 +45,8 @@ export default defineConfig({
     command: `pnpm exec next build && pnpm exec next start -p ${PORT}`,
     // favicon.ico bypasses the proxy, so readiness never depends on Supabase env.
     url: `${baseURL}/favicon.ico`,
+    // Never hit real AI providers from e2e, even if .env.local has keys.
+    env: { AI_PROVIDER_MODE: process.env.AI_PROVIDER_MODE ?? "fake" },
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },
