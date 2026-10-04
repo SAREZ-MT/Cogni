@@ -22,10 +22,17 @@ export class InMemoryFlashcardRepository implements FlashcardRepository {
     this.rows.push(...cards);
   }
 
+  async findById(id: string, ownerId: string): Promise<Flashcard | null> {
+    return (
+      this.rows.find((card) => card.id === id && card.ownerId === ownerId) ??
+      null
+    );
+  }
+
   async listByPage(pageId: string, ownerId: string): Promise<Flashcard[]> {
-    return this.rows
-      .filter((card) => card.pageId === pageId && card.ownerId === ownerId)
-      .sort((a, b) => a.position - b.position);
+    return this.ownedOnPage(pageId, ownerId).filter(
+      (card) => card.archivedAt === null,
+    );
   }
 
   async countByPage(pageId: string, ownerId: string): Promise<number> {
@@ -33,7 +40,7 @@ export class InMemoryFlashcardRepository implements FlashcardRepository {
   }
 
   async nextPosition(pageId: string, ownerId: string): Promise<number> {
-    const cards = await this.listByPage(pageId, ownerId);
+    const cards = this.ownedOnPage(pageId, ownerId);
     return cards.length === 0
       ? 0
       : (cards[cards.length - 1]?.position ?? -1) + 1;
@@ -42,7 +49,7 @@ export class InMemoryFlashcardRepository implements FlashcardRepository {
   async countByOwnerGroupedByPage(ownerId: string): Promise<DeckSummary[]> {
     const counts = new Map<string, number>();
     for (const card of this.rows) {
-      if (card.ownerId !== ownerId) continue;
+      if (card.ownerId !== ownerId || card.archivedAt !== null) continue;
       counts.set(card.pageId, (counts.get(card.pageId) ?? 0) + 1);
     }
     const decks: DeckSummary[] = [];
@@ -56,5 +63,23 @@ export class InMemoryFlashcardRepository implements FlashcardRepository {
         a.pageTitle.localeCompare(b.pageTitle) ||
         a.pageId.localeCompare(b.pageId),
     );
+  }
+
+  async archive(id: string, ownerId: string, now: Date): Promise<void> {
+    const index = this.rows.findIndex(
+      (card) => card.id === id && card.ownerId === ownerId,
+    );
+    const card = this.rows[index];
+    if (!card || card.archivedAt !== null) return;
+    this.rows[index] = { ...card, archivedAt: now, updatedAt: now };
+  }
+
+  // Nothing runs concurrently in memory.
+  async lockDeck(): Promise<void> {}
+
+  private ownedOnPage(pageId: string, ownerId: string): Flashcard[] {
+    return this.rows
+      .filter((card) => card.pageId === pageId && card.ownerId === ownerId)
+      .sort((a, b) => a.position - b.position);
   }
 }

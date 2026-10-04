@@ -12,15 +12,27 @@ export interface DeckSummary {
 }
 
 // Every method is owner-scoped (documento-maestro §6.1): another owner's
-// cards are invisible.
+// cards are invisible. Archived cards are invisible too, except to findById
+// and nextPosition.
 export interface FlashcardRepository {
   insertMany(cards: readonly Flashcard[]): Promise<void>;
-  // Ordered by position ascending.
+  // The card, archived or not; null for an unknown id or another owner's.
+  findById(id: string, ownerId: string): Promise<Flashcard | null>;
+  // Active cards ordered by position ascending.
   listByPage(pageId: string, ownerId: string): Promise<Flashcard[]>;
+  // Active cards only.
   countByPage(pageId: string, ownerId: string): Promise<number>;
-  // 0 for an empty deck, otherwise highest position + 1.
+  // 0 for a page that never had cards, otherwise highest position + 1.
+  // Archived cards count, so a position is never handed out twice.
   nextPosition(pageId: string, ownerId: string): Promise<number>;
   // The owner's decks: pages (and notebooks) that are not archived and hold
-  // at least one card, ordered by notebook title, then page title.
+  // at least one active card, ordered by notebook title, then page title.
   countByOwnerGroupedByPage(ownerId: string): Promise<DeckSummary[]>;
+  // Logical delete. An already archived card keeps its first archivedAt;
+  // another owner's card is left untouched.
+  archive(id: string, ownerId: string, now: Date): Promise<void>;
+  // Serializes concurrent changes to the page's deck until the surrounding
+  // unit of work ends, so "never empty" and position checks hold under
+  // concurrency. A no-op outside a transaction and in memory.
+  lockDeck(pageId: string, ownerId: string): Promise<void>;
 }

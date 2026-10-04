@@ -7,6 +7,7 @@ import {
 } from "@/modules/ai";
 import { DomainError } from "@/shared/kernel/domain-error";
 import { err, ok } from "@/shared/kernel/result";
+import { InMemoryDeckStudyItems } from "./application/testing/in-memory-deck-unit-of-work";
 import { InMemoryFlashcardRepository } from "./application/testing/in-memory-flashcard-repository";
 
 // Session, composition roots and analytics are mocked so this proves the
@@ -26,6 +27,9 @@ vi.mock("@/shared/config/env.server", () => ({
 const { captureException } = vi.hoisted(() => ({ captureException: vi.fn() }));
 vi.mock("@sentry/nextjs", () => ({ captureException }));
 const { track } = vi.hoisted(() => ({ track: vi.fn() }));
+// revalidatePath needs a real Next.js request store (notebooks/actions.test.ts).
+const { revalidatePath } = vi.hoisted(() => ({ revalidatePath: vi.fn() }));
+vi.mock("next/cache", () => ({ revalidatePath }));
 vi.mock("@/shared/observability/analytics", () => ({
   createServerAnalytics: () => ({ track }),
 }));
@@ -50,6 +54,7 @@ const generation: AiGeneration = {
 
 let current: {
   flashcards: InMemoryFlashcardRepository;
+  studyItems: InMemoryDeckStudyItems;
   limit: GenerationRateLimit;
   checks: number;
   pageText: { title: string; plainText: string } | null;
@@ -85,6 +90,15 @@ vi.mock("./infrastructure", () => ({
   DrizzleFlashcardRepository: vi.fn(function DrizzleFlashcardRepository() {
     return current.flashcards;
   }),
+  DrizzleDeckUnitOfWork: vi.fn(function DrizzleDeckUnitOfWork() {
+    return {
+      run: (work: (repositories: unknown) => Promise<unknown>) =>
+        work({
+          flashcards: current.flashcards,
+          studyItems: current.studyItems,
+        }),
+    };
+  }),
 }));
 
 const OWNER = "3d2f9a1e-5b6c-4d7e-8f90-1a2b3c4d5e6f";
@@ -100,8 +114,10 @@ describe("flashcards Server Actions", () => {
     getCurrentUser.mockResolvedValue({ id: OWNER });
     captureException.mockClear();
     track.mockClear();
+    revalidatePath.mockClear();
     current = {
       flashcards: new InMemoryFlashcardRepository(),
+      studyItems: new InMemoryDeckStudyItems(),
       limit: { allowed: true, remaining: 4, resetAt: RESET },
       checks: 0,
       pageText: { title: "Tema", plainText: "uno dos tres" },
@@ -330,6 +346,139 @@ describe("flashcards Server Actions", () => {
       const { listDecksAction } = await actions();
 
       const result = await listDecksAction();
+
+      expect(!result.ok && result.error.code).toBe("FLASHCARDS_UNEXPECTED");
+      expect(captureException).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("createFlashcardAction", () => {
+    const input = { pageId: PAGE, front: " ¿Qué es X? ", back: "Y " };
+
+    it("rejects an unauthenticated caller before doing anything", async () => {
+      getCurrentUser.mockResolvedValue(null);
+      const { createFlashcardAction } = await actions();
+
+      const result = await createFlashcardAction(input);
+
+      expect(!result.ok && result.error.code).toBe(
+        "FLASHCARDS_SESSION_REQUIRED",
+      );
+      expect(await current.flashcards.countByPage(PAGE, OWNER)).toBe(0);
+    });
+
+    it.each([
+      ["a non-uuid page id", { ...input, pageId: "x" }],
+      ["a missing side", { pageId: PAGE, front: "X" }],
+      ["a non-string side", { ...input, back: 3 }],
+    ])("rejects %s as invalid input", async (_label, bad) => {
+      const { createFlashcardAction } = await actions();
+      const result = await createFlashcardAction(bad);
+      expect(!result.ok && result.error.code).toBe("FLASHCARDS_INVALID_INPUT");
+    });
+
+    it("creates the card and its study item, returns a plain view and revalidates", async () => {
+      const { createFlashcardAction } = await actions();
+
+      const result = await createFlashcardAction(input);
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value).toEqual({
+        id: expect.any(String),
+        pageId: PAGE,
+        front: "¿Qué es X?",
+        back: "Y",
+        position: 0,
+      });
+      expect(current.studyItems.all().map((item) => item.sourceId)).toEqual([
+        result.value.id,
+      ]);
+      expect(revalidatePath).toHaveBeenCalledWith("/flashcards", "layout");
+    });
+
+    it("maps a domain refusal to its ActionError code without revalidating", async () => {
+      const { createFlashcardAction } = await actions();
+
+      const result = await createFlashcardAction({ ...input, back: "   " });
+
+      expect(!result.ok && result.error.code).toBe("FLASHCARD_EMPTY");
+      expect(revalidatePath).not.toHaveBeenCalled();
+    });
+
+    it("maps an unknown page to PAGE_NOT_FOUND", async () => {
+      current.pageText = null;
+      const { createFlashcardAction } = await actions();
+
+      const result = await createFlashcardAction(input);
+
+      expect(!result.ok && result.error.code).toBe("PAGE_NOT_FOUND");
+    });
+  });
+
+  describe("archiveFlashcardAction", () => {
+    async function seedDeck(count: number): Promise<string[]> {
+      const { createFlashcardAction } = await actions();
+      const ids: string[] = [];
+      for (let i = 0; i < count; i += 1) {
+        const created = await createFlashcardAction({
+          pageId: PAGE,
+          front: `P${i}`,
+          back: `R${i}`,
+        });
+        if (!created.ok) throw new Error(created.error.code);
+        ids.push(created.value.id);
+      }
+      revalidatePath.mockClear();
+      return ids;
+    }
+
+    it("rejects an unauthenticated caller", async () => {
+      getCurrentUser.mockResolvedValue(null);
+      const { archiveFlashcardAction } = await actions();
+      const result = await archiveFlashcardAction({ flashcardId: PAGE });
+      expect(!result.ok && result.error.code).toBe(
+        "FLASHCARDS_SESSION_REQUIRED",
+      );
+    });
+
+    it("rejects an invalid flashcard id", async () => {
+      const { archiveFlashcardAction } = await actions();
+      const result = await archiveFlashcardAction({ flashcardId: "x" });
+      expect(!result.ok && result.error.code).toBe("FLASHCARDS_INVALID_INPUT");
+    });
+
+    it("archives a card of a deck that keeps others and revalidates", async () => {
+      const [, second] = await seedDeck(2);
+      const { archiveFlashcardAction } = await actions();
+
+      const result = await archiveFlashcardAction({ flashcardId: second });
+
+      expect(result).toEqual({ ok: true, value: { remaining: 1 } });
+      expect(await current.flashcards.countByPage(PAGE, OWNER)).toBe(1);
+      expect(revalidatePath).toHaveBeenCalledWith("/flashcards", "layout");
+    });
+
+    it("refuses the last card with FLASHCARD_LAST_CARD", async () => {
+      const [only] = await seedDeck(1);
+      const { archiveFlashcardAction } = await actions();
+
+      const result = await archiveFlashcardAction({ flashcardId: only });
+
+      expect(!result.ok && result.error.code).toBe("FLASHCARD_LAST_CARD");
+      expect(await current.flashcards.countByPage(PAGE, OWNER)).toBe(1);
+      expect(revalidatePath).not.toHaveBeenCalled();
+    });
+
+    it("never throws: an unexpected failure is reported to Sentry", async () => {
+      current.flashcards = {
+        findById: async () => {
+          throw new Error("db down");
+        },
+      } as unknown as InMemoryFlashcardRepository;
+      const { archiveFlashcardAction } = await actions();
+
+      const result = await archiveFlashcardAction({ flashcardId: PAGE });
 
       expect(!result.ok && result.error.code).toBe("FLASHCARDS_UNEXPECTED");
       expect(captureException).toHaveBeenCalledTimes(1);

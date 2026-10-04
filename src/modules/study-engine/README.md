@@ -47,7 +47,8 @@ tablas: solo el servidor accede.
 | Capa | Archivos |
 |---|---|
 | `application/testing/` | Contratos compartidos `*-repository.contract.ts` y fakes `InMemory*Repository` (exportados por `testing.ts`). |
-| `infrastructure/` | `DrizzleStudyItemRepository`, `DrizzleReviewLogRepository`, `DrizzlePageMasteryRepository`. |
+| `infrastructure/` | `DrizzleStudyItemRepository`, `DrizzleReviewLogRepository`, `DrizzlePageMasteryRepository`. Aceptan la base o una transacción abierta (`DbExecutor`). |
+| `server-api.ts` | `createStudyItemRepository(db)`, exportado por `index.ts`: otros módulos guardan ítems dentro de su propia transacción (flashcards lo usa en `DrizzleDeckUnitOfWork` para crear la tarjeta y su ítem juntos). |
 
 ## Pruebas
 
@@ -56,7 +57,7 @@ suelo de EF, extremos q = 0 y q = 5, calidad inválida y una secuencia de tres
 días simulados con `dueAt` exactos. `mastery.test.ts` cubre página sin ítems,
 los límites 0,35 y 0,70, ítems suspendidos y el conteo de vencidos.
 `in-memory-study-engine-repositories.contract.test.ts` corre los tres
-contratos contra los fakes; `tests/db/drizzle-study-engine-repositories.contract.test.ts`
+contratos contra los fakes (el fake de ítems respeta el único `(kind, source_id)` y el de dominio no deja que otro dueño sobrescriba una página); `tests/db/drizzle-study-engine-repositories.contract.test.ts`
 los corre contra Postgres y `tests/db/study-engine-schema.smoke.test.ts`
 prueba el relleno, las restricciones y la reversión de la migración 0009.
 

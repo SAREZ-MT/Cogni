@@ -47,8 +47,10 @@ export function runFlashcardRepositoryContract(
     position,
     createdAt: new Date("2026-10-03T10:00:00.000Z"),
     updatedAt: new Date("2026-10-03T10:00:00.000Z"),
+    archivedAt: null,
     ...overrides,
   });
+  const ARCHIVED_AT = new Date("2026-10-04T09:00:00.000Z");
 
   describe("FlashcardRepository contract", () => {
     it("nextPosition starts at 0 and then follows the highest position", async () => {
@@ -110,6 +112,82 @@ export function runFlashcardRepositoryContract(
       expect(await repo.countByPage(pageId, ctx.ownerId)).toBe(0);
     });
 
+    it("findById returns the owner's card, archived or not", async () => {
+      const ctx = options.context();
+      const repo = options.createRepository();
+      const pageId = await ctx.newPageId();
+      const card = makeCard(ctx, pageId, 0);
+      await repo.insertMany([card]);
+      expect(await repo.findById(card.id, ctx.ownerId)).toEqual(card);
+      expect(await repo.findById(card.id, ctx.otherOwnerId)).toBeNull();
+      expect(await repo.findById(ctx.newId(), ctx.ownerId)).toBeNull();
+      await repo.archive(card.id, ctx.ownerId, ARCHIVED_AT);
+      expect(await repo.findById(card.id, ctx.ownerId)).toMatchObject({
+        id: card.id,
+        archivedAt: ARCHIVED_AT,
+      });
+    });
+
+    describe("archive", () => {
+      it("hides the card from listByPage and countByPage", async () => {
+        const ctx = options.context();
+        const repo = options.createRepository();
+        const pageId = await ctx.newPageId();
+        const kept = makeCard(ctx, pageId, 0);
+        const archived = makeCard(ctx, pageId, 1);
+        await repo.insertMany([kept, archived]);
+        await repo.archive(archived.id, ctx.ownerId, ARCHIVED_AT);
+        const cards = await repo.listByPage(pageId, ctx.ownerId);
+        expect(cards.map((card) => card.id)).toEqual([kept.id]);
+        expect(await repo.countByPage(pageId, ctx.ownerId)).toBe(1);
+      });
+
+      it("keeps positions monotonic: nextPosition still counts archived cards", async () => {
+        const ctx = options.context();
+        const repo = options.createRepository();
+        const pageId = await ctx.newPageId();
+        const first = makeCard(ctx, pageId, 0);
+        const last = makeCard(ctx, pageId, 1);
+        await repo.insertMany([first, last]);
+        await repo.archive(last.id, ctx.ownerId, ARCHIVED_AT);
+        expect(await repo.nextPosition(pageId, ctx.ownerId)).toBe(2);
+      });
+
+      it("keeps the first archivedAt when archived twice", async () => {
+        const ctx = options.context();
+        const repo = options.createRepository();
+        const pageId = await ctx.newPageId();
+        const card = makeCard(ctx, pageId, 0);
+        await repo.insertMany([card]);
+        await repo.archive(card.id, ctx.ownerId, ARCHIVED_AT);
+        await repo.archive(
+          card.id,
+          ctx.ownerId,
+          new Date("2026-10-05T09:00:00.000Z"),
+        );
+        expect((await repo.findById(card.id, ctx.ownerId))?.archivedAt).toEqual(
+          ARCHIVED_AT,
+        );
+      });
+
+      it("never archives another owner's card", async () => {
+        const ctx = options.context();
+        const repo = options.createRepository();
+        const pageId = await ctx.newPageId();
+        const card = makeCard(ctx, pageId, 0);
+        await repo.insertMany([card]);
+        await repo.archive(card.id, ctx.otherOwnerId, ARCHIVED_AT);
+        expect(await repo.findById(card.id, ctx.ownerId)).toEqual(card);
+      });
+    });
+
+    it("lockDeck resolves for an owned page, with or without cards", async () => {
+      const ctx = options.context();
+      const repo = options.createRepository();
+      const pageId = await ctx.newPageId();
+      await expect(repo.lockDeck(pageId, ctx.ownerId)).resolves.toBeUndefined();
+    });
+
     describe("countByOwnerGroupedByPage", () => {
       it("returns one entry per page that has cards, with its count and page metadata", async () => {
         const ctx = options.context();
@@ -141,6 +219,23 @@ export function runFlashcardRepositoryContract(
         await repo.insertMany([makeCard(ctx, pageId, 0)]);
         const decks = await repo.countByOwnerGroupedByPage(ctx.otherOwnerId);
         expect(decks.some((deck) => deck.pageId === pageId)).toBe(false);
+      });
+
+      it("counts only active cards and drops a deck whose cards are all archived", async () => {
+        const ctx = options.context();
+        const repo = options.createRepository();
+        const partly = await ctx.newPageId();
+        const fully = await ctx.newPageId();
+        const active = makeCard(ctx, partly, 0);
+        const gone = makeCard(ctx, partly, 1);
+        const onlyCard = makeCard(ctx, fully, 0);
+        await repo.insertMany([active, gone, onlyCard]);
+        await repo.archive(gone.id, ctx.ownerId, ARCHIVED_AT);
+        await repo.archive(onlyCard.id, ctx.ownerId, ARCHIVED_AT);
+        const decks = await repo.countByOwnerGroupedByPage(ctx.ownerId);
+        const byPage = new Map(decks.map((deck) => [deck.pageId, deck]));
+        expect(byPage.get(partly)?.count).toBe(1);
+        expect(byPage.has(fully)).toBe(false);
       });
 
       it("drops the deck of an archived page", async () => {

@@ -94,6 +94,7 @@ if (process.env.DATABASE_URL) {
           generationId: null,
           createdAt: new Date(),
           updatedAt: new Date(),
+          archivedAt: null,
         },
       ]);
       expect(await repo.countByPage(pageId, owner.id)).toBe(1);

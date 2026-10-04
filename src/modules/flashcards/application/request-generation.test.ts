@@ -17,7 +17,7 @@ import {
   type RequestGenerationDeps,
   requestGeneration,
 } from "./request-generation";
-import { InMemoryFlashcardRepository } from "./testing/in-memory-flashcard-repository";
+import { InMemoryDeckUnitOfWork } from "./testing/in-memory-deck-unit-of-work";
 
 const OWNER = "owner-1";
 const PAGE = "page-1";
@@ -102,7 +102,8 @@ function makeAi(outcome: "ok" | "fail" | { cards: unknown[] } = "ok") {
 
 let ids = 0;
 function makeDeps(overrides: Partial<RequestGenerationDeps> = {}) {
-  const flashcards = new InMemoryFlashcardRepository();
+  const deck = new InMemoryDeckUnitOfWork();
+  const flashcards = deck.flashcards;
   const limiter = new StubLimiter();
   const ai = makeAi();
   const deps: RequestGenerationDeps = {
@@ -112,14 +113,14 @@ function makeDeps(overrides: Partial<RequestGenerationDeps> = {}) {
       plainText: "uno dos tres cuatro",
     }),
     ai,
-    flashcards,
+    deck,
     clock: createFixedClock(NOW),
     ids: { next: () => `card-${++ids}` },
     tokenCap: 12000,
     defaultCount: 10,
     ...overrides,
   };
-  return { deps, flashcards, limiter, ai };
+  return { deps, deck, flashcards, limiter, ai };
 }
 
 describe("requestGeneration", () => {
@@ -154,6 +155,30 @@ describe("requestGeneration", () => {
       model: "gemini-3.5-flash-lite",
     });
     expect(await flashcards.countByPage(PAGE, OWNER)).toBe(2);
+  });
+
+  it("creates one due study item per persisted card in the same unit of work", async () => {
+    const { deps, deck } = makeDeps();
+
+    const result = await requestGeneration({ pageId: PAGE }, deps, OWNER);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(deck.runs).toBe(1);
+    const items = deck.studyItems.all();
+    expect(items.map((item) => item.sourceId)).toEqual(
+      result.value.cards.map((card) => card.id),
+    );
+    expect(
+      items.every(
+        (item) =>
+          item.kind === "flashcard" &&
+          item.ownerId === OWNER &&
+          item.pageId === PAGE &&
+          item.repetitions === 0 &&
+          item.dueAt.getTime() === NOW.getTime(),
+      ),
+    ).toBe(true);
   });
 
   it("returns DAILY_LIMIT_REACHED with resetAt and calls no AI nor persists", async () => {

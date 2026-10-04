@@ -1,5 +1,5 @@
 import { and, asc, eq, isNull, lte } from "drizzle-orm";
-import type { Db } from "@/shared/db/client";
+import type { DbExecutor } from "@/shared/db/client";
 import { type StudyItemRow, studyItems } from "@/shared/db/schema";
 import type { StudyItem, StudyItemKind } from "../domain/study-item";
 import type { StudyItemRepository } from "../domain/study-item-repository";
@@ -27,7 +27,7 @@ function toStudyItem(row: StudyItemRow): StudyItem {
 // Drizzle implementation of StudyItemRepository; every query filters by
 // owner_id (documento-maestro §6.1).
 export class DrizzleStudyItemRepository implements StudyItemRepository {
-  constructor(private readonly db: Db) {}
+  constructor(private readonly db: DbExecutor) {}
 
   async save(item: StudyItem): Promise<void> {
     const state = {

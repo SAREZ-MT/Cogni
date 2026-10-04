@@ -18,6 +18,7 @@ const card = (
   position,
   createdAt: new Date("2026-10-04T10:00:00.000Z"),
   updatedAt: new Date("2026-10-04T10:00:00.000Z"),
+  archivedAt: null,
 });
 
 describe("listDecks", () => {

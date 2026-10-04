@@ -75,6 +75,24 @@ export function runPageMasteryRepositoryContract(
       });
     });
 
+    it("never lets another owner overwrite a page's row", async () => {
+      const ctx = options.context();
+      const repo = options.createRepository();
+      const mastery = makeMastery(ctx, await ctx.newPageId());
+      await repo.upsert(mastery);
+      await repo.upsert(
+        makeMastery(ctx, mastery.pageId, {
+          ownerId: ctx.otherOwnerId,
+          level: "Dominado",
+          score: 0.99,
+        }),
+      );
+      expect(await repo.getByPage(mastery.pageId, ctx.ownerId)).toEqual(
+        mastery,
+      );
+      expect(await repo.getByPage(mastery.pageId, ctx.otherOwnerId)).toBe(null);
+    });
+
     it("listByOwner returns one row per page ordered by pageId", async () => {
       const ctx = options.context();
       const repo = options.createRepository();

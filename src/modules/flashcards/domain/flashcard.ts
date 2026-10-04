@@ -4,6 +4,12 @@ import { FLASHCARD_ERROR } from "./errors";
 
 export type FlashcardOrigin = "ai" | "manual";
 
+// Upper bound per side for hand-written cards, counted after trimming
+// (createManualFlashcard; the dialog's textareas use it too). AI cards have
+// no bound of their own; this one keeps a manual card readable on the flip
+// card and the payload small.
+export const MAX_FLASHCARD_SIDE_LENGTH = 1000;
+
 // One card of a page's deck (documento-maestro §6.1). `generationId` links
 // AI-made cards to the audited generation; null for manual cards.
 export interface Flashcard {
@@ -17,6 +23,9 @@ export interface Flashcard {
   readonly position: number;
   readonly createdAt: Date;
   readonly updatedAt: Date;
+  // Logical delete (§6.1): an archived card leaves every read and its study
+  // item is suspended.
+  readonly archivedAt: Date | null;
 }
 
 export interface NewFlashcard {
@@ -46,5 +55,12 @@ export function createFlashcard(
       ),
     );
   }
-  return ok({ ...input, front, back, createdAt: now, updatedAt: now });
+  return ok({
+    ...input,
+    front,
+    back,
+    createdAt: now,
+    updatedAt: now,
+    archivedAt: null,
+  });
 }

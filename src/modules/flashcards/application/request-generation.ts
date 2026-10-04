@@ -11,11 +11,12 @@ import {
   truncateToTokenCap,
 } from "@/modules/ai";
 import type { PageTextReader } from "@/modules/notebooks";
+import { newStudyItem } from "@/modules/study-engine";
 import type { Clock } from "@/shared/kernel/clock";
 import { DomainError } from "@/shared/kernel/domain-error";
 import { err, ok, type Result } from "@/shared/kernel/result";
 import { createFlashcard, type Flashcard } from "../domain";
-import type { FlashcardRepository } from "../domain/flashcard-repository";
+import type { DeckUnitOfWork } from "./deck-unit-of-work";
 
 export const MIN_CARD_COUNT = 3;
 export const MAX_CARD_COUNT = 20;
@@ -45,7 +46,7 @@ export interface RequestGenerationDeps {
       Result<{ object: unknown; generation: AiGeneration }, DomainError>
     >;
   };
-  flashcards: FlashcardRepository;
+  deck: DeckUnitOfWork;
   clock: Clock;
   ids: IdGenerator;
   tokenCap: number;
@@ -111,34 +112,51 @@ export async function requestGeneration(
     return err(new AiGenerationFailedError(generation.id));
   }
 
-  const firstPosition = await deps.flashcards.nextPosition(
-    input.pageId,
-    ownerId,
-  );
+  // Cards and their study items (§3.4) are written in one unit of work;
+  // the deck lock keeps positions unique against a concurrent manual card.
   const now = deps.clock.now();
-  const cards: Flashcard[] = [];
-  for (const raw of parsed.data.cards) {
-    const card = createFlashcard(
-      {
-        id: deps.ids.next(),
-        ownerId,
-        pageId: input.pageId,
-        generationId: generation.id,
-        front: raw.front,
-        back: raw.back,
-        origin: "ai",
-        position: firstPosition + cards.length,
-      },
-      now,
-    );
-    if (card.ok) cards.push(card.value);
-  }
-  // A deck is never empty: nothing is persisted when no card is valid.
+  const cards = await deps.deck.run(async ({ flashcards, studyItems }) => {
+    await flashcards.lockDeck(input.pageId, ownerId);
+    const firstPosition = await flashcards.nextPosition(input.pageId, ownerId);
+    const valid: Flashcard[] = [];
+    for (const raw of parsed.data.cards) {
+      const card = createFlashcard(
+        {
+          id: deps.ids.next(),
+          ownerId,
+          pageId: input.pageId,
+          generationId: generation.id,
+          front: raw.front,
+          back: raw.back,
+          origin: "ai",
+          position: firstPosition + valid.length,
+        },
+        now,
+      );
+      if (card.ok) valid.push(card.value);
+    }
+    // A deck is never empty: nothing is persisted when no card is valid.
+    if (valid.length === 0) return valid;
+
+    await flashcards.insertMany(valid);
+    for (const card of valid) {
+      await studyItems.save(
+        newStudyItem({
+          id: deps.ids.next(),
+          ownerId,
+          pageId: input.pageId,
+          kind: "flashcard",
+          sourceId: card.id,
+          now,
+        }),
+      );
+    }
+    return valid;
+  });
   if (cards.length === 0) {
     return err(new AiGenerationFailedError(generation.id));
   }
 
-  await deps.flashcards.insertMany(cards);
   return ok({
     cards,
     remainingToday: limit.remaining,

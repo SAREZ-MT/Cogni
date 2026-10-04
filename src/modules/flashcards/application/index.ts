@@ -1,3 +1,16 @@
+export {
+  type ArchiveFlashcardResult,
+  archiveFlashcard,
+} from "./archive-flashcard";
+export {
+  type CreateManualFlashcardDeps,
+  createManualFlashcard,
+} from "./create-manual-flashcard";
+export type {
+  DeckRepositories,
+  DeckStudyItems,
+  DeckUnitOfWork,
+} from "./deck-unit-of-work";
 export { getGenerationStatus } from "./get-generation-status";
 export { listDecks } from "./list-decks";
 export { listFlashcardsByPage } from "./list-flashcards-by-page";
