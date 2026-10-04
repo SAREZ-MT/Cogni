@@ -1,3 +1,4 @@
-// Public API of the "study-engine" module. Empty until Fase 4 — Motor de repetición espaciada y Flashcards implements it.
-// No cross-module import may reach past this file (documento-maestro §5.3.5).
-export {};
+// Public API of the "study-engine" module: the pure SM-2 engine and page
+// mastery (documento-maestro §7). No cross-module import may reach past this
+// file (§5.3.5).
+export * from "./domain";
