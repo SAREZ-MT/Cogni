@@ -44,3 +44,22 @@ and rate limiting (documento-maestro §8).
   and limiter state at module level.
 
 Other modules import only from `index.ts`.
+
+## Environment
+
+Server only, never `NEXT_PUBLIC_*` (validated in `src/shared/config/env.schema.ts`):
+
+- `AI_PROVIDER_MODE` `live` (default) or `fake`. Fake mode needs no keys: the
+  registry holds one deterministic provider and quota, breaker and limiter
+  state stay in memory. CI and e2e use it.
+- Live mode needs `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` and at
+  least one generation provider: `GOOGLE_GENERATIVE_AI_API_KEY`,
+  `OPENROUTER_API_KEY`, or `CLOUDFLARE_ACCOUNT_ID` plus `CLOUDFLARE_API_TOKEN`
+  (set together). `GROQ_API_KEY` enables the evaluation-only entry.
+- `REDIS_KEY_PREFIX` (default `cogni:dev`, `cogni:prod` in production),
+  `AI_DAILY_GENERATIONS` (default 6), `AI_PAGE_TOKEN_CAP` (default 12000).
+
+Decisions and dropped providers: `docs/adr/0004-capa-de-ia-con-proveedores-gratuitos.md`.
+
+Known follow-up: `generateObject` is deprecated in `ai@7.0.127` in favor of
+`generateText` with `Output.object`; migrate in `ai-sdk-provider.ts`.

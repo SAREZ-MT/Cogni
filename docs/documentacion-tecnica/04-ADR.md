@@ -18,7 +18,8 @@
 - Fase 8 (Endurecimiento) está parcialmente cubierta: Content Security Policy con nonce, redirección del dominio apex y protección de sesión existen; el resto (registro de logs externo, pruebas de carga, auditoría de accesibilidad) no se ha iniciado.
 - De las 11 decisiones registradas en este documento:
   - **Completamente implementadas y verificables en el código de `main`:** ADR-001, ADR-002, ADR-003, ADR-004, ADR-005, ADR-006, ADR-009, ADR-010.
-  - **Aceptadas, pendientes de implementación (especificación del documento maestro, módulo aún vacío):** ADR-007 (Fase 4 — motor de repetición espaciada), ADR-008 (Fase 3 — capa de IA).
+  - **Implementada en la Fase 3 (2026-10-04):** ADR-008 (capa de IA con rotación multiproveedor); el registro de proveedores cambió respecto del texto original, ver `docs/adr/0004-capa-de-ia-con-proveedores-gratuitos.md`.
+  - **Aceptada, pendiente de implementación (especificación del documento maestro, módulo aún vacío):** ADR-007 (Fase 4 — motor de repetición espaciada).
   - **Aceptada e implementada en su mayor parte, con un cambio puntual pendiente:** ADR-011 (Row Level Security está activa; el cambio de `style-src` decidido el 2026-09-24 no está aplicado todavía en `src/shared/config/security-headers.ts`).
 
 ### Documento vivo
@@ -30,7 +31,7 @@ Este documento se actualiza a medida que avanza la construcción de Cogni; la no
 | Sección de este documento | Fase RAD | Uso en la tesis |
 |---|---|---|
 | ADR-001, ADR-002, ADR-003, ADR-004, ADR-005, ADR-006, ADR-009, ADR-010 (decisiones implementadas) | Planificación de requisitos / Construcción | Evidencia de que cada decisión de producto, stack y arquitectura fue tomada antes de programar y quedó verificada contra el código construido. |
-| ADR-007, ADR-008 (decisiones aceptadas, pendientes de implementación) | Planificación de requisitos | Documentan decisiones ya cerradas para fases futuras (4 y 3), útiles como diseño detallado a sustentar ante el jurado antes de su Construcción. |
+| ADR-007 (decisión aceptada, pendiente de implementación) | Planificación de requisitos | Documenta una decisión ya cerrada para una fase futura (4), útiles como diseño detallado a sustentar ante el jurado antes de su Construcción. |
 | ADR-011 (política de seguridad: RLS y CSP) | Implementación | Sustenta las medidas de seguridad ya desplegadas y el cambio de configuración pendiente, propio de la fase de Implementación/endurecimiento. |
 
 ---
@@ -46,7 +47,7 @@ Este documento se actualiza a medida que avanza la construcción de Cogni; la no
 | ADR-005 | Supabase Auth con RLS y proxy de sesión | Aceptado | `docs/documento-maestro.md` §9 |
 | ADR-006 | Tiptap como base del editor de bloques | Aceptado | `docs/adr/0001-decisiones-fundacionales.md` (ítem 3) |
 | ADR-007 | SM-2 por ítem con nivel de dominio derivado por página | Aceptado — pendiente de implementación (Fase 4) | `docs/adr/0001-decisiones-fundacionales.md` (ítem 2) |
-| ADR-008 | Vercel AI SDK con rotación multiproveedor y salida estructurada | Aceptado — pendiente de implementación (Fase 3) | `docs/adr/0001-decisiones-fundacionales.md` (ítem 6) |
+| ADR-008 | Vercel AI SDK con rotación multiproveedor y salida estructurada | Aceptado — implementado (Fase 3) | `docs/adr/0001-decisiones-fundacionales.md` (ítem 6); actualizado por `docs/adr/0004-capa-de-ia-con-proveedores-gratuitos.md` |
 | ADR-009 | Vercel Hobby con Cloudflare DNS, Fluid Compute y Vercel Cron | Aceptado | `docs/documento-maestro.md` §4.2, §10 |
 | ADR-010 | Estrategia de pruebas: TDD con Vitest, Playwright y dependency-cruiser | Aceptado | `docs/documento-maestro.md` §4.4 |
 | ADR-011 | Política de seguridad: RLS y Content Security Policy | Aceptado — pendiente de implementación del cambio de `style-src` | `docs/documento-maestro.md` §9; decisión registrada en sesión de trabajo del 2026-09-24 (cambio de `style-src`) |
@@ -398,7 +399,7 @@ Sin mitigación por ahora — la Fase 4 (§13 del documento maestro) implementa 
 
 ### Estado
 
-Aceptado — pendiente de implementación (Fase 3).
+Aceptado — implementado en la Fase 3. La lista de proveedores del texto original quedó reemplazada por la del `docs/adr/0004-capa-de-ia-con-proveedores-gratuitos.md` (Google AI Studio, Cloudflare Workers AI y OpenRouter para generación; Groq solo para evaluación; Mistral y Cerebras descartados). Las secciones siguientes conservan el análisis original de la decisión.
 
 ### Contexto
 
