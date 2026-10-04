@@ -186,3 +186,111 @@ export const importJobs = pgTable(
 ).enableRLS();
 
 export type ImportJobRow = typeof importJobs.$inferSelect;
+
+// Same convention as IMPORT_JOB_STATUSES: literal tuples kept here (schema.ts
+// imports no module) that feed both `$type<>()` and the CHECK text. The ai
+// domain owns AI_PURPOSES / GenerationStatus; `ai-generations.contract` and
+// the DB smoke tests keep these in step.
+export const AI_GENERATION_STATUSES = [
+  "queued",
+  "running",
+  "done",
+  "failed",
+] as const;
+export type AiGenerationStatusValue = (typeof AI_GENERATION_STATUSES)[number];
+
+export const AI_GENERATION_PURPOSES = [
+  "generate_flashcards",
+  "generate_exam_questions",
+  "generate_exam_variants",
+  "generate_recall_questions",
+  "evaluate_recall_answer",
+  "session_feedback",
+] as const;
+export type AiGenerationPurposeValue = (typeof AI_GENERATION_PURPOSES)[number];
+
+// One audited model call (documento-maestro §6.1). page_id is nullable and
+// SET NULL on page delete so the audit trail and quota history survive.
+// RLS on with no policies, like every table here: only the server connection
+// reaches it.
+export const aiGenerations = pgTable(
+  "ai_generations",
+  {
+    id: uuid("id").primaryKey(),
+    ownerId: uuid("owner_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    pageId: uuid("page_id").references(() => pages.id, {
+      onDelete: "set null",
+    }),
+    purpose: text("purpose").notNull().$type<AiGenerationPurposeValue>(),
+    provider: text("provider").notNull(),
+    model: text("model").notNull(),
+    promptVersion: text("prompt_version").notNull(),
+    inputTokens: integer("input_tokens").notNull().default(0),
+    outputTokens: integer("output_tokens").notNull().default(0),
+    latencyMs: integer("latency_ms").notNull().default(0),
+    status: text("status").notNull().$type<AiGenerationStatusValue>(),
+    error: text("error"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("ai_generations_owner_created_idx").on(
+      table.ownerId,
+      table.createdAt,
+    ),
+    index("ai_generations_page_id_idx").on(table.pageId),
+    check(
+      "ai_generations_status_check",
+      sql`${table.status} in ('queued', 'running', 'done', 'failed')`,
+    ),
+    check(
+      "ai_generations_purpose_check",
+      sql`${table.purpose} in ('generate_flashcards', 'generate_exam_questions', 'generate_exam_variants', 'generate_recall_questions', 'evaluate_recall_answer', 'session_feedback')`,
+    ),
+  ],
+).enableRLS();
+
+export type AiGenerationRow = typeof aiGenerations.$inferSelect;
+
+// A page's deck is its cards (documento-maestro §6.1): there is no deck
+// table, and a deck never holds an empty card (CHECK constraints).
+export const flashcards = pgTable(
+  "flashcards",
+  {
+    id: uuid("id").primaryKey(),
+    ownerId: uuid("owner_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    pageId: uuid("page_id")
+      .notNull()
+      .references(() => pages.id, { onDelete: "cascade" }),
+    generationId: uuid("generation_id").references(() => aiGenerations.id, {
+      onDelete: "set null",
+    }),
+    front: text("front").notNull(),
+    back: text("back").notNull(),
+    origin: text("origin").notNull().$type<"ai" | "manual">(),
+    position: integer("position").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("flashcards_page_position_idx").on(table.pageId, table.position),
+    index("flashcards_owner_id_idx").on(table.ownerId),
+    check("flashcards_origin_check", sql`${table.origin} in ('ai', 'manual')`),
+    check("flashcards_front_not_blank", sql`length(btrim(${table.front})) > 0`),
+    check("flashcards_back_not_blank", sql`length(btrim(${table.back})) > 0`),
+  ],
+).enableRLS();
+
+export type FlashcardRow = typeof flashcards.$inferSelect;

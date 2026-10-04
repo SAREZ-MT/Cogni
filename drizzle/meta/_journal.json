@@ -50,6 +50,13 @@
       "when": 1790140322272,
       "tag": "0006_page_pdfs_storage",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791079649107,
+      "tag": "0007_ai_generations_flashcards",
+      "breakpoints": true
     }
   ]
 }
