@@ -8,7 +8,11 @@ export class InMemoryAiGenerationRepository implements AiGenerationRepository {
     this.rows.set(generation.id, generation);
   }
 
+  // Owner-scoped like the Drizzle adapter: a row owned by someone else is
+  // never touched.
   async update(generation: AiGeneration): Promise<void> {
+    const existing = this.rows.get(generation.id);
+    if (!existing || existing.ownerId !== generation.ownerId) return;
     this.rows.set(generation.id, generation);
   }
 
