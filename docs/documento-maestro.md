@@ -518,6 +518,7 @@ En la Fase 3 solo `generate_flashcards` está cableado de extremo a extremo (pro
 ## 9. Seguridad y autorización
 
 - Autenticación con Supabase Auth: correo/contraseña con verificación y Google OAuth. Sesión por cookies gestionadas por `@supabase/ssr`.
+- Aceptación de los términos de uso: toda cuenta (correo o Google, nueva o existente) debe aceptar la versión vigente de los términos (`TERMS_VERSION`, una fecha) antes de usar la aplicación. El layout autenticado redirige a `/terminos` a quien no la haya aceptado; la página es pública y, con sesión pendiente, muestra la casilla de aceptación (mayoría de edad y términos). La versión y la fecha quedan en `profiles`; al publicar una versión nueva se vuelve a pedir a todos.
 - Toda Server Action y route handler valida sesión y valida entrada con Zod antes de tocar `application`.
 - Autorización por propiedad: cada caso de uso recibe `ownerId` de la sesión y filtra por él. No existe acceso entre usuarios.
 - Storage: buckets privados con políticas RLS por `owner_id`. URLs firmadas de corta duración.
@@ -622,7 +623,7 @@ Hecho cuando: con la cuota de un proveedor agotada artificialmente, la generaci�
 Estado (actualizado en la Fase 3):
 
 - Entregado: registro de proveedores, rotación por cuota, circuit breaker, límite de 6 generaciones por usuario por día, prompts versionados (`generate_flashcards/v1`), entidad `AiGeneration` (tabla `ai_generations`), generación y listado de flashcards (tabla `flashcards`), interfaz en el panel de técnicas de la página y rutas `/flashcards`, modo `AI_PROVIDER_MODE=fake` para CI y e2e.
-- Pendiente: ejecución manual de `scripts/ai-smoke.mts` con claves reales y cuota agotada artificialmente (criterio de "hecho"); migración de `generateObject` a `generateText` con `Output.object`; términos de uso en el registro (funcionalidad separada).
+- Pendiente: ejecución manual de `scripts/ai-smoke.mts` con claves reales y cuota agotada artificialmente (criterio de "hecho"); migración de `generateObject` a `generateText` con `Output.object`.
 
 ### Fase 4 — Motor de repetición espaciada y Flashcards
 

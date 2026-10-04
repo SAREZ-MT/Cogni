@@ -1,5 +1,6 @@
 import { test as base, expect, type Page } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
+import { TERMS_VERSION } from "@/modules/identity/domain/terms";
 
 // Real Supabase project (cogni-dev) drives these flows. Without its env the
 // auth suites skip instead of failing, so `pnpm test:e2e` still runs the
@@ -30,16 +31,36 @@ export function uniqueEmail(prefix: string): string {
 
 // The "verification stub" from design.md: the admin API confirms the email
 // so the flow under test starts at a verified account.
-export async function createVerifiedUser(): Promise<TestUser> {
+//
+// By default the user also arrives with the CURRENT terms already accepted:
+// the (app) layout redirects accounts that have not accepted to /terminos,
+// which would otherwise intercept every spec that signs in. The profiles
+// row is written through the service-role client (RLS has no policies and
+// the service role bypasses it); the app's own ensureProfile then finds it
+// and leaves it untouched. `{ acceptTerms: false }` skips this so the
+// terms-acceptance spec can exercise the gate with a brand-new account.
+export async function createVerifiedUser(
+  options: { acceptTerms?: boolean } = {},
+): Promise<TestUser> {
+  const { acceptTerms = true } = options;
   const email = uniqueEmail("verified");
   const password = "Secreta-123";
-  const { data, error } = await adminClient().auth.admin.createUser({
+  const admin = adminClient();
+  const { data, error } = await admin.auth.admin.createUser({
     email,
     password,
     email_confirm: true,
   });
   if (error || !data.user)
     throw error ?? new Error("admin.createUser returned no user");
+  if (acceptTerms) {
+    const { error: profileError } = await admin.from("profiles").upsert({
+      id: data.user.id,
+      terms_accepted_version: TERMS_VERSION,
+      terms_accepted_at: new Date().toISOString(),
+    });
+    if (profileError) throw profileError;
+  }
   return { id: data.user.id, email, password };
 }
 
@@ -50,11 +71,15 @@ export async function deleteUserByEmail(email: string): Promise<void> {
   if (user) await admin.auth.admin.deleteUser(user.id);
 }
 
-export async function signIn(page: Page, user: TestUser): Promise<void> {
+export async function submitSignIn(page: Page, user: TestUser): Promise<void> {
   await page.goto("/login");
   await page.getByLabel("Correo electrónico").fill(user.email);
   await page.getByLabel("Contraseña").fill(user.password);
   await page.getByRole("button", { name: "Iniciar sesión" }).click();
+}
+
+export async function signIn(page: Page, user: TestUser): Promise<void> {
+  await submitSignIn(page, user);
   await expect(page).toHaveURL("/");
 }
 
@@ -62,12 +87,19 @@ export async function signIn(page: Page, user: TestUser): Promise<void> {
 // plus a test-scoped one for scenarios that need an owner with no data at
 // all (the worker user accumulates notebooks across specs).
 export const test = base.extend<
-  { freshUser: TestUser },
+  { freshUser: TestUser; unacceptedUser: TestUser },
   { verifiedUser: TestUser }
 >({
   // biome-ignore lint/correctness/noEmptyPattern: Playwright fixture signature
   freshUser: async ({}, use) => {
     const user = await createVerifiedUser();
+    await use(user);
+    await deleteUserByEmail(user.email);
+  },
+  // Verified account that has NOT accepted the terms (see createVerifiedUser).
+  // biome-ignore lint/correctness/noEmptyPattern: Playwright fixture signature
+  unacceptedUser: async ({}, use) => {
+    const user = await createVerifiedUser({ acceptTerms: false });
     await use(user);
     await deleteUserByEmail(user.email);
   },
