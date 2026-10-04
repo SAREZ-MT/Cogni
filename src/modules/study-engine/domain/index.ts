@@ -10,7 +10,9 @@ export {
   STABILITY_HORIZON_DAYS,
 } from "./mastery";
 export type { PageMastery } from "./page-mastery";
+export type { PageMasteryRepository } from "./page-mastery-repository";
 export type { ReviewLog, SessionKind } from "./review-log";
+export type { ReviewLogRepository } from "./review-log-repository";
 export { applySm2 } from "./sm2";
 export {
   FLASHCARD_QUALITY,
@@ -23,3 +25,4 @@ export {
   type StudyItem,
   type StudyItemKind,
 } from "./study-item";
+export type { StudyItemRepository } from "./study-item-repository";

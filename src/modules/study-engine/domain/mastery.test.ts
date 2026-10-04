@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { computeMastery, MASTERY_LEVELS } from "./mastery";
+import type { Quality } from "./study-item";
 
 const NOW = new Date("2026-01-10T00:00:00.000Z");
 const DAY_MS = 86_400_000;
@@ -7,7 +8,7 @@ const DAY_MS = 86_400_000;
 function item(
   overrides: Partial<{
     intervalDays: number;
-    lastQuality: number | null;
+    lastQuality: Quality | null;
     dueAt: Date;
     suspendedAt: Date | null;
   }> = {},

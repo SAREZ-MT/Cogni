@@ -25,7 +25,7 @@ export interface Sm2State {
   readonly intervalDays: number;
   readonly repetitions: number;
   readonly dueAt: Date;
-  readonly lastQuality: number | null;
+  readonly lastQuality: Quality | null;
   readonly lastReviewedAt: Date | null;
   readonly lapses: number;
 }

@@ -15,10 +15,11 @@ function readDownSql(migration: string): string {
   );
 }
 
-// Reversions run newest first. import_jobs (0005) and ai_generations /
-// flashcards (0007) reference pages, so they must be reverted before 0003 can
-// drop the tables they depend on.
+// Reversions run newest first. import_jobs (0005), ai_generations /
+// flashcards (0007) and the study-engine tables (0009) reference pages, so
+// they must be reverted before 0003 can drop the tables they depend on.
 const REVERSIONS_DOWN_TO_0003 = [
+  "0009_study_engine",
   "0007_ai_generations_flashcards",
   "0005_import_jobs",
   "0003_notebooks_pages_assets",
