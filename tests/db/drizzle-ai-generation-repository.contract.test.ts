@@ -59,7 +59,7 @@ if (process.env.DATABASE_URL) {
       pageId,
       purpose: "generate_flashcards" as const,
       provider: "gemini",
-      model: "gemini-2.5-flash-lite",
+      model: "gemini-3.5-flash-lite",
       promptVersion: "v1",
       status: "running" as const,
     });

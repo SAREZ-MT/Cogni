@@ -1,6 +1,21 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { selectProvider } from "../domain";
 import { buildProviderEntries, buildProviderMap } from "./provider-registry";
+
+const openAiCompatibleSpy = vi.hoisted(() => vi.fn());
+vi.mock("@ai-sdk/openai-compatible", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@ai-sdk/openai-compatible")>();
+  return {
+    ...actual,
+    createOpenAICompatible: (
+      ...args: Parameters<typeof actual.createOpenAICompatible>
+    ) => {
+      openAiCompatibleSpy(...args);
+      return actual.createOpenAICompatible(...args);
+    },
+  };
+});
 
 const none = { AI_PROVIDER_MODE: "live" as const };
 const all = {
@@ -53,7 +68,7 @@ describe("buildProviderEntries", () => {
       .sort((a, b) => a.priority - b.priority)
       .map((e) => [e.id, e.model, e.rpm, e.rpd]);
     expect(generation).toEqual([
-      ["gemini-flash-lite", "gemini-2.5-flash-lite", 10, 20],
+      ["gemini-flash-lite", "gemini-3.5-flash-lite", 10, 20],
       [
         "cloudflare-workers-ai",
         "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
@@ -87,6 +102,17 @@ describe("buildProviderEntries", () => {
     for (const entry of entries) {
       expect(map.get(entry.id)?.model).toBe(entry.model);
     }
+  });
+
+  it("enables structured outputs for Cloudflare so JSON schemas are sent", () => {
+    openAiCompatibleSpy.mockClear();
+    buildProviderMap(all);
+    expect(openAiCompatibleSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "cloudflare-workers-ai",
+        supportsStructuredOutputs: true,
+      }),
+    );
   });
 
   it("uses only the fake entry and provider in fake mode", () => {

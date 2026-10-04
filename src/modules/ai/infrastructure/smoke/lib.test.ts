@@ -13,7 +13,7 @@ import {
 const entries: ProviderEntry[] = [
   {
     id: "gemini-flash-lite",
-    model: "gemini-2.5-flash-lite",
+    model: "gemini-3.5-flash-lite",
     capabilities: ["generate_flashcards"],
     rpm: 10,
     rpd: 20,
@@ -162,7 +162,7 @@ describe("formatSummary", () => {
       {
         step: "1 baseline",
         provider: "gemini-flash-lite",
-        model: "gemini-2.5-flash-lite",
+        model: "gemini-3.5-flash-lite",
         status: "done",
         tokens: 321,
         latencyMs: 1234,

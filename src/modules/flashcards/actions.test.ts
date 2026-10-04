@@ -37,7 +37,7 @@ const generation: AiGeneration = {
   pageId: null,
   purpose: "generate_flashcards",
   provider: "gemini",
-  model: "gemini-2.5-flash-lite",
+  model: "gemini-3.5-flash-lite",
   promptVersion: "generate_flashcards/v1",
   inputTokens: 1,
   outputTokens: 1,
@@ -166,7 +166,7 @@ describe("flashcards Server Actions", () => {
       expect(track).toHaveBeenCalledWith("generation_requested", OWNER, {
         pageId: PAGE,
         provider: "gemini",
-        model: "gemini-2.5-flash-lite",
+        model: "gemini-3.5-flash-lite",
         status: "done",
         truncated: false,
       });

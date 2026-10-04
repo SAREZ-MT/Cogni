@@ -29,7 +29,7 @@ export function runAiGenerationRepositoryContract(
     pageId: ctx.pageId,
     purpose: "generate_flashcards",
     provider: "gemini",
-    model: "gemini-2.5-flash-lite",
+    model: "gemini-3.5-flash-lite",
     promptVersion: "v1",
     inputTokens: 0,
     outputTokens: 0,

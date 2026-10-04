@@ -63,7 +63,7 @@ function generation(id = "gen-1"): AiGeneration {
     pageId: PAGE,
     purpose: "generate_flashcards",
     provider: "gemini",
-    model: "gemini-2.5-flash-lite",
+    model: "gemini-3.5-flash-lite",
     promptVersion: "generate_flashcards/v1",
     inputTokens: 10,
     outputTokens: 20,
@@ -151,7 +151,7 @@ describe("requestGeneration", () => {
       wordsTotal: 4,
       generationId: "gen-1",
       provider: "gemini",
-      model: "gemini-2.5-flash-lite",
+      model: "gemini-3.5-flash-lite",
     });
     expect(await flashcards.countByPage(PAGE, OWNER)).toBe(2);
   });

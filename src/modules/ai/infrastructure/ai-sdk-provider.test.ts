@@ -19,12 +19,12 @@ describe("createAiSdkProvider", () => {
   it("exposes the id and model id of the port", () => {
     const provider = createAiSdkProvider({
       id: "gemini-flash-lite",
-      modelId: "gemini-2.5-flash-lite",
+      modelId: "gemini-3.5-flash-lite",
       model,
       generateObject: vi.fn(),
     });
     expect(provider.id).toBe("gemini-flash-lite");
-    expect(provider.model).toBe("gemini-2.5-flash-lite");
+    expect(provider.model).toBe("gemini-3.5-flash-lite");
   });
 
   it("passes schema, prompts, temperature and token cap to generateObject", async () => {
