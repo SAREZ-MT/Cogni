@@ -8,19 +8,28 @@ export function createInMemoryGenerationLimiter(options: {
   clock: Clock;
 }): GenerationRateLimiter {
   const counts = new Map<string, number>();
+
+  function window(ownerId: string) {
+    const day = options.clock.now().toISOString().slice(0, 10);
+    const resetAt = new Date(`${day}T00:00:00.000Z`);
+    resetAt.setUTCDate(resetAt.getUTCDate() + 1);
+    const key = `${ownerId}:${day}`;
+    return { key, used: counts.get(key) ?? 0, resetAt };
+  }
+
   return {
     async check(ownerId) {
-      const now = options.clock.now();
-      const day = now.toISOString().slice(0, 10);
-      const key = `${ownerId}:${day}`;
-      const used = counts.get(key) ?? 0;
-      const resetAt = new Date(`${day}T00:00:00.000Z`);
-      resetAt.setUTCDate(resetAt.getUTCDate() + 1);
+      const { key, used, resetAt } = window(ownerId);
       if (used >= options.limit) {
         return { allowed: false, remaining: 0, resetAt };
       }
       counts.set(key, used + 1);
       return { allowed: true, remaining: options.limit - used - 1, resetAt };
+    },
+    async peek(ownerId) {
+      const { used, resetAt } = window(ownerId);
+      const remaining = Math.max(0, options.limit - used);
+      return { allowed: remaining > 0, remaining, resetAt };
     },
   };
 }

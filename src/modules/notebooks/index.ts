@@ -77,6 +77,8 @@ export {
   type PageAsset,
   type PageAssetRepository,
   type PageRepository,
+  type PageText,
+  type PageTextReader,
   type SavePagePort,
   type StorageGateway,
   TITLE_MAX_LENGTH,

@@ -28,6 +28,7 @@ export type {
   UpdateIfVersionInput,
   UpdateIfVersionResult,
 } from "./page-repository";
+export type { PageText, PageTextReader } from "./page-text-reader";
 export {
   extractPlainText,
   type TiptapDoc,

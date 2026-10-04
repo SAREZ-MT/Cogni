@@ -306,6 +306,57 @@ describe("createNotebooksServerApi", () => {
     });
   });
 
+  describe("getPageText", () => {
+    async function setup() {
+      const { createNotebooksServerApi } = await import("./server-api");
+      await notebooks.create(makeNotebook());
+      const api = createNotebooksServerApi({ db: FAKE_DB });
+      const created = await api.createPage(OWNER_ID, {
+        notebookId: "nb-1",
+        title: "Fotosintesis",
+      });
+      if (!created.ok) throw new Error("setup failed");
+      return { api, pageId: created.value.id };
+    }
+
+    it("returns the title and plain text of an owned page", async () => {
+      const { api, pageId } = await setup();
+      await api.writeImportedContent(OWNER_ID, {
+        pageId,
+        content: IMPORTED_DOC,
+        expectedVersion: 1,
+      });
+
+      const result = await api.getPageText(pageId, OWNER_ID);
+
+      expect(result).toEqual({
+        ok: true,
+        value: { title: "Fotosintesis", plainText: "hola" },
+      });
+    });
+
+    it("returns NOT_FOUND for a page owned by someone else", async () => {
+      const { api, pageId } = await setup();
+
+      const result = await api.getPageText(pageId, OTHER_OWNER_ID);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.error.code).toBe("PAGE_NOT_FOUND");
+    });
+
+    it("returns NOT_FOUND for an archived page", async () => {
+      const { api, pageId } = await setup();
+      const page = await pages.findById(pageId);
+      if (!page) throw new Error("setup failed");
+      await pages.update({ ...page, archivedAt: NOW });
+
+      const result = await api.getPageText(pageId, OWNER_ID);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.error.code).toBe("PAGE_NOT_FOUND");
+    });
+  });
+
   describe("writeImportedContent (updatedAt)", () => {
     it("uses the injected clock for updatedAt instead of the system clock", async () => {
       const { createNotebooksServerApi } = await import("./server-api");

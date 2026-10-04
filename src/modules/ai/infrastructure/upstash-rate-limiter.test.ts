@@ -18,6 +18,14 @@ vi.mock("@upstash/ratelimit", () => {
       state.constructorOptions.push(options);
       this.max = (options.limiter as { args: [number] }).args[0];
     }
+    async getRemaining(identifier: string) {
+      const used = state.counts.get(identifier) ?? 0;
+      return {
+        remaining: Math.max(0, this.max - used),
+        reset: 1_790_000_000_000,
+        limit: this.max,
+      };
+    }
     async limit(identifier: string) {
       const used = (state.counts.get(identifier) ?? 0) + 1;
       state.counts.set(identifier, used);
@@ -78,5 +86,32 @@ describe("createDailyGenerationLimiter", () => {
     });
     await limiter.check("a");
     expect((await limiter.check("b")).allowed).toBe(true);
+  });
+
+  it("peeks the remaining units without consuming one", async () => {
+    const limiter = createDailyGenerationLimiter({
+      redis: new InMemoryRedis() as never,
+      prefix: "p",
+      limit: 3,
+    });
+    await limiter.check("owner-1");
+    const peeked = await limiter.peek("owner-1");
+    expect(peeked).toEqual({
+      allowed: true,
+      remaining: 2,
+      resetAt: new Date(1_790_000_000_000),
+    });
+    expect((await limiter.peek("owner-1")).remaining).toBe(2);
+    expect((await limiter.check("owner-1")).remaining).toBe(1);
+  });
+
+  it("reports not allowed when the window is exhausted", async () => {
+    const limiter = createDailyGenerationLimiter({
+      redis: new InMemoryRedis() as never,
+      prefix: "p",
+      limit: 1,
+    });
+    await limiter.check("owner-1");
+    expect((await limiter.peek("owner-1")).allowed).toBe(false);
   });
 });
