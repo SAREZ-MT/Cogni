@@ -1,5 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import { Sparkles } from "lucide-react";
+import type { ReactNode } from "react";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import { IconTile } from "@/shared/ui/icon-tile";
@@ -36,6 +37,17 @@ export interface TechniqueCardProps {
   // Server Action exists. Kept as a prop rather than hardcoded so a future
   // technique can flip it once it's actually wired up.
   disabled?: boolean;
+  // Wires the card to a real action (Flashcards, Phase 3): the button is then
+  // enabled by default and calls this on click. Without it the card stays the
+  // inert preview described above.
+  onGenerate?: () => void;
+  // The action is running: the button is disabled, busy and reads
+  // "Generando…".
+  pending?: boolean;
+  generateTestId?: string;
+  // Feedback under the button (remaining quota, notices, errors); the caller
+  // owns the copy.
+  children?: ReactNode;
   className?: string;
 }
 
@@ -50,9 +62,15 @@ export function TechniqueCard({
   tone,
   name,
   description,
-  disabled = true,
+  disabled,
+  onGenerate,
+  pending = false,
+  generateTestId,
+  children,
   className,
 }: TechniqueCardProps) {
+  const wired = onGenerate !== undefined;
+  const isDisabled = pending || (disabled ?? !wired);
   return (
     <Card
       padding="none"
@@ -69,9 +87,12 @@ export function TechniqueCard({
       </div>
       <Button
         type="button"
-        disabled={disabled}
-        aria-disabled={disabled}
-        title={disabled ? "Disponible pronto" : undefined}
+        disabled={isDisabled}
+        aria-disabled={isDisabled}
+        aria-busy={pending || undefined}
+        data-testid={generateTestId}
+        onClick={onGenerate}
+        title={isDisabled && !wired ? "Disponible pronto" : undefined}
         size="sm"
         className={cn(
           "w-full text-[11.5px] disabled:cursor-not-allowed disabled:opacity-60",
@@ -79,8 +100,9 @@ export function TechniqueCard({
         )}
       >
         <Sparkles aria-hidden="true" size={12} strokeWidth={2} />
-        Generar
+        {pending ? "Generando…" : "Generar"}
       </Button>
+      {children}
     </Card>
   );
 }

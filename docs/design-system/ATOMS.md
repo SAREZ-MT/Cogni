@@ -200,6 +200,13 @@ anatomy; simplified per user decision 2026-09-24 — a card has **only** a
   (default `true` — no technique is built yet), `className?`. `href`,
   `meta`, and `actionLabel` were removed: no card links anywhere anymore,
   there's no meta line, and the action's label is a fixed "Generar".
+- Wired variant (Phase 3, Flashcards): pass `onGenerate` and the card becomes
+  live — the button is enabled by default (`disabled` can still force it
+  off, e.g. quota exhausted, without the "Disponible pronto" title, which is
+  reserved for unwired cards), `pending` disables it, sets `aria-busy` and
+  swaps the label to "Generando…", `generateTestId` tags the button and
+  `children` render under it inside the card (the caller owns quota/notice/
+  error copy). Without `onGenerate` the card behaves exactly as before.
 - Anatomy: icon tile (`IconTile` size `"30"` — closest existing token to the
   reference's 32px — radius `"md"`) + name + description, then one
   full-width `Button` reading "Generar" with a leading `Sparkles` icon
@@ -221,11 +228,15 @@ anatomy; simplified per user decision 2026-09-24 — a card has **only** a
 
 Used by: `techniques-panel.tsx`.
 
-**Preview gate.** The "Técnicas" panel advertises flashcards, active recall
-and exams, which are sample-data previews until their routes land. The page
-route (`pages/[pageId]/page.tsx`) computes `designPreviewsEnabled()` on the
-server and only renders `TechniquesPanel` when it is true, so production
-shows no panel and the layout's `display: contents` slot adds no space.
+**Preview gate.** Flashcards are real since Phase 3 (Generar, quota counter,
+the page's cards); active recall and exams are still sample-data previews
+until their routes land. The page route (`pages/[pageId]/page.tsx`) always
+renders `TechniquesPanel` and passes `showPreviews={designPreviewsEnabled()}`:
+with previews off (production) the panel shows only the Flashcards card and
+the page's real deck; with previews on it also lists the two preview
+techniques and their sample saved sections under a "Vista previa" pill.
+`SavedStudySection` keys rows by tone + href + label, so rows sharing a label
+need distinct hrefs.
 
 ## StudyItemRow (`study-item-row.tsx`)
 
@@ -238,7 +249,8 @@ clicking it goes straight to that item's study session.
 
 - `href`, `label`, `detail` (free-form right-aligned text, e.g. "8 tarjetas
   · 5 pendientes"), `tone: "primary" | "green" | "pink"` (dot color —
-  `primary-600`/`success-600`/`pastel-pink-fg`), `className?`.
+  `primary-600`/`success-600`/`pastel-pink-fg`), `testId?` (e2e hook),
+  `title?` (native tooltip), `className?`.
 - `StudyItemTone` is its own type (not imported from `technique-card.tsx`)
   so this atom has no dependency on the technique-card module.
 
@@ -376,7 +388,9 @@ never needs to say anything else).
   report's amber/blue/green/orange/pink `DECK_COLORS` cycle, mapped onto
   existing warning/info/success/pastel-orange/pastel-pink tokens instead of
   new hex literals. Assigned by position in the notebook's page list.
-- `href`, `tone`, `label`, `cardCount`, `dueCount`.
+- `href`, `tone`, `label`, `cardCount`, `dueCount?`. `dueCount` is optional:
+  omitted (no scheduler exists before Phase 4) the status pill is not
+  rendered at all, instead of showing a false "Al día".
 
 Used by: `flashcards/[notebookId]/page.tsx`.
 
