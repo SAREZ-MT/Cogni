@@ -76,4 +76,7 @@ export interface GenerationRateLimit {
 
 export interface GenerationRateLimiter {
   check(ownerId: string): Promise<GenerationRateLimit>;
+  // Reads the same window WITHOUT consuming a unit (`allowed` is whether a
+  // call would be accepted now).
+  peek(ownerId: string): Promise<GenerationRateLimit>;
 }

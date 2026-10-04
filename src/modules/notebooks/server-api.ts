@@ -10,14 +10,16 @@ import { type Clock, systemClock } from "@/shared/kernel/clock";
 import type { DomainError } from "@/shared/kernel/domain-error";
 import { ok, type Result } from "@/shared/kernel/result";
 import { createPage as createPageUseCase } from "./application/create-page";
+import { getPage as getPageUseCase } from "./application/get-page";
 import { writeImportedContent as writeImportedContentUseCase } from "./application/write-imported-content";
+import type { PageTextReader } from "./domain/page-text-reader";
 import type { TiptapDoc } from "./domain/plain-text";
 import {
   DrizzleNotebookRepository,
   DrizzlePageRepository,
 } from "./infrastructure";
 
-export interface NotebooksServerApi {
+export interface NotebooksServerApi extends PageTextReader {
   // null when the notebook does not exist, belongs to another owner, or is
   // archived.
   findActiveNotebook(
@@ -75,6 +77,15 @@ export function createNotebooksServerApi(deps: {
 
     async writeImportedContent(ownerId, input) {
       return writeImportedContentUseCase(input, { pages, clock }, ownerId);
+    },
+
+    async getPageText(pageId, ownerId) {
+      const result = await getPageUseCase({ pageId }, { pages }, ownerId);
+      if (!result.ok) return result;
+      return ok({
+        title: result.value.title,
+        plainText: result.value.plainText,
+      });
     },
 
     async findPageNotebookId(ownerId, pageId) {

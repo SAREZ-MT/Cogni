@@ -25,5 +25,14 @@ export function createDailyGenerationLimiter(options: {
         resetAt: new Date(result.reset),
       };
     },
+    // `getRemaining` reads the window without consuming a unit.
+    async peek(ownerId) {
+      const result = await ratelimit.getRemaining(ownerId);
+      return {
+        allowed: result.remaining > 0,
+        remaining: result.remaining,
+        resetAt: new Date(result.reset),
+      };
+    },
   };
 }
