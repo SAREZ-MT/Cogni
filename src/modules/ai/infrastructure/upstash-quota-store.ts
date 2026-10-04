@@ -2,8 +2,19 @@ import type { QuotaStore } from "../application/ports";
 import type { ProviderUsage } from "../domain";
 import type { RedisLike } from "./redis-like";
 
-const DAY_TTL_SECONDS = 48 * 3600;
+export const QUOTA_DAY_TTL_SECONDS = 48 * 3600;
 const MINUTE_TTL_SECONDS = 120;
+
+// Key builder shared with the manual smoke script, so it can never drift from
+// what the store reads and writes. Both buckets are derived in UTC.
+export function quotaKeys(prefix: string, providerId: string, now: Date) {
+  const iso = now.toISOString();
+  const base = `${prefix}:ai:quota:${providerId}`;
+  return {
+    day: `${base}:${iso.slice(0, 10)}`,
+    minute: `${base}:${iso.slice(0, 16).replace("T", "-").replace(":", "-")}`,
+  };
+}
 
 // Two counters per provider (documento-maestro §8.2), both bucketed in UTC:
 //   {prefix}:ai:quota:{provider}:{yyyy-mm-dd}        TTL 48 h
@@ -15,12 +26,7 @@ export class UpstashQuotaStore implements QuotaStore {
   ) {}
 
   private keys(providerId: string, now: Date) {
-    const iso = now.toISOString(); // always UTC
-    const base = `${this.prefix}:ai:quota:${providerId}`;
-    return {
-      day: `${base}:${iso.slice(0, 10)}`,
-      minute: `${base}:${iso.slice(0, 16).replace("T", "-").replace(":", "-")}`,
-    };
+    return quotaKeys(this.prefix, providerId, now);
   }
 
   async readUsage(providerId: string, now: Date): Promise<ProviderUsage> {
@@ -36,7 +42,7 @@ export class UpstashQuotaStore implements QuotaStore {
     const keys = this.keys(providerId, now);
     const pipeline = this.redis.pipeline();
     pipeline.incr(keys.day);
-    pipeline.expire(keys.day, DAY_TTL_SECONDS);
+    pipeline.expire(keys.day, QUOTA_DAY_TTL_SECONDS);
     pipeline.incr(keys.minute);
     pipeline.expire(keys.minute, MINUTE_TTL_SECONDS);
     await pipeline.exec();
