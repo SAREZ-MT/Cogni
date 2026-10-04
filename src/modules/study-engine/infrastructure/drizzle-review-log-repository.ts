@@ -1,5 +1,5 @@
 import { and, asc, eq } from "drizzle-orm";
-import type { Db } from "@/shared/db/client";
+import type { DbExecutor } from "@/shared/db/client";
 import { type ReviewLogRow, reviewLogs } from "@/shared/db/schema";
 import type { ReviewLog } from "../domain/review-log";
 import type { ReviewLogRepository } from "../domain/review-log-repository";
@@ -22,7 +22,7 @@ function toReviewLog(row: ReviewLogRow): ReviewLog {
 // Drizzle implementation of ReviewLogRepository: insert-only, every read
 // filters by owner_id (documento-maestro §6.1).
 export class DrizzleReviewLogRepository implements ReviewLogRepository {
-  constructor(private readonly db: Db) {}
+  constructor(private readonly db: DbExecutor) {}
 
   async append(log: ReviewLog): Promise<void> {
     await this.db.insert(reviewLogs).values({

@@ -232,5 +232,16 @@ export function runStudyItemRepositoryContract(
         );
       });
     });
+
+    it("lock resolves for an owned item, an unknown id and another owner, changing nothing", async () => {
+      const ctx = options.context();
+      const repo = options.createRepository();
+      const item = makeItem(ctx, await ctx.newPageId());
+      await repo.save(item);
+      await repo.lock(item.id, ctx.ownerId);
+      await repo.lock(ctx.newId(), ctx.ownerId);
+      await repo.lock(item.id, ctx.otherOwnerId);
+      expect(await repo.findById(item.id, ctx.ownerId)).toEqual(item);
+    });
   });
 }

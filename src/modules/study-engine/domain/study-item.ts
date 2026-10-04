@@ -16,6 +16,9 @@ export const FLASHCARD_QUALITY = {
   easy: 5,
 } as const satisfies Record<string, Quality>;
 
+// The four flashcard buttons: Otra vez, Difícil, Bien, Fácil.
+export type FlashcardRating = keyof typeof FLASHCARD_QUALITY;
+
 // §6.1: easiness is >= 1.3 and starts at 2.5.
 export const MIN_EASINESS = 1.3;
 export const INITIAL_EASINESS = 2.5;

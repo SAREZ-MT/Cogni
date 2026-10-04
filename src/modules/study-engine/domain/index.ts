@@ -1,5 +1,11 @@
 export { STUDY_ENGINE_ERROR } from "./errors";
 export {
+  type FlashcardSession,
+  type NewFlashcardSessionInput,
+  newFlashcardSession,
+} from "./flashcard-session";
+export type { FlashcardSessionRepository } from "./flashcard-session-repository";
+export {
   CONSOLIDATING_THRESHOLD,
   computeMastery,
   MASTERED_THRESHOLD,
@@ -16,6 +22,7 @@ export type { ReviewLogRepository } from "./review-log-repository";
 export { applySm2 } from "./sm2";
 export {
   FLASHCARD_QUALITY,
+  type FlashcardRating,
   INITIAL_EASINESS,
   MIN_EASINESS,
   type NewStudyItemInput,

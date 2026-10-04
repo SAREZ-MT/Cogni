@@ -137,4 +137,12 @@ export class DrizzleStudyItemRepository implements StudyItemRepository {
       );
     return this.findById(id, ownerId);
   }
+
+  async lock(id: string, ownerId: string): Promise<void> {
+    await this.db
+      .select({ id: studyItems.id })
+      .from(studyItems)
+      .where(and(eq(studyItems.id, id), eq(studyItems.ownerId, ownerId)))
+      .for("update");
+  }
 }

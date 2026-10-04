@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { newStudyItem } from "../../domain/study-item";
+import { runFlashcardSessionRepositoryContract } from "./flashcard-session-repository.contract";
+import { InMemoryFlashcardSessionRepository } from "./in-memory-flashcard-session-repository";
 import { InMemoryPageMasteryRepository } from "./in-memory-page-mastery-repository";
 import { InMemoryReviewLogRepository } from "./in-memory-review-log-repository";
 import { InMemoryStudyItemRepository } from "./in-memory-study-item-repository";
@@ -38,5 +40,10 @@ runReviewLogRepositoryContract({
 
 runPageMasteryRepositoryContract({
   createRepository: () => new InMemoryPageMasteryRepository(),
+  context: () => ({ ...ownership, newPageId: async () => randomUUID() }),
+});
+
+runFlashcardSessionRepositoryContract({
+  createRepository: () => new InMemoryFlashcardSessionRepository(),
   context: () => ({ ...ownership, newPageId: async () => randomUUID() }),
 });
