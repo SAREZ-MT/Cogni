@@ -1,5 +1,10 @@
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
+import {
+  type FlashcardView,
+  getGenerationStatusAction,
+  listFlashcardsAction,
+} from "@/modules/flashcards";
 import { getImportJobStatus, PageImportView } from "@/modules/ingestion";
 import {
   getAssetReadUrl,
@@ -72,12 +77,25 @@ export default async function PageView({ params }: PagePageProps) {
   const jobResult = await getImportJobStatus({ pageId: page.id });
   const initialJob = jobResult.ok ? jobResult.value : null;
 
-  // Preview gate: the "Técnicas" panel advertises flashcards, active recall
-  // and exams, which are sample-data previews. Decided on the server and
-  // simply not rendered when previews are off (production); the layout's
-  // portal slot stays an empty `display: contents` box, so the editor page
-  // keeps its single centered column with no dead space.
-  const showTechniquesPanel = designPreviewsEnabled();
+  // The "Técnicas" panel always renders: Flashcards are real (Phase 3). The
+  // server only decides whether the still-sample techniques (Active recall,
+  // Exámenes) show up in it; with previews off (production) the panel holds
+  // just Flashcards and the page's real deck.
+  const showPreviews = designPreviewsEnabled();
+
+  // Initial panel data is read here and refreshed client-side after each
+  // generation. Both actions never throw; a failed read degrades to an empty
+  // deck / unknown counter instead of blocking the editor route.
+  const [cardsResult, statusResult] = await Promise.all([
+    listFlashcardsAction({ pageId: page.id }),
+    getGenerationStatusAction().catch(() => null),
+  ]);
+  const initialFlashcards: FlashcardView[] = cardsResult.ok
+    ? cardsResult.value
+    : [];
+  const initialRemaining = statusResult?.ok
+    ? statusResult.value.remainingToday
+    : null;
 
   // design/shell-look: the "Técnicas" panel's collapsed state, read
   // server-side (same pattern as AppLayout's SIDEBAR_COOKIE) so
@@ -150,9 +168,14 @@ export default async function PageView({ params }: PagePageProps) {
           }
         />
       </section>
-      {showTechniquesPanel && (
-        <TechniquesPanel initialCollapsed={techniquesPanelCollapsed} />
-      )}
+      <TechniquesPanel
+        initialCollapsed={techniquesPanelCollapsed}
+        notebookId={notebookId}
+        pageId={page.id}
+        showPreviews={showPreviews}
+        initialFlashcards={initialFlashcards}
+        initialRemaining={initialRemaining}
+      />
     </>
   );
 }

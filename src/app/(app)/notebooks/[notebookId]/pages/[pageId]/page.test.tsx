@@ -40,6 +40,15 @@ const { TechniquesPanel } = vi.hoisted(() => ({
 }));
 vi.mock("./_components/techniques-panel", () => ({ TechniquesPanel }));
 
+const { listFlashcardsAction, getGenerationStatusAction } = vi.hoisted(() => ({
+  listFlashcardsAction: vi.fn(),
+  getGenerationStatusAction: vi.fn(),
+}));
+vi.mock("@/modules/flashcards", () => ({
+  listFlashcardsAction,
+  getGenerationStatusAction,
+}));
+
 const { PageEditor } = vi.hoisted(() => ({ PageEditor: vi.fn(() => null) }));
 vi.mock("./_components/page-editor", () => ({ PageEditor }));
 
@@ -113,6 +122,13 @@ describe("page route ingestion wiring", () => {
     designPreviewsEnabled.mockReturnValue(true);
     getNotebookTitleForRoute.mockReset();
     getNotebookTitleForRoute.mockResolvedValue("Biología Celular");
+    listFlashcardsAction.mockReset();
+    listFlashcardsAction.mockResolvedValue({ ok: true, value: [] });
+    getGenerationStatusAction.mockReset();
+    getGenerationStatusAction.mockResolvedValue({
+      ok: true,
+      value: { remainingToday: 6, resetAt: "2026-10-05T00:00:00.000Z" },
+    });
   });
 
   it("constrains the title and the editor to the design system reading measure (max-w-2xl, centered)", async () => {
@@ -302,35 +318,81 @@ describe("page route ingestion wiring", () => {
     );
   });
 
-  // Preview gate (design-integration T5): the techniques panel links to
-  // flashcards / active recall / exams, which are sample-data previews. The
-  // gate is computed on the server and the panel is simply not rendered when
-  // previews are off, so production never shows it.
-  describe("techniques panel preview gate", () => {
+  // Flashcards are real since Phase 3, so the panel always renders; the
+  // server decides only whether the still-sample techniques (Active recall,
+  // Exámenes) appear in it, via `showPreviews`.
+  describe("techniques panel", () => {
     beforeEach(() => {
       getPageForRoute.mockResolvedValue(page());
       getImportJobStatus.mockResolvedValue({ ok: true, value: null });
     });
 
-    it("renders the techniques panel when design previews are enabled", async () => {
+    type PanelProps = {
+      showPreviews: boolean;
+      notebookId: string;
+      pageId: string;
+      initialFlashcards: unknown[];
+      initialRemaining: number | null;
+    };
+
+    async function renderPanelProps() {
+      const [, panel] = await renderFragment();
+      expect((panel as ReactElement).type).toBe(TechniquesPanel);
+      return (panel as ReactElement<PanelProps>).props;
+    }
+
+    it("renders the panel with previews on, passing the page identity", async () => {
       designPreviewsEnabled.mockReturnValue(true);
 
-      const [, panel] = await renderFragment();
+      const props = await renderPanelProps();
 
-      expect(panel).toBeTruthy();
-      expect((panel as ReactElement).type).toBe(TechniquesPanel);
+      expect(props.showPreviews).toBe(true);
+      expect(props.notebookId).toBe("nb-1");
+      expect(props.pageId).toBe("page-1");
     });
 
-    it("renders no techniques panel when design previews are disabled", async () => {
+    it("still renders the panel with previews off, flagged as no previews", async () => {
       designPreviewsEnabled.mockReturnValue(false);
 
       const [section, panel] = await renderFragment();
 
-      expect(panel).toBeFalsy();
-      // The content column is unaffected: it is still the only child.
+      expect((panel as ReactElement).type).toBe(TechniquesPanel);
+      expect((panel as ReactElement<PanelProps>).props.showPreviews).toBe(
+        false,
+      );
       expect((section.props as { className: string }).className).toContain(
         "max-w-2xl",
       );
+    });
+
+    it("loads the page's cards and the remaining generations on the server", async () => {
+      const cards = [
+        { id: "c1", pageId: "page-1", front: "P", back: "R", position: 0 },
+      ];
+      listFlashcardsAction.mockResolvedValue({ ok: true, value: cards });
+      getGenerationStatusAction.mockResolvedValue({
+        ok: true,
+        value: { remainingToday: 2, resetAt: "2026-10-05T00:00:00.000Z" },
+      });
+
+      const props = await renderPanelProps();
+
+      expect(listFlashcardsAction).toHaveBeenCalledWith({ pageId: "page-1" });
+      expect(props.initialFlashcards).toEqual(cards);
+      expect(props.initialRemaining).toBe(2);
+    });
+
+    it("degrades to no cards and an unknown counter when the actions fail", async () => {
+      listFlashcardsAction.mockResolvedValue({
+        ok: false,
+        error: { code: "FLASHCARDS_UNEXPECTED", message: "x" },
+      });
+      getGenerationStatusAction.mockRejectedValue(new Error("boom"));
+
+      const props = await renderPanelProps();
+
+      expect(props.initialFlashcards).toEqual([]);
+      expect(props.initialRemaining).toBeNull();
     });
 
     it("starts the panel collapsed when the visitor's cookie says so", async () => {
