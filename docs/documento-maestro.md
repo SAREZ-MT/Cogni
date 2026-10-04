@@ -614,7 +614,7 @@ Hecho cuando: un PDF de 30 páginas con capa de texto termina como página edita
 
 ### Fase 3 — Capa de IA
 
-> **Implementada en la rama `feat/ai-pr6-ui-docs` (2026-10-04), construida con ODD.** Decisiones en `docs/adr/0004-capa-de-ia-con-proveedores-gratuitos.md`.
+> **Implementada el 2026-10-04 en seis PR apiladas (#63–#66 y las dos siguientes), construida con ODD.** Decisiones en `docs/adr/0004-capa-de-ia-con-proveedores-gratuitos.md`.
 
 Entregables: `ProviderRegistry`, rotación por cuota con Upstash, circuit breaker, rate limiting por usuario, prompts versionados, `AiGeneration`, primer caso de uso real: `generate_flashcards` desde una página (sin sesiones de repaso todavía; solo generación y listado).
 Hecho cuando: con la cuota de un proveedor agotada artificialmente, la generación sigue funcionando con el siguiente y el registro lo evidencia.
