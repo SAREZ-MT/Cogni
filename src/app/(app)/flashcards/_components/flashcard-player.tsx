@@ -2,7 +2,7 @@
 
 import { CheckCircle2, ChevronLeft, Eye, X } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { BackLink } from "@/shared/ui/back-link";
 import { Button } from "@/shared/ui/button";
 import { EmptyState } from "@/shared/ui/empty-state";
@@ -43,6 +43,10 @@ export interface FlashcardPlayerProps {
   // of restarting it (graded cards are no longer due).
   onExit?: () => void;
 }
+
+// Shown when onRate rejects instead of resolving an outcome (network drop,
+// server action crash): the card stays so the student can retry or finish.
+const RATE_FAILURE = "No pudimos guardar tu respuesta. Intenta de nuevo.";
 
 const RATINGS: { tone: RatingTone; label: string; hint: string }[] = [
   { tone: "again", label: "Otra vez", hint: "< 1 min" },
@@ -106,6 +110,9 @@ export function FlashcardPlayer({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [masteryLevel, setMasteryLevel] = useState<string | null>(null);
+  // Synchronous re-entry guard: `saving` is render-time state, so two clicks
+  // before React re-renders would both pass it and grade the card twice.
+  const rating = useRef(false);
 
   const total = cards.length;
   const reviewed = tally.again + tally.hard + tally.good + tally.easy;
@@ -135,12 +142,23 @@ export function FlashcardPlayer({
   }
 
   async function rate(tone: RatingTone) {
-    if (!card || saving) return;
+    if (!card || rating.current) return;
+    // Advance from the card that was graded, never from whatever index is
+    // current when the outcome lands.
+    const gradedIndex = index;
     if (onRate) {
+      rating.current = true;
       setSaving(true);
       setError(null);
-      const outcome = await onRate(card, tone);
-      setSaving(false);
+      let outcome: RateOutcome;
+      try {
+        outcome = await onRate(card, tone);
+      } catch {
+        outcome = { ok: false, message: RATE_FAILURE };
+      } finally {
+        rating.current = false;
+        setSaving(false);
+      }
       if (!outcome.ok) {
         setError(outcome.message);
         return;
@@ -148,11 +166,11 @@ export function FlashcardPlayer({
       if (outcome.masteryLevel) setMasteryLevel(outcome.masteryLevel);
     }
     setTally((prev) => ({ ...prev, [tone]: prev[tone] + 1 }));
-    if (index + 1 >= total) {
+    if (gradedIndex + 1 >= total) {
       finish();
       return;
     }
-    setIndex((prev) => prev + 1);
+    setIndex(gradedIndex + 1);
     setFlipped(false);
   }
 

@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -188,6 +188,67 @@ describe("DeckReview", () => {
 
     expect(await screen.findByText("Tarjeta 2 de 2")).toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("keeps the card usable when grading rejects", async () => {
+    actions.startFlashcardSessionAction.mockResolvedValue({
+      ok: true,
+      value: { sessionId: SESSION, cards: [card(1), card(2)] },
+    });
+    actions.gradeFlashcardAction.mockRejectedValue(new Error("network"));
+    const user = setup();
+    await start(user);
+
+    await user.click(await screen.findByTestId("flip-card"));
+    await user.click(screen.getByTestId("rate-good"));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "No pudimos guardar tu respuesta. Intenta de nuevo.",
+    );
+    expect(screen.getByText("Tarjeta 1 de 2")).toBeInTheDocument();
+    expect(screen.getByTestId("rate-good")).toBeEnabled();
+    expect(screen.getByRole("button", { name: /Terminar/ })).toBeEnabled();
+  });
+
+  it("grades once and skips no card on a double click", async () => {
+    actions.startFlashcardSessionAction.mockResolvedValue({
+      ok: true,
+      value: { sessionId: SESSION, cards: [card(1), card(2), card(3)] },
+    });
+    actions.gradeFlashcardAction
+      .mockResolvedValueOnce({
+        ok: true,
+        value: { reviewedCount: 1, againCount: 0, masteryLevel: "Aprendiendo" },
+      })
+      .mockResolvedValue({
+        ok: false,
+        error: { code: "STUDY_ENGINE_ITEM_NOT_DUE", message: "x" },
+      });
+    const user = setup();
+    await start(user);
+    await user.click(await screen.findByTestId("flip-card"));
+
+    const good = screen.getByTestId("rate-good");
+    await act(async () => {
+      good.click();
+      good.click();
+    });
+
+    expect(await screen.findByText("Tarjeta 2 de 3")).toBeInTheDocument();
+    expect(actions.gradeFlashcardAction).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("Pregunta 2")).toBeInTheDocument();
+  });
+
+  it("reports a start that rejects", async () => {
+    actions.startFlashcardSessionAction.mockRejectedValue(new Error("network"));
+    const user = setup();
+
+    await start(user);
+
+    expect(
+      await screen.findByText("No pudimos iniciar el repaso"),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Repasar/ })).toBeEnabled();
   });
 
   it("keeps the card and explains when a grade cannot be saved", async () => {

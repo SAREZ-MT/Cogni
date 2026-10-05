@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { SampleCard } from "../_data/sample";
@@ -268,6 +268,48 @@ describe("FlashcardPlayer", () => {
       expect(screen.getByText("Tarjeta 1 de 2")).toBeInTheDocument();
       expect(screen.getByTestId("rate-good")).toBeEnabled();
       expect(tally()).toEqual(["0", "0", "0", "0"]);
+    });
+
+    it("recovers when onRate rejects: alert, same card, controls usable", async () => {
+      const onRate = vi.fn(async (): Promise<RateOutcome> => {
+        throw new Error("network down");
+      });
+      const { user } = graded(onRate);
+
+      await user.click(screen.getByTestId("flip-card"));
+      await user.click(screen.getByTestId("rate-good"));
+
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        "No pudimos guardar tu respuesta. Intenta de nuevo.",
+      );
+      expect(screen.getByText("Tarjeta 1 de 2")).toBeInTheDocument();
+      expect(screen.getByTestId("rate-good")).toBeEnabled();
+      expect(screen.getByRole("button", { name: /Terminar/ })).toBeEnabled();
+      expect(tally()).toEqual(["0", "0", "0", "0"]);
+    });
+
+    it("sends one grade per card even when clicked twice before re-render", async () => {
+      let resolve: (outcome: RateOutcome) => void = () => {};
+      const onRate = vi.fn(
+        () =>
+          new Promise<RateOutcome>((done) => {
+            resolve = done;
+          }),
+      );
+      const { user } = graded(onRate);
+      await user.click(screen.getByTestId("flip-card"));
+
+      const good = screen.getByTestId("rate-good");
+      act(() => {
+        good.click();
+        good.click();
+      });
+      expect(onRate).toHaveBeenCalledTimes(1);
+
+      await act(async () => resolve({ ok: true }));
+
+      expect(await screen.findByText("Tarjeta 2 de 2")).toBeInTheDocument();
+      expect(tally()).toEqual(["0", "0", "1", "0"]);
     });
 
     it("finishes once after the last card and summarizes with the page's mastery level", async () => {

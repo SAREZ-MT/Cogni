@@ -22,7 +22,9 @@ import {
 } from "./flashcard-player";
 
 const NOTHING_DUE = "STUDY_ENGINE_NOTHING_DUE";
-// The card was graded already (a double submit): nothing to redo.
+// The card was graded already: the player sends one grade per card, so
+// this only answers a retry whose first attempt reached the server but lost
+// its response. The card is graded, so moving on is correct.
 const ALREADY_GRADED = "STUDY_ENGINE_ITEM_NOT_DUE";
 const GRADE_FAILURE = "No pudimos guardar tu respuesta. Intenta de nuevo.";
 
@@ -85,7 +87,13 @@ export function DeckReview({
   function startReview() {
     setNotice(null);
     startTransition(async () => {
-      const result = await startFlashcardSessionAction({ pageId });
+      let result: Awaited<ReturnType<typeof startFlashcardSessionAction>>;
+      try {
+        result = await startFlashcardSessionAction({ pageId });
+      } catch {
+        setNotice("start-failed");
+        return;
+      }
       if (!result.ok) {
         setNotice(
           result.error.code === NOTHING_DUE ? "nothing-due" : "start-failed",
