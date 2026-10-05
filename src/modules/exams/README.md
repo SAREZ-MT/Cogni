@@ -12,7 +12,30 @@ feature document is `odd/tasks/phase-5-exams.md`.
 - Persistence — done (T2): migration `drizzle/0010_exams.sql` (+ `.down.sql`),
   ports in `domain/`, Drizzle adapters in `infrastructure/`, in-memory fakes
   in `application/testing/`.
-- The study-engine hook, use cases, actions and UI — pending (T3–T9).
+- The study-engine hook — done (T3, in study-engine: `recordExamReviews`).
+- Manual questions — done (T4): use cases in `application/`, Server Actions
+  in `actions.ts`, the `/exams/[notebookId]/[pageId]/preguntas` screen.
+- AI generation, sessions, retakes, feedback and the hub — pending (T5–T9).
+
+## Manual questions (T4)
+
+- `createExamQuestion` checks the page is the owner's (`PAGE_NOT_FOUND`),
+  validates with `newExamQuestion` and saves the root together with its
+  `StudyItem(kind = "exam_question", sourceId = rootId)` in one
+  `ExamUnitOfWork` run, so `recordExamReviews` always finds the item.
+- `editExamQuestion` edits in place (same id, root, origin); a retired
+  question answers `EXAMS_QUESTION_RETIRED`, another owner's
+  `EXAMS_QUESTION_NOT_FOUND`.
+- `retireExamQuestion` retires (never deletes) and, when the root's lineage
+  has no active question left, suspends the root's item in the same run.
+  Idempotent: a second call keeps the first `retiredAt`.
+- `listPageExamQuestions` lists the page's active questions, oldest first.
+- `runExamWork` turns an err Result into a rollback (a unit of work only
+  rolls back on a throw). `DrizzleExamUnitOfWork` runs one transaction with
+  the question repository and study-engine's `createStudyItemRepository`.
+- `action-support.ts` duplicates the small flashcards boundary helpers
+  (session, Zod parse, never-throw) with `EXAMS_*` codes: `src/shared`
+  cannot depend on `identity`, and modules only meet through their index.
 
 ## Domain
 

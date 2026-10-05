@@ -76,6 +76,17 @@ export class InMemoryExamQuestionRepository implements ExamQuestionRepository {
     return retired;
   }
 
+  // Test helpers for a transactional fake unit of work: copy the stored
+  // rows before a run and put them back when it throws.
+  snapshot(): ExamQuestion[] {
+    return [...this.rows.values()];
+  }
+
+  restore(rows: readonly ExamQuestion[]): void {
+    this.rows.clear();
+    for (const row of rows) this.rows.set(row.id, row);
+  }
+
   private list(keep: (question: ExamQuestion) => boolean): ExamQuestion[] {
     return [...this.rows.values()].filter(keep).sort(
       byTimeThenKey(
