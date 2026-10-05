@@ -47,3 +47,41 @@ export function question(
   if (!created.ok) throw created.error;
   return { ...created.value, ...overrides };
 }
+
+// Saves `count` manual questions on PAGE for OWNER, ids q-01, q-02…, each
+// with its root's study item due at `dueAt` (NOW by default) in the
+// session unit of work's fakes.
+export async function seedSessionQuestions(
+  uow: {
+    repos: { questions: { save(q: ExamQuestion): Promise<void> } };
+    studyItems: {
+      addItem(input: {
+        ownerId: string;
+        pageId: string;
+        rootId: string;
+        dueAt: Date;
+      }): void;
+    };
+  },
+  count: number,
+  options: { createdAt?: Date; dueAt?: Date; prefix?: string } = {},
+): Promise<ExamQuestion[]> {
+  const created: ExamQuestion[] = [];
+  for (let n = 1; n <= count; n += 1) {
+    const id = `${options.prefix ?? "q"}-${String(n).padStart(2, "0")}`;
+    const q = question(id, {
+      stem: `¿Pregunta ${id}?`,
+      concept: `Concepto ${id}`,
+      createdAt: options.createdAt ?? NOW,
+    });
+    await uow.repos.questions.save(q);
+    uow.studyItems.addItem({
+      ownerId: OWNER,
+      pageId: PAGE,
+      rootId: q.rootId,
+      dueAt: options.dueAt ?? NOW,
+    });
+    created.push(q);
+  }
+  return created;
+}

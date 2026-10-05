@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, gt, isNull, lte, or } from "drizzle-orm";
 import type { DbExecutor } from "@/shared/db/client";
 import { type ExamQuestionRow, examQuestions } from "@/shared/db/schema";
 import type { ExamQuestion } from "../domain/exam-question";
@@ -86,6 +86,26 @@ export class DrizzleExamQuestionRepository implements ExamQuestionRepository {
           eq(examQuestions.pageId, pageId),
           eq(examQuestions.ownerId, ownerId),
           isNull(examQuestions.retiredAt),
+        ),
+      )
+      .orderBy(asc(examQuestions.createdAt), asc(examQuestions.id));
+    return rows.map(toQuestion);
+  }
+
+  async listShownAt(
+    pageId: string,
+    ownerId: string,
+    at: Date,
+  ): Promise<ExamQuestion[]> {
+    const rows = await this.db
+      .select()
+      .from(examQuestions)
+      .where(
+        and(
+          eq(examQuestions.pageId, pageId),
+          eq(examQuestions.ownerId, ownerId),
+          lte(examQuestions.createdAt, at),
+          or(isNull(examQuestions.retiredAt), gt(examQuestions.retiredAt, at)),
         ),
       )
       .orderBy(asc(examQuestions.createdAt), asc(examQuestions.id));

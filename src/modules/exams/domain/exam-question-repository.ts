@@ -14,6 +14,16 @@ export interface ExamQuestionRepository {
   // The page's questions that can still be shown (not retired), oldest
   // first (createdAt, then id).
   listActiveByPage(pageId: string, ownerId: string): Promise<ExamQuestion[]>;
+  // The page's questions that could be shown at instant `at`: created at
+  // or before it and not retired by then (retiredAt null or after `at`),
+  // oldest first. An exam session's questions are composed from this
+  // snapshot at its start, so later edits of the page's question set never
+  // change an open session's questions.
+  listShownAt(
+    pageId: string,
+    ownerId: string,
+    at: Date,
+  ): Promise<ExamQuestion[]>;
   // Every question of a root's lineage, retired ones included, oldest
   // first: what newVariant compares a new wording against (§7.5.1).
   listLineage(rootId: string, ownerId: string): Promise<ExamQuestion[]>;

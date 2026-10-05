@@ -12,3 +12,19 @@ export {
   retireExamQuestionAction,
 } from "./actions";
 export * from "./domain";
+export {
+  answerExamQuestionAction,
+  type ExamAnswerView,
+  type ExamPlayerQuestionView,
+  type ExamResultQuestionView,
+  type ExamResultsView,
+  type ExamSessionView,
+  type ExamStartView,
+  type FinishedExamSessionView,
+  finishExamSessionAction,
+  getExamResultsAction,
+  getExamSessionAction,
+  getExamStartAction,
+  type StartedExamSessionView,
+  startExamSessionAction,
+} from "./session-actions";

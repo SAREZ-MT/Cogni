@@ -568,4 +568,124 @@ export function runExamRepositoriesContract(
       expect(await pageStates.get(pageId, ctx.ownerId)).toEqual(state);
     });
   });
+
+  describe("Exam session reads (T6)", () => {
+    it("listShownAt keeps the questions shown at an instant, retired later included", async () => {
+      const ctx = options.context();
+      const { questions } = options.createRepositories();
+      const pageId = await ctx.newPageId();
+      const early = question(ctx, pageId, { now: T0 });
+      const retiredLater = question(ctx, pageId, { now: T0 });
+      const retiredBefore = question(ctx, pageId, { now: T0 });
+      const createdLater = question(ctx, pageId, { now: T2 });
+      const otherPage = question(ctx, await ctx.newPageId(), { now: T0 });
+      for (const q of [
+        early,
+        retiredLater,
+        retiredBefore,
+        createdLater,
+        otherPage,
+      ]) {
+        await questions.save(q);
+      }
+      await questions.retire(retiredLater.id, ctx.ownerId, T2);
+      await questions.retire(retiredBefore.id, ctx.ownerId, T0);
+
+      const shown = await questions.listShownAt(pageId, ctx.ownerId, T1);
+      expect(shown.map((q) => q.id).sort()).toEqual(
+        [early.id, retiredLater.id].sort(),
+      );
+      expect(await questions.listShownAt(pageId, ctx.otherOwnerId, T1)).toEqual(
+        [],
+      );
+    });
+
+    it("lockById reads the owner's session and nothing else", async () => {
+      const ctx = options.context();
+      const { sessions } = options.createRepositories();
+      const s = session(ctx, await ctx.newPageId());
+      await sessions.create(s);
+      expect(await sessions.lockById(s.id, ctx.ownerId)).toEqual(s);
+      expect(await sessions.lockById(s.id, ctx.otherOwnerId)).toBeNull();
+      expect(await sessions.lockById(ctx.newId(), ctx.ownerId)).toBeNull();
+    });
+
+    it("findOpenByPage returns the latest open normal session only", async () => {
+      const ctx = options.context();
+      const repos = options.createRepositories();
+      const pageId = await ctx.newPageId();
+      expect(
+        await repos.sessions.findOpenByPage(pageId, ctx.ownerId),
+      ).toBeNull();
+      const q = question(ctx, pageId);
+      await repos.questions.save(q);
+      const done = session(ctx, pageId);
+      await repos.sessions.create(done);
+      await repos.sessions.finish(
+        unwrap(finishExamSession(done, [answer(done.id, q, true)], T1)),
+      );
+      expect(
+        await repos.sessions.findOpenByPage(pageId, ctx.ownerId),
+      ).toBeNull();
+      const retake = session(ctx, pageId, done.id);
+      await repos.sessions.create(retake);
+      expect(
+        await repos.sessions.findOpenByPage(pageId, ctx.ownerId),
+      ).toBeNull();
+      const older = session(ctx, pageId);
+      const newer = { ...session(ctx, pageId), startedAt: T1 };
+      await repos.sessions.create(older);
+      await repos.sessions.create(newer);
+      expect(await repos.sessions.findOpenByPage(pageId, ctx.ownerId)).toEqual(
+        newer,
+      );
+      expect(
+        await repos.sessions.findOpenByPage(pageId, ctx.otherOwnerId),
+      ).toBeNull();
+    });
+
+    it("lockPageForStart resolves", async () => {
+      const ctx = options.context();
+      const { sessions } = options.createRepositories();
+      await expect(
+        sessions.lockPageForStart(await ctx.newPageId(), ctx.ownerId),
+      ).resolves.toBeUndefined();
+    });
+
+    it("lastAnsweredAtByRoot keeps each root's latest answer before an instant", async () => {
+      const ctx = options.context();
+      const repos = options.createRepositories();
+      const pageId = await ctx.newPageId();
+      const a = question(ctx, pageId);
+      const b = question(ctx, pageId);
+      const c = question(ctx, pageId);
+      for (const q of [a, b, c]) await repos.questions.save(q);
+      const first = session(ctx, pageId);
+      const second = session(ctx, pageId);
+      await repos.sessions.create(first);
+      await repos.sessions.create(second);
+      await repos.answers.saveMany(
+        [answer(first.id, a, true, T0), answer(first.id, b, false, T0)],
+        ctx.ownerId,
+      );
+      await repos.answers.saveMany(
+        [answer(second.id, a, false, T1), answer(second.id, c, true, T2)],
+        ctx.ownerId,
+      );
+      const seen = await repos.answers.lastAnsweredAtByRoot(
+        pageId,
+        ctx.ownerId,
+        T2,
+      );
+      expect(seen).toEqual(
+        new Map([
+          [a.rootId, T1],
+          [b.rootId, T0],
+        ]),
+      );
+      expect(
+        await repos.answers.lastAnsweredAtByRoot(pageId, ctx.otherOwnerId, T2),
+      ).toEqual(new Map());
+    });
+  });
 }

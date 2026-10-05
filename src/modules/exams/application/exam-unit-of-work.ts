@@ -20,10 +20,12 @@ export interface ExamQuestionRepositories {
 // `work` writes through the given repositories commits together or not at
 // all (a thrown error rolls it back). Questions and study items live in
 // two modules, so the transaction boundary is this port.
-export interface ExamUnitOfWork {
-  run<T>(
-    work: (repositories: ExamQuestionRepositories) => Promise<T>,
-  ): Promise<T>;
+export type ExamUnitOfWork = UnitOfWorkOf<ExamQuestionRepositories>;
+
+// A unit of work over some repositories R: everything `work` writes
+// through them commits together, and a thrown error rolls it back.
+export interface UnitOfWorkOf<R> {
+  run<T>(work: (repositories: R) => Promise<T>): Promise<T>;
 }
 
 // Carries an err Result out of ExamUnitOfWork.run as a throw, so the unit
@@ -38,9 +40,9 @@ class RollbackSignal<E> extends Error {
 // Runs a Result-returning work in one unit of work. Returning err from
 // inside `run` would commit whatever was written before the refusal, so an
 // err rolls everything back and is returned as is. Thrown errors propagate.
-export async function runExamWork<T, E>(
-  uow: ExamUnitOfWork,
-  work: (repositories: ExamQuestionRepositories) => Promise<Result<T, E>>,
+export async function runExamWork<R, T, E>(
+  uow: UnitOfWorkOf<R>,
+  work: (repositories: R) => Promise<Result<T, E>>,
 ): Promise<Result<T, E>> {
   try {
     return await uow.run(async (repositories) => {
