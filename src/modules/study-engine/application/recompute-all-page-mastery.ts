@@ -10,6 +10,14 @@ import type { StudyRepositories, StudyUnitOfWork } from "./study-unit-of-work";
 // by the job bounded however many pages exist.
 export const MASTERY_RECOMPUTE_BATCH_SIZE = 200;
 
+// Longest wait for one page's item locks. A grade holds an item lock for
+// the few milliseconds of its own transaction, so a wait this long means a
+// stuck or very slow writer: the page is counted as failed and retried
+// first on the next run (it stays stale). Kept far below the route's
+// margin (maxDuration 300 s minus the 240 s job budget) so a run that
+// starts its last page just before the budget still ends in time.
+export const MASTERY_PAGE_LOCK_TIMEOUT_MS = 5_000;
+
 export interface RecomputeAllPageMasteryDeps {
   pages: StudiedPageReader;
   // One unit of work (transaction) per page.
@@ -21,6 +29,8 @@ export interface RecomputeAllPageMasteryDeps {
   // picks up the pages left behind (they are then the stalest).
   timeBudgetMs: number;
   batchSize?: number;
+  // Overrides MASTERY_PAGE_LOCK_TIMEOUT_MS (tests).
+  pageLockTimeoutMs?: number;
   // Called once per page whose recompute threw; the job goes on.
   onPageError?: (page: StudiedPage, error: unknown) => void;
 }
@@ -45,7 +55,8 @@ export interface MasteryRecomputeSummary {
 // old key, the cursor moves past it, so it is tried once per run.
 //
 // A failing page is counted and reported, never fatal to the others; a
-// failing listing query aborts the run (nothing more can be read).
+// failing listing query aborts the run (nothing more can be read). A page
+// whose lock wait exceeds the lock timeout fails like any other page.
 export async function recomputeAllPageMastery(
   deps: RecomputeAllPageMasteryDeps,
 ): Promise<MasteryRecomputeSummary> {
@@ -88,13 +99,19 @@ export async function recomputeAllPageMastery(
 // page's items holds that item's row lock until it commits (its own item,
 // review log and mastery), so the job waits and then computes from the
 // graded state. `now` is read after the lock, so the row the job writes is
-// never older than a grade that committed before it.
+// never older than a grade that committed before it. The lock wait is
+// bounded (MASTERY_PAGE_LOCK_TIMEOUT_MS), so one held lock cannot stall
+// the run past the platform limit.
 async function recomputePage(
   page: StudiedPage,
   repos: StudyRepositories,
   deps: RecomputeAllPageMasteryDeps,
 ): Promise<void> {
-  await repos.studyItems.lockPage(page.pageId, page.ownerId);
+  await repos.studyItems.lockPage(
+    page.pageId,
+    page.ownerId,
+    deps.pageLockTimeoutMs ?? MASTERY_PAGE_LOCK_TIMEOUT_MS,
+  );
   const now = deps.clock.now();
   const items = await repos.studyItems.listByPage(page.pageId, page.ownerId);
   await repos.pageMastery.upsert({

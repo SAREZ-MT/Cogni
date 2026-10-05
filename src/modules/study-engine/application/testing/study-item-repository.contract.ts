@@ -277,9 +277,9 @@ export function runStudyItemRepositoryContract(
       const pageId = await ctx.newPageId();
       const item = makeItem(ctx, pageId);
       await repo.save(item);
-      await repo.lockPage(pageId, ctx.ownerId);
-      await repo.lockPage(ctx.newId(), ctx.ownerId);
-      await repo.lockPage(pageId, ctx.otherOwnerId);
+      await repo.lockPage(pageId, ctx.ownerId, 1_000);
+      await repo.lockPage(ctx.newId(), ctx.ownerId, 1_000);
+      await repo.lockPage(pageId, ctx.otherOwnerId, 1_000);
       expect(await repo.listByPage(pageId, ctx.ownerId)).toEqual([item]);
     });
   });

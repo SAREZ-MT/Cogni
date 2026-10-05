@@ -31,7 +31,9 @@ export interface StudyItemRepository {
   lock(id: string, ownerId: string): Promise<void>;
   // Row-locks every item of the page (in id order) until the surrounding
   // unit of work ends, so the daily mastery job waits for an in-flight
-  // grade of any of them and then reads the graded state. A no-op outside
-  // a transaction and in memory.
-  lockPage(pageId: string, ownerId: string): Promise<void>;
+  // grade of any of them and then reads the graded state. Waits at most
+  // `timeoutMs` and then rejects (Postgres lock timeout, SQLSTATE 55P03);
+  // the bound stays in force for the rest of the unit of work. A no-op
+  // outside a transaction and in memory.
+  lockPage(pageId: string, ownerId: string, timeoutMs: number): Promise<void>;
 }

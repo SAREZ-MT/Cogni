@@ -2,7 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 import type { Clock } from "@/shared/kernel/clock";
 import { computeMastery } from "../domain/mastery";
 import { newStudyItem, type StudyItem } from "../domain/study-item";
-import { recomputeAllPageMastery } from "./recompute-all-page-mastery";
+import {
+  MASTERY_PAGE_LOCK_TIMEOUT_MS,
+  recomputeAllPageMastery,
+} from "./recompute-all-page-mastery";
 import { InMemoryStudiedPageReader } from "./testing/in-memory-studied-page-reader";
 import { InMemoryStudyUnitOfWork } from "./testing/in-memory-study-unit-of-work";
 
@@ -382,11 +385,11 @@ describe("recomputeAllPageMastery", () => {
     });
     const lockPage = uow.studyItems.lockPage.bind(uow.studyItems);
     vi.spyOn(uow.studyItems, "lockPage").mockImplementation(
-      async (pageId, ownerId) => {
+      async (pageId, ownerId, timeoutMs) => {
         steps.push(`lock ${pageId}`);
         // Time passes while the job waits for the lock.
         time.advance(MINUTE_MS);
-        return lockPage(pageId, ownerId);
+        return lockPage(pageId, ownerId, timeoutMs);
       },
     );
     const read = uow.studyItems.listByPage.bind(uow.studyItems);
@@ -437,7 +440,7 @@ describe("recomputeAllPageMastery", () => {
     });
     const lockPage = uow.studyItems.lockPage.bind(uow.studyItems);
     vi.spyOn(uow.studyItems, "lockPage").mockImplementationOnce(
-      async (pageId, ownerId) => {
+      async (pageId, ownerId, timeoutMs) => {
         time.advance(1_000);
         const graded: StudyItem = {
           ...due,
@@ -456,7 +459,7 @@ describe("recomputeAllPageMastery", () => {
           computedAt: time.clock.now(),
         });
         time.advance(1_000);
-        return lockPage(pageId, ownerId);
+        return lockPage(pageId, ownerId, timeoutMs);
       },
     );
 
@@ -465,5 +468,62 @@ describe("recomputeAllPageMastery", () => {
     const stored = await pageMastery.getByPage("p1", "owner-a");
     expect(stored?.itemsDue).toBe(0);
     expect(stored?.computedAt).toEqual(new Date(NOW.getTime() + 2_000));
+  });
+  it("bounds the wait for each page lock with the default lock timeout", async () => {
+    const { deps, uow } = await setup([
+      item("owner-a", "p1"),
+      item("owner-b", "p2"),
+    ]);
+    const lockPage = vi.spyOn(uow.studyItems, "lockPage");
+
+    await recomputeAllPageMastery(deps);
+
+    expect(MASTERY_PAGE_LOCK_TIMEOUT_MS).toBeGreaterThan(0);
+    expect(lockPage.mock.calls).toEqual([
+      ["p1", "owner-a", MASTERY_PAGE_LOCK_TIMEOUT_MS],
+      ["p2", "owner-b", MASTERY_PAGE_LOCK_TIMEOUT_MS],
+    ]);
+  });
+
+  it("passes an overridden lock timeout to every page lock", async () => {
+    const { deps, uow } = await setup([item("owner-a", "p1")]);
+    const lockPage = vi.spyOn(uow.studyItems, "lockPage");
+
+    await recomputeAllPageMastery({ ...deps, pageLockTimeoutMs: 250 });
+
+    expect(lockPage).toHaveBeenCalledWith("p1", "owner-a", 250);
+  });
+
+  it("counts a page whose lock wait times out as failed and goes on with the next", async () => {
+    const { deps, uow, pageMastery, onPageError } = await setup([
+      item("owner-a", "p1"),
+      item("owner-a", "p2"),
+    ]);
+    // What Postgres raises when lock_timeout expires (SQLSTATE 55P03).
+    const lockTimeout = Object.assign(
+      new Error("canceling statement due to lock timeout"),
+      { code: "55P03" },
+    );
+    const lockPage = uow.studyItems.lockPage.bind(uow.studyItems);
+    vi.spyOn(uow.studyItems, "lockPage").mockImplementation(
+      async (pageId, ownerId, timeoutMs) => {
+        if (pageId === "p1") throw lockTimeout;
+        return lockPage(pageId, ownerId, timeoutMs);
+      },
+    );
+
+    const summary = await recomputeAllPageMastery(deps);
+
+    expect(summary).toEqual({
+      pagesRecomputed: 1,
+      pagesFailed: 1,
+      complete: true,
+    });
+    expect(onPageError).toHaveBeenCalledWith(
+      { pageId: "p1", ownerId: "owner-a", masteryComputedAt: null },
+      lockTimeout,
+    );
+    expect(await pageMastery.getByPage("p1", "owner-a")).toBeNull();
+    expect(await pageMastery.getByPage("p2", "owner-a")).not.toBeNull();
   });
 });

@@ -101,7 +101,11 @@ export class InMemoryStudyItemRepository implements StudyItemRepository {
   // Single-threaded in memory: nothing to serialize.
   async lock(_id: string, _ownerId: string): Promise<void> {}
 
-  async lockPage(_pageId: string, _ownerId: string): Promise<void> {}
+  async lockPage(
+    _pageId: string,
+    _ownerId: string,
+    _timeoutMs: number,
+  ): Promise<void> {}
 
   private owned(ownerId: string): StudyItem[] {
     return [...this.rows.values()].filter((item) => item.ownerId === ownerId);

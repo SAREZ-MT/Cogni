@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull, lte } from "drizzle-orm";
+import { and, asc, eq, isNull, lte, sql } from "drizzle-orm";
 import type { DbExecutor } from "@/shared/db/client";
 import {
   notebooks,
@@ -157,7 +157,18 @@ export class DrizzleStudyItemRepository implements StudyItemRepository {
       .for("update");
   }
 
-  async lockPage(pageId: string, ownerId: string): Promise<void> {
+  async lockPage(
+    pageId: string,
+    ownerId: string,
+    timeoutMs: number,
+  ): Promise<void> {
+    // set_config(..., true) is SET LOCAL with a bound parameter: the bound
+    // ends with the surrounding transaction and never leaks to the pooled
+    // connection's next user.
+    const bound = `${Math.max(1, Math.trunc(timeoutMs))}ms`;
+    await this.db.execute(
+      sql`select set_config('lock_timeout', ${bound}, true)`,
+    );
     // Id order: two lockers of overlapping rows queue instead of deadlocking.
     await this.db
       .select({ id: studyItems.id })
