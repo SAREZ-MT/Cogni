@@ -15,7 +15,10 @@ feature document is `odd/tasks/phase-5-exams.md`.
 - The study-engine hook — done (T3, in study-engine: `recordExamReviews`).
 - Manual questions — done (T4): use cases in `application/`, Server Actions
   in `actions.ts`, the `/exams/[notebookId]/[pageId]/preguntas` screen.
-- AI generation, sessions, retakes, feedback and the hub — pending (T5–T9).
+- AI generation — done (T5): `requestExamGeneration` +
+  `generateExamQuestionsAction`, "Examen → Generar" in the page's
+  techniques panel.
+- Sessions, retakes, feedback and the hub — pending (T6–T9).
 
 ## Manual questions (T4)
 
@@ -36,6 +39,31 @@ feature document is `odd/tasks/phase-5-exams.md`.
 - `action-support.ts` duplicates the small flashcards boundary helpers
   (session, Zod parse, never-throw) with `EXAMS_*` codes: `src/shared`
   cannot depend on `identity`, and modules only meet through their index.
+
+## AI generation (T5)
+
+- `requestExamGeneration({ pageId, count })` mirrors flashcards'
+  `requestGeneration`: count in [10, 30] (default 10,
+  `EXAMS_INVALID_QUESTION_COUNT`), page owned (`PAGE_NOT_FOUND`) and not
+  blank (`AI_PAGE_EMPTY`) are checked BEFORE `limiter.check`, which
+  consumes ONE unit per request; a provider failure after the check keeps
+  the unit consumed, as in flashcards.
+- Prompt `generate_exam_questions/v1` (ai module) receives the truncated
+  page text, the count and the page's active questions (`[concept] stem`,
+  last 60) so the model avoids duplicates.
+- Batching: at most `EXAM_GENERATION_BATCH_SIZE` (15) questions per model
+  call, split evenly (25 → 13 + 12); later calls also list the stems
+  accepted from earlier ones. All calls finish before anything is written.
+- Each question goes through `newExamQuestion(origin "ai", generationId of
+  its call)`; invalid ones, stems equal (`normalizeWording`) to an active or
+  already accepted stem, and extras beyond a call's count are skipped and
+  counted. The valid roots and their study items are written in ONE
+  `runExamWork`, which re-reads the active stems first (a manual question
+  may land during the calls). Nothing usable → `AI_GENERATION_FAILED`,
+  nothing stored.
+- The fake provider (`AI_PROVIDER_MODE=fake`) reads the prompt and returns
+  exactly `count` distinct questions whose numbered stems skip the listed
+  existing ones.
 
 ## Domain
 

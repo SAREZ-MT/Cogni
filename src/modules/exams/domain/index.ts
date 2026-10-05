@@ -29,6 +29,7 @@ export {
   type NewVariantInput,
   newExamQuestion,
   newVariant,
+  normalizeWording,
   retireExamQuestion,
 } from "./exam-question";
 export type { ExamQuestionRepository } from "./exam-question-repository";

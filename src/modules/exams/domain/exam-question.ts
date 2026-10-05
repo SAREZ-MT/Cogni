@@ -225,7 +225,7 @@ function validateContent(
 // Wording comparison ignores case, runs of whitespace, opening Spanish
 // marks (¿ ¡) and trailing punctuation, so "¿Qué es X?" and "que es x."
 // count as the same wording. Used for stems and options alike.
-function normalizeWording(text: string): string {
+export function normalizeWording(text: string): string {
   return text
     .replace(/\s+/g, " ")
     .replace(/^[\s¿¡]+/, "")

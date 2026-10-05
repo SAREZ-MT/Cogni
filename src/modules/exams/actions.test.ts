@@ -9,6 +9,9 @@ import { InMemoryExamUnitOfWork } from "./application/testing/in-memory-exam-uni
 const { getCurrentUser } = vi.hoisted(() => ({ getCurrentUser: vi.fn() }));
 vi.mock("@/modules/identity", () => ({ getCurrentUser }));
 vi.mock("@/shared/db/client", () => ({ getDb: () => ({}) }));
+// actions.ts also hosts the generation action, which reads the server env
+// (server-only); the question actions never call it.
+vi.mock("@/shared/config/env.server", () => ({ serverEnv: () => ({}) }));
 const { captureException } = vi.hoisted(() => ({ captureException: vi.fn() }));
 vi.mock("@sentry/nextjs", () => ({ captureException }));
 const { revalidatePath } = vi.hoisted(() => ({ revalidatePath: vi.fn() }));
