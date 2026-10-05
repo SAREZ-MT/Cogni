@@ -162,7 +162,8 @@ function isReclaimable(feedback: SessionFeedback, now: Date): boolean {
 // failure (limit, provider, invalid answer, timeout, storage error) is
 // stored as "failed" when possible and returned as ok: it never blocks
 // closing the session. A pending row whose request died is reclaimed once
-// stale (STALE_PENDING_MS); done and failed rows are final.
+// stale (STALE_PENDING_MS); done and failed rows are final, even for a
+// slow request that lost its row: it returns the stored outcome instead.
 export async function requestSessionFeedback(
   input: { sessionId: string },
   deps: RequestSessionFeedbackDeps,
@@ -219,16 +220,36 @@ export async function requestSessionFeedback(
   }
   const pending = claimed.claimed;
 
+  // Writes `next` only while the row is still pending. When the write did
+  // not apply (another request settled the row meanwhile) or its outcome is
+  // unknown (it threw, maybe after committing), the stored row is the
+  // truth: a settled row wins, a still-pending one gives null.
+  const settle = async (
+    next: SessionFeedback,
+  ): Promise<SessionFeedback | null> => {
+    try {
+      if (await deps.feedback.settlePending(next)) return next;
+    } catch {
+      // Unknown outcome: read the row back below.
+    }
+    try {
+      const current = await deps.feedback.findBySession(
+        "flashcards",
+        session.id,
+        ownerId,
+      );
+      return current && current.status !== "pending" ? current : null;
+    } catch {
+      return null;
+    }
+  };
+
   // Best effort: when even this write fails the row stays pending and a
-  // later request reclaims it once stale.
+  // later request reclaims it once stale; the student still gets the calm
+  // failed note.
   const fail = async (generationId: string | null) => {
     const failed = failSessionFeedback(pending, generationId, deps.clock.now());
-    try {
-      await deps.feedback.update(failed);
-    } catch {
-      // Swallowed on purpose: the student still gets the calm failed note.
-    }
-    return ok(failed);
+    return ok((await settle(failed)) ?? failed);
   };
 
   // Every error after the claim ends in "failed", never in a stuck row.
@@ -277,12 +298,9 @@ export async function requestSessionFeedback(
       generation.id,
       deps.clock.now(),
     );
-    try {
-      await deps.feedback.update(done);
-    } catch {
-      return fail(generation.id);
-    }
-    return ok(done);
+    const settled = await settle(done);
+    // Still pending: the done write did not commit, so fail the row.
+    return settled ? ok(settled) : fail(generation.id);
   } catch {
     return fail(null);
   }

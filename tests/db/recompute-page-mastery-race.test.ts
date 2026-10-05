@@ -20,6 +20,8 @@ import { createTestOwner, deleteTestOwner } from "./helpers/test-owner";
 // while a grade holds its item's row lock, the job's per-page unit of work
 // waits on the page lock, then reads the graded item, so it can never write
 // a mastery computed from the pre-grade state over the grade's fresher row.
+// The wait is bounded (R3-unbounded-page-lock-wait): a lock held past the
+// job's lock timeout fails that page instead of stalling the run.
 if (process.env.DATABASE_URL) {
   const db = createTestDb();
   // A second connection, so the grade and the job really overlap.
@@ -148,6 +150,90 @@ if (process.env.DATABASE_URL) {
         itemsDue: 0,
         computedAt: JOB_NOW,
       });
+    });
+
+    it("gives up on a page whose items stay locked past the lock timeout and finishes the run", async () => {
+      const pageId = randomUUID();
+      await db.insert(pages).values({
+        id: pageId,
+        ownerId: owner.id,
+        notebookId,
+        title: `Página ${pageId}`,
+        content: { type: "doc", content: [] },
+        position: 1,
+      });
+      const held = newStudyItem({
+        id: randomUUID(),
+        ownerId: owner.id,
+        pageId,
+        kind: "flashcard",
+        sourceId: randomUUID(),
+        now: CREATED,
+      });
+      await new DrizzleStudyItemRepository(db).save(held);
+      const reader: StudiedPageReader = {
+        listStalePages: async ({ after }) =>
+          after === null
+            ? [{ pageId, ownerId: owner.id, masteryComputedAt: null }]
+            : [],
+      };
+
+      let releaseLock = () => {};
+      const lockMayEnd = new Promise<void>((resolve) => {
+        releaseLock = resolve;
+      });
+      let lockHeld = () => {};
+      const holderHoldsLock = new Promise<void>((resolve) => {
+        lockHeld = resolve;
+      });
+      // A writer that keeps the item locked far longer than the job waits.
+      const holder = db.transaction(async (tx) => {
+        await new DrizzleStudyItemRepository(tx).lock(held.id, owner.id);
+        lockHeld();
+        await lockMayEnd;
+      });
+
+      // `db` has a single connection and the holder's transaction owns it
+      // until released: every read on `db` waits until after `finally`.
+      const errors: unknown[] = [];
+      let summary: Awaited<ReturnType<typeof recomputeAllPageMastery>>;
+      try {
+        await holderHoldsLock;
+        summary = await recomputeAllPageMastery({
+          pages: reader,
+          uow: new DrizzleStudyUnitOfWork(jobConnection),
+          clock: createFixedClock(JOB_NOW),
+          ids: { next: randomUUID },
+          timeBudgetMs: 60_000,
+          pageLockTimeoutMs: 300,
+          onPageError: (_page, error) => errors.push(error),
+        });
+      } finally {
+        releaseLock();
+        await holder;
+      }
+
+      expect(summary).toEqual({
+        pagesRecomputed: 0,
+        pagesFailed: 1,
+        complete: true,
+      });
+      expect(errors).toHaveLength(1);
+      // Drizzle wraps the driver error; its cause is Postgres's
+      // lock_not_available (SQLSTATE 55P03).
+      expect((errors[0] as { cause?: { code?: string } }).cause?.code).toBe(
+        "55P03",
+      );
+      expect(
+        await new DrizzlePageMasteryRepository(db).getByPage(pageId, owner.id),
+      ).toBeNull();
+
+      // The bound is transaction-local: the job's connection waits normally
+      // again afterwards (no lock_timeout left on the session).
+      const [setting] = await jobConnection.execute<{ lock_timeout: string }>(
+        sql`show lock_timeout`,
+      );
+      expect(setting?.lock_timeout).toBe("0");
     });
   });
 }
