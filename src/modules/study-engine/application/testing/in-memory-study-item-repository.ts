@@ -1,3 +1,7 @@
+import type {
+  StudiedPage,
+  StudiedPageReader,
+} from "../../domain/studied-page-reader";
 import type { StudyItem, StudyItemKind } from "../../domain/study-item";
 import type { StudyItemRepository } from "../../domain/study-item-repository";
 
@@ -6,7 +10,9 @@ import type { StudyItemRepository } from "../../domain/study-item-repository";
 // There is no pages table here: `isPageActive` stands in for the join that
 // drops archived pages and pages of archived notebooks from listDue (every
 // page is active by default).
-export class InMemoryStudyItemRepository implements StudyItemRepository {
+export class InMemoryStudyItemRepository
+  implements StudyItemRepository, StudiedPageReader
+{
   private readonly rows = new Map<string, StudyItem>();
 
   constructor(
@@ -91,6 +97,23 @@ export class InMemoryStudyItemRepository implements StudyItemRepository {
     const suspended = { ...item, suspendedAt: now, updatedAt: now };
     this.rows.set(id, suspended);
     return suspended;
+  }
+
+  // Cross-owner by design (StudiedPageReader): the daily mastery job.
+  async listStudiedPages(
+    afterPageId: string | null,
+    limit: number,
+  ): Promise<StudiedPage[]> {
+    const pages = new Map<string, StudiedPage>();
+    for (const item of this.rows.values()) {
+      if (afterPageId !== null && compareIds(item.pageId, afterPageId) <= 0) {
+        continue;
+      }
+      pages.set(item.pageId, { pageId: item.pageId, ownerId: item.ownerId });
+    }
+    return [...pages.values()]
+      .sort((a, b) => compareIds(a.pageId, b.pageId))
+      .slice(0, limit);
   }
 
   // Single-threaded in memory: nothing to serialize.

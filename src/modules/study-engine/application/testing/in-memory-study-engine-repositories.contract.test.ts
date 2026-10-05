@@ -9,6 +9,7 @@ import { InMemoryStudyItemRepository } from "./in-memory-study-item-repository";
 import { runPageMasteryRepositoryContract } from "./page-mastery-repository.contract";
 import { runReviewLogRepositoryContract } from "./review-log-repository.contract";
 import { runSessionFeedbackRepositoryContract } from "./session-feedback-repository.contract";
+import { runStudiedPageReaderContract } from "./studied-page-reader.contract";
 import { runStudyItemRepositoryContract } from "./study-item-repository.contract";
 
 // The fakes have no pages table and no foreign keys: any fresh id is a valid
@@ -69,4 +70,28 @@ runFlashcardSessionRepositoryContract({
 runSessionFeedbackRepositoryContract({
   createRepository: () => new InMemorySessionFeedbackRepository(),
   context: () => ({ ...ownership, newGenerationId: async () => randomUUID() }),
+});
+
+// The in-memory item store is also the cross-owner StudiedPageReader.
+runStudiedPageReaderContract({
+  context: async () => {
+    const store = new InMemoryStudyItemRepository();
+    return {
+      ...ownership,
+      reader: store,
+      newPageId: async () => randomUUID(),
+      addItem: async ({ ownerId, pageId, suspended }) => {
+        const now = new Date("2026-10-01T08:00:00.000Z");
+        const item = newStudyItem({
+          id: randomUUID(),
+          ownerId,
+          pageId,
+          kind: "flashcard",
+          sourceId: randomUUID(),
+          now,
+        });
+        await store.save({ ...item, suspendedAt: suspended ? now : null });
+      },
+    };
+  },
 });
