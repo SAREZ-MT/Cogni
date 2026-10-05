@@ -45,6 +45,35 @@ export interface RequestSessionFeedbackDeps {
   };
   clock: Clock;
   ids: IdGenerator;
+  // Overrides FEEDBACK_AI_TIMEOUT_MS (tests).
+  aiTimeoutMs?: number;
+}
+
+// Longest wait for the AI answer. generateStructured may try two providers;
+// past this the student gets the calm "no feedback" note instead of a
+// spinner. The call itself is not cancelled (the provider port has no
+// abort signal): its audit row still completes in the background.
+export const FEEDBACK_AI_TIMEOUT_MS = 25_000;
+
+// A "pending" row untouched for this long belongs to a request that died
+// (function killed, crash) or hung: the next request may reclaim it. Well
+// above FEEDBACK_AI_TIMEOUT_MS plus the surrounding reads and writes, so a
+// live request is never overtaken.
+export const STALE_PENDING_MS = 2 * 60_000;
+
+class FeedbackTimeoutError extends Error {
+  constructor() {
+    super("The AI feedback did not arrive in time");
+    this.name = "FeedbackTimeoutError";
+  }
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new FeedbackTimeoutError()), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
 // Answers a student struggled with: "Otra vez" (quality <= 2) and
@@ -85,11 +114,55 @@ async function struggledFronts(
   return fronts;
 }
 
+// Claims the session's feedback row: inserts a new pending row, or takes
+// over a stale pending one. Returns the claimed row, or the row another
+// request holds (fresh pending, done, failed or a concurrent winner).
+async function claim(
+  session: { id: string },
+  existing: SessionFeedback | null,
+  deps: RequestSessionFeedbackDeps,
+  ownerId: string,
+): Promise<{ claimed: SessionFeedback } | { held: SessionFeedback | null }> {
+  const now = deps.clock.now();
+  if (existing) {
+    const reclaimed = await deps.feedback.reclaimStalePending(
+      "flashcards",
+      session.id,
+      ownerId,
+      new Date(now.getTime() - STALE_PENDING_MS),
+      now,
+    );
+    if (reclaimed) return { claimed: reclaimed };
+  } else {
+    const pending = newSessionFeedback({
+      id: deps.ids.next(),
+      ownerId,
+      sessionKind: "flashcards",
+      sessionId: session.id,
+      now,
+    });
+    if (await deps.feedback.create(pending)) return { claimed: pending };
+  }
+  // A concurrent request claimed or reclaimed the row first: its row wins.
+  return {
+    held: await deps.feedback.findBySession("flashcards", session.id, ownerId),
+  };
+}
+
+function isReclaimable(feedback: SessionFeedback, now: Date): boolean {
+  return (
+    feedback.status === "pending" &&
+    now.getTime() - feedback.updatedAt.getTime() > STALE_PENDING_MS
+  );
+}
+
 // AI feedback at the end of a flashcard review session (documento-maestro
 // §3.3, §8.4). Idempotent per session: the first request claims the
 // session's only feedback row and every later one reads it back. An AI
-// failure (limit, provider, invalid answer) is stored as "failed" and
-// returned as ok: it never blocks closing the session.
+// failure (limit, provider, invalid answer, timeout, storage error) is
+// stored as "failed" when possible and returned as ok: it never blocks
+// closing the session. A pending row whose request died is reclaimed once
+// stale (STALE_PENDING_MS); done and failed rows are final.
 export async function requestSessionFeedback(
   input: { sessionId: string },
   deps: RequestSessionFeedbackDeps,
@@ -115,7 +188,9 @@ export async function requestSessionFeedback(
     session.id,
     ownerId,
   );
-  if (existing) return ok(existing);
+  if (existing && !isReclaimable(existing, deps.clock.now())) {
+    return ok(existing);
+  }
 
   const logs = await deps.reviewLogs.listBySession(
     "flashcards",
@@ -131,22 +206,10 @@ export async function requestSessionFeedback(
     );
   }
 
-  const pending = newSessionFeedback({
-    id: deps.ids.next(),
-    ownerId,
-    sessionKind: "flashcards",
-    sessionId: session.id,
-    now: deps.clock.now(),
-  });
-  if (!(await deps.feedback.create(pending))) {
-    // A concurrent request claimed the session first: its row wins.
-    const winner = await deps.feedback.findBySession(
-      "flashcards",
-      session.id,
-      ownerId,
-    );
-    return winner
-      ? ok(winner)
+  const claimed = await claim(session, existing, deps, ownerId);
+  if ("held" in claimed) {
+    return claimed.held
+      ? ok(claimed.held)
       : err(
           new DomainError(
             STUDY_ENGINE_ERROR.SESSION_NOT_FOUND,
@@ -154,54 +217,73 @@ export async function requestSessionFeedback(
           ),
         );
   }
+  const pending = claimed.claimed;
 
+  // Best effort: when even this write fails the row stays pending and a
+  // later request reclaims it once stale.
   const fail = async (generationId: string | null) => {
     const failed = failSessionFeedback(pending, generationId, deps.clock.now());
-    await deps.feedback.update(failed);
+    try {
+      await deps.feedback.update(failed);
+    } catch {
+      // Swallowed on purpose: the student still gets the calm failed note.
+    }
     return ok(failed);
   };
 
-  const limit = await deps.limiter.peek(ownerId);
-  if (!limit.allowed) return fail(null);
-
-  let generated: Awaited<ReturnType<typeof deps.ai.generateStructured>>;
+  // Every error after the claim ends in "failed", never in a stuck row.
   try {
-    const prompt = buildSessionFeedbackPrompt({
-      technique: "flashcards",
-      reviewedCount: logs.length,
-      counts: countByButton(logs),
-      struggled: await struggledFronts(logs, deps, ownerId),
-    });
-    generated = await deps.ai.generateStructured(
-      {
-        purpose: "session_feedback",
-        pageId: session.pageId,
-        promptVersion: SESSION_FEEDBACK_PROMPT_VERSION,
-        ...prompt,
-      },
-      ownerId,
+    const limit = await deps.limiter.peek(ownerId);
+    if (!limit.allowed) return fail(null);
+
+    let generated: Awaited<ReturnType<typeof deps.ai.generateStructured>>;
+    try {
+      const prompt = buildSessionFeedbackPrompt({
+        technique: "flashcards",
+        reviewedCount: logs.length,
+        counts: countByButton(logs),
+        struggled: await struggledFronts(logs, deps, ownerId),
+      });
+      generated = await withTimeout(
+        deps.ai.generateStructured(
+          {
+            purpose: "session_feedback",
+            pageId: session.pageId,
+            promptVersion: SESSION_FEEDBACK_PROMPT_VERSION,
+            ...prompt,
+          },
+          ownerId,
+        ),
+        deps.aiTimeoutMs ?? FEEDBACK_AI_TIMEOUT_MS,
+      );
+    } catch {
+      return fail(null);
+    }
+    if (!generated.ok) {
+      return fail(
+        generated.error instanceof AiGenerationFailedError
+          ? generated.error.generationId
+          : null,
+      );
+    }
+
+    const { generation } = generated.value;
+    const parsed = sessionFeedbackOutput.safeParse(generated.value.object);
+    if (!parsed.success) return fail(generation.id);
+
+    const done = completeSessionFeedback(
+      pending,
+      parsed.data,
+      generation.id,
+      deps.clock.now(),
     );
+    try {
+      await deps.feedback.update(done);
+    } catch {
+      return fail(generation.id);
+    }
+    return ok(done);
   } catch {
     return fail(null);
   }
-  if (!generated.ok) {
-    return fail(
-      generated.error instanceof AiGenerationFailedError
-        ? generated.error.generationId
-        : null,
-    );
-  }
-
-  const { generation } = generated.value;
-  const parsed = sessionFeedbackOutput.safeParse(generated.value.object);
-  if (!parsed.success) return fail(generation.id);
-
-  const done = completeSessionFeedback(
-    pending,
-    parsed.data,
-    generation.id,
-    deps.clock.now(),
-  );
-  await deps.feedback.update(done);
-  return ok(done);
 }

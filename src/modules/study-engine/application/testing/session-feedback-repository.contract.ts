@@ -23,6 +23,9 @@ export interface SessionFeedbackRepositoryContractOptions {
 
 const T0 = new Date("2026-10-01T08:00:00.000Z");
 const T1 = new Date("2026-10-01T08:00:05.000Z");
+// A reclaim run long after T0: rows last touched before CUTOFF are stale.
+const CUTOFF = new Date("2026-10-01T08:02:00.000Z");
+const LATER = new Date("2026-10-01T08:03:00.000Z");
 
 const CONTENT = {
   summary: "Buena sesión.",
@@ -124,6 +127,125 @@ export function runSessionFeedbackRepositoryContract(
       expect(
         await repo.findBySession("flashcards", feedback.sessionId, ctx.ownerId),
       ).toEqual(failed);
+    });
+
+    it("reclaimStalePending re-claims a pending row last touched before the cutoff", async () => {
+      const ctx = options.context();
+      const repo = options.createRepository();
+      const feedback = pending(ctx);
+      await repo.create(feedback);
+
+      const reclaimed = await repo.reclaimStalePending(
+        "flashcards",
+        feedback.sessionId,
+        ctx.ownerId,
+        CUTOFF,
+        LATER,
+      );
+
+      expect(reclaimed).toEqual({ ...feedback, updatedAt: LATER });
+      expect(
+        await repo.findBySession("flashcards", feedback.sessionId, ctx.ownerId),
+      ).toEqual({ ...feedback, updatedAt: LATER });
+    });
+
+    it("reclaimStalePending leaves a pending row touched at or after the cutoff", async () => {
+      const ctx = options.context();
+      const repo = options.createRepository();
+      const feedback = pending(ctx);
+      await repo.create(feedback);
+
+      expect(
+        await repo.reclaimStalePending(
+          "flashcards",
+          feedback.sessionId,
+          ctx.ownerId,
+          T0,
+          LATER,
+        ),
+      ).toBeNull();
+      expect(
+        await repo.findBySession("flashcards", feedback.sessionId, ctx.ownerId),
+      ).toEqual(feedback);
+    });
+
+    it("reclaimStalePending never re-claims a done or failed row", async () => {
+      const ctx = options.context();
+      const repo = options.createRepository();
+      const failed = pending(ctx);
+      await repo.create(failed);
+      await repo.update(failSessionFeedback(failed, null, T0));
+      const done = pending(ctx);
+      await repo.create(done);
+      await repo.update(
+        completeSessionFeedback(done, CONTENT, await ctx.newGenerationId(), T0),
+      );
+
+      for (const row of [failed, done]) {
+        expect(
+          await repo.reclaimStalePending(
+            "flashcards",
+            row.sessionId,
+            ctx.ownerId,
+            CUTOFF,
+            LATER,
+          ),
+        ).toBeNull();
+      }
+      expect(
+        (await repo.findBySession("flashcards", failed.sessionId, ctx.ownerId))
+          ?.status,
+      ).toBe("failed");
+      expect(
+        (await repo.findBySession("flashcards", done.sessionId, ctx.ownerId))
+          ?.status,
+      ).toBe("done");
+    });
+
+    it("reclaimStalePending never re-claims another owner's row", async () => {
+      const ctx = options.context();
+      const repo = options.createRepository();
+      const feedback = pending(ctx);
+      await repo.create(feedback);
+
+      expect(
+        await repo.reclaimStalePending(
+          "flashcards",
+          feedback.sessionId,
+          ctx.otherOwnerId,
+          CUTOFF,
+          LATER,
+        ),
+      ).toBeNull();
+      expect(
+        await repo.findBySession("flashcards", feedback.sessionId, ctx.ownerId),
+      ).toEqual(feedback);
+    });
+
+    it("reclaimStalePending lets only one of two concurrent requests win", async () => {
+      const ctx = options.context();
+      const repo = options.createRepository();
+      const feedback = pending(ctx);
+      await repo.create(feedback);
+
+      const results = await Promise.all([
+        repo.reclaimStalePending(
+          "flashcards",
+          feedback.sessionId,
+          ctx.ownerId,
+          CUTOFF,
+          LATER,
+        ),
+        repo.reclaimStalePending(
+          "flashcards",
+          feedback.sessionId,
+          ctx.ownerId,
+          CUTOFF,
+          LATER,
+        ),
+      ]);
+
+      expect(results.filter((row) => row !== null)).toHaveLength(1);
     });
 
     it("update never touches another owner's row", async () => {

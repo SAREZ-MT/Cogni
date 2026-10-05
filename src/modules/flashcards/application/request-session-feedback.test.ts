@@ -23,6 +23,7 @@ import { createFlashcard } from "../domain";
 import {
   type RequestSessionFeedbackDeps,
   requestSessionFeedback,
+  STALE_PENDING_MS,
 } from "./request-session-feedback";
 import { InMemoryFlashcardRepository } from "./testing/in-memory-flashcard-repository";
 
@@ -46,6 +47,8 @@ const FEEDBACK_OBJECT = {
 class StubFeedbackRepository implements SessionFeedbackRepository {
   readonly rows = new Map<string, SessionFeedback>();
   creates = 0;
+  // Statuses whose update throws, to simulate a database failure.
+  failUpdatesOf = new Set<SessionFeedback["status"]>();
   async create(feedback: SessionFeedback): Promise<boolean> {
     this.creates += 1;
     if (this.rows.has(feedback.sessionId)) return false;
@@ -63,7 +66,25 @@ class StubFeedbackRepository implements SessionFeedbackRepository {
       : null;
   }
   async update(feedback: SessionFeedback): Promise<void> {
+    if (this.failUpdatesOf.has(feedback.status)) {
+      throw new Error("database unavailable");
+    }
     this.rows.set(feedback.sessionId, feedback);
+  }
+  async reclaimStalePending(
+    kind: SessionKind,
+    sessionId: string,
+    ownerId: string,
+    staleBefore: Date,
+    now: Date,
+  ): Promise<SessionFeedback | null> {
+    const row = await this.findBySession(kind, sessionId, ownerId);
+    if (!row || row.status !== "pending" || row.updatedAt >= staleBefore) {
+      return null;
+    }
+    const reclaimed = { ...row, updatedAt: now };
+    this.rows.set(sessionId, reclaimed);
+    return reclaimed;
   }
 }
 
@@ -86,7 +107,13 @@ function generation(id = "gen-1"): AiGeneration {
   };
 }
 
-type AiOutcome = "ok" | "fail" | "error" | "throw" | { object: unknown };
+type AiOutcome =
+  | "ok"
+  | "fail"
+  | "error"
+  | "throw"
+  | "hang"
+  | { object: unknown };
 
 function makeAi(outcome: AiOutcome = "ok") {
   const calls: GenerateStructuredInput[] = [];
@@ -103,6 +130,7 @@ function makeAi(outcome: AiOutcome = "ok") {
         return err(new DomainError("AI_NO_PROVIDER_AVAILABLE", "none"));
       }
       if (outcome === "throw") throw new Error("network down");
+      if (outcome === "hang") return new Promise(() => {});
       const object = outcome === "ok" ? FEEDBACK_OBJECT : outcome.object;
       return ok({ object, generation: generation() });
     },
@@ -123,7 +151,9 @@ interface Fixture {
 let fx: Fixture;
 let nextId = 0;
 
-function build(options: { ai?: AiOutcome; allowed?: boolean } = {}): Fixture {
+function build(
+  options: { ai?: AiOutcome; allowed?: boolean; peekThrows?: boolean } = {},
+): Fixture {
   const sessions = new Map<string, FlashcardSession>();
   const logs: ReviewLog[] = [];
   const items = new Map<string, StudyItem>();
@@ -165,6 +195,7 @@ function build(options: { ai?: AiOutcome; allowed?: boolean } = {}): Fixture {
       limiter: {
         peek: async (): Promise<GenerationRateLimit> => {
           fixture.peeks += 1;
+          if (options.peekThrows) throw new Error("redis unavailable");
           return {
             allowed: options.allowed ?? true,
             remaining: options.allowed === false ? 0 : 3,
@@ -175,6 +206,7 @@ function build(options: { ai?: AiOutcome; allowed?: boolean } = {}): Fixture {
       ai,
       clock: createFixedClock(NOW),
       ids: { next: () => `id-${++nextId}` },
+      aiTimeoutMs: 50,
     },
   };
   return fixture;
@@ -417,6 +449,166 @@ describe("requestSessionFeedback", () => {
 
     expect(result.ok && result.value).toEqual(claimed);
     expect(fx.ai.calls).toHaveLength(0);
+  });
+
+  it("stores failed feedback when reading the daily limit throws", async () => {
+    fx = build({ peekThrows: true });
+    await gradedSession();
+
+    const result = await requestSessionFeedback(
+      { sessionId: SESSION },
+      fx.deps,
+      OWNER,
+    );
+
+    expect(result.ok && result.value.status).toBe("failed");
+    expect(fx.feedback.rows.get(SESSION)?.status).toBe("failed");
+    expect(fx.ai.calls).toHaveLength(0);
+  });
+
+  it("stores failed feedback when saving the done content throws", async () => {
+    await gradedSession();
+    fx.feedback.failUpdatesOf.add("done");
+
+    const result = await requestSessionFeedback(
+      { sessionId: SESSION },
+      fx.deps,
+      OWNER,
+    );
+
+    expect(result.ok && result.value).toMatchObject({
+      status: "failed",
+      content: null,
+      generationId: "gen-1",
+    });
+    expect(fx.feedback.rows.get(SESSION)?.status).toBe("failed");
+  });
+
+  it("still returns failed feedback when saving the failure throws too", async () => {
+    fx = build({ ai: "fail" });
+    await gradedSession();
+    fx.feedback.failUpdatesOf.add("failed");
+
+    const result = await requestSessionFeedback(
+      { sessionId: SESSION },
+      fx.deps,
+      OWNER,
+    );
+
+    expect(result.ok && result.value.status).toBe("failed");
+    // The row stays pending; a later request reclaims it once stale.
+    expect(fx.feedback.rows.get(SESSION)?.status).toBe("pending");
+  });
+
+  it("stores failed feedback when the AI does not answer in time", async () => {
+    fx = build({ ai: "hang" });
+    await gradedSession();
+
+    const result = await requestSessionFeedback(
+      { sessionId: SESSION },
+      fx.deps,
+      OWNER,
+    );
+
+    expect(result.ok && result.value).toMatchObject({
+      status: "failed",
+      generationId: null,
+    });
+    expect(fx.feedback.rows.get(SESSION)?.status).toBe("failed");
+  });
+
+  describe("a pending row left by an earlier request", () => {
+    function seedPending(ageMs: number): SessionFeedback {
+      const at = new Date(NOW.getTime() - ageMs);
+      const row: SessionFeedback = {
+        id: "earlier-request",
+        ownerId: OWNER,
+        sessionKind: "flashcards",
+        sessionId: SESSION,
+        status: "pending",
+        content: null,
+        generationId: null,
+        createdAt: at,
+        updatedAt: at,
+      };
+      fx.feedback.rows.set(SESSION, row);
+      return row;
+    }
+
+    it("is reclaimed once stale and the AI is asked again", async () => {
+      await gradedSession();
+      seedPending(STALE_PENDING_MS + 1);
+
+      const result = await requestSessionFeedback(
+        { sessionId: SESSION },
+        fx.deps,
+        OWNER,
+      );
+
+      expect(result.ok && result.value).toMatchObject({
+        id: "earlier-request",
+        status: "done",
+        content: FEEDBACK_OBJECT,
+      });
+      expect(fx.ai.calls).toHaveLength(1);
+      expect(fx.feedback.rows.get(SESSION)?.status).toBe("done");
+    });
+
+    it("keeps returning pending while it is fresh", async () => {
+      await gradedSession();
+      const row = seedPending(STALE_PENDING_MS - 1);
+
+      const result = await requestSessionFeedback(
+        { sessionId: SESSION },
+        fx.deps,
+        OWNER,
+      );
+
+      expect(result.ok && result.value).toEqual(row);
+      expect(fx.ai.calls).toHaveLength(0);
+      expect(fx.peeks).toBe(0);
+    });
+
+    it("returns the current row when a concurrent request reclaimed it first", async () => {
+      await gradedSession();
+      seedPending(STALE_PENDING_MS + 1);
+      const reclaimedByOther = {
+        ...fx.feedback.rows.get(SESSION),
+        updatedAt: NOW,
+      } as SessionFeedback;
+      fx.feedback.reclaimStalePending = async () => {
+        fx.feedback.rows.set(SESSION, reclaimedByOther);
+        return null;
+      };
+
+      const result = await requestSessionFeedback(
+        { sessionId: SESSION },
+        fx.deps,
+        OWNER,
+      );
+
+      expect(result.ok && result.value).toEqual(reclaimedByOther);
+      expect(fx.ai.calls).toHaveLength(0);
+    });
+
+    it("never reclaims an old failed row", async () => {
+      await gradedSession();
+      const old = new Date(NOW.getTime() - 10 * STALE_PENDING_MS);
+      fx.feedback.rows.set(SESSION, {
+        ...seedPending(0),
+        status: "failed",
+        updatedAt: old,
+      });
+
+      const result = await requestSessionFeedback(
+        { sessionId: SESSION },
+        fx.deps,
+        OWNER,
+      );
+
+      expect(result.ok && result.value.status).toBe("failed");
+      expect(fx.ai.calls).toHaveLength(0);
+    });
   });
 
   it("refuses another owner's session", async () => {

@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, lt } from "drizzle-orm";
 import type { DbExecutor } from "@/shared/db/client";
 import { type SessionFeedbackRow, sessionFeedback } from "@/shared/db/schema";
 import type { SessionKind } from "../domain/review-log";
@@ -86,5 +86,31 @@ export class DrizzleSessionFeedbackRepository
           eq(sessionFeedback.ownerId, feedback.ownerId),
         ),
       );
+  }
+
+  // A conditional UPDATE: Postgres row locking re-checks the WHERE for a
+  // second concurrent reclaim, which then matches nothing (its updated_at
+  // is no longer before the cutoff), so exactly one request wins.
+  async reclaimStalePending(
+    sessionKind: SessionKind,
+    sessionId: string,
+    ownerId: string,
+    staleBefore: Date,
+    now: Date,
+  ): Promise<SessionFeedback | null> {
+    const [row] = await this.db
+      .update(sessionFeedback)
+      .set({ updatedAt: now })
+      .where(
+        and(
+          eq(sessionFeedback.sessionKind, sessionKind),
+          eq(sessionFeedback.sessionId, sessionId),
+          eq(sessionFeedback.ownerId, ownerId),
+          eq(sessionFeedback.status, "pending"),
+          lt(sessionFeedback.updatedAt, staleBefore),
+        ),
+      )
+      .returning();
+    return row ? toFeedback(row) : null;
   }
 }

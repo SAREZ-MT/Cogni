@@ -16,4 +16,15 @@ export interface SessionFeedbackRepository {
   // Stores status, content, generation and updatedAt of an existing row of
   // the same owner; another owner's row is left untouched.
   update(feedback: SessionFeedback): Promise<void>;
+  // Atomically takes over a "pending" row last touched before `staleBefore`
+  // (its request died or hung): sets updatedAt to `now` and returns the
+  // row. Returns null and changes nothing for a fresh pending row, a done
+  // or failed row, another owner's row, or when a concurrent reclaim won.
+  reclaimStalePending(
+    sessionKind: SessionKind,
+    sessionId: string,
+    ownerId: string,
+    staleBefore: Date,
+    now: Date,
+  ): Promise<SessionFeedback | null>;
 }

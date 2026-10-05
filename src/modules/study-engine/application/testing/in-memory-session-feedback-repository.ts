@@ -41,6 +41,30 @@ export class InMemorySessionFeedbackRepository
     });
   }
 
+  // No await between the check and the write: atomic like the conditional
+  // UPDATE of the Drizzle adapter.
+  async reclaimStalePending(
+    sessionKind: SessionKind,
+    sessionId: string,
+    ownerId: string,
+    staleBefore: Date,
+    now: Date,
+  ): Promise<SessionFeedback | null> {
+    const key = keyOf(sessionKind, sessionId);
+    const row = this.rows.get(key);
+    if (
+      !row ||
+      row.ownerId !== ownerId ||
+      row.status !== "pending" ||
+      row.updatedAt.getTime() >= staleBefore.getTime()
+    ) {
+      return null;
+    }
+    const reclaimed = { ...row, updatedAt: now };
+    this.rows.set(key, reclaimed);
+    return reclaimed;
+  }
+
   all(): SessionFeedback[] {
     return [...this.rows.values()];
   }
