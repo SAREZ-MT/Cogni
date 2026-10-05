@@ -106,6 +106,22 @@ export class DrizzleExamQuestionRepository implements ExamQuestionRepository {
     return rows.map(toQuestion);
   }
 
+  async lockLineage(rootId: string, ownerId: string): Promise<void> {
+    // SELECT … FOR UPDATE in id order, so two transactions locking the same
+    // lineage take its rows in the same order and never deadlock.
+    await this.db
+      .select({ id: examQuestions.id })
+      .from(examQuestions)
+      .where(
+        and(
+          eq(examQuestions.rootId, rootId),
+          eq(examQuestions.ownerId, ownerId),
+        ),
+      )
+      .orderBy(asc(examQuestions.id))
+      .for("update");
+  }
+
   async retire(
     id: string,
     ownerId: string,

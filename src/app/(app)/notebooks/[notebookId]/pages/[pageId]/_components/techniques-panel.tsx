@@ -1,6 +1,12 @@
 "use client";
 
-import { Layers, PanelRightClose, PanelRightOpen } from "lucide-react";
+import {
+  Layers,
+  ListChecks,
+  PanelRightClose,
+  PanelRightOpen,
+} from "lucide-react";
+import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { getSampleStudyItemsForPage } from "@/app/(app)/flashcards/_data/sample";
@@ -9,6 +15,7 @@ import {
   generateFlashcardsAction,
   listFlashcardsAction,
 } from "@/modules/flashcards";
+import { Button } from "@/shared/ui/button";
 import { EmptyState } from "@/shared/ui/empty-state";
 import { IconTile } from "@/shared/ui/icon-tile";
 import { PanelToggleButton } from "@/shared/ui/panel-toggle-button";
@@ -25,7 +32,10 @@ import {
 import { TECHNIQUES_PANEL_SLOT_ID } from "../../../../../_components/techniques-panel-slot";
 import { TECHNIQUES } from "./techniques";
 
-// PREVIEW ONLY: Active recall and Exámenes are still design previews (user
+// Examen is live since Phase 5 T4: its card links to the page's questions
+// ("Preguntas", real data) while its "Generar" stays disabled until T5.
+//
+// PREVIEW ONLY: Active recall and Exámenes' saved items are still design previews (user
 // decision 2026-09-24): fixed sample items, not filtered by the real
 // notebookId/pageId this panel is mounted on — see
 // getSampleStudyItemsForPage's own doc comment. They render only when the
@@ -62,8 +72,8 @@ export interface TechniquesPanelProps {
   initialCollapsed: boolean;
   notebookId: string;
   pageId: string;
-  // Server decision (designPreviewsEnabled): also list the Active recall /
-  // Exámenes previews and their sample saved items.
+  // Server decision (designPreviewsEnabled): also list the Active recall
+  // preview and the Active recall / Exámenes sample saved items.
   showPreviews: boolean;
   // Initial data is read by the server page and refreshed on the client
   // after each generation (the panel is hidden/collapsible, so nothing
@@ -168,7 +178,8 @@ export function TechniquesPanel({
   }
   const visibleTechniques = showPreviews
     ? TECHNIQUES
-    : TECHNIQUES.filter((t) => t.id === "flashcards");
+    : TECHNIQUES.filter((t) => t.id !== "active-recall");
+  const questionsHref = `/exams/${notebookId}/${pageId}/preguntas`;
 
   const toggleButton = (
     <PanelToggleButton
@@ -215,7 +226,7 @@ export function TechniquesPanel({
               icon={t.icon}
               tone={t.tone}
               title={t.name}
-              available={t.id === "flashcards"}
+              available={t.id !== "active-recall"}
             />
           ))}
         </div>
@@ -260,6 +271,26 @@ export function TechniquesPanel({
                   {error}
                 </p>
               )}
+            </TechniqueCard>
+          ) : t.id === "exam" ? (
+            <TechniqueCard
+              key={t.id}
+              icon={t.icon}
+              tone={t.tone}
+              name={t.name}
+              description={t.description}
+            >
+              <Button
+                asChild
+                variant="outline"
+                size="sm"
+                className="w-full text-[11.5px]"
+              >
+                <Link href={questionsHref} data-testid="exam-questions-link">
+                  <ListChecks aria-hidden="true" size={14} strokeWidth={1.75} />
+                  Preguntas
+                </Link>
+              </Button>
             </TechniqueCard>
           ) : (
             <TechniqueCard

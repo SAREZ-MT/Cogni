@@ -100,18 +100,35 @@ describe("TechniquesPanel", () => {
     ).toHaveLength(2);
   });
 
-  it("shows only Flashcards and no sample sections with previews off", async () => {
+  it("shows Flashcards and Examen but no Active recall or sample sections with previews off", async () => {
     await renderPanel(false, { showPreviews: false });
 
     expect(screen.getByText("Flashcards")).toBeInTheDocument();
     expect(screen.queryByText("Active recall")).not.toBeInTheDocument();
-    expect(screen.queryByText("Examen")).not.toBeInTheDocument();
+    expect(screen.getByText("Examen")).toBeInTheDocument();
     expect(screen.queryByText("Vista previa")).not.toBeInTheDocument();
     expect(
       screen.queryByText("Sesiones de Active Recall"),
     ).not.toBeInTheDocument();
     expect(screen.queryByText("Exámenes recientes")).not.toBeInTheDocument();
     expect(screen.queryByText("Mitocondria")).not.toBeInTheDocument();
+  });
+
+  it("links the Examen card to the page's questions while its Generar stays disabled", async () => {
+    await renderPanel(false, { showPreviews: false });
+
+    expect(screen.getByTestId("exam-questions-link")).toHaveAttribute(
+      "href",
+      `/exams/${NOTEBOOK_ID}/${PAGE_ID}/preguntas`,
+    );
+    expect(screen.getByTestId("exam-questions-link")).toHaveTextContent(
+      "Preguntas",
+    );
+    const generate = screen.getAllByRole("button", { name: "Generar" });
+    expect(generate).toHaveLength(2);
+    expect(
+      generate.filter((b) => (b as HTMLButtonElement).disabled),
+    ).toHaveLength(1);
   });
 
   it("keeps the active recall and exam saved items as a labelled sample preview", async () => {

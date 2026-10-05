@@ -63,6 +63,9 @@ export class InMemoryExamQuestionRepository implements ExamQuestionRepository {
     return this.list((q) => q.rootId === rootId && q.ownerId === ownerId);
   }
 
+  // A single-threaded fake has no concurrent transactions to queue.
+  async lockLineage(): Promise<void> {}
+
   async retire(
     id: string,
     ownerId: string,
@@ -74,6 +77,17 @@ export class InMemoryExamQuestionRepository implements ExamQuestionRepository {
     const retired = { ...stored, retiredAt: now, updatedAt: now };
     this.rows.set(id, retired);
     return retired;
+  }
+
+  // Test helpers for a transactional fake unit of work: copy the stored
+  // rows before a run and put them back when it throws.
+  snapshot(): ExamQuestion[] {
+    return [...this.rows.values()];
+  }
+
+  restore(rows: readonly ExamQuestion[]): void {
+    this.rows.clear();
+    for (const row of rows) this.rows.set(row.id, row);
   }
 
   private list(keep: (question: ExamQuestion) => boolean): ExamQuestion[] {

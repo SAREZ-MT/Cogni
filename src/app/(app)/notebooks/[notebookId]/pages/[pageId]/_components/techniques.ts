@@ -12,9 +12,10 @@ export interface TechniqueDefinition {
 
 // Study-technique content for the "Técnicas" panel (design/shell-look):
 // icon + name + description per technique. Flashcards are wired to real
-// Server Actions since Phase 3 (the panel adds the live "Generar"); Active
-// recall and Examen are still previews whose "Generar" stays disabled (user
-// decision 2026-09-24: no navigation, no meta line, no "pronto" pill).
+// Server Actions since Phase 3 (the panel adds the live "Generar"); Examen
+// links to the page's questions since Phase 5 T4 but its "Generar" stays
+// disabled until T5; Active recall is still a preview whose "Generar" stays
+// disabled (user decision 2026-09-24: no meta line, no "pronto" pill).
 // Icons match the ones the main Sidebar's "Técnicas" section already uses
 // for the same three entries (sidebar.tsx's TECNICAS_SECTION), so the icon
 // vocabulary stays consistent across the shell.

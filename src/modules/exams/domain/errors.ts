@@ -29,4 +29,11 @@ export const EXAM_ERROR = {
   NO_ANSWERS: "EXAMS_NO_ANSWERS",
   // The session was already finished.
   SESSION_FINISHED: "EXAMS_SESSION_FINISHED",
+  // The owner has no such question (missing or another owner's).
+  QUESTION_NOT_FOUND: "EXAMS_QUESTION_NOT_FOUND",
+  // Server Action boundary: no signed-in user, input rejected by the
+  // schema, or an unexpected failure (logged, never shown raw).
+  SESSION_REQUIRED: "EXAMS_SESSION_REQUIRED",
+  INVALID_INPUT: "EXAMS_INVALID_INPUT",
+  UNEXPECTED: "EXAMS_UNEXPECTED",
 } as const;

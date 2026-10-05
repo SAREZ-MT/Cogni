@@ -1,187 +1,269 @@
 "use client";
 
-import { Plus } from "lucide-react";
-import { useState } from "react";
+import { ClipboardList, Info, Plus } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
+import {
+  createExamQuestionAction,
+  EXAM_MIN_QUESTIONS,
+  type ExamQuestionView,
+  editExamQuestionAction,
+  retireExamQuestionAction,
+} from "@/modules/exams";
 import { BackLink } from "@/shared/ui/back-link";
 import { Button } from "@/shared/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/shared/ui/dialog";
+import { EmptyState } from "@/shared/ui/empty-state";
 import { ExamQuestionRow } from "@/shared/ui/exam-question-row";
-import { Pill } from "@/shared/ui/pill";
+import { IconTile } from "@/shared/ui/icon-tile";
 import {
   QuestionFormDialog,
   type QuestionFormValues,
 } from "@/shared/ui/question-form-dialog";
 import { SectionHeader } from "@/shared/ui/section-header";
-import type { ExamQuestion } from "../_data/sample";
+import { plural } from "../../flashcards/_lib/plural";
+
+const SAVE_FAILURE = "No pudimos guardar la pregunta. Intenta de nuevo.";
+const RETIRE_FAILURE = "No pudimos retirar la pregunta. Intenta de nuevo.";
+
+// Spanish copy per ActionError code of the exams question actions; anything
+// else falls back to the generic failure of the action.
+const ERROR_COPY: Record<string, string> = {
+  EXAMS_INVALID_QUESTION:
+    "Revisa la pregunta: las 4 opciones deben ser distintas y ningún campo puede quedar vacío.",
+  EXAMS_INVALID_INPUT:
+    "Revisa la pregunta: algún campo es demasiado largo o no es válido.",
+  EXAMS_QUESTION_RETIRED: "Esta pregunta ya fue retirada.",
+  EXAMS_QUESTION_NOT_FOUND: "Esta pregunta ya no existe.",
+  EXAMS_SESSION_REQUIRED: "Tu sesión expiró. Inicia sesión de nuevo.",
+  PAGE_NOT_FOUND: "Esta página ya no existe.",
+};
+
+type Tuple4 = readonly [string, string, string, string];
+type OptionIndex = 0 | 1 | 2 | 3;
 
 export interface ExamQuestionsViewProps {
-  notebookId: string;
   notebookTitle: string;
   pageId: string;
   pageTitle: string;
-  initialQuestions: ExamQuestion[];
+  // The notebook page the questions belong to ("Volver a la página").
+  pageHref: string;
+  // The page's active questions, oldest first (retired ones are excluded).
+  questions: ExamQuestionView[];
 }
 
-function generateManualId(pageId: string): string {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return `${pageId}-manual-${crypto.randomUUID()}`;
-  }
-  return `${pageId}-manual-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-// "Preguntas del examen" manual creation/editing screen (design preview,
-// 2026-09-24; documento-maestro §3.3 "creadas manualmente", Fase 5
-// "edición manual de preguntas con concept"). Client-side only: saving
-// appends/updates local state, "Retirar" marks a question `retiredAt`
-// instead of deleting it (history stays visible) — nothing here persists
-// past a remount, same scope as ExamPlayer.
+// "Preguntas del examen" of one page on real data (documento-maestro §3.3
+// "creadas manualmente", Fase 5 "edición manual de preguntas con concept"):
+// the active questions, "Nueva pregunta", in-place "Editar" and "Retirar"
+// with a confirmation (a retired question leaves the exam and its concept
+// leaves the reviews). Every change goes through an exams Server Action and
+// refreshes the route, which re-reads the list on the server.
 export function ExamQuestionsView({
-  notebookId,
   notebookTitle,
   pageId,
   pageTitle,
-  initialQuestions,
+  pageHref,
+  questions,
 }: ExamQuestionsViewProps) {
-  const [questions, setQuestions] = useState<ExamQuestion[]>(initialQuestions);
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const router = useRouter();
+  const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [retiringId, setRetiringId] = useState<string | null>(null);
+  const [retireError, setRetireError] = useState<string | null>(null);
+  const [retiring, startRetire] = useTransition();
 
-  const sessionsHref = `/exams/${notebookId}`;
-  const editingQuestion = editingId
+  const editing = editingId
     ? questions.find((question) => question.id === editingId)
     : undefined;
+  const manualCount = questions.filter((q) => q.origin === "manual").length;
+  const aiCount = questions.length - manualCount;
+  const missing = EXAM_MIN_QUESTIONS - questions.length;
 
-  const activeQuestions = questions.filter((question) => !question.retiredAt);
-  // A question with no origin renders as "IA" in its row, so the header
-  // counts it the same way.
-  const manualCount = activeQuestions.filter(
-    (question) => question.origin === "manual",
-  ).length;
-  const aiCount = activeQuestions.length - manualCount;
-
-  function openCreateDialog() {
+  function openCreate() {
     setEditingId(null);
-    setDialogOpen(true);
+    setFormOpen(true);
   }
 
-  function openEditDialog(id: string) {
+  function openEdit(id: string) {
     setEditingId(id);
-    setDialogOpen(true);
+    setFormOpen(true);
   }
 
-  function retireQuestion(id: string) {
-    const today = new Date().toLocaleDateString("es", {
-      day: "numeric",
-      month: "short",
-    });
-    setQuestions((prev) =>
-      prev.map((question) =>
-        question.id === id ? { ...question, retiredAt: today } : question,
-      ),
-    );
-  }
-
-  function handleSubmit(values: QuestionFormValues) {
-    if (editingId) {
-      setQuestions((prev) =>
-        prev.map((question) =>
-          question.id === editingId
-            ? {
-                ...question,
-                stem: values.stem,
-                options: values.options,
-                correctIndex: values.correctIndex,
-                concept: values.concept,
-                explanation: values.explanation || undefined,
-              }
-            : question,
-        ),
-      );
-    } else {
-      setQuestions((prev) => [
-        ...prev,
-        {
-          id: generateManualId(pageId),
-          pageId,
-          stem: values.stem,
-          options: values.options,
-          correctIndex: values.correctIndex,
-          concept: values.concept,
-          explanation: values.explanation || undefined,
-          origin: "manual",
-        },
-      ]);
+  async function save(values: QuestionFormValues): Promise<string | null> {
+    try {
+      const result = editingId
+        ? await editExamQuestionAction({ questionId: editingId, ...values })
+        : await createExamQuestionAction({ pageId, ...values });
+      if (!result.ok) return ERROR_COPY[result.error.code] ?? SAVE_FAILURE;
+    } catch {
+      return SAVE_FAILURE;
     }
-    setEditingId(null);
+    router.refresh();
+    return null;
   }
 
-  const initialFormValues: QuestionFormValues | undefined = editingQuestion
+  function openRetire(id: string) {
+    setRetireError(null);
+    setRetiringId(id);
+  }
+
+  function confirmRetire() {
+    if (!retiringId) return;
+    const questionId = retiringId;
+    setRetireError(null);
+    startRetire(async () => {
+      let result: Awaited<ReturnType<typeof retireExamQuestionAction>>;
+      try {
+        result = await retireExamQuestionAction({ questionId });
+      } catch {
+        setRetireError(RETIRE_FAILURE);
+        return;
+      }
+      if (!result.ok) {
+        setRetireError(ERROR_COPY[result.error.code] ?? RETIRE_FAILURE);
+        return;
+      }
+      setRetiringId(null);
+      router.refresh();
+    });
+  }
+
+  const initialValues: QuestionFormValues | undefined = editing
     ? {
-        stem: editingQuestion.stem,
-        options: [...editingQuestion.options] as [
-          string,
-          string,
-          string,
-          string,
-        ],
-        correctIndex: editingQuestion.correctIndex,
-        concept: editingQuestion.concept,
-        explanation: editingQuestion.explanation ?? "",
+        stem: editing.stem,
+        options: [...editing.options] as [string, string, string, string],
+        correctIndex: editing.correctIndex as OptionIndex,
+        concept: editing.concept,
+        explanation: editing.explanation,
       }
     : undefined;
 
   return (
     <div className="mx-auto flex w-full max-w-[760px] flex-1 flex-col gap-5 py-8">
-      <BackLink href={sessionsHref}>Todos los exámenes</BackLink>
+      <BackLink href={pageHref}>Volver a la página</BackLink>
 
       <SectionHeader
-        eyebrow={
-          <span className="flex items-center gap-2">
-            {`Exámenes · ${notebookTitle}`}
-            <Pill size="sm" tone="neutral">
-              Vista previa
-            </Pill>
-          </span>
-        }
+        eyebrow={`Exámenes · ${notebookTitle}`}
         title={`${pageTitle} — preguntas`}
         titleClassName="text-xl"
-        description={`${activeQuestions.length} preguntas · ${aiCount} generadas por IA · ${manualCount} manuales`}
+        description={[
+          plural(questions.length, "pregunta", "preguntas"),
+          plural(aiCount, "generada por IA", "generadas por IA"),
+          plural(manualCount, "manual", "manuales"),
+        ].join(" · ")}
         actions={
-          <Button type="button" onClick={openCreateDialog}>
+          <Button
+            type="button"
+            onClick={openCreate}
+            data-testid="new-exam-question-button"
+          >
             <Plus aria-hidden="true" size={16} strokeWidth={2} />
             Nueva pregunta
           </Button>
         }
       />
 
-      <div className="flex flex-col gap-3">
-        {questions.map((question, index) => (
-          <ExamQuestionRow
-            key={question.id}
-            index={index + 1}
-            stem={question.stem}
-            concept={question.concept}
-            origin={question.origin ?? "ai"}
-            options={question.options}
-            correctIndex={question.correctIndex}
-            retiredAt={question.retiredAt}
-            onEdit={() => openEditDialog(question.id)}
-            onRetire={
-              question.retiredAt ? undefined : () => retireQuestion(question.id)
-            }
+      {missing > 0 && (
+        <p
+          data-testid="exam-questions-minimum"
+          className="flex items-start gap-2 rounded-xl border border-border-subtle bg-card px-4 py-3 text-[13px] text-fg-secondary"
+        >
+          <Info
+            aria-hidden="true"
+            size={16}
+            strokeWidth={1.75}
+            className="mt-px shrink-0 text-fg-muted"
           />
-        ))}
-      </div>
+          {`Un examen necesita al menos ${EXAM_MIN_QUESTIONS} preguntas. Agrega ${missing} más para poder rendirlo.`}
+        </p>
+      )}
+
+      {questions.length === 0 ? (
+        <EmptyState
+          fill
+          icon={
+            <IconTile size="56" tone="pink">
+              <ClipboardList aria-hidden="true" size={28} strokeWidth={1.75} />
+            </IconTile>
+          }
+          title="Esta página aún no tiene preguntas"
+          titleClassName="text-base"
+          description="Crea la primera con Nueva pregunta: enunciado, 4 opciones, la correcta y el concepto que evalúa."
+          descriptionClassName="max-w-[380px]"
+        />
+      ) : (
+        <div className="flex flex-col gap-3">
+          {questions.map((question, index) => (
+            <ExamQuestionRow
+              key={question.id}
+              index={index + 1}
+              stem={question.stem}
+              concept={question.concept}
+              origin={question.origin}
+              options={question.options as unknown as Tuple4}
+              correctIndex={question.correctIndex as OptionIndex}
+              onEdit={() => openEdit(question.id)}
+              onRetire={() => openRetire(question.id)}
+            />
+          ))}
+        </div>
+      )}
 
       <QuestionFormDialog
-        open={dialogOpen}
+        open={formOpen}
         onOpenChange={(open) => {
-          setDialogOpen(open);
+          setFormOpen(open);
           if (!open) setEditingId(null);
         }}
         mode={editingId ? "edit" : "create"}
-        initialValues={initialFormValues}
-        onSubmit={handleSubmit}
+        initialValues={initialValues}
+        onSubmit={save}
       />
+
+      <Dialog
+        open={retiringId !== null}
+        onOpenChange={(open) => {
+          if (!open) setRetiringId(null);
+        }}
+      >
+        <DialogContent data-testid="retire-exam-question-dialog">
+          <DialogHeader>
+            <DialogTitle>¿Retirar esta pregunta?</DialogTitle>
+            <DialogDescription>
+              Sale de tus exámenes y de tus repasos. Su historial se conserva.
+            </DialogDescription>
+          </DialogHeader>
+          {retireError && (
+            <p role="alert" className="text-destructive text-sm">
+              {retireError}
+            </p>
+          )}
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setRetiringId(null)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={confirmRetire}
+              disabled={retiring}
+            >
+              {retiring ? "Retirando…" : "Retirar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

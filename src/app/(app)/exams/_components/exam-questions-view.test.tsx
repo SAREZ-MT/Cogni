@@ -1,280 +1,267 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import type { ExamQuestion } from "../_data/sample";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { ExamQuestionView } from "@/modules/exams";
+import { err, ok } from "@/shared/kernel/result";
 import { ExamQuestionsView } from "./exam-questions-view";
 
-const QUESTIONS: ExamQuestion[] = [
-  {
-    id: "q1",
-    pageId: "pg",
-    stem: "Pregunta de la IA",
-    options: ["A1", "B1", "C1", "D1"],
-    correctIndex: 0,
-    concept: "Uno",
-    origin: "ai",
-  },
-  {
-    id: "q2",
-    pageId: "pg",
-    stem: "Pregunta manual",
-    options: ["A2", "B2", "C2", "D2"],
-    correctIndex: 1,
-    concept: "Dos",
-    origin: "manual",
-  },
-  {
-    id: "q3",
-    pageId: "pg",
-    stem: "Pregunta retirada",
-    options: ["A3", "B3", "C3", "D3"],
-    correctIndex: 2,
-    concept: "Tres",
-    origin: "ai",
-    retiredAt: "22 sept",
-  },
-  {
-    id: "q4",
-    pageId: "pg",
-    stem: "Variante",
-    options: ["A4", "B4", "C4", "D4"],
-    correctIndex: 3,
-    concept: "Cuatro",
-    origin: "ai_variant",
-  },
-];
+const {
+  createExamQuestionAction,
+  editExamQuestionAction,
+  retireExamQuestionAction,
+  refresh,
+} = vi.hoisted(() => ({
+  createExamQuestionAction: vi.fn(),
+  editExamQuestionAction: vi.fn(),
+  retireExamQuestionAction: vi.fn(),
+  refresh: vi.fn(),
+}));
+vi.mock("@/modules/exams", () => ({
+  EXAM_MIN_QUESTIONS: 10,
+  createExamQuestionAction,
+  editExamQuestionAction,
+  retireExamQuestionAction,
+}));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
 
-function setup(initialQuestions: ExamQuestion[] = QUESTIONS) {
+const PAGE_ID = "0a1b2c3d-4e5f-4061-8798-a1b2c3d4e5f6";
+
+function view(
+  id: string,
+  overrides: Partial<ExamQuestionView> = {},
+): ExamQuestionView {
+  return {
+    id,
+    pageId: PAGE_ID,
+    stem: `Pregunta ${id}`,
+    options: [`A${id}`, `B${id}`, `C${id}`, `D${id}`],
+    correctIndex: 1,
+    explanation: "",
+    concept: `Concepto ${id}`,
+    origin: "manual",
+    ...overrides,
+  };
+}
+
+function renderView(questions: ExamQuestionView[]) {
   const user = userEvent.setup();
   render(
     <ExamQuestionsView
-      notebookId="nb"
       notebookTitle="Biología"
-      pageId="pg"
+      pageId={PAGE_ID}
       pageTitle="Mitocondria"
-      initialQuestions={initialQuestions}
+      pageHref="/notebooks/nb/pages/pg"
+      questions={questions}
     />,
   );
   return user;
 }
 
-function rows() {
-  return screen.getAllByTestId("exam-question-row");
+async function fillForm(user: ReturnType<typeof userEvent.setup>) {
+  const dialog = screen.getByTestId("question-form-dialog");
+  await user.type(within(dialog).getByLabelText("Enunciado"), "¿Qué es?");
+  for (const [letter, text] of [
+    ["A", "Uno"],
+    ["B", "Dos"],
+    ["C", "Tres"],
+    ["D", "Cuatro"],
+  ] as const) {
+    await user.type(
+      within(dialog).getByPlaceholderText(`Opción ${letter}`),
+      text,
+    );
+  }
+  await user.click(
+    within(dialog).getByRole("radio", { name: "Opción B es la correcta" }),
+  );
+  await user.type(
+    within(dialog).getByLabelText("Concepto que evalúa"),
+    "Definición",
+  );
+  return dialog;
 }
 
 describe("ExamQuestionsView", () => {
-  afterEach(() => {
-    vi.useRealTimers();
+  beforeEach(() => {
+    for (const fn of [
+      createExamQuestionAction,
+      editExamQuestionAction,
+      retireExamQuestionAction,
+      refresh,
+    ]) {
+      fn.mockReset();
+    }
   });
 
-  it("counts active questions by origin, leaving out the retired ones", () => {
-    setup();
+  it("lists the page's questions with their counts and no preview label", () => {
+    renderView([view("q1", { origin: "ai" }), view("q2")]);
 
     expect(
-      screen.getByText("3 preguntas · 2 generadas por IA · 1 manuales"),
+      screen.getByRole("heading", { name: "Mitocondria — preguntas" }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByTestId("exam-question-row")).toHaveLength(2);
+    expect(
+      screen.getByText("2 preguntas · 1 generada por IA · 1 manual"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Vista previa")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /Volver a la página/ }),
+    ).toHaveAttribute("href", "/notebooks/nb/pages/pg");
+  });
+
+  it("uses the singular for counts of one", () => {
+    renderView([view("q1")]);
+
+    expect(
+      screen.getByText("1 pregunta · 0 generadas por IA · 1 manual"),
     ).toBeInTheDocument();
   });
 
-  it("lists every question, retired ones included and muted", () => {
-    setup();
-
-    expect(rows()).toHaveLength(4);
-    expect(within(rows()[2]).getByText("Retirada")).toBeInTheDocument();
-    expect(rows()[2]).toHaveClass("opacity-60");
-  });
-
-  it("shows each question's origin", () => {
-    setup();
-
-    expect(within(rows()[0]).getByText("IA")).toBeInTheDocument();
-    expect(within(rows()[1]).getByText("Manual")).toBeInTheDocument();
-    expect(within(rows()[3]).getByText("Variante")).toBeInTheDocument();
-  });
-
-  it("treats a question with no origin as AI generated", () => {
-    setup([{ ...QUESTIONS[0], origin: undefined }]);
-
-    expect(within(rows()[0]).getByText("IA")).toBeInTheDocument();
-    expect(screen.getByText(/1 generadas por IA/)).toBeInTheDocument();
-  });
-
-  it("links back to the notebook's exams", () => {
-    setup();
+  it("uses the singular for one AI question among several", () => {
+    renderView([view("q1", { origin: "ai" }), view("q2"), view("q3")]);
 
     expect(
-      screen.getByRole("link", { name: "Todos los exámenes" }),
-    ).toHaveAttribute("href", "/exams/nb");
+      screen.getByText("3 preguntas · 1 generada por IA · 2 manuales"),
+    ).toBeInTheDocument();
   });
 
-  it("retires a question without deleting it and stops offering 'Retirar'", async () => {
-    vi.useFakeTimers({ toFake: ["Date"] });
-    vi.setSystemTime(new Date("2026-09-24T12:00:00Z"));
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    render(
-      <ExamQuestionsView
-        notebookId="nb"
-        notebookTitle="Biología"
-        pageId="pg"
-        pageTitle="Mitocondria"
-        initialQuestions={QUESTIONS}
-      />,
-    );
+  it("explains calmly that an exam needs at least 10 questions", () => {
+    renderView([view("q1"), view("q2"), view("q3")]);
 
-    await user.click(
-      within(rows()[0]).getByRole("button", { name: "Retirar" }),
+    expect(screen.getByTestId("exam-questions-minimum")).toHaveTextContent(
+      "Un examen necesita al menos 10 preguntas. Agrega 7 más para poder rendirlo.",
     );
+  });
 
-    expect(rows()).toHaveLength(4);
-    expect(within(rows()[0]).getByText("Retirada")).toBeInTheDocument();
+  it("hides the minimum note once the page holds 10 questions", () => {
+    renderView(Array.from({ length: 10 }, (_, i) => view(`q${i}`)));
+
     expect(
-      within(rows()[0]).queryByRole("button", { name: "Retirar" }),
+      screen.queryByTestId("exam-questions-minimum"),
     ).not.toBeInTheDocument();
+  });
+
+  it("shows an empty state when the page has no questions", () => {
+    renderView([]);
+
     expect(
-      screen.getByText("2 preguntas · 1 generadas por IA · 1 manuales"),
+      screen.getByText("Esta página aún no tiene preguntas"),
     ).toBeInTheDocument();
   });
 
-  it("offers no 'Retirar' for an already retired question", () => {
-    setup();
+  it("creates a question through the Server Action and refreshes", async () => {
+    createExamQuestionAction.mockResolvedValue(ok(view("new")));
+    const user = renderView([]);
 
-    expect(
-      within(rows()[2]).queryByRole("button", { name: "Retirar" }),
-    ).not.toBeInTheDocument();
-    expect(
-      within(rows()[2]).getByRole("button", { name: "Editar" }),
-    ).toBeInTheDocument();
-  });
-
-  it("adds a manual question from 'Nueva pregunta'", async () => {
-    const user = setup();
-
-    await user.click(screen.getByRole("button", { name: /Nueva pregunta/ }));
-    expect(
-      screen.getByRole("heading", { name: "Nueva pregunta" }),
-    ).toBeInTheDocument();
-    await user.type(screen.getByLabelText("Enunciado"), "Mi pregunta");
-    await user.type(screen.getByPlaceholderText("Opción A"), "Uno");
-    await user.type(screen.getByPlaceholderText("Opción B"), "Dos");
-    await user.type(screen.getByPlaceholderText("Opción C"), "Tres");
-    await user.type(screen.getByPlaceholderText("Opción D"), "Cuatro");
+    await user.click(screen.getByRole("button", { name: "Nueva pregunta" }));
+    const dialog = await fillForm(user);
     await user.click(
-      screen.getByRole("radio", { name: "Opción B es la correcta" }),
+      within(dialog).getByRole("button", { name: "Guardar pregunta" }),
     );
-    await user.type(
-      screen.getByLabelText("Concepto que evalúa"),
-      "Mi concepto",
-    );
-    await user.click(screen.getByRole("button", { name: "Guardar pregunta" }));
 
-    expect(rows()).toHaveLength(5);
-    const added = rows()[4];
-    expect(within(added).getByText("5. Mi pregunta")).toBeInTheDocument();
-    expect(within(added).getByText("Manual")).toBeInTheDocument();
-    expect(within(added).getByText("B) Dos").tagName).toBe("STRONG");
-    expect(screen.getByText(/2 manuales/)).toBeInTheDocument();
+    expect(createExamQuestionAction).toHaveBeenCalledWith({
+      pageId: PAGE_ID,
+      stem: "¿Qué es?",
+      options: ["Uno", "Dos", "Tres", "Cuatro"],
+      correctIndex: 1,
+      concept: "Definición",
+      explanation: "",
+    });
+    expect(refresh).toHaveBeenCalled();
     expect(
       screen.queryByTestId("question-form-dialog"),
     ).not.toBeInTheDocument();
   });
 
-  it("gives each new manual question its own id so edits never cross", async () => {
-    const user = setup([]);
+  it("keeps the dialog open with Spanish copy when the server refuses", async () => {
+    createExamQuestionAction.mockResolvedValue(
+      err({ code: "EXAMS_INVALID_QUESTION", message: "x" }),
+    );
+    const user = renderView([]);
 
-    for (const stem of ["Primera", "Segunda"]) {
-      await user.click(screen.getByRole("button", { name: /Nueva pregunta/ }));
-      await user.type(screen.getByLabelText("Enunciado"), stem);
-      for (const letter of ["A", "B", "C", "D"]) {
-        await user.type(
-          screen.getByPlaceholderText(`Opción ${letter}`),
-          letter,
-        );
-      }
-      await user.type(screen.getByLabelText("Concepto que evalúa"), stem);
-      await user.click(
-        screen.getByRole("button", { name: "Guardar pregunta" }),
-      );
-    }
-    await user.click(within(rows()[0]).getByRole("button", { name: "Editar" }));
-    await user.clear(screen.getByLabelText("Enunciado"));
-    await user.type(screen.getByLabelText("Enunciado"), "Primera editada");
-    await user.click(screen.getByRole("button", { name: "Guardar cambios" }));
-
-    expect(
-      within(rows()[0]).getByText("1. Primera editada"),
-    ).toBeInTheDocument();
-    expect(within(rows()[1]).getByText("2. Segunda")).toBeInTheDocument();
-  });
-
-  it("edits a question in place, prefilled, keeping its origin and position", async () => {
-    const user = setup();
-
-    await user.click(within(rows()[1]).getByRole("button", { name: "Editar" }));
-    expect(
-      screen.getByRole("heading", { name: "Editar pregunta" }),
-    ).toBeInTheDocument();
-    expect(screen.getByLabelText("Enunciado")).toHaveValue("Pregunta manual");
-    expect(
-      screen.getByRole("radio", { name: "Opción B es la correcta" }),
-    ).toBeChecked();
-
-    await user.clear(screen.getByLabelText("Enunciado"));
-    await user.type(screen.getByLabelText("Enunciado"), "Texto nuevo");
+    await user.click(screen.getByRole("button", { name: "Nueva pregunta" }));
+    const dialog = await fillForm(user);
     await user.click(
-      screen.getByRole("radio", { name: "Opción D es la correcta" }),
+      within(dialog).getByRole("button", { name: "Guardar pregunta" }),
     );
-    await user.click(screen.getByRole("button", { name: "Guardar cambios" }));
 
-    expect(rows()).toHaveLength(4);
-    const edited = rows()[1];
-    expect(within(edited).getByText("2. Texto nuevo")).toBeInTheDocument();
-    expect(within(edited).getByText("Manual")).toBeInTheDocument();
-    expect(within(edited).getByText("D) D2").tagName).toBe("STRONG");
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+      "Revisa la pregunta: las 4 opciones deben ser distintas y ningún campo puede quedar vacío.",
+    );
+    expect(refresh).not.toHaveBeenCalled();
   });
 
-  it("starts 'Nueva pregunta' empty after editing another one", async () => {
-    const user = setup();
+  it("answers a thrown action with the generic failure", async () => {
+    createExamQuestionAction.mockRejectedValue(new Error("network"));
+    const user = renderView([]);
 
-    await user.click(within(rows()[1]).getByRole("button", { name: "Editar" }));
-    await user.click(screen.getByRole("button", { name: "Cancelar" }));
-    await user.click(screen.getByRole("button", { name: /Nueva pregunta/ }));
+    await user.click(screen.getByRole("button", { name: "Nueva pregunta" }));
+    const dialog = await fillForm(user);
+    await user.click(
+      within(dialog).getByRole("button", { name: "Guardar pregunta" }),
+    );
 
-    expect(screen.getByLabelText("Enunciado")).toHaveValue("");
-    expect(
-      screen.getByRole("button", { name: "Guardar pregunta" }),
-    ).toBeDisabled();
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+      "No pudimos guardar la pregunta. Intenta de nuevo.",
+    );
   });
 
-  it("changes nothing when the dialog is cancelled", async () => {
-    const user = setup();
+  it("edits a question in place, prefilled", async () => {
+    editExamQuestionAction.mockResolvedValue(ok(view("q1")));
+    const user = renderView([view("q1", { explanation: "Porque sí" })]);
 
-    await user.click(within(rows()[0]).getByRole("button", { name: "Editar" }));
-    await user.clear(screen.getByLabelText("Enunciado"));
-    await user.type(screen.getByLabelText("Enunciado"), "No guardar");
-    await user.click(screen.getByRole("button", { name: "Cancelar" }));
+    await user.click(screen.getByRole("button", { name: "Editar" }));
+    const dialog = screen.getByTestId("question-form-dialog");
+    expect(within(dialog).getByLabelText("Enunciado")).toHaveValue(
+      "Pregunta q1",
+    );
+    await user.clear(within(dialog).getByLabelText("Enunciado"));
+    await user.type(within(dialog).getByLabelText("Enunciado"), "Nueva");
+    await user.click(
+      within(dialog).getByRole("button", { name: "Guardar cambios" }),
+    );
 
-    expect(
-      within(rows()[0]).getByText("1. Pregunta de la IA"),
-    ).toBeInTheDocument();
+    expect(editExamQuestionAction).toHaveBeenCalledWith({
+      questionId: "q1",
+      stem: "Nueva",
+      options: ["Aq1", "Bq1", "Cq1", "Dq1"],
+      correctIndex: 1,
+      concept: "Concepto q1",
+      explanation: "Porque sí",
+    });
+    expect(refresh).toHaveBeenCalled();
   });
 
-  it("keeps the explanation of a manual question for its next edit", async () => {
-    const user = setup([]);
+  it("retires a question only after confirming", async () => {
+    retireExamQuestionAction.mockResolvedValue(ok({ id: "q1" }));
+    const user = renderView([view("q1")]);
 
-    await user.click(screen.getByRole("button", { name: /Nueva pregunta/ }));
-    await user.type(screen.getByLabelText("Enunciado"), "Con explicación");
-    for (const letter of ["A", "B", "C", "D"]) {
-      await user.type(screen.getByPlaceholderText(`Opción ${letter}`), letter);
-    }
-    await user.type(screen.getByLabelText("Concepto que evalúa"), "Concepto");
-    await user.type(
-      screen.getByLabelText("Explicación (opcional)"),
-      "Porque sí",
-    );
-    await user.click(screen.getByRole("button", { name: "Guardar pregunta" }));
-    await user.click(within(rows()[0]).getByRole("button", { name: "Editar" }));
+    await user.click(screen.getByRole("button", { name: "Retirar" }));
+    const dialog = screen.getByRole("dialog", {
+      name: "¿Retirar esta pregunta?",
+    });
+    expect(retireExamQuestionAction).not.toHaveBeenCalled();
+    await user.click(within(dialog).getByRole("button", { name: "Retirar" }));
 
-    expect(screen.getByLabelText("Explicación (opcional)")).toHaveValue(
-      "Porque sí",
+    expect(retireExamQuestionAction).toHaveBeenCalledWith({ questionId: "q1" });
+    expect(refresh).toHaveBeenCalled();
+  });
+
+  it("keeps the confirmation open with the error when retiring fails", async () => {
+    retireExamQuestionAction.mockResolvedValue(
+      err({ code: "EXAMS_QUESTION_NOT_FOUND", message: "x" }),
     );
+    const user = renderView([view("q1")]);
+
+    await user.click(screen.getByRole("button", { name: "Retirar" }));
+    const dialog = screen.getByRole("dialog", {
+      name: "¿Retirar esta pregunta?",
+    });
+    await user.click(within(dialog).getByRole("button", { name: "Retirar" }));
+
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+      "Esta pregunta ya no existe.",
+    );
+    expect(refresh).not.toHaveBeenCalled();
   });
 });
