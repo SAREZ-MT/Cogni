@@ -100,7 +100,7 @@ export function runSessionFeedbackRepositoryContract(
       ).toBeNull();
     });
 
-    it("update stores the done content and its generation", async () => {
+    it("settlePending stores the done content and its generation", async () => {
       const ctx = options.context();
       const repo = options.createRepository();
       const feedback = pending(ctx);
@@ -111,19 +111,19 @@ export function runSessionFeedbackRepositoryContract(
         await ctx.newGenerationId(),
         T1,
       );
-      await repo.update(done);
+      expect(await repo.settlePending(done)).toBe(true);
       expect(
         await repo.findBySession("flashcards", feedback.sessionId, ctx.ownerId),
       ).toEqual(done);
     });
 
-    it("update stores a failure without content", async () => {
+    it("settlePending stores a failure without content", async () => {
       const ctx = options.context();
       const repo = options.createRepository();
       const feedback = pending(ctx);
       await repo.create(feedback);
       const failed = failSessionFeedback(feedback, null, T1);
-      await repo.update(failed);
+      expect(await repo.settlePending(failed)).toBe(true);
       expect(
         await repo.findBySession("flashcards", feedback.sessionId, ctx.ownerId),
       ).toEqual(failed);
@@ -174,10 +174,10 @@ export function runSessionFeedbackRepositoryContract(
       const repo = options.createRepository();
       const failed = pending(ctx);
       await repo.create(failed);
-      await repo.update(failSessionFeedback(failed, null, T0));
+      await repo.settlePending(failSessionFeedback(failed, null, T0));
       const done = pending(ctx);
       await repo.create(done);
-      await repo.update(
+      await repo.settlePending(
         completeSessionFeedback(done, CONTENT, await ctx.newGenerationId(), T0),
       );
 
@@ -248,15 +248,72 @@ export function runSessionFeedbackRepositoryContract(
       expect(results.filter((row) => row !== null)).toHaveLength(1);
     });
 
-    it("update never touches another owner's row", async () => {
+    it("settlePending never overwrites a settled row and reports it did not apply", async () => {
       const ctx = options.context();
       const repo = options.createRepository();
       const feedback = pending(ctx);
       await repo.create(feedback);
-      await repo.update({
-        ...failSessionFeedback(feedback, null, T1),
-        ownerId: ctx.otherOwnerId,
-      });
+      const done = completeSessionFeedback(
+        feedback,
+        CONTENT,
+        await ctx.newGenerationId(),
+        T1,
+      );
+      await repo.settlePending(done);
+
+      // A slow request that lost the row settles it again, either way.
+      expect(
+        await repo.settlePending(failSessionFeedback(feedback, null, LATER)),
+      ).toBe(false);
+      expect(
+        await repo.settlePending(
+          completeSessionFeedback(
+            feedback,
+            { ...CONTENT, summary: "Otra." },
+            await ctx.newGenerationId(),
+            LATER,
+          ),
+        ),
+      ).toBe(false);
+      expect(
+        await repo.findBySession("flashcards", feedback.sessionId, ctx.ownerId),
+      ).toEqual(done);
+    });
+
+    it("settlePending never overwrites a failed row", async () => {
+      const ctx = options.context();
+      const repo = options.createRepository();
+      const feedback = pending(ctx);
+      await repo.create(feedback);
+      const failed = failSessionFeedback(feedback, null, T1);
+      await repo.settlePending(failed);
+
+      expect(
+        await repo.settlePending(
+          completeSessionFeedback(
+            feedback,
+            CONTENT,
+            await ctx.newGenerationId(),
+            LATER,
+          ),
+        ),
+      ).toBe(false);
+      expect(
+        await repo.findBySession("flashcards", feedback.sessionId, ctx.ownerId),
+      ).toEqual(failed);
+    });
+
+    it("settlePending never touches another owner's row", async () => {
+      const ctx = options.context();
+      const repo = options.createRepository();
+      const feedback = pending(ctx);
+      await repo.create(feedback);
+      expect(
+        await repo.settlePending({
+          ...failSessionFeedback(feedback, null, T1),
+          ownerId: ctx.otherOwnerId,
+        }),
+      ).toBe(false);
       expect(
         await repo.findBySession("flashcards", feedback.sessionId, ctx.ownerId),
       ).toEqual(feedback);

@@ -71,8 +71,10 @@ export class DrizzleSessionFeedbackRepository
     return row ? toFeedback(row) : null;
   }
 
-  async update(feedback: SessionFeedback): Promise<void> {
-    await this.db
+  // Conditional UPDATE: Postgres re-checks `status = 'pending'` after any
+  // concurrent writer commits, so only one settle can ever apply.
+  async settlePending(feedback: SessionFeedback): Promise<boolean> {
+    const settled = await this.db
       .update(sessionFeedback)
       .set({
         status: feedback.status,
@@ -84,8 +86,11 @@ export class DrizzleSessionFeedbackRepository
         and(
           eq(sessionFeedback.id, feedback.id),
           eq(sessionFeedback.ownerId, feedback.ownerId),
+          eq(sessionFeedback.status, "pending"),
         ),
-      );
+      )
+      .returning({ id: sessionFeedback.id });
+    return settled.length > 0;
   }
 
   // A conditional UPDATE: Postgres row locking re-checks the WHERE for a

@@ -13,9 +13,12 @@ export interface SessionFeedbackRepository {
     sessionId: string,
     ownerId: string,
   ): Promise<SessionFeedback | null>;
-  // Stores status, content, generation and updatedAt of an existing row of
-  // the same owner; another owner's row is left untouched.
-  update(feedback: SessionFeedback): Promise<void>;
+  // Settles the row: stores status, content, generation and updatedAt only
+  // while the stored row (same id and owner) is still "pending". Returns
+  // whether it applied. A done or failed row is final and never
+  // overwritten, so a slow request whose row was reclaimed and settled by
+  // another one cannot replace that outcome.
+  settlePending(feedback: SessionFeedback): Promise<boolean>;
   // Atomically takes over a "pending" row last touched before `staleBefore`
   // (its request died or hung): sets updatedAt to `now` and returns the
   // row. Returns null and changes nothing for a fresh pending row, a done

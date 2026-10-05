@@ -47,8 +47,11 @@ const FEEDBACK_OBJECT = {
 class StubFeedbackRepository implements SessionFeedbackRepository {
   readonly rows = new Map<string, SessionFeedback>();
   creates = 0;
-  // Statuses whose update throws, to simulate a database failure.
-  failUpdatesOf = new Set<SessionFeedback["status"]>();
+  // Statuses whose settle throws before writing (database unavailable).
+  failSettlesOf = new Set<SessionFeedback["status"]>();
+  // Statuses whose settle commits and then throws (connection lost while
+  // the commit was acknowledged): the caller cannot tell it applied.
+  commitThenThrowOf = new Set<SessionFeedback["status"]>();
   async create(feedback: SessionFeedback): Promise<boolean> {
     this.creates += 1;
     if (this.rows.has(feedback.sessionId)) return false;
@@ -65,11 +68,24 @@ class StubFeedbackRepository implements SessionFeedbackRepository {
       ? row
       : null;
   }
-  async update(feedback: SessionFeedback): Promise<void> {
-    if (this.failUpdatesOf.has(feedback.status)) {
+  async settlePending(feedback: SessionFeedback): Promise<boolean> {
+    if (this.failSettlesOf.has(feedback.status)) {
       throw new Error("database unavailable");
     }
+    const row = this.rows.get(feedback.sessionId);
+    if (
+      !row ||
+      row.id !== feedback.id ||
+      row.ownerId !== feedback.ownerId ||
+      row.status !== "pending"
+    ) {
+      return false;
+    }
     this.rows.set(feedback.sessionId, feedback);
+    if (this.commitThenThrowOf.has(feedback.status)) {
+      throw new Error("connection lost after commit");
+    }
+    return true;
   }
   async reclaimStalePending(
     kind: SessionKind,
@@ -468,7 +484,7 @@ describe("requestSessionFeedback", () => {
 
   it("stores failed feedback when saving the done content throws", async () => {
     await gradedSession();
-    fx.feedback.failUpdatesOf.add("done");
+    fx.feedback.failSettlesOf.add("done");
 
     const result = await requestSessionFeedback(
       { sessionId: SESSION },
@@ -487,7 +503,7 @@ describe("requestSessionFeedback", () => {
   it("still returns failed feedback when saving the failure throws too", async () => {
     fx = build({ ai: "fail" });
     await gradedSession();
-    fx.feedback.failUpdatesOf.add("failed");
+    fx.feedback.failSettlesOf.add("failed");
 
     const result = await requestSessionFeedback(
       { sessionId: SESSION },
@@ -498,6 +514,113 @@ describe("requestSessionFeedback", () => {
     expect(result.ok && result.value.status).toBe("failed");
     // The row stays pending; a later request reclaims it once stale.
     expect(fx.feedback.rows.get(SESSION)?.status).toBe("pending");
+  });
+
+  it("keeps a done write that committed even though the database then reported an error", async () => {
+    await gradedSession();
+    fx.feedback.commitThenThrowOf.add("done");
+
+    const result = await requestSessionFeedback(
+      { sessionId: SESSION },
+      fx.deps,
+      OWNER,
+    );
+
+    expect(result.ok && result.value).toMatchObject({
+      status: "done",
+      content: FEEDBACK_OBJECT,
+      generationId: "gen-1",
+    });
+    expect(fx.feedback.rows.get(SESSION)?.status).toBe("done");
+  });
+
+  describe("a row another request settled while this one waited for the AI", () => {
+    const OTHER_CONTENT = {
+      summary: "Otra respuesta.",
+      strengths: ["Constancia"],
+      toReinforce: ["Las fases de la mitosis"],
+      nextStepSuggestion: "Repasa mañana.",
+    };
+
+    // The slow request's AI call: while it waits, another request reclaims
+    // the row (stale) and settles it with `status`.
+    function settledMeanwhile(
+      status: "done" | "failed",
+      outcome: "ok" | "fail",
+    ) {
+      let settled: SessionFeedback | null = null;
+      const ai = makeAi(outcome);
+      fx.deps.ai = {
+        generateStructured: async (input) => {
+          const row = fx.feedback.rows.get(SESSION) as SessionFeedback;
+          settled =
+            status === "done"
+              ? {
+                  ...row,
+                  status,
+                  content: OTHER_CONTENT,
+                  generationId: "gen-other",
+                  updatedAt: NOW,
+                }
+              : {
+                  ...row,
+                  status,
+                  content: null,
+                  generationId: null,
+                  updatedAt: NOW,
+                };
+          fx.feedback.rows.set(SESSION, settled);
+          return ai.generateStructured(input);
+        },
+      };
+      return () => settled;
+    }
+
+    it("returns the other request's done row instead of overwriting it with this answer", async () => {
+      await gradedSession();
+      const settled = settledMeanwhile("done", "ok");
+
+      const result = await requestSessionFeedback(
+        { sessionId: SESSION },
+        fx.deps,
+        OWNER,
+      );
+
+      expect(result.ok && result.value).toEqual(settled());
+      expect(fx.feedback.rows.get(SESSION)).toMatchObject({
+        status: "done",
+        content: OTHER_CONTENT,
+        generationId: "gen-other",
+      });
+    });
+
+    it("never turns the other request's done row into failed when this AI call fails", async () => {
+      await gradedSession();
+      const settled = settledMeanwhile("done", "fail");
+
+      const result = await requestSessionFeedback(
+        { sessionId: SESSION },
+        fx.deps,
+        OWNER,
+      );
+
+      expect(result.ok && result.value).toEqual(settled());
+      expect(fx.feedback.rows.get(SESSION)?.status).toBe("done");
+    });
+
+    it("returns the other request's failed row instead of storing this answer over it", async () => {
+      await gradedSession();
+      const settled = settledMeanwhile("failed", "ok");
+
+      const result = await requestSessionFeedback(
+        { sessionId: SESSION },
+        fx.deps,
+        OWNER,
+      );
+
+      expect(result.ok && result.value).toEqual(settled());
+      expect(fx.feedback.rows.get(SESSION)?.status).toBe("failed");
+    });
   });
 
   it("stores failed feedback when the AI does not answer in time", async () => {

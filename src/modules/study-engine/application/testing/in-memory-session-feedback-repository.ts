@@ -26,11 +26,18 @@ export class InMemorySessionFeedbackRepository
     return row && row.ownerId === ownerId ? row : null;
   }
 
-  async update(feedback: SessionFeedback): Promise<void> {
+  // No await between the check and the write: atomic like the conditional
+  // UPDATE of the Drizzle adapter.
+  async settlePending(feedback: SessionFeedback): Promise<boolean> {
     const key = keyOf(feedback.sessionKind, feedback.sessionId);
     const row = this.rows.get(key);
-    if (!row || row.ownerId !== feedback.ownerId || row.id !== feedback.id) {
-      return;
+    if (
+      !row ||
+      row.ownerId !== feedback.ownerId ||
+      row.id !== feedback.id ||
+      row.status !== "pending"
+    ) {
+      return false;
     }
     this.rows.set(key, {
       ...row,
@@ -39,6 +46,7 @@ export class InMemorySessionFeedbackRepository
       generationId: feedback.generationId,
       updatedAt: feedback.updatedAt,
     });
+    return true;
   }
 
   // No await between the check and the write: atomic like the conditional
