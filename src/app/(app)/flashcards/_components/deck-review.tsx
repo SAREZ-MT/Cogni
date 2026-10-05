@@ -2,7 +2,13 @@
 
 import { Play } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { type ReactNode, useState, useTransition } from "react";
+import {
+  type ReactNode,
+  useEffect,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import {
   finishFlashcardSessionAction,
   gradeFlashcardAction,
@@ -45,6 +51,9 @@ export interface DeckReviewProps {
   actions?: ReactNode;
   // The deck itself (the review list or its empty state).
   children: ReactNode;
+  // Opened from "Repasos de hoy" (`?repasar=1`): start the review right
+  // away instead of waiting for "Repasar".
+  autoStart?: boolean;
 }
 
 interface ActiveSession {
@@ -104,8 +113,10 @@ export function DeckReview({
   canReview,
   actions,
   children,
+  autoStart = false,
 }: DeckReviewProps) {
   const router = useRouter();
+  const autoStarted = useRef(false);
   const [session, setSession] = useState<ActiveSession | null>(null);
   const [notice, setNotice] = useState<Notice>(null);
   const [feedback, setFeedback] = useState<Feedback>({ status: "loading" });
@@ -138,6 +149,22 @@ export function DeckReview({
       });
     });
   }
+
+  // Once per mount (the ref survives StrictMode's effect replay). The query
+  // is dropped through the native history API, which Next.js syncs without
+  // a server render, so a reload or "Volver al mazo" shows the deck instead
+  // of starting another session.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: start once on mount, not on every render's new startReview
+  useEffect(() => {
+    if (!autoStart || !canReview || autoStarted.current) return;
+    autoStarted.current = true;
+    window.history.replaceState(
+      null,
+      "",
+      `/flashcards/${notebookId}/${pageId}`,
+    );
+    startReview();
+  }, [autoStart, canReview, notebookId, pageId]);
 
   if (session) {
     const { sessionId } = session;

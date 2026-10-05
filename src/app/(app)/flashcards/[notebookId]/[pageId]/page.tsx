@@ -19,6 +19,7 @@ import { plural } from "../../_lib/plural";
 
 interface FlashcardsSessionPageProps {
   params: Promise<{ notebookId: string; pageId: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
 // Deck route. One page owns at most one deck (product rule 2026-09-24), so
@@ -29,14 +30,17 @@ interface FlashcardsSessionPageProps {
 //   sample data, ungraded and local.
 // - Otherwise: the page's real cards as a flip-card review list, with
 //   "Nueva tarjeta", a per-card archive action and "Repasar", which runs the
-//   graded SM-2 session over the page's due cards (DeckReview). A page that
+//   graded SM-2 session over the page's due cards (DeckReview); opened from
+//   "Repasos de hoy" with `?repasar=1`, that session starts at once. A page that
 //   is unknown, archived or not the caller's 404s. A page without cards has
 //   no deck yet (a deck is never empty): it shows an empty state whose
 //   "Nueva tarjeta" creates the first card and with it the deck.
 export default async function FlashcardsSessionPage({
   params,
+  searchParams,
 }: FlashcardsSessionPageProps) {
   const { notebookId, pageId } = await params;
+  const { repasar } = await searchParams;
 
   if (designPreviewsEnabled()) {
     const sampleNotebook = getSampleNotebook(notebookId);
@@ -93,6 +97,7 @@ export default async function FlashcardsSessionPage({
             : plural(cards.value.length, "tarjeta", "tarjetas")
         }
         canReview={cards.value.length > 0}
+        autoStart={repasar === "1"}
         actions={<NewFlashcardDialog pageId={page.id} />}
       >
         {cards.value.length === 0 ? (

@@ -5,6 +5,12 @@ export {
   gradeFlashcard,
 } from "./grade-flashcard";
 export {
+  MASTERY_RECOMPUTE_BATCH_SIZE,
+  type MasteryRecomputeSummary,
+  type RecomputeAllPageMasteryDeps,
+  recomputeAllPageMastery,
+} from "./recompute-all-page-mastery";
+export {
   type DueFlashcard,
   type PageAccess,
   type StartedFlashcardSession,

@@ -23,6 +23,12 @@ export class InMemoryPageMasteryRepository implements PageMasteryRepository {
     return row && row.ownerId === ownerId ? row : null;
   }
 
+  // Any owner's row, for the cross-owner InMemoryStudiedPageReader (the
+  // Drizzle query joins page_mastery on page_id alone).
+  computedAtOf(pageId: string): Date | null {
+    return this.rows.get(pageId)?.computedAt ?? null;
+  }
+
   async listByOwner(ownerId: string): Promise<PageMastery[]> {
     return [...this.rows.values()]
       .filter((row) => row.ownerId === ownerId)

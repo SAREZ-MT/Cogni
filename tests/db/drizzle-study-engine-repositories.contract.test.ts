@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { eq } from "drizzle-orm";
 import { afterAll } from "vitest";
 import { runFlashcardSessionRepositoryContract } from "@/modules/study-engine/application/testing/flashcard-session-repository.contract";
 import { runPageMasteryRepositoryContract } from "@/modules/study-engine/application/testing/page-mastery-repository.contract";
@@ -42,12 +43,12 @@ if (process.env.DATABASE_URL) {
     position: 1,
   });
 
-  async function newPage(): Promise<string> {
+  async function newPage(inNotebook: string = notebookId): Promise<string> {
     const id = randomUUID();
     await db.insert(pages).values({
       id,
       ownerId: owner.id,
-      notebookId,
+      notebookId: inNotebook,
       title: `Página ${id}`,
       content: { type: "doc", content: [] },
       position: nextPagePosition++,
@@ -63,7 +64,27 @@ if (process.env.DATABASE_URL) {
 
   runStudyItemRepositoryContract({
     createRepository: () => new DrizzleStudyItemRepository(db),
-    context: () => ({ ...ownership, newPageId: newPage }),
+    context: () => ({
+      ...ownership,
+      newPageId: () => newPage(),
+      archivePage: async (pageId) => {
+        await db
+          .update(pages)
+          .set({ archivedAt: new Date() })
+          .where(eq(pages.id, pageId));
+      },
+      newPageInArchivedNotebook: async () => {
+        const archivedNotebookId = randomUUID();
+        await db.insert(notebooks).values({
+          id: archivedNotebookId,
+          ownerId: owner.id,
+          title: "Cuaderno archivado del contrato",
+          position: 2,
+          archivedAt: new Date(),
+        });
+        return newPage(archivedNotebookId);
+      },
+    }),
   });
 
   runReviewLogRepositoryContract({

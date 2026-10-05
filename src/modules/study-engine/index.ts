@@ -4,14 +4,17 @@
 export type {
   DueFlashcard,
   GradedFlashcard,
+  MasteryRecomputeSummary,
   PageAccess,
   StartedFlashcardSession,
 } from "./application";
 export * from "./domain";
 export {
   createFlashcardSessionsServerApi,
+  createMasteryRecomputeJob,
   createSessionFeedbackSources,
   createStudyItemRepository,
   type FlashcardSessionsServerApi,
+  type MasteryRecomputeJob,
   type SessionFeedbackSources,
 } from "./server-api";

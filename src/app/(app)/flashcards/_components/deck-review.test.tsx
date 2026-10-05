@@ -1,5 +1,6 @@
 import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { StrictMode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { refresh } = vi.hoisted(() => ({ refresh: vi.fn() }));
@@ -391,6 +392,66 @@ describe("DeckReview", () => {
         within(summary).queryByTestId("session-feedback"),
       ).not.toBeInTheDocument();
       expect(actions.requestSessionFeedbackAction).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("opened from Repasos de hoy (autoStart)", () => {
+    function renderAutoStart(canReview = true) {
+      render(
+        <StrictMode>
+          <DeckReview
+            notebookId="nb"
+            notebookTitle="Biología"
+            pageId={PAGE}
+            deckLabel="Mitocondria"
+            description="2 tarjetas"
+            canReview={canReview}
+            autoStart
+          >
+            <p>lista del mazo</p>
+          </DeckReview>
+        </StrictMode>,
+      );
+    }
+
+    beforeEach(() => {
+      window.history.replaceState(null, "", `/flashcards/nb/${PAGE}?repasar=1`);
+    });
+
+    it("starts the page's session once, without a click, and drops ?repasar from the URL", async () => {
+      actions.startFlashcardSessionAction.mockResolvedValue({
+        ok: true,
+        value: { sessionId: SESSION, cards: [card(1)] },
+      });
+
+      renderAutoStart();
+
+      expect(await screen.findByTestId("flashcard-player")).toBeInTheDocument();
+      expect(actions.startFlashcardSessionAction).toHaveBeenCalledTimes(1);
+      expect(actions.startFlashcardSessionAction).toHaveBeenCalledWith({
+        pageId: PAGE,
+      });
+      expect(window.location.pathname).toBe(`/flashcards/nb/${PAGE}`);
+      expect(window.location.search).toBe("");
+    });
+
+    it("says the deck is up to date when nothing is due any more", async () => {
+      actions.startFlashcardSessionAction.mockResolvedValue({
+        ok: false,
+        error: { code: "STUDY_ENGINE_NOTHING_DUE", message: "x" },
+      });
+
+      renderAutoStart();
+
+      expect(await screen.findByText("Estás al día")).toBeInTheDocument();
+      expect(screen.getByText("lista del mazo")).toBeInTheDocument();
+    });
+
+    it("starts nothing on a page without cards", async () => {
+      renderAutoStart(false);
+
+      await act(async () => {});
+      expect(actions.startFlashcardSessionAction).not.toHaveBeenCalled();
     });
   });
 });

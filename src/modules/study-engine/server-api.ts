@@ -9,7 +9,9 @@ import {
   finishFlashcardSession,
   type GradedFlashcard,
   gradeFlashcard,
+  type MasteryRecomputeSummary,
   type PageAccess,
+  recomputeAllPageMastery,
   type StartedFlashcardSession,
   startFlashcardSession,
 } from "./application";
@@ -17,12 +19,14 @@ import type { FlashcardSession } from "./domain/flashcard-session";
 import type { FlashcardSessionRepository } from "./domain/flashcard-session-repository";
 import type { ReviewLogRepository } from "./domain/review-log-repository";
 import type { SessionFeedbackRepository } from "./domain/session-feedback-repository";
+import type { StudiedPage } from "./domain/studied-page-reader";
 import type { FlashcardRating } from "./domain/study-item";
 import type { StudyItemRepository } from "./domain/study-item-repository";
 import {
   DrizzleFlashcardSessionRepository,
   DrizzleReviewLogRepository,
   DrizzleSessionFeedbackRepository,
+  DrizzleStudiedPageReader,
   DrizzleStudyItemRepository,
   DrizzleStudyUnitOfWork,
 } from "./infrastructure";
@@ -100,5 +104,33 @@ export function createSessionFeedbackSources(
     reviewLogs: new DrizzleReviewLogRepository(db),
     studyItems: new DrizzleStudyItemRepository(db),
     feedback: new DrizzleSessionFeedbackRepository(db),
+  };
+}
+
+// The daily mastery job (/api/recompute-mastery). Runs without a user
+// session over every owner's pages; the route authenticates the cron and
+// sets the time budget from its maxDuration.
+export interface MasteryRecomputeJob {
+  run(): Promise<MasteryRecomputeSummary>;
+}
+
+export function createMasteryRecomputeJob(deps: {
+  db: DbExecutor;
+  clock: Clock;
+  ids: { next(): string };
+  timeBudgetMs: number;
+  onPageError?: (page: StudiedPage, error: unknown) => void;
+}): MasteryRecomputeJob {
+  const { db, clock, ids, timeBudgetMs, onPageError } = deps;
+  return {
+    run: () =>
+      recomputeAllPageMastery({
+        pages: new DrizzleStudiedPageReader(db),
+        uow: new DrizzleStudyUnitOfWork(db),
+        clock,
+        ids,
+        timeBudgetMs,
+        onPageError,
+      }),
   };
 }

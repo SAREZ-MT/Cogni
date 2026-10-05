@@ -3,8 +3,15 @@ import type { StudyItemRepository } from "../../domain/study-item-repository";
 
 // In-memory StudyItemRepository for unit tests; satisfies the shared
 // contract (study-item-repository.contract.ts). Rows are keyed by id.
+// There is no pages table here: `isPageActive` stands in for the join that
+// drops archived pages and pages of archived notebooks from listDue (every
+// page is active by default).
 export class InMemoryStudyItemRepository implements StudyItemRepository {
   private readonly rows = new Map<string, StudyItem>();
+
+  constructor(
+    private readonly isPageActive: (pageId: string) => boolean = () => true,
+  ) {}
 
   async save(item: StudyItem): Promise<void> {
     const existing = this.rows.get(item.id);
@@ -54,6 +61,7 @@ export class InMemoryStudyItemRepository implements StudyItemRepository {
         (item) =>
           item.suspendedAt === null &&
           item.dueAt.getTime() <= now.getTime() &&
+          this.isPageActive(item.pageId) &&
           (pageId === undefined || item.pageId === pageId),
       )
       .sort(
@@ -85,8 +93,15 @@ export class InMemoryStudyItemRepository implements StudyItemRepository {
     return suspended;
   }
 
+  // Every owner's items, for the cross-owner InMemoryStudiedPageReader.
+  allItems(): StudyItem[] {
+    return [...this.rows.values()];
+  }
+
   // Single-threaded in memory: nothing to serialize.
   async lock(_id: string, _ownerId: string): Promise<void> {}
+
+  async lockPage(_pageId: string, _ownerId: string): Promise<void> {}
 
   private owned(ownerId: string): StudyItem[] {
     return [...this.rows.values()].filter((item) => item.ownerId === ownerId);

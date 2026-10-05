@@ -15,7 +15,8 @@ export interface StudyItemRepository {
     ownerId: string,
   ): Promise<StudyItem | null>;
   // Non-suspended items with dueAt <= now, oldest due first; limited to one
-  // page when pageId is given.
+  // page when pageId is given. Items of archived pages and of pages in
+  // archived notebooks are never due.
   listDue(ownerId: string, now: Date, pageId?: string): Promise<StudyItem[]>;
   // Every item of the page, suspended ones included (computeMastery skips
   // them), ordered by creation.
@@ -28,4 +29,9 @@ export interface StudyItemRepository {
   // work ends (row lock), so a double submit cannot apply SM-2 twice to the
   // same state. A no-op outside a transaction and in memory.
   lock(id: string, ownerId: string): Promise<void>;
+  // Row-locks every item of the page (in id order) until the surrounding
+  // unit of work ends, so the daily mastery job waits for an in-flight
+  // grade of any of them and then reads the graded state. A no-op outside
+  // a transaction and in memory.
+  lockPage(pageId: string, ownerId: string): Promise<void>;
 }

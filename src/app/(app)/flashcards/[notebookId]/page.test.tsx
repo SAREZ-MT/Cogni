@@ -14,6 +14,10 @@ const { getNotebookTitleForRoute } = vi.hoisted(() => ({
   getNotebookTitleForRoute: vi.fn(),
 }));
 vi.mock("@/modules/notebooks", () => ({ getNotebookTitleForRoute }));
+const { listDueTodayAction } = vi.hoisted(() => ({
+  listDueTodayAction: vi.fn(),
+}));
+vi.mock("@/modules/scheduling", () => ({ listDueTodayAction }));
 
 import FlashcardsNotebookPage from "./page";
 
@@ -39,6 +43,21 @@ describe("FlashcardsNotebookPage (real data)", () => {
   beforeEach(() => {
     notFound.mockClear();
     listDecksAction.mockReset();
+    listDueTodayAction.mockReset();
+    listDueTodayAction.mockResolvedValue({
+      ok: true,
+      value: [
+        {
+          pageId: "p2",
+          pageTitle: "Membrana celular",
+          notebookId: "n1",
+          notebookTitle: "Biología Celular",
+          notebookColor: "purple",
+          due: { flashcard: 4, exam_question: 0, recall_question: 0 },
+          earliestDueAt: new Date("2026-10-04T08:00:00.000Z"),
+        },
+      ],
+    });
     getNotebookTitleForRoute.mockReset();
     getNotebookTitleForRoute.mockResolvedValue("Biología Celular");
     listDecksAction.mockResolvedValue({
@@ -86,10 +105,26 @@ describe("FlashcardsNotebookPage (real data)", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows no due status: there is no scheduler before Phase 4", async () => {
+  it("shows each deck's due flashcards, or Al día when none is due", async () => {
     render(await FlashcardsNotebookPage({ params: params("n1") }));
 
-    expect(screen.queryByText(/pendientes/)).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /Membrana celular/ }),
+    ).toHaveTextContent("4 pendientes");
+    expect(screen.getByRole("link", { name: /Mitocondria/ })).toHaveTextContent(
+      "Al día",
+    );
+  });
+
+  it("shows no due status when the due list could not load", async () => {
+    listDueTodayAction.mockResolvedValue({
+      ok: false,
+      error: { code: "SCHEDULING_UNEXPECTED", message: "x" },
+    });
+
+    render(await FlashcardsNotebookPage({ params: params("n1") }));
+
+    expect(screen.queryByText(/pendiente/)).not.toBeInTheDocument();
     expect(screen.queryByText("Al día")).not.toBeInTheDocument();
   });
 

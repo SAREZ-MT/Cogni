@@ -1,6 +1,11 @@
 import { and, asc, eq, isNull, lte } from "drizzle-orm";
 import type { DbExecutor } from "@/shared/db/client";
-import { type StudyItemRow, studyItems } from "@/shared/db/schema";
+import {
+  notebooks,
+  pages,
+  type StudyItemRow,
+  studyItems,
+} from "@/shared/db/schema";
 import type { StudyItem, StudyItemKind } from "../domain/study-item";
 import type { StudyItemRepository } from "../domain/study-item-repository";
 
@@ -92,19 +97,25 @@ export class DrizzleStudyItemRepository implements StudyItemRepository {
     now: Date,
     pageId?: string,
   ): Promise<StudyItem[]> {
+    // Items of an archived page, or of a page in an archived notebook, are
+    // out of every session ("Repasos de hoy" included) until restored.
     const rows = await this.db
-      .select()
+      .select({ item: studyItems })
       .from(studyItems)
+      .innerJoin(pages, eq(pages.id, studyItems.pageId))
+      .innerJoin(notebooks, eq(notebooks.id, pages.notebookId))
       .where(
         and(
           eq(studyItems.ownerId, ownerId),
           isNull(studyItems.suspendedAt),
           lte(studyItems.dueAt, now),
+          isNull(pages.archivedAt),
+          isNull(notebooks.archivedAt),
           pageId === undefined ? undefined : eq(studyItems.pageId, pageId),
         ),
       )
       .orderBy(asc(studyItems.dueAt), asc(studyItems.id));
-    return rows.map(toStudyItem);
+    return rows.map((row) => toStudyItem(row.item));
   }
 
   async listByPage(pageId: string, ownerId: string): Promise<StudyItem[]> {
@@ -143,6 +154,18 @@ export class DrizzleStudyItemRepository implements StudyItemRepository {
       .select({ id: studyItems.id })
       .from(studyItems)
       .where(and(eq(studyItems.id, id), eq(studyItems.ownerId, ownerId)))
+      .for("update");
+  }
+
+  async lockPage(pageId: string, ownerId: string): Promise<void> {
+    // Id order: two lockers of overlapping rows queue instead of deadlocking.
+    await this.db
+      .select({ id: studyItems.id })
+      .from(studyItems)
+      .where(
+        and(eq(studyItems.pageId, pageId), eq(studyItems.ownerId, ownerId)),
+      )
+      .orderBy(asc(studyItems.id))
       .for("update");
   }
 }

@@ -9,6 +9,10 @@ export interface StudyItemRepositoryContractContext {
   // insert a real page row (FK) per test.
   readonly newPageId: () => Promise<string>;
   readonly newId: () => string;
+  // Archives the page (logical delete), so its items stop being due.
+  readonly archivePage: (pageId: string) => Promise<void>;
+  // Returns a page owned by `ownerId` whose notebook is archived.
+  readonly newPageInArchivedNotebook: () => Promise<string>;
 }
 
 export interface StudyItemRepositoryContractOptions {
@@ -168,6 +172,29 @@ export function runStudyItemRepositoryContract(
         expect(onlyA.map((item) => item.id)).toEqual([onA.id]);
       });
 
+      it("skips items of archived pages and archived notebooks", async () => {
+        const ctx = options.context();
+        const repo = options.createRepository();
+        const active = await ctx.newPageId();
+        const archived = await ctx.newPageId();
+        const inArchivedNotebook = await ctx.newPageInArchivedNotebook();
+        const onActive = makeItem(ctx, active, { dueAt: at(1) });
+        const onArchived = makeItem(ctx, archived, { dueAt: at(1) });
+        const onArchivedNotebook = makeItem(ctx, inArchivedNotebook, {
+          dueAt: at(1),
+        });
+        for (const item of [onActive, onArchived, onArchivedNotebook]) {
+          await repo.save(item);
+        }
+        await ctx.archivePage(archived);
+
+        const all = (await repo.listDue(ctx.ownerId, at(2))).map((i) => i.id);
+        expect(all).toContain(onActive.id);
+        expect(all).not.toContain(onArchived.id);
+        expect(all).not.toContain(onArchivedNotebook.id);
+        expect(await repo.listDue(ctx.ownerId, at(2), archived)).toEqual([]);
+      });
+
       it("never lists another owner's items", async () => {
         const ctx = options.context();
         const repo = options.createRepository();
@@ -242,6 +269,18 @@ export function runStudyItemRepositoryContract(
       await repo.lock(ctx.newId(), ctx.ownerId);
       await repo.lock(item.id, ctx.otherOwnerId);
       expect(await repo.findById(item.id, ctx.ownerId)).toEqual(item);
+    });
+
+    it("lockPage resolves for an owned page, an unknown page and another owner, changing nothing", async () => {
+      const ctx = options.context();
+      const repo = options.createRepository();
+      const pageId = await ctx.newPageId();
+      const item = makeItem(ctx, pageId);
+      await repo.save(item);
+      await repo.lockPage(pageId, ctx.ownerId);
+      await repo.lockPage(ctx.newId(), ctx.ownerId);
+      await repo.lockPage(pageId, ctx.otherOwnerId);
+      expect(await repo.listByPage(pageId, ctx.ownerId)).toEqual([item]);
     });
   });
 }

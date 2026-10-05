@@ -78,11 +78,11 @@ export function DeckSummaryCard({
         <p className="mt-1 text-fg-muted text-xs">
           {meta ?? (
             <>
-              {cardCount} tarjetas
+              {cardCount} {cardCount === 1 ? "tarjeta" : "tarjetas"}
               {dueCount > 0 ? (
                 <span className="font-medium text-error-600">
                   {" "}
-                  · {dueCount} pendientes
+                  · {dueCount} {dueCount === 1 ? "pendiente" : "pendientes"}
                 </span>
               ) : (
                 <span className="font-medium text-success-600">

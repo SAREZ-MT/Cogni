@@ -36,8 +36,13 @@ vi.mock("@/modules/notebooks", () => ({
 
 import FlashcardsSessionPage from "./page";
 
-const props = (notebookId: string, pageId: string) => ({
+const props = (
+  notebookId: string,
+  pageId: string,
+  search: Record<string, string> = {},
+) => ({
   params: Promise.resolve({ notebookId, pageId }),
+  searchParams: Promise.resolve(search),
 });
 
 const NOTEBOOK = "0a1b2c3d-4e5f-4061-8798-a1b2c3d4e5f6";
@@ -135,6 +140,36 @@ describe("FlashcardsSessionPage", () => {
       expect(
         screen.getAllByRole("button", { name: "Archivar tarjeta" }),
       ).toHaveLength(2);
+    });
+
+    it("starts the review right away when opened from Repasos de hoy (?repasar=1)", async () => {
+      const { startFlashcardSessionAction } = await import(
+        "@/modules/flashcards"
+      );
+      vi.mocked(startFlashcardSessionAction).mockResolvedValue({
+        ok: false,
+        error: { code: "STUDY_ENGINE_NOTHING_DUE", message: "x" },
+      });
+
+      render(
+        await FlashcardsSessionPage(props(NOTEBOOK, PAGE, { repasar: "1" })),
+      );
+
+      expect(await screen.findByText("Estás al día")).toBeInTheDocument();
+      expect(startFlashcardSessionAction).toHaveBeenCalledWith({
+        pageId: PAGE,
+      });
+    });
+
+    it("waits for Repasar without ?repasar=1", async () => {
+      const { startFlashcardSessionAction } = await import(
+        "@/modules/flashcards"
+      );
+      vi.mocked(startFlashcardSessionAction).mockClear();
+
+      render(await FlashcardsSessionPage(props(NOTEBOOK, PAGE)));
+
+      expect(startFlashcardSessionAction).not.toHaveBeenCalled();
     });
 
     it("offers Repasar on a deck with cards", async () => {

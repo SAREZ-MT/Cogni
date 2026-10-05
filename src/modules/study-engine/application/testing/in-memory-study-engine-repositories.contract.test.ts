@@ -5,10 +5,12 @@ import { InMemoryFlashcardSessionRepository } from "./in-memory-flashcard-sessio
 import { InMemoryPageMasteryRepository } from "./in-memory-page-mastery-repository";
 import { InMemoryReviewLogRepository } from "./in-memory-review-log-repository";
 import { InMemorySessionFeedbackRepository } from "./in-memory-session-feedback-repository";
+import { InMemoryStudiedPageReader } from "./in-memory-studied-page-reader";
 import { InMemoryStudyItemRepository } from "./in-memory-study-item-repository";
 import { runPageMasteryRepositoryContract } from "./page-mastery-repository.contract";
 import { runReviewLogRepositoryContract } from "./review-log-repository.contract";
 import { runSessionFeedbackRepositoryContract } from "./session-feedback-repository.contract";
+import { runStudiedPageReaderContract } from "./studied-page-reader.contract";
 import { runStudyItemRepositoryContract } from "./study-item-repository.contract";
 
 // The fakes have no pages table and no foreign keys: any fresh id is a valid
@@ -19,9 +21,25 @@ const ownership = {
   newId: () => randomUUID(),
 };
 
+// The fake knows no pages: archived pages (and pages of archived notebooks)
+// are this set, which the repository reads through its page predicate.
+const inactivePages = new Set<string>();
+
 runStudyItemRepositoryContract({
-  createRepository: () => new InMemoryStudyItemRepository(),
-  context: () => ({ ...ownership, newPageId: async () => randomUUID() }),
+  createRepository: () =>
+    new InMemoryStudyItemRepository((pageId) => !inactivePages.has(pageId)),
+  context: () => ({
+    ...ownership,
+    newPageId: async () => randomUUID(),
+    archivePage: async (pageId) => {
+      inactivePages.add(pageId);
+    },
+    newPageInArchivedNotebook: async () => {
+      const pageId = randomUUID();
+      inactivePages.add(pageId);
+      return pageId;
+    },
+  }),
 });
 
 runReviewLogRepositoryContract({
@@ -53,4 +71,41 @@ runFlashcardSessionRepositoryContract({
 runSessionFeedbackRepositoryContract({
   createRepository: () => new InMemorySessionFeedbackRepository(),
   context: () => ({ ...ownership, newGenerationId: async () => randomUUID() }),
+});
+
+// The cross-owner StudiedPageReader reads the item and mastery fakes.
+runStudiedPageReaderContract({
+  context: async () => {
+    const store = new InMemoryStudyItemRepository();
+    const mastery = new InMemoryPageMasteryRepository();
+    return {
+      ...ownership,
+      reader: new InMemoryStudiedPageReader(store, mastery),
+      newPageId: async () => randomUUID(),
+      addItem: async ({ ownerId, pageId, suspended }) => {
+        const now = new Date("2026-10-01T08:00:00.000Z");
+        const item = newStudyItem({
+          id: randomUUID(),
+          ownerId,
+          pageId,
+          kind: "flashcard",
+          sourceId: randomUUID(),
+          now,
+        });
+        await store.save({ ...item, suspendedAt: suspended ? now : null });
+      },
+      setMastery: async ({ ownerId, pageId, computedAt }) => {
+        await mastery.upsert({
+          id: randomUUID(),
+          ownerId,
+          pageId,
+          level: "Nuevo",
+          score: 0,
+          itemsTotal: 1,
+          itemsDue: 1,
+          computedAt,
+        });
+      },
+    };
+  },
 });
