@@ -4,9 +4,11 @@ import { runFlashcardSessionRepositoryContract } from "./flashcard-session-repos
 import { InMemoryFlashcardSessionRepository } from "./in-memory-flashcard-session-repository";
 import { InMemoryPageMasteryRepository } from "./in-memory-page-mastery-repository";
 import { InMemoryReviewLogRepository } from "./in-memory-review-log-repository";
+import { InMemorySessionFeedbackRepository } from "./in-memory-session-feedback-repository";
 import { InMemoryStudyItemRepository } from "./in-memory-study-item-repository";
 import { runPageMasteryRepositoryContract } from "./page-mastery-repository.contract";
 import { runReviewLogRepositoryContract } from "./review-log-repository.contract";
+import { runSessionFeedbackRepositoryContract } from "./session-feedback-repository.contract";
 import { runStudyItemRepositoryContract } from "./study-item-repository.contract";
 
 // The fakes have no pages table and no foreign keys: any fresh id is a valid
@@ -46,4 +48,9 @@ runPageMasteryRepositoryContract({
 runFlashcardSessionRepositoryContract({
   createRepository: () => new InMemoryFlashcardSessionRepository(),
   context: () => ({ ...ownership, newPageId: async () => randomUUID() }),
+});
+
+runSessionFeedbackRepositoryContract({
+  createRepository: () => new InMemorySessionFeedbackRepository(),
+  context: () => ({ ...ownership, newGenerationId: async () => randomUUID() }),
 });

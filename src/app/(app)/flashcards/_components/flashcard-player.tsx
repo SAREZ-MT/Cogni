@@ -2,7 +2,7 @@
 
 import { CheckCircle2, ChevronLeft, Eye, X } from "lucide-react";
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { type ReactNode, useRef, useState } from "react";
 import { BackLink } from "@/shared/ui/back-link";
 import { Button } from "@/shared/ui/button";
 import { EmptyState } from "@/shared/ui/empty-state";
@@ -42,6 +42,9 @@ export interface FlashcardPlayerProps {
   // Graded session: the summary's primary action leaves the player instead
   // of restarting it (graded cards are no longer due).
   onExit?: () => void;
+  // The summary's feedback slot (the AI session feedback of a graded
+  // session); null hides it. Without it the summary keeps its placeholder.
+  feedback?: ReactNode;
 }
 
 // Shown when onRate rejects instead of resolving an outcome (network drop,
@@ -102,6 +105,7 @@ export function FlashcardPlayer({
   onRate,
   onFinish,
   onExit,
+  feedback,
 }: FlashcardPlayerProps) {
   const [index, setIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
@@ -305,6 +309,7 @@ export function FlashcardPlayer({
           title="¡Sesión completada!"
           subtitle={`${deckLabel} — ${plural(reviewed, "tarjeta revisada", "tarjetas revisadas")}`}
           stats={summaryStats}
+          {...(feedback !== undefined && { feedback })}
           highlight={
             onRate ? (
               masteryLevel && (

@@ -1,4 +1,4 @@
-import type { ReviewLog } from "../../domain/review-log";
+import type { ReviewLog, SessionKind } from "../../domain/review-log";
 import type { ReviewLogRepository } from "../../domain/review-log-repository";
 
 // In-memory ReviewLogRepository for unit tests; satisfies the shared
@@ -14,10 +14,28 @@ export class InMemoryReviewLogRepository implements ReviewLogRepository {
   async listByItem(itemId: string, ownerId: string): Promise<ReviewLog[]> {
     return this.rows
       .filter((log) => log.itemId === itemId && log.ownerId === ownerId)
-      .sort(
-        (a, b) =>
-          a.reviewedAt.getTime() - b.reviewedAt.getTime() ||
-          (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
-      );
+      .sort(byReviewedAtThenId);
   }
+
+  async listBySession(
+    sessionKind: SessionKind,
+    sessionId: string,
+    ownerId: string,
+  ): Promise<ReviewLog[]> {
+    return this.rows
+      .filter(
+        (log) =>
+          log.sessionKind === sessionKind &&
+          log.sessionId === sessionId &&
+          log.ownerId === ownerId,
+      )
+      .sort(byReviewedAtThenId);
+  }
+}
+
+function byReviewedAtThenId(a: ReviewLog, b: ReviewLog): number {
+  return (
+    a.reviewedAt.getTime() - b.reviewedAt.getTime() ||
+    (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
+  );
 }

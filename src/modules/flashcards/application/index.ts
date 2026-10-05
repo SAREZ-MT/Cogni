@@ -23,3 +23,7 @@ export {
   type RequestGenerationResult,
   requestGeneration,
 } from "./request-generation";
+export {
+  type RequestSessionFeedbackDeps,
+  requestSessionFeedback,
+} from "./request-session-feedback";
