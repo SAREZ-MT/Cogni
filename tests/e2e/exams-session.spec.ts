@@ -157,7 +157,8 @@ test.describe("exam session", () => {
 
     // The failed page waits for its retake (T7): no new normal exam.
     await page.goto(`/exams/${notebookId}/${pageId}`);
-    await expect(page.getByTestId("exam-retake-soon")).toBeVisible();
+    await expect(page.getByTestId("exam-retake")).toBeVisible();
+    await expect(page.getByTestId("start-exam-button")).toHaveCount(0);
   });
 
   test("passes an exam and offers a new one", async ({ page }) => {

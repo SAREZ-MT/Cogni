@@ -13,6 +13,7 @@ import {
 import { BackLink } from "@/shared/ui/back-link";
 import { Button } from "@/shared/ui/button";
 import { OptionRow, type OptionRowState } from "@/shared/ui/option-row";
+import { Pill } from "@/shared/ui/pill";
 import { QuestionCard } from "@/shared/ui/question-card";
 import { QuestionProgressDots } from "@/shared/ui/question-progress-dots";
 import { StatusBanner } from "@/shared/ui/status-banner";
@@ -156,9 +157,20 @@ export function ExamPlayer({
 
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="font-bold text-[18px] text-fg">Examen — {pageTitle}</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="font-bold text-[18px] text-fg">
+              Examen — {pageTitle}
+            </p>
+            {session.isRetake && (
+              <Pill data-testid="exam-retake-label" size="sm" tone="rose">
+                Repetición
+              </Pill>
+            )}
+          </div>
           <p className="mt-0.5 text-fg-muted text-xs">
-            {total} preguntas de opción múltiple
+            {session.isRetake
+              ? `${total} preguntas · lo que fallaste vuelve reformulado`
+              : `${total} preguntas de opción múltiple`}
           </p>
         </div>
         <TimerChip seconds={seconds} />

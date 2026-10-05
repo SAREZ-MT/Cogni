@@ -87,7 +87,9 @@ describe("TechniquesPanel", () => {
       ok({
         activeQuestionCount: 0,
         retakePending: false,
+        failedRootCount: 0,
         openSessionId: null,
+        openRetakeSessionId: null,
         lastFinishedSessionId: null,
       }),
     );
@@ -397,7 +399,9 @@ describe("TechniquesPanel", () => {
         ok({
           activeQuestionCount,
           retakePending,
+          failedRootCount: retakePending ? 4 : 0,
           openSessionId: null,
+          openRetakeSessionId: null,
           lastFinishedSessionId: null,
         }),
       );
@@ -424,12 +428,18 @@ describe("TechniquesPanel", () => {
       expect(screen.getByTestId("take-exam-button")).toBeDisabled();
     });
 
-    it("shows a calm note while a retake is pending", async () => {
+    it("offers the retake instead of a normal exam while one is pending", async () => {
       start(12, true);
       await renderPanel(false);
 
-      expect(await screen.findByTestId("exam-retake-soon")).toHaveTextContent(
-        "Repetir examen (próximamente)",
+      const retake = await screen.findByTestId("retake-exam-button");
+      expect(retake).toHaveTextContent("Repetir examen");
+      expect(retake).toHaveAttribute(
+        "href",
+        `/exams/${NOTEBOOK_ID}/${PAGE_ID}`,
+      );
+      expect(screen.getByTestId("exam-retake-note")).toHaveTextContent(
+        "4 conceptos",
       );
       expect(
         screen.queryByRole("link", { name: /Rendir examen/ }),

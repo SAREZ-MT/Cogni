@@ -65,7 +65,7 @@ describe("ExamResultsView", () => {
     expect(rows[0]).toHaveTextContent("La respiración celular produce ATP.");
   });
 
-  it("marks a failed exam, lists its failed concepts and keeps the retake as a placeholder", () => {
+  it("marks a failed exam, lists its failed concepts and offers the retake", () => {
     renderView(results());
     expect(screen.getByTestId("exam-failed")).toHaveTextContent(
       "Nota menor a 70 %",
@@ -73,7 +73,10 @@ describe("ExamResultsView", () => {
     expect(screen.getByTestId("exam-failed-concepts")).toHaveTextContent(
       "Función de la mitocondria",
     );
-    expect(screen.getByTestId("retake-exam-soon")).toBeDisabled();
+    expect(screen.getByTestId("retake-exam-link")).toHaveAttribute(
+      "href",
+      "/exams/nb/pg",
+    );
     expect(screen.queryByTestId("new-exam-link")).not.toBeInTheDocument();
     expect(screen.getByTestId("feedback-status")).toHaveTextContent("pronto");
   });

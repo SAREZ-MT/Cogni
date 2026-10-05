@@ -6,6 +6,7 @@ import {
   ListChecks,
   PanelRightClose,
   PanelRightOpen,
+  RotateCcw,
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
@@ -433,13 +434,24 @@ export function TechniquesPanel({
                   </Link>
                 </Button>
               ) : examStart?.retakePending ? (
-                <p
-                  data-testid="exam-retake-soon"
-                  className="text-[10.5px] text-fg-muted"
-                >
-                  Repetir examen (próximamente): pronto podrás repetirlo con
-                  preguntas nuevas sobre lo que fallaste.
-                </p>
+                <>
+                  <Button asChild size="sm" className="w-full text-[11.5px]">
+                    <Link href={examHref} data-testid="retake-exam-button">
+                      <RotateCcw
+                        aria-hidden="true"
+                        size={14}
+                        strokeWidth={1.75}
+                      />
+                      Repetir examen
+                    </Link>
+                  </Button>
+                  <p
+                    data-testid="exam-retake-note"
+                    className="text-[10.5px] text-fg-muted"
+                  >
+                    {`Fallaste el último examen: ${examStart.failedRootCount} conceptos vuelven con preguntas reformuladas.`}
+                  </p>
+                </>
               ) : (
                 <>
                   <Button

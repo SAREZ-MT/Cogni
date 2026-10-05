@@ -5,6 +5,12 @@ import { SetBreadcrumb } from "../../../_components/breadcrumb";
 import { ExamPlayer } from "../../_components/exam-player";
 import { ExamStart } from "../../_components/exam-start";
 
+// "Repetir examen" runs startExamRetakeAction from this route: the AI
+// reformulation of the failed questions (up to 2 provider calls, each with
+// a retry) needs the same budget as the notebook page's generations. Next
+// applies a Server Action's maxDuration from the page segment hosting it.
+export const maxDuration = 120;
+
 interface ExamSessionPageProps {
   params: Promise<{ notebookId: string; pageId: string }>;
 }
@@ -12,7 +18,8 @@ interface ExamSessionPageProps {
 // A page's exam on real data (Phase 5 T6, documento-maestro §3.3). One page
 // owns at most one exam, so the route is [notebookId]/[pageId]: while the
 // page has an open session the player resumes it (its questions, answers
-// and clock); otherwise the start screen picks N (10-30) and opens one. It
+// and clock; the open retake while one is pending, T7); otherwise the start
+// screen picks N (10-30) and opens an exam, or the retake of a failed one. It
 // left the design-preview gate in T6; the exams hub stays a preview until
 // T9, so the breadcrumb's "Exámenes" has no link yet. A page that is
 // unknown, archived, in another notebook or not the caller's 404s.
@@ -29,9 +36,16 @@ export default async function ExamSessionPage({
   const pageHref = `/notebooks/${notebookId}/pages/${page.id}`;
   const examHref = `/exams/${notebookId}/${page.id}`;
 
-  const { openSessionId, lastFinishedSessionId } = start.value;
-  const session = openSessionId
-    ? await getExamSessionAction({ sessionId: openSessionId })
+  const {
+    openSessionId,
+    openRetakeSessionId,
+    retakePending,
+    lastFinishedSessionId,
+  } = start.value;
+  // While a retake is pending only the retake may be taken (§7.5).
+  const resumeId = retakePending ? openRetakeSessionId : openSessionId;
+  const session = resumeId
+    ? await getExamSessionAction({ sessionId: resumeId })
     : null;
   if (session && !session.ok) notFound();
 
@@ -59,7 +73,8 @@ export default async function ExamSessionPage({
           pageHref={pageHref}
           questionsHref={`${examHref}/preguntas`}
           activeQuestionCount={start.value.activeQuestionCount}
-          retakePending={start.value.retakePending}
+          retakePending={retakePending}
+          failedRootCount={start.value.failedRootCount}
           lastResultsHref={
             lastFinishedSessionId
               ? `${examHref}/resultados?sesion=${lastFinishedSessionId}`
