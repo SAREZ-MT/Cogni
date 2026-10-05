@@ -66,6 +66,38 @@ describe("answerExamQuestion", () => {
     expect(stored[0]?.answeredAt).toEqual(ANSWERED_AT);
   });
 
+  it("checks the question against the list stored at start, whatever the study items do later", async () => {
+    const { uow, deps, sessionId } = await started();
+    // All 12 were due alike, so q-01..q-10 were composed. Now q-11 and q-12
+    // fall due first and q-09, q-10 move far out: a composition run again
+    // would swap them, the stored list does not.
+    for (const [n, item] of uow.studyItems.items.entries()) {
+      const early = item.sourceId === "q-11" || item.sourceId === "q-12";
+      uow.studyItems.items[n] = {
+        ...item,
+        dueAt: early
+          ? new Date("2026-09-01T00:00:00.000Z")
+          : new Date("2026-12-01T00:00:00.000Z"),
+      };
+    }
+    const shown = await answerExamQuestion(
+      { sessionId, questionId: "q-10", selectedIndex: 0 },
+      deps,
+      OWNER,
+    );
+    expect(shown.ok).toBe(true);
+    const notShown = await answerExamQuestion(
+      { sessionId, questionId: "q-11", selectedIndex: 0 },
+      deps,
+      OWNER,
+    );
+    expect(notShown.ok).toBe(false);
+    if (notShown.ok) return;
+    expect(notShown.error.code).toBe(EXAM_ERROR.QUESTION_NOT_IN_SESSION);
+    const stored = await uow.repos.answers.listBySession(sessionId, OWNER);
+    expect(stored.map((a) => a.questionId)).toEqual(["q-10"]);
+  });
+
   it("refuses a second answer to the same question", async () => {
     const { deps, sessionId } = await started();
     await answerExamQuestion(

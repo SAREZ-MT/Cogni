@@ -4,10 +4,9 @@ import { err, ok, type Result } from "@/shared/kernel/result";
 import { EXAM_ERROR } from "../domain/errors";
 import type { ExamSession } from "../domain/exam-session";
 import { gradeExamAnswer } from "../domain/exam-session";
-import {
-  composeSessionQuestions,
-  type ExamSessionRepositories,
-  type ExamSessionUnitOfWork,
+import type {
+  ExamSessionRepositories,
+  ExamSessionUnitOfWork,
 } from "./exam-session-work";
 import { runExamWork } from "./exam-unit-of-work";
 
@@ -29,7 +28,8 @@ export interface AnsweredExamQuestion {
 // Grades one answer of an open session (§3.3, deterministic correction) and
 // stores it. The session row is locked first, so an answer and a finish of
 // the same session queue: no answer lands in a finished session. One answer
-// per question (and per root); the question must be one of the session's.
+// per question (and per root); the question must be one of the session's
+// stored list (questionIds, fixed at its start).
 // SM-2 is untouched here: the reviews are recorded when the session ends.
 export async function answerExamQuestion(
   input: { sessionId: string; questionId: string; selectedIndex: number },
@@ -40,9 +40,9 @@ export async function answerExamQuestion(
     const session = await lockOpenSession(input.sessionId, ownerId, repos);
     if (!session.ok) return session;
 
-    const questions = await composeSessionQuestions(session.value, repos);
-    if (!questions.ok) return questions;
-    const question = questions.value.find((q) => q.id === input.questionId);
+    const question = session.value.questionIds.includes(input.questionId)
+      ? await repos.questions.findById(input.questionId, ownerId)
+      : null;
     if (!question) {
       return err(
         new DomainError(

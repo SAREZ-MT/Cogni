@@ -3,9 +3,14 @@ import type { Clock } from "@/shared/kernel/clock";
 import { DomainError } from "@/shared/kernel/domain-error";
 import { err, ok, type Result } from "@/shared/kernel/result";
 import { EXAM_ERROR } from "../domain/errors";
-import { type ExamSession, newExamSession } from "../domain/exam-session";
 import {
-  composeSessionQuestions,
+  type ExamSession,
+  invalidCount,
+  isValidQuestionCount,
+  newExamSession,
+} from "../domain/exam-session";
+import {
+  composeNormalExam,
   type ExamSessionUnitOfWork,
 } from "./exam-session-work";
 import { runExamWork } from "./exam-unit-of-work";
@@ -34,8 +39,9 @@ export interface StartedExamSession {
 //   exam picks up where it stopped. Starts of one page are serialized
 //   (lockPageForStart) so two concurrent starts cannot both create one.
 // - Otherwise the questions are composed (composeExam: fewer than 10 roots
-//   is EXAMS_NOT_ENOUGH_QUESTIONS) and the session is stored; its question
-//   order is derived again from its start (composeSessionQuestions).
+//   is EXAMS_NOT_ENOUGH_QUESTIONS) and the session is stored with that
+//   list (questionIds): answering, finishing and reading use it as it is,
+//   never a new composition.
 export async function startExamSession(
   input: { pageId: string; requestedCount: number },
   deps: StartExamSessionDeps,
@@ -45,18 +51,11 @@ export async function startExamSession(
   const page = await deps.pages.getPageText(input.pageId, ownerId);
   if (!page.ok) return page;
 
+  if (!isValidQuestionCount(input.requestedCount)) {
+    return err(invalidCount(input.requestedCount));
+  }
   const now = deps.clock.now();
-  const session = newExamSession(
-    {
-      id: deps.ids.next(),
-      ownerId,
-      pageId: input.pageId,
-      requestedCount: input.requestedCount,
-      retakeOfSessionId: null,
-    },
-    now,
-  );
-  if (!session.ok) return session;
+  const id = deps.ids.next();
 
   return runExamWork(
     deps.uow,
@@ -74,8 +73,24 @@ export async function startExamSession(
       const open = await repos.sessions.findOpenByPage(input.pageId, ownerId);
       if (open) return ok({ session: open, resumed: true });
 
-      const questions = await composeSessionQuestions(session.value, repos);
-      if (!questions.ok) return questions;
+      const questionIds = await composeNormalExam(
+        { ...input, now },
+        ownerId,
+        repos,
+      );
+      if (!questionIds.ok) return questionIds;
+      const session = newExamSession(
+        {
+          id,
+          ownerId,
+          pageId: input.pageId,
+          requestedCount: input.requestedCount,
+          retakeOfSessionId: null,
+          questionIds: questionIds.value,
+        },
+        now,
+      );
+      if (!session.ok) return session;
       await repos.sessions.create(session.value);
       return ok({ session: session.value, resumed: false });
     },

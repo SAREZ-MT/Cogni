@@ -11,6 +11,10 @@ export interface ExamQuestionRepository {
   // no such question.
   update(question: ExamQuestion): Promise<ExamQuestion | null>;
   findById(id: string, ownerId: string): Promise<ExamQuestion | null>;
+  // The owner's questions among `ids`, retired ones included, in no given
+  // order; unknown ids and other owners' questions are left out. An exam
+  // session reads its stored question list with it.
+  listByIds(ids: readonly string[], ownerId: string): Promise<ExamQuestion[]>;
   // The page's questions that can still be shown (not retired), oldest
   // first (createdAt, then id).
   listActiveByPage(pageId: string, ownerId: string): Promise<ExamQuestion[]>;

@@ -4,7 +4,6 @@ import { EXAM_ERROR } from "../domain/errors";
 import { examSessionDurationMs } from "../domain/exam-session";
 import { answerExamQuestion } from "./answer-exam-question";
 import { completeExamSession } from "./complete-exam-session";
-import { composeSessionQuestions } from "./exam-session-work";
 import { startExamSession } from "./start-exam-session";
 import {
   LATER,
@@ -35,11 +34,13 @@ async function exam(answered: number, wrong: number) {
   );
   if (!started.ok) throw started.error;
   const { session } = started.value;
-  const questions = await uow.run((repos) =>
-    composeSessionQuestions(session, repos),
-  );
-  if (!questions.ok) throw questions.error;
-  for (const [n, q] of questions.value.slice(0, answered).entries()) {
+  const questions = [];
+  for (const id of session.questionIds) {
+    const question = await uow.repos.questions.findById(id, OWNER);
+    if (!question) throw new Error(`question ${id} not stored`);
+    questions.push(question);
+  }
+  for (const [n, q] of questions.slice(0, answered).entries()) {
     const result = await answerExamQuestion(
       {
         sessionId: session.id,
@@ -52,7 +53,7 @@ async function exam(answered: number, wrong: number) {
     if (!result.ok) throw result.error;
   }
   const deps = { uow, clock: createFixedClock(FINISHED_AT) };
-  return { uow, deps, sessionId: session.id, questions: questions.value };
+  return { uow, deps, sessionId: session.id, questions };
 }
 
 describe("completeExamSession", () => {
@@ -140,6 +141,53 @@ describe("completeExamSession", () => {
       (await uow.repos.sessions.findById(sessionId, OWNER))?.finishedAt,
     ).toBeNull();
     expect(await uow.repos.pageStates.get(PAGE, OWNER)).toBeNull();
+  });
+
+  it("finishes once the stored questions are answered, even if the study items moved", async () => {
+    const uow = new InMemoryExamSessionUnitOfWork();
+    await seedSessionQuestions(uow, 12);
+    const started = await startExamSession(
+      { pageId: PAGE, requestedCount: 10 },
+      {
+        pages,
+        uow,
+        clock: createFixedClock(LATER),
+        ids: { next: () => "session-1" },
+      },
+      OWNER,
+    );
+    if (!started.ok) throw started.error;
+    const { session } = started.value;
+    // q-11 and q-12 fall due first after the start: a composition run
+    // again would ask for them instead of two of the stored ones.
+    for (const [n, item] of uow.studyItems.items.entries()) {
+      const early = item.sourceId === "q-11" || item.sourceId === "q-12";
+      uow.studyItems.items[n] = {
+        ...item,
+        dueAt: early
+          ? new Date("2026-09-01T00:00:00.000Z")
+          : new Date("2026-12-01T00:00:00.000Z"),
+      };
+    }
+    const clock = createFixedClock(LATER);
+    for (const questionId of session.questionIds) {
+      const answered = await answerExamQuestion(
+        { sessionId: session.id, questionId, selectedIndex: 0 },
+        { uow, clock },
+        OWNER,
+      );
+      if (!answered.ok) throw answered.error;
+    }
+    const result = await completeExamSession(
+      { sessionId: session.id },
+      { uow, clock: createFixedClock(FINISHED_AT) },
+      OWNER,
+    );
+    expect(result.ok && result.value.session).toMatchObject({
+      total: 10,
+      correct: 10,
+      passed: true,
+    });
   });
 
   it("refuses another owner's session", async () => {

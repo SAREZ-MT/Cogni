@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, isNull, lte, or } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, isNull, lte, or } from "drizzle-orm";
 import type { DbExecutor } from "@/shared/db/client";
 import { type ExamQuestionRow, examQuestions } from "@/shared/db/schema";
 import type { ExamQuestion } from "../domain/exam-question";
@@ -72,6 +72,23 @@ export class DrizzleExamQuestionRepository implements ExamQuestionRepository {
       .from(examQuestions)
       .where(owned(id, ownerId));
     return row ? toQuestion(row) : null;
+  }
+
+  async listByIds(
+    ids: readonly string[],
+    ownerId: string,
+  ): Promise<ExamQuestion[]> {
+    if (ids.length === 0) return [];
+    const rows = await this.db
+      .select()
+      .from(examQuestions)
+      .where(
+        and(
+          inArray(examQuestions.id, [...ids]),
+          eq(examQuestions.ownerId, ownerId),
+        ),
+      );
+    return rows.map(toQuestion);
   }
 
   async listActiveByPage(

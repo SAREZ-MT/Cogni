@@ -105,7 +105,7 @@ export interface ExamResultsView {
   // the player).
   durationSeconds: number;
   questions: ExamResultQuestionView[];
-  // Concepts of the wrong answers, once each, in answer order.
+  // Concepts of the wrong answers, once each, in the exam's question order.
   failedConcepts: string[];
 }
 

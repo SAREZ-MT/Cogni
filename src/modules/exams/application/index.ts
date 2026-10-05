@@ -15,10 +15,11 @@ export {
 } from "./create-exam-question";
 export { editExamQuestion } from "./edit-exam-question";
 export {
-  composeSessionQuestions,
+  composeNormalExam,
   type ExamReviews,
   type ExamSessionRepositories,
   type ExamSessionUnitOfWork,
+  loadSessionQuestions,
 } from "./exam-session-work";
 export {
   type ExamQuestionRepositories,

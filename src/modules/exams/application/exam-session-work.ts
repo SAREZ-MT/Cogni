@@ -36,32 +36,43 @@ export interface ExamSessionRepositories {
 // One transaction over everything an exam session reads and writes.
 export type ExamSessionUnitOfWork = UnitOfWorkOf<ExamSessionRepositories>;
 
-// The questions of a normal exam session, in order. The order is not
-// stored (exam_sessions has no column for it); it is derived again, the
-// same every time, from the page as it was when the session started:
-//   - the questions shown at startedAt (listShownAt), the latest wording
-//     of each root, so questions added or retired later change nothing;
-//   - lastSeenAt from answers given before startedAt, so this session's own
-//     answers never reorder it;
-//   - due dates from the roots' study items and failed roots from the page
-//     state, which only a finished exam of the page changes, and a page
-//     holds at most one open normal session (startExamSession resumes it),
-//     so they cannot move while the session is open;
-//   - composeExam with now = startedAt.
-// A finished session is read from its answers instead (readExamSession).
-export async function composeSessionQuestions(
+// The questions of a session in their stored order (session.questionIds,
+// fixed at the start). Nothing is composed again: answering, finishing and
+// reading an open or a finished session all see the list the student was
+// shown, whatever happened to the page's questions or study items since.
+// Questions retired after the start still show; questions are retired,
+// never deleted, so every stored id resolves.
+export async function loadSessionQuestions(
   session: ExamSession,
+  repos: Pick<ExamSessionRepositories, "questions">,
+): Promise<ExamQuestion[]> {
+  const found = await repos.questions.listByIds(
+    session.questionIds,
+    session.ownerId,
+  );
+  const byId = new Map(found.map((question) => [question.id, question]));
+  return session.questionIds.flatMap((id) => {
+    const question = byId.get(id);
+    return question ? [question] : [];
+  });
+}
+
+// The question ids of a new normal exam on a page, in the order shown:
+//   - the page's questions shown at `now`, the latest wording of each root;
+//   - due dates from the roots' study items, failed roots from the page
+//     state and lastSeenAt from the page's earlier answers;
+//   - composeExam (fewer than 10 roots is EXAMS_NOT_ENOUGH_QUESTIONS).
+// Called once, by startExamSession; the result is stored on the session.
+export async function composeNormalExam(
+  input: { pageId: string; requestedCount: number; now: Date },
+  ownerId: string,
   repos: Pick<
     ExamSessionRepositories,
     "questions" | "answers" | "pageStates" | "studyItems"
   >,
-): Promise<Result<ExamQuestion[], DomainError>> {
-  if (session.isRetake) {
-    // Retakes are composed from fresh variants (composeRetake), Phase 5 T7.
-    throw new Error(`retake session ${session.id} is not supported yet`);
-  }
-  const { pageId, ownerId, startedAt } = session;
-  const shown = await repos.questions.listShownAt(pageId, ownerId, startedAt);
+): Promise<Result<string[], DomainError>> {
+  const { pageId, now } = input;
+  const shown = await repos.questions.listShownAt(pageId, ownerId, now);
   // listShownAt is oldest first: the last question of a root wins.
   const latestByRoot = new Map<string, ExamQuestion>();
   for (const question of shown) latestByRoot.set(question.rootId, question);
@@ -74,11 +85,7 @@ export async function composeSessionQuestions(
       .filter((item) => item.kind === "exam_question")
       .map((item) => [item.sourceId, item.dueAt]),
   );
-  const seen = await repos.answers.lastAnsweredAtByRoot(
-    pageId,
-    ownerId,
-    startedAt,
-  );
+  const seen = await repos.answers.lastAnsweredAtByRoot(pageId, ownerId, now);
 
   const candidates: ExamCandidate[] = [...latestByRoot.values()].map(
     (question) => ({
@@ -90,15 +97,10 @@ export async function composeSessionQuestions(
     }),
   );
   const composed = composeExam({
-    requestedCount: session.requestedCount,
+    requestedCount: input.requestedCount,
     candidates,
-    now: startedAt,
+    now,
   });
   if (!composed.ok) return composed;
-  return ok(
-    composed.value.flatMap(({ rootId }) => {
-      const question = latestByRoot.get(rootId);
-      return question ? [question] : [];
-    }),
-  );
+  return ok(composed.value.map(({ questionId }) => questionId));
 }

@@ -17,6 +17,7 @@ import {
 } from "@/modules/exams/infrastructure";
 import type { PageTextReader } from "@/modules/notebooks";
 import {
+  examAnswers,
   notebooks,
   pages,
   profiles,
@@ -31,10 +32,15 @@ import { createTestOwner, deleteTestOwner } from "./helpers/test-owner";
 // An exam session against Postgres: the finish stores the result, the page
 // state and the SM-2 reviews in one transaction, rolls all of it back when
 // the reviews fail, and two concurrent finishes (or starts) of one page
-// never both win.
+// never both win. Concurrent answers and an answer racing a finish queue on
+// the session row: one answer per question, never one in a finished session.
 if (process.env.DATABASE_URL) {
   const db = createTestDb();
   const otherConnection = createTestDb();
+  // Holds a session's row lock while the racing calls queue behind it.
+  const holderConnection = createTestDb();
+  // Watches which backends are blocked; never takes part in a race.
+  const observer = createTestDb();
   const owner = await createTestOwner("exam-session-owner");
   const notebookId = randomUUID();
   let nextPagePosition = 1;
@@ -53,6 +59,8 @@ if (process.env.DATABASE_URL) {
     } finally {
       await db.$client.end();
       await otherConnection.$client.end();
+      await holderConnection.$client.end();
+      await observer.$client.end();
     }
   });
 
@@ -112,15 +120,17 @@ if (process.env.DATABASE_URL) {
     );
   }
 
-  // Starts an exam and answers every question, the first `wrong` wrong.
-  async function answeredExam(pageId: string, wrong: number) {
+  // Starts an exam and answers its first `count` questions (all by
+  // default), the first `wrong` of them wrong.
+  async function answeredExam(pageId: string, wrong: number, count = 10) {
     const started = await start(pageId);
     if (!started.ok) throw started.error;
     const sessionId = started.value.session.id;
     const uow = new DrizzleExamSessionUnitOfWork(db, ids);
     const detail = await readExamSession({ sessionId }, { uow }, owner.id);
     if (!detail.ok) throw detail.error;
-    for (const [n, { question }] of detail.value.questions.entries()) {
+    const shown = detail.value.questions.slice(0, count);
+    for (const [n, { question }] of shown.entries()) {
       const answered = await answerExamQuestion(
         {
           sessionId,
@@ -137,8 +147,71 @@ if (process.env.DATABASE_URL) {
     }
     return {
       sessionId,
+      questionIds: detail.value.questions.map((q) => q.question.id),
       roots: detail.value.questions.map((q) => q.question.rootId),
     };
+  }
+
+  function answer(sessionId: string, questionId: string, connection = db) {
+    return answerExamQuestion(
+      { sessionId, questionId, selectedIndex: 0 },
+      {
+        uow: new DrizzleExamSessionUnitOfWork(connection, ids),
+        clock: createFixedClock(new Date(STARTED.getTime() + 60_000)),
+      },
+      owner.id,
+    );
+  }
+
+  // Opens the connection before a race, so no race leg pays a connect.
+  async function warm(connection: typeof db): Promise<void> {
+    await connection.$client`select 1`;
+  }
+
+  // Resolves once `count` backends wait on an exam session's row lock.
+  // Counted from pg_stat_activity, not by backend pid: cogni-dev is reached
+  // through a transaction pooler, so a connection's pid is not stable.
+  async function waiting(count: number): Promise<void> {
+    for (let attempt = 0; attempt < 400; attempt += 1) {
+      const [row] = await observer.$client<{ n: number }[]>`
+        select count(*)::int as n from pg_stat_activity
+        where wait_event_type = 'Lock'
+          and query ilike '%from "exam_sessions"%for update%'
+      `;
+      if (row && row.n >= count) return;
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    throw new Error(`${count} backends never waited on the session lock`);
+  }
+
+  // Row-locks the session on holderConnection until `release` is called,
+  // so the racing calls queue behind it in the order they arrive.
+  async function holdSession(sessionId: string) {
+    let release = () => {};
+    const released = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let held = () => {};
+    const isHeld = new Promise<void>((resolve) => {
+      held = resolve;
+    });
+    const holder = holderConnection.transaction(async (tx) => {
+      await new DrizzleExamSessionRepository(tx).lockById(sessionId, owner.id);
+      held();
+      await released;
+    });
+    await isHeld;
+    return async () => {
+      release();
+      await holder;
+    };
+  }
+
+  async function answersOf(sessionId: string) {
+    return db
+      .select()
+      .from(examAnswers)
+      .where(eq(examAnswers.sessionId, sessionId));
   }
 
   function finish(sessionId: string, connection = db) {
@@ -206,6 +279,97 @@ if (process.env.DATABASE_URL) {
         EXAM_ERROR.SESSION_FINISHED,
       );
       expect(await logsOf(sessionId)).toHaveLength(10);
+    });
+
+    it("stores exactly one of two concurrent answers to one question", async () => {
+      const pageId = await pageWithQuestions();
+      const { sessionId, questionIds } = await answeredExam(pageId, 0, 0);
+      const target = questionIds[0] as string;
+      await warm(db);
+      await warm(otherConnection);
+      const release = await holdSession(sessionId);
+      let settled = 0;
+      const first = answer(sessionId, target).finally(() => (settled += 1));
+      const second = answer(sessionId, target, otherConnection).finally(
+        () => (settled += 1),
+      );
+      try {
+        await waiting(2);
+        expect(settled).toBe(0);
+      } finally {
+        await release();
+      }
+      const results = await Promise.all([first, second]);
+      expect(results.filter((r) => r.ok)).toHaveLength(1);
+      const refused = results.find((r) => !r.ok);
+      expect(refused && !refused.ok && refused.error.code).toBe(
+        EXAM_ERROR.DUPLICATE_ANSWER,
+      );
+      const stored = await answersOf(sessionId);
+      expect(stored.map((a) => a.questionId)).toEqual([target]);
+    });
+
+    it("counts an answer that reaches the session before a racing finish", async () => {
+      const pageId = await pageWithQuestions();
+      const { sessionId, questionIds } = await answeredExam(pageId, 0, 9);
+      const last = questionIds[9] as string;
+      await warm(db);
+      await warm(otherConnection);
+      const release = await holdSession(sessionId);
+      const answered = answer(sessionId, last);
+      let finished: ReturnType<typeof finish> | undefined;
+      try {
+        await waiting(1);
+        finished = finish(sessionId, otherConnection);
+        await waiting(2);
+      } finally {
+        await release();
+      }
+      const [answerResult, finishResult] = await Promise.all([
+        answered,
+        finished,
+      ]);
+      expect(answerResult.ok).toBe(true);
+      if (!finishResult?.ok) throw new Error("the finish was refused");
+      expect(finishResult.value.session).toMatchObject({
+        total: 10,
+        correct: 10,
+        passed: true,
+      });
+      expect(await answersOf(sessionId)).toHaveLength(10);
+      expect(await logsOf(sessionId)).toHaveLength(10);
+    });
+
+    it("refuses as finished an answer that reaches the session after a racing finish", async () => {
+      const pageId = await pageWithQuestions();
+      const { sessionId, questionIds } = await answeredExam(pageId, 0);
+      await warm(db);
+      await warm(otherConnection);
+      const release = await holdSession(sessionId);
+      const finished = finish(sessionId, otherConnection);
+      let answered: ReturnType<typeof answer> | undefined;
+      try {
+        await waiting(1);
+        answered = answer(sessionId, questionIds[0] as string);
+        await waiting(2);
+      } finally {
+        await release();
+      }
+      const [finishResult, answerResult] = await Promise.all([
+        finished,
+        answered,
+      ]);
+      expect(finishResult.ok).toBe(true);
+      expect(answerResult?.ok).toBe(false);
+      if (!answerResult || answerResult.ok) return;
+      expect(answerResult.error.code).toBe(EXAM_ERROR.SESSION_FINISHED);
+      // Nothing was added to the finished session.
+      expect(await answersOf(sessionId)).toHaveLength(10);
+      const session = await new DrizzleExamSessionRepository(db).findById(
+        sessionId,
+        owner.id,
+      );
+      expect(session).toMatchObject({ total: 10, finishedAt: FINISHED });
     });
 
     it("rolls the finish back when the SM-2 reviews fail", async () => {

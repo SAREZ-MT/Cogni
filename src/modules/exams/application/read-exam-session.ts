@@ -4,8 +4,8 @@ import { EXAM_ERROR } from "../domain/errors";
 import type { ExamQuestion } from "../domain/exam-question";
 import type { ExamAnswer, ExamSession } from "../domain/exam-session";
 import {
-  composeSessionQuestions,
   type ExamSessionUnitOfWork,
+  loadSessionQuestions,
 } from "./exam-session-work";
 
 export interface ExamSessionQuestion {
@@ -19,11 +19,11 @@ export interface ExamSessionDetail {
   questions: ExamSessionQuestion[];
 }
 
-// One of the owner's sessions with its questions in order: an open session
-// in its composed order with the answers given so far (the player); a
-// finished one from its answers, in answer order (the results; every
-// question of a finished exam was answered). Questions retired after the
-// exam still show. Read-only.
+// One of the owner's sessions with its questions in the order stored at its
+// start, each with its answer: the answers given so far for an open session
+// (the player), every answer for a finished one (the results; a finished
+// exam has all its questions answered). Questions retired after the exam
+// still show. Read-only.
 export async function readExamSession(
   input: { sessionId: string },
   deps: { uow: ExamSessionUnitOfWork },
@@ -40,25 +40,11 @@ export async function readExamSession(
       );
     }
     const answers = await repos.answers.listBySession(session.id, ownerId);
-
-    if (session.finishedAt !== null) {
-      const questions: ExamSessionQuestion[] = [];
-      for (const answer of answers) {
-        const question = await repos.questions.findById(
-          answer.questionId,
-          ownerId,
-        );
-        if (question) questions.push({ question, answer });
-      }
-      return ok({ session, questions });
-    }
-
-    const composed = await composeSessionQuestions(session, repos);
-    if (!composed.ok) return composed;
     const byQuestion = new Map(answers.map((a) => [a.questionId, a]));
+    const questions = await loadSessionQuestions(session, repos);
     return ok({
       session,
-      questions: composed.value.map((question) => ({
+      questions: questions.map((question) => ({
         question,
         answer: byQuestion.get(question.id) ?? null,
       })),

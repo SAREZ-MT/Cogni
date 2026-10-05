@@ -52,7 +52,7 @@ describe("readExamSession", () => {
     });
   });
 
-  it("reads a finished session from its answers, in answer order", async () => {
+  it("reads a finished session in its stored order with every answer", async () => {
     const { uow, clock, start } = await setup(10);
     const started = await start();
     if (!started.ok) throw started.error;
@@ -74,9 +74,9 @@ describe("readExamSession", () => {
     const view = await readExamSession({ sessionId }, { uow }, OWNER);
     if (!view.ok) throw view.error;
     expect(view.value.session.finishedAt).toEqual(LATER);
-    expect(view.value.questions.map((q) => q.question.id)).toEqual(
-      [...ids].reverse(),
-    );
+    // The order shown during the exam (stored at start), not answer order.
+    expect(view.value.questions.map((q) => q.question.id)).toEqual(ids);
+    expect(view.value.questions.every((q) => q.answer !== null)).toBe(true);
   });
 
   it("refuses another owner's session", async () => {

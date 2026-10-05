@@ -50,6 +50,14 @@ export class InMemoryExamQuestionRepository implements ExamQuestionRepository {
     return question && question.ownerId === ownerId ? question : null;
   }
 
+  async listByIds(
+    ids: readonly string[],
+    ownerId: string,
+  ): Promise<ExamQuestion[]> {
+    const wanted = new Set(ids);
+    return this.list((q) => wanted.has(q.id) && q.ownerId === ownerId);
+  }
+
   async listActiveByPage(
     pageId: string,
     ownerId: string,

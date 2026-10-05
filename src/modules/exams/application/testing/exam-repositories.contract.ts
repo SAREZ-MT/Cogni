@@ -92,6 +92,8 @@ export function runExamRepositoriesContract(
           pageId,
           requestedCount: 10,
           retakeOfSessionId,
+          // Order matters: the stored list is read back as it was given.
+          questionIds: ["c", "a", "b"].map(() => ctx.newId()),
         },
         T0,
       ),
@@ -598,6 +600,29 @@ export function runExamRepositoriesContract(
       expect(await questions.listShownAt(pageId, ctx.otherOwnerId, T1)).toEqual(
         [],
       );
+    });
+
+    it("listByIds returns the owner's questions among the ids, retired included", async () => {
+      const ctx = options.context();
+      const { questions } = options.createRepositories();
+      const pageId = await ctx.newPageId();
+      const kept = question(ctx, pageId, { now: T0 });
+      const retired = question(ctx, pageId, { now: T0 });
+      const notAsked = question(ctx, pageId, { now: T0 });
+      for (const q of [kept, retired, notAsked]) await questions.save(q);
+      await questions.retire(retired.id, ctx.ownerId, T1);
+
+      const found = await questions.listByIds(
+        [retired.id, ctx.newId(), kept.id],
+        ctx.ownerId,
+      );
+      expect(found.map((q) => q.id).sort()).toEqual(
+        [kept.id, retired.id].sort(),
+      );
+      expect(await questions.listByIds([kept.id], ctx.otherOwnerId)).toEqual(
+        [],
+      );
+      expect(await questions.listByIds([], ctx.ownerId)).toEqual([]);
     });
 
     it("lockById reads the owner's session and nothing else", async () => {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createFixedClock } from "@/shared/kernel/clock";
 import { EXAM_ERROR } from "../domain/errors";
-import { composeSessionQuestions } from "./exam-session-work";
+import { readExamSession } from "./read-exam-session";
 import { startExamSession } from "./start-exam-session";
 import {
   LATER,
@@ -154,11 +154,8 @@ describe("startExamSession", () => {
       OWNER,
     );
     if (!started.ok) throw started.error;
-    const composed = await uow.run((repos) =>
-      composeSessionQuestions(started.value.session, repos),
-    );
-    if (!composed.ok) throw composed.error;
-    expect(composed.value.map((q) => q.id)).toEqual([
+    const { session } = started.value;
+    expect(session.questionIds).toEqual([
       "q-05",
       "q-03",
       "q-01",
@@ -171,17 +168,30 @@ describe("startExamSession", () => {
       "q-10",
     ]);
     expect(questions).toHaveLength(12);
+    // The composed list is stored with the session, not derived again.
+    const stored = await uow.repos.sessions.findById(session.id, OWNER);
+    expect(stored?.questionIds).toEqual(session.questionIds);
 
-    // Questions added or retired after the start change nothing.
+    // Questions added or retired and due dates moved after the start
+    // change nothing: the session reads its stored list.
     const after = new Date(LATER.getTime() + 60_000);
     await seedSessionQuestions(uow, 3, { createdAt: after, prefix: "late" });
     await uow.repos.questions.retire("q-05", OWNER, after);
-    const again = await uow.run((repos) =>
-      composeSessionQuestions(started.value.session, repos),
+    for (const [n, item] of uow.studyItems.items.entries()) {
+      uow.studyItems.items[n] = {
+        ...item,
+        dueAt:
+          item.sourceId === "q-11" ? NOW : new Date("2026-12-01T00:00:00.000Z"),
+      };
+    }
+    const again = await readExamSession(
+      { sessionId: session.id },
+      { uow },
+      OWNER,
     );
     if (!again.ok) throw again.error;
-    expect(again.value.map((q) => q.id)).toEqual(
-      composed.value.map((q) => q.id),
+    expect(again.value.questions.map((q) => q.question.id)).toEqual(
+      session.questionIds,
     );
   });
 });

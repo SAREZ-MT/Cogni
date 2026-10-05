@@ -9,10 +9,7 @@ import {
 } from "../domain/exam-session";
 import { scoreExam } from "../domain/scoring";
 import { lockOpenSession } from "./answer-exam-question";
-import {
-  composeSessionQuestions,
-  type ExamSessionUnitOfWork,
-} from "./exam-session-work";
+import type { ExamSessionUnitOfWork } from "./exam-session-work";
 import { runExamWork } from "./exam-unit-of-work";
 
 export interface CompleteExamSessionDeps {
@@ -29,7 +26,7 @@ export interface CompletedExamSession {
 // Ends an exam (§7.5) in one transaction:
 //   1. lock the session row (FOR UPDATE) and refuse a missing or finished
 //      one (EXAMS_SESSION_FINISHED), so two finishes never both score it;
-//   2. every question of the session must be answered
+//   2. every question of the session's stored list must be answered
 //      (EXAMS_SESSION_INCOMPLETE): the player reveals each answer as it is
 //      given, so an exam ends only when all its questions are answered and
 //      score = correct / total counts every question of the exam;
@@ -49,11 +46,11 @@ export async function completeExamSession(
     if (!session.ok) return session;
     const { pageId } = session.value;
 
-    const questions = await composeSessionQuestions(session.value, repos);
-    if (!questions.ok) return questions;
     const answers = await repos.answers.listBySession(input.sessionId, ownerId);
     const answered = new Set(answers.map((answer) => answer.questionId));
-    const missing = questions.value.filter((q) => !answered.has(q.id)).length;
+    const missing = session.value.questionIds.filter(
+      (id) => !answered.has(id),
+    ).length;
     if (missing > 0) {
       return err(
         new DomainError(

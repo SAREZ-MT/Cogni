@@ -12,6 +12,7 @@ function toSession(row: ExamSessionRow): ExamSession {
     requestedCount: row.requestedCount,
     isRetake: row.isRetake,
     retakeOfSessionId: row.retakeOfSessionId,
+    questionIds: row.questionIds,
     startedAt: row.startedAt,
     finishedAt: row.finishedAt,
     total: row.total,
@@ -29,6 +30,7 @@ export class DrizzleExamSessionRepository implements ExamSessionRepository {
   async create(session: ExamSession): Promise<void> {
     await this.db.insert(examSessions).values({
       ...session,
+      questionIds: [...session.questionIds],
       createdAt: session.startedAt,
       updatedAt: session.startedAt,
     });

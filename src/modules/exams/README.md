@@ -76,14 +76,17 @@ feature document is `odd/tasks/phase-5-exams.md`.
   opening a second one; otherwise composes the exam (`composeExam`, < 10
   roots → `EXAMS_NOT_ENOUGH_QUESTIONS`) and stores the session. Starts of
   one page are serialized with a transaction-scoped advisory lock.
-- The question order is not stored (no migration): `composeSessionQuestions`
-  derives it again, identically, from the page as it was at `startedAt` —
-  questions shown at that instant (`listShownAt`, latest wording per root),
-  answers given before it (least recently seen), the roots' due dates and
-  failed roots, which only a finished exam of the page changes, with
-  `now = startedAt`. A finished session is read from its answers.
+- The composed list is stored on the session (`exam_sessions.question_ids`,
+  ordered ids, migration 0011, CHECK: a JSON array of 1 to `requested_count`
+  ids). `composeNormalExam` runs once, at the start: questions shown at that
+  instant (`listShownAt`, latest wording per root), earlier answers (least
+  recently seen), the roots' due dates and failed roots. Answering,
+  finishing and reading an open or finished session use the stored list
+  only (`loadSessionQuestions`), so later changes to the page's questions
+  or study items never move an open exam. T7 retakes store their variant
+  ids the same way.
 - `answerExamQuestion` locks the session row, checks the question is one of
-  the session's and unanswered, grades it and returns the correct option
+  the session's stored ids and unanswered, grades it and returns the correct option
   and explanation (the player reveals each answer).
 - `completeExamSession`, one transaction: lock the session `FOR UPDATE`,
   refuse a finished one (`EXAMS_SESSION_FINISHED`) or unanswered questions
