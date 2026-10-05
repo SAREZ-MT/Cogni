@@ -16,6 +16,17 @@ const { captureException } = vi.hoisted(() => ({ captureException: vi.fn() }));
 vi.mock("@sentry/nextjs", () => ({ captureException }));
 const { revalidatePath } = vi.hoisted(() => ({ revalidatePath: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath }));
+const { requestSessionFeedback } = vi.hoisted(() => ({
+  requestSessionFeedback: vi.fn(),
+}));
+vi.mock("./application/request-session-feedback", () => ({
+  requestSessionFeedback,
+}));
+vi.mock("@/shared/config/env.server", () => ({ serverEnv: () => ({}) }));
+vi.mock("@/modules/ai", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/modules/ai")>()),
+  createAiServerApi: () => ({ generationLimiter: {} }),
+}));
 vi.mock("@/modules/notebooks", () => ({
   createNotebooksServerApi: () => ({ getPageText: vi.fn() }),
 }));
@@ -32,6 +43,7 @@ let current: {
 vi.mock("@/modules/study-engine", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/modules/study-engine")>()),
   createFlashcardSessionsServerApi: () => current.sessions,
+  createSessionFeedbackSources: () => ({}),
 }));
 vi.mock("./infrastructure", () => ({
   DrizzleFlashcardRepository: vi.fn(function DrizzleFlashcardRepository() {
@@ -86,6 +98,7 @@ describe("flashcard review session Server Actions", () => {
     getCurrentUser.mockResolvedValue({ id: OWNER });
     captureException.mockClear();
     revalidatePath.mockClear();
+    requestSessionFeedback.mockReset();
     current = {
       flashcards: new InMemoryFlashcardRepository(),
       sessions: { start: vi.fn(), grade: vi.fn(), finish: vi.fn() },
@@ -310,6 +323,107 @@ describe("flashcard review session Server Actions", () => {
         "STUDY_ENGINE_SESSION_NOT_FOUND",
       );
       expect(revalidatePath).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("requestSessionFeedbackAction", () => {
+    const feedbackRow = (overrides = {}) => ({
+      id: "f1",
+      ownerId: OWNER,
+      sessionKind: "flashcards",
+      sessionId: SESSION,
+      status: "done",
+      content: {
+        summary: "Buena sesión.",
+        strengths: ["Mitocondria"],
+        toReinforce: ["Mitosis"],
+        nextStepSuggestion: "Repasa mañana.",
+      },
+      generationId: "gen-1",
+      createdAt: NOW,
+      updatedAt: NOW,
+      ...overrides,
+    });
+
+    it("returns the done feedback content for the owner's session", async () => {
+      requestSessionFeedback.mockResolvedValue(ok(feedbackRow()));
+      const { requestSessionFeedbackAction } = await actions();
+
+      const result = await requestSessionFeedbackAction({ sessionId: SESSION });
+
+      expect(requestSessionFeedback).toHaveBeenCalledWith(
+        { sessionId: SESSION },
+        expect.anything(),
+        OWNER,
+      );
+      expect(result).toEqual(
+        ok({
+          status: "done",
+          content: {
+            summary: "Buena sesión.",
+            strengths: ["Mitocondria"],
+            toReinforce: ["Mitosis"],
+            nextStepSuggestion: "Repasa mañana.",
+          },
+        }),
+      );
+    });
+
+    it("returns a failed feedback as ok, without content", async () => {
+      requestSessionFeedback.mockResolvedValue(
+        ok(
+          feedbackRow({ status: "failed", content: null, generationId: null }),
+        ),
+      );
+      const { requestSessionFeedbackAction } = await actions();
+
+      const result = await requestSessionFeedbackAction({ sessionId: SESSION });
+
+      expect(result).toEqual(ok({ status: "failed", content: null }));
+    });
+
+    it("rejects an unauthenticated caller", async () => {
+      getCurrentUser.mockResolvedValue(null);
+      const { requestSessionFeedbackAction } = await actions();
+
+      const result = await requestSessionFeedbackAction({ sessionId: SESSION });
+
+      expect(!result.ok && result.error.code).toBe(
+        "FLASHCARDS_SESSION_REQUIRED",
+      );
+      expect(requestSessionFeedback).not.toHaveBeenCalled();
+    });
+
+    it("rejects invalid input", async () => {
+      const { requestSessionFeedbackAction } = await actions();
+
+      const result = await requestSessionFeedbackAction({ sessionId: "x" });
+
+      expect(!result.ok && result.error.code).toBe("FLASHCARDS_INVALID_INPUT");
+      expect(requestSessionFeedback).not.toHaveBeenCalled();
+    });
+
+    it("maps a refusal to an ActionError", async () => {
+      requestSessionFeedback.mockResolvedValue(
+        err(new DomainError("STUDY_ENGINE_SESSION_NOT_FOUND", SESSION)),
+      );
+      const { requestSessionFeedbackAction } = await actions();
+
+      const result = await requestSessionFeedbackAction({ sessionId: SESSION });
+
+      expect(!result.ok && result.error.code).toBe(
+        "STUDY_ENGINE_SESSION_NOT_FOUND",
+      );
+    });
+
+    it("never throws: an unexpected failure becomes FLASHCARDS_UNEXPECTED", async () => {
+      requestSessionFeedback.mockRejectedValue(new Error("db down"));
+      const { requestSessionFeedbackAction } = await actions();
+
+      const result = await requestSessionFeedbackAction({ sessionId: SESSION });
+
+      expect(!result.ok && result.error.code).toBe("FLASHCARDS_UNEXPECTED");
+      expect(captureException).toHaveBeenCalled();
     });
   });
 });

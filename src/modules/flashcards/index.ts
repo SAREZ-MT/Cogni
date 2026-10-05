@@ -22,5 +22,7 @@ export {
   type ReviewCardView,
   type ReviewSessionView,
   type ReviewSummaryView,
+  requestSessionFeedbackAction,
+  type SessionFeedbackView,
   startFlashcardSessionAction,
 } from "./session-actions";

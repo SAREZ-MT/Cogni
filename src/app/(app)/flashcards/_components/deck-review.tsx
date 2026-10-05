@@ -7,6 +7,7 @@ import {
   finishFlashcardSessionAction,
   gradeFlashcardAction,
   type ReviewCardView,
+  requestSessionFeedbackAction,
   startFlashcardSessionAction,
 } from "@/modules/flashcards";
 import { BackLink } from "@/shared/ui/back-link";
@@ -20,6 +21,10 @@ import {
   type PlayerCard,
   type RateOutcome,
 } from "./flashcard-player";
+import {
+  SessionFeedbackPanel,
+  type SessionFeedbackPanelState,
+} from "./session-feedback-panel";
 
 const NOTHING_DUE = "STUDY_ENGINE_NOTHING_DUE";
 // The card was graded already: the player sends one grade per card, so
@@ -48,6 +53,27 @@ interface ActiveSession {
 }
 
 type Notice = "nothing-due" | "start-failed" | null;
+
+// null: nothing to give feedback on (no card graded), so no panel.
+type Feedback = SessionFeedbackPanelState | null;
+
+// Closes the session, then asks for its AI feedback (documento-maestro
+// §3.3: at the end, never between cards). Any failure only degrades the
+// panel to a calm note; the summary stays usable.
+async function finishWithFeedback(sessionId: string): Promise<Feedback> {
+  try {
+    const finished = await finishFlashcardSessionAction({ sessionId });
+    if (!finished.ok) return { status: "unavailable" };
+    if (finished.value.reviewedCount === 0) return null;
+    const result = await requestSessionFeedbackAction({ sessionId });
+    if (result.ok && result.value.status === "done" && result.value.content) {
+      return { status: "done", content: result.value.content };
+    }
+  } catch {
+    // Network drop or a crashed action: same calm note.
+  }
+  return { status: "unavailable" };
+}
 
 function toPlayerCard(card: ReviewCardView): PlayerCard {
   const days = card.nextIntervalDays;
@@ -82,10 +108,12 @@ export function DeckReview({
   const router = useRouter();
   const [session, setSession] = useState<ActiveSession | null>(null);
   const [notice, setNotice] = useState<Notice>(null);
+  const [feedback, setFeedback] = useState<Feedback>({ status: "loading" });
   const [starting, startTransition] = useTransition();
 
   function startReview() {
     setNotice(null);
+    setFeedback({ status: "loading" });
     startTransition(async () => {
       let result: Awaited<ReturnType<typeof startFlashcardSessionAction>>;
       try {
@@ -134,10 +162,11 @@ export function DeckReview({
         cards={session.cards}
         onRate={rate}
         onFinish={async () => {
-          // The session stays open if this fails; nothing the student sees
-          // depends on it.
-          await finishFlashcardSessionAction({ sessionId });
+          // The session stays open if closing fails; the summary still
+          // shows, only without feedback.
+          setFeedback(await finishWithFeedback(sessionId));
         }}
+        feedback={feedback && <SessionFeedbackPanel state={feedback} />}
         onExit={() => {
           setSession(null);
           router.refresh();

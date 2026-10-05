@@ -9,6 +9,7 @@ const actions = vi.hoisted(() => ({
   startFlashcardSessionAction: vi.fn(),
   gradeFlashcardAction: vi.fn(),
   finishFlashcardSessionAction: vi.fn(),
+  requestSessionFeedbackAction: vi.fn(),
 }));
 vi.mock("@/modules/flashcards", () => actions);
 
@@ -16,6 +17,13 @@ import { DeckReview } from "./deck-review";
 
 const PAGE = "1b2c3d4e-5f60-4172-8899-b2c3d4e5f607";
 const SESSION = "7c1b2c3d-4e5f-4061-8798-a1b2c3d4e5f6";
+
+const FEEDBACK = {
+  summary: "Buena sesión.",
+  strengths: ["Pregunta 1"],
+  toReinforce: [],
+  nextStepSuggestion: "Repasa mañana.",
+};
 
 const card = (n: number, days = { again: 1, hard: 1, good: 1, easy: 1 }) => ({
   itemId: `i${n}`,
@@ -58,6 +66,10 @@ describe("DeckReview", () => {
     actions.finishFlashcardSessionAction.mockResolvedValue({
       ok: true,
       value: { reviewedCount: 1, againCount: 0 },
+    });
+    actions.requestSessionFeedbackAction.mockResolvedValue({
+      ok: true,
+      value: { status: "done", content: FEEDBACK },
     });
   });
 
@@ -270,5 +282,115 @@ describe("DeckReview", () => {
       "No pudimos guardar tu respuesta. Intenta de nuevo.",
     );
     expect(screen.getByText("Tarjeta 1 de 1")).toBeInTheDocument();
+  });
+
+  describe("session feedback", () => {
+    async function finishOneCard(user: ReturnType<typeof userEvent.setup>) {
+      actions.startFlashcardSessionAction.mockResolvedValue({
+        ok: true,
+        value: { sessionId: SESSION, cards: [card(1)] },
+      });
+      await start(user);
+      await user.click(await screen.findByTestId("flip-card"));
+      await user.click(screen.getByTestId("rate-good"));
+      return screen.findByRole("dialog", { name: /Sesión completada/ });
+    }
+
+    it("asks for the finished session's feedback and shows it in the summary", async () => {
+      const user = setup();
+
+      const summary = await finishOneCard(user);
+
+      expect(
+        await within(summary).findByText("Buena sesión."),
+      ).toBeInTheDocument();
+      expect(actions.requestSessionFeedbackAction).toHaveBeenCalledTimes(1);
+      expect(actions.requestSessionFeedbackAction).toHaveBeenCalledWith({
+        sessionId: SESSION,
+      });
+      expect(
+        actions.finishFlashcardSessionAction.mock.invocationCallOrder[0],
+      ).toBeLessThan(
+        actions.requestSessionFeedbackAction.mock.invocationCallOrder[0] ?? 0,
+      );
+    });
+
+    it("shows a calm note and keeps the summary usable when the AI failed", async () => {
+      actions.requestSessionFeedbackAction.mockResolvedValue({
+        ok: true,
+        value: { status: "failed", content: null },
+      });
+      const user = setup();
+
+      const summary = await finishOneCard(user);
+
+      expect(
+        await within(summary).findByText(
+          /no pudimos preparar la retroalimentación/,
+        ),
+      ).toBeInTheDocument();
+      await user.click(
+        within(summary).getByRole("button", { name: "Volver al mazo" }),
+      );
+      expect(screen.getByText("lista del mazo")).toBeInTheDocument();
+    });
+
+    it.each([
+      ["refused", { ok: false, error: { code: "X", message: "x" } }],
+      ["rejected", null],
+    ])("shows the calm note when the feedback request is %s", async (_l, value) => {
+      if (value) actions.requestSessionFeedbackAction.mockResolvedValue(value);
+      else actions.requestSessionFeedbackAction.mockRejectedValue(new Error());
+      const user = setup();
+
+      const summary = await finishOneCard(user);
+
+      expect(
+        await within(summary).findByText(
+          /no pudimos preparar la retroalimentación/,
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it("does not ask for feedback when the session could not be closed", async () => {
+      actions.finishFlashcardSessionAction.mockResolvedValue({
+        ok: false,
+        error: { code: "STUDY_ENGINE_SESSION_NOT_FOUND", message: "x" },
+      });
+      const user = setup();
+
+      const summary = await finishOneCard(user);
+
+      expect(
+        await within(summary).findByText(
+          /no pudimos preparar la retroalimentación/,
+        ),
+      ).toBeInTheDocument();
+      expect(actions.requestSessionFeedbackAction).not.toHaveBeenCalled();
+    });
+
+    it("shows no feedback panel when no card was graded", async () => {
+      actions.startFlashcardSessionAction.mockResolvedValue({
+        ok: true,
+        value: { sessionId: SESSION, cards: [card(1)] },
+      });
+      actions.finishFlashcardSessionAction.mockResolvedValue({
+        ok: true,
+        value: { reviewedCount: 0, againCount: 0 },
+      });
+      const user = setup();
+      await start(user);
+
+      await user.click(await screen.findByRole("button", { name: /Terminar/ }));
+
+      const summary = await screen.findByRole("dialog", {
+        name: /Sesión completada/,
+      });
+      await act(async () => {});
+      expect(
+        within(summary).queryByTestId("session-feedback"),
+      ).not.toBeInTheDocument();
+      expect(actions.requestSessionFeedbackAction).not.toHaveBeenCalled();
+    });
   });
 });

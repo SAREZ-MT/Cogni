@@ -1,13 +1,16 @@
 "use server";
 
 import { z } from "zod";
+import { createAiServerApi } from "@/modules/ai";
 import { createNotebooksServerApi } from "@/modules/notebooks";
 import {
   createFlashcardSessionsServerApi,
+  createSessionFeedbackSources,
   type DueFlashcard,
   FLASHCARD_QUALITY,
   type FlashcardRating,
 } from "@/modules/study-engine";
+import { serverEnv } from "@/shared/config/env.server";
 import { getDb } from "@/shared/db/client";
 import { systemClock } from "@/shared/kernel/clock";
 import { type ActionError, toActionError } from "@/shared/kernel/domain-error";
@@ -19,6 +22,7 @@ import {
   revalidateDecks,
   withBoundary,
 } from "./action-support";
+import { requestSessionFeedback } from "./application/request-session-feedback";
 import type { Flashcard } from "./domain/flashcard";
 import type { FlashcardRepository } from "./domain/flashcard-repository";
 import { DrizzleFlashcardRepository } from "./infrastructure";
@@ -55,6 +59,19 @@ export interface ReviewSummaryView {
   againCount: number;
 }
 
+// AI feedback of a finished session (§3.3, §8.4). "failed" (and a
+// "pending" left by a concurrent request) carry no content; the UI shows a
+// calm note and the session is closed either way.
+export interface SessionFeedbackView {
+  status: "pending" | "done" | "failed";
+  content: {
+    summary: string;
+    strengths: string[];
+    toReinforce: string[];
+    nextStepSuggestion: string;
+  } | null;
+}
+
 const RATINGS = Object.keys(FLASHCARD_QUALITY) as [
   FlashcardRating,
   ...FlashcardRating[],
@@ -67,6 +84,7 @@ const gradeInput = z.object({
   rating: z.enum(RATINGS),
 });
 const finishInput = z.object({ sessionId: z.uuid() });
+const feedbackInput = z.object({ sessionId: z.uuid() });
 
 function deps() {
   const db = getDb();
@@ -164,6 +182,49 @@ export async function finishFlashcardSessionAction(
     return ok({
       reviewedCount: finished.value.reviewedCount,
       againCount: finished.value.againCount,
+    });
+  });
+}
+
+export async function requestSessionFeedbackAction(
+  input: unknown,
+): Promise<Result<SessionFeedbackView, ActionError>> {
+  return withBoundary(async () => {
+    const ownerId = await requireOwnerId();
+    if (!ownerId.ok) return ownerId;
+    const parsed = parseInput(feedbackInput, input);
+    if (!parsed.ok) return parsed;
+
+    const db = getDb();
+    const ids = { next: createId };
+    const ai = createAiServerApi({
+      env: serverEnv(),
+      db,
+      clock: systemClock,
+      ids,
+    });
+    const result = await requestSessionFeedback(
+      parsed.value,
+      {
+        ...createSessionFeedbackSources(db),
+        flashcards: new DrizzleFlashcardRepository(db),
+        limiter: ai.generationLimiter,
+        ai,
+        clock: systemClock,
+        ids,
+      },
+      ownerId.value,
+    );
+    if (!result.ok) return err(toActionError(result.error));
+    const { status, content } = result.value;
+    return ok({
+      status,
+      content: content && {
+        summary: content.summary,
+        strengths: [...content.strengths],
+        toReinforce: [...content.toReinforce],
+        nextStepSuggestion: content.nextStepSuggestion,
+      },
     });
   });
 }
