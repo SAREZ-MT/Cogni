@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Button } from "@/shared/ui/button";
 import {
   Dialog,
@@ -39,6 +39,9 @@ export interface QuestionFormDialogProps {
   // A sync handler closes the dialog at once. An async one keeps it open
   // while it runs ("Guardando…"); resolving to a message shows it as an
   // alert and keeps the dialog open, resolving to null/undefined closes it.
+  // While it runs the dialog cannot be cancelled or dismissed; a save that
+  // resolves after the caller closed (and maybe reopened) the dialog is
+  // ignored, so it never closes or annotates a later session.
   onSubmit: (
     values: QuestionFormValues,
   ) => undefined | Promise<string | null | undefined>;
@@ -62,6 +65,10 @@ export function QuestionFormDialog({
   );
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  // Identifies the current open/closed session of the dialog: every `open`
+  // transition starts a new one, and a submit only applies its outcome to
+  // the session it started in.
+  const session = useRef(0);
   const stemId = useId();
   const conceptId = useId();
   const explanationId = useId();
@@ -71,6 +78,8 @@ export function QuestionFormDialog({
   // controlled `open` prop) instead of keying/remounting the component.
   // biome-ignore lint/correctness/useExhaustiveDependencies: only re-sync on the open transition, not on every initialValues identity change while open.
   useEffect(() => {
+    session.current += 1;
+    setPending(false);
     if (open) {
       setValues(initialValues ?? EMPTY_VALUES);
       setError(null);
@@ -109,18 +118,27 @@ export function QuestionFormDialog({
       onOpenChange(false);
       return;
     }
+    const started = session.current;
     setPending(true);
+    let message: string | null | undefined;
     try {
-      const message = await outcome;
-      if (message) setError(message);
-      else onOpenChange(false);
+      message = await outcome;
     } finally {
-      setPending(false);
+      if (session.current === started) setPending(false);
     }
+    if (session.current !== started) return;
+    if (message) setError(message);
+    else onOpenChange(false);
+  }
+
+  // Escape, the overlay and the close button cannot dismiss a running save.
+  function changeOpen(next: boolean) {
+    if (!next && pending) return;
+    onOpenChange(next);
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={changeOpen}>
       <DialogContent data-testid="question-form-dialog" className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>
@@ -222,7 +240,11 @@ export function QuestionFormDialog({
         )}
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button
+            variant="outline"
+            onClick={() => changeOpen(false)}
+            disabled={pending}
+          >
             Cancelar
           </Button>
           <Button type="button" onClick={submit} disabled={!isValid || pending}>

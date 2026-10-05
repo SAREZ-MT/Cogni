@@ -300,4 +300,85 @@ describe("QuestionFormDialog", () => {
 
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
+
+  it("cannot be cancelled or dismissed while an async submit runs", async () => {
+    let resolve: (error: string | null) => void = () => {};
+    const { user, onOpenChange } = setup({
+      mode: "edit",
+      initialValues: EDIT_VALUES,
+      onSubmit: () =>
+        new Promise<string | null>((done) => {
+          resolve = done;
+        }),
+    });
+
+    await user.click(screen.getByRole("button", { name: "Guardar cambios" }));
+
+    expect(screen.getByRole("button", { name: "Cancelar" })).toBeDisabled();
+    await user.keyboard("{Escape}");
+    expect(onOpenChange).not.toHaveBeenCalled();
+
+    resolve(null);
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+  });
+
+  it("ignores a save that resolves after the dialog was closed and reopened", async () => {
+    const pendingSaves: ((error: string | null) => void)[] = [];
+    const props = {
+      mode: "edit" as const,
+      initialValues: EDIT_VALUES,
+      onOpenChange: vi.fn(),
+      onSubmit: () =>
+        new Promise<string | null>((done) => {
+          pendingSaves.push(done);
+        }),
+    };
+    const user = userEvent.setup();
+    const { rerender } = render(<QuestionFormDialog {...props} open />);
+    await user.click(screen.getByRole("button", { name: "Guardar cambios" }));
+    expect(screen.getByRole("button", { name: "Guardando…" })).toBeDisabled();
+
+    // The caller closes and reopens the dialog while the first save runs.
+    rerender(<QuestionFormDialog {...props} open={false} />);
+    rerender(<QuestionFormDialog {...props} open />);
+
+    expect(
+      screen.getByRole("button", { name: "Guardar cambios" }),
+    ).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Cancelar" })).toBeEnabled();
+
+    pendingSaves[0]?.("Algo falló.");
+    await new Promise((done) => setTimeout(done, 0));
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(props.onOpenChange).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole("button", { name: "Guardar cambios" }),
+    ).toBeEnabled();
+  });
+
+  it("ignores a stale save that succeeds after the dialog was reopened", async () => {
+    const pendingSaves: ((error: string | null) => void)[] = [];
+    const props = {
+      mode: "edit" as const,
+      initialValues: EDIT_VALUES,
+      onOpenChange: vi.fn(),
+      onSubmit: () =>
+        new Promise<string | null>((done) => {
+          pendingSaves.push(done);
+        }),
+    };
+    const user = userEvent.setup();
+    const { rerender } = render(<QuestionFormDialog {...props} open />);
+    await user.click(screen.getByRole("button", { name: "Guardar cambios" }));
+
+    rerender(<QuestionFormDialog {...props} open={false} />);
+    rerender(<QuestionFormDialog {...props} open />);
+    pendingSaves[0]?.(null);
+    await new Promise((done) => setTimeout(done, 0));
+
+    // The old save must not close the new session.
+    expect(props.onOpenChange).not.toHaveBeenCalled();
+    expect(screen.getByTestId("question-form-dialog")).toBeInTheDocument();
+  });
 });

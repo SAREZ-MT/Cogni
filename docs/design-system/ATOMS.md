@@ -975,6 +975,15 @@ pregunta" and every row's "Editar"; it re-syncs its local form state from
   Spanish message as a `role="alert"` line (`text-destructive text-sm`,
   same as `NewFlashcardDialog`) above the footer and stays open. Re-opening
   clears the error.
+- Since the T4 review fixes: while an async save runs, "Cancelar" is
+  disabled and Escape, the overlay and the close button do not dismiss the
+  dialog (a running save is never silently abandoned). Each `open`
+  transition starts a new session: if the caller closes the dialog anyway,
+  the reopened form starts enabled ("Guardando…" never leaks into it) and
+  the old save's outcome is ignored — it never closes or shows its error in
+  the new session. `NewFlashcardDialog` still lets "Cancelar" run during a
+  save and carries the Phase 4 stale-transition advisory; align it with
+  this behaviour when that dialog is next touched.
 
 Used by: `exams/_components/exam-questions-view.tsx`.
 

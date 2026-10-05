@@ -46,7 +46,14 @@ function firstStatement(source: string): string {
 // structurally here instead of by review.
 describe.each(PREVIEW_TREES)("%s preview gate", (tree, routes) => {
   const pages = pageFiles(path.join(import.meta.dirname, tree)).filter(
-    (file) => !REAL_DATA_PAGES.has(path.relative(import.meta.dirname, file)),
+    (file) =>
+      !REAL_DATA_PAGES.has(
+        // REAL_DATA_PAGES uses "/"; path.relative uses "\\" on Windows.
+        path
+          .relative(import.meta.dirname, file)
+          .split(path.sep)
+          .join("/"),
+      ),
   );
 
   it("finds the routes of the tree", () => {
