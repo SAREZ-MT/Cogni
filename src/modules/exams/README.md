@@ -67,14 +67,23 @@ Tables `exam_questions`, `exam_sessions`, `exam_answers` and
 `exam_page_state` (RLS on, no policies: only the server connection reaches
 them). CHECKs mirror the domain: 4 options, correct index 0–3, an original is
 its own root and only a variant has `variant_of`, N in 10–30, a finished
-session carries its whole result. `exam_answers` is keyed by
-`(session_id, question_id)` and unique on `(session_id, root_id)`.
+session carries its whole result. Composite keys keep a lineage on one
+owner and page (`exam_questions_root_fk`) and a replaced question in the
+same lineage (`exam_questions_variant_of_fk`); both are NO ACTION, so a root
+with variants or a replaced question cannot be deleted (questions are
+retired), while deleting the page or the owner removes the whole lineage.
+`exam_answers` is keyed by `(session_id, question_id)`, unique on
+`(session_id, root_id)`, and `(question_id, root_id)` must be a question and
+its own root (`exam_answers_question_root_fk`, cascade).
 
 Ports (`ExamQuestionRepository`, `ExamSessionRepository`,
 `ExamAnswerRepository`, `ExamPageStateRepository`) are owner-scoped.
 `listLineage` includes retired questions (what `newVariant` compares
 against); `listActiveByPage` excludes them. `saveMany` writes a batch of
-answers or none. `createDrizzleExamRepositories(db)` builds all four on one
+answers or none, and refuses a session or question that is not the owner's,
+a question off the session's page or a root that is not the question's.
+`ExamPageStateRepository.upsert` writes nothing for a page that is not the
+owner's (it inserts from `pages` in the same statement). `createDrizzleExamRepositories(db)` builds all four on one
 executor; `db` may be an open transaction, so exam writes join the caller's
 commit together with study-engine's repositories. One shared contract
 (`application/testing/exam-repositories.contract.ts`) runs against the fakes

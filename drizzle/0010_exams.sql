@@ -41,6 +41,8 @@ CREATE TABLE "exam_questions" (
 	"retired_at" timestamp with time zone,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "exam_questions_id_owner_page_key" UNIQUE("id","owner_id","page_id"),
+	CONSTRAINT "exam_questions_id_root_key" UNIQUE("id","root_id"),
 	CONSTRAINT "exam_questions_origin_check" CHECK ("exam_questions"."origin" in ('ai', 'manual', 'ai_variant')),
 	CONSTRAINT "exam_questions_options_count" CHECK (jsonb_typeof("exam_questions"."options") = 'array' and jsonb_array_length("exam_questions"."options") = 4),
 	CONSTRAINT "exam_questions_correct_index_range" CHECK ("exam_questions"."correct_index" between 0 and 3),
@@ -76,16 +78,15 @@ CREATE TABLE "exam_sessions" (
 ALTER TABLE "exam_sessions" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 ALTER TABLE "exam_answers" ADD CONSTRAINT "exam_answers_owner_id_profiles_id_fk" FOREIGN KEY ("owner_id") REFERENCES "public"."profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "exam_answers" ADD CONSTRAINT "exam_answers_session_id_exam_sessions_id_fk" FOREIGN KEY ("session_id") REFERENCES "public"."exam_sessions"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "exam_answers" ADD CONSTRAINT "exam_answers_question_id_exam_questions_id_fk" FOREIGN KEY ("question_id") REFERENCES "public"."exam_questions"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "exam_answers" ADD CONSTRAINT "exam_answers_root_id_exam_questions_id_fk" FOREIGN KEY ("root_id") REFERENCES "public"."exam_questions"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "exam_answers" ADD CONSTRAINT "exam_answers_question_root_fk" FOREIGN KEY ("question_id","root_id") REFERENCES "public"."exam_questions"("id","root_id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "exam_page_state" ADD CONSTRAINT "exam_page_state_page_id_pages_id_fk" FOREIGN KEY ("page_id") REFERENCES "public"."pages"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "exam_page_state" ADD CONSTRAINT "exam_page_state_owner_id_profiles_id_fk" FOREIGN KEY ("owner_id") REFERENCES "public"."profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "exam_page_state" ADD CONSTRAINT "exam_page_state_last_passed_session_id_exam_sessions_id_fk" FOREIGN KEY ("last_passed_session_id") REFERENCES "public"."exam_sessions"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "exam_questions" ADD CONSTRAINT "exam_questions_owner_id_profiles_id_fk" FOREIGN KEY ("owner_id") REFERENCES "public"."profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "exam_questions" ADD CONSTRAINT "exam_questions_page_id_pages_id_fk" FOREIGN KEY ("page_id") REFERENCES "public"."pages"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "exam_questions" ADD CONSTRAINT "exam_questions_root_id_exam_questions_id_fk" FOREIGN KEY ("root_id") REFERENCES "public"."exam_questions"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "exam_questions" ADD CONSTRAINT "exam_questions_variant_of_exam_questions_id_fk" FOREIGN KEY ("variant_of") REFERENCES "public"."exam_questions"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "exam_questions" ADD CONSTRAINT "exam_questions_generation_id_ai_generations_id_fk" FOREIGN KEY ("generation_id") REFERENCES "public"."ai_generations"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "exam_questions" ADD CONSTRAINT "exam_questions_root_fk" FOREIGN KEY ("root_id","owner_id","page_id") REFERENCES "public"."exam_questions"("id","owner_id","page_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "exam_questions" ADD CONSTRAINT "exam_questions_variant_of_fk" FOREIGN KEY ("variant_of","root_id") REFERENCES "public"."exam_questions"("id","root_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "exam_sessions" ADD CONSTRAINT "exam_sessions_owner_id_profiles_id_fk" FOREIGN KEY ("owner_id") REFERENCES "public"."profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "exam_sessions" ADD CONSTRAINT "exam_sessions_page_id_pages_id_fk" FOREIGN KEY ("page_id") REFERENCES "public"."pages"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "exam_sessions" ADD CONSTRAINT "exam_sessions_retake_of_session_id_exam_sessions_id_fk" FOREIGN KEY ("retake_of_session_id") REFERENCES "public"."exam_sessions"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint

@@ -1,6 +1,6 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import type { DbExecutor } from "@/shared/db/client";
-import { examAnswers, examSessions } from "@/shared/db/schema";
+import { examAnswers, examQuestions, examSessions } from "@/shared/db/schema";
 import type { ExamAnswerRepository } from "../domain/exam-answer-repository";
 import type { ExamAnswer } from "../domain/exam-session";
 
@@ -16,8 +16,8 @@ export class DrizzleExamAnswerRepository implements ExamAnswerRepository {
     if (answers.length === 0) return;
     // The session foreign key alone would accept another owner's session.
     const sessionIds = [...new Set(answers.map((a) => a.sessionId))];
-    const owned = await this.db
-      .select({ id: examSessions.id })
+    const sessions = await this.db
+      .select({ id: examSessions.id, pageId: examSessions.pageId })
       .from(examSessions)
       .where(
         and(
@@ -25,8 +25,39 @@ export class DrizzleExamAnswerRepository implements ExamAnswerRepository {
           eq(examSessions.ownerId, ownerId),
         ),
       );
-    if (owned.length !== sessionIds.length) {
+    if (sessions.length !== sessionIds.length) {
       throw new Error("exam answers reference a session the owner lacks");
+    }
+    // The (question_id, root_id) foreign key ties the root to the question;
+    // the owner and the session's page are checked here (a question's
+    // owner, page and root never change).
+    const questionIds = [...new Set(answers.map((a) => a.questionId))];
+    const questions = await this.db
+      .select({
+        id: examQuestions.id,
+        rootId: examQuestions.rootId,
+        pageId: examQuestions.pageId,
+      })
+      .from(examQuestions)
+      .where(
+        and(
+          inArray(examQuestions.id, questionIds),
+          eq(examQuestions.ownerId, ownerId),
+        ),
+      );
+    const pageOfSession = new Map(sessions.map((s) => [s.id, s.pageId]));
+    const questionById = new Map(questions.map((q) => [q.id, q]));
+    for (const answer of answers) {
+      const question = questionById.get(answer.questionId);
+      if (
+        !question ||
+        question.rootId !== answer.rootId ||
+        question.pageId !== pageOfSession.get(answer.sessionId)
+      ) {
+        throw new Error(
+          `exam question ${answer.questionId} does not fit the answer`,
+        );
+      }
     }
     // One statement: the (session, question) and (session, root) keys
     // reject a duplicate and the whole batch with it.

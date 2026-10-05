@@ -135,12 +135,17 @@ export class InMemoryExamSessionRepository implements ExamSessionRepository {
   }
 }
 
-// Needs the session fake to check ownership, as the table's foreign key
-// and the Drizzle adapter's owner check do.
+// Needs the session and question fakes to check ownership, as the table's
+// foreign keys and the Drizzle adapter's checks do: the session and the
+// question are the owner's, the question is on the session's page and the
+// answer's root is the question's root.
 export class InMemoryExamAnswerRepository implements ExamAnswerRepository {
   private readonly rows: { ownerId: string; answer: ExamAnswer }[] = [];
 
-  constructor(private readonly sessions: ExamSessionRepository) {}
+  constructor(
+    private readonly sessions: ExamSessionRepository,
+    private readonly questions: ExamQuestionRepository,
+  ) {}
 
   async saveMany(
     answers: readonly ExamAnswer[],
@@ -153,8 +158,22 @@ export class InMemoryExamAnswerRepository implements ExamAnswerRepository {
       ]),
     );
     for (const answer of answers) {
-      if (!(await this.sessions.findById(answer.sessionId, ownerId))) {
+      const session = await this.sessions.findById(answer.sessionId, ownerId);
+      if (!session) {
         throw new Error(`exam session ${answer.sessionId} not found`);
+      }
+      const question = await this.questions.findById(
+        answer.questionId,
+        ownerId,
+      );
+      if (
+        !question ||
+        question.rootId !== answer.rootId ||
+        question.pageId !== session.pageId
+      ) {
+        throw new Error(
+          `exam question ${answer.questionId} does not fit the answer`,
+        );
       }
       for (const key of [
         `${answer.sessionId}:q:${answer.questionId}`,
@@ -190,12 +209,21 @@ export class InMemoryExamPageStateRepository
 {
   private readonly rows = new Map<string, ExamPageState>();
 
+  // Stands in for the pages table: whether `pageId` is `ownerId`'s page.
+  constructor(
+    private readonly isPageOwnedBy: (
+      pageId: string,
+      ownerId: string,
+    ) => boolean = () => true,
+  ) {}
+
   async get(pageId: string, ownerId: string): Promise<ExamPageState | null> {
     const state = this.rows.get(pageId);
     return state && state.ownerId === ownerId ? state : null;
   }
 
   async upsert(state: ExamPageState): Promise<void> {
+    if (!this.isPageOwnedBy(state.pageId, state.ownerId)) return;
     const stored = this.rows.get(state.pageId);
     if (stored && stored.ownerId !== state.ownerId) return;
     this.rows.set(state.pageId, {
@@ -205,12 +233,19 @@ export class InMemoryExamPageStateRepository
   }
 }
 
-export function createInMemoryExamRepositories() {
+// `isPageOwnedBy` stands in for the pages table (every page is the
+// caller's by default).
+export function createInMemoryExamRepositories(
+  options: {
+    isPageOwnedBy?: (pageId: string, ownerId: string) => boolean;
+  } = {},
+) {
   const sessions = new InMemoryExamSessionRepository();
+  const questions = new InMemoryExamQuestionRepository();
   return {
-    questions: new InMemoryExamQuestionRepository(),
+    questions,
     sessions,
-    answers: new InMemoryExamAnswerRepository(sessions),
-    pageStates: new InMemoryExamPageStateRepository(),
+    answers: new InMemoryExamAnswerRepository(sessions, questions),
+    pageStates: new InMemoryExamPageStateRepository(options.isPageOwnedBy),
   };
 }

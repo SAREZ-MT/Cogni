@@ -1,6 +1,6 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import type { DbExecutor } from "@/shared/db/client";
-import { examPageState } from "@/shared/db/schema";
+import { examPageState, pages } from "@/shared/db/schema";
 import type { ExamPageStateRepository } from "../domain/exam-page-state-repository";
 import type { ExamPageState } from "../domain/exam-session";
 
@@ -35,11 +35,33 @@ export class DrizzleExamPageStateRepository implements ExamPageStateRepository {
       lastPassedSessionId: state.lastPassedSessionId,
       updatedAt: new Date(),
     };
-    // The WHERE on the conflict branch makes an upsert with another owner's
-    // page a no-op instead of a takeover.
+    // One statement: the insert selects from pages, so a page that is not
+    // the owner's inserts nothing; the WHERE on the conflict branch makes an
+    // upsert over another owner's row a no-op instead of a takeover.
     await this.db
       .insert(examPageState)
-      .values({ pageId: state.pageId, ownerId: state.ownerId, ...values })
+      .select(
+        this.db
+          .select({
+            pageId: pages.id,
+            ownerId: pages.ownerId,
+            retakePending: sql<boolean>`${values.retakePending}`.as(
+              "retake_pending",
+            ),
+            failedRootIds: sql<string[]>`${JSON.stringify(
+              values.failedRootIds,
+            )}::jsonb`.as("failed_root_ids"),
+            lastPassedSessionId: sql<
+              string | null
+            >`${values.lastPassedSessionId}::uuid`.as("last_passed_session_id"),
+            createdAt: sql<Date>`now()`.as("created_at"),
+            updatedAt: sql<Date>`now()`.as("updated_at"),
+          })
+          .from(pages)
+          .where(
+            and(eq(pages.id, state.pageId), eq(pages.ownerId, state.ownerId)),
+          ),
+      )
       .onConflictDoUpdate({
         target: examPageState.pageId,
         set: values,

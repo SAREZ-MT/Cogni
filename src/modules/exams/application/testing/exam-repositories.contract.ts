@@ -429,6 +429,43 @@ export function runExamRepositoriesContract(
       expect(await repos.answers.listBySession(s.id, ctx.ownerId)).toEqual([]);
     });
 
+    it("refuses an answer whose root is not its question's root", async () => {
+      const ctx = options.context();
+      const { repos, s, a, b } = await seeded(ctx);
+      await expect(
+        repos.answers.saveMany(
+          [{ ...answer(s.id, a, true), rootId: b.rootId }],
+          ctx.ownerId,
+        ),
+      ).rejects.toThrow();
+      expect(await repos.answers.listBySession(s.id, ctx.ownerId)).toEqual([]);
+    });
+
+    it("refuses a question of another page than the session's", async () => {
+      const ctx = options.context();
+      const { repos, s, a } = await seeded(ctx);
+      const elsewhere = question(ctx, await ctx.newPageId());
+      await repos.questions.save(elsewhere);
+      await expect(
+        repos.answers.saveMany(
+          [answer(s.id, a, true), answer(s.id, elsewhere, true)],
+          ctx.ownerId,
+        ),
+      ).rejects.toThrow();
+      expect(await repos.answers.listBySession(s.id, ctx.ownerId)).toEqual([]);
+    });
+
+    it("refuses another owner's question", async () => {
+      const ctx = options.context();
+      const { repos, pageId, s } = await seeded(ctx);
+      const theirs = question(ctx, pageId, { ownerId: ctx.otherOwnerId });
+      await repos.questions.save(theirs);
+      await expect(
+        repos.answers.saveMany([answer(s.id, theirs, true)], ctx.ownerId),
+      ).rejects.toThrow();
+      expect(await repos.answers.listBySession(s.id, ctx.ownerId)).toEqual([]);
+    });
+
     it("lets two sessions answer the same question", async () => {
       const ctx = options.context();
       const { repos, pageId, s, a } = await seeded(ctx);
@@ -478,6 +515,22 @@ export function runExamRepositoriesContract(
       expect(await repos.pageStates.get(pageId, ctx.ownerId)).toEqual(
         passedState,
       );
+    });
+
+    it("refuses a page that is not the owner's", async () => {
+      const ctx = options.context();
+      const { pageStates } = options.createRepositories();
+      // The page belongs to ownerId and has no state yet.
+      const pageId = await ctx.newPageId();
+      await pageStates.upsert({
+        pageId,
+        ownerId: ctx.otherOwnerId,
+        retakePending: true,
+        failedRootIds: [ctx.newId()],
+        lastPassedSessionId: null,
+      });
+      expect(await pageStates.get(pageId, ctx.otherOwnerId)).toBeNull();
+      expect(await pageStates.get(pageId, ctx.ownerId)).toBeNull();
     });
 
     it("never reads or overwrites another owner's state", async () => {

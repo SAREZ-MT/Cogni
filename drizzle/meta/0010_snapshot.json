@@ -1,5 +1,5 @@
 {
-  "id": "b1694e7b-a413-4031-ad5c-98761758b93f",
+  "id": "c87c2af6-c29d-481d-bcf9-f271c25c545b",
   "prevId": "3e0ce939-782f-4ff1-9175-f49ad5aca5d8",
   "version": "7",
   "dialect": "postgresql",
@@ -292,28 +292,17 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "exam_answers_question_id_exam_questions_id_fk": {
-          "name": "exam_answers_question_id_exam_questions_id_fk",
+        "exam_answers_question_root_fk": {
+          "name": "exam_answers_question_root_fk",
           "tableFrom": "exam_answers",
           "tableTo": "exam_questions",
           "columnsFrom": [
-            "question_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "exam_answers_root_id_exam_questions_id_fk": {
-          "name": "exam_answers_root_id_exam_questions_id_fk",
-          "tableFrom": "exam_answers",
-          "tableTo": "exam_questions",
-          "columnsFrom": [
+            "question_id",
             "root_id"
           ],
           "columnsTo": [
-            "id"
+            "id",
+            "root_id"
           ],
           "onDelete": "cascade",
           "onUpdate": "no action"
@@ -645,32 +634,6 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "exam_questions_root_id_exam_questions_id_fk": {
-          "name": "exam_questions_root_id_exam_questions_id_fk",
-          "tableFrom": "exam_questions",
-          "tableTo": "exam_questions",
-          "columnsFrom": [
-            "root_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "exam_questions_variant_of_exam_questions_id_fk": {
-          "name": "exam_questions_variant_of_exam_questions_id_fk",
-          "tableFrom": "exam_questions",
-          "tableTo": "exam_questions",
-          "columnsFrom": [
-            "variant_of"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
         "exam_questions_generation_id_ai_generations_id_fk": {
           "name": "exam_questions_generation_id_ai_generations_id_fk",
           "tableFrom": "exam_questions",
@@ -683,10 +646,60 @@
           ],
           "onDelete": "set null",
           "onUpdate": "no action"
+        },
+        "exam_questions_root_fk": {
+          "name": "exam_questions_root_fk",
+          "tableFrom": "exam_questions",
+          "tableTo": "exam_questions",
+          "columnsFrom": [
+            "root_id",
+            "owner_id",
+            "page_id"
+          ],
+          "columnsTo": [
+            "id",
+            "owner_id",
+            "page_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "exam_questions_variant_of_fk": {
+          "name": "exam_questions_variant_of_fk",
+          "tableFrom": "exam_questions",
+          "tableTo": "exam_questions",
+          "columnsFrom": [
+            "variant_of",
+            "root_id"
+          ],
+          "columnsTo": [
+            "id",
+            "root_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "exam_questions_id_owner_page_key": {
+          "name": "exam_questions_id_owner_page_key",
+          "nullsNotDistinct": false,
+          "columns": [
+            "id",
+            "owner_id",
+            "page_id"
+          ]
+        },
+        "exam_questions_id_root_key": {
+          "name": "exam_questions_id_root_key",
+          "nullsNotDistinct": false,
+          "columns": [
+            "id",
+            "root_id"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {
         "exam_questions_origin_check": {

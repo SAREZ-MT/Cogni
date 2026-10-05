@@ -4,6 +4,7 @@ import {
   boolean,
   check,
   doublePrecision,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -554,7 +555,11 @@ export type ExamQuestionOriginValue = (typeof EXAM_QUESTION_ORIGINS)[number];
 // (its own id when original) and variant_of the question it replaced; the
 // study item of kind exam_question points at the root. A retired question
 // never shows again but stays for the lineage (a variant never repeats an
-// earlier wording).
+// earlier wording). Questions are retired, never deleted: the lineage keys
+// are NO ACTION, so deleting a root with variants or a replaced question
+// fails, while deleting the page (or the owner) removes the whole lineage
+// in one statement, because every question of a lineage shares the root's
+// owner and page (exam_questions_root_fk).
 export const examQuestions = pgTable(
   "exam_questions",
   {
@@ -570,15 +575,8 @@ export const examQuestions = pgTable(
     correctIndex: integer("correct_index").notNull(),
     explanation: text("explanation").notNull(),
     concept: text("concept").notNull(),
-    rootId: uuid("root_id")
-      .notNull()
-      .references((): AnyPgColumn => examQuestions.id, {
-        onDelete: "cascade",
-      }),
-    variantOf: uuid("variant_of").references(
-      (): AnyPgColumn => examQuestions.id,
-      { onDelete: "set null" },
-    ),
+    rootId: uuid("root_id").notNull(),
+    variantOf: uuid("variant_of"),
     origin: text("origin").notNull().$type<ExamQuestionOriginValue>(),
     generationId: uuid("generation_id").references(() => aiGenerations.id, {
       onDelete: "set null",
@@ -598,6 +596,25 @@ export const examQuestions = pgTable(
       .where(sql`${table.retiredAt} is null`),
     index("exam_questions_root_id_idx").on(table.rootId),
     index("exam_questions_owner_id_idx").on(table.ownerId),
+    // Targets of the composite lineage keys below and of exam_answers.
+    unique("exam_questions_id_owner_page_key").on(
+      table.id,
+      table.ownerId,
+      table.pageId,
+    ),
+    unique("exam_questions_id_root_key").on(table.id, table.rootId),
+    // The root is a question of the same owner and page.
+    foreignKey({
+      name: "exam_questions_root_fk",
+      columns: [table.rootId, table.ownerId, table.pageId],
+      foreignColumns: [table.id, table.ownerId, table.pageId],
+    }),
+    // The replaced question belongs to the same lineage.
+    foreignKey({
+      name: "exam_questions_variant_of_fk",
+      columns: [table.variantOf, table.rootId],
+      foreignColumns: [table.id, table.rootId],
+    }),
     check(
       "exam_questions_origin_check",
       sql`${table.origin} in ('ai', 'manual', 'ai_variant')`,
@@ -684,8 +701,9 @@ export const examSessions = pgTable(
 export type ExamSessionRow = typeof examSessions.$inferSelect;
 
 // One graded answer. question_id is the wording actually shown (maybe a
-// variant), root_id the lineage it feeds: one answer per question and per
-// root in a session.
+// variant), root_id the lineage it feeds and must be that question's root
+// (exam_answers_question_root_fk): one answer per question and per root in
+// a session.
 export const examAnswers = pgTable(
   "exam_answers",
   {
@@ -695,12 +713,8 @@ export const examAnswers = pgTable(
     sessionId: uuid("session_id")
       .notNull()
       .references(() => examSessions.id, { onDelete: "cascade" }),
-    questionId: uuid("question_id")
-      .notNull()
-      .references(() => examQuestions.id, { onDelete: "cascade" }),
-    rootId: uuid("root_id")
-      .notNull()
-      .references(() => examQuestions.id, { onDelete: "cascade" }),
+    questionId: uuid("question_id").notNull(),
+    rootId: uuid("root_id").notNull(),
     selectedIndex: integer("selected_index").notNull(),
     isCorrect: boolean("is_correct").notNull(),
     answeredAt: timestamp("answered_at", { withTimezone: true }).notNull(),
@@ -714,6 +728,14 @@ export const examAnswers = pgTable(
       columns: [table.sessionId, table.questionId],
     }),
     unique("exam_answers_session_root_key").on(table.sessionId, table.rootId),
+    // CASCADE: a page delete removes the questions before the session
+    // cascade reaches their answers, and a NO ACTION check would fire in
+    // between. Questions are only deleted with their page or owner.
+    foreignKey({
+      name: "exam_answers_question_root_fk",
+      columns: [table.questionId, table.rootId],
+      foreignColumns: [examQuestions.id, examQuestions.rootId],
+    }).onDelete("cascade"),
     index("exam_answers_question_id_idx").on(table.questionId),
     index("exam_answers_owner_id_idx").on(table.ownerId),
     check(
