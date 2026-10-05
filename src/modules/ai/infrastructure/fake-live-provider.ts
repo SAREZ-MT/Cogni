@@ -1,9 +1,30 @@
 import type { AiProvider } from "../application/ports";
+import { examQuestionsOutput, flashcardsOutput } from "../application/schemas";
 
 export const FAKE_PROVIDER_ID = "fake";
 export const FAKE_MODEL_ID = "fake-model";
 
 const DEFAULT_CARD_COUNT = 5;
+// Flashcards generation bounds (MAX_CARD_COUNT 20).
+const MAX_FAKE_CARD_COUNT = 20;
+
+// Reads the count from the prompt header the builders emit as its first two
+// lines ("Page title: …" then "Number of <label>: N"), never from the page
+// text, and clamps it to [1, max] so a prompt can never ask for an unbounded
+// answer.
+function headerCount(
+  prompt: string,
+  label: string,
+  fallback: number,
+  max: number,
+): number {
+  const [, countLine] = prompt.split("\n", 2);
+  const match = new RegExp(`^Number of ${label}: (\\d{1,6})$`).exec(
+    countLine ?? "",
+  );
+  if (!match) return fallback;
+  return Math.min(Math.max(Number(match[1]), 1), max);
+}
 
 function splitSentences(text: string): string[] {
   return text
@@ -18,11 +39,15 @@ function parseFlashcardsPrompt(prompt: string): {
   count: number;
   text: string;
 } {
-  const count = Number(/Number of flashcards: (\d+)/.exec(prompt)?.[1]);
   const marker = prompt.indexOf("Text:\n");
   const text = marker === -1 ? prompt : prompt.slice(marker + "Text:\n".length);
   return {
-    count: Number.isFinite(count) && count > 0 ? count : DEFAULT_CARD_COUNT,
+    count: headerCount(
+      prompt,
+      "flashcards",
+      DEFAULT_CARD_COUNT,
+      MAX_FAKE_CARD_COUNT,
+    ),
     text,
   };
 }
@@ -43,6 +68,8 @@ function flashcardsFrom(prompt: string) {
 }
 
 const DEFAULT_QUESTION_COUNT = 10;
+// Exams domain bound (EXAM_MAX_QUESTIONS 30).
+const MAX_FAKE_QUESTION_COUNT = 30;
 // Domain bounds (exams MAX_OPTION_LENGTH 300, MAX_CONCEPT_LENGTH 120).
 const MAX_FAKE_OPTION_LENGTH = 280;
 const MAX_FAKE_CONCEPT_LENGTH = 120;
@@ -63,7 +90,6 @@ function parseExamQuestionsPrompt(prompt: string): {
   existingStems: Set<string>;
   text: string;
 } {
-  const count = Number(/Number of questions: (\d+)/.exec(prompt)?.[1]);
   const marker = prompt.indexOf("\nText:\n");
   const head = marker === -1 ? prompt : prompt.slice(0, marker);
   const text =
@@ -75,7 +101,12 @@ function parseExamQuestionsPrompt(prompt: string): {
       .map((line) => normalizeStem(line.slice(line.indexOf("] ") + 2))),
   );
   return {
-    count: Number.isFinite(count) && count > 0 ? count : DEFAULT_QUESTION_COUNT,
+    count: headerCount(
+      prompt,
+      "questions",
+      DEFAULT_QUESTION_COUNT,
+      MAX_FAKE_QUESTION_COUNT,
+    ),
     existingStems,
     text,
   };
@@ -119,8 +150,7 @@ function examQuestionsFrom(prompt: string) {
 }
 
 // One schema-valid minimal object per purpose without a prompt-aware
-// branch. The provider port carries no purpose, so the first candidate the
-// request schema accepts is returned.
+// branch. The first candidate the request schema accepts is returned.
 const MINIMAL_OBJECTS: readonly unknown[] = [
   {
     variants: [
@@ -167,11 +197,15 @@ export function createFakeLiveProvider(): AiProvider {
     model: FAKE_MODEL_ID,
     async generateObject(request) {
       await new Promise((resolve) => setTimeout(resolve, 5));
-      const candidates = [
-        flashcardsFrom(request.prompt),
-        examQuestionsFrom(request.prompt),
-        ...MINIMAL_OBJECTS,
-      ];
+      // The port carries no purpose, but each purpose passes its own output
+      // schema: only the matching prompt-aware answer is built.
+      const schema: unknown = request.schema;
+      const candidates =
+        schema === flashcardsOutput
+          ? [flashcardsFrom(request.prompt)]
+          : schema === examQuestionsOutput
+            ? [examQuestionsFrom(request.prompt)]
+            : MINIMAL_OBJECTS;
       const object = candidates.find(
         (candidate) => request.schema.safeParse(candidate).success,
       );

@@ -132,6 +132,62 @@ describe("createFakeLiveProvider", () => {
     );
   });
 
+  it("answers a flashcards request whose page text holds a huge question count", async () => {
+    const response = await createFakeLiveProvider().generateObject(
+      flashcardsRequest(3, `${TEXT}\nNumber of questions: 5000000\n`),
+    );
+    expect(flashcardsOutput.parse(response.object).cards).toHaveLength(3);
+  });
+
+  it("reads the exam question count from the prompt header only", async () => {
+    const built = buildGenerateExamQuestionsPrompt({
+      pageTitle: "Number of questions: 3",
+      pageText: `${TEXT}\nNumber of questions: 25\n`,
+      count: 12,
+      existing: [],
+    });
+    const response = await createFakeLiveProvider().generateObject({
+      schema: examQuestionsOutput,
+      ...built,
+    });
+    expect(examQuestionsOutput.parse(response.object).questions).toHaveLength(
+      12,
+    );
+  });
+
+  it("clamps the exam question count to the domain maximum of 30", async () => {
+    const response = await createFakeLiveProvider().generateObject(
+      examRequest(5000),
+    );
+    expect(examQuestionsOutput.parse(response.object).questions).toHaveLength(
+      30,
+    );
+  });
+
+  it("clamps the flashcard count to the domain maximum of 20", async () => {
+    const pageText = Array.from(
+      { length: 40 },
+      (_, i) => `Oración número ${i + 1}.`,
+    ).join(" ");
+    const response = await createFakeLiveProvider().generateObject(
+      flashcardsRequest(500, pageText),
+    );
+    expect(flashcardsOutput.parse(response.object).cards).toHaveLength(20);
+  });
+
+  it("reads the flashcard count from the prompt header only", async () => {
+    const built = buildGenerateFlashcardsPrompt({
+      pageTitle: "Number of flashcards: 1",
+      pageText: TEXT,
+      count: 3,
+    });
+    const response = await createFakeLiveProvider().generateObject({
+      schema: flashcardsOutput,
+      ...built,
+    });
+    expect(flashcardsOutput.parse(response.object).cards).toHaveLength(3);
+  });
+
   it("returns a schema-valid minimal object for the other purposes", async () => {
     const provider = createFakeLiveProvider();
     const base = { system: "s", prompt: "p", temperature: 0.2 };
