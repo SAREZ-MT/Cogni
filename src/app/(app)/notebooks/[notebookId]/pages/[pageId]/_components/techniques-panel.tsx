@@ -11,11 +11,18 @@ import { useEffect, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { getSampleStudyItemsForPage } from "@/app/(app)/flashcards/_data/sample";
 import {
+  EXAM_DEFAULT_QUESTIONS,
+  EXAM_MAX_QUESTIONS,
+  EXAM_MIN_QUESTIONS,
+  generateExamQuestionsAction,
+} from "@/modules/exams";
+import {
   type FlashcardView,
   generateFlashcardsAction,
   listFlashcardsAction,
 } from "@/modules/flashcards";
 import { Button } from "@/shared/ui/button";
+import { CountStepper } from "@/shared/ui/count-stepper";
 import { EmptyState } from "@/shared/ui/empty-state";
 import { IconTile } from "@/shared/ui/icon-tile";
 import { PanelToggleButton } from "@/shared/ui/panel-toggle-button";
@@ -32,8 +39,9 @@ import {
 import { TECHNIQUES_PANEL_SLOT_ID } from "../../../../../_components/techniques-panel-slot";
 import { TECHNIQUES } from "./techniques";
 
-// Examen is live since Phase 5 T4: its card links to the page's questions
-// ("Preguntas", real data) while its "Generar" stays disabled until T5.
+// Examen is live since Phase 5: its card links to the page's questions
+// ("Preguntas", real data, T4) and its "Generar" creates 10-30 AI questions
+// (T5), sharing the daily generation limit with Flashcards.
 //
 // PREVIEW ONLY: Active recall and Exámenes' saved items are still design previews (user
 // decision 2026-09-24): fixed sample items, not filtered by the real
@@ -58,6 +66,45 @@ const ERROR_COPY: Record<string, string> = {
   AI_PAGE_EMPTY: "La página está vacía: escribe algo antes de generar.",
   FLASHCARDS_SESSION_REQUIRED: "Tu sesión expiró. Inicia sesión de nuevo.",
 };
+
+const EXAM_GENERIC_FAILURE =
+  "No pudimos generar las preguntas. Intenta de nuevo.";
+
+// Spanish copy per ActionError code of generateExamQuestionsAction; the
+// rest (PAGE_NOT_FOUND, AI_GENERATION_FAILED, EXAMS_UNEXPECTED…) reads as
+// the generic failure.
+const EXAM_ERROR_COPY: Record<string, string> = {
+  AI_DAILY_LIMIT_REACHED: LIMIT_REACHED,
+  AI_PAGE_EMPTY: "La página está vacía: escribe algo antes de generar.",
+  EXAMS_SESSION_REQUIRED: "Tu sesión expiró. Inicia sesión de nuevo.",
+};
+
+// The count stepper moves in steps of 5 between 10 and 30.
+const EXAM_COUNT_STEP = 5;
+
+function examNoticeCopy(value: {
+  created: number;
+  skipped: number;
+  truncated: boolean;
+  wordsUsed: number;
+}): string {
+  const parts = [
+    value.created === 1
+      ? "Se generó 1 pregunta."
+      : `Se generaron ${value.created} preguntas.`,
+  ];
+  if (value.skipped === 1) {
+    parts.push("1 se descartó por repetida o inválida.");
+  } else if (value.skipped > 1) {
+    parts.push(`${value.skipped} se descartaron por repetidas o inválidas.`);
+  }
+  if (value.truncated) {
+    parts.push(
+      `Se usaron las primeras ${value.wordsUsed} palabras de la página.`,
+    );
+  }
+  return parts.join(" ");
+}
 
 function remainingCopy(remaining: number): string {
   if (remaining <= 0) return LIMIT_REACHED;
@@ -104,6 +151,10 @@ export function TechniquesPanel({
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [examCount, setExamCount] = useState(EXAM_DEFAULT_QUESTIONS);
+  const [examNotice, setExamNotice] = useState<string | null>(null);
+  const [examError, setExamError] = useState<string | null>(null);
+  const [examPending, startExamTransition] = useTransition();
   // The slot element (rendered by AppLayout) doesn't exist as a portal
   // target concept until this component looks it up after mount —
   // `createPortal` needs a real, already-committed DOM node (same
@@ -154,7 +205,37 @@ export function TechniquesPanel({
     });
   }
 
+  // The questions live on their own route (revalidated by the action), so
+  // the panel only reports what was created; "Preguntas" opens the list.
+  function generateExam() {
+    setExamNotice(null);
+    setExamError(null);
+    startExamTransition(async () => {
+      let result: Awaited<ReturnType<typeof generateExamQuestionsAction>>;
+      try {
+        result = await generateExamQuestionsAction({
+          pageId,
+          count: examCount,
+        });
+      } catch {
+        setExamError(EXAM_GENERIC_FAILURE);
+        return;
+      }
+      if (!result.ok) {
+        setExamError(
+          EXAM_ERROR_COPY[result.error.code] ?? EXAM_GENERIC_FAILURE,
+        );
+        if (result.error.code === "AI_DAILY_LIMIT_REACHED") setRemaining(0);
+        return;
+      }
+      setRemaining(result.value.remainingToday);
+      setExamNotice(examNoticeCopy(result.value));
+    });
+  }
+
   if (!slotNode) return null;
+
+  const limitReached = remaining !== null && remaining <= 0;
 
   const deckHref = `/flashcards/${notebookId}/${pageId}`;
   const cardRows: StudyItemRowProps[] = cards
@@ -243,7 +324,7 @@ export function TechniquesPanel({
               description={t.description}
               onGenerate={generate}
               pending={pending}
-              disabled={remaining !== null && remaining <= 0}
+              disabled={limitReached}
               generateTestId="generate-flashcards"
             >
               {remaining !== null && (
@@ -279,6 +360,22 @@ export function TechniquesPanel({
               tone={t.tone}
               name={t.name}
               description={t.description}
+              onGenerate={generateExam}
+              pending={examPending}
+              disabled={limitReached}
+              generateTestId="generate-exam-questions"
+              controls={
+                <CountStepper
+                  label="Preguntas a generar"
+                  value={examCount}
+                  min={EXAM_MIN_QUESTIONS}
+                  max={EXAM_MAX_QUESTIONS}
+                  step={EXAM_COUNT_STEP}
+                  onChange={setExamCount}
+                  disabled={examPending}
+                  testId="exam-count"
+                />
+              }
             >
               <Button
                 asChild
@@ -291,6 +388,31 @@ export function TechniquesPanel({
                   Preguntas
                 </Link>
               </Button>
+              {limitReached && !examError && (
+                <p
+                  data-testid="exam-generation-limit"
+                  className="text-[10.5px] text-fg-muted"
+                >
+                  {LIMIT_REACHED}
+                </p>
+              )}
+              {examNotice && (
+                <p
+                  data-testid="exam-generation-notice"
+                  className="text-[10.5px] text-fg-muted"
+                >
+                  {examNotice}
+                </p>
+              )}
+              {examError && (
+                <p
+                  role="alert"
+                  data-testid="exam-generation-error"
+                  className="text-[10.5px] text-error-600"
+                >
+                  {examError}
+                </p>
+              )}
             </TechniqueCard>
           ) : (
             <TechniqueCard

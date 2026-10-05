@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ZodType } from "zod";
+import { buildGenerateExamQuestionsPrompt } from "../application/prompts/generate_exam_questions/v1";
 import { buildGenerateFlashcardsPrompt } from "../application/prompts/generate_flashcards/v1";
 import {
   examQuestionsOutput,
@@ -22,6 +23,29 @@ function flashcardsRequest(count: number, pageText = TEXT) {
     count,
   });
   return { schema: flashcardsOutput, ...built };
+}
+
+function examRequest(
+  count: number,
+  existing: { stem: string; concept: string }[] = [],
+  pageText = TEXT,
+) {
+  const built = buildGenerateExamQuestionsPrompt({
+    pageTitle: "Célula",
+    pageText,
+    count,
+    existing,
+  });
+  return { schema: examQuestionsOutput, ...built };
+}
+
+// Same comparison the exams domain applies to stems and options.
+function normalized(text: string): string {
+  return text
+    .replace(/\s+/g, " ")
+    .replace(/^[\s¿¡]+/, "")
+    .replace(/[\s.,;:!?…]+$/, "")
+    .toLocaleLowerCase();
 }
 
 describe("createFakeLiveProvider", () => {
@@ -63,6 +87,105 @@ describe("createFakeLiveProvider", () => {
         flashcardsOutput.parse(response.object).cards.length,
       ).toBeGreaterThan(0);
     }
+  });
+
+  it("derives exactly `count` distinct, valid exam questions from the prompt, even past the number of sentences", async () => {
+    const response = await createFakeLiveProvider().generateObject(
+      examRequest(10),
+    );
+    const { questions } = examQuestionsOutput.parse(response.object);
+
+    expect(questions).toHaveLength(10);
+    expect(new Set(questions.map((q) => normalized(q.stem))).size).toBe(10);
+    for (const question of questions) {
+      expect(new Set(question.options.map(normalized)).size).toBe(4);
+      expect(question.concept.length).toBeLessThanOrEqual(120);
+    }
+    // The correct option is the page sentence the question is about.
+    expect(questions[0]?.options[questions[0].correctIndex]).toBe(
+      "La mitocondria produce energía para la célula.",
+    );
+    expect(new Set(questions.map((q) => q.correctIndex)).size).toBe(4);
+  });
+
+  it("never repeats a stem listed as an existing question", async () => {
+    const provider = createFakeLiveProvider();
+    const first = examQuestionsOutput.parse(
+      (await provider.generateObject(examRequest(10))).object,
+    ).questions;
+
+    const second = examQuestionsOutput.parse(
+      (await provider.generateObject(examRequest(10, first))).object,
+    ).questions;
+
+    const seen = new Set(first.map((q) => normalized(q.stem)));
+    expect(second).toHaveLength(10);
+    expect(second.some((q) => seen.has(normalized(q.stem)))).toBe(false);
+  });
+
+  it("still returns questions for a blank page text", async () => {
+    const response = await createFakeLiveProvider().generateObject(
+      examRequest(10, [], "   "),
+    );
+    expect(examQuestionsOutput.parse(response.object).questions).toHaveLength(
+      10,
+    );
+  });
+
+  it("answers a flashcards request whose page text holds a huge question count", async () => {
+    const response = await createFakeLiveProvider().generateObject(
+      flashcardsRequest(3, `${TEXT}\nNumber of questions: 5000000\n`),
+    );
+    expect(flashcardsOutput.parse(response.object).cards).toHaveLength(3);
+  });
+
+  it("reads the exam question count from the prompt header only", async () => {
+    const built = buildGenerateExamQuestionsPrompt({
+      pageTitle: "Number of questions: 3",
+      pageText: `${TEXT}\nNumber of questions: 25\n`,
+      count: 12,
+      existing: [],
+    });
+    const response = await createFakeLiveProvider().generateObject({
+      schema: examQuestionsOutput,
+      ...built,
+    });
+    expect(examQuestionsOutput.parse(response.object).questions).toHaveLength(
+      12,
+    );
+  });
+
+  it("clamps the exam question count to the domain maximum of 30", async () => {
+    const response = await createFakeLiveProvider().generateObject(
+      examRequest(5000),
+    );
+    expect(examQuestionsOutput.parse(response.object).questions).toHaveLength(
+      30,
+    );
+  });
+
+  it("clamps the flashcard count to the domain maximum of 20", async () => {
+    const pageText = Array.from(
+      { length: 40 },
+      (_, i) => `Oración número ${i + 1}.`,
+    ).join(" ");
+    const response = await createFakeLiveProvider().generateObject(
+      flashcardsRequest(500, pageText),
+    );
+    expect(flashcardsOutput.parse(response.object).cards).toHaveLength(20);
+  });
+
+  it("reads the flashcard count from the prompt header only", async () => {
+    const built = buildGenerateFlashcardsPrompt({
+      pageTitle: "Number of flashcards: 1",
+      pageText: TEXT,
+      count: 3,
+    });
+    const response = await createFakeLiveProvider().generateObject({
+      schema: flashcardsOutput,
+      ...built,
+    });
+    expect(flashcardsOutput.parse(response.object).cards).toHaveLength(3);
   });
 
   it("returns a schema-valid minimal object for the other purposes", async () => {

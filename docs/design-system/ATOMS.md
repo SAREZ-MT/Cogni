@@ -226,6 +226,10 @@ anatomy; simplified per user decision 2026-09-24 — a card has **only** a
   `IconTile` tones for the icon tile, and onto `primary-600`/`success-600`/
   `pastel-pink-fg` for the solid button fill. No new tone was needed.
 
+- `controls?` (Phase 5 T5): options of the action rendered between the
+  description and the button — Examen passes a `CountStepper` ("Preguntas a
+  generar", 10–30 in steps of 5). Flashcards passes none.
+
 Used by: `techniques-panel.tsx`.
 
 **Preview gate.** Flashcards are real since Phase 3 (Generar, quota counter,
@@ -1229,3 +1233,21 @@ screen-reader behaviour.
   label 14px `text-fg`, description 12px `text-fg-secondary`.
 
 Used by: `modules/identity/ui/accept-terms-form.tsx`.
+
+## CountStepper (`count-stepper.tsx`)
+
+Compact numeric choice inside a fixed range (Phase 5 T5, 2026-10-05): how
+many exam questions "Examen → Generar" creates (10–30, default 10). Reusable
+for T6's exam length selector (same range).
+
+- Props: `label` (visible, names the `role="group"` and the buttons:
+  "Más/Menos {label in lower case}"), `value`, `min`, `max`, `step?` (1),
+  `onChange`, `disabled?`, `testId?` (the value is tagged `${testId}-value`),
+  `className?`.
+- Anatomy: 10.5px muted label on the left; on the right two `Button`
+  `variant="outline" size="icon-xs"` (Lucide `Minus`/`Plus`, strokeWidth 2)
+  around an `<output aria-live="polite">` with the value (12px semibold,
+  tabular numbers). Each button clamps to `[min, max]` and is disabled at its
+  bound or when `disabled`.
+
+Used by: `techniques-panel.tsx` (Examen card `controls`).

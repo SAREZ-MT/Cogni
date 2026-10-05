@@ -1,5 +1,6 @@
 "use server";
 
+import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
 import { AI_ERROR, createAiServerApi } from "@/modules/ai";
 import { createNotebooksServerApi } from "@/modules/notebooks";
@@ -13,7 +14,10 @@ import {
 } from "@/shared/kernel/domain-error";
 import { createId } from "@/shared/kernel/id";
 import { err, ok, type Result } from "@/shared/kernel/result";
-import { createServerAnalytics } from "@/shared/observability/analytics";
+import {
+  type Analytics,
+  createServerAnalytics,
+} from "@/shared/observability/analytics";
 import {
   parseInput,
   requireOwnerId,
@@ -135,6 +139,19 @@ function toView(card: Flashcard): FlashcardView {
   };
 }
 
+// Analytics is never a dependency of the action: a rejected event is
+// reported and dropped, so a saved generation still answers with its result.
+async function trackSafely(
+  analytics: Analytics,
+  ...event: Parameters<Analytics["track"]>
+): Promise<void> {
+  try {
+    await analytics.track(...event);
+  } catch (error) {
+    Sentry.captureException(error);
+  }
+}
+
 function statusFor(error: DomainError): "limit" | "empty" | "failed" {
   if (error.code === AI_ERROR.DAILY_LIMIT_REACHED) return "limit";
   if (error.code === AI_ERROR.PAGE_EMPTY) return "empty";
@@ -167,7 +184,7 @@ export async function generateFlashcardsAction(
     );
 
     if (!result.ok) {
-      await analytics.track("generation_requested", ownerId.value, {
+      await trackSafely(analytics, "generation_requested", ownerId.value, {
         pageId: parsed.value.pageId,
         provider: null,
         model: null,
@@ -183,7 +200,7 @@ export async function generateFlashcardsAction(
     }
 
     const value = result.value;
-    await analytics.track("generation_requested", ownerId.value, {
+    await trackSafely(analytics, "generation_requested", ownerId.value, {
       pageId: parsed.value.pageId,
       provider: value.provider,
       model: value.model,

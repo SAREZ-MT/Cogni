@@ -45,6 +45,9 @@ export interface TechniqueCardProps {
   // "Generando…".
   pending?: boolean;
   generateTestId?: string;
+  // Options of the action rendered between the description and the button
+  // (e.g. Examen's question count); the caller owns them.
+  controls?: ReactNode;
   // Feedback under the button (remaining quota, notices, errors); the caller
   // owns the copy.
   children?: ReactNode;
@@ -66,6 +69,7 @@ export function TechniqueCard({
   onGenerate,
   pending = false,
   generateTestId,
+  controls,
   children,
   className,
 }: TechniqueCardProps) {
@@ -85,6 +89,7 @@ export function TechniqueCard({
           <p className="mt-0.5 text-[10.5px] text-fg-muted">{description}</p>
         </div>
       </div>
+      {controls}
       <Button
         type="button"
         disabled={isDisabled}

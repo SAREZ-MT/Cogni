@@ -19,6 +19,13 @@ export type {
   QuotaStore,
 } from "./ports";
 export {
+  buildGenerateExamQuestionsPrompt,
+  type ExistingExamQuestion,
+  GENERATE_EXAM_QUESTIONS_PROMPT_VERSION,
+  type GenerateExamQuestionsPromptInput,
+  MAX_EXISTING_QUESTIONS,
+} from "./prompts/generate_exam_questions/v1";
+export {
   buildGenerateFlashcardsPrompt,
   GENERATE_FLASHCARDS_PROMPT_VERSION,
 } from "./prompts/generate_flashcards/v1";
