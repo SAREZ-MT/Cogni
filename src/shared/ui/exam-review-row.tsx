@@ -50,6 +50,10 @@ export interface ExamReviewRowProps {
   // `status === "correct"` (a correct answer has no failed-concept
   // explanation to show).
   explanationPending?: boolean;
+  // The question's own explanation (Phase 5 T6), shown under "Explicación"
+  // for a failed question when no AI explanation is pending. Without it
+  // and without a pending explanation, no explanation block renders.
+  explanation?: string;
   className?: string;
 }
 
@@ -65,6 +69,7 @@ export function ExamReviewRow({
   yourAnswerLabel,
   correctAnswerLabel,
   explanationPending = true,
+  explanation,
   className,
 }: ExamReviewRowProps) {
   const config = STATUS_CONFIG[status];
@@ -110,7 +115,18 @@ export function ExamReviewRow({
             )}
           </div>
 
-          {isFailed && (
+          {isFailed && !explanationPending && explanation && (
+            <div className="mt-3">
+              <p className="font-medium text-[11px] text-fg-muted uppercase tracking-[0.05em]">
+                Explicación
+              </p>
+              <p className="mt-1 text-[13px] text-fg-secondary">
+                {explanation}
+              </p>
+            </div>
+          )}
+
+          {isFailed && explanationPending && (
             <div className="mt-3">
               <p className="font-medium text-[11px] text-fg-muted uppercase tracking-[0.05em]">
                 Explicación de la IA

@@ -828,8 +828,13 @@ explanation.
 
 - `index`, `stem`, `status: "correct" | "incorrect" | "unanswered"`,
   `concept`, `yourAnswerLabel`, `correctAnswerLabel`,
-  `explanationPending?` (default `true`), `className?`.
+  `explanationPending?` (default `true`), `explanation?`, `className?`.
   `data-testid="exam-review-row"`.
+- Phase 5 T6: `explanation` is the question's own explanation, shown under
+  an "Explicación" label for a failed question when `explanationPending` is
+  `false` (the AI explanation of T8 replaces it later). With neither a
+  pending AI explanation nor an `explanation`, no explanation block renders
+  (before T6 an empty "Explicación de la IA" heading stayed).
 
 Used by: `exams/_components/exam-results-view.tsx`.
 
@@ -856,6 +861,19 @@ results pattern as `ActiveRecallResultsView`, not the `SessionSummary`
 overlay). `data-testid`s: `exam-session`/`exam-results` (roots),
 `exam-option-{index}`, `exam-timer`, `exam-progress-dots`, `exam-score`,
 `exam-review-row`.
+
+Phase 5 T6: the player (`exams/[notebookId]/[pageId]/page.tsx`) and the
+results (`…/resultados/page.tsx`) left the preview and run on real data.
+The route renders `exams/_components/exam-start.tsx` (`CountStepper` for
+N = 10–30, `StatusBanner` notes for "needs 10" and a pending retake) or,
+while the page has an open session, the real `exam-player.tsx` (one
+question at a time, `OptionRow` `correct`/`incorrect`/`muted` reveal + a
+`StatusBanner` with the explanation, `TimerChip` counting from the session
+start). "Ver resultados" finishes the session and opens
+`resultados?sesion=<id>`, rendered by `exam-results-view.tsx` (`ScoreCard`,
+pass/fail `StatusBanner`, failed-concept `Pill`s, `ExamReviewRow` with the
+question's explanation). Only the hub and the notebook view still read
+`exams/_data/sample.ts`.
 
 `flashcards/_data/sample.ts`'s `getSampleStudyItemsForPage()` exam item now
 points at the real preview (`/exams/biologia-celular/mitocondria`,

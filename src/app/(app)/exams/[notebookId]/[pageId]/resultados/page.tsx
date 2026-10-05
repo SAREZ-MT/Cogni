@@ -1,61 +1,54 @@
 import { notFound } from "next/navigation";
-import { requireDesignPreviews } from "@/shared/config/design-previews";
+import { getExamResultsAction } from "@/modules/exams";
+import { getNotebookTitleForRoute, getPageForRoute } from "@/modules/notebooks";
 import { SetBreadcrumb } from "../../../../_components/breadcrumb";
-import { getSampleNotebook } from "../../../../flashcards/_data/sample";
 import { ExamResultsView } from "../../../_components/exam-results-view";
-import {
-  getExamPage,
-  getExamQuestions,
-  getLastExamSession,
-} from "../../../_data/sample";
 
 interface ExamResultsPageProps {
   params: Promise<{ notebookId: string; pageId: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
-// Stored exam results route (design preview, 2026-09-24; documento-maestro
-// §3.3/§7.5: a completed session is a durable record, not just an
-// in-session overlay). Renders the page's LAST stored session from sample
-// data through the same ExamResultsView the live player uses
-// (`mode="stored"`) — an unknown notebook/page, or a page never attempted,
-// all 404.
+// A finished exam's results on real data (Phase 5 T6, documento-maestro
+// §3.3/§7.5: a completed session is a durable record). `?sesion=<id>` picks
+// the session (the player opens its results this way); without it, the
+// page's last finished exam. An unknown/foreign page, an unknown or open
+// session, another page's session or a page never examined 404s.
 export default async function ExamResultsPage({
   params,
+  searchParams,
 }: ExamResultsPageProps) {
-  requireDesignPreviews();
   const { notebookId, pageId } = await params;
-  const notebook = getSampleNotebook(notebookId);
-  if (!notebook) notFound();
-
-  const page = getExamPage(notebookId, pageId);
+  const { sesion } = await searchParams;
+  const page = await getPageForRoute(notebookId, pageId);
   if (!page) notFound();
-
-  const session = getLastExamSession(pageId);
-  if (!session) notFound();
-
-  const questions = getExamQuestions(pageId, { retake: session.isRetake });
+  const results = await getExamResultsAction({
+    pageId: page.id,
+    ...(typeof sesion === "string" ? { sessionId: sesion } : {}),
+  });
+  if (!results.ok) notFound();
+  const notebookTitle =
+    (await getNotebookTitleForRoute(notebookId)) ?? "Cuaderno";
+  const pageHref = `/notebooks/${notebookId}/pages/${page.id}`;
+  const examHref = `/exams/${notebookId}/${page.id}`;
 
   return (
     <section className="flex flex-1 flex-col">
       <SetBreadcrumb
         items={[
-          { label: "Exámenes", href: "/exams" },
-          { label: notebook.title, href: `/exams/${notebookId}` },
-          { label: page.title, href: `/exams/${notebookId}/${pageId}` },
+          { label: "Exámenes" },
+          { label: notebookTitle, href: `/notebooks/${notebookId}` },
+          { label: page.title, href: pageHref },
           { label: "Resultados" },
         ]}
       />
       <ExamResultsView
-        notebookId={notebookId}
-        pageId={pageId}
-        notebookTitle={notebook.title}
+        notebookTitle={notebookTitle}
         pageTitle={page.title}
-        questions={questions}
-        answers={session.answers}
-        durationSeconds={session.durationSeconds}
-        date={session.date}
-        isRetake={session.isRetake}
-        mode="stored"
+        pageHref={pageHref}
+        questionsHref={`${examHref}/preguntas`}
+        examHref={examHref}
+        results={results.value}
       />
     </section>
   );

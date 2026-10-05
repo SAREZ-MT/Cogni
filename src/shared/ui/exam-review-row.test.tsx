@@ -72,9 +72,31 @@ describe("ExamReviewRow", () => {
   it("drops the loading skeleton once the explanation is no longer pending", () => {
     render(<ExamReviewRow {...BASE} explanationPending={false} />);
 
-    expect(screen.getByText("Explicación de la IA")).toBeInTheDocument();
     expect(
       screen.queryByText("Disponible cuando termine la retroalimentación"),
     ).not.toBeInTheDocument();
+  });
+
+  it("shows the question's own explanation when no AI explanation is pending", () => {
+    render(
+      <ExamReviewRow
+        {...BASE}
+        explanationPending={false}
+        explanation="La fosforilación ocurre en la membrana interna."
+      />,
+    );
+
+    expect(screen.getByText("Explicación")).toBeInTheDocument();
+    expect(
+      screen.getByText("La fosforilación ocurre en la membrana interna."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Explicación de la IA")).not.toBeInTheDocument();
+  });
+
+  it("renders no explanation block when there is nothing to explain", () => {
+    render(<ExamReviewRow {...BASE} explanationPending={false} />);
+
+    expect(screen.queryByText("Explicación de la IA")).not.toBeInTheDocument();
+    expect(screen.queryByText("Explicación")).not.toBeInTheDocument();
   });
 });

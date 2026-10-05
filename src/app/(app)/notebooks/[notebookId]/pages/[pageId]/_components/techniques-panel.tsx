@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  FileCheck,
   Layers,
   ListChecks,
   PanelRightClose,
@@ -14,7 +15,9 @@ import {
   EXAM_DEFAULT_QUESTIONS,
   EXAM_MAX_QUESTIONS,
   EXAM_MIN_QUESTIONS,
+  type ExamStartView,
   generateExamQuestionsAction,
+  getExamStartAction,
 } from "@/modules/exams";
 import {
   type FlashcardView,
@@ -81,6 +84,17 @@ const EXAM_ERROR_COPY: Record<string, string> = {
 
 // The count stepper moves in steps of 5 between 10 and 30.
 const EXAM_COUNT_STEP = 5;
+
+// The page's exam start state, or null when it cannot be read (the card
+// then keeps "Rendir examen" disabled without a note).
+async function readExamStart(pageId: string): Promise<ExamStartView | null> {
+  try {
+    const result = await getExamStartAction({ pageId });
+    return result.ok ? result.value : null;
+  } catch {
+    return null;
+  }
+}
 
 function examNoticeCopy(value: {
   created: number;
@@ -155,6 +169,9 @@ export function TechniquesPanel({
   const [examNotice, setExamNotice] = useState<string | null>(null);
   const [examError, setExamError] = useState<string | null>(null);
   const [examPending, startExamTransition] = useTransition();
+  // Whether the page can hold an exam ("Rendir examen"); read on mount and
+  // after each question generation. Null until read or when it fails.
+  const [examStart, setExamStart] = useState<ExamStartView | null>(null);
   // The slot element (rendered by AppLayout) doesn't exist as a portal
   // target concept until this component looks it up after mount —
   // `createPortal` needs a real, already-committed DOM node (same
@@ -164,6 +181,16 @@ export function TechniquesPanel({
   useEffect(() => {
     setSlotNode(document.getElementById(TECHNIQUES_PANEL_SLOT_ID));
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    readExamStart(pageId).then((view) => {
+      if (active) setExamStart(view);
+    });
+    return () => {
+      active = false;
+    };
+  }, [pageId]);
 
   function toggle() {
     const next = !collapsed;
@@ -230,6 +257,7 @@ export function TechniquesPanel({
       }
       setRemaining(result.value.remainingToday);
       setExamNotice(examNoticeCopy(result.value));
+      setExamStart(await readExamStart(pageId));
     });
   }
 
@@ -260,7 +288,12 @@ export function TechniquesPanel({
   const visibleTechniques = showPreviews
     ? TECHNIQUES
     : TECHNIQUES.filter((t) => t.id !== "active-recall");
-  const questionsHref = `/exams/${notebookId}/${pageId}/preguntas`;
+  const examHref = `/exams/${notebookId}/${pageId}`;
+  const questionsHref = `${examHref}/preguntas`;
+  const canTakeExam =
+    examStart !== null &&
+    !examStart.retakePending &&
+    examStart.activeQuestionCount >= EXAM_MIN_QUESTIONS;
 
   const toggleButton = (
     <PanelToggleButton
@@ -388,6 +421,51 @@ export function TechniquesPanel({
                   Preguntas
                 </Link>
               </Button>
+              {canTakeExam ? (
+                <Button asChild size="sm" className="w-full text-[11.5px]">
+                  <Link href={examHref} data-testid="take-exam-button">
+                    <FileCheck
+                      aria-hidden="true"
+                      size={14}
+                      strokeWidth={1.75}
+                    />
+                    Rendir examen
+                  </Link>
+                </Button>
+              ) : examStart?.retakePending ? (
+                <p
+                  data-testid="exam-retake-soon"
+                  className="text-[10.5px] text-fg-muted"
+                >
+                  Repetir examen (próximamente): pronto podrás repetirlo con
+                  preguntas nuevas sobre lo que fallaste.
+                </p>
+              ) : (
+                <>
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled
+                    className="w-full text-[11.5px]"
+                    data-testid="take-exam-button"
+                  >
+                    <FileCheck
+                      aria-hidden="true"
+                      size={14}
+                      strokeWidth={1.75}
+                    />
+                    Rendir examen
+                  </Button>
+                  {examStart && (
+                    <p
+                      data-testid="exam-needs-questions"
+                      className="text-[10.5px] text-fg-muted"
+                    >
+                      {`Necesitas al menos ${EXAM_MIN_QUESTIONS} preguntas para rendir un examen.`}
+                    </p>
+                  )}
+                </>
+              )}
               {limitReached && !examError && (
                 <p
                   data-testid="exam-generation-limit"

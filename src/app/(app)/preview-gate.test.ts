@@ -10,13 +10,17 @@ import { describe, expect, it } from "vitest";
 // `designPreviewsEnabled()` (covered by that route's own test).
 const PREVIEW_TREES: [tree: string, routes: number][] = [
   ["active-recall", 3],
-  ["exams", 3],
+  ["exams", 2],
   ["dashboard", 1],
 ];
 
-// Real-data routes leave the gate (Phase 5 T4: an exam page's questions).
+// Real-data routes leave the gate (Phase 5 T4: an exam page's questions;
+// T6: its exam player and results). The exams hub and notebook view stay
+// previews until T9.
 const REAL_DATA_PAGES = new Set([
+  "exams/[notebookId]/[pageId]/page.tsx",
   "exams/[notebookId]/[pageId]/preguntas/page.tsx",
+  "exams/[notebookId]/[pageId]/resultados/page.tsx",
 ]);
 
 function pageFiles(dir: string): string[] {

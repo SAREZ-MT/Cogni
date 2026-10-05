@@ -43,7 +43,7 @@ function view(
   };
 }
 
-function renderView(questions: ExamQuestionView[]) {
+function renderView(questions: ExamQuestionView[], retakePending = false) {
   const user = userEvent.setup();
   render(
     <ExamQuestionsView
@@ -52,6 +52,8 @@ function renderView(questions: ExamQuestionView[]) {
       pageTitle="Mitocondria"
       pageHref="/notebooks/nb/pages/pg"
       questions={questions}
+      examHref="/exams/nb/pg"
+      retakePending={retakePending}
     />,
   );
   return user;
@@ -263,5 +265,31 @@ describe("ExamQuestionsView", () => {
       "Esta pregunta ya no existe.",
     );
     expect(refresh).not.toHaveBeenCalled();
+  });
+
+  describe("Rendir examen", () => {
+    const ten = Array.from({ length: 10 }, (_, n) => view(`q${n + 1}`));
+
+    it("links to the page's exam once it has 10 questions", () => {
+      renderView(ten);
+      expect(screen.getByTestId("take-exam-button")).toHaveAttribute(
+        "href",
+        "/exams/nb/pg",
+      );
+    });
+
+    it("is disabled below 10 questions", () => {
+      renderView(ten.slice(0, 9));
+      const button = screen.getByTestId("take-exam-button");
+      expect(button).toBeDisabled();
+      expect(button).toHaveTextContent("Rendir examen");
+    });
+
+    it("says the retake is coming soon while one is pending", () => {
+      renderView(ten, true);
+      const button = screen.getByTestId("take-exam-button");
+      expect(button).toBeDisabled();
+      expect(button).toHaveTextContent("Repetir examen (próximamente)");
+    });
   });
 });
