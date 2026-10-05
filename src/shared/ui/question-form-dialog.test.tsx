@@ -1,8 +1,9 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import {
   QuestionFormDialog,
+  type QuestionFormDialogProps,
   type QuestionFormValues,
 } from "./question-form-dialog";
 
@@ -21,10 +22,11 @@ function setup(
     mode?: "create" | "edit";
     initialValues?: QuestionFormValues;
     open?: boolean;
+    onSubmit?: QuestionFormDialogProps["onSubmit"];
   } = {},
 ) {
   const user = userEvent.setup();
-  const onSubmit = vi.fn();
+  const onSubmit = vi.fn(props.onSubmit);
   const onOpenChange = vi.fn();
   const view = render(
     <QuestionFormDialog
@@ -241,5 +243,61 @@ describe("QuestionFormDialog", () => {
     );
 
     expect(screen.getByPlaceholderText("Opción A")).toHaveValue("");
+  });
+
+  it("waits for an async submit, then closes when it reports no error", async () => {
+    let resolve: (error: string | null) => void = () => {};
+    const { user, onOpenChange } = setup({
+      mode: "edit",
+      initialValues: EDIT_VALUES,
+      onSubmit: () =>
+        new Promise<string | null>((done) => {
+          resolve = done;
+        }),
+    });
+
+    await user.click(screen.getByRole("button", { name: "Guardar cambios" }));
+
+    expect(screen.getByRole("button", { name: "Guardando…" })).toBeDisabled();
+    expect(onOpenChange).not.toHaveBeenCalled();
+    resolve(null);
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+  });
+
+  it("stays open and shows the error an async submit reports", async () => {
+    const { user, onOpenChange } = setup({
+      mode: "edit",
+      initialValues: EDIT_VALUES,
+      onSubmit: async () => "Las opciones deben ser distintas.",
+    });
+
+    await user.click(screen.getByRole("button", { name: "Guardar cambios" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Las opciones deben ser distintas.",
+    );
+    expect(onOpenChange).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole("button", { name: "Guardar cambios" }),
+    ).toBeEnabled();
+  });
+
+  it("clears a previous error when the dialog opens again", async () => {
+    const onSubmit = async () => "Algo falló.";
+    const props = {
+      mode: "edit" as const,
+      initialValues: EDIT_VALUES,
+      onOpenChange: vi.fn(),
+      onSubmit,
+    };
+    const user = userEvent.setup();
+    const { rerender } = render(<QuestionFormDialog {...props} open />);
+    await user.click(screen.getByRole("button", { name: "Guardar cambios" }));
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+
+    rerender(<QuestionFormDialog {...props} open={false} />);
+    rerender(<QuestionFormDialog {...props} open />);
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });

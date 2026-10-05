@@ -909,6 +909,25 @@ is local (saving appends/edits in memory; "Retirar" marks `retiredAt`
 instead of deleting — history stays visible, nothing is persisted past a
 remount).
 
+**Since Phase 5 T4 (2026-10-05) the route runs on real data** and left the
+design-preview gate (the exams hub, player and results stay previews until
+T6/T9). The page reads the page's active questions through
+`listExamQuestionsAction` (retired questions are not listed any more, so no
+row shows the "Retirada" pill here); "Nueva pregunta" / "Editar" save
+through `createExamQuestionAction` / `editExamQuestionAction` and
+"Retirar" opens a `Dialog` confirmation ("¿Retirar esta pregunta?",
+destructive "Retirar") before `retireExamQuestionAction`; each success
+refreshes the route. Below the header, while the page holds fewer than 10
+questions, a calm bordered note with a muted `Info` icon reads "Un examen
+necesita al menos 10 preguntas. Agrega {n} más para poder rendirlo."
+(`data-testid="exam-questions-minimum"`); with none, an `EmptyState`
+(pink `IconTile` + `ClipboardList`) reads "Esta página aún no tiene
+preguntas". The `BackLink` is "Volver a la página" (the notebook page) and
+the "Vista previa" pill is gone. Entry point: the page's "Técnicas" panel —
+the Examen card (visible in production too) carries an outline "Preguntas"
+`Button asChild` link (`data-testid="exam-questions-link"`) under its still
+disabled "Generar".
+
 `exams/_data/sample.ts`'s `ExamQuestion` gained optional `origin: "ai" |
 "manual" | "ai_variant"`, `variantOf?`, `explanation?`, `retiredAt?` —
 populated only by the new `getExamQuestionsForManagement(pageId)`, a
@@ -948,8 +967,14 @@ pregunta" and every row's "Editar"; it re-syncs its local form state from
 `initialValues` on every `open` transition instead of being remounted.
 
 - `open`, `onOpenChange`, `mode: "create" | "edit"`, `initialValues?`,
-  `onSubmit: (values: QuestionFormValues) => void`.
-  `data-testid="question-form-dialog"`.
+  `onSubmit: (values: QuestionFormValues) => undefined | Promise<string |
+  null | undefined>`. `data-testid="question-form-dialog"`.
+- Since Phase 5 T4: a sync `onSubmit` closes at once (as before); an async
+  one keeps the dialog open while it runs (save button disabled, reading
+  "Guardando…"), then closes on `null`/`undefined` or shows the returned
+  Spanish message as a `role="alert"` line (`text-destructive text-sm`,
+  same as `NewFlashcardDialog`) above the footer and stays open. Re-opening
+  clears the error.
 
 Used by: `exams/_components/exam-questions-view.tsx`.
 

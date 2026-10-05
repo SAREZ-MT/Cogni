@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { err, ok } from "@/shared/kernel/result";
 
 vi.mock("server-only", () => ({}));
 
@@ -8,64 +9,90 @@ const { notFound } = vi.hoisted(() => ({
     throw new Error("NEXT_NOT_FOUND");
   }),
 }));
-vi.mock("next/navigation", () => ({ notFound }));
+vi.mock("next/navigation", () => ({ notFound, useRouter: () => ({}) }));
+
+const { getPageForRoute, getNotebookTitleForRoute, listExamQuestionsAction } =
+  vi.hoisted(() => ({
+    getPageForRoute: vi.fn(),
+    getNotebookTitleForRoute: vi.fn(),
+    listExamQuestionsAction: vi.fn(),
+  }));
+vi.mock("@/modules/notebooks", () => ({
+  getPageForRoute,
+  getNotebookTitleForRoute,
+}));
+vi.mock("@/modules/exams", () => ({
+  EXAM_MIN_QUESTIONS: 10,
+  listExamQuestionsAction,
+  createExamQuestionAction: vi.fn(),
+  editExamQuestionAction: vi.fn(),
+  retireExamQuestionAction: vi.fn(),
+}));
 
 import ExamQuestionsPage from "./page";
 
-function params(notebookId: string, pageId: string) {
+const NOTEBOOK = "5e6f7a8b-9c0d-4e1f-8a2b-3c4d5e6f7a8b";
+const PAGE = "0a1b2c3d-4e5f-4061-8798-a1b2c3d4e5f6";
+
+function params(notebookId = NOTEBOOK, pageId = PAGE) {
   return { params: Promise.resolve({ notebookId, pageId }) };
 }
 
 describe("ExamQuestionsPage", () => {
-  afterEach(() => {
+  beforeEach(() => {
     vi.unstubAllEnvs();
     notFound.mockClear();
+    getPageForRoute.mockResolvedValue({
+      id: PAGE,
+      notebookId: NOTEBOOK,
+      title: "Mitocondria",
+    });
+    getNotebookTitleForRoute.mockResolvedValue("Biología celular");
+    listExamQuestionsAction.mockResolvedValue(
+      ok([
+        {
+          id: "q1",
+          pageId: PAGE,
+          stem: "¿Qué produce la mitocondria?",
+          options: ["ATP", "ADN", "Lípidos", "Almidón"],
+          correctIndex: 0,
+          explanation: "",
+          concept: "Función de la mitocondria",
+          origin: "manual",
+        },
+      ]),
+    );
   });
 
-  it("answers 404 in production", async () => {
+  it("lists the page's real questions, also in production", async () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("COGNI_DESIGN_PREVIEWS", "");
+
+    render(await ExamQuestionsPage(params()));
+
+    expect(getPageForRoute).toHaveBeenCalledWith(NOTEBOOK, PAGE);
+    expect(listExamQuestionsAction).toHaveBeenCalledWith({ pageId: PAGE });
+    expect(
+      screen.getByRole("heading", { name: "Mitocondria — preguntas" }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByTestId("exam-question-row")).toHaveLength(1);
+    expect(screen.getByText("Exámenes · Biología celular")).toBeInTheDocument();
+  });
+
+  it("answers 404 for a page that is unknown, archived or not the caller's", async () => {
+    getPageForRoute.mockResolvedValue(null);
 
     await expect(
       ExamQuestionsPage(params("biologia-celular", "mitocondria")),
     ).rejects.toThrow("NEXT_NOT_FOUND");
+    expect(listExamQuestionsAction).not.toHaveBeenCalled();
   });
 
-  it.each([
-    ["no-existe", "mitocondria"],
-    ["biologia-celular", "no-existe"],
-    ["calculo-iii", "mitocondria"],
-  ])("answers 404 for %s/%s", async (notebookId, pageId) => {
-    vi.stubEnv("NODE_ENV", "development");
-
-    await expect(ExamQuestionsPage(params(notebookId, pageId))).rejects.toThrow(
-      "NEXT_NOT_FOUND",
-    );
-  });
-
-  it("lists the page's management questions with their origins", async () => {
-    vi.stubEnv("NODE_ENV", "development");
-
-    render(await ExamQuestionsPage(params("biologia-celular", "mitocondria")));
-
-    expect(
-      screen.getByRole("heading", { name: "Mitocondria — preguntas" }),
-    ).toBeInTheDocument();
-    expect(screen.getAllByTestId("exam-question-row")).toHaveLength(15);
-    expect(screen.getAllByText("Retirada")).toHaveLength(4);
-    expect(screen.getAllByText("Variante").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Manual")).toHaveLength(1);
-  });
-
-  it("lists a plain page as AI generated, nothing retired", async () => {
-    vi.stubEnv("NODE_ENV", "development");
-
-    render(
-      await ExamQuestionsPage(params("historia-del-arte", "renacimiento")),
+  it("answers 404 when the questions cannot be read", async () => {
+    listExamQuestionsAction.mockResolvedValue(
+      err({ code: "EXAMS_UNEXPECTED", message: "x" }),
     );
 
-    expect(screen.getAllByTestId("exam-question-row")).toHaveLength(5);
-    expect(screen.queryByText("Retirada")).not.toBeInTheDocument();
-    expect(screen.queryByText("Manual")).not.toBeInTheDocument();
+    await expect(ExamQuestionsPage(params())).rejects.toThrow("NEXT_NOT_FOUND");
   });
 });

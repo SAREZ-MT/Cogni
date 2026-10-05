@@ -36,15 +36,20 @@ export interface QuestionFormDialogProps {
   mode: "create" | "edit";
   // Prefills the form for `mode="edit"`; ignored for `mode="create"`.
   initialValues?: QuestionFormValues;
-  onSubmit: (values: QuestionFormValues) => void;
+  // A sync handler closes the dialog at once. An async one keeps it open
+  // while it runs ("Guardando…"); resolving to a message shows it as an
+  // alert and keeps the dialog open, resolving to null/undefined closes it.
+  onSubmit: (
+    values: QuestionFormValues,
+  ) => undefined | Promise<string | null | undefined>;
 }
 
 // Manual question creation/editing dialog (design preview, 2026-09-24;
 // documento-maestro §3.3 "creadas manualmente", Fase 5 "edición manual de
 // preguntas con concept") — built on Cogni's Dialog atom, same composition
-// pattern as modules/notebooks/ui/create-notebook-dialog.tsx. Client-side
-// only: the caller (exam-questions-view.tsx) owns the actual add/edit
-// local state; this atom only collects and validates the form values.
+// pattern as modules/notebooks/ui/create-notebook-dialog.tsx. The caller
+// (exam-questions-view.tsx) persists the values through a Server Action;
+// this atom collects and validates them and shows the caller's error.
 export function QuestionFormDialog({
   open,
   onOpenChange,
@@ -55,6 +60,8 @@ export function QuestionFormDialog({
   const [values, setValues] = useState<QuestionFormValues>(
     initialValues ?? EMPTY_VALUES,
   );
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
   const stemId = useId();
   const conceptId = useId();
   const explanationId = useId();
@@ -64,7 +71,10 @@ export function QuestionFormDialog({
   // controlled `open` prop) instead of keying/remounting the component.
   // biome-ignore lint/correctness/useExhaustiveDependencies: only re-sync on the open transition, not on every initialValues identity change while open.
   useEffect(() => {
-    if (open) setValues(initialValues ?? EMPTY_VALUES);
+    if (open) {
+      setValues(initialValues ?? EMPTY_VALUES);
+      setError(null);
+    }
   }, [open]);
 
   const isValid =
@@ -80,9 +90,10 @@ export function QuestionFormDialog({
     });
   }
 
-  function submit() {
-    if (!isValid) return;
-    onSubmit({
+  async function submit() {
+    if (!isValid || pending) return;
+    setError(null);
+    const outcome = onSubmit({
       stem: values.stem.trim(),
       options: values.options.map((option) => option.trim()) as [
         string,
@@ -94,7 +105,18 @@ export function QuestionFormDialog({
       concept: values.concept.trim(),
       explanation: values.explanation.trim(),
     });
-    onOpenChange(false);
+    if (outcome === undefined) {
+      onOpenChange(false);
+      return;
+    }
+    setPending(true);
+    try {
+      const message = await outcome;
+      if (message) setError(message);
+      else onOpenChange(false);
+    } finally {
+      setPending(false);
+    }
   }
 
   return (
@@ -193,12 +215,22 @@ export function QuestionFormDialog({
           </div>
         </div>
 
+        {error && (
+          <p role="alert" className="text-destructive text-sm">
+            {error}
+          </p>
+        )}
+
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
-          <Button type="button" onClick={submit} disabled={!isValid}>
-            {mode === "edit" ? "Guardar cambios" : "Guardar pregunta"}
+          <Button type="button" onClick={submit} disabled={!isValid || pending}>
+            {pending
+              ? "Guardando…"
+              : mode === "edit"
+                ? "Guardar cambios"
+                : "Guardar pregunta"}
           </Button>
         </DialogFooter>
       </DialogContent>

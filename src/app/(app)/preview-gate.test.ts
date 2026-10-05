@@ -14,6 +14,11 @@ const PREVIEW_TREES: [tree: string, routes: number][] = [
   ["dashboard", 1],
 ];
 
+// Real-data routes leave the gate (Phase 5 T4: an exam page's questions).
+const REAL_DATA_PAGES = new Set([
+  "exams/[notebookId]/[pageId]/preguntas/page.tsx",
+]);
+
 function pageFiles(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const full = path.join(dir, entry.name);
@@ -40,7 +45,9 @@ function firstStatement(source: string): string {
 // without the guard would leak it into production, so the guard is enforced
 // structurally here instead of by review.
 describe.each(PREVIEW_TREES)("%s preview gate", (tree, routes) => {
-  const pages = pageFiles(path.join(import.meta.dirname, tree));
+  const pages = pageFiles(path.join(import.meta.dirname, tree)).filter(
+    (file) => !REAL_DATA_PAGES.has(path.relative(import.meta.dirname, file)),
+  );
 
   it("finds the routes of the tree", () => {
     expect(pages.length).toBeGreaterThanOrEqual(routes);
