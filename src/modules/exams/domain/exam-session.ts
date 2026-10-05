@@ -35,6 +35,10 @@ export interface ExamSession {
   readonly requestedCount: number;
   readonly isRetake: boolean;
   readonly retakeOfSessionId: string | null;
+  // The questions shown, in order, fixed at the start (composeExam for a
+  // normal exam, the fresh variants for a retake): answering, finishing
+  // and reading the session use this list only, never a new composition.
+  readonly questionIds: readonly string[];
   readonly startedAt: Date;
   readonly finishedAt: Date | null;
   readonly total: number | null;
@@ -51,6 +55,8 @@ export interface NewExamSessionInput {
   requestedCount: number;
   // The failed session this one retakes; null for an ordinary attempt.
   retakeOfSessionId: string | null;
+  // 1 to requestedCount distinct question ids, in the order shown.
+  questionIds: readonly string[];
 }
 
 export function newExamSession(
@@ -60,8 +66,22 @@ export function newExamSession(
   if (!isValidQuestionCount(input.requestedCount)) {
     return err(invalidCount(input.requestedCount));
   }
+  const { questionIds } = input;
+  if (
+    questionIds.length === 0 ||
+    questionIds.length > input.requestedCount ||
+    new Set(questionIds).size !== questionIds.length
+  ) {
+    return err(
+      new DomainError(
+        EXAM_ERROR.INVALID_SESSION_QUESTIONS,
+        `an exam session holds 1 to ${input.requestedCount} distinct questions, got ${questionIds.length}`,
+      ),
+    );
+  }
   return ok({
     ...input,
+    questionIds: [...questionIds],
     isRetake: input.retakeOfSessionId !== null,
     startedAt: now,
     finishedAt: null,

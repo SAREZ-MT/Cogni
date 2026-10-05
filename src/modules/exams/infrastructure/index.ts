@@ -8,6 +8,7 @@ export { DrizzleExamAnswerRepository } from "./drizzle-exam-answer-repository";
 export { DrizzleExamPageStateRepository } from "./drizzle-exam-page-state-repository";
 export { DrizzleExamQuestionRepository } from "./drizzle-exam-question-repository";
 export { DrizzleExamSessionRepository } from "./drizzle-exam-session-repository";
+export { DrizzleExamSessionUnitOfWork } from "./drizzle-exam-session-unit-of-work";
 export { DrizzleExamUnitOfWork } from "./drizzle-exam-unit-of-work";
 
 // Every exam repository on one executor. `db` may be an open transaction

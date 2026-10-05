@@ -18,7 +18,10 @@ feature document is `odd/tasks/phase-5-exams.md`.
 - AI generation — done (T5): `requestExamGeneration` +
   `generateExamQuestionsAction`, "Examen → Generar" in the page's
   techniques panel.
-- Sessions, retakes, feedback and the hub — pending (T6–T9).
+- Exam session — done (T6): `startExamSession`, `answerExamQuestion`,
+  `completeExamSession`, `readExamSession`, `getExamPageOverview` +
+  `session-actions.ts`; the player and results routes on real data.
+- Retakes, feedback and the hub — pending (T7–T9).
 
 ## Manual questions (T4)
 
@@ -64,6 +67,34 @@ feature document is `odd/tasks/phase-5-exams.md`.
 - The fake provider (`AI_PROVIDER_MODE=fake`) reads the prompt and returns
   exactly `count` distinct questions whose numbered stems skip the listed
   existing ones.
+
+## Exam session (T6)
+
+- `startExamSession(pageId, N ∈ [10, 30])`: refuses a pending retake
+  (`EXAMS_RETAKE_PENDING`, T7 reformulates the failed questions); resumes
+  the page's open normal session as it is (its N and questions) instead of
+  opening a second one; otherwise composes the exam (`composeExam`, < 10
+  roots → `EXAMS_NOT_ENOUGH_QUESTIONS`) and stores the session. Starts of
+  one page are serialized with a transaction-scoped advisory lock.
+- The composed list is stored on the session (`exam_sessions.question_ids`,
+  ordered ids, migration 0011, CHECK: a JSON array of 1 to `requested_count`
+  ids). `composeNormalExam` runs once, at the start: questions shown at that
+  instant (`listShownAt`, latest wording per root), earlier answers (least
+  recently seen), the roots' due dates and failed roots. Answering,
+  finishing and reading an open or finished session use the stored list
+  only (`loadSessionQuestions`), so later changes to the page's questions
+  or study items never move an open exam. T7 retakes store their variant
+  ids the same way.
+- `answerExamQuestion` locks the session row, checks the question is one of
+  the session's stored ids and unanswered, grades it and returns the correct option
+  and explanation (the player reveals each answer).
+- `completeExamSession`, one transaction: lock the session `FOR UPDATE`,
+  refuse a finished one (`EXAMS_SESSION_FINISHED`) or unanswered questions
+  (`EXAMS_SESSION_INCOMPLETE`: an exam ends when all its questions are
+  answered, so score = correct / total counts every question), derive the
+  result (`finishExamSession`), upsert `ExamPageState` (`scoreExam`) and
+  record every answer with `recordExamReviews` (a savepoint of the same
+  transaction). Any failure rolls all of it back.
 
 ## Domain
 

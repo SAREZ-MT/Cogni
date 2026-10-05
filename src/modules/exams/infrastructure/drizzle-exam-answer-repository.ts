@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, lt, max } from "drizzle-orm";
 import type { DbExecutor } from "@/shared/db/client";
 import { examAnswers, examQuestions, examSessions } from "@/shared/db/schema";
 import type { ExamAnswerRepository } from "../domain/exam-answer-repository";
@@ -95,5 +95,30 @@ export class DrizzleExamAnswerRepository implements ExamAnswerRepository {
         ),
       )
       .orderBy(asc(examAnswers.answeredAt), asc(examAnswers.questionId));
+  }
+
+  async lastAnsweredAtByRoot(
+    pageId: string,
+    ownerId: string,
+    before: Date,
+  ): Promise<Map<string, Date>> {
+    const rows = await this.db
+      .select({
+        rootId: examAnswers.rootId,
+        lastAt: max(examAnswers.answeredAt),
+      })
+      .from(examAnswers)
+      .innerJoin(examSessions, eq(examSessions.id, examAnswers.sessionId))
+      .where(
+        and(
+          eq(examAnswers.ownerId, ownerId),
+          eq(examSessions.pageId, pageId),
+          lt(examAnswers.answeredAt, before),
+        ),
+      )
+      .groupBy(examAnswers.rootId);
+    return new Map(
+      rows.flatMap((row) => (row.lastAt ? [[row.rootId, row.lastAt]] : [])),
+    );
   }
 }

@@ -93,8 +93,8 @@ describe.skipIf(!url)("0010 exams schema", () => {
   ): Promise<string> {
     const id = randomUUID();
     await tx`
-      insert into exam_sessions (id, owner_id, page_id, requested_count, started_at)
-      values (${id}, ${ownerId()}, ${page}, 10, now())
+      insert into exam_sessions (id, owner_id, page_id, requested_count, question_ids, started_at)
+      values (${id}, ${ownerId()}, ${page}, 10, '["q"]'::jsonb, now())
     `;
     return id;
   }
@@ -220,8 +220,8 @@ describe.skipIf(!url)("0010 exams schema", () => {
   it("refuses a requested count outside 10..30", async () => {
     await expectViolation(
       (tx) => tx`
-        insert into exam_sessions (id, owner_id, page_id, requested_count, started_at)
-        values (${randomUUID()}, ${ownerId()}, ${pageId}, 9, now())
+        insert into exam_sessions (id, owner_id, page_id, requested_count, question_ids, started_at)
+        values (${randomUUID()}, ${ownerId()}, ${pageId}, 9, '["q"]'::jsonb, now())
       `,
       "exam_sessions_requested_count_range",
     );
@@ -230,15 +230,56 @@ describe.skipIf(!url)("0010 exams schema", () => {
   it("refuses a finished session without its result", async () => {
     await expectViolation(
       (tx) => tx`
-        insert into exam_sessions (id, owner_id, page_id, requested_count, started_at, finished_at)
-        values (${randomUUID()}, ${ownerId()}, ${pageId}, 10, now(), now())
+        insert into exam_sessions (id, owner_id, page_id, requested_count, question_ids, started_at, finished_at)
+        values (${randomUUID()}, ${ownerId()}, ${pageId}, 10, '["q"]'::jsonb, now(), now())
       `,
       "exam_sessions_result_check",
     );
   });
 
+  it("refuses a session without its question list", async () => {
+    await inRolledBackTx(sql, async (tx) => {
+      await expect(
+        tx`
+          insert into exam_sessions (id, owner_id, page_id, requested_count, started_at)
+          values (${randomUUID()}, ${ownerId()}, ${pageId}, 10, now())
+        `,
+      ).rejects.toMatchObject({ code: "23502", column_name: "question_ids" });
+    });
+  });
+
+  it.each([
+    ["an empty list", "[]"],
+    [
+      "more ids than requested",
+      JSON.stringify(Array.from({ length: 11 }, (_, n) => `q${n}`)),
+    ],
+    ["an object instead of a list", '{"q": 1}'],
+  ])("refuses a question list with %s", async (_label, questionIds) => {
+    await expectViolation(
+      (tx) => tx`
+        insert into exam_sessions (id, owner_id, page_id, requested_count, question_ids, started_at)
+        values (${randomUUID()}, ${ownerId()}, ${pageId}, 10, ${questionIds}::jsonb, now())
+      `,
+      "exam_sessions_question_ids_check",
+    );
+  });
+
+  it("reverting 0011 drops the question list and its check", async () => {
+    await inRolledBackTx(sql, async (tx) => {
+      await tx.unsafe(readDownSql("0011_exam_session_questions"));
+      const columns = await tx`
+        select column_name from information_schema.columns
+        where table_schema = 'public' and table_name = 'exam_sessions'
+          and column_name = 'question_ids'
+      `;
+      expect(columns).toEqual([]);
+    });
+  });
+
   it("reversion drops the four exam tables", async () => {
     await inRolledBackTx(sql, async (tx) => {
+      await tx.unsafe(readDownSql("0011_exam_session_questions"));
       await tx.unsafe(readDownSql("0010_exams"));
       const tables = await tx`
         select table_name from information_schema.tables

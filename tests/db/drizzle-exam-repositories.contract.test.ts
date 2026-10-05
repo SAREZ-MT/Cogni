@@ -116,6 +116,7 @@ if (process.env.DATABASE_URL) {
           pageId,
           requestedCount: 10,
           retakeOfSessionId: null,
+          questionIds: [randomUUID()],
         },
         now,
       );

@@ -24,6 +24,7 @@ const base = {
   pageId: "page-1",
   requestedCount: EXAM_DEFAULT_QUESTIONS,
   retakeOfSessionId: null,
+  questionIds: ["q-1", "q-2", "q-3"],
 };
 
 describe("constants", () => {
@@ -62,6 +63,7 @@ describe("newExamSession", () => {
       requestedCount: 10,
       isRetake: false,
       retakeOfSessionId: null,
+      questionIds: ["q-1", "q-2", "q-3"],
       startedAt,
       finishedAt: null,
       total: null,
@@ -81,6 +83,18 @@ describe("newExamSession", () => {
     if (!result.ok) return;
     expect(result.value.isRetake).toBe(true);
     expect(result.value.retakeOfSessionId).toBe("s-0");
+  });
+
+  it.each([
+    ["none", []],
+    ["more than requested", Array.from({ length: 11 }, (_, n) => `q-${n}`)],
+    ["a repeated one", ["q-1", "q-2", "q-1"]],
+  ])("refuses a question list with %s", (_label, questionIds) => {
+    const result = newExamSession({ ...base, questionIds }, startedAt);
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.code).toBe(EXAM_ERROR.INVALID_SESSION_QUESTIONS);
   });
 
   it.each([9, 31])("refuses %i requested questions", (requestedCount) => {

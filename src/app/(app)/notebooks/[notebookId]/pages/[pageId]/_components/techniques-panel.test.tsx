@@ -18,14 +18,16 @@ vi.mock("@/modules/flashcards", () => ({
   generateFlashcardsAction,
   listFlashcardsAction,
 }));
-const { generateExamQuestionsAction } = vi.hoisted(() => ({
+const { generateExamQuestionsAction, getExamStartAction } = vi.hoisted(() => ({
   generateExamQuestionsAction: vi.fn(),
+  getExamStartAction: vi.fn(),
 }));
 vi.mock("@/modules/exams", () => ({
   EXAM_DEFAULT_QUESTIONS: 10,
   EXAM_MAX_QUESTIONS: 30,
   EXAM_MIN_QUESTIONS: 10,
   generateExamQuestionsAction,
+  getExamStartAction,
 }));
 
 const NOTEBOOK_ID = "nb-1";
@@ -80,6 +82,15 @@ describe("TechniquesPanel", () => {
     generateFlashcardsAction.mockReset();
     listFlashcardsAction.mockReset();
     generateExamQuestionsAction.mockReset();
+    getExamStartAction.mockReset();
+    getExamStartAction.mockResolvedValue(
+      ok({
+        activeQuestionCount: 0,
+        retakePending: false,
+        openSessionId: null,
+        lastFinishedSessionId: null,
+      }),
+    );
   });
 
   it("portals into the layout slot, not inline", async () => {
@@ -377,6 +388,77 @@ describe("TechniquesPanel", () => {
       expect(await screen.findByTestId("generation-error")).toHaveTextContent(
         "No pudimos generar las tarjetas. Intenta de nuevo.",
       );
+    });
+  });
+
+  describe("Rendir examen (exam card)", () => {
+    function start(activeQuestionCount: number, retakePending = false) {
+      getExamStartAction.mockResolvedValue(
+        ok({
+          activeQuestionCount,
+          retakePending,
+          openSessionId: null,
+          lastFinishedSessionId: null,
+        }),
+      );
+    }
+
+    it("links to the page's exam once the page has 10 questions", async () => {
+      start(12);
+      await renderPanel(false);
+
+      const link = await screen.findByRole("link", { name: /Rendir examen/ });
+      expect(link).toHaveAttribute("href", `/exams/${NOTEBOOK_ID}/${PAGE_ID}`);
+      expect(getExamStartAction).toHaveBeenCalledWith({ pageId: PAGE_ID });
+    });
+
+    it("is disabled with the 10-question note below 10 questions", async () => {
+      start(4);
+      await renderPanel(false);
+
+      expect(
+        await screen.findByText(
+          "Necesitas al menos 10 preguntas para rendir un examen.",
+        ),
+      ).toBeInTheDocument();
+      expect(screen.getByTestId("take-exam-button")).toBeDisabled();
+    });
+
+    it("shows a calm note while a retake is pending", async () => {
+      start(12, true);
+      await renderPanel(false);
+
+      expect(await screen.findByTestId("exam-retake-soon")).toHaveTextContent(
+        "Repetir examen (próximamente)",
+      );
+      expect(
+        screen.queryByRole("link", { name: /Rendir examen/ }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("re-reads the question count after a generation", async () => {
+      start(0);
+      generateExamQuestionsAction.mockResolvedValue(
+        ok({
+          questions: [],
+          created: 10,
+          skipped: 0,
+          remainingToday: 5,
+          truncated: false,
+          wordsUsed: 10,
+          wordsTotal: 10,
+        }),
+      );
+      const user = userEvent.setup();
+      await renderPanel(false);
+      await screen.findByTestId("take-exam-button");
+      start(10);
+
+      await user.click(screen.getByTestId("generate-exam-questions"));
+
+      expect(
+        await screen.findByRole("link", { name: /Rendir examen/ }),
+      ).toBeInTheDocument();
     });
   });
 

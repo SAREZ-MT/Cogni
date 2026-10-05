@@ -11,12 +11,17 @@ const { notFound } = vi.hoisted(() => ({
 }));
 vi.mock("next/navigation", () => ({ notFound, useRouter: () => ({}) }));
 
-const { getPageForRoute, getNotebookTitleForRoute, listExamQuestionsAction } =
-  vi.hoisted(() => ({
-    getPageForRoute: vi.fn(),
-    getNotebookTitleForRoute: vi.fn(),
-    listExamQuestionsAction: vi.fn(),
-  }));
+const {
+  getPageForRoute,
+  getNotebookTitleForRoute,
+  listExamQuestionsAction,
+  getExamStartAction,
+} = vi.hoisted(() => ({
+  getPageForRoute: vi.fn(),
+  getNotebookTitleForRoute: vi.fn(),
+  listExamQuestionsAction: vi.fn(),
+  getExamStartAction: vi.fn(),
+}));
 vi.mock("@/modules/notebooks", () => ({
   getPageForRoute,
   getNotebookTitleForRoute,
@@ -24,6 +29,7 @@ vi.mock("@/modules/notebooks", () => ({
 vi.mock("@/modules/exams", () => ({
   EXAM_MIN_QUESTIONS: 10,
   listExamQuestionsAction,
+  getExamStartAction,
   createExamQuestionAction: vi.fn(),
   editExamQuestionAction: vi.fn(),
   retireExamQuestionAction: vi.fn(),
@@ -48,6 +54,14 @@ describe("ExamQuestionsPage", () => {
       title: "Mitocondria",
     });
     getNotebookTitleForRoute.mockResolvedValue("Biología celular");
+    getExamStartAction.mockResolvedValue(
+      ok({
+        activeQuestionCount: 1,
+        retakePending: true,
+        openSessionId: null,
+        lastFinishedSessionId: null,
+      }),
+    );
     listExamQuestionsAction.mockResolvedValue(
       ok([
         {
@@ -77,6 +91,9 @@ describe("ExamQuestionsPage", () => {
     ).toBeInTheDocument();
     expect(screen.getAllByTestId("exam-question-row")).toHaveLength(1);
     expect(screen.getByText("Exámenes · Biología celular")).toBeInTheDocument();
+    expect(screen.getByTestId("take-exam-button")).toHaveTextContent(
+      "Repetir examen (próximamente)",
+    );
   });
 
   it("answers 404 for a page that is unknown, archived or not the caller's", async () => {

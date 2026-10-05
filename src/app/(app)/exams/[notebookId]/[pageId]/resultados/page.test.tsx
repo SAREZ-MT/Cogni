@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { err, ok } from "@/shared/kernel/result";
 
 vi.mock("server-only", () => ({}));
 
@@ -10,63 +11,84 @@ const { notFound } = vi.hoisted(() => ({
 }));
 vi.mock("next/navigation", () => ({ notFound }));
 
+const { getPageForRoute, getNotebookTitleForRoute, getExamResultsAction } =
+  vi.hoisted(() => ({
+    getPageForRoute: vi.fn(),
+    getNotebookTitleForRoute: vi.fn(),
+    getExamResultsAction: vi.fn(),
+  }));
+vi.mock("@/modules/notebooks", () => ({
+  getPageForRoute,
+  getNotebookTitleForRoute,
+}));
+vi.mock("@/modules/exams", () => ({ getExamResultsAction }));
+
 import ExamResultsPage from "./page";
 
-function params(notebookId: string, pageId: string) {
-  return { params: Promise.resolve({ notebookId, pageId }) };
+const NOTEBOOK = "5e6f7a8b-9c0d-4e1f-8a2b-3c4d5e6f7a8b";
+const PAGE = "0a1b2c3d-4e5f-4061-8798-a1b2c3d4e5f6";
+const SESSION = "11111111-1111-4111-8111-111111111111";
+
+function props(sesion?: string) {
+  return {
+    params: Promise.resolve({ notebookId: NOTEBOOK, pageId: PAGE }),
+    searchParams: Promise.resolve(sesion ? { sesion } : {}),
+  };
 }
 
-describe("ExamResultsPage (stored results)", () => {
-  afterEach(() => {
-    vi.unstubAllEnvs();
-    notFound.mockClear();
+describe("ExamResultsPage", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getPageForRoute.mockResolvedValue({
+      id: PAGE,
+      notebookId: NOTEBOOK,
+      title: "Mitocondria",
+    });
+    getNotebookTitleForRoute.mockResolvedValue("Biología celular");
+    getExamResultsAction.mockResolvedValue(
+      ok({
+        sessionId: SESSION,
+        pageId: PAGE,
+        finishedAt: "2026-10-05T10:07:30.000Z",
+        total: 10,
+        correct: 8,
+        scorePercent: 80,
+        passed: true,
+        durationSeconds: 95,
+        questions: [],
+        failedConcepts: [],
+      }),
+    );
   });
 
-  it("answers 404 in production", async () => {
-    vi.stubEnv("NODE_ENV", "production");
-    vi.stubEnv("COGNI_DESIGN_PREVIEWS", "");
-
-    await expect(
-      ExamResultsPage(params("biologia-celular", "mitocondria")),
-    ).rejects.toThrow("NEXT_NOT_FOUND");
+  it("renders the chosen session's results on real data", async () => {
+    render(await ExamResultsPage(props(SESSION)));
+    expect(getExamResultsAction).toHaveBeenCalledWith({
+      pageId: PAGE,
+      sessionId: SESSION,
+    });
+    expect(screen.getByTestId("exam-results")).toBeInTheDocument();
+    expect(screen.getByText("80%")).toBeInTheDocument();
+    expect(screen.getByText("01:35")).toBeInTheDocument();
   });
 
-  it.each([
-    ["no-existe", "mitocondria"],
-    ["biologia-celular", "no-existe"],
-    ["calculo-iii", "derivadas-parciales"],
-  ])("answers 404 for %s/%s (unknown or never attempted)", async (notebookId, pageId) => {
-    vi.stubEnv("NODE_ENV", "development");
+  it("falls back to the page's last finished exam without ?sesion", async () => {
+    render(await ExamResultsPage(props()));
+    expect(getExamResultsAction).toHaveBeenCalledWith({ pageId: PAGE });
+  });
 
-    await expect(ExamResultsPage(params(notebookId, pageId))).rejects.toThrow(
+  it("answers 404 when there are no results to show", async () => {
+    getExamResultsAction.mockResolvedValue(
+      err({ code: "EXAMS_SESSION_NOT_FOUND", message: "x" }),
+    );
+    await expect(ExamResultsPage(props(SESSION))).rejects.toThrow(
       "NEXT_NOT_FOUND",
     );
   });
 
-  it("renders the last stored session of a failed page with the retake link", async () => {
-    vi.stubEnv("NODE_ENV", "development");
-
-    render(await ExamResultsPage(params("biologia-celular", "mitocondria")));
-
-    expect(screen.getByTestId("exam-score")).toHaveTextContent("60%");
-    expect(screen.getByText("Presentado el 22 sept")).toBeInTheDocument();
-    expect(screen.getByText("Nota menor a 70 %")).toBeInTheDocument();
-    expect(
-      screen.getByRole("link", { name: "Repetir examen" }),
-    ).toHaveAttribute("href", "/exams/biologia-celular/mitocondria?retake=1");
-    expect(screen.getByText("09:00")).toBeInTheDocument();
-  });
-
-  it("renders a passed page as approved, linking a fresh session", async () => {
-    vi.stubEnv("NODE_ENV", "development");
-
-    render(await ExamResultsPage(params("historia-del-arte", "renacimiento")));
-
-    expect(screen.getByTestId("exam-score")).toHaveTextContent("100%");
-    expect(screen.getByText("Aprobado")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Nuevo examen/ })).toHaveAttribute(
-      "href",
-      "/exams/historia-del-arte/renacimiento",
-    );
+  it("answers 404 for a page that is not the caller's", async () => {
+    getPageForRoute.mockResolvedValue(null);
+    await expect(ExamResultsPage(props())).rejects.toThrow("NEXT_NOT_FOUND");
+    expect(getExamResultsAction).not.toHaveBeenCalled();
   });
 });

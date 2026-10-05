@@ -11,4 +11,12 @@ export interface ExamAnswerRepository {
   saveMany(answers: readonly ExamAnswer[], ownerId: string): Promise<void>;
   // The session's answers, oldest first (answeredAt, then questionId).
   listBySession(sessionId: string, ownerId: string): Promise<ExamAnswer[]>;
+  // For every root answered in a session of the page strictly before
+  // `before`, its latest answeredAt: the "least recently seen" input of
+  // composeExam.
+  lastAnsweredAtByRoot(
+    pageId: string,
+    ownerId: string,
+    before: Date,
+  ): Promise<Map<string, Date>>;
 }

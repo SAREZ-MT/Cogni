@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { listExamQuestionsAction } from "@/modules/exams";
+import { getExamStartAction, listExamQuestionsAction } from "@/modules/exams";
 import { getNotebookTitleForRoute, getPageForRoute } from "@/modules/notebooks";
 import { SetBreadcrumb } from "../../../../_components/breadcrumb";
 import { ExamQuestionsView } from "../../../_components/exam-questions-view";
@@ -10,9 +10,9 @@ interface ExamQuestionsPageProps {
 
 // "Preguntas" of one page (Phase 5 T4, documento-maestro §3.3 "creadas
 // manualmente"): the page's active questions on real data, with manual
-// create, edit and retire. It left the design-preview gate in T4; the
-// exams hub, player and results stay previews until T6/T9, so the
-// breadcrumb's "Exámenes" has no link yet. A page that is unknown,
+// create, edit and retire, and "Rendir examen". It left the design-preview
+// gate in T4 (the player and results in T6); the exams hub stays a preview
+// until T9, so the breadcrumb's "Exámenes" has no link yet. A page that is unknown,
 // archived, in another notebook or not the caller's 404s.
 export default async function ExamQuestionsPage({
   params,
@@ -22,6 +22,10 @@ export default async function ExamQuestionsPage({
   if (!page) notFound();
   const questions = await listExamQuestionsAction({ pageId: page.id });
   if (!questions.ok) notFound();
+  // "Rendir examen" needs the pending-retake flag; when it cannot be read
+  // the list still shows and the button stays as if no retake were pending
+  // (the start screen re-checks it).
+  const start = await getExamStartAction({ pageId: page.id });
   const notebookTitle =
     (await getNotebookTitleForRoute(notebookId)) ?? "Cuaderno";
   const pageHref = `/notebooks/${notebookId}/pages/${page.id}`;
@@ -42,6 +46,8 @@ export default async function ExamQuestionsPage({
         pageTitle={page.title}
         pageHref={pageHref}
         questions={questions.value}
+        examHref={`/exams/${notebookId}/${page.id}`}
+        retakePending={start.ok && start.value.retakePending}
       />
     </section>
   );

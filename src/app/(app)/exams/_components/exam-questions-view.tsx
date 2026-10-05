@@ -1,6 +1,7 @@
 "use client";
 
-import { ClipboardList, Info, Plus } from "lucide-react";
+import { ClipboardList, FileCheck, Info, Plus } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import {
@@ -57,6 +58,11 @@ export interface ExamQuestionsViewProps {
   pageHref: string;
   // The page's active questions, oldest first (retired ones are excluded).
   questions: ExamQuestionView[];
+  // The page's exam ("Rendir examen").
+  examHref: string;
+  // The last exam failed: a normal exam cannot start until the retake
+  // (Phase 5 T7) ships.
+  retakePending?: boolean;
 }
 
 // "Preguntas del examen" of one page on real data (documento-maestro §3.3
@@ -71,6 +77,8 @@ export function ExamQuestionsView({
   pageTitle,
   pageHref,
   questions,
+  examHref,
+  retakePending = false,
 }: ExamQuestionsViewProps) {
   const router = useRouter();
   const [formOpen, setFormOpen] = useState(false);
@@ -159,14 +167,36 @@ export function ExamQuestionsView({
           plural(manualCount, "manual", "manuales"),
         ].join(" · ")}
         actions={
-          <Button
-            type="button"
-            onClick={openCreate}
-            data-testid="new-exam-question-button"
-          >
-            <Plus aria-hidden="true" size={16} strokeWidth={2} />
-            Nueva pregunta
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {missing > 0 || retakePending ? (
+              <Button
+                type="button"
+                variant="outline"
+                disabled
+                data-testid="take-exam-button"
+              >
+                <FileCheck aria-hidden="true" size={16} strokeWidth={1.75} />
+                {retakePending
+                  ? "Repetir examen (próximamente)"
+                  : "Rendir examen"}
+              </Button>
+            ) : (
+              <Button asChild variant="outline">
+                <Link href={examHref} data-testid="take-exam-button">
+                  <FileCheck aria-hidden="true" size={16} strokeWidth={1.75} />
+                  Rendir examen
+                </Link>
+              </Button>
+            )}
+            <Button
+              type="button"
+              onClick={openCreate}
+              data-testid="new-exam-question-button"
+            >
+              <Plus aria-hidden="true" size={16} strokeWidth={2} />
+              Nueva pregunta
+            </Button>
+          </div>
         }
       />
 

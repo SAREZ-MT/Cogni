@@ -1,4 +1,4 @@
-import { and, asc, eq, isNotNull, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import type { DbExecutor } from "@/shared/db/client";
 import { type ExamSessionRow, examSessions } from "@/shared/db/schema";
 import type { ExamSession } from "../domain/exam-session";
@@ -12,6 +12,7 @@ function toSession(row: ExamSessionRow): ExamSession {
     requestedCount: row.requestedCount,
     isRetake: row.isRetake,
     retakeOfSessionId: row.retakeOfSessionId,
+    questionIds: row.questionIds,
     startedAt: row.startedAt,
     finishedAt: row.finishedAt,
     total: row.total,
@@ -29,6 +30,7 @@ export class DrizzleExamSessionRepository implements ExamSessionRepository {
   async create(session: ExamSession): Promise<void> {
     await this.db.insert(examSessions).values({
       ...session,
+      questionIds: [...session.questionIds],
       createdAt: session.startedAt,
       updatedAt: session.startedAt,
     });
@@ -40,6 +42,44 @@ export class DrizzleExamSessionRepository implements ExamSessionRepository {
       .from(examSessions)
       .where(owned(id, ownerId));
     return row ? toSession(row) : null;
+  }
+
+  async lockById(id: string, ownerId: string): Promise<ExamSession | null> {
+    const [row] = await this.db
+      .select()
+      .from(examSessions)
+      .where(owned(id, ownerId))
+      .for("update");
+    return row ? toSession(row) : null;
+  }
+
+  async findOpenByPage(
+    pageId: string,
+    ownerId: string,
+  ): Promise<ExamSession | null> {
+    const [row] = await this.db
+      .select()
+      .from(examSessions)
+      .where(
+        and(
+          eq(examSessions.pageId, pageId),
+          eq(examSessions.ownerId, ownerId),
+          isNull(examSessions.finishedAt),
+          eq(examSessions.isRetake, false),
+        ),
+      )
+      .orderBy(desc(examSessions.startedAt), desc(examSessions.id))
+      .limit(1);
+    return row ? toSession(row) : null;
+  }
+
+  async lockPageForStart(pageId: string, ownerId: string): Promise<void> {
+    // Transaction-scoped advisory lock keyed by owner and page: released at
+    // commit or rollback, so it needs no row to exist (a page's first exam
+    // has no exam_page_state row to lock yet).
+    await this.db.execute(
+      sql`select pg_advisory_xact_lock(hashtextextended(${`exam-start:${ownerId}:${pageId}`}, 0))`,
+    );
   }
 
   async finish(session: ExamSession): Promise<ExamSession | null> {

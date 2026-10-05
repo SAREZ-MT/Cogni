@@ -663,6 +663,9 @@ export const examSessions = pgTable(
       (): AnyPgColumn => examSessions.id,
       { onDelete: "set null" },
     ),
+    // The ordered ids of the questions shown, fixed at the start (0011):
+    // the session never composes its questions again.
+    questionIds: jsonb("question_ids").notNull().$type<string[]>(),
     startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
     finishedAt: timestamp("finished_at", { withTimezone: true }),
     total: integer("total"),
@@ -683,6 +686,10 @@ export const examSessions = pgTable(
     check(
       "exam_sessions_requested_count_range",
       sql`${table.requestedCount} between 10 and 30`,
+    ),
+    check(
+      "exam_sessions_question_ids_check",
+      sql`jsonb_typeof(${table.questionIds}) = 'array' and jsonb_array_length(${table.questionIds}) between 1 and ${table.requestedCount}`,
     ),
     check(
       "exam_sessions_retake_check",

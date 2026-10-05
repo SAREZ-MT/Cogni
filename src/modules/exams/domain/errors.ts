@@ -12,6 +12,9 @@ export const EXAM_ERROR = {
   // The requested number of questions is outside [EXAM_MIN_QUESTIONS,
   // EXAM_MAX_QUESTIONS] or below the number of failed roots of a retake.
   INVALID_QUESTION_COUNT: "EXAMS_INVALID_QUESTION_COUNT",
+  // A session's stored question list is empty, longer than its requested
+  // count or repeats a question.
+  INVALID_SESSION_QUESTIONS: "EXAMS_INVALID_SESSION_QUESTIONS",
   // The page has fewer active roots than EXAM_MIN_QUESTIONS.
   NOT_ENOUGH_QUESTIONS: "EXAMS_NOT_ENOUGH_QUESTIONS",
   // A retake was requested but the page has no failed roots.
@@ -31,6 +34,15 @@ export const EXAM_ERROR = {
   SESSION_FINISHED: "EXAMS_SESSION_FINISHED",
   // The owner has no such question (missing or another owner's).
   QUESTION_NOT_FOUND: "EXAMS_QUESTION_NOT_FOUND",
+  // The page failed its last exam: only a retake with reformulated
+  // questions may start (§7.5), never a normal exam that repeats wordings.
+  RETAKE_PENDING: "EXAMS_RETAKE_PENDING",
+  // The owner has no such exam session (missing or another owner's).
+  SESSION_NOT_FOUND: "EXAMS_SESSION_NOT_FOUND",
+  // The answered question is not one of the session's questions.
+  QUESTION_NOT_IN_SESSION: "EXAMS_QUESTION_NOT_IN_SESSION",
+  // The session still has unanswered questions and cannot be finished.
+  SESSION_INCOMPLETE: "EXAMS_SESSION_INCOMPLETE",
   // Server Action boundary: no signed-in user, input rejected by the
   // schema, or an unexpected failure (logged, never shown raw).
   SESSION_REQUIRED: "EXAMS_SESSION_REQUIRED",

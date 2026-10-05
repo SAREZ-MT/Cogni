@@ -50,12 +50,34 @@ export class InMemoryExamQuestionRepository implements ExamQuestionRepository {
     return question && question.ownerId === ownerId ? question : null;
   }
 
+  async listByIds(
+    ids: readonly string[],
+    ownerId: string,
+  ): Promise<ExamQuestion[]> {
+    const wanted = new Set(ids);
+    return this.list((q) => wanted.has(q.id) && q.ownerId === ownerId);
+  }
+
   async listActiveByPage(
     pageId: string,
     ownerId: string,
   ): Promise<ExamQuestion[]> {
     return this.list(
       (q) => q.pageId === pageId && q.ownerId === ownerId && !q.retiredAt,
+    );
+  }
+
+  async listShownAt(
+    pageId: string,
+    ownerId: string,
+    at: Date,
+  ): Promise<ExamQuestion[]> {
+    return this.list(
+      (q) =>
+        q.pageId === pageId &&
+        q.ownerId === ownerId &&
+        q.createdAt.getTime() <= at.getTime() &&
+        (q.retiredAt === null || q.retiredAt.getTime() > at.getTime()),
     );
   }
 
@@ -115,6 +137,34 @@ export class InMemoryExamSessionRepository implements ExamSessionRepository {
     return session && session.ownerId === ownerId ? session : null;
   }
 
+  async lockById(id: string, ownerId: string): Promise<ExamSession | null> {
+    return this.findById(id, ownerId);
+  }
+
+  async findOpenByPage(
+    pageId: string,
+    ownerId: string,
+  ): Promise<ExamSession | null> {
+    const open = [...this.rows.values()]
+      .filter(
+        (s) =>
+          s.pageId === pageId &&
+          s.ownerId === ownerId &&
+          s.finishedAt === null &&
+          !s.isRetake,
+      )
+      .sort(
+        byTimeThenKey(
+          (s) => s.startedAt,
+          (s) => s.id,
+        ),
+      );
+    return open.at(-1) ?? null;
+  }
+
+  // A single-threaded fake has no concurrent starts to queue.
+  async lockPageForStart(): Promise<void> {}
+
   async finish(session: ExamSession): Promise<ExamSession | null> {
     const stored = await this.findById(session.id, session.ownerId);
     if (!stored) return null;
@@ -146,6 +196,15 @@ export class InMemoryExamSessionRepository implements ExamSessionRepository {
           (s) => s.id,
         ),
       );
+  }
+
+  snapshot(): ExamSession[] {
+    return [...this.rows.values()];
+  }
+
+  restore(rows: readonly ExamSession[]): void {
+    this.rows.clear();
+    for (const row of rows) this.rows.set(row.id, row);
   }
 }
 
@@ -216,6 +275,33 @@ export class InMemoryExamAnswerRepository implements ExamAnswerRepository {
         ),
       );
   }
+
+  async lastAnsweredAtByRoot(
+    pageId: string,
+    ownerId: string,
+    before: Date,
+  ): Promise<Map<string, Date>> {
+    const latest = new Map<string, Date>();
+    for (const { ownerId: owner, answer } of this.rows) {
+      if (owner !== ownerId) continue;
+      if (answer.answeredAt.getTime() >= before.getTime()) continue;
+      const session = await this.sessions.findById(answer.sessionId, ownerId);
+      if (session?.pageId !== pageId) continue;
+      const seen = latest.get(answer.rootId);
+      if (!seen || seen.getTime() < answer.answeredAt.getTime()) {
+        latest.set(answer.rootId, answer.answeredAt);
+      }
+    }
+    return latest;
+  }
+
+  snapshot(): { ownerId: string; answer: ExamAnswer }[] {
+    return [...this.rows];
+  }
+
+  restore(rows: readonly { ownerId: string; answer: ExamAnswer }[]): void {
+    this.rows.splice(0, this.rows.length, ...rows);
+  }
 }
 
 export class InMemoryExamPageStateRepository
@@ -244,6 +330,15 @@ export class InMemoryExamPageStateRepository
       ...state,
       failedRootIds: [...state.failedRootIds],
     });
+  }
+
+  snapshot(): ExamPageState[] {
+    return [...this.rows.values()];
+  }
+
+  restore(rows: readonly ExamPageState[]): void {
+    this.rows.clear();
+    for (const row of rows) this.rows.set(row.pageId, row);
   }
 }
 
