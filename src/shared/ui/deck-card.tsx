@@ -30,7 +30,9 @@ export interface DeckCardProps {
   tone: DeckTone;
   label: string;
   cardCount: number;
-  // Omitted while no scheduler exists (before Phase 4): no status pill.
+  // Due cards of the page (scheduling's "Repasos de hoy"). Omitted when the
+  // due count is unknown (it could not be loaded): no status pill rather
+  // than a false "Al día".
   dueCount?: number;
   className?: string;
 }
@@ -71,7 +73,7 @@ export function DeckCard({
         </span>
         {dueCount === undefined ? null : dueCount > 0 ? (
           <Pill size="sm" tone="error" dot>
-            {dueCount} pendientes
+            {dueCount} {dueCount === 1 ? "pendiente" : "pendientes"}
           </Pill>
         ) : (
           <Pill size="sm" tone="success" dot>

@@ -1,11 +1,13 @@
 import { Layers } from "lucide-react";
 import { listDecksAction } from "@/modules/flashcards";
 import { COLOR_PALETTE, type NotebookColor } from "@/modules/notebooks";
+import { listDueTodayAction } from "@/modules/scheduling";
 import { DeckSummaryCard } from "@/shared/ui/deck-summary-card";
 import { EmptyState } from "@/shared/ui/empty-state";
 import { IconTile } from "@/shared/ui/icon-tile";
-import { SectionHeader } from "@/shared/ui/section-header";
+import { SectionHeader, SectionTitle } from "@/shared/ui/section-header";
 import { SetBreadcrumb } from "../_components/breadcrumb";
+import { DueTodayList, type DueTodayRow } from "./_components/due-today-list";
 import { plural } from "./_lib/plural";
 
 const DEFAULT_TONE: NotebookColor = "purple";
@@ -14,13 +16,38 @@ function toTone(color: string | null): NotebookColor {
   return COLOR_PALETTE.find((candidate) => candidate === color) ?? DEFAULT_TONE;
 }
 
-// Flashcards hub on real data (Phase 3): one summary card per notebook that
-// holds at least one deck (a deck = a page with cards, named by the page).
-// There is no due/pending data until the Phase 4 scheduler, so the hub shows
-// card counts only: no "Estudiar ahora" quick start and no pending pills.
+// Flashcards hub on real data: "Repasos de hoy" (Phase 4, scheduling's
+// listDueToday: the pages with flashcards due now, each opening its graded
+// review) above one summary card per notebook that holds at least one deck
+// (a deck = a page with cards, named by the page) with its card and due
+// counts. When the due list cannot load, the cards show card counts only
+// instead of a false "al día".
 export default async function FlashcardsHubPage() {
-  const result = await listDecksAction();
+  const [result, dueResult] = await Promise.all([
+    listDecksAction(),
+    listDueTodayAction(),
+  ]);
   const decks = result.ok ? result.value : [];
+
+  const dueToday: DueTodayRow[] | null = dueResult.ok
+    ? dueResult.value
+        .filter((page) => page.due.flashcard > 0)
+        .map((page) => ({
+          pageId: page.pageId,
+          pageTitle: page.pageTitle,
+          notebookId: page.notebookId,
+          notebookTitle: page.notebookTitle,
+          tone: toTone(page.notebookColor),
+          dueCount: page.due.flashcard,
+        }))
+    : null;
+  const dueByNotebook = new Map<string, number>();
+  for (const page of dueToday ?? []) {
+    dueByNotebook.set(
+      page.notebookId,
+      (dueByNotebook.get(page.notebookId) ?? 0) + page.dueCount,
+    );
+  }
 
   const byNotebook = new Map<
     string,
@@ -73,17 +100,29 @@ export default async function FlashcardsHubPage() {
           descriptionClassName="max-w-[340px]"
         />
       ) : (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3.5">
-          {notebooks.map((notebook) => (
-            <DeckSummaryCard
-              key={notebook.notebookId}
-              href={`/flashcards/${notebook.notebookId}`}
-              tone={notebook.tone}
-              title={notebook.title}
-              meta={plural(notebook.cardCount, "tarjeta", "tarjetas")}
-            />
-          ))}
-        </div>
+        <>
+          <DueTodayList rows={dueToday} />
+          <div>
+            <SectionTitle>Mazos por cuaderno</SectionTitle>
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3.5">
+              {notebooks.map((notebook) => (
+                <DeckSummaryCard
+                  key={notebook.notebookId}
+                  href={`/flashcards/${notebook.notebookId}`}
+                  tone={notebook.tone}
+                  title={notebook.title}
+                  cardCount={notebook.cardCount}
+                  dueCount={dueByNotebook.get(notebook.notebookId) ?? 0}
+                  meta={
+                    dueToday === null
+                      ? plural(notebook.cardCount, "tarjeta", "tarjetas")
+                      : undefined
+                  }
+                />
+              ))}
+            </div>
+          </div>
+        </>
       )}
     </section>
   );

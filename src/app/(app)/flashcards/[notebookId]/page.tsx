@@ -2,6 +2,7 @@ import { BookOpen } from "lucide-react";
 import { notFound } from "next/navigation";
 import { listDecksAction } from "@/modules/flashcards";
 import { getNotebookTitleForRoute } from "@/modules/notebooks";
+import { listDueTodayAction } from "@/modules/scheduling";
 import { BackLink } from "@/shared/ui/back-link";
 import { DeckCard, type DeckTone } from "@/shared/ui/deck-card";
 import { EmptyState } from "@/shared/ui/empty-state";
@@ -27,8 +28,9 @@ interface FlashcardsNotebookPageProps {
 // Deck list for one notebook on real data (Phase 3): one deck per page that
 // holds cards, titled by the page. Same not-found contract as the real
 // notebooks route (notebooks/[notebookId]/page.tsx): a notebookId that is
-// unknown, archived or another user's 404s instead of leaking anything. No
-// due/pending status until the Phase 4 scheduler.
+// unknown, archived or another user's 404s instead of leaking anything.
+// Each deck shows its flashcards due now (scheduling's "Repasos de hoy");
+// when that list cannot load the status pill is left out, never "Al día".
 export default async function FlashcardsNotebookPage({
   params,
 }: FlashcardsNotebookPageProps) {
@@ -36,7 +38,13 @@ export default async function FlashcardsNotebookPage({
   const notebookTitle = await getNotebookTitleForRoute(notebookId);
   if (!notebookTitle) notFound();
 
-  const result = await listDecksAction();
+  const [result, dueResult] = await Promise.all([
+    listDecksAction(),
+    listDueTodayAction(),
+  ]);
+  const dueByPage = dueResult.ok
+    ? new Map(dueResult.value.map((page) => [page.pageId, page.due.flashcard]))
+    : null;
   const pages = result.ok
     ? result.value.filter((deck) => deck.notebookId === notebookId)
     : [];
@@ -90,6 +98,11 @@ export default async function FlashcardsNotebookPage({
                 tone={DECK_TONES[index % DECK_TONES.length] ?? "warning"}
                 label={page.pageTitle}
                 cardCount={page.count}
+                dueCount={
+                  dueByPage === null
+                    ? undefined
+                    : (dueByPage.get(page.pageId) ?? 0)
+                }
               />
             ))}
           </div>

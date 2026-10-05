@@ -68,4 +68,21 @@ describe("DeckSummaryCard", () => {
 
     expect(container.querySelector(".bg-pastel-orange")).not.toBeNull();
   });
+
+  it("uses the singular for one card and one pending card", () => {
+    render(
+      <DeckSummaryCard
+        href="/x"
+        tone="green"
+        title="T"
+        cardCount={1}
+        dueCount={1}
+      />,
+    );
+
+    expect(screen.getByRole("link")).toHaveTextContent(
+      "1 tarjeta · 1 pendiente",
+    );
+    expect(screen.queryByText(/tarjetas|pendientes/)).not.toBeInTheDocument();
+  });
 });

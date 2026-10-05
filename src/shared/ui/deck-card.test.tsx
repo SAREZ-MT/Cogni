@@ -62,4 +62,11 @@ describe("DeckCard", () => {
 
     expect(screen.getByText("1 tarjeta")).toBeInTheDocument();
   });
+
+  it("uses the singular for a single pending card", () => {
+    render(
+      <DeckCard href="/x" tone="info" label="L" cardCount={4} dueCount={1} />,
+    );
+    expect(screen.getByText("1 pendiente")).toBeInTheDocument();
+  });
 });

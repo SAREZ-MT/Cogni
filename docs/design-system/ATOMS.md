@@ -401,8 +401,11 @@ never needs to say anything else).
   existing warning/info/success/pastel-orange/pastel-pink tokens instead of
   new hex literals. Assigned by position in the notebook's page list.
 - `href`, `tone`, `label`, `cardCount`, `dueCount?`. `dueCount` is optional:
-  omitted (no scheduler exists before Phase 4) the status pill is not
-  rendered at all, instead of showing a false "Al día".
+  omitted (the due list could not be loaded) the status pill is not
+  rendered at all, instead of showing a false "Al día". Since Phase 4 T6
+  `flashcards/[notebookId]/page.tsx` passes the page's flashcards due now
+  (scheduling's `listDueTodayAction`); the pill reads "1 pendiente" /
+  "{N} pendientes".
 
 Used by: `flashcards/[notebookId]/page.tsx`.
 
@@ -531,6 +534,23 @@ card/due concept). Flashcards' call site is unchanged (still passes
 `cardCount`/`dueCount`, no `meta`) — zero visual change.
 
 Used by: `flashcards/page.tsx`, `active-recall/page.tsx`.
+
+Phase 4 T6 (2026-10-04): the default meta line pluralizes ("1 tarjeta",
+"1 pendiente"). The flashcards hub now passes `cardCount` and the
+notebook's summed flashcards due now as `dueCount`; when the due list
+cannot be loaded it passes `meta` with the card count only, so the card
+never claims "al día" without data.
+
+### "Repasos de hoy" list (`flashcards/_components/due-today-list.tsx`)
+
+Route component, not an atom: it composes `Card` (`padding="md"`),
+`SectionTitle`, `IconTile` (size `36`, radius `input`, notebook tone),
+`Pill` (`sm`, `error`, `dot`: "{N} pendientes") and `Button`
+(`asChild`, `size="sm"`, `variant="outline"`) around a `next/link`
+"Repasar" that opens `/flashcards/{notebookId}/{pageId}?repasar=1`.
+Rows reuse the ReadyToReview divider pattern. Nothing due shows
+`EmptyState variant="success"` ("Estás al día"); a failed load shows one
+muted line instead.
 
 ## Active recall design preview (2026-09-24)
 
