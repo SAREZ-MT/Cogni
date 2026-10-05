@@ -63,6 +63,9 @@ export class InMemoryExamQuestionRepository implements ExamQuestionRepository {
     return this.list((q) => q.rootId === rootId && q.ownerId === ownerId);
   }
 
+  // A single-threaded fake has no concurrent transactions to queue.
+  async lockLineage(): Promise<void> {}
+
   async retire(
     id: string,
     ownerId: string,

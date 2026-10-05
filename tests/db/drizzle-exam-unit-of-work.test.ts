@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { afterAll, describe, expect, it } from "vitest";
 import { createExamQuestion } from "@/modules/exams/application/create-exam-question";
 import { retireExamQuestion } from "@/modules/exams/application/retire-exam-question";
@@ -21,9 +21,12 @@ import { createTestOwner, deleteTestOwner } from "./helpers/test-owner";
 
 // The exam unit of work against the real database: a root question and its
 // study item commit or roll back together, and retiring the root suspends
-// its item in the same transaction.
+// its item in the same transaction, even when two connections retire the
+// last two questions of one lineage at once.
 if (process.env.DATABASE_URL) {
   const db = createTestDb();
+  // A second connection, so two transactions can really overlap.
+  const otherConnection = createTestDb();
   const owner = await createTestOwner("exam-uow-owner");
   const notebookId = randomUUID();
   const pageId = randomUUID();
@@ -35,6 +38,7 @@ if (process.env.DATABASE_URL) {
       await deleteTestOwner(owner.id);
     } finally {
       await db.$client.end();
+      await otherConnection.$client.end();
     }
   });
 
@@ -178,6 +182,70 @@ if (process.env.DATABASE_URL) {
       expect(retired.ok && retired.value.retiredAt).toEqual(LATER);
       expect(again.ok && again.value.retiredAt).toEqual(LATER);
       expect((await itemFor(created.value.id))?.suspendedAt).toEqual(LATER);
+    });
+
+    it("suspends the root's item when two connections retire the lineage's last two questions at once", async () => {
+      const created = await createExamQuestion(
+        CONTENT,
+        {
+          pages: pagesReader,
+          uow: new DrizzleExamUnitOfWork(db),
+          clock: createFixedClock(NOW),
+          ids: { next: () => randomUUID() },
+        },
+        owner.id,
+      );
+      if (!created.ok) throw created.error;
+      const root = created.value;
+      const variant = {
+        ...root,
+        id: randomUUID(),
+        stem: "¿Qué molécula produce la mitocondria?",
+        variantOf: root.id,
+      };
+      await db.insert(examQuestions).values({
+        ...variant,
+        options: [...variant.options],
+      });
+      // Opens the second connection now, so its transaction does not lag
+      // behind the first one while it connects.
+      await otherConnection.execute(sql`select 1`);
+
+      // The second connection retires the variant and holds its transaction
+      // open; meanwhile the first one retires the root. Without a lineage
+      // lock each sees the other's question still active and neither
+      // suspends the root's item.
+      let release: () => void = () => {};
+      const held = new Promise<void>((done) => {
+        release = done;
+      });
+      const variantRetire = otherConnection.transaction(async (tx) => {
+        const result = await retireExamQuestion(
+          { questionId: variant.id },
+          {
+            uow: new DrizzleExamUnitOfWork(tx),
+            clock: createFixedClock(LATER),
+          },
+          owner.id,
+        );
+        await held;
+        return result;
+      });
+      const rootRetire = retireExamQuestion(
+        { questionId: root.id },
+        { uow: new DrizzleExamUnitOfWork(db), clock: createFixedClock(LATER) },
+        owner.id,
+      );
+      // Gives the root's retire time to finish unless the lock holds it.
+      await Promise.race([
+        rootRetire,
+        new Promise((done) => setTimeout(done, 2_000)),
+      ]);
+      release();
+
+      const [first, second] = await Promise.all([rootRetire, variantRetire]);
+      expect(first.ok && second.ok).toBe(true);
+      expect((await itemFor(root.id))?.suspendedAt).toEqual(LATER);
     });
   });
 }

@@ -83,6 +83,27 @@ describe("retireExamQuestion", () => {
     expect(uow.studyItems.all()[0]?.suspendedAt).toEqual(LATER);
   });
 
+  it("locks the question's lineage before retiring it and reading the lineage", async () => {
+    const { uow, deps } = await seeded(question("q-1"));
+    const calls: string[] = [];
+    const { questions } = uow;
+    const record =
+      <A extends unknown[], R>(name: string, method: (...args: A) => R) =>
+      (...args: A): R => {
+        calls.push(`${name}:${String(args[0])}`);
+        return method.apply(questions, args);
+      };
+    questions.lockLineage = record("lockLineage", questions.lockLineage);
+    questions.retire = record("retire", questions.retire);
+    questions.listLineage = record("listLineage", questions.listLineage);
+
+    await retireExamQuestion({ questionId: "q-1" }, deps, OWNER);
+
+    // Concurrent retires of one lineage queue behind the lock, so the last
+    // one sees every other retire and suspends the root's item.
+    expect(calls).toEqual(["lockLineage:q-1", "retire:q-1", "listLineage:q-1"]);
+  });
+
   it("refuses another owner's or a missing question as not found, changing nothing", async () => {
     const { uow, deps } = await seeded(question("q-1"));
 

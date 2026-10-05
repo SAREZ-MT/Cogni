@@ -17,6 +17,12 @@ export interface ExamQuestionRepository {
   // Every question of a root's lineage, retired ones included, oldest
   // first: what newVariant compares a new wording against (§7.5.1).
   listLineage(rootId: string, ownerId: string): Promise<ExamQuestion[]>;
+  // Locks every question row of a root's lineage until the surrounding
+  // unit of work ends, so concurrent changes of one lineage (e.g. two
+  // retires deciding whether the root's study item is suspended) queue
+  // instead of each reading the other's uncommitted state. Resolves for
+  // an unknown root too (nothing to lock).
+  lockLineage(rootId: string, ownerId: string): Promise<void>;
   // Retires the question. Idempotent: an already retired question keeps
   // its original retiredAt. Returns the question, or null when the owner
   // has no such question.

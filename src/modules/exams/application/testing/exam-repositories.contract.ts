@@ -241,6 +241,19 @@ export function runExamRepositoriesContract(
       ]);
     });
 
+    it("lockLineage resolves for an owned lineage and for an unknown root", async () => {
+      const ctx = options.context();
+      const { questions } = options.createRepositories();
+      const root = question(ctx, await ctx.newPageId());
+      await questions.save(root);
+      await expect(
+        questions.lockLineage(root.id, ctx.ownerId),
+      ).resolves.toBeUndefined();
+      await expect(
+        questions.lockLineage(ctx.newId(), ctx.ownerId),
+      ).resolves.toBeUndefined();
+    });
+
     it("retire is idempotent and keeps the first retiredAt", async () => {
       const ctx = options.context();
       const { questions } = options.createRepositories();
