@@ -175,7 +175,11 @@ describe("startExamRetakeAction", () => {
     const result = await start({ pageId: PAGE, count: 10 });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.value).toMatchObject({ resumed: false, remainingToday: 4 });
+    expect(result.value).toMatchObject({
+      kind: "started",
+      resumed: false,
+      remainingToday: 4,
+    });
     expect(current.checks).toBe(1);
     expect(revalidatePath).toHaveBeenCalledWith("/exams", "layout");
     expect(revalidatePath).toHaveBeenCalledWith("/notebooks", "layout");
@@ -186,7 +190,8 @@ describe("startExamRetakeAction", () => {
       retakePending: true,
       failedRootCount: 4,
       openSessionId: null,
-      openRetakeSessionId: result.value.sessionId,
+      openRetakeSessionId:
+        result.value.kind === "started" ? result.value.sessionId : "none",
     });
   });
 
@@ -226,5 +231,46 @@ describe("startExamRetakeAction", () => {
     const result = await (await action())({ pageId: PAGE, count: 10 });
     expect(!result.ok && result.error.code).toBe("EXAMS_UNEXPECTED");
     expect(captureException).toHaveBeenCalled();
+  });
+
+  it("clears a retake whose failed questions were all retired, and the start screen offers a normal exam again", async () => {
+    await failedPage();
+    const generate = vi.fn(freshVariants);
+    current.generate = generate;
+    for (let n = 1; n <= 4; n += 1) {
+      await current.uow.repos.questions.retire(
+        questionId(n),
+        OWNER,
+        new Date("2026-10-02T00:00:00.000Z"),
+      );
+    }
+    const result = await (await action())({ pageId: PAGE, count: 10 });
+    expect(result).toEqual({ ok: true, value: { kind: "cleared" } });
+    expect(generate).not.toHaveBeenCalled();
+    expect(current.checks).toBe(0);
+    expect(revalidatePath).toHaveBeenCalledWith("/exams", "layout");
+    expect(revalidatePath).toHaveBeenCalledWith("/notebooks", "layout");
+
+    const { getExamStartAction } = await import("./session-actions");
+    const view = await getExamStartAction({ pageId: PAGE });
+    expect(view.ok && view.value).toMatchObject({
+      retakePending: false,
+      failedRootCount: 0,
+    });
+  });
+
+  it("refuses a retake below 10 questions without calling the model", async () => {
+    await failedPage();
+    const generate = vi.fn(freshVariants);
+    current.generate = generate;
+    await current.uow.repos.questions.retire(
+      questionId(10),
+      OWNER,
+      new Date("2026-10-02T00:00:00.000Z"),
+    );
+    const result = await (await action())({ pageId: PAGE, count: 10 });
+    expect(!result.ok && result.error.code).toBe("EXAMS_NOT_ENOUGH_QUESTIONS");
+    expect(generate).not.toHaveBeenCalled();
+    expect(current.checks).toBe(0);
   });
 });

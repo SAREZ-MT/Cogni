@@ -15,7 +15,13 @@ import { type ExamQuestion, newVariant } from "../domain/exam-question";
 import { finishExamSession, newExamSession } from "../domain/exam-session";
 import { answerExamQuestion } from "./answer-exam-question";
 import { completeExamSession } from "./complete-exam-session";
-import { type StartExamRetakeDeps, startExamRetake } from "./start-exam-retake";
+import {
+  type ClearedExamRetake,
+  type StartExamRetakeDeps,
+  type StartedExamRetake,
+  startExamRetake,
+} from "./start-exam-retake";
+import { startExamSession } from "./start-exam-session";
 import {
   LATER,
   NOW,
@@ -191,6 +197,15 @@ async function storedState(uow: InMemoryExamSessionUnitOfWork) {
   };
 }
 
+// The started retake of an ok result (not a cleared one).
+function startedOf(
+  result: Result<StartedExamRetake | ClearedExamRetake, DomainError>,
+): StartedExamRetake {
+  if (!result.ok) throw result.error;
+  if (result.value.kind !== "started") throw new Error("retake was cleared");
+  return result.value;
+}
+
 function expectError(result: Result<unknown, DomainError>, code: string) {
   expect(result.ok).toBe(false);
   if (result.ok) return;
@@ -244,12 +259,10 @@ describe("startExamRetake", () => {
       deps,
       OWNER,
     );
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-
-    const { session } = result.value;
-    expect(result.value.resumed).toBe(false);
-    expect(result.value.remainingToday).toBe(4);
+    const started = startedOf(result);
+    const { session } = started;
+    expect(started.resumed).toBe(false);
+    expect(started.remainingToday).toBe(4);
     expect(session).toMatchObject({
       pageId: PAGE,
       requestedCount: 10,
@@ -324,16 +337,11 @@ describe("startExamRetake", () => {
       deps,
       OWNER,
     );
-    if (!first.ok) throw first.error;
-    const again = await startExamRetake(
-      { pageId: PAGE, requestedCount: 12 },
-      deps,
-      OWNER,
+    const again = startedOf(
+      await startExamRetake({ pageId: PAGE, requestedCount: 12 }, deps, OWNER),
     );
-    expect(again.ok).toBe(true);
-    if (!again.ok) return;
-    expect(again.value.resumed).toBe(true);
-    expect(again.value.session).toEqual(first.value.session);
+    expect(again.resumed).toBe(true);
+    expect(again.session).toEqual(startedOf(first).session);
     expect(ai.calls).toHaveLength(1);
     expect(limiter.checks).toBe(1);
   });
@@ -454,10 +462,9 @@ describe("startExamRetake", () => {
       deps,
       OWNER,
     );
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.value.session.questionIds.slice(0, 4)).toEqual(variantIds);
-    expect(result.value.remainingToday).toBeNull();
+    const started = startedOf(result);
+    expect(started.session.questionIds.slice(0, 4)).toEqual(variantIds);
+    expect(started.remainingToday).toBeNull();
     expect(ai.calls).toHaveLength(0);
     expect(limiter.peeks + limiter.checks).toBe(0);
   });
@@ -482,12 +489,15 @@ describe("startExamRetake", () => {
     const original = seeded[0] as ExamQuestion;
 
     const takeRetake = async (wrong: number, at: Date) => {
-      const started = await startExamRetake(
-        { pageId: PAGE, requestedCount: 10 },
-        { ...deps, clock: createFixedClock(at) },
-        OWNER,
+      const started = ok(
+        startedOf(
+          await startExamRetake(
+            { pageId: PAGE, requestedCount: 10 },
+            { ...deps, clock: createFixedClock(at) },
+            OWNER,
+          ),
+        ),
       );
-      if (!started.ok) throw started.error;
       const questions = await uow.repos.questions.listByIds(
         started.value.session.questionIds,
         OWNER,
@@ -567,5 +577,139 @@ describe("startExamRetake", () => {
       failedRootIds: [],
       lastPassedSessionId: second.id,
     });
+  });
+});
+
+// The student may retire questions after failing (R3-retake-ai-before-
+// composition, user decision 2026-10-05): a retake that can no longer be
+// built is refused before any AI call, and a retake whose failed concepts
+// all left the page is cleared so the page can hold a normal exam again.
+describe("startExamRetake after questions were retired", () => {
+  async function retire(
+    uow: InMemoryExamSessionUnitOfWork,
+    questions: readonly ExamQuestion[],
+  ) {
+    for (const q of questions) {
+      await uow.repos.questions.retire(q.id, OWNER, LATER);
+    }
+  }
+
+  it("refuses a retake below 10 questions before any AI call: nothing stored, no unit consumed", async () => {
+    const { uow, ai, limiter, deps } = setup();
+    const seeded = await seedFailedExam(uow, {
+      seeded: 10,
+      asked: 10,
+      failed: 4,
+    });
+    // One non-failed concept left the page: 9 roots remain.
+    await retire(uow, seeded.slice(9, 10));
+    const before = await storedState(uow);
+    const result = await startExamRetake(
+      { pageId: PAGE, requestedCount: 10 },
+      deps,
+      OWNER,
+    );
+    expectError(result, EXAM_ERROR.NOT_ENOUGH_QUESTIONS);
+    expect(ai.calls).toHaveLength(0);
+    expect(limiter.peeks + limiter.checks).toBe(0);
+    expect(await storedState(uow)).toEqual(before);
+    expect((await uow.repos.pageStates.get(PAGE, OWNER))?.retakePending).toBe(
+      true,
+    );
+  });
+
+  it("refuses before any AI call when a retired failed concept leaves fewer than 10 roots", async () => {
+    const { uow, ai, limiter, deps } = setup();
+    const seeded = await seedFailedExam(uow, {
+      seeded: 10,
+      asked: 10,
+      failed: 4,
+    });
+    await retire(uow, seeded.slice(0, 1));
+    const result = await startExamRetake(
+      { pageId: PAGE, requestedCount: 10 },
+      deps,
+      OWNER,
+    );
+    expectError(result, EXAM_ERROR.NOT_ENOUGH_QUESTIONS);
+    expect(ai.calls).toHaveLength(0);
+    expect(limiter.peeks + limiter.checks).toBe(0);
+  });
+
+  it("clears the retake when every failed concept was retired, keeping the last pass, and lets a normal exam start", async () => {
+    const { uow, ai, limiter, deps } = setup();
+    const seeded = await seedFailedExam(uow, { seeded: 14, failed: 4 });
+    await uow.repos.pageStates.upsert({
+      pageId: PAGE,
+      ownerId: OWNER,
+      retakePending: true,
+      failedRootIds: seeded.slice(0, 4).map((q) => q.rootId),
+      lastPassedSessionId: "passed-before",
+    });
+    await retire(uow, seeded.slice(0, 4));
+
+    const blocked = await startExamSession(
+      { pageId: PAGE, requestedCount: 10 },
+      deps,
+      OWNER,
+    );
+    expectError(blocked, EXAM_ERROR.RETAKE_PENDING);
+
+    const result = await startExamRetake(
+      { pageId: PAGE, requestedCount: 10 },
+      deps,
+      OWNER,
+    );
+    expect(result).toEqual(ok({ kind: "cleared" }));
+    expect(ai.calls).toHaveLength(0);
+    expect(limiter.peeks + limiter.checks).toBe(0);
+    expect(await uow.repos.pageStates.get(PAGE, OWNER)).toEqual({
+      pageId: PAGE,
+      ownerId: OWNER,
+      retakePending: false,
+      failedRootIds: [],
+      lastPassedSessionId: "passed-before",
+    });
+    expect(uow.repos.sessions.snapshot()).toHaveLength(1);
+
+    const normal = await startExamSession(
+      { pageId: PAGE, requestedCount: 10 },
+      deps,
+      OWNER,
+    );
+    expect(normal.ok).toBe(true);
+    if (!normal.ok) return;
+    expect(normal.value.session.isRetake).toBe(false);
+  });
+
+  it("retakes only the failed concepts that are still on the page", async () => {
+    const { uow, ai, deps } = setup();
+    const seeded = await seedFailedExam(uow, { seeded: 12, failed: 4 });
+    await retire(uow, seeded.slice(0, 1));
+    const result = await startExamRetake(
+      { pageId: PAGE, requestedCount: 10 },
+      deps,
+      OWNER,
+    );
+    const { session } = startedOf(result);
+    expect(ai.calls).toHaveLength(1);
+    expect(
+      promptRoots((ai.calls[0] as GenerateStructuredInput).prompt),
+    ).toEqual(seeded.slice(1, 4).map((q) => q.rootId));
+    const head = await uow.repos.questions.listByIds(
+      session.questionIds.slice(0, 3),
+      OWNER,
+    );
+    expect(head.map((q) => q.rootId).sort()).toEqual(
+      seeded
+        .slice(1, 4)
+        .map((q) => q.rootId)
+        .sort(),
+    );
+    expect(session.questionIds).toHaveLength(10);
+    const roots = (
+      await uow.repos.questions.listByIds(session.questionIds, OWNER)
+    ).map((q) => q.rootId);
+    expect(roots).not.toContain(seeded[0]?.rootId);
   });
 });

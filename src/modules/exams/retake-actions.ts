@@ -21,12 +21,18 @@ import { ExamDailyLimitReachedError, startExamRetake } from "./application";
 import { EXAM_MAX_QUESTIONS, EXAM_MIN_QUESTIONS } from "./domain/exam-session";
 import { DrizzleExamSessionUnitOfWork } from "./infrastructure";
 
-export interface StartedExamRetakeView {
-  sessionId: string;
-  resumed: boolean;
-  // Daily AI generations left; null when no AI call was made.
-  remainingToday: number | null;
-}
+// "started": the retake is open (sessionId). "cleared": every failed
+// question was retired since the failed exam, so the pending retake was
+// dropped and the page holds a normal exam again.
+export type StartedExamRetakeView =
+  | {
+      kind: "started";
+      sessionId: string;
+      resumed: boolean;
+      // Daily AI generations left; null when no AI call was made.
+      remainingToday: number | null;
+    }
+  | { kind: "cleared" };
 
 // The UI always sends N: its minimum depends on the failed roots
 // (max(10, failed)), which the use case checks.
@@ -36,6 +42,7 @@ const retakeInput = z.object({
 });
 
 // "Repetir examen" (documento-maestro §7.5): resumes the page's open retake
+// (or clears a retake whose failed questions were all retired)
 // or generates the reformulated questions (one generation of the daily
 // limit, consumed only when the retake was created) and opens it. The
 // action may run a long provider call: Next applies `maxDuration` from the
@@ -78,7 +85,11 @@ export async function startExamRetakeAction(
     // the notebook page's techniques panel read them.
     revalidateExams();
     revalidatePath("/notebooks", "layout");
+    if (result.value.kind === "cleared") {
+      return ok<StartedExamRetakeView>({ kind: "cleared" });
+    }
     return ok({
+      kind: "started",
       sessionId: result.value.session.id,
       resumed: result.value.resumed,
       remainingToday: result.value.remainingToday,

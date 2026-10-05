@@ -166,4 +166,27 @@ describe("getExamPageOverview", () => {
     expect(overview.value.openSession).toBeNull();
     expect(overview.value.openRetake?.id).toBe("retake-1");
   });
+
+  it("counts only the failed roots that still have an active question", async () => {
+    const { uow } = await setup(12);
+    await uow.repos.pageStates.upsert({
+      pageId: PAGE,
+      ownerId: OWNER,
+      retakePending: true,
+      failedRootIds: ["q-01", "q-02", "q-03"],
+      lastPassedSessionId: null,
+    });
+    await uow.repos.questions.retire("q-01", OWNER, LATER);
+    const overview = await getExamPageOverview(
+      { pageId: PAGE },
+      { uow },
+      OWNER,
+    );
+    if (!overview.ok) throw overview.error;
+    expect(overview.value).toMatchObject({
+      activeQuestionCount: 11,
+      retakePending: true,
+      failedRootCount: 2,
+    });
+  });
 });

@@ -55,12 +55,20 @@ export interface StartExamRetakeDeps {
 }
 
 export interface StartedExamRetake {
+  kind: "started";
   session: ExamSession;
   // True when the page's open retake was returned instead of a new one.
   resumed: boolean;
   // Daily generations left after this start; null when no AI call was made
   // (a resumed retake, or variants that already existed).
   remainingToday: number | null;
+}
+
+// Every failed concept of the page left it (the student retired all of
+// its questions after failing): the pending retake was cleared and the
+// page holds a normal exam again (user decision 2026-10-05).
+export interface ClearedExamRetake {
+  kind: "cleared";
 }
 
 // A failed root of the last failed exam and how the retake covers it.
@@ -85,6 +93,8 @@ interface RetakePlan {
 type PlanOutcome =
   | { kind: "resume"; session: ExamSession }
   | { kind: "plan"; plan: RetakePlan };
+
+type CheckedOutcome = PlanOutcome | { kind: "cleared" };
 
 type StoredOutcome =
   | { kind: "resume"; session: ExamSession }
@@ -112,6 +122,15 @@ function noRetakePending(pageId: string) {
 //   the number of failed roots: EXAMS_INVALID_QUESTION_COUNT. Both before
 //   any AI call.
 // - The page's open retake is resumed as it is (no AI call).
+// - Failed roots whose lineage has no active question left (retired by the
+//   student after failing) are dropped. When none is left the pending
+//   retake is cleared (retakePending false, no failed roots, the last
+//   passing session kept) under the page lock and { kind: "cleared" } is
+//   returned: the page holds a normal exam again. No AI call.
+// - Before any AI call the retake is composed with the current candidates
+//   and one placeholder variant per failed root: a page that cannot hold it
+//   (fewer than 10 roots: EXAMS_NOT_ENOUGH_QUESTIONS) is refused without
+//   calling the model or consuming a unit.
 // - A failed root that already has an active, unshown variant (stored by
 //   an earlier attempt) reuses it; only the other roots are sent to the
 //   model, so a retake whose variants all exist makes no AI call.
@@ -136,30 +155,29 @@ export async function startExamRetake(
   input: { pageId: string; requestedCount: number },
   deps: StartExamRetakeDeps,
   ownerId: string,
-): Promise<Result<StartedExamRetake, DomainError>> {
+): Promise<Result<StartedExamRetake | ClearedExamRetake, DomainError>> {
   const page = await deps.pages.getPageText(input.pageId, ownerId);
   if (!page.ok) return page;
   if (!isValidQuestionCount(input.requestedCount)) {
     return err(invalidCount(input.requestedCount));
   }
 
-  const outcome = await deps.uow.run((repos) =>
-    planRetake(input.pageId, ownerId, repos),
+  const now = deps.clock.now();
+  const outcome = await runExamWork(deps.uow, (repos) =>
+    checkRetake(input, ownerId, repos, now),
   );
   if (!outcome.ok) return outcome;
+  if (outcome.value.kind === "cleared") return ok({ kind: "cleared" });
   if (outcome.value.kind === "resume") {
     return ok({
+      kind: "started",
       session: outcome.value.session,
       resumed: true,
       remainingToday: null,
     });
   }
   const { plan } = outcome.value;
-  if (input.requestedCount < plan.roots.length) {
-    return err(invalidCount(input.requestedCount));
-  }
 
-  const now = deps.clock.now();
   const missing = plan.roots.filter((root) => root.fresh === null);
   let generated = new Map<string, NewVariantInput>();
   if (missing.length > 0) {
@@ -247,6 +265,7 @@ export async function startExamRetake(
   if (!stored.ok) return stored;
   if (stored.value.kind === "resume") {
     return ok({
+      kind: "started",
       session: stored.value.session,
       resumed: true,
       remainingToday: null,
@@ -258,7 +277,77 @@ export async function startExamRetake(
     const consumed = await deps.limiter.check(ownerId);
     remainingToday = consumed.allowed ? consumed.remaining : 0;
   }
-  return ok({ session: stored.value.session, resumed: false, remainingToday });
+  return ok({
+    kind: "started",
+    session: stored.value.session,
+    resumed: false,
+    remainingToday,
+  });
+}
+
+// Stands for a variant not generated yet in the dry-run composition; never
+// stored and never a real question id.
+const PLACEHOLDER_VARIANT = "retake-variant-pending:";
+
+// Plans the retake before any AI call: resumes the open retake, clears a
+// retake with no failed root left (under the page lock, re-planned there),
+// and dry-runs composeRetake with the page's current candidates and one
+// placeholder per failed root, so a retake that cannot be composed is
+// refused before the model is called. The composition is checked again
+// with the real variants inside the storing transaction.
+async function checkRetake(
+  input: { pageId: string; requestedCount: number },
+  ownerId: string,
+  repos: ExamSessionRepositories,
+  now: Date,
+): Promise<Result<CheckedOutcome, DomainError>> {
+  let outcome = await planRetake(input.pageId, ownerId, repos);
+  if (!outcome.ok || outcome.value.kind === "resume") return outcome;
+  if (outcome.value.plan.roots.length === 0) {
+    await repos.sessions.lockPageForStart(input.pageId, ownerId);
+    outcome = await planRetake(input.pageId, ownerId, repos);
+    if (!outcome.ok || outcome.value.kind === "resume") return outcome;
+    if (outcome.value.plan.roots.length === 0) {
+      await clearRetake(input.pageId, ownerId, repos);
+      return ok({ kind: "cleared" });
+    }
+  }
+  const { plan } = outcome.value;
+  const composed = composeRetake({
+    requestedCount: input.requestedCount,
+    failedRootIds: plan.roots.map((root) => root.rootId),
+    variantsByRoot: new Map(
+      plan.roots.map((root) => [
+        root.rootId,
+        root.fresh?.id ?? `${PLACEHOLDER_VARIANT}${root.rootId}`,
+      ]),
+    ),
+    shownQuestionIds: plan.shownQuestionIds,
+    otherCandidates: await listExamCandidates(
+      { pageId: input.pageId, now },
+      ownerId,
+      repos,
+    ),
+    now,
+  });
+  if (!composed.ok) return composed;
+  return outcome;
+}
+
+// The page leaves the retake: no pending retake, no failed roots; the last
+// passing session is kept.
+async function clearRetake(
+  pageId: string,
+  ownerId: string,
+  repos: ExamSessionRepositories,
+): Promise<void> {
+  const state = await repos.pageStates.get(pageId, ownerId);
+  if (!state) return;
+  await repos.pageStates.upsert({
+    ...state,
+    retakePending: false,
+    failedRootIds: [],
+  });
 }
 
 // Reads what a retake start needs: the open retake to resume, or the

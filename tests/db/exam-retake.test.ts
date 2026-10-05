@@ -217,6 +217,7 @@ if (process.env.DATABASE_URL) {
 
       const result = await retake(pageId, limiter);
       if (!result.ok) throw result.error;
+      if (result.value.kind !== "started") throw new Error("not started");
       const { session } = result.value;
       expect(limiter.checks).toBe(1);
 
@@ -269,6 +270,7 @@ if (process.env.DATABASE_URL) {
       // Resuming makes no AI call and no second session.
       const again = await retake(pageId, limiter);
       if (!again.ok) throw again.error;
+      if (again.value.kind !== "started") throw new Error("not started");
       expect(again.value).toMatchObject({ resumed: true });
       expect(again.value.session.id).toBe(session.id);
       expect(limiter.checks).toBe(1);
@@ -312,6 +314,35 @@ if (process.env.DATABASE_URL) {
         .where(eq(examSessions.pageId, pageId));
       expect(sessions.map((s) => s.id)).toEqual([failedSessionId]);
       expect(shown).toHaveLength(10);
+    });
+
+    it("clears the pending retake when every failed question was retired under the page lock, without an AI call or a new session", async () => {
+      const { pageId, shown } = await failedPage();
+      await db
+        .update(examQuestions)
+        .set({ retiredAt: STARTED })
+        .where(
+          inArray(
+            examQuestions.id,
+            shown.slice(0, 4).map((q) => q.id),
+          ),
+        );
+      const limiter = new CountingLimiter();
+      const result = await retake(pageId, limiter);
+      expect(result).toEqual(ok({ kind: "cleared" }));
+      expect(limiter.checks).toBe(0);
+      expect(
+        await new DrizzleExamPageStateRepository(db).get(pageId, owner.id),
+      ).toMatchObject({
+        retakePending: false,
+        failedRootIds: [],
+        lastPassedSessionId: null,
+      });
+      const sessions = await db
+        .select()
+        .from(examSessions)
+        .where(eq(examSessions.pageId, pageId));
+      expect(sessions).toHaveLength(1);
     });
   });
 }
