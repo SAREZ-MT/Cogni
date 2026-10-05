@@ -20,6 +20,9 @@ vi.mock("@/modules/flashcards", () => ({
   listFlashcardsAction,
   createFlashcardAction: vi.fn(),
   archiveFlashcardAction: vi.fn(),
+  startFlashcardSessionAction: vi.fn(),
+  gradeFlashcardAction: vi.fn(),
+  finishFlashcardSessionAction: vi.fn(),
   MAX_FLASHCARD_SIDE_LENGTH: 1000,
 }));
 const { getPageForRoute, getNotebookTitleForRoute } = vi.hoisted(() => ({
@@ -89,7 +92,7 @@ describe("FlashcardsSessionPage", () => {
     });
   });
 
-  describe("real deck (ungraded review list)", () => {
+  describe("real deck (review list + graded review)", () => {
     beforeEach(() => {
       getPageForRoute.mockResolvedValue({ id: PAGE, title: "Mitocondria" });
       listFlashcardsAction.mockResolvedValue({
@@ -98,7 +101,7 @@ describe("FlashcardsSessionPage", () => {
       });
     });
 
-    it("shows the page's real cards as flip cards, without grading, in production too", async () => {
+    it("shows the page's real cards as flip cards, ungraded until Repasar, in production too", async () => {
       vi.stubEnv("NODE_ENV", "production");
       vi.stubEnv("COGNI_DESIGN_PREVIEWS", "");
 
@@ -134,6 +137,14 @@ describe("FlashcardsSessionPage", () => {
       ).toHaveLength(2);
     });
 
+    it("offers Repasar on a deck with cards", async () => {
+      render(await FlashcardsSessionPage(props(NOTEBOOK, PAGE)));
+
+      expect(
+        screen.getByRole("button", { name: /Repasar/ }),
+      ).toBeInTheDocument();
+    });
+
     it("lets a page without cards start its deck with the first card", async () => {
       listFlashcardsAction.mockResolvedValue({ ok: true, value: [] });
 
@@ -146,6 +157,9 @@ describe("FlashcardsSessionPage", () => {
         screen.getByText("Esta página aún no tiene tarjetas"),
       ).toBeInTheDocument();
       expect(screen.queryByTestId("flip-card")).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /Repasar/ }),
+      ).not.toBeInTheDocument();
       expect(
         screen.getAllByRole("button", { name: "Nueva tarjeta" }).length,
       ).toBeGreaterThan(0);

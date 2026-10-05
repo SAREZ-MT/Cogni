@@ -24,4 +24,8 @@ export interface StudyItemRepository {
   // an already suspended item keeps its original suspendedAt. Returns the
   // item, or null when the owner has no such item.
   suspend(id: string, ownerId: string, now: Date): Promise<StudyItem | null>;
+  // Serializes concurrent grades of one item until the surrounding unit of
+  // work ends (row lock), so a double submit cannot apply SM-2 twice to the
+  // same state. A no-op outside a transaction and in memory.
+  lock(id: string, ownerId: string): Promise<void>;
 }

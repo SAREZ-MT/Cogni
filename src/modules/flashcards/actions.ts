@@ -1,22 +1,25 @@
 "use server";
 
-import * as Sentry from "@sentry/nextjs";
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { AI_ERROR, createAiServerApi } from "@/modules/ai";
-import { getCurrentUser } from "@/modules/identity";
 import { createNotebooksServerApi } from "@/modules/notebooks";
 import { serverEnv } from "@/shared/config/env.server";
 import { getDb } from "@/shared/db/client";
 import { systemClock } from "@/shared/kernel/clock";
 import {
   type ActionError,
-  DomainError,
+  type DomainError,
   toActionError,
 } from "@/shared/kernel/domain-error";
 import { createId } from "@/shared/kernel/id";
 import { err, ok, type Result } from "@/shared/kernel/result";
 import { createServerAnalytics } from "@/shared/observability/analytics";
+import {
+  parseInput,
+  requireOwnerId,
+  revalidateDecks,
+  withBoundary,
+} from "./action-support";
 import {
   archiveFlashcard as archiveFlashcardUseCase,
   createManualFlashcard as createManualFlashcardUseCase,
@@ -28,7 +31,6 @@ import {
   MIN_CARD_COUNT,
   requestGeneration as requestGenerationUseCase,
 } from "./application";
-import { FLASHCARD_ERROR } from "./domain/errors";
 import { type Flashcard, MAX_FLASHCARD_SIDE_LENGTH } from "./domain/flashcard";
 import {
   DrizzleDeckUnitOfWork,
@@ -99,41 +101,6 @@ const side = z.string().max(MAX_FLASHCARD_SIDE_LENGTH * 2);
 const createInput = z.object({ pageId: z.uuid(), front: side, back: side });
 const archiveInput = z.object({ flashcardId: z.uuid() });
 
-const UNEXPECTED_ERROR: ActionError = {
-  code: FLASHCARD_ERROR.UNEXPECTED,
-  message: "unexpected flashcards action failure",
-};
-
-function actionError(code: string, message: string): ActionError {
-  return toActionError(new DomainError(code, message));
-}
-
-async function requireOwnerId(): Promise<Result<string, ActionError>> {
-  const user = await getCurrentUser();
-  if (!user) {
-    return err(
-      actionError(
-        FLASHCARD_ERROR.SESSION_REQUIRED,
-        "Debes iniciar sesión para continuar.",
-      ),
-    );
-  }
-  return ok(user.id);
-}
-
-function parseInput<T>(
-  schema: z.ZodType<T>,
-  input: unknown,
-): Result<T, ActionError> {
-  const parsed = schema.safeParse(input);
-  if (!parsed.success) {
-    return err(
-      actionError(FLASHCARD_ERROR.INVALID_INPUT, "Invalid flashcards input"),
-    );
-  }
-  return ok(parsed.data);
-}
-
 // Adapters are built per call, like ingestion/actions.ts: serverless
 // functions are short-lived, so no module-level singletons.
 function deps() {
@@ -156,17 +123,6 @@ function deps() {
       host: env.NEXT_PUBLIC_POSTHOG_HOST,
     }),
   };
-}
-
-async function withBoundary<T>(
-  run: () => Promise<Result<T, ActionError>>,
-): Promise<Result<T, ActionError>> {
-  try {
-    return await run();
-  } catch (error) {
-    Sentry.captureException(error);
-    return err(UNEXPECTED_ERROR);
-  }
 }
 
 function toView(card: Flashcard): FlashcardView {
@@ -296,12 +252,6 @@ export async function listDecksAction(): Promise<
     if (!result.ok) return err(toActionError(result.error));
     return ok(result.value.map((deck) => ({ ...deck })));
   });
-}
-
-// Every flashcards route (decks list, notebook decks, page deck) reads the
-// cards; revalidating the segment layout refreshes all of them.
-function revalidateDecks(): void {
-  revalidatePath("/flashcards", "layout");
 }
 
 export async function createFlashcardAction(

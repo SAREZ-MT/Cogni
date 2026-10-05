@@ -3,7 +3,7 @@
 Flashcards generated from a page or written by hand (documento-maestro §3.3,
 §8). Every card owns a `StudyItem` of the `study-engine` module (§3.4),
 created with the card and suspended when the card is archived. Review
-sessions arrive later in Phase 4.
+sessions are scheduled by `study-engine`; this module adds the card text.
 
 ## Layout
 
@@ -50,6 +50,17 @@ sessions arrive later in Phase 4.
   validate session and input, return `Result<T, ActionError>`, report failures
   to Sentry and emit the `generation_requested` event. `maxDuration` is declared
   on the page route that hosts the action.
+- `session-actions.ts` (`"use server"`), the review session (§3.3, §7.2):
+  `startFlashcardSessionAction` (`{ pageId? }`, the due cards of one page or
+  of every page, with their text and the days each button would schedule),
+  `gradeFlashcardAction` (`{ sessionId, itemId, rating }`, rating
+  `again | hard | good | easy`; returns the session counts and the page's
+  mastery level, no revalidation mid-session) and
+  `finishFlashcardSessionAction` (counts only, never study time; revalidates
+  the `/flashcards` layout). Scheduling goes through study-engine's
+  `createFlashcardSessionsServerApi`.
+- `action-support.ts` the boundary helpers both action files share (session,
+  Zod parsing, never-throw wrapper, deck revalidation).
 
 ## Environment
 
@@ -61,4 +72,5 @@ that exercises real providers.
 
 ## Next phase
 
-Phase 4: spaced repetition engine and review sessions (documento-maestro §13).
+Rest of Phase 4: AI session feedback, the "Repasos de hoy" view and the
+daily mastery job (documento-maestro §13).

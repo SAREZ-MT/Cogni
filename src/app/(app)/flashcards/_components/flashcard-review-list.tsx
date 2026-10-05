@@ -17,8 +17,8 @@ export interface FlashcardReviewListProps {
 }
 
 // Ungraded review of a page's real deck: every card is a FlipCard that flips
-// on click. The graded study session (ratings, SM-2 scheduling) is Phase 4 and
-// lives in FlashcardPlayer, which still runs on sample data. Each card keeps
+// on click. The graded study session (ratings, SM-2 scheduling) is
+// FlashcardPlayer, opened by DeckReview's "Repasar". Each card keeps
 // its own flipped state and is anchored by its id so the techniques panel can
 // link straight to it. The archive action sits outside the FlipCard so
 // clicking it never flips the card.

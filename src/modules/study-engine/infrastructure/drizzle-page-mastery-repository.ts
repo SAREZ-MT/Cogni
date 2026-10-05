@@ -1,5 +1,5 @@
 import { and, asc, eq } from "drizzle-orm";
-import type { Db } from "@/shared/db/client";
+import type { DbExecutor } from "@/shared/db/client";
 import { type PageMasteryRow, pageMastery } from "@/shared/db/schema";
 import type { PageMastery } from "../domain/page-mastery";
 import type { PageMasteryRepository } from "../domain/page-mastery-repository";
@@ -20,7 +20,7 @@ function toPageMastery(row: PageMasteryRow): PageMastery {
 // Drizzle implementation of PageMasteryRepository; one row per page
 // (page_mastery_page_id_key), every query filters by owner_id.
 export class DrizzlePageMasteryRepository implements PageMasteryRepository {
-  constructor(private readonly db: Db) {}
+  constructor(private readonly db: DbExecutor) {}
 
   async upsert(mastery: PageMastery): Promise<void> {
     const values = {

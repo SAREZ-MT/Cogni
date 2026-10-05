@@ -8,10 +8,11 @@ repaso: todos pasan por este motor.
 
 ## Estado
 
-Fase 4, tareas T1 y T2: dominio puro cubierto al 100 % y persistencia
-(`study_items`, `review_logs`, `page_mastery`) con puertos, fakes en memoria y
-adaptadores Drizzle. Los casos de uso y las acciones de servidor llegan en las
-tareas siguientes de la misma fase.
+Fase 4, tareas T1 a T4: dominio puro cubierto al 100 %, persistencia
+(`study_items`, `review_logs`, `page_mastery`, `flashcard_sessions`) con
+puertos, fakes en memoria y adaptadores Drizzle, y la sesión de repaso de
+flashcards (iniciar, calificar, terminar). La retroalimentación con IA, la
+vista "Repasos de hoy" y el trabajo diario llegan en las tareas siguientes.
 
 ## Dominio (`domain/`)
 
@@ -22,9 +23,11 @@ tareas siguientes de la misma fase.
 | `mastery.ts` | `computeMastery(items, now)`: nivel de dominio v1 según §7.3 (solo ítems no suspendidos; estabilidad `min(1, intervalDays / 21)`; acierto si `lastQuality >= 3`; umbrales 0,35 y 0,70). Exporta `MASTERY_LEVELS`, `MasteryLevel` y `MasterySnapshot` (`level`, `score`, `itemsTotal`, `itemsDue`). |
 | `review-log.ts` | `ReviewLog` y `SessionKind` (`flashcards` / `exam` / `recall`). |
 | `page-mastery.ts` | `PageMastery`, el agregado persistido por página. |
-| `errors.ts` | Códigos `STUDY_ENGINE_ERROR`. |
-| `study-item-repository.ts` | Puerto `StudyItemRepository`: `save` (inserta o reemplaza el estado SM-2), `findById`, `findBySource(kind, sourceId)`, `listDue(ownerId, now, pageId?)` (no suspendidos con `dueAt <= now`, el más antiguo primero), `listByPage` (incluye suspendidos) y `suspend` (idempotente). |
+| `flashcard-session.ts` | `FlashcardSession` (`pageId` nulo en la sesión multipágina; abierta mientras `finishedAt` es nulo; solo cuenta repasos y respuestas "Otra vez", nunca tiempo) y `newFlashcardSession(...)`. |
+| `errors.ts` | Códigos `STUDY_ENGINE_ERROR`, entre ellos `ITEM_NOT_DUE`, `NOTHING_DUE`, `SESSION_NOT_FOUND` y `SESSION_FINISHED`. |
+| `study-item-repository.ts` | Puerto `StudyItemRepository`: `save` (inserta o reemplaza el estado SM-2), `findById`, `findBySource(kind, sourceId)`, `listDue(ownerId, now, pageId?)` (no suspendidos con `dueAt <= now`, el más antiguo primero), `listByPage` (incluye suspendidos), `suspend` (idempotente) y `lock` (bloqueo de fila hasta el fin de la unidad de trabajo). |
 | `review-log-repository.ts` | Puerto `ReviewLogRepository`: `append` y `listByItem` (solo inserción, el más antiguo primero). |
+| `flashcard-session-repository.ts` | Puerto `FlashcardSessionRepository`: `insert`, `findById`, `recordGrade` (incrementos atómicos) y `finish` (idempotente). |
 | `page-mastery-repository.ts` | Puerto `PageMasteryRepository`: `upsert` (una fila por página; conserva el primer `id`), `getByPage` y `listByOwner` (ordenado por `pageId`). |
 
 Reglas del dominio: sin Zod, sin base de datos, sin `new Date()`; solo importa
@@ -32,6 +35,15 @@ de `@/shared/kernel`. Identificadores y comentarios en inglés.
 
 Todos los puertos filtran por `owner_id`: los datos de otro dueño no se ven
 ni se sobrescriben.
+
+## Casos de uso (`application/`)
+
+| Archivo | Contenido |
+|---|---|
+| `start-flashcard-session.ts` | `startFlashcardSession({ pageId? })`: comprueba la página con `PageAccess` (que `PageTextReader` de notebooks cumple), lista las flashcards vencidas de esa página o de todas las del dueño, abre la sesión y devuelve cada ítem con `flashcardId` y los días que programaría cada botón. Sin vencidas responde `NOTHING_DUE` y no abre sesión. |
+| `grade-flashcard.ts` | `gradeFlashcard({ sessionId, itemId, rating })`: botón → calidad (§7.2), `applySm2`, guarda el ítem, agrega el `ReviewLog`, cuenta la respuesta en la sesión y recalcula `PageMastery`, todo en una `StudyUnitOfWork`. Bloquea el ítem antes de leerlo. Rechaza sin escribir: sesión ajena, desconocida o terminada; ítem ajeno, de otra página, de otra técnica, suspendido (tarjeta archivada) o no vencido (doble envío). |
+| `finish-flashcard-session.ts` | `finishFlashcardSession({ sessionId })`: cierra la sesión (idempotente) y devuelve sus conteos. |
+| `study-unit-of-work.ts` | Puerto `StudyUnitOfWork`: ítems, logs, dominio y sesiones confirman o revierten juntos. |
 
 ## Persistencia
 
@@ -47,8 +59,8 @@ tablas: solo el servidor accede.
 | Capa | Archivos |
 |---|---|
 | `application/testing/` | Contratos compartidos `*-repository.contract.ts` y fakes `InMemory*Repository` (exportados por `testing.ts`). |
-| `infrastructure/` | `DrizzleStudyItemRepository`, `DrizzleReviewLogRepository`, `DrizzlePageMasteryRepository`. Aceptan la base o una transacción abierta (`DbExecutor`). |
-| `server-api.ts` | `createStudyItemRepository(db)`, exportado por `index.ts`: otros módulos guardan ítems dentro de su propia transacción (flashcards lo usa en `DrizzleDeckUnitOfWork` para crear la tarjeta y su ítem juntos). |
+| `infrastructure/` | `DrizzleStudyItemRepository` (`lock` es `SELECT ... FOR UPDATE`), `DrizzleReviewLogRepository`, `DrizzlePageMasteryRepository`, `DrizzleFlashcardSessionRepository` y `DrizzleStudyUnitOfWork` (una transacción por calificación). Aceptan la base o una transacción abierta (`DbExecutor`). |
+| `server-api.ts` | Exportado por `index.ts`. `createStudyItemRepository(db)`: otros módulos guardan ítems dentro de su propia transacción (flashcards lo usa en `DrizzleDeckUnitOfWork`). `createFlashcardSessionsServerApi({ db, pages, clock, ids })`: `start`, `grade` y `finish`, que llaman las acciones de servidor de flashcards (este módulo no conoce el texto de las tarjetas). |
 
 ## Pruebas
 
@@ -60,6 +72,14 @@ los límites 0,35 y 0,70, ítems suspendidos y el conteo de vencidos.
 contratos contra los fakes (el fake de ítems respeta el único `(kind, source_id)` y el de dominio no deja que otro dueño sobrescriba una página); `tests/db/drizzle-study-engine-repositories.contract.test.ts`
 los corre contra Postgres y `tests/db/study-engine-schema.smoke.test.ts`
 prueba el relleno, las restricciones y la reversión de la migración 0009.
+Los casos de uso tienen pruebas propias con fakes y reloj fijo;
+`flashcard-review.integration.test.ts` recorre iniciar → calificar →
+terminar durante 3 días simulados (y el día 7, cuando vence la tercera
+revisión) y comprueba intervalos, EF, fechas, logs y dominio exactos.
+`tests/db/drizzle-study-unit-of-work.test.ts` prueba contra Postgres que una
+calificación escribe todo junto, revierte todo si falla un paso, rechaza el
+ítem de otro dueño y aplica SM-2 una sola vez ante dos calificaciones
+concurrentes de la misma tarjeta.
 
 ## Dependencias declaradas
 

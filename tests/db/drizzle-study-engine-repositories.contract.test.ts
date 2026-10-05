@@ -1,9 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { afterAll } from "vitest";
+import { runFlashcardSessionRepositoryContract } from "@/modules/study-engine/application/testing/flashcard-session-repository.contract";
 import { runPageMasteryRepositoryContract } from "@/modules/study-engine/application/testing/page-mastery-repository.contract";
 import { runReviewLogRepositoryContract } from "@/modules/study-engine/application/testing/review-log-repository.contract";
 import { runStudyItemRepositoryContract } from "@/modules/study-engine/application/testing/study-item-repository.contract";
 import { newStudyItem } from "@/modules/study-engine/domain/study-item";
+import { DrizzleFlashcardSessionRepository } from "@/modules/study-engine/infrastructure/drizzle-flashcard-session-repository";
 import { DrizzlePageMasteryRepository } from "@/modules/study-engine/infrastructure/drizzle-page-mastery-repository";
 import { DrizzleReviewLogRepository } from "@/modules/study-engine/infrastructure/drizzle-review-log-repository";
 import { DrizzleStudyItemRepository } from "@/modules/study-engine/infrastructure/drizzle-study-item-repository";
@@ -83,6 +85,11 @@ if (process.env.DATABASE_URL) {
 
   runPageMasteryRepositoryContract({
     createRepository: () => new DrizzlePageMasteryRepository(db),
+    context: () => ({ ...ownership, newPageId: newPage }),
+  });
+
+  runFlashcardSessionRepositoryContract({
+    createRepository: () => new DrizzleFlashcardSessionRepository(db),
     context: () => ({ ...ownership, newPageId: newPage }),
   });
 }

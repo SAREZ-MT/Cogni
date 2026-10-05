@@ -60,6 +60,19 @@ export function runReviewLogRepositoryContract(
       ]);
     });
 
+    it("breaks a reviewedAt tie by id, like the database", async () => {
+      const ctx = options.context();
+      const repo = options.createRepository();
+      const itemId = await ctx.newItemId();
+      const at = "2026-10-01T09:00:00.000Z";
+      const logs = [makeLog(ctx, itemId, at), makeLog(ctx, itemId, at)];
+      const [high, low] = [...logs].sort((a, b) => (a.id < b.id ? 1 : -1));
+      if (!high || !low) throw new Error("two logs expected");
+      await repo.append(high);
+      await repo.append(low);
+      expect(await repo.listByItem(itemId, ctx.ownerId)).toEqual([low, high]);
+    });
+
     it("lists only the given item's logs", async () => {
       const ctx = options.context();
       const repo = options.createRepository();
