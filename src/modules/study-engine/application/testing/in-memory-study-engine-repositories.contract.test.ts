@@ -19,9 +19,25 @@ const ownership = {
   newId: () => randomUUID(),
 };
 
+// The fake knows no pages: archived pages (and pages of archived notebooks)
+// are this set, which the repository reads through its page predicate.
+const inactivePages = new Set<string>();
+
 runStudyItemRepositoryContract({
-  createRepository: () => new InMemoryStudyItemRepository(),
-  context: () => ({ ...ownership, newPageId: async () => randomUUID() }),
+  createRepository: () =>
+    new InMemoryStudyItemRepository((pageId) => !inactivePages.has(pageId)),
+  context: () => ({
+    ...ownership,
+    newPageId: async () => randomUUID(),
+    archivePage: async (pageId) => {
+      inactivePages.add(pageId);
+    },
+    newPageInArchivedNotebook: async () => {
+      const pageId = randomUUID();
+      inactivePages.add(pageId);
+      return pageId;
+    },
+  }),
 });
 
 runReviewLogRepositoryContract({

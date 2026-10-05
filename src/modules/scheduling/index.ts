@@ -1,3 +1,4 @@
-// Public API of the "scheduling" module. Empty until Fase 7 — Calendario y Dashboard implements it.
-// No cross-module import may reach past this file (documento-maestro §5.3.5).
-export {};
+// Public API of the "scheduling" module: the "Hoy" view (documento-maestro
+// §3.5). No cross-module import may reach past this file (§5.3.5).
+export { type DueTodayPageView, listDueTodayAction } from "./actions";
+export * from "./domain";

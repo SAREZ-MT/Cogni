@@ -25,7 +25,7 @@ vista "Repasos de hoy" y el trabajo diario llegan en las tareas siguientes.
 | `page-mastery.ts` | `PageMastery`, el agregado persistido por página. |
 | `flashcard-session.ts` | `FlashcardSession` (`pageId` nulo en la sesión multipágina; abierta mientras `finishedAt` es nulo; solo cuenta repasos y respuestas "Otra vez", nunca tiempo) y `newFlashcardSession(...)`. |
 | `errors.ts` | Códigos `STUDY_ENGINE_ERROR`, entre ellos `ITEM_NOT_DUE`, `NOTHING_DUE`, `SESSION_NOT_FOUND` y `SESSION_FINISHED`. |
-| `study-item-repository.ts` | Puerto `StudyItemRepository`: `save` (inserta o reemplaza el estado SM-2), `findById`, `findBySource(kind, sourceId)`, `listDue(ownerId, now, pageId?)` (no suspendidos con `dueAt <= now`, el más antiguo primero), `listByPage` (incluye suspendidos), `suspend` (idempotente) y `lock` (bloqueo de fila hasta el fin de la unidad de trabajo). |
+| `study-item-repository.ts` | Puerto `StudyItemRepository`: `save` (inserta o reemplaza el estado SM-2), `findById`, `findBySource(kind, sourceId)`, `listDue(ownerId, now, pageId?)` (no suspendidos con `dueAt <= now`, el más antiguo primero; excluye páginas archivadas y páginas de cuadernos archivados), `listByPage` (incluye suspendidos), `suspend` (idempotente) y `lock` (bloqueo de fila hasta el fin de la unidad de trabajo). |
 | `review-log-repository.ts` | Puerto `ReviewLogRepository`: `append` y `listByItem` (solo inserción, el más antiguo primero). |
 | `flashcard-session-repository.ts` | Puerto `FlashcardSessionRepository`: `insert`, `findById`, `recordGrade` (incrementos atómicos) y `finish` (idempotente). |
 | `page-mastery-repository.ts` | Puerto `PageMasteryRepository`: `upsert` (una fila por página; conserva el primer `id`), `getByPage` y `listByOwner` (ordenado por `pageId`). |

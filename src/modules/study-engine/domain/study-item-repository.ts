@@ -15,7 +15,8 @@ export interface StudyItemRepository {
     ownerId: string,
   ): Promise<StudyItem | null>;
   // Non-suspended items with dueAt <= now, oldest due first; limited to one
-  // page when pageId is given.
+  // page when pageId is given. Items of archived pages and of pages in
+  // archived notebooks are never due.
   listDue(ownerId: string, now: Date, pageId?: string): Promise<StudyItem[]>;
   // Every item of the page, suspended ones included (computeMastery skips
   // them), ordered by creation.
