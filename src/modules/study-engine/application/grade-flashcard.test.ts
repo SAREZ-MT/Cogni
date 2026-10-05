@@ -285,3 +285,24 @@ describe("gradeFlashcard", () => {
     expect(await uow.reviewLogs.listByItem("a", OWNER)).toEqual([]);
   });
 });
+
+describe("gradeFlashcard atomicity", () => {
+  it("rolls back the item and its log when the session disappears after the first write", async () => {
+    const { uow, deps } = await setup();
+    await uow.studyItems.save(card("a"));
+    uow.sessions.recordGrade = async () => null;
+
+    const result = await gradeFlashcard(
+      { sessionId: "s1", itemId: "a", rating: "good" },
+      deps,
+      OWNER,
+    );
+
+    expect(!result.ok && result.error.code).toBe(
+      STUDY_ENGINE_ERROR.SESSION_NOT_FOUND,
+    );
+    expect(await uow.studyItems.findById("a", OWNER)).toEqual(card("a"));
+    expect(await uow.reviewLogs.listByItem("a", OWNER)).toEqual([]);
+    expect(await uow.pageMastery.getByPage("page-1", OWNER)).toBe(null);
+  });
+});

@@ -8,6 +8,16 @@ export class InMemoryFlashcardSessionRepository
 {
   private readonly rows = new Map<string, FlashcardSession>();
 
+  // Captures the rows; the returned function restores them (the in-memory
+  // unit of work's rollback).
+  snapshot(): () => void {
+    const saved = new Map(this.rows);
+    return () => {
+      this.rows.clear();
+      for (const [key, row] of saved) this.rows.set(key, row);
+    };
+  }
+
   async insert(session: FlashcardSession): Promise<void> {
     if (this.rows.has(session.id)) {
       throw new Error("duplicate flashcard session id");

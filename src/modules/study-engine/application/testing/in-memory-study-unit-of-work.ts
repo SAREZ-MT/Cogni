@@ -4,8 +4,9 @@ import { InMemoryPageMasteryRepository } from "./in-memory-page-mastery-reposito
 import { InMemoryReviewLogRepository } from "./in-memory-review-log-repository";
 import { InMemoryStudyItemRepository } from "./in-memory-study-item-repository";
 
-// Runs `work` directly against the fakes. It cannot roll back; atomicity is
-// proven against Postgres by tests/db/drizzle-study-unit-of-work.test.ts.
+// Runs `work` directly against the fakes and, like a transaction, restores
+// every fake to its state before the run when `work` throws. Postgres
+// atomicity is proven by tests/db/drizzle-study-unit-of-work.test.ts.
 export class InMemoryStudyUnitOfWork implements StudyUnitOfWork {
   runs = 0;
 
@@ -18,11 +19,22 @@ export class InMemoryStudyUnitOfWork implements StudyUnitOfWork {
 
   async run<T>(work: (repositories: StudyRepositories) => Promise<T>) {
     this.runs += 1;
-    return work({
-      studyItems: this.studyItems,
-      reviewLogs: this.reviewLogs,
-      pageMastery: this.pageMastery,
-      sessions: this.sessions,
-    });
+    const restores = [
+      this.studyItems.snapshot(),
+      this.reviewLogs.snapshot(),
+      this.pageMastery.snapshot(),
+      this.sessions.snapshot(),
+    ];
+    try {
+      return await work({
+        studyItems: this.studyItems,
+        reviewLogs: this.reviewLogs,
+        pageMastery: this.pageMastery,
+        sessions: this.sessions,
+      });
+    } catch (error) {
+      for (const restore of restores) restore();
+      throw error;
+    }
   }
 }

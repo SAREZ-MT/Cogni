@@ -7,6 +7,16 @@ import type { ReviewLogRepository } from "../../domain/review-log-repository";
 export class InMemoryReviewLogRepository implements ReviewLogRepository {
   private readonly rows: ReviewLog[] = [];
 
+  // Captures the rows; the returned function restores them (the in-memory
+  // unit of work's rollback).
+  snapshot(): () => void {
+    const saved = [...this.rows];
+    return () => {
+      this.rows.length = 0;
+      this.rows.push(...saved);
+    };
+  }
+
   async append(log: ReviewLog): Promise<void> {
     this.rows.push(log);
   }

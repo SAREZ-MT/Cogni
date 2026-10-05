@@ -11,7 +11,10 @@ import {
   gradeFlashcard,
   type MasteryRecomputeSummary,
   type PageAccess,
+  type RecordExamReviewsInput,
+  type RecordedExamReviews,
   recomputeAllPageMastery,
+  recordExamReviews,
   type StartedFlashcardSession,
   startFlashcardSession,
 } from "./application";
@@ -83,6 +86,28 @@ export function createFlashcardSessionsServerApi(deps: {
       ),
     finish: (ownerId, input) =>
       finishFlashcardSession(input, { sessions, clock }, ownerId),
+  };
+}
+
+// Feeds a finished exam's answers to the SM-2 engine (recordExamReviews).
+// `db` may be the exams module's open transaction: the reviews then run in
+// a savepoint of it and commit or roll back with the session's finish,
+// answers and page state. Create each root's study item with
+// createStudyItemRepository on the same transaction.
+export interface ExamReviewRecorder {
+  record(
+    input: RecordExamReviewsInput,
+  ): Promise<Result<RecordedExamReviews, DomainError>>;
+}
+
+export function createExamReviewRecorder(deps: {
+  db: DbExecutor;
+  ids: { next(): string };
+}): ExamReviewRecorder {
+  const { db, ids } = deps;
+  return {
+    record: (input) =>
+      recordExamReviews(input, { uow: new DrizzleStudyUnitOfWork(db), ids }),
   };
 }
 

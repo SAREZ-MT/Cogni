@@ -11,6 +11,7 @@ import {
   type FlashcardRating,
   type StudyItem,
 } from "../domain/study-item";
+import { runInUnitOfWork } from "./run-in-unit-of-work";
 import type { StudyUnitOfWork } from "./study-unit-of-work";
 
 export interface GradeFlashcardDeps {
@@ -28,13 +29,14 @@ export interface GradedFlashcard {
 // Grades one due flashcard of an open session (§7.2 button → quality,
 // §7.1 SM-2): the item's new state, its ReviewLog, the session counts and
 // the page's PageMastery (§7.3) are written in one unit of work. Every
-// check runs before the first write, so a refusal writes nothing.
+// check runs before the first write, and any refusal rolls the unit of
+// work back (runInUnitOfWork), so a refusal writes nothing.
 export async function gradeFlashcard(
   input: { sessionId: string; itemId: string; rating: FlashcardRating },
   deps: GradeFlashcardDeps,
   ownerId: string,
 ): Promise<Result<GradedFlashcard, DomainError>> {
-  return deps.uow.run(async (repos) => {
+  return runInUnitOfWork(deps.uow, async (repos) => {
     const now = deps.clock.now();
 
     const session = await repos.sessions.findById(input.sessionId, ownerId);

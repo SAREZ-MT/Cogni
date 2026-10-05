@@ -71,6 +71,13 @@
       "when": 1791137503755,
       "tag": "0009_study_engine",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791216494441,
+      "tag": "0010_exams",
+      "breakpoints": true
     }
   ]
 }

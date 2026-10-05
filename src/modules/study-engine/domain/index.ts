@@ -36,6 +36,8 @@ export type {
   StudiedPageReader,
 } from "./studied-page-reader";
 export {
+  EXAM_REVIEW_QUALITY,
+  examReviewQualityFor,
   FLASHCARD_QUALITY,
   type FlashcardRating,
   INITIAL_EASINESS,
