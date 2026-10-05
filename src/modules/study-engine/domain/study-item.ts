@@ -30,6 +30,16 @@ export const EXAM_REVIEW_QUALITY = {
   correct: 4,
 } as const satisfies Record<string, Quality>;
 
+// The quality an exam answer reviews its root's item with; null leaves
+// SM-2 untouched (correct but not due).
+export function examReviewQualityFor(answer: {
+  correct: boolean;
+  wasDue: boolean;
+}): Quality | null {
+  if (!answer.correct) return EXAM_REVIEW_QUALITY.wrong;
+  return answer.wasDue ? EXAM_REVIEW_QUALITY.correct : null;
+}
+
 // §6.1: easiness is >= 1.3 and starts at 2.5.
 export const MIN_EASINESS = 1.3;
 export const INITIAL_EASINESS = 2.5;

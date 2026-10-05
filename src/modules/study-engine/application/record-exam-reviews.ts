@@ -5,10 +5,11 @@ import { computeMastery } from "../domain/mastery";
 import type { PageMastery } from "../domain/page-mastery";
 import { applySm2 } from "../domain/sm2";
 import {
-  EXAM_REVIEW_QUALITY,
+  examReviewQualityFor,
   type Quality,
   type StudyItem,
 } from "../domain/study-item";
+import { runInUnitOfWork } from "./run-in-unit-of-work";
 import type { StudyUnitOfWork } from "./study-unit-of-work";
 
 export interface ExamReviewAnswer {
@@ -43,19 +44,22 @@ export interface RecordedExamReviews {
 
 // Feeds a finished exam to the SM-2 engine (§7.2, user decision
 // 2026-10-05). Exam-neutral: the caller passes { rootId, correct } and the
-// quality mapping lives here (EXAM_REVIEW_QUALITY):
+// quality mapping lives here (examReviewQualityFor):
 //   wrong            → q = 1, due or not (the page shows in "Hoy" tomorrow)
 //   correct and due  → q = 4
 //   correct, not due → skipped (no review, no log)
 // Suspended items (retired roots) are skipped. Each review writes the item
 // and a ReviewLog(sessionKind "exam"); the page mastery is recomputed once.
-// All of it is one unit of work, so a failure rolls everything back.
+// All of it is one unit of work, and every refusal rolls it back
+// (runInUnitOfWork), so a failure writes nothing.
 //
 // Every root must already own its study item: exams creates it together
 // with the root question (T4/T5). A missing one (or another owner's,
 // another page's or a non-exam item) is ITEM_NOT_FOUND and nothing is
-// written. Calling it twice for one session would review twice; the caller
-// runs it once, in the same transaction that finishes the session.
+// written. A session whose answers were already recorded (it has exam
+// review logs) is EXAM_SESSION_ALREADY_RECORDED, checked inside the same
+// unit of work; the caller still runs it in the transaction that finishes
+// the session, which serializes concurrent finishes of one session.
 export async function recordExamReviews(
   input: RecordExamReviewsInput,
   deps: RecordExamReviewsDeps,
@@ -69,7 +73,7 @@ export async function recordExamReviews(
     );
   }
 
-  return deps.uow.run(async (repos) => {
+  return runInUnitOfWork(deps.uow, async (repos) => {
     // Resolve every root's item before writing anything.
     const itemIdByRoot = new Map<string, string>();
     for (const { rootId } of input.answers) {
@@ -96,6 +100,23 @@ export async function recordExamReviews(
       locked.set(id, item);
     }
 
+    // After the locks: a concurrent recording of the same answers waits for
+    // them and then sees the committed logs.
+    const recorded = await repos.reviewLogs.listBySession(
+      "exam",
+      input.sessionId,
+      ownerId,
+    );
+    if (recorded.length > 0) {
+      return fail(
+        STUDY_ENGINE_ERROR.EXAM_SESSION_ALREADY_RECORDED,
+        input.sessionId,
+      );
+    }
+
+    // Compute every review before the first write.
+    const reviews: { before: StudyItem; after: StudyItem; quality: Quality }[] =
+      [];
     const reviewedRootIds: string[] = [];
     const skippedRootIds: string[] = [];
     for (const answer of input.answers) {
@@ -108,21 +129,28 @@ export async function recordExamReviews(
       }
       const next = applySm2(item, quality, now);
       if (!next.ok) return next;
-      const reviewed: StudyItem = { ...item, ...next.value, updatedAt: now };
-      await repos.studyItems.save(reviewed);
+      reviews.push({
+        before: item,
+        after: { ...item, ...next.value, updatedAt: now },
+        quality,
+      });
+      reviewedRootIds.push(answer.rootId);
+    }
+
+    for (const { before, after, quality } of reviews) {
+      await repos.studyItems.save(after);
       await repos.reviewLogs.append({
         id: deps.ids.next(),
         ownerId,
-        itemId: item.id,
+        itemId: before.id,
         quality,
         reviewedAt: now,
-        intervalBefore: item.intervalDays,
-        intervalAfter: reviewed.intervalDays,
-        easinessAfter: reviewed.easiness,
+        intervalBefore: before.intervalDays,
+        intervalAfter: after.intervalDays,
+        easinessAfter: after.easiness,
         sessionKind: "exam",
         sessionId: input.sessionId,
       });
-      reviewedRootIds.push(answer.rootId);
     }
 
     const snapshot = computeMastery(
@@ -150,9 +178,10 @@ function qualityFor(
   now: Date,
 ): Quality | null {
   if (item.suspendedAt !== null) return null;
-  if (!correct) return EXAM_REVIEW_QUALITY.wrong;
-  if (item.dueAt.getTime() <= now.getTime()) return EXAM_REVIEW_QUALITY.correct;
-  return null;
+  return examReviewQualityFor({
+    correct,
+    wasDue: item.dueAt.getTime() <= now.getTime(),
+  });
 }
 
 function fail(code: string, message: string) {

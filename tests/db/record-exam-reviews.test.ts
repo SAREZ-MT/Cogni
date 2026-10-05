@@ -3,8 +3,13 @@ import { eq } from "drizzle-orm";
 import { afterAll, describe, expect, it } from "vitest";
 import { createExamReviewRecorder } from "@/modules/study-engine";
 import { recordExamReviews } from "@/modules/study-engine/application/record-exam-reviews";
+import { runInUnitOfWork } from "@/modules/study-engine/application/run-in-unit-of-work";
 import type { StudyUnitOfWork } from "@/modules/study-engine/application/study-unit-of-work";
-import { newStudyItem } from "@/modules/study-engine/domain/study-item";
+import { STUDY_ENGINE_ERROR } from "@/modules/study-engine/domain/errors";
+import {
+  newStudyItem,
+  type StudyItem,
+} from "@/modules/study-engine/domain/study-item";
 import { DrizzleStudyItemRepository } from "@/modules/study-engine/infrastructure/drizzle-study-item-repository";
 import { DrizzleStudyUnitOfWork } from "@/modules/study-engine/infrastructure/drizzle-study-unit-of-work";
 import {
@@ -15,6 +20,8 @@ import {
   reviewLogs,
   studyItems,
 } from "@/shared/db/schema";
+import { DomainError } from "@/shared/kernel/domain-error";
+import { err } from "@/shared/kernel/result";
 import { createTestDb } from "./helpers/test-db";
 import { createTestOwner, deleteTestOwner } from "./helpers/test-owner";
 
@@ -166,7 +173,7 @@ if (process.env.DATABASE_URL) {
     });
 
     it("rolls back with the caller's transaction it joined", async () => {
-      const { pageId, roots, sessionId } = await fixture();
+      const { pageId, roots, items, sessionId } = await fixture();
 
       await expect(
         db.transaction(async (tx) => {
@@ -188,6 +195,87 @@ if (process.env.DATABASE_URL) {
       const after = await stored(pageId, sessionId);
       expect(after.logs).toEqual([]);
       expect(after.mastery).toEqual([]);
+      // The items keep their pre-exam SM-2 state.
+      const byId = <T extends { id: string }>(rows: T[]) =>
+        [...rows].sort((a, b) => (a.id < b.id ? -1 : 1));
+      expect(byId(after.items)).toEqual(
+        byId(items).map((item) =>
+          expect.objectContaining({
+            id: item.id,
+            easiness: item.easiness,
+            intervalDays: item.intervalDays,
+            repetitions: item.repetitions,
+            lapses: item.lapses,
+            dueAt: item.dueAt,
+            lastQuality: item.lastQuality,
+            lastReviewedAt: item.lastReviewedAt,
+          }),
+        ),
+      );
+    });
+
+    it("refuses a session already recorded and writes nothing more", async () => {
+      const { pageId, roots, sessionId } = await fixture();
+      const recorder = createExamReviewRecorder({ db, ids });
+      const first = await recorder.record({
+        ownerId: owner.id,
+        sessionId,
+        pageId,
+        answers: [{ rootId: roots[0] as string, correct: false }],
+        now: NOW,
+      });
+      expect(first.ok).toBe(true);
+      const before = await stored(pageId, sessionId);
+
+      const again = await recorder.record({
+        ownerId: owner.id,
+        sessionId,
+        pageId,
+        answers: [{ rootId: roots[1] as string, correct: false }],
+        now: new Date(NOW.getTime() + 60_000),
+      });
+
+      expect(!again.ok && again.error.code).toBe(
+        STUDY_ENGINE_ERROR.EXAM_SESSION_ALREADY_RECORDED,
+      );
+      expect(await stored(pageId, sessionId)).toEqual(before);
+    });
+
+    it("leaves no partial rows when a work returns err after writing", async () => {
+      const { pageId, items, sessionId } = await fixture();
+      const target = items[0] as StudyItem;
+
+      const result = await runInUnitOfWork(
+        new DrizzleStudyUnitOfWork(db),
+        async (repos) => {
+          await repos.studyItems.save({
+            ...target,
+            intervalDays: 6,
+            lastReviewedAt: NOW,
+            updatedAt: NOW,
+          });
+          await repos.reviewLogs.append({
+            id: randomUUID(),
+            ownerId: owner.id,
+            itemId: target.id,
+            quality: 1,
+            reviewedAt: NOW,
+            intervalBefore: 0,
+            intervalAfter: 6,
+            easinessAfter: 2.5,
+            sessionKind: "exam",
+            sessionId,
+          });
+          return err(new DomainError("LATE_REFUSAL", "refused after writing"));
+        },
+      );
+
+      expect(!result.ok && result.error.code).toBe("LATE_REFUSAL");
+      const after = await stored(pageId, sessionId);
+      expect(after.logs).toEqual([]);
+      expect(after.items.every((item) => item.lastReviewedAt === null)).toBe(
+        true,
+      );
     });
   });
 }

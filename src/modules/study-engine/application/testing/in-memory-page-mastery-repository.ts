@@ -6,6 +6,16 @@ import type { PageMasteryRepository } from "../../domain/page-mastery-repository
 export class InMemoryPageMasteryRepository implements PageMasteryRepository {
   private readonly rows = new Map<string, PageMastery>();
 
+  // Captures the rows; the returned function restores them (the in-memory
+  // unit of work's rollback).
+  snapshot(): () => void {
+    const saved = new Map(this.rows);
+    return () => {
+      this.rows.clear();
+      for (const [key, row] of saved) this.rows.set(key, row);
+    };
+  }
+
   async upsert(mastery: PageMastery): Promise<void> {
     const existing = this.rows.get(mastery.pageId);
     if (existing && existing.ownerId !== mastery.ownerId) return;

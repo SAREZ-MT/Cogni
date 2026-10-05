@@ -303,3 +303,70 @@ describe("recordExamReviews", () => {
     expect(mastery.upserts).toBe(1);
   });
 });
+
+describe("recordExamReviews idempotency", () => {
+  it("refuses a session that already has exam review logs and writes nothing", async () => {
+    const { uow, deps, mastery } = await setup([
+      rootItem("r1", notDue),
+      rootItem("r2", notDue),
+    ]);
+    const first = await recordExamReviews(
+      input([{ rootId: "r1", correct: false }]),
+      deps,
+    );
+    expect(first.ok).toBe(true);
+    const r2Before = await uow.studyItems.findById("item-r2", OWNER);
+    const upsertsBefore = mastery.upserts;
+
+    const again = await recordExamReviews(
+      input([{ rootId: "r2", correct: false }]),
+      deps,
+    );
+
+    expect(!again.ok && again.error.code).toBe(
+      STUDY_ENGINE_ERROR.EXAM_SESSION_ALREADY_RECORDED,
+    );
+    expect(await uow.studyItems.findById("item-r2", OWNER)).toEqual(r2Before);
+    expect(
+      await uow.reviewLogs.listBySession("exam", SESSION, OWNER),
+    ).toHaveLength(1);
+    expect(mastery.upserts).toBe(upsertsBefore);
+  });
+
+  it("checks the session inside the unit of work", async () => {
+    const { uow, deps } = await setup([rootItem("r1")]);
+    const seen: string[] = [];
+    const listBySession = uow.reviewLogs.listBySession.bind(uow.reviewLogs);
+    uow.reviewLogs.listBySession = async (...args) => {
+      seen.push(`runs:${uow.runs}`);
+      return listBySession(...args);
+    };
+
+    await recordExamReviews(input([{ rootId: "r1", correct: true }]), deps);
+
+    expect(seen).toEqual(["runs:1"]);
+  });
+
+  it("ignores flashcard logs that share the session id", async () => {
+    const { uow, deps } = await setup([rootItem("r1")]);
+    await uow.reviewLogs.append({
+      id: "flash-log",
+      ownerId: OWNER,
+      itemId: "item-other",
+      quality: 4,
+      reviewedAt: CREATED,
+      intervalBefore: 0,
+      intervalAfter: 1,
+      easinessAfter: 2.5,
+      sessionKind: "flashcards",
+      sessionId: SESSION,
+    });
+
+    const result = await recordExamReviews(
+      input([{ rootId: "r1", correct: true }]),
+      deps,
+    );
+
+    expect(result.ok).toBe(true);
+  });
+});

@@ -13,6 +13,16 @@ export class InMemoryStudyItemRepository implements StudyItemRepository {
     private readonly isPageActive: (pageId: string) => boolean = () => true,
   ) {}
 
+  // Captures the rows; the returned function restores them (the in-memory
+  // unit of work's rollback).
+  snapshot(): () => void {
+    const saved = new Map(this.rows);
+    return () => {
+      this.rows.clear();
+      for (const [key, row] of saved) this.rows.set(key, row);
+    };
+  }
+
   async save(item: StudyItem): Promise<void> {
     const existing = this.rows.get(item.id);
     if (existing && existing.ownerId !== item.ownerId) return;
