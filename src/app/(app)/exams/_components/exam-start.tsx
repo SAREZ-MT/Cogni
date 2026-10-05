@@ -30,13 +30,18 @@ const ERROR_COPY: Record<string, string> = {
   PAGE_NOT_FOUND: "Esta página ya no existe.",
 };
 
+const RETAKE_NEEDS_QUESTIONS =
+  "Agrega o genera preguntas para repetir el examen.";
+const RETAKE_CLEARED =
+  "Retiraste las preguntas que fallaste, así que no queda nada por repetir. Ya puedes rendir un examen normal.";
+
 // Spanish copy per ActionError code of startExamRetakeAction.
 const RETAKE_ERROR_COPY: Record<string, string> = {
   AI_DAILY_LIMIT_REACHED:
     "Llegaste al límite diario de generaciones con IA. Podrás repetir el examen mañana.",
   EXAMS_RETAKE_VARIANT_MISSING:
     "La IA no está disponible ahora y no pudimos reformular las preguntas. Intenta de nuevo más tarde.",
-  EXAMS_NOT_ENOUGH_QUESTIONS: `Esta página necesita al menos ${EXAM_MIN_QUESTIONS} preguntas para repetir el examen.`,
+  EXAMS_NOT_ENOUGH_QUESTIONS: RETAKE_NEEDS_QUESTIONS,
   EXAMS_NO_RETAKE_PENDING: "Esta página ya no tiene una repetición pendiente.",
   EXAMS_SESSION_REQUIRED: "Tu sesión expiró. Inicia sesión de nuevo.",
   PAGE_NOT_FOUND: "Esta página ya no existe.",
@@ -64,7 +69,11 @@ export interface ExamStartProps {
 // (§7.5) the normal exam stays blocked and "Repetir examen" opens the
 // retake instead (startExamRetakeAction): N starts at max(10, failed roots)
 // so every failed concept is retaken, and the AI reformulation of the
-// failed questions shows a generating state.
+// failed questions shows a generating state. A retake that cannot reach 10
+// questions asks for more (Preguntas, or Generar on the page's Examen
+// card) instead of calling the AI; a retake whose failed questions were
+// all retired (failedRootCount 0) offers "Continuar", which clears it and
+// refreshes into the normal exam.
 export function ExamStart({
   pageTitle,
   pageHref,
@@ -94,8 +103,11 @@ export function ExamStart({
   );
   const [retakeCount, setRetakeCount] = useState(retakeMin);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [starting, startTransition] = useTransition();
   const enough = activeQuestionCount >= EXAM_MIN_QUESTIONS;
+  // Every failed question was retired since the exam: nothing to retake.
+  const retakeEmpty = retakePending && failedRootCount === 0;
 
   function start() {
     setError(null);
@@ -116,6 +128,7 @@ export function ExamStart({
 
   function retake() {
     setError(null);
+    setNotice(null);
     startTransition(async () => {
       try {
         const result = await startExamRetakeAction({
@@ -124,8 +137,14 @@ export function ExamStart({
         });
         if (!result.ok) {
           setError(RETAKE_ERROR_COPY[result.error.code] ?? RETAKE_FAILURE);
+          // The page lost questions meanwhile: refresh into the
+          // add-questions state.
+          if (result.error.code === "EXAMS_NOT_ENOUGH_QUESTIONS") {
+            router.refresh();
+          }
           return;
         }
+        if (result.value.kind === "cleared") setNotice(RETAKE_CLEARED);
       } catch {
         setError(RETAKE_FAILURE);
         return;
@@ -155,7 +174,43 @@ export function ExamStart({
           </p>
         </div>
 
-        {retakePending ? (
+        {retakeEmpty ? (
+          <>
+            <StatusBanner
+              data-testid="exam-retake"
+              tone="pending"
+              title="No queda nada por repetir"
+              description="Retiraste las preguntas que fallaste en el último examen. Continúa para volver al examen normal."
+            />
+            <Button
+              type="button"
+              onClick={retake}
+              disabled={starting}
+              data-testid="retake-exam-button"
+              className="min-w-[200px]"
+            >
+              <Play aria-hidden="true" size={15} strokeWidth={2} />
+              {starting ? "Preparando…" : "Continuar"}
+            </Button>
+          </>
+        ) : retakePending && !enough ? (
+          <StatusBanner
+            data-testid="retake-not-enough"
+            tone="pending"
+            title={RETAKE_NEEDS_QUESTIONS}
+            description={`Una repetición necesita al menos ${EXAM_MIN_QUESTIONS} preguntas y esta página tiene ${activeQuestionCount}.`}
+            action={
+              <div className="flex flex-wrap gap-2">
+                <Button asChild size="sm" variant="outline">
+                  <Link href={questionsHref}>Ver preguntas</Link>
+                </Button>
+                <Button asChild size="sm" variant="outline">
+                  <Link href={pageHref}>Generar preguntas</Link>
+                </Button>
+              </div>
+            }
+          />
+        ) : retakePending ? (
           <>
             <StatusBanner
               data-testid="exam-retake"
@@ -237,6 +292,14 @@ export function ExamStart({
           />
         )}
 
+        {notice && (
+          <output
+            data-testid="exam-start-notice"
+            className="block text-[13px] text-fg-muted"
+          >
+            {notice}
+          </output>
+        )}
         {error && (
           <p
             role="alert"

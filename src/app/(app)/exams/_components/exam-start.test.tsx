@@ -117,13 +117,25 @@ describe("ExamStart", () => {
     expect(screen.getByTestId("retake-exam-button")).toHaveTextContent(
       "Generando preguntas nuevas…",
     );
-    finish(ok({ sessionId: "r1", resumed: false, remainingToday: 3 }));
+    finish(
+      ok({
+        kind: "started",
+        sessionId: "r1",
+        resumed: false,
+        remainingToday: 3,
+      }),
+    );
     await vi.waitFor(() => expect(refresh).toHaveBeenCalled());
   });
 
   it("starts a retake of 10 when fewer than 10 roots failed", async () => {
     startExamRetakeAction.mockResolvedValue(
-      ok({ sessionId: "r1", resumed: false, remainingToday: 3 }),
+      ok({
+        kind: "started",
+        sessionId: "r1",
+        resumed: false,
+        remainingToday: 3,
+      }),
     );
     const user = renderStart({ retakePending: true, failedRootCount: 4 });
     expect(screen.getByTestId("exam-retake")).toHaveTextContent(
@@ -168,5 +180,55 @@ describe("ExamStart", () => {
       "al menos 10 preguntas",
     );
     expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it("asks for more questions instead of a retake that cannot reach 10", () => {
+    renderStart({
+      retakePending: true,
+      failedRootCount: 4,
+      activeQuestionCount: 9,
+    });
+    expect(screen.getByTestId("retake-not-enough")).toHaveTextContent(
+      "Agrega o genera preguntas para repetir el examen",
+    );
+    expect(screen.getByRole("link", { name: "Ver preguntas" })).toHaveAttribute(
+      "href",
+      "/exams/nb/pg/preguntas",
+    );
+    expect(
+      screen.getByRole("link", { name: "Generar preguntas" }),
+    ).toHaveAttribute("href", "/notebooks/nb/pages/pg");
+    expect(screen.queryByTestId("retake-exam-button")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("start-exam-button")).not.toBeInTheDocument();
+  });
+
+  it("refreshes into the add-questions state when the retake is refused for lack of questions", async () => {
+    startExamRetakeAction.mockResolvedValue(
+      err({ code: "EXAMS_NOT_ENOUGH_QUESTIONS", message: "x" }),
+    );
+    const user = renderStart({ retakePending: true, failedRootCount: 4 });
+    await user.click(screen.getByTestId("retake-exam-button"));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Agrega o genera preguntas para repetir el examen",
+    );
+    expect(refresh).toHaveBeenCalled();
+  });
+
+  it("explains a retake whose failed questions were all retired and returns to the normal exam", async () => {
+    startExamRetakeAction.mockResolvedValue(ok({ kind: "cleared" }));
+    const user = renderStart({ retakePending: true, failedRootCount: 0 });
+    expect(screen.getByTestId("exam-retake")).toHaveTextContent(
+      "Retiraste las preguntas que fallaste",
+    );
+    expect(screen.queryByTestId("retake-count")).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("retake-exam-button"));
+    expect(startExamRetakeAction).toHaveBeenCalledWith({
+      pageId: PAGE_ID,
+      count: 10,
+    });
+    expect(await screen.findByTestId("exam-start-notice")).toHaveTextContent(
+      "Ya puedes rendir un examen normal",
+    );
+    expect(refresh).toHaveBeenCalled();
   });
 });

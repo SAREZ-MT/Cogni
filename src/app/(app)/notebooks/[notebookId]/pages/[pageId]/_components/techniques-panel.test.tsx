@@ -394,12 +394,16 @@ describe("TechniquesPanel", () => {
   });
 
   describe("Rendir examen (exam card)", () => {
-    function start(activeQuestionCount: number, retakePending = false) {
+    function start(
+      activeQuestionCount: number,
+      retakePending = false,
+      failedRootCount = retakePending ? 4 : 0,
+    ) {
       getExamStartAction.mockResolvedValue(
         ok({
           activeQuestionCount,
           retakePending,
-          failedRootCount: retakePending ? 4 : 0,
+          failedRootCount,
           openSessionId: null,
           openRetakeSessionId: null,
           lastFinishedSessionId: null,
@@ -444,6 +448,34 @@ describe("TechniquesPanel", () => {
       expect(
         screen.queryByRole("link", { name: /Rendir examen/ }),
       ).not.toBeInTheDocument();
+    });
+
+    it("asks for more questions instead of a retake that cannot reach 10", async () => {
+      start(9, true);
+      await renderPanel(false);
+
+      expect(
+        await screen.findByTestId("exam-retake-needs-questions"),
+      ).toHaveTextContent("Agrega o genera preguntas para repetir el examen.");
+      expect(
+        screen.queryByTestId("retake-exam-button"),
+      ).not.toBeInTheDocument();
+      expect(screen.getByTestId("generate-exam-questions")).toBeInTheDocument();
+    });
+
+    it("points to the exam to continue when every failed question was retired", async () => {
+      start(12, true, 0);
+      await renderPanel(false);
+
+      const retake = await screen.findByTestId("retake-exam-button");
+      expect(retake).toHaveTextContent("Continuar");
+      expect(retake).toHaveAttribute(
+        "href",
+        `/exams/${NOTEBOOK_ID}/${PAGE_ID}`,
+      );
+      expect(screen.getByTestId("exam-retake-note")).toHaveTextContent(
+        "Retiraste las preguntas que fallaste",
+      );
     });
 
     it("re-reads the question count after a generation", async () => {
