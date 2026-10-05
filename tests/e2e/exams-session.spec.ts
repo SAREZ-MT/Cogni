@@ -109,8 +109,11 @@ async function takeExam(
 test.describe("exam session", () => {
   test.skip(!hasSupabaseEnv, "Supabase env (cogni-dev) is not configured");
 
-  test.beforeEach(async ({ page, verifiedUser }) => {
-    await signIn(page, verifiedUser);
+  // A test-scoped user: the fake AI daily limit (6 per owner, in server
+  // memory) would otherwise be shared with every AI-spending spec in the
+  // worker and run out depending on spec order.
+  test.beforeEach(async ({ page, freshUser }) => {
+    await signIn(page, freshUser);
   });
 
   test("takes a 10-question exam, fails it and schedules the page for tomorrow", async ({

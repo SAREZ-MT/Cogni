@@ -88,8 +88,11 @@ async function answerSession(
 test.describe("exam retake", () => {
   test.skip(!hasSupabaseEnv, "Supabase env (cogni-dev) is not configured");
 
-  test.beforeEach(async ({ page, verifiedUser }) => {
-    await signIn(page, verifiedUser);
+  // A test-scoped user: the fake AI daily limit (6 per owner, in server
+  // memory) would otherwise be shared with every AI-spending spec in the
+  // worker and run out depending on spec order.
+  test.beforeEach(async ({ page, freshUser }) => {
+    await signIn(page, freshUser);
   });
 
   test("retakes a failed exam with reformulated questions about the failed concepts and passes it", async ({
