@@ -11,6 +11,13 @@ export {
   recomputeAllPageMastery,
 } from "./recompute-all-page-mastery";
 export {
+  type ExamReviewAnswer,
+  type RecordExamReviewsDeps,
+  type RecordExamReviewsInput,
+  type RecordedExamReviews,
+  recordExamReviews,
+} from "./record-exam-reviews";
+export {
   type DueFlashcard,
   type PageAccess,
   type StartedFlashcardSession,

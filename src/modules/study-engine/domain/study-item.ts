@@ -19,6 +19,17 @@ export const FLASHCARD_QUALITY = {
 // The four flashcard buttons: Otra vez, Difícil, Bien, Fácil.
 export type FlashcardRating = keyof typeof FLASHCARD_QUALITY;
 
+// §7.2 and the user decision of 2026-10-05: a wrong exam answer reviews the
+// root's item with q = 1 whether or not it was due; a correct one reviews it
+// with q = 4 only when it was due, and otherwise leaves SM-2 untouched (no
+// interval inflation from repeated attempts). Mirrors examQualityFor in the
+// exams module, which study-engine must not import
+// (study-engine-knows-no-technique).
+export const EXAM_REVIEW_QUALITY = {
+  wrong: 1,
+  correct: 4,
+} as const satisfies Record<string, Quality>;
+
 // §6.1: easiness is >= 1.3 and starts at 2.5.
 export const MIN_EASINESS = 1.3;
 export const INITIAL_EASINESS = 2.5;

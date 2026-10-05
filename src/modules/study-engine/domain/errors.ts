@@ -9,6 +9,8 @@ export const STUDY_ENGINE_ERROR = {
   ITEM_NOT_DUE: "STUDY_ENGINE_ITEM_NOT_DUE",
   // A review session was requested but no item is due.
   NOTHING_DUE: "STUDY_ENGINE_NOTHING_DUE",
+  // A batch of exam reviews answers one root twice.
+  INVALID_REVIEW_BATCH: "STUDY_ENGINE_INVALID_REVIEW_BATCH",
   SESSION_NOT_FOUND: "STUDY_ENGINE_SESSION_NOT_FOUND",
   SESSION_FINISHED: "STUDY_ENGINE_SESSION_FINISHED",
 } as const;
