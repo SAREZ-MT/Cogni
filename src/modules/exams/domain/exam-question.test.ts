@@ -142,7 +142,7 @@ describe("newVariant", () => {
   it("keeps the root, the concept and the owner, and points at the replaced question", () => {
     const original = createdQuestion();
 
-    const result = newVariant(original, variantInput, later);
+    const result = newVariant(original, [], variantInput, later);
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -164,11 +164,12 @@ describe("newVariant", () => {
 
   it("keeps the original root across a chain of variants", () => {
     const original = createdQuestion();
-    const first = newVariant(original, variantInput, later);
+    const first = newVariant(original, [], variantInput, later);
     if (!first.ok) throw first.error;
 
     const second = newVariant(
       first.value,
+      [original],
       { ...variantInput, id: "q-3", stem: "¿Qué orgánulo tiene crestas?" },
       later,
     );
@@ -184,6 +185,7 @@ describe("newVariant", () => {
 
     const result = newVariant(
       original,
+      [],
       { ...variantInput, stem: "  ¿QUÉ   organelo produce atp? " },
       later,
     );
@@ -191,12 +193,68 @@ describe("newVariant", () => {
     expectErrorCode(result, EXAM_ERROR.VARIANT_SAME_WORDING);
   });
 
+  describe("across a chain original → v1 → v2", () => {
+    function firstVariant(original: ExamQuestion) {
+      const result = newVariant(original, [original], variantInput, later);
+      if (!result.ok) throw result.error;
+      return result.value;
+    }
+
+    it.each([
+      ["the exact original wording", "¿Qué organelo produce ATP?"],
+      ["a different case", "¿qué ORGANELO produce atp?"],
+      ["extra spaces", "  ¿Qué   organelo\tproduce ATP?  "],
+      ["no question marks", "Qué organelo produce ATP"],
+      ["other trailing punctuation", "¿Qué organelo produce ATP?..."],
+    ])("refuses %s in v2", (_label, stem) => {
+      const original = createdQuestion();
+      const v1 = firstVariant(original);
+
+      const result = newVariant(
+        v1,
+        [original, v1],
+        { ...variantInput, id: "q-3", stem },
+        later,
+      );
+
+      expectErrorCode(result, EXAM_ERROR.VARIANT_SAME_WORDING);
+    });
+
+    it("refuses the original wording even when the lineage omits the replaced question", () => {
+      const original = createdQuestion();
+      const v1 = firstVariant(original);
+
+      const result = newVariant(
+        v1,
+        [original],
+        { ...variantInput, id: "q-3", stem: "¿Qué organelo produce ATP" },
+        later,
+      );
+
+      expectErrorCode(result, EXAM_ERROR.VARIANT_SAME_WORDING);
+    });
+
+    it("refuses a lineage holding a question of another root", () => {
+      const original = createdQuestion();
+      const other = createdQuestion({ id: "q-9", stem: "¿Otra pregunta?" });
+
+      const result = newVariant(
+        original,
+        [original, other],
+        variantInput,
+        later,
+      );
+
+      expectErrorCode(result, EXAM_ERROR.INVALID_QUESTION);
+    });
+  });
+
   it("refuses to vary a retired question", () => {
     const retired = retireExamQuestion(createdQuestion(), later);
     if (!retired.ok) throw retired.error;
 
     expectErrorCode(
-      newVariant(retired.value, variantInput, later),
+      newVariant(retired.value, [], variantInput, later),
       EXAM_ERROR.QUESTION_RETIRED,
     );
   });
@@ -205,6 +263,7 @@ describe("newVariant", () => {
     expectErrorCode(
       newVariant(
         createdQuestion(),
+        [],
         { ...variantInput, correctIndex: 7 },
         later,
       ),

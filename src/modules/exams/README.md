@@ -17,16 +17,23 @@ feature document is `odd/tasks/phase-5-exams.md`.
 - `exam-question.ts`: `ExamQuestion` (4 distinct options, one correct index,
   `concept`, lineage `rootId`/`variantOf`, origin `ai | manual | ai_variant`).
   `newExamQuestion` creates an original (its own root), `newVariant` the AI
-  reformulation of a retake (same root and concept, never the same wording),
+  reformulation of a retake (same root and concept, never any earlier wording
+  of the root's lineage — the caller passes that lineage; wordings compare
+  ignoring case, spaces, `¿ ¡` and trailing punctuation),
   `editExamQuestion` edits in place keeping the root, `retireExamQuestion`
   retires it. A retired question cannot be edited, varied or retired again.
 - `exam-session.ts`: `ExamSession`, `ExamAnswer` (`gradeExamAnswer` corrects
   deterministically), `ExamPageState` and the constants `EXAM_MIN_QUESTIONS`
   (10), `EXAM_MAX_QUESTIONS` (30), `EXAM_DEFAULT_QUESTIONS` (10) and
-  `EXAM_PASS_THRESHOLD` (0.70). `examSessionDurationMs` derives the time
-  shown on the results screen (the only place a time metric is shown).
+  `EXAM_PASS_THRESHOLD` (0.70). `finishExamSession` derives total, correct,
+  score and passed from the session's answers (`tallyAnswers`: one answer per
+  question and per root, none from another session, at most N) and refuses a
+  finish before the start or a second finish. `examSessionDurationMs` derives
+  the time shown on the results screen (the only place a time metric is
+  shown).
 - `scoring.ts`: `scoreExam` — pass iff score ≥ 0.70, decided with integer
-  arithmetic. A failure leaves a retake pending with the failed roots and
+  arithmetic (`isPassingScore`); duplicate answers are refused
+  (`EXAMS_DUPLICATE_ANSWER`). A failure leaves a retake pending with the failed roots and
   keeps the last pass; a pass clears it and records the session.
 - `composition.ts`: `composeExam` orders roots failed last time first, then
   due roots (oldest first), then least recently seen (never seen first), one
@@ -48,8 +55,9 @@ feature document is `odd/tasks/phase-5-exams.md`.
   (`EXAMS_INVALID_QUESTION_COUNT`), so every failed concept is always
   retaken; the UI should offer `max(10, failed roots)` as the minimum.
 - **Blocked retake.** A failed root without a fresh variant, or whose variant
-  is a wording already shown, blocks the retake
-  (`EXAMS_RETAKE_VARIANT_MISSING`); the original wording is never reused.
+  is a question already shown, blocks the retake
+  (`EXAMS_RETAKE_VARIANT_MISSING`). No earlier wording of the root is ever
+  reused: `newVariant` refuses one (`EXAMS_VARIANT_SAME_WORDING`).
 
 ## Dependencies
 

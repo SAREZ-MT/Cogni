@@ -10,6 +10,14 @@ export const EXAM_MAX_QUESTIONS = 30;
 export const EXAM_DEFAULT_QUESTIONS = 10;
 export const EXAM_PASS_THRESHOLD = 0.7;
 
+// The threshold as whole percent, so a pass is decided with integers and
+// never by a float product such as 0.7 * 30 = 20.999… (§7.5: >= 0.70).
+const PASS_PERCENT = Math.round(EXAM_PASS_THRESHOLD * 100);
+
+export function isPassingScore(correct: number, total: number): boolean {
+  return correct * 100 >= total * PASS_PERCENT;
+}
+
 export function isValidQuestionCount(count: number): boolean {
   return (
     Number.isInteger(count) &&
@@ -45,13 +53,6 @@ export interface NewExamSessionInput {
   retakeOfSessionId: string | null;
 }
 
-export interface ExamSessionResult {
-  total: number;
-  correct: number;
-  score: number;
-  passed: boolean;
-}
-
 export function newExamSession(
   input: NewExamSessionInput,
   now: Date,
@@ -71,9 +72,15 @@ export function newExamSession(
   });
 }
 
+// Closes the session with the result derived from its answers, so the
+// stored total, correct, score and passed can never disagree. Refuses a
+// session already finished, no answers, an answer of another session, two
+// answers to one question or root, more answers than requested questions
+// (fewer is fine: the exam holds min(N, roots)), and a finish before the
+// start.
 export function finishExamSession(
   session: ExamSession,
-  result: ExamSessionResult,
+  answers: readonly ExamAnswer[],
   now: Date,
 ): Result<ExamSession, DomainError> {
   if (session.finishedAt !== null) {
@@ -84,7 +91,71 @@ export function finishExamSession(
       ),
     );
   }
-  return ok({ ...session, ...result, finishedAt: now });
+  const tally = tallyAnswers(session.id, answers);
+  if (!tally.ok) return tally;
+  const { total, correct } = tally.value;
+  if (total > session.requestedCount) {
+    return invalidFinish(
+      `exam session ${session.id} requested ${session.requestedCount} questions, got ${total} answers`,
+    );
+  }
+  if (now.getTime() < session.startedAt.getTime()) {
+    return invalidFinish(
+      `exam session ${session.id} cannot finish before it started`,
+    );
+  }
+  return ok({
+    ...session,
+    finishedAt: now,
+    total,
+    correct,
+    score: correct / total,
+    passed: isPassingScore(correct, total),
+  });
+}
+
+export interface AnswerTally {
+  readonly total: number;
+  readonly correct: number;
+}
+
+// Checks the answers of one session and counts them: at least one, all of
+// `sessionId`, and one per question and per root.
+export function tallyAnswers(
+  sessionId: string,
+  answers: readonly ExamAnswer[],
+): Result<AnswerTally, DomainError> {
+  if (answers.length === 0) {
+    return err(
+      new DomainError(EXAM_ERROR.NO_ANSWERS, "an exam needs answers to score"),
+    );
+  }
+  const questions = new Set<string>();
+  const roots = new Set<string>();
+  for (const answer of answers) {
+    if (answer.sessionId !== sessionId) {
+      return err(
+        new DomainError(
+          EXAM_ERROR.INVALID_ANSWER,
+          `answer to ${answer.questionId} belongs to session ${answer.sessionId}`,
+        ),
+      );
+    }
+    if (questions.has(answer.questionId) || roots.has(answer.rootId)) {
+      return err(
+        new DomainError(
+          EXAM_ERROR.DUPLICATE_ANSWER,
+          `session ${sessionId} has two answers to question ${answer.questionId} or root ${answer.rootId}`,
+        ),
+      );
+    }
+    questions.add(answer.questionId);
+    roots.add(answer.rootId);
+  }
+  return ok({
+    total: answers.length,
+    correct: answers.filter((answer) => answer.isCorrect).length,
+  });
 }
 
 // Elapsed time shown by the results screen (user decision 2026-10-05: the
@@ -161,6 +232,10 @@ export function initialExamPageState(
     failedRootIds: [],
     lastPassedSessionId: null,
   };
+}
+
+function invalidFinish(message: string) {
+  return err(new DomainError(EXAM_ERROR.INVALID_SESSION_FINISH, message));
 }
 
 export function invalidCount(count: number): DomainError {

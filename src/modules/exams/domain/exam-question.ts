@@ -96,24 +96,39 @@ export function newExamQuestion(
   });
 }
 
+// What newVariant needs from each earlier question of the root's lineage.
+export type LineageQuestion = Pick<ExamQuestion, "id" | "rootId" | "stem">;
+
 // Creates the AI reformulation that replaces `previous` in a retake: same
-// page, owner, root and concept; a different wording (§7.5.1). The caller
-// retires `previous` afterwards (§7.5.2).
+// page, owner, root and concept; a wording different from every earlier
+// one of the root (§7.5.1). `lineage` holds every earlier question of
+// `previous.rootId`, retired ones included (the caller loads it); `previous`
+// is always compared even when missing from it. The caller retires
+// `previous` afterwards (§7.5.2).
 export function newVariant(
   previous: ExamQuestion,
+  lineage: readonly LineageQuestion[],
   input: NewVariantInput,
   now: Date,
 ): Result<ExamQuestion, DomainError> {
   if (previous.retiredAt !== null) return retired(previous.id);
+  const foreign = lineage.find((q) => q.rootId !== previous.rootId);
+  if (foreign) {
+    return invalid(
+      `question ${foreign.id} is not in the lineage of root ${previous.rootId}`,
+    );
+  }
   const content = validateContent({ ...input, concept: previous.concept });
   if (!content.ok) return content;
-  if (
-    normalizeWording(content.value.stem) === normalizeWording(previous.stem)
-  ) {
+  const stem = normalizeWording(content.value.stem);
+  const repeated = [previous, ...lineage].find(
+    (q) => normalizeWording(q.stem) === stem,
+  );
+  if (repeated) {
     return err(
       new DomainError(
         EXAM_ERROR.VARIANT_SAME_WORDING,
-        `variant ${input.id} repeats the wording of question ${previous.id}`,
+        `variant ${input.id} repeats the wording of question ${repeated.id}`,
       ),
     );
   }
@@ -207,9 +222,15 @@ function validateContent(
   });
 }
 
-// Wording comparison ignores case and runs of whitespace.
+// Wording comparison ignores case, runs of whitespace, opening Spanish
+// marks (¿ ¡) and trailing punctuation, so "¿Qué es X?" and "que es x."
+// count as the same wording. Used for stems and options alike.
 function normalizeWording(text: string): string {
-  return text.trim().replace(/\s+/g, " ").toLocaleLowerCase();
+  return text
+    .replace(/\s+/g, " ")
+    .replace(/^[\s¿¡]+/, "")
+    .replace(/[\s.,;:!?…]+$/, "")
+    .toLocaleLowerCase();
 }
 
 function invalid(message: string) {

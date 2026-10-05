@@ -5,10 +5,12 @@ import {
   EXAM_MAX_QUESTIONS,
   EXAM_MIN_QUESTIONS,
   EXAM_PASS_THRESHOLD,
+  type ExamAnswer,
   examSessionDurationMs,
   finishExamSession,
   gradeExamAnswer,
   initialExamPageState,
+  isPassingScore,
   isValidQuestionCount,
   newExamSession,
 } from "./exam-session";
@@ -91,22 +93,38 @@ describe("newExamSession", () => {
 });
 
 describe("finishExamSession and examSessionDurationMs", () => {
-  function opened() {
-    const result = newExamSession(base, startedAt);
+  function opened(requestedCount = EXAM_DEFAULT_QUESTIONS) {
+    const result = newExamSession({ ...base, requestedCount }, startedAt);
     if (!result.ok) throw result.error;
     return result.value;
+  }
+
+  function answers(total: number, correct: number): ExamAnswer[] {
+    return Array.from({ length: total }, (_, i) => ({
+      sessionId: "s-1",
+      questionId: `v-${i}`,
+      rootId: `r-${i}`,
+      selectedIndex: 0,
+      isCorrect: i < correct,
+      answeredAt: finishedAt,
+    }));
+  }
+
+  function expectCode(
+    result: { ok: true } | { ok: false; error: { code: string } },
+    code: string,
+  ) {
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.code).toBe(code);
   }
 
   it("has no duration while open", () => {
     expect(examSessionDurationMs(opened())).toBeNull();
   });
 
-  it("stores the score and derives the duration from start and finish", () => {
-    const result = finishExamSession(
-      opened(),
-      { total: 10, correct: 7, score: 0.7, passed: true },
-      finishedAt,
-    );
+  it("derives the result from the answers and the duration from start and finish", () => {
+    const result = finishExamSession(opened(), answers(10, 7), finishedAt);
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -120,23 +138,97 @@ describe("finishExamSession and examSessionDurationMs", () => {
     expect(examSessionDurationMs(result.value)).toBe(750_000);
   });
 
-  it("refuses to finish a session twice", () => {
-    const first = finishExamSession(
-      opened(),
-      { total: 10, correct: 2, score: 0.2, passed: false },
+  it.each([
+    [10, 6, false],
+    [30, 21, true],
+    [30, 20, false],
+  ])("%i answers with %i correct → passed %s", (total, correct, passed) => {
+    const result = finishExamSession(
+      opened(30),
+      answers(total, correct),
       finishedAt,
     );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.correct).toBe(correct);
+    expect(result.value.score).toBe(correct / total);
+    expect(result.value.passed).toBe(passed);
+    expect(result.value.passed).toBe(isPassingScore(correct, total));
+  });
+
+  it("refuses to finish a session twice", () => {
+    const first = finishExamSession(opened(), answers(10, 2), finishedAt);
     if (!first.ok) throw first.error;
 
-    const second = finishExamSession(
-      first.value,
-      { total: 10, correct: 9, score: 0.9, passed: true },
-      finishedAt,
+    expectCode(
+      finishExamSession(first.value, answers(10, 9), finishedAt),
+      EXAM_ERROR.SESSION_FINISHED,
     );
+  });
 
-    expect(second.ok).toBe(false);
-    if (second.ok) return;
-    expect(second.error.code).toBe(EXAM_ERROR.SESSION_FINISHED);
+  it("refuses to finish without answers", () => {
+    expectCode(
+      finishExamSession(opened(), [], finishedAt),
+      EXAM_ERROR.NO_ANSWERS,
+    );
+  });
+
+  it("refuses an answer of another session", () => {
+    const mixed = answers(10, 10);
+    mixed[2] = { ...mixed[2], sessionId: "s-other" };
+
+    expectCode(
+      finishExamSession(opened(), mixed, finishedAt),
+      EXAM_ERROR.INVALID_ANSWER,
+    );
+  });
+
+  it("refuses two answers to the same question", () => {
+    const duplicated = [...answers(9, 9), { ...answers(1, 1)[0] }];
+
+    expectCode(
+      finishExamSession(opened(), duplicated, finishedAt),
+      EXAM_ERROR.DUPLICATE_ANSWER,
+    );
+  });
+
+  it("refuses two answers to the same root", () => {
+    const duplicated = [
+      ...answers(9, 9),
+      { ...answers(1, 1)[0], questionId: "v-other" },
+    ];
+
+    expectCode(
+      finishExamSession(opened(), duplicated, finishedAt),
+      EXAM_ERROR.DUPLICATE_ANSWER,
+    );
+  });
+
+  it("refuses more answers than requested questions", () => {
+    expectCode(
+      finishExamSession(opened(10), answers(11, 11), finishedAt),
+      EXAM_ERROR.INVALID_SESSION_FINISH,
+    );
+  });
+
+  it("refuses a finish before the start", () => {
+    expectCode(
+      finishExamSession(
+        opened(),
+        answers(10, 10),
+        new Date(startedAt.getTime() - 1),
+      ),
+      EXAM_ERROR.INVALID_SESSION_FINISH,
+    );
+  });
+
+  it("accepts a finish at the start instant", () => {
+    const result = finishExamSession(opened(), answers(10, 10), startedAt);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(examSessionDurationMs(result.value)).toBe(0);
   });
 });
 

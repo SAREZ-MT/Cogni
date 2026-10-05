@@ -123,7 +123,21 @@ describe("scoreExam", () => {
     });
   });
 
-  it("lists a failed root once even if two answers share it", () => {
+  it("refuses two answers to the same question", () => {
+    const duplicated = [...answers(10, 0), { ...answers(1, 0)[0] }];
+
+    const result = scoreExam({
+      sessionId: "s-1",
+      answers: duplicated,
+      previous,
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.code).toBe(EXAM_ERROR.DUPLICATE_ANSWER);
+  });
+
+  it("refuses two answers to the same root", () => {
     const duplicated = [
       ...answers(10, 0),
       { ...answers(1, 0)[0], questionId: "v-x" },
@@ -135,11 +149,9 @@ describe("scoreExam", () => {
       previous,
     });
 
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(
-      result.value.failedRootIds.filter((id) => id === "r-0"),
-    ).toHaveLength(1);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.code).toBe(EXAM_ERROR.DUPLICATE_ANSWER);
   });
 
   it("refuses an exam without answers", () => {

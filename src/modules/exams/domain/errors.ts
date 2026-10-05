@@ -7,7 +7,7 @@ export const EXAM_ERROR = {
   INVALID_QUESTION: "EXAMS_INVALID_QUESTION",
   // A retired question cannot be edited, retired again or varied.
   QUESTION_RETIRED: "EXAMS_QUESTION_RETIRED",
-  // A variant must not repeat the wording of the question it replaces.
+  // A variant must not repeat any earlier wording of its root's lineage.
   VARIANT_SAME_WORDING: "EXAMS_VARIANT_SAME_WORDING",
   // The requested number of questions is outside [EXAM_MIN_QUESTIONS,
   // EXAM_MAX_QUESTIONS] or below the number of failed roots of a retake.
@@ -20,7 +20,12 @@ export const EXAM_ERROR = {
   RETAKE_VARIANT_MISSING: "EXAMS_RETAKE_VARIANT_MISSING",
   // An answer's selected index is out of range or belongs to another session.
   INVALID_ANSWER: "EXAMS_INVALID_ANSWER",
-  // A session cannot be scored without answers.
+  // Two answers in one session share a question or a root.
+  DUPLICATE_ANSWER: "EXAMS_DUPLICATE_ANSWER",
+  // A finish before the session's start, or with more answers than the
+  // requested number of questions.
+  INVALID_SESSION_FINISH: "EXAMS_INVALID_SESSION_FINISH",
+  // A session cannot be scored or finished without answers.
   NO_ANSWERS: "EXAMS_NO_ANSWERS",
   // The session was already finished.
   SESSION_FINISHED: "EXAMS_SESSION_FINISHED",

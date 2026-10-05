@@ -18,6 +18,7 @@ export {
   type ExamQuestionOrigin,
   type ExamQuestionPatch,
   editExamQuestion,
+  type LineageQuestion,
   MAX_CONCEPT_LENGTH,
   MAX_EXPLANATION_LENGTH,
   MAX_OPTION_LENGTH,
@@ -29,6 +30,7 @@ export {
   retireExamQuestion,
 } from "./exam-question";
 export {
+  type AnswerTally,
   EXAM_DEFAULT_QUESTIONS,
   EXAM_MAX_QUESTIONS,
   EXAM_MIN_QUESTIONS,
@@ -36,15 +38,16 @@ export {
   type ExamAnswer,
   type ExamPageState,
   type ExamSession,
-  type ExamSessionResult,
   examSessionDurationMs,
   finishExamSession,
   type GradeExamAnswerInput,
   gradeExamAnswer,
   initialExamPageState,
+  isPassingScore,
   isValidQuestionCount,
   type NewExamSessionInput,
   newExamSession,
+  tallyAnswers,
 } from "./exam-session";
 export {
   decideFeedback,
