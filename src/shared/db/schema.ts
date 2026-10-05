@@ -1,11 +1,14 @@
 import { sql } from "drizzle-orm";
 import {
+  type AnyPgColumn,
+  boolean,
   check,
   doublePrecision,
   index,
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   unique,
@@ -540,3 +543,222 @@ export const sessionFeedback = pgTable(
 ).enableRLS();
 
 export type SessionFeedbackRow = typeof sessionFeedback.$inferSelect;
+
+// Exams (documento-maestro §3.3, §6.1, §7.5). Literal tuples mirror
+// ExamQuestionOrigin in modules/exams/domain; RLS on with no policies, like
+// every table here.
+export const EXAM_QUESTION_ORIGINS = ["ai", "manual", "ai_variant"] as const;
+export type ExamQuestionOriginValue = (typeof EXAM_QUESTION_ORIGINS)[number];
+
+// One multiple-choice question. root_id is the lineage's original question
+// (its own id when original) and variant_of the question it replaced; the
+// study item of kind exam_question points at the root. A retired question
+// never shows again but stays for the lineage (a variant never repeats an
+// earlier wording).
+export const examQuestions = pgTable(
+  "exam_questions",
+  {
+    id: uuid("id").primaryKey(),
+    ownerId: uuid("owner_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    pageId: uuid("page_id")
+      .notNull()
+      .references(() => pages.id, { onDelete: "cascade" }),
+    stem: text("stem").notNull(),
+    options: jsonb("options").notNull().$type<string[]>(),
+    correctIndex: integer("correct_index").notNull(),
+    explanation: text("explanation").notNull(),
+    concept: text("concept").notNull(),
+    rootId: uuid("root_id")
+      .notNull()
+      .references((): AnyPgColumn => examQuestions.id, {
+        onDelete: "cascade",
+      }),
+    variantOf: uuid("variant_of").references(
+      (): AnyPgColumn => examQuestions.id,
+      { onDelete: "set null" },
+    ),
+    origin: text("origin").notNull().$type<ExamQuestionOriginValue>(),
+    generationId: uuid("generation_id").references(() => aiGenerations.id, {
+      onDelete: "set null",
+    }),
+    retiredAt: timestamp("retired_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    // Serves listActiveByPage: the page's questions still shown.
+    index("exam_questions_page_active_idx")
+      .on(table.pageId, table.createdAt)
+      .where(sql`${table.retiredAt} is null`),
+    index("exam_questions_root_id_idx").on(table.rootId),
+    index("exam_questions_owner_id_idx").on(table.ownerId),
+    check(
+      "exam_questions_origin_check",
+      sql`${table.origin} in ('ai', 'manual', 'ai_variant')`,
+    ),
+    check(
+      "exam_questions_options_count",
+      sql`jsonb_typeof(${table.options}) = 'array' and jsonb_array_length(${table.options}) = 4`,
+    ),
+    check(
+      "exam_questions_correct_index_range",
+      sql`${table.correctIndex} between 0 and 3`,
+    ),
+    check(
+      "exam_questions_stem_not_blank",
+      sql`length(btrim(${table.stem})) > 0`,
+    ),
+    check(
+      "exam_questions_concept_not_blank",
+      sql`length(btrim(${table.concept})) > 0`,
+    ),
+    // An original is its own root; only a variant replaces another question.
+    check(
+      "exam_questions_lineage_check",
+      sql`(${table.variantOf} is null) = (${table.rootId} = ${table.id})`,
+    ),
+  ],
+).enableRLS();
+
+export type ExamQuestionRow = typeof examQuestions.$inferSelect;
+
+// One exam attempt. The result columns are null until the session is
+// finished, all together; an abandoned session stays open.
+export const examSessions = pgTable(
+  "exam_sessions",
+  {
+    id: uuid("id").primaryKey(),
+    ownerId: uuid("owner_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    pageId: uuid("page_id")
+      .notNull()
+      .references(() => pages.id, { onDelete: "cascade" }),
+    requestedCount: integer("requested_count").notNull(),
+    isRetake: boolean("is_retake").notNull().default(false),
+    retakeOfSessionId: uuid("retake_of_session_id").references(
+      (): AnyPgColumn => examSessions.id,
+      { onDelete: "set null" },
+    ),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    total: integer("total"),
+    correct: integer("correct"),
+    score: doublePrecision("score"),
+    passed: boolean("passed"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    // Serves listFinishedByPage (feedback history) and the hub.
+    index("exam_sessions_page_finished_idx").on(table.pageId, table.finishedAt),
+    index("exam_sessions_owner_started_idx").on(table.ownerId, table.startedAt),
+    check(
+      "exam_sessions_requested_count_range",
+      sql`${table.requestedCount} between 10 and 30`,
+    ),
+    check(
+      "exam_sessions_retake_check",
+      sql`${table.retakeOfSessionId} is null or ${table.isRetake}`,
+    ),
+    check(
+      "exam_sessions_result_check",
+      sql`(${table.finishedAt} is null and ${table.total} is null and ${table.correct} is null and ${table.score} is null and ${table.passed} is null)
+        or (${table.finishedAt} is not null and ${table.total} between 1 and ${table.requestedCount}
+          and ${table.correct} between 0 and ${table.total}
+          and ${table.score} between 0 and 1 and ${table.passed} is not null)`,
+    ),
+  ],
+).enableRLS();
+
+export type ExamSessionRow = typeof examSessions.$inferSelect;
+
+// One graded answer. question_id is the wording actually shown (maybe a
+// variant), root_id the lineage it feeds: one answer per question and per
+// root in a session.
+export const examAnswers = pgTable(
+  "exam_answers",
+  {
+    ownerId: uuid("owner_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    sessionId: uuid("session_id")
+      .notNull()
+      .references(() => examSessions.id, { onDelete: "cascade" }),
+    questionId: uuid("question_id")
+      .notNull()
+      .references(() => examQuestions.id, { onDelete: "cascade" }),
+    rootId: uuid("root_id")
+      .notNull()
+      .references(() => examQuestions.id, { onDelete: "cascade" }),
+    selectedIndex: integer("selected_index").notNull(),
+    isCorrect: boolean("is_correct").notNull(),
+    answeredAt: timestamp("answered_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    primaryKey({
+      name: "exam_answers_pkey",
+      columns: [table.sessionId, table.questionId],
+    }),
+    unique("exam_answers_session_root_key").on(table.sessionId, table.rootId),
+    index("exam_answers_question_id_idx").on(table.questionId),
+    index("exam_answers_owner_id_idx").on(table.ownerId),
+    check(
+      "exam_answers_selected_index_range",
+      sql`${table.selectedIndex} between 0 and 3`,
+    ),
+  ],
+).enableRLS();
+
+export type ExamAnswerRow = typeof examAnswers.$inferSelect;
+
+// Per-page exam state: a pending retake with the roots failed in the last
+// failed exam, and the last passing session.
+export const examPageState = pgTable(
+  "exam_page_state",
+  {
+    pageId: uuid("page_id")
+      .primaryKey()
+      .references(() => pages.id, { onDelete: "cascade" }),
+    ownerId: uuid("owner_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    retakePending: boolean("retake_pending").notNull().default(false),
+    failedRootIds: jsonb("failed_root_ids")
+      .notNull()
+      .default(sql`'[]'::jsonb`)
+      .$type<string[]>(),
+    lastPassedSessionId: uuid("last_passed_session_id").references(
+      () => examSessions.id,
+      { onDelete: "set null" },
+    ),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("exam_page_state_owner_id_idx").on(table.ownerId),
+    check(
+      "exam_page_state_failed_root_ids_array",
+      sql`jsonb_typeof(${table.failedRootIds}) = 'array'`,
+    ),
+  ],
+).enableRLS();
+
+export type ExamPageStateRow = typeof examPageState.$inferSelect;

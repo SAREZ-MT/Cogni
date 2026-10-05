@@ -7,6 +7,8 @@ export {
   type ExamCandidate,
 } from "./composition";
 export { EXAM_ERROR } from "./errors";
+export type { ExamAnswerRepository } from "./exam-answer-repository";
+export type { ExamPageStateRepository } from "./exam-page-state-repository";
 export {
   EXAM_QUALITY,
   type ExamReviewDecision,
@@ -29,6 +31,7 @@ export {
   newVariant,
   retireExamQuestion,
 } from "./exam-question";
+export type { ExamQuestionRepository } from "./exam-question-repository";
 export {
   type AnswerTally,
   EXAM_DEFAULT_QUESTIONS,
@@ -49,6 +52,7 @@ export {
   newExamSession,
   tallyAnswers,
 } from "./exam-session";
+export type { ExamSessionRepository } from "./exam-session-repository";
 export {
   decideFeedback,
   type FeedbackDecision,

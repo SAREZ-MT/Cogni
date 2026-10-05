@@ -9,8 +9,10 @@ feature document is `odd/tasks/phase-5-exams.md`.
 ## Status
 
 - `domain/` — done (T1). Pure TypeScript, no I/O.
-- Persistence, the study-engine hook, use cases, actions and UI — pending
-  (T2–T9).
+- Persistence — done (T2): migration `drizzle/0010_exams.sql` (+ `.down.sql`),
+  ports in `domain/`, Drizzle adapters in `infrastructure/`, in-memory fakes
+  in `application/testing/`.
+- The study-engine hook, use cases, actions and UI — pending (T3–T9).
 
 ## Domain
 
@@ -58,6 +60,25 @@ feature document is `odd/tasks/phase-5-exams.md`.
   is a question already shown, blocks the retake
   (`EXAMS_RETAKE_VARIANT_MISSING`). No earlier wording of the root is ever
   reused: `newVariant` refuses one (`EXAMS_VARIANT_SAME_WORDING`).
+
+## Persistence
+
+Tables `exam_questions`, `exam_sessions`, `exam_answers` and
+`exam_page_state` (RLS on, no policies: only the server connection reaches
+them). CHECKs mirror the domain: 4 options, correct index 0–3, an original is
+its own root and only a variant has `variant_of`, N in 10–30, a finished
+session carries its whole result. `exam_answers` is keyed by
+`(session_id, question_id)` and unique on `(session_id, root_id)`.
+
+Ports (`ExamQuestionRepository`, `ExamSessionRepository`,
+`ExamAnswerRepository`, `ExamPageStateRepository`) are owner-scoped.
+`listLineage` includes retired questions (what `newVariant` compares
+against); `listActiveByPage` excludes them. `saveMany` writes a batch of
+answers or none. `createDrizzleExamRepositories(db)` builds all four on one
+executor; `db` may be an open transaction, so exam writes join the caller's
+commit together with study-engine's repositories. One shared contract
+(`application/testing/exam-repositories.contract.ts`) runs against the fakes
+(`pnpm test`) and the Drizzle adapters (`pnpm test:db`).
 
 ## Dependencies
 

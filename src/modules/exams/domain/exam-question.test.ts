@@ -220,14 +220,16 @@ describe("newVariant", () => {
       expectErrorCode(result, EXAM_ERROR.VARIANT_SAME_WORDING);
     });
 
-    it("refuses the original wording even when the lineage omits the replaced question", () => {
+    it("refuses the replaced question's wording even when the lineage omits it", () => {
       const original = createdQuestion();
       const v1 = firstVariant(original);
 
+      // The lineage holds only the original; v1 (`previous`) is still
+      // compared, so repeating v1's wording is refused.
       const result = newVariant(
         v1,
         [original],
-        { ...variantInput, id: "q-3", stem: "¿Qué organelo produce ATP" },
+        { ...variantInput, id: "q-3", stem: `  ${v1.stem.toUpperCase()}  ` },
         later,
       );
 
