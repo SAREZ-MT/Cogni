@@ -18,7 +18,7 @@ vi.mock("@/modules/study-engine", () => ({
   createMasteryRecomputeJob: createJob,
 }));
 
-import { GET } from "./route";
+import { GET, maxDuration } from "./route";
 
 function request(authorization?: string) {
   return new Request("http://localhost/api/recompute-mastery", {
@@ -68,15 +68,51 @@ describe("GET /api/recompute-mastery", () => {
     expect(run).not.toHaveBeenCalled();
   });
 
-  it("recomputes every page with the right bearer and answers a summary", async () => {
-    run.mockResolvedValueOnce({ pagesRecomputed: 3, pagesFailed: 1 });
+  it("recomputes the pages with the right bearer and answers a summary", async () => {
+    run.mockResolvedValueOnce({
+      pagesRecomputed: 3,
+      pagesFailed: 1,
+      complete: false,
+    });
     const response = await GET(request(`Bearer ${SECRET}`));
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
       ok: true,
       pagesRecomputed: 3,
       pagesFailed: 1,
+      complete: false,
     });
     expect(run).toHaveBeenCalledTimes(1);
+  });
+
+  it("declares the Hobby plan's 300 s function limit as maxDuration", () => {
+    expect(maxDuration).toBe(300);
+  });
+
+  it("gives the job a time budget that leaves a minute before maxDuration", async () => {
+    run.mockResolvedValueOnce({
+      pagesRecomputed: 0,
+      pagesFailed: 0,
+      complete: true,
+    });
+    await GET(request(`Bearer ${SECRET}`));
+    expect(createJob).toHaveBeenCalledWith(
+      expect.objectContaining({ timeBudgetMs: 240_000 }),
+    );
+  });
+
+  it("logs a failed run and answers a controlled 500 without the error detail", async () => {
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    run.mockRejectedValueOnce(new Error("listing query failed"));
+    try {
+      const response = await GET(request(`Bearer ${SECRET}`));
+      expect(response.status).toBe(500);
+      expect(await response.json()).toEqual({ ok: false });
+      expect(errors).toHaveBeenCalledWith("[recompute-mastery] run failed", {
+        error: "listing query failed",
+      });
+    } finally {
+      errors.mockRestore();
+    }
   });
 });

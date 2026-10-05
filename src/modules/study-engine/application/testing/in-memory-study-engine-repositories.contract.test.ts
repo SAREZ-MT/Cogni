@@ -5,6 +5,7 @@ import { InMemoryFlashcardSessionRepository } from "./in-memory-flashcard-sessio
 import { InMemoryPageMasteryRepository } from "./in-memory-page-mastery-repository";
 import { InMemoryReviewLogRepository } from "./in-memory-review-log-repository";
 import { InMemorySessionFeedbackRepository } from "./in-memory-session-feedback-repository";
+import { InMemoryStudiedPageReader } from "./in-memory-studied-page-reader";
 import { InMemoryStudyItemRepository } from "./in-memory-study-item-repository";
 import { runPageMasteryRepositoryContract } from "./page-mastery-repository.contract";
 import { runReviewLogRepositoryContract } from "./review-log-repository.contract";
@@ -72,13 +73,14 @@ runSessionFeedbackRepositoryContract({
   context: () => ({ ...ownership, newGenerationId: async () => randomUUID() }),
 });
 
-// The in-memory item store is also the cross-owner StudiedPageReader.
+// The cross-owner StudiedPageReader reads the item and mastery fakes.
 runStudiedPageReaderContract({
   context: async () => {
     const store = new InMemoryStudyItemRepository();
+    const mastery = new InMemoryPageMasteryRepository();
     return {
       ...ownership,
-      reader: store,
+      reader: new InMemoryStudiedPageReader(store, mastery),
       newPageId: async () => randomUUID(),
       addItem: async ({ ownerId, pageId, suspended }) => {
         const now = new Date("2026-10-01T08:00:00.000Z");
@@ -91,6 +93,18 @@ runStudiedPageReaderContract({
           now,
         });
         await store.save({ ...item, suspendedAt: suspended ? now : null });
+      },
+      setMastery: async ({ ownerId, pageId, computedAt }) => {
+        await mastery.upsert({
+          id: randomUUID(),
+          ownerId,
+          pageId,
+          level: "Nuevo",
+          score: 0,
+          itemsTotal: 1,
+          itemsDue: 1,
+          computedAt,
+        });
       },
     };
   },

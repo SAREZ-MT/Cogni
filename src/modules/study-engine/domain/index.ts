@@ -31,6 +31,7 @@ export {
 export type { SessionFeedbackRepository } from "./session-feedback-repository";
 export { applySm2 } from "./sm2";
 export type {
+  StalePagesQuery,
   StudiedPage,
   StudiedPageReader,
 } from "./studied-page-reader";

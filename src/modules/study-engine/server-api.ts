@@ -24,7 +24,6 @@ import type { FlashcardRating } from "./domain/study-item";
 import type { StudyItemRepository } from "./domain/study-item-repository";
 import {
   DrizzleFlashcardSessionRepository,
-  DrizzlePageMasteryRepository,
   DrizzleReviewLogRepository,
   DrizzleSessionFeedbackRepository,
   DrizzleStudiedPageReader,
@@ -109,7 +108,8 @@ export function createSessionFeedbackSources(
 }
 
 // The daily mastery job (/api/recompute-mastery). Runs without a user
-// session over every owner's pages; the route authenticates the cron.
+// session over every owner's pages; the route authenticates the cron and
+// sets the time budget from its maxDuration.
 export interface MasteryRecomputeJob {
   run(): Promise<MasteryRecomputeSummary>;
 }
@@ -118,17 +118,18 @@ export function createMasteryRecomputeJob(deps: {
   db: DbExecutor;
   clock: Clock;
   ids: { next(): string };
+  timeBudgetMs: number;
   onPageError?: (page: StudiedPage, error: unknown) => void;
 }): MasteryRecomputeJob {
-  const { db, clock, ids, onPageError } = deps;
+  const { db, clock, ids, timeBudgetMs, onPageError } = deps;
   return {
     run: () =>
       recomputeAllPageMastery({
         pages: new DrizzleStudiedPageReader(db),
-        studyItems: new DrizzleStudyItemRepository(db),
-        pageMastery: new DrizzlePageMasteryRepository(db),
+        uow: new DrizzleStudyUnitOfWork(db),
         clock,
         ids,
+        timeBudgetMs,
         onPageError,
       }),
   };

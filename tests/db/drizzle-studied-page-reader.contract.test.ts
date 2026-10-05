@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { afterAll } from "vitest";
 import { runStudiedPageReaderContract } from "@/modules/study-engine/application/testing/studied-page-reader.contract";
 import { newStudyItem } from "@/modules/study-engine/domain/study-item";
+import { DrizzlePageMasteryRepository } from "@/modules/study-engine/infrastructure/drizzle-page-mastery-repository";
 import { DrizzleStudiedPageReader } from "@/modules/study-engine/infrastructure/drizzle-studied-page-reader";
 import { DrizzleStudyItemRepository } from "@/modules/study-engine/infrastructure/drizzle-study-item-repository";
 import { notebooks, pages, profiles } from "@/shared/db/schema";
@@ -10,7 +11,8 @@ import { createTestOwner, deleteTestOwner } from "./helpers/test-owner";
 
 // Top-level await: the contract builds its `it()` closures at collection
 // time, so the fixtures must exist before it is called. Deleting the owners
-// cascades to every notebook, page and study item created here.
+// cascades to every notebook, page, study item and mastery row created
+// here.
 if (process.env.DATABASE_URL) {
   const db = createTestDb();
   const owner = await createTestOwner("studied-pages-owner");
@@ -69,6 +71,18 @@ if (process.env.DATABASE_URL) {
         await new DrizzleStudyItemRepository(db).save({
           ...item,
           suspendedAt: suspended ? now : null,
+        });
+      },
+      setMastery: async ({ ownerId, pageId, computedAt }) => {
+        await new DrizzlePageMasteryRepository(db).upsert({
+          id: randomUUID(),
+          ownerId,
+          pageId,
+          level: "Nuevo",
+          score: 0,
+          itemsTotal: 1,
+          itemsDue: 1,
+          computedAt,
         });
       },
     }),

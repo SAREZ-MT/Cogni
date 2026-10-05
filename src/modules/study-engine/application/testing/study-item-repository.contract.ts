@@ -270,5 +270,17 @@ export function runStudyItemRepositoryContract(
       await repo.lock(item.id, ctx.otherOwnerId);
       expect(await repo.findById(item.id, ctx.ownerId)).toEqual(item);
     });
+
+    it("lockPage resolves for an owned page, an unknown page and another owner, changing nothing", async () => {
+      const ctx = options.context();
+      const repo = options.createRepository();
+      const pageId = await ctx.newPageId();
+      const item = makeItem(ctx, pageId);
+      await repo.save(item);
+      await repo.lockPage(pageId, ctx.ownerId);
+      await repo.lockPage(ctx.newId(), ctx.ownerId);
+      await repo.lockPage(pageId, ctx.otherOwnerId);
+      expect(await repo.listByPage(pageId, ctx.ownerId)).toEqual([item]);
+    });
   });
 }

@@ -156,4 +156,16 @@ export class DrizzleStudyItemRepository implements StudyItemRepository {
       .where(and(eq(studyItems.id, id), eq(studyItems.ownerId, ownerId)))
       .for("update");
   }
+
+  async lockPage(pageId: string, ownerId: string): Promise<void> {
+    // Id order: two lockers of overlapping rows queue instead of deadlocking.
+    await this.db
+      .select({ id: studyItems.id })
+      .from(studyItems)
+      .where(
+        and(eq(studyItems.pageId, pageId), eq(studyItems.ownerId, ownerId)),
+      )
+      .orderBy(asc(studyItems.id))
+      .for("update");
+  }
 }

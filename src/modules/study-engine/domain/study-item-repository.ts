@@ -29,4 +29,9 @@ export interface StudyItemRepository {
   // work ends (row lock), so a double submit cannot apply SM-2 twice to the
   // same state. A no-op outside a transaction and in memory.
   lock(id: string, ownerId: string): Promise<void>;
+  // Row-locks every item of the page (in id order) until the surrounding
+  // unit of work ends, so the daily mastery job waits for an in-flight
+  // grade of any of them and then reads the graded state. A no-op outside
+  // a transaction and in memory.
+  lockPage(pageId: string, ownerId: string): Promise<void>;
 }

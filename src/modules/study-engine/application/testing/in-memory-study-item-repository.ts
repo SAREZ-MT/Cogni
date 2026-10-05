@@ -1,7 +1,3 @@
-import type {
-  StudiedPage,
-  StudiedPageReader,
-} from "../../domain/studied-page-reader";
 import type { StudyItem, StudyItemKind } from "../../domain/study-item";
 import type { StudyItemRepository } from "../../domain/study-item-repository";
 
@@ -10,9 +6,7 @@ import type { StudyItemRepository } from "../../domain/study-item-repository";
 // There is no pages table here: `isPageActive` stands in for the join that
 // drops archived pages and pages of archived notebooks from listDue (every
 // page is active by default).
-export class InMemoryStudyItemRepository
-  implements StudyItemRepository, StudiedPageReader
-{
+export class InMemoryStudyItemRepository implements StudyItemRepository {
   private readonly rows = new Map<string, StudyItem>();
 
   constructor(
@@ -99,25 +93,15 @@ export class InMemoryStudyItemRepository
     return suspended;
   }
 
-  // Cross-owner by design (StudiedPageReader): the daily mastery job.
-  async listStudiedPages(
-    afterPageId: string | null,
-    limit: number,
-  ): Promise<StudiedPage[]> {
-    const pages = new Map<string, StudiedPage>();
-    for (const item of this.rows.values()) {
-      if (afterPageId !== null && compareIds(item.pageId, afterPageId) <= 0) {
-        continue;
-      }
-      pages.set(item.pageId, { pageId: item.pageId, ownerId: item.ownerId });
-    }
-    return [...pages.values()]
-      .sort((a, b) => compareIds(a.pageId, b.pageId))
-      .slice(0, limit);
+  // Every owner's items, for the cross-owner InMemoryStudiedPageReader.
+  allItems(): StudyItem[] {
+    return [...this.rows.values()];
   }
 
   // Single-threaded in memory: nothing to serialize.
   async lock(_id: string, _ownerId: string): Promise<void> {}
+
+  async lockPage(_pageId: string, _ownerId: string): Promise<void> {}
 
   private owned(ownerId: string): StudyItem[] {
     return [...this.rows.values()].filter((item) => item.ownerId === ownerId);
