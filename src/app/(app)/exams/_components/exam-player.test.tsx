@@ -51,6 +51,7 @@ function session(questions: ExamPlayerQuestionView[]): ExamSessionView {
     pageId: PAGE_ID,
     startedAt: STARTED.toISOString(),
     finished: false,
+    isRetake: false,
     questions,
   };
 }

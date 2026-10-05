@@ -85,8 +85,13 @@ export class InMemoryExamQuestionRepository implements ExamQuestionRepository {
     return this.list((q) => q.rootId === rootId && q.ownerId === ownerId);
   }
 
-  // A single-threaded fake has no concurrent transactions to queue.
-  async lockLineage(): Promise<void> {}
+  // A single-threaded fake has no concurrent transactions to queue; it
+  // records the roots locked, in call order, for tests.
+  readonly lockedLineages: string[] = [];
+
+  async lockLineage(rootId: string): Promise<void> {
+    this.lockedLineages.push(rootId);
+  }
 
   async retire(
     id: string,
@@ -145,13 +150,28 @@ export class InMemoryExamSessionRepository implements ExamSessionRepository {
     pageId: string,
     ownerId: string,
   ): Promise<ExamSession | null> {
+    return this.latestOpen(pageId, ownerId, false);
+  }
+
+  async findOpenRetakeByPage(
+    pageId: string,
+    ownerId: string,
+  ): Promise<ExamSession | null> {
+    return this.latestOpen(pageId, ownerId, true);
+  }
+
+  private latestOpen(
+    pageId: string,
+    ownerId: string,
+    isRetake: boolean,
+  ): ExamSession | null {
     const open = [...this.rows.values()]
       .filter(
         (s) =>
           s.pageId === pageId &&
           s.ownerId === ownerId &&
           s.finishedAt === null &&
-          !s.isRetake,
+          s.isRetake === isRetake,
       )
       .sort(
         byTimeThenKey(

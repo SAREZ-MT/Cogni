@@ -1,5 +1,9 @@
 import type { AiProvider } from "../application/ports";
-import { examQuestionsOutput, flashcardsOutput } from "../application/schemas";
+import {
+  examQuestionsOutput,
+  examVariantsOutput,
+  flashcardsOutput,
+} from "../application/schemas";
 
 export const FAKE_PROVIDER_ID = "fake";
 export const FAKE_MODEL_ID = "fake-model";
@@ -149,6 +153,79 @@ function examQuestionsFrom(prompt: string) {
   return { questions };
 }
 
+interface FakeFailedRoot {
+  rootId: string;
+  concept: string;
+  correctAnswer: string;
+  previousStems: Set<string>;
+}
+
+// Reads the failed roots that `buildGenerateExamVariantsPrompt` lists
+// before the page text ("Root <id> [<concept>]" with indented "Correct
+// answer:" and "Previous wording:" lines), never from the page text. At
+// most MAX_FAKE_QUESTION_COUNT roots: a retake holds at most 30 questions.
+function parseExamVariantsPrompt(prompt: string): FakeFailedRoot[] {
+  const marker = prompt.indexOf("\nText:\n");
+  const head = marker === -1 ? prompt : prompt.slice(0, marker);
+  const roots: FakeFailedRoot[] = [];
+  for (const line of head.split("\n")) {
+    const root = /^Root (\S+) \[(.*)\]$/.exec(line);
+    if (root) {
+      if (roots.length === MAX_FAKE_QUESTION_COUNT) break;
+      roots.push({
+        rootId: root[1] as string,
+        concept: (root[2] as string).slice(0, MAX_FAKE_CONCEPT_LENGTH),
+        correctAnswer: "",
+        previousStems: new Set(),
+      });
+      continue;
+    }
+    const current = roots.at(-1);
+    if (!current) continue;
+    if (line.startsWith("  Correct answer: ")) {
+      current.correctAnswer = line.slice("  Correct answer: ".length);
+    } else if (line.startsWith("  Previous wording: ")) {
+      current.previousStems.add(
+        normalizeStem(line.slice("  Previous wording: ".length)),
+      );
+    }
+  }
+  return roots;
+}
+
+// One variant per listed root, echoing its id: a numbered stem about the
+// root's concept that skips every previous wording, with the listed
+// correct answer among 4 distinct options.
+function examVariantsFrom(prompt: string) {
+  const variants = parseExamVariantsPrompt(prompt).map((root, index) => {
+    let number = root.previousStems.size;
+    let stem = "";
+    do {
+      number += 1;
+      stem = `Variante ${number} sobre «${root.concept}»: ¿qué afirma el texto?`;
+    } while (root.previousStems.has(normalizeStem(stem)));
+    const correct = (root.correctAnswer || "Lo que dice el texto").slice(
+      0,
+      MAX_FAKE_OPTION_LENGTH,
+    );
+    const correctIndex = (index + number) % 4;
+    const options = [
+      `«${root.concept}» no aparece en el texto.`,
+      `«${root.concept}» pertenece a otra materia.`,
+      "Ninguna de las otras opciones es correcta.",
+    ];
+    options.splice(correctIndex, 0, correct);
+    return {
+      forRootId: root.rootId,
+      stem,
+      options,
+      correctIndex,
+      explanation: `El texto lo explica: ${correct}`,
+    };
+  });
+  return { variants };
+}
+
 // One schema-valid minimal object per purpose without a prompt-aware
 // branch. The first candidate the request schema accepts is returned.
 const MINIMAL_OBJECTS: readonly unknown[] = [
@@ -205,7 +282,9 @@ export function createFakeLiveProvider(): AiProvider {
           ? [flashcardsFrom(request.prompt)]
           : schema === examQuestionsOutput
             ? [examQuestionsFrom(request.prompt)]
-            : MINIMAL_OBJECTS;
+            : schema === examVariantsOutput
+              ? [examVariantsFrom(request.prompt), ...MINIMAL_OBJECTS]
+              : MINIMAL_OBJECTS;
       const object = candidates.find(
         (candidate) => request.schema.safeParse(candidate).success,
       );

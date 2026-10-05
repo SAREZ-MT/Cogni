@@ -57,6 +57,21 @@ export class DrizzleExamSessionRepository implements ExamSessionRepository {
     pageId: string,
     ownerId: string,
   ): Promise<ExamSession | null> {
+    return this.latestOpen(pageId, ownerId, false);
+  }
+
+  async findOpenRetakeByPage(
+    pageId: string,
+    ownerId: string,
+  ): Promise<ExamSession | null> {
+    return this.latestOpen(pageId, ownerId, true);
+  }
+
+  private async latestOpen(
+    pageId: string,
+    ownerId: string,
+    isRetake: boolean,
+  ): Promise<ExamSession | null> {
     const [row] = await this.db
       .select()
       .from(examSessions)
@@ -65,7 +80,7 @@ export class DrizzleExamSessionRepository implements ExamSessionRepository {
           eq(examSessions.pageId, pageId),
           eq(examSessions.ownerId, ownerId),
           isNull(examSessions.finishedAt),
-          eq(examSessions.isRetake, false),
+          eq(examSessions.isRetake, isRetake),
         ),
       )
       .orderBy(desc(examSessions.startedAt), desc(examSessions.id))

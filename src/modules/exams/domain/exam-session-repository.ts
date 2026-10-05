@@ -13,6 +13,13 @@ export interface ExamSessionRepository {
   // The page's open (unfinished) normal session, the latest started first;
   // null when there is none. Retakes are not returned.
   findOpenByPage(pageId: string, ownerId: string): Promise<ExamSession | null>;
+  // The page's open (unfinished) retake, the latest started first; null
+  // when there is none. A started retake is resumed instead of generating
+  // its variants again (§7.5).
+  findOpenRetakeByPage(
+    pageId: string,
+    ownerId: string,
+  ): Promise<ExamSession | null>;
   // Serializes the starts of exams on one page until the surrounding unit
   // of work ends (transaction-scoped advisory lock), so two concurrent
   // starts cannot both create an open session. A no-op in memory.

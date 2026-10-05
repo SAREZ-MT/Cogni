@@ -26,6 +26,12 @@ export {
   MAX_EXISTING_QUESTIONS,
 } from "./prompts/generate_exam_questions/v1";
 export {
+  buildGenerateExamVariantsPrompt,
+  type FailedExamRoot,
+  GENERATE_EXAM_VARIANTS_PROMPT_VERSION,
+  type GenerateExamVariantsPromptInput,
+} from "./prompts/generate_exam_variants/v1";
+export {
   buildGenerateFlashcardsPrompt,
   GENERATE_FLASHCARDS_PROMPT_VERSION,
 } from "./prompts/generate_flashcards/v1";
