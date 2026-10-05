@@ -104,6 +104,25 @@ describe("TechniqueCard", () => {
         screen.getByText("Te quedan 4 generaciones hoy"),
       ).toBeInTheDocument();
     });
+
+    it("renders controls above the button and children below it", () => {
+      renderWired({
+        controls: <p>Controles</p>,
+        children: <p>Debajo</p>,
+      });
+
+      const button = screen.getByRole("button", { name: "Generar" });
+      const controls = screen.getByText("Controles");
+      const below = screen.getByText("Debajo");
+      expect(
+        controls.compareDocumentPosition(button) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(
+        button.compareDocumentPosition(below) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
   });
 
   it("is not a link: generating never navigates to a route that may not exist", () => {

@@ -18,6 +18,15 @@ vi.mock("@/modules/flashcards", () => ({
   generateFlashcardsAction,
   listFlashcardsAction,
 }));
+const { generateExamQuestionsAction } = vi.hoisted(() => ({
+  generateExamQuestionsAction: vi.fn(),
+}));
+vi.mock("@/modules/exams", () => ({
+  EXAM_DEFAULT_QUESTIONS: 10,
+  EXAM_MAX_QUESTIONS: 30,
+  EXAM_MIN_QUESTIONS: 10,
+  generateExamQuestionsAction,
+}));
 
 const NOTEBOOK_ID = "nb-1";
 const PAGE_ID = "0a1b2c3d-4e5f-4061-8798-a1b2c3d4e5f6";
@@ -70,6 +79,7 @@ describe("TechniquesPanel", () => {
     clearCookie();
     generateFlashcardsAction.mockReset();
     listFlashcardsAction.mockReset();
+    generateExamQuestionsAction.mockReset();
   });
 
   it("portals into the layout slot, not inline", async () => {
@@ -86,18 +96,19 @@ describe("TechniquesPanel", () => {
     expect(screen.queryByTestId("techniques-panel")).not.toBeInTheDocument();
   });
 
-  it("lists the three techniques with previews on: only Flashcards is live, the other two stay disabled previews", async () => {
+  it("lists the three techniques with previews on: Flashcards and Examen are live, Active recall stays a disabled preview", async () => {
     await renderPanel(false);
 
     expect(screen.getByText("Flashcards")).toBeInTheDocument();
     expect(screen.getByText("Active recall")).toBeInTheDocument();
     expect(screen.getByText("Examen")).toBeInTheDocument();
     expect(screen.getByTestId("generate-flashcards")).toBeEnabled();
+    expect(screen.getByTestId("generate-exam-questions")).toBeEnabled();
     const generate = screen.getAllByRole("button", { name: "Generar" });
     expect(generate).toHaveLength(3);
     expect(
       generate.filter((b) => (b as HTMLButtonElement).disabled),
-    ).toHaveLength(2);
+    ).toHaveLength(1);
   });
 
   it("shows Flashcards and Examen but no Active recall or sample sections with previews off", async () => {
@@ -114,7 +125,7 @@ describe("TechniquesPanel", () => {
     expect(screen.queryByText("Mitocondria")).not.toBeInTheDocument();
   });
 
-  it("links the Examen card to the page's questions while its Generar stays disabled", async () => {
+  it("links the Examen card to the page's questions, with both Generar live", async () => {
     await renderPanel(false, { showPreviews: false });
 
     expect(screen.getByTestId("exam-questions-link")).toHaveAttribute(
@@ -128,7 +139,7 @@ describe("TechniquesPanel", () => {
     expect(generate).toHaveLength(2);
     expect(
       generate.filter((b) => (b as HTMLButtonElement).disabled),
-    ).toHaveLength(1);
+    ).toHaveLength(0);
   });
 
   it("keeps the active recall and exam saved items as a labelled sample preview", async () => {
@@ -365,6 +376,138 @@ describe("TechniquesPanel", () => {
 
       expect(await screen.findByTestId("generation-error")).toHaveTextContent(
         "No pudimos generar las tarjetas. Intenta de nuevo.",
+      );
+    });
+  });
+
+  describe("exam questions (real data)", () => {
+    function generated(created: number, skipped = 0, truncated = false) {
+      return ok({
+        questions: [],
+        created,
+        skipped,
+        remainingToday: 3,
+        truncated,
+        wordsUsed: 40,
+        wordsTotal: 90,
+      });
+    }
+
+    it("offers 10 to 30 questions in steps of 5, starting at 10", async () => {
+      const user = userEvent.setup();
+      await renderPanel(false, { showPreviews: false });
+
+      const count = screen.getByRole("group", {
+        name: "Preguntas a generar",
+      });
+      expect(screen.getByTestId("exam-count-value")).toHaveTextContent("10");
+      await user.click(
+        within(count).getByRole("button", { name: "Más preguntas a generar" }),
+      );
+      expect(screen.getByTestId("exam-count-value")).toHaveTextContent("15");
+    });
+
+    it("generates the chosen count for the page, shows pending, then the created count and the counter", async () => {
+      const user = userEvent.setup();
+      let resolve: (value: unknown) => void = () => {};
+      generateExamQuestionsAction.mockReturnValue(
+        new Promise((r) => {
+          resolve = r;
+        }),
+      );
+      await renderPanel(false, { initialRemaining: 4 });
+
+      await user.click(
+        screen.getByRole("button", { name: "Más preguntas a generar" }),
+      );
+      await user.click(screen.getByTestId("generate-exam-questions"));
+
+      expect(generateExamQuestionsAction).toHaveBeenCalledWith({
+        pageId: PAGE_ID,
+        count: 15,
+      });
+      expect(screen.getByTestId("generate-exam-questions")).toHaveTextContent(
+        "Generando…",
+      );
+      await act(async () => resolve(generated(15)));
+
+      expect(
+        await screen.findByTestId("exam-generation-notice"),
+      ).toHaveTextContent("Se generaron 15 preguntas.");
+      expect(screen.getByTestId("generation-remaining")).toHaveTextContent(
+        "Te quedan 3 generaciones hoy",
+      );
+    });
+
+    it("says how many generated questions were discarded and when the page was truncated", async () => {
+      const user = userEvent.setup();
+      generateExamQuestionsAction.mockResolvedValue(generated(9, 1, true));
+      await renderPanel(false);
+
+      await user.click(screen.getByTestId("generate-exam-questions"));
+
+      expect(
+        await screen.findByTestId("exam-generation-notice"),
+      ).toHaveTextContent(
+        "Se generaron 9 preguntas. 1 se descartó por repetida o inválida. Se usaron las primeras 40 palabras de la página.",
+      );
+    });
+
+    it.each([
+      ["AI_DAILY_LIMIT_REACHED", "Llegaste al límite de hoy. Vuelve mañana."],
+      ["AI_PAGE_EMPTY", "La página está vacía: escribe algo antes de generar."],
+      [
+        "AI_GENERATION_FAILED",
+        "No pudimos generar las preguntas. Intenta de nuevo.",
+      ],
+    ])("maps %s to its message", async (code, message) => {
+      const user = userEvent.setup();
+      generateExamQuestionsAction.mockResolvedValue(
+        err({ code, message: "x" }),
+      );
+      await renderPanel(false);
+
+      await user.click(screen.getByTestId("generate-exam-questions"));
+
+      expect(
+        await screen.findByTestId("exam-generation-error"),
+      ).toHaveTextContent(message);
+    });
+
+    it("zeroes the shared counter on the daily limit, disabling both Generar", async () => {
+      const user = userEvent.setup();
+      generateExamQuestionsAction.mockResolvedValue(
+        err({ code: "AI_DAILY_LIMIT_REACHED", message: "x" }),
+      );
+      await renderPanel(false, { initialRemaining: 2 });
+
+      await user.click(screen.getByTestId("generate-exam-questions"));
+
+      await screen.findByTestId("exam-generation-error");
+      expect(screen.getByTestId("generate-exam-questions")).toBeDisabled();
+      expect(screen.getByTestId("generate-flashcards")).toBeDisabled();
+    });
+
+    it("explains a disabled Generar when no generations remain", async () => {
+      await renderPanel(false, { initialRemaining: 0 });
+
+      expect(screen.getByTestId("generate-exam-questions")).toBeDisabled();
+      expect(screen.getByTestId("exam-generation-limit")).toHaveTextContent(
+        "Llegaste al límite de hoy. Vuelve mañana.",
+      );
+    });
+
+    it("reports an unexpected rejection instead of throwing", async () => {
+      const user = userEvent.setup();
+      generateExamQuestionsAction.mockRejectedValue(new Error("network"));
+      await renderPanel(false);
+
+      await user.click(screen.getByTestId("generate-exam-questions"));
+
+      expect(
+        await screen.findByTestId("exam-generation-error"),
+      ).toHaveTextContent(
+        "No pudimos generar las preguntas. Intenta de nuevo.",
       );
     });
   });
