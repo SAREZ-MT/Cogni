@@ -38,6 +38,19 @@ sessions are scheduled by `study-engine`; this module adds the card text.
     nothing is persisted.
   - `listFlashcardsByPage`, `listDecks` (one deck per page, count derived from
     its cards), `getGenerationStatus` (remaining generations, does not consume).
+  - `requestSessionFeedback` (§3.3, §8.4) asks the AI for feedback on a
+    finished session with at least one graded answer
+    (`FLASHCARDS_FEEDBACK_SESSION_OPEN`, `FLASHCARDS_FEEDBACK_NOTHING_REVIEWED`)
+    using the `session_feedback/v1` prompt (counts per button and up to 8
+    hardest fronts, never study time). It only peeks the daily AI limit and
+    never consumes it. Idempotent per session: the first request claims the
+    session's single `SessionFeedback` row, later ones read it back; a
+    `pending` row untouched for `STALE_PENDING_MS` (2 min) is reclaimed; the
+    AI wait is capped at `FEEDBACK_AI_TIMEOUT_MS` (25 s). The final write uses
+    `settlePending`, so a `done` or `failed` row is never overwritten: when
+    the write did not apply or its outcome is unknown, the stored row is
+    returned. Any failure ends as `failed` and still returns `ok`, so it never
+    blocks closing the session. See ADR 0005.
 - `infrastructure/` `DrizzleFlashcardRepository` (table `flashcards`), checked
   by the same contract as the in-memory fake in `testing.ts`;
   `DrizzleDeckUnitOfWork` runs each deck change in one Postgres transaction
@@ -57,8 +70,10 @@ sessions are scheduled by `study-engine`; this module adds the card text.
   `again | hard | good | easy`; returns the session counts and the page's
   mastery level, no revalidation mid-session) and
   `finishFlashcardSessionAction` (counts only, never study time; revalidates
-  the `/flashcards` layout). Scheduling goes through study-engine's
-  `createFlashcardSessionsServerApi`.
+  the `/flashcards` layout) and `requestSessionFeedbackAction`
+  (`{ sessionId }`, returns the feedback `status` and `content`). Scheduling
+  goes through study-engine's `createFlashcardSessionsServerApi`; feedback
+  reads its data through `createSessionFeedbackSources`.
 - `action-support.ts` the boundary helpers both action files share (session,
   Zod parsing, never-throw wrapper, deck revalidation).
 
@@ -70,7 +85,15 @@ e2e, no provider keys needed). Provider keys and Redis variables belong to the
 `ai` module; see `src/modules/ai/README.md`, including the manual smoke script
 that exercises real providers.
 
+## UI
+
+`src/app/(app)/flashcards/`: the deck page reviews in place (`DeckReview`,
+`FlashcardPlayer` with the four SM-2 buttons, `SessionFeedbackPanel` at the
+end) and starts once when opened with `?repasar=1`; `/flashcards` shows
+"Repasos de hoy" (`DueTodayList`, from the `scheduling` module) and the due
+count of every deck; `NewFlashcardDialog` adds manual cards.
+
 ## Next phase
 
-Rest of Phase 4: AI session feedback, the "Repasos de hoy" view and the
-daily mastery job (documento-maestro §13).
+Phase 4 is closed (documento-maestro §13, ADR 0005). Exams (Phase 5) reuse
+the same study engine.

@@ -8,11 +8,12 @@ repaso: todos pasan por este motor.
 
 ## Estado
 
-Fase 4, tareas T1 a T4: dominio puro cubierto al 100 %, persistencia
-(`study_items`, `review_logs`, `page_mastery`, `flashcard_sessions`) con
-puertos, fakes en memoria y adaptadores Drizzle, y la sesión de repaso de
-flashcards (iniciar, calificar, terminar). La retroalimentación con IA, la
-vista "Repasos de hoy" y el trabajo diario llegan en las tareas siguientes.
+Fase 4 completa (decisiones en `docs/adr/0005-motor-de-repeticion-y-flashcards.md`):
+dominio puro cubierto al 100 %, persistencia (`study_items`, `review_logs`,
+`page_mastery`, `flashcard_sessions`, `session_feedback`) con puertos, fakes
+en memoria y adaptadores Drizzle, la sesión de repaso de flashcards (iniciar,
+calificar, terminar), el almacenamiento de la retroalimentación de sesión y
+el trabajo diario que recalcula el dominio de todas las páginas.
 
 ## Dominio (`domain/`)
 
@@ -24,9 +25,12 @@ vista "Repasos de hoy" y el trabajo diario llegan en las tareas siguientes.
 | `review-log.ts` | `ReviewLog` y `SessionKind` (`flashcards` / `exam` / `recall`). |
 | `page-mastery.ts` | `PageMastery`, el agregado persistido por página. |
 | `flashcard-session.ts` | `FlashcardSession` (`pageId` nulo en la sesión multipágina; abierta mientras `finishedAt` es nulo; solo cuenta repasos y respuestas "Otra vez", nunca tiempo) y `newFlashcardSession(...)`. |
+| `session-feedback.ts` | `SessionFeedback` (`status` pending/done/failed, `content`, `generationId`), `newSessionFeedback`, `completeSessionFeedback` y `failSessionFeedback`. |
+| `studied-page-reader.ts` | Puerto `StudiedPageReader.listStalePages({ staleBefore, after, limit })`: páginas con ítems cuyo dominio falta o es anterior a `staleBefore`, la más desactualizada primero, paginadas por `(masteryComputedAt, pageId)`. Es el único puerto entre dueños: lo usa solo el trabajo diario y devuelve identificadores. |
 | `errors.ts` | Códigos `STUDY_ENGINE_ERROR`, entre ellos `ITEM_NOT_DUE`, `NOTHING_DUE`, `SESSION_NOT_FOUND` y `SESSION_FINISHED`. |
-| `study-item-repository.ts` | Puerto `StudyItemRepository`: `save` (inserta o reemplaza el estado SM-2), `findById`, `findBySource(kind, sourceId)`, `listDue(ownerId, now, pageId?)` (no suspendidos con `dueAt <= now`, el más antiguo primero; excluye páginas archivadas y páginas de cuadernos archivados), `listByPage` (incluye suspendidos), `suspend` (idempotente) y `lock` (bloqueo de fila hasta el fin de la unidad de trabajo). |
-| `review-log-repository.ts` | Puerto `ReviewLogRepository`: `append` y `listByItem` (solo inserción, el más antiguo primero). |
+| `study-item-repository.ts` | Puerto `StudyItemRepository`: `save` (inserta o reemplaza el estado SM-2), `findById`, `findBySource(kind, sourceId)`, `listDue(ownerId, now, pageId?)` (no suspendidos con `dueAt <= now`, el más antiguo primero; excluye páginas archivadas y páginas de cuadernos archivados), `listByPage` (incluye suspendidos), `suspend` (idempotente), `lock` (bloqueo de fila hasta el fin de la unidad de trabajo) y `lockPage(pageId, ownerId, timeoutMs)` (bloquea todos los ítems de la página en orden de id y se rinde tras `timeoutMs`). |
+| `review-log-repository.ts` | Puerto `ReviewLogRepository`: `append`, `listByItem` y `listBySession` (solo inserción, el más antiguo primero). |
+| `session-feedback-repository.ts` | Puerto `SessionFeedbackRepository`: `create` (una fila por sesión; `false` si ya existe), `findBySession`, `settlePending` (escribe `done` o `failed` solo si la fila sigue `pending`; devuelve si se aplicó) y `reclaimStalePending` (toma una fila `pending` abandonada; un solo ganador). |
 | `flashcard-session-repository.ts` | Puerto `FlashcardSessionRepository`: `insert`, `findById`, `recordGrade` (incrementos atómicos) y `finish` (idempotente). |
 | `page-mastery-repository.ts` | Puerto `PageMasteryRepository`: `upsert` (una fila por página; conserva el primer `id`), `getByPage` y `listByOwner` (ordenado por `pageId`). |
 
@@ -43,6 +47,7 @@ ni se sobrescriben.
 | `start-flashcard-session.ts` | `startFlashcardSession({ pageId? })`: comprueba la página con `PageAccess` (que `PageTextReader` de notebooks cumple), lista las flashcards vencidas de esa página o de todas las del dueño, abre la sesión y devuelve cada ítem con `flashcardId` y los días que programaría cada botón. Sin vencidas responde `NOTHING_DUE` y no abre sesión. |
 | `grade-flashcard.ts` | `gradeFlashcard({ sessionId, itemId, rating })`: botón → calidad (§7.2), `applySm2`, guarda el ítem, agrega el `ReviewLog`, cuenta la respuesta en la sesión y recalcula `PageMastery`, todo en una `StudyUnitOfWork`. Bloquea el ítem antes de leerlo. Rechaza sin escribir: sesión ajena, desconocida o terminada; ítem ajeno, de otra página, de otra técnica, suspendido (tarjeta archivada) o no vencido (doble envío). |
 | `finish-flashcard-session.ts` | `finishFlashcardSession({ sessionId })`: cierra la sesión (idempotente) y devuelve sus conteos. |
+| `recompute-all-page-mastery.ts` | `recomputeAllPageMastery(deps)`: el trabajo diario (§7.3). Recorre `listStalePages` en lotes de 200 dentro de `timeBudgetMs`; por página, una unidad de trabajo que bloquea los ítems (`lockPage` con `MASTERY_PAGE_LOCK_TIMEOUT_MS`, 5 s), lee el reloj, recalcula con `computeMastery` y hace `upsert`. Una página que falla (incluido el tiempo de espera del bloqueo) se cuenta y se informa con `onPageError` sin detener a las demás. Devuelve `{ pagesRecomputed, pagesFailed, complete }`. |
 | `study-unit-of-work.ts` | Puerto `StudyUnitOfWork`: ítems, logs, dominio y sesiones confirman o revierten juntos. |
 
 ## Persistencia
@@ -59,8 +64,18 @@ tablas: solo el servidor accede.
 | Capa | Archivos |
 |---|---|
 | `application/testing/` | Contratos compartidos `*-repository.contract.ts` y fakes `InMemory*Repository` (exportados por `testing.ts`). |
-| `infrastructure/` | `DrizzleStudyItemRepository` (`lock` es `SELECT ... FOR UPDATE`), `DrizzleReviewLogRepository`, `DrizzlePageMasteryRepository`, `DrizzleFlashcardSessionRepository` y `DrizzleStudyUnitOfWork` (una transacción por calificación). Aceptan la base o una transacción abierta (`DbExecutor`). |
-| `server-api.ts` | Exportado por `index.ts`. `createStudyItemRepository(db)`: otros módulos guardan ítems dentro de su propia transacción (flashcards lo usa en `DrizzleDeckUnitOfWork`). `createFlashcardSessionsServerApi({ db, pages, clock, ids })`: `start`, `grade` y `finish`, que llaman las acciones de servidor de flashcards (este módulo no conoce el texto de las tarjetas). |
+| `infrastructure/` | `DrizzleStudyItemRepository` (`lock` y `lockPage` son `SELECT ... FOR UPDATE`; `lockPage` fija antes un `lock_timeout` local a la transacción con `set_config`), `DrizzleReviewLogRepository`, `DrizzlePageMasteryRepository`, `DrizzleFlashcardSessionRepository`, `DrizzleSessionFeedbackRepository` (reclamo y cierre con `UPDATE` condicional), `DrizzleStudiedPageReader` y `DrizzleStudyUnitOfWork` (una transacción por calificación o por página del trabajo diario). Aceptan la base o una transacción abierta (`DbExecutor`). |
+| `server-api.ts` | Exportado por `index.ts`. `createStudyItemRepository(db)`: otros módulos guardan ítems dentro de su propia transacción (flashcards lo usa en `DrizzleDeckUnitOfWork`). `createFlashcardSessionsServerApi({ db, pages, clock, ids })`: `start`, `grade` y `finish`, que llaman las acciones de servidor de flashcards (este módulo no conoce el texto de las tarjetas). `createSessionFeedbackSources(db)`: sesiones, logs, ítems y retroalimentación para el caso de uso `requestSessionFeedback` de flashcards. `createMasteryRecomputeJob({ db, clock, ids, timeBudgetMs, onPageError })`: el trabajo diario que ejecuta la ruta `/api/recompute-mastery`. |
+
+## Trabajo diario
+
+`GET /api/recompute-mastery` (`src/app/api/recompute-mastery/route.ts`) corre
+con Vercel Cron a las 06:30 UTC (`vercel.json`). Exige `Authorization: Bearer
+$CRON_SECRET` con comparación de tiempo constante (401 si falta o no coincide;
+500 si `CRON_SECRET` no está configurado). Declara `maxDuration = 300` y da al
+trabajo 240 s; responde `{ ok, pagesRecomputed, pagesFailed, complete }`, y
+500 `{ ok: false }` si falla el listado. Una ejecución incompleta deja las
+páginas pendientes al frente de la siguiente.
 
 ## Pruebas
 
@@ -79,7 +94,13 @@ revisión) y comprueba intervalos, EF, fechas, logs y dominio exactos.
 `tests/db/drizzle-study-unit-of-work.test.ts` prueba contra Postgres que una
 calificación escribe todo junto, revierte todo si falla un paso, rechaza el
 ítem de otro dueño y aplica SM-2 una sola vez ante dos calificaciones
-concurrentes de la misma tarjeta.
+concurrentes de la misma tarjeta. `recompute-all-page-mastery.test.ts` cubre
+lotes, presupuesto de tiempo, orden por antigüedad, páginas fallidas y el
+orden bloquear → leer → escribir; `tests/db/recompute-page-mastery-race.test.ts`
+prueba contra Postgres que el trabajo espera la calificación en curso y que
+abandona una página cuyo bloqueo supera el `lock_timeout`. Los contratos de
+`StudiedPageReader` y `SessionFeedbackRepository` corren contra el fake y
+contra Postgres.
 
 ## Dependencias declaradas
 

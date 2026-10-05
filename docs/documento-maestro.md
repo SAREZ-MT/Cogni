@@ -2,8 +2,9 @@
 
 | Campo | Valor |
 |---|---|
-| Versión del documento | 1.2.0 |
+| Versión del documento | 1.3.0 |
 | Fecha | 2026-09-14 (actualizado 2026-10-04) |
+| Cambios de la versión 1.3.0 | ADR 0005: decisiones de implementación de la Fase 4 (repaso en la página del mazo, calificación solo de ítems vencidos, retroalimentación idempotente que no consume el límite diario de IA, trabajo diario de dominio acotado en tiempo y con bloqueo por página). Notas en §5.2, §6.1 y §7.3; §13 (Fase 4 implementada). |
 | Cambios de la versión 1.2.0 | ADR 0004: capa de IA con cuatro proveedores gratuitos (Mistral y Cerebras descartados), límite de 6 generaciones por usuario por día y tope de página con truncado. Actualizadas §4.2, §4.3, §8.1, §8.2, §8.3, §8.4, §8.5 y §13 (Fase 3 implementada). |
 | Cambios de la versión 1.1.0 | ADR 0003: Vercel Fluid Compute y Vercel Cron reemplazan a Trigger.dev. Fase 2 (importación de PDF) implementada y fuera de "Próximamente". La métrica por técnica "tiempo de estudio" se reemplaza por "repasos completados". |
 | Estado | Aprobado. Fuente de verdad para todas las fases. |
@@ -239,6 +240,8 @@ Restricción conocida: los modelos Pro de Gemini no están en el tier gratuito. 
 | `scheduling` | Calendario y vista "Hoy" | `study-engine`, `notebooks` |
 | `analytics` | Dashboard, métricas, calibración | `study-engine`, técnicas (solo lectura) |
 
+Nota de implementación (Fase 4, ADR 0005): `study-engine` también persiste las sesiones de flashcards y la retroalimentación de sesión (`FlashcardSession`, `SessionFeedback`) y ofrece la sesión de repaso (iniciar, calificar, terminar) como API de servidor; las acciones que la usan y el caso de uso de retroalimentación viven en `flashcards`, porque `study-engine` no importa técnicas. Los puertos `RecordReview` y `GetDueItems` de §5.3 se materializan en esa API (`gradeFlashcard`, `startFlashcardSession`) y en `StudyItemRepository.listDue`.
+
 ### 5.3 Reglas de dependencia (obligatorias)
 
 1. `domain` no importa nada externo: ni Next.js, ni Drizzle, ni AI SDK, ni React.
@@ -350,7 +353,13 @@ Relaciones que importan:
 - Un `StudyItem` de tipo `exam_question` apunta a la pregunta **raíz** (`root_id`). Todas las variantes de esa raíz alimentan el mismo ítem. Así el motor sigue el concepto, no la redacción.
 - `ReviewLog.session_id` apunta a `FlashcardSession`, `ExamSession` o `RecallSession` según `session_kind`.
 - `SessionFeedback` existe una vez por sesión terminada.
-- `owner_id` se filtra en la capa de aplicación en toda consulta, sin excepción.
+- `owner_id` se filtra en la capa de aplicación en toda consulta, sin excepción. La única excepción deliberada es el listado entre dueños del trabajo diario de dominio (`StudiedPageReader`), que corre sin sesión y devuelve solo identificadores.
+
+Notas de implementación de la Fase 4 (ADR 0005):
+
+- `FlashcardSession` no tiene `status`: está abierta mientras `finished_at` es nulo. Su tabla y su repositorio están en `study-engine`.
+- `SessionFeedback` nace `pending` cuando se pide y pasa una sola vez a `done` (con contenido) o `failed`; ambos son definitivos. Una fila `pending` sin tocar durante 2 minutos se puede reclamar. Su tabla y su repositorio están en `study-engine`; el caso de uso, en `flashcards`.
+- `Flashcard.archived_at` se agregó en la migración 0009 (faltaba en la Fase 3). Archivar una tarjeta suspende su `StudyItem`; el último ítem activo de un mazo no se puede archivar.
 
 ### 6.2 Reglas de persistencia
 
@@ -413,6 +422,11 @@ nivel:
 ```
 
 Es una fórmula v1. Se implementa como función pura, se prueba al 100 % y se ajusta por ADR con datos reales. El calendario ordena por `due_at` mínimo de los ítems de la página; el dashboard muestra `level` y `score`.
+
+Notas de implementación de la Fase 4 (ADR 0005):
+
+- Calificar exige que el ítem esté vencido: un ítem con `due_at` futuro (por ejemplo, un doble envío) se rechaza con `STUDY_ENGINE_ITEM_NOT_DUE` sin escribir, bajo bloqueo de fila del ítem.
+- `PageMastery` se recalcula en la misma transacción de cada calificación y, además, una vez al día para todas las páginas en `/api/recompute-mastery` (Vercel Cron, 06:30 UTC, `CRON_SECRET`). El trabajo procesa primero las páginas más desactualizadas dentro de un presupuesto de 240 s, bloquea los ítems de cada página con un `lock_timeout` de 5 s y deja para la siguiente ejecución las páginas que no alcanzó o que fallaron.
 
 ### 7.4 Calidad combinada en recordación activa (v1)
 
@@ -627,8 +641,15 @@ Estado (actualizado en la Fase 3):
 
 ### Fase 4 — Motor de repetición espaciada y Flashcards
 
+> **Implementada el 2026-10-04 en siete PR apiladas (#71–#76 y la de cierre), construida con ODD.** Decisiones en `docs/adr/0005-motor-de-repeticion-y-flashcards.md`.
+
 Entregables: `applySm2` y `computeMastery` con TDD al 100 %, `StudyItem`, `ReviewLog`, `PageMastery`, flashcards manuales, sesión de repaso con 4 botones, retroalimentación de sesión con IA, vista mínima "Repasos de hoy", job diario.
 Hecho cuando: un usuario repasa durante 3 días simulados y los intervalos coinciden exactamente con SM-2 en los tests y en producción.
+
+Estado (actualizado en la Fase 4):
+
+- Entregado: `applySm2` y `computeMastery` con cobertura del 100 %; migración `0009_study_engine` (`study_items`, `review_logs`, `page_mastery`, `flashcard_sessions`, `session_feedback`, `flashcards.archived_at`, con ítems rellenados para las tarjetas existentes); flashcards manuales ("Nueva tarjeta") y archivado sin dejar mazos vacíos; sesión de repaso en la página del mazo con los cuatro botones y bloqueo contra doble calificación; retroalimentación con IA (`session_feedback/v1`) al cerrar la sesión; vista "Repasos de hoy" en `/flashcards` (módulo `scheduling`) con conteos reales de vencidas por mazo; trabajo diario `/api/recompute-mastery`. La prueba de integración con reloj inyectado reproduce los días 0, 1 y 2 y la tercera revisión el día 7 (intervalos 1, 6 y 16; EF 2,46).
+- Pendiente: el inicio automático de `?repasar=1` es por instancia de `DeckReview` (no se dispara en una navegación del cliente sin volver a montar, y el parámetro queda en la URL si no hay nada que repasar); el contrato del lector de "Repasos de hoy" no prueba el desempate con igual `earliestDueAt`; `isAuthorized` duplicado entre `/api/keep-alive` y `/api/recompute-mastery`; la sesión multipágina no tiene entrada en la interfaz; las sesiones abandonadas quedan abiertas; el trabajo diario recalcula páginas archivadas; el registro "destination stream closed early" en los e2e. Detalle en ADR 0005.
 
 ### Fase 5 — Exámenes
 

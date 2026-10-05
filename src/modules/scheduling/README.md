@@ -7,8 +7,10 @@ fechas de vencimiento que escribe `study-engine` (§3.4); nunca calcula una.
 
 ## Estado
 
-Fase 4, tarea T6: vista "Repasos de hoy". El calendario mensual y semanal
-llega en la Fase 7.
+Fase 4 (cerrada, ADR 0005): vista "Repasos de hoy". Cada fila abre la página
+del mazo con `?repasar=1`, que inicia el repaso en el mismo lugar; no hay
+sesión multipágina en la interfaz. El calendario mensual y semanal y la vista
+"Hoy" completa llegan en la Fase 7.
 
 ## Dominio (`domain/`)
 
