@@ -17,6 +17,24 @@ vi.mock("@sentry/nextjs", () => ({ captureException }));
 const { revalidatePath } = vi.hoisted(() => ({ revalidatePath: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath }));
 
+const { track } = vi.hoisted(() => ({ track: vi.fn() }));
+vi.mock("@/shared/observability/analytics", () => ({
+  createServerAnalytics: () => ({ track }),
+}));
+// The generation action is proven against a stubbed use case: this file
+// checks the boundary around it (analytics, revalidation, error mapping).
+vi.mock("@/modules/ai", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/modules/ai")>()),
+  createAiServerApi: () => ({ generationLimiter: {} }),
+}));
+const { requestExamGeneration } = vi.hoisted(() => ({
+  requestExamGeneration: vi.fn(),
+}));
+vi.mock("./application", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./application")>()),
+  requestExamGeneration,
+}));
+
 let current: {
   uow: InMemoryExamUnitOfWork;
   pageFound: boolean;
@@ -73,6 +91,9 @@ describe("exams Server Actions", () => {
     getCurrentUser.mockResolvedValue({ id: OWNER });
     captureException.mockClear();
     revalidatePath.mockClear();
+    track.mockReset();
+    track.mockResolvedValue(undefined);
+    requestExamGeneration.mockReset();
     current = {
       uow: new InMemoryExamUnitOfWork(),
       pageFound: true,
@@ -259,6 +280,49 @@ describe("exams Server Actions", () => {
       expect(!anonymous.ok && anonymous.error.code).toBe(
         "EXAMS_SESSION_REQUIRED",
       );
+    });
+  });
+
+  describe("generateExamQuestionsAction", () => {
+    const GENERATED = {
+      provider: "fake",
+      model: "fake-model",
+      questions: [],
+      skipped: 0,
+      remainingToday: 4,
+      truncated: false,
+      wordsUsed: 10,
+      wordsTotal: 10,
+    };
+
+    it("keeps a saved generation successful and revalidates when analytics rejects", async () => {
+      requestExamGeneration.mockResolvedValue(ok(GENERATED));
+      track.mockRejectedValue(new Error("posthog down"));
+      const { generateExamQuestionsAction } = await actions();
+
+      const result = await generateExamQuestionsAction({
+        pageId: PAGE,
+        count: 10,
+      });
+
+      expect(result).toEqual(
+        ok(expect.objectContaining({ created: 0, remainingToday: 4 })),
+      );
+      expect(revalidatePath).toHaveBeenCalledWith("/exams", "layout");
+      expect(track).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps the domain error of a refused generation when analytics rejects", async () => {
+      requestExamGeneration.mockResolvedValue(
+        err(new DomainError("PAGE_NOT_FOUND", PAGE)),
+      );
+      track.mockRejectedValue(new Error("posthog down"));
+      const { generateExamQuestionsAction } = await actions();
+
+      const result = await generateExamQuestionsAction({ pageId: PAGE });
+
+      expect(!result.ok && result.error.code).toBe("PAGE_NOT_FOUND");
+      expect(track).toHaveBeenCalledTimes(1);
     });
   });
 });

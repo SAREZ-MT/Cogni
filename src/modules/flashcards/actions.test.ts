@@ -239,6 +239,27 @@ describe("flashcards Server Actions", () => {
       );
     });
 
+    it("keeps a saved generation successful when analytics rejects", async () => {
+      track.mockRejectedValueOnce(new Error("posthog down"));
+      const { generateFlashcardsAction } = await actions();
+
+      const result = await generateFlashcardsAction({ pageId: PAGE });
+
+      expect(result.ok).toBe(true);
+      expect(await current.flashcards.countByPage(PAGE, OWNER)).toBe(1);
+      expect(track).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps the domain error of a refused generation when analytics rejects", async () => {
+      current.pageText = { title: "T", plainText: " " };
+      track.mockRejectedValueOnce(new Error("posthog down"));
+      const { generateFlashcardsAction } = await actions();
+
+      const result = await generateFlashcardsAction({ pageId: PAGE });
+
+      expect(!result.ok && result.error.code).toBe(AI_ERROR.PAGE_EMPTY);
+    });
+
     it("never throws: an unexpected failure is reported to Sentry", async () => {
       current.throwOnPageRead = true;
       const { generateFlashcardsAction } = await actions();

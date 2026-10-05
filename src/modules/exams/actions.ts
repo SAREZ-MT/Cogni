@@ -1,5 +1,6 @@
 "use server";
 
+import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
 import { AI_ERROR, createAiServerApi } from "@/modules/ai";
 import { createNotebooksServerApi } from "@/modules/notebooks";
@@ -13,7 +14,10 @@ import {
 } from "@/shared/kernel/domain-error";
 import { createId } from "@/shared/kernel/id";
 import { err, ok, type Result } from "@/shared/kernel/result";
-import { createServerAnalytics } from "@/shared/observability/analytics";
+import {
+  type Analytics,
+  createServerAnalytics,
+} from "@/shared/observability/analytics";
 import {
   parseInput,
   requireOwnerId,
@@ -145,6 +149,19 @@ function generationDeps() {
       host: env.NEXT_PUBLIC_POSTHOG_HOST,
     }),
   };
+}
+
+// Analytics is never a dependency of the action: a rejected event is
+// reported and dropped, so a saved generation still answers with its result.
+async function trackSafely(
+  analytics: Analytics,
+  ...event: Parameters<Analytics["track"]>
+): Promise<void> {
+  try {
+    await analytics.track(...event);
+  } catch (error) {
+    Sentry.captureException(error);
+  }
 }
 
 function statusFor(error: DomainError): "limit" | "empty" | "failed" {
@@ -283,7 +300,7 @@ export async function generateExamQuestionsAction(
 
     const purpose = "generate_exam_questions";
     if (!result.ok) {
-      await analytics.track("generation_requested", ownerId.value, {
+      await trackSafely(analytics, "generation_requested", ownerId.value, {
         pageId: parsed.value.pageId,
         purpose,
         provider: null,
@@ -300,7 +317,8 @@ export async function generateExamQuestionsAction(
     }
 
     const value = result.value;
-    await analytics.track("generation_requested", ownerId.value, {
+    revalidateExams();
+    await trackSafely(analytics, "generation_requested", ownerId.value, {
       pageId: parsed.value.pageId,
       purpose,
       provider: value.provider,
@@ -308,7 +326,6 @@ export async function generateExamQuestionsAction(
       status: "done",
       truncated: value.truncated,
     });
-    revalidateExams();
     return ok({
       questions: value.questions.map(toView),
       created: value.questions.length,
