@@ -3,13 +3,15 @@ import { afterAll } from "vitest";
 import { runFlashcardSessionRepositoryContract } from "@/modules/study-engine/application/testing/flashcard-session-repository.contract";
 import { runPageMasteryRepositoryContract } from "@/modules/study-engine/application/testing/page-mastery-repository.contract";
 import { runReviewLogRepositoryContract } from "@/modules/study-engine/application/testing/review-log-repository.contract";
+import { runSessionFeedbackRepositoryContract } from "@/modules/study-engine/application/testing/session-feedback-repository.contract";
 import { runStudyItemRepositoryContract } from "@/modules/study-engine/application/testing/study-item-repository.contract";
 import { newStudyItem } from "@/modules/study-engine/domain/study-item";
 import { DrizzleFlashcardSessionRepository } from "@/modules/study-engine/infrastructure/drizzle-flashcard-session-repository";
 import { DrizzlePageMasteryRepository } from "@/modules/study-engine/infrastructure/drizzle-page-mastery-repository";
 import { DrizzleReviewLogRepository } from "@/modules/study-engine/infrastructure/drizzle-review-log-repository";
+import { DrizzleSessionFeedbackRepository } from "@/modules/study-engine/infrastructure/drizzle-session-feedback-repository";
 import { DrizzleStudyItemRepository } from "@/modules/study-engine/infrastructure/drizzle-study-item-repository";
-import { notebooks, pages, profiles } from "@/shared/db/schema";
+import { aiGenerations, notebooks, pages, profiles } from "@/shared/db/schema";
 import { createTestDb } from "./helpers/test-db";
 import { createTestOwner, deleteTestOwner } from "./helpers/test-owner";
 
@@ -91,5 +93,26 @@ if (process.env.DATABASE_URL) {
   runFlashcardSessionRepositoryContract({
     createRepository: () => new DrizzleFlashcardSessionRepository(db),
     context: () => ({ ...ownership, newPageId: newPage }),
+  });
+
+  runSessionFeedbackRepositoryContract({
+    createRepository: () => new DrizzleSessionFeedbackRepository(db),
+    context: () => ({
+      ...ownership,
+      newGenerationId: async () => {
+        const id = randomUUID();
+        await db.insert(aiGenerations).values({
+          id,
+          ownerId: owner.id,
+          pageId: null,
+          purpose: "session_feedback",
+          provider: "fake",
+          model: "fake-model",
+          promptVersion: "session_feedback/v1",
+          status: "done",
+        });
+        return id;
+      },
+    }),
   });
 }

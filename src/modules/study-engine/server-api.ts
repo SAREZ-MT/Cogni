@@ -14,10 +14,15 @@ import {
   startFlashcardSession,
 } from "./application";
 import type { FlashcardSession } from "./domain/flashcard-session";
+import type { FlashcardSessionRepository } from "./domain/flashcard-session-repository";
+import type { ReviewLogRepository } from "./domain/review-log-repository";
+import type { SessionFeedbackRepository } from "./domain/session-feedback-repository";
 import type { FlashcardRating } from "./domain/study-item";
 import type { StudyItemRepository } from "./domain/study-item-repository";
 import {
   DrizzleFlashcardSessionRepository,
+  DrizzleReviewLogRepository,
+  DrizzleSessionFeedbackRepository,
   DrizzleStudyItemRepository,
   DrizzleStudyUnitOfWork,
 } from "./infrastructure";
@@ -74,5 +79,26 @@ export function createFlashcardSessionsServerApi(deps: {
       ),
     finish: (ownerId, input) =>
       finishFlashcardSession(input, { sessions, clock }, ownerId),
+  };
+}
+
+// What a technique's session feedback reads and writes (flashcards'
+// requestSessionFeedback): the finished session, its graded answers, their
+// items and the session's single feedback row.
+export interface SessionFeedbackSources {
+  sessions: FlashcardSessionRepository;
+  reviewLogs: ReviewLogRepository;
+  studyItems: StudyItemRepository;
+  feedback: SessionFeedbackRepository;
+}
+
+export function createSessionFeedbackSources(
+  db: DbExecutor,
+): SessionFeedbackSources {
+  return {
+    sessions: new DrizzleFlashcardSessionRepository(db),
+    reviewLogs: new DrizzleReviewLogRepository(db),
+    studyItems: new DrizzleStudyItemRepository(db),
+    feedback: new DrizzleSessionFeedbackRepository(db),
   };
 }

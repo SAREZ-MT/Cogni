@@ -92,6 +92,46 @@ export function runReviewLogRepositoryContract(
       expect(await repo.listByItem(itemId, ctx.otherOwnerId)).toEqual([]);
     });
 
+    it("listBySession returns one session's logs oldest first", async () => {
+      const ctx = options.context();
+      const repo = options.createRepository();
+      const itemId = await ctx.newItemId();
+      const otherItemId = await ctx.newItemId();
+      const sessionId = ctx.newId();
+      const later = makeLog(ctx, otherItemId, "2026-10-01T09:05:00.000Z", {
+        sessionId,
+        quality: 1,
+      });
+      const earlier = makeLog(ctx, itemId, "2026-10-01T09:00:00.000Z", {
+        sessionId,
+      });
+      await repo.append(later);
+      await repo.append(earlier);
+      await repo.append(makeLog(ctx, itemId, "2026-10-01T09:01:00.000Z"));
+      await repo.append(
+        makeLog(ctx, itemId, "2026-10-01T09:02:00.000Z", {
+          sessionId,
+          sessionKind: "exam",
+        }),
+      );
+      expect(
+        await repo.listBySession("flashcards", sessionId, ctx.ownerId),
+      ).toEqual([earlier, later]);
+    });
+
+    it("listBySession never lists another owner's logs", async () => {
+      const ctx = options.context();
+      const repo = options.createRepository();
+      const itemId = await ctx.newItemId();
+      const sessionId = ctx.newId();
+      await repo.append(
+        makeLog(ctx, itemId, "2026-10-01T09:00:00.000Z", { sessionId }),
+      );
+      expect(
+        await repo.listBySession("flashcards", sessionId, ctx.otherOwnerId),
+      ).toEqual([]);
+    });
+
     it("keeps every session kind", async () => {
       const ctx = options.context();
       const repo = options.createRepository();

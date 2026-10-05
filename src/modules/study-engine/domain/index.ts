@@ -19,6 +19,16 @@ export type { PageMastery } from "./page-mastery";
 export type { PageMasteryRepository } from "./page-mastery-repository";
 export type { ReviewLog, SessionKind } from "./review-log";
 export type { ReviewLogRepository } from "./review-log-repository";
+export {
+  completeSessionFeedback,
+  failSessionFeedback,
+  type NewSessionFeedbackInput,
+  newSessionFeedback,
+  type SessionFeedback,
+  type SessionFeedbackContent,
+  type SessionFeedbackStatus,
+} from "./session-feedback";
+export type { SessionFeedbackRepository } from "./session-feedback-repository";
 export { applySm2 } from "./sm2";
 export {
   FLASHCARD_QUALITY,

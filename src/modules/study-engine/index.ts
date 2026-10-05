@@ -10,6 +10,8 @@ export type {
 export * from "./domain";
 export {
   createFlashcardSessionsServerApi,
+  createSessionFeedbackSources,
   createStudyItemRepository,
   type FlashcardSessionsServerApi,
+  type SessionFeedbackSources,
 } from "./server-api";

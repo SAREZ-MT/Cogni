@@ -1,7 +1,7 @@
 import { and, asc, eq } from "drizzle-orm";
 import type { DbExecutor } from "@/shared/db/client";
 import { type ReviewLogRow, reviewLogs } from "@/shared/db/schema";
-import type { ReviewLog } from "../domain/review-log";
+import type { ReviewLog, SessionKind } from "../domain/review-log";
 import type { ReviewLogRepository } from "../domain/review-log-repository";
 
 function toReviewLog(row: ReviewLogRow): ReviewLog {
@@ -45,6 +45,25 @@ export class DrizzleReviewLogRepository implements ReviewLogRepository {
       .from(reviewLogs)
       .where(
         and(eq(reviewLogs.itemId, itemId), eq(reviewLogs.ownerId, ownerId)),
+      )
+      .orderBy(asc(reviewLogs.reviewedAt), asc(reviewLogs.id));
+    return rows.map(toReviewLog);
+  }
+
+  async listBySession(
+    sessionKind: SessionKind,
+    sessionId: string,
+    ownerId: string,
+  ): Promise<ReviewLog[]> {
+    const rows = await this.db
+      .select()
+      .from(reviewLogs)
+      .where(
+        and(
+          eq(reviewLogs.sessionKind, sessionKind),
+          eq(reviewLogs.sessionId, sessionId),
+          eq(reviewLogs.ownerId, ownerId),
+        ),
       )
       .orderBy(asc(reviewLogs.reviewedAt), asc(reviewLogs.id));
     return rows.map(toReviewLog);
