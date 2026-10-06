@@ -39,10 +39,14 @@ Implementado:
   tiene respuestas). Guardar y terminar se serializan con el bloqueo de la
   fila de la sesión.
 - `actions.ts`: `generateRecallQuestionsAction`; `session-actions.ts`:
-  `getRecallSessionPlanAction`, `startRecallSessionAction`,
-  `saveRecallAnswerAction` y `finishRecallSessionAction`. Ninguna lanza:
-  responden `{ code, message }` (y `resetAt` en el límite diario).
-- "Generar" del panel de técnicas conectado desde la tarea T4.
+  `getRecallSessionPlanAction`, `getRecallPageSummaryAction` (cantidad de
+  preguntas activas de la página, para la fila del panel),
+  `startRecallSessionAction`, `saveRecallAnswerAction` y
+  `finishRecallSessionAction`. Ninguna lanza: responden `{ code, message }`
+  (y `resetAt` en el límite diario).
+- Panel "Técnicas de estudio": "Generar" conectado desde la tarea T4; desde
+  T5b, la fila "Recordación activa" de "Generado en esta página" abre la
+  sesión (`/active-recall/{notebookId}/{pageId}`).
 
 Pendiente: evaluación con IA (T6) y el hub y la vista de cuaderno sobre
 datos reales (T7).

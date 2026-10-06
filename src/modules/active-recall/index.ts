@@ -10,7 +10,9 @@ export * from "./domain";
 export {
   type FinishedRecallSessionView,
   finishRecallSessionAction,
+  getRecallPageSummaryAction,
   getRecallSessionPlanAction,
+  type RecallPageSummaryView,
   type RecallSessionPlanView,
   type RecallSessionQuestionView,
   type SavedRecallAnswerView,

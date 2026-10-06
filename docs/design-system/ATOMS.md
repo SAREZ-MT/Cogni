@@ -235,13 +235,12 @@ anatomy; simplified per user decision 2026-09-24 — a card has **only** a
 
 Used by: `techniques-panel.tsx`.
 
-**Preview gate.** Flashcards are real since Phase 3 (Generar, quota counter,
-the page's cards); active recall and exams are still sample-data previews
-until their routes land. The page route (`pages/[pageId]/page.tsx`) always
-renders `TechniquesPanel` and passes `showPreviews={designPreviewsEnabled()}`:
-with previews off (production) the panel shows only the Flashcards card and
-the page's real deck; with previews on it also lists the two preview
-techniques and their sample saved sections under a "Vista previa" pill.
+**Generated list (Phase 6 T5b).** The panel no longer has sample previews:
+all three techniques are real, and below the cards one `SavedStudySection`
+("Generado en esta página") lists one `StudyItemRow` per technique with
+content on the page (NotebookLM Studio model). Cards only generate — no
+practice button or deck/exam link inside a card, except Examen's
+"Preguntas" link, kept until the questions screen gets another entry.
 `SavedStudySection` keys rows by tone + href + label, so rows sharing a label
 need distinct hrefs.
 
@@ -277,14 +276,12 @@ reference.
   the label when `items` is empty; without it an empty group renders
   nothing), `className?`.
 
-Used by: `techniques-panel.tsx`, once per technique (`Mazo de esta página` /
-`Sesiones de Active Recall` / `Exámenes recientes`), below a "Generado en
-esta página" title + a neutral `Pill` "Vista previa" (the section's data
-comes from `flashcards/_data/sample.ts`'s `getSampleStudyItemsForPage()` —
-fixed sample items, not filtered by the real page, since there's no backend
-yet). The flashcards group is always at most one item: one page owns at most
-one deck (product rule 2026-09-24), so "Mazo de esta página" never lists more
-than the page's own deck.
+Used by: `techniques-panel.tsx`, once, as "Generado en esta página": one row
+per technique with content on the page (Flashcards → "N tarjetas", deck
+route with `?repasar=1`; Recordación activa → "N preguntas", recall session
+route; Examen → "N preguntas" plus "· Repetición pendiente" while a retake is
+pending, exam route), with a tinted `EmptyState` as `empty` when nothing was
+generated yet.
 
 ## ViewToggle (`view-toggle.tsx`)
 

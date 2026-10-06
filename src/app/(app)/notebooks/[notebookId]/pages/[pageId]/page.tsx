@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
+import { getRecallPageSummaryAction } from "@/modules/active-recall";
 import { getExamReviewNoticeAction } from "@/modules/exams";
 import {
   type FlashcardView,
@@ -16,7 +17,6 @@ import {
   requestImageUpload,
   saveContent,
 } from "@/modules/notebooks";
-import { designPreviewsEnabled } from "@/shared/config/design-previews";
 import { BackLink } from "@/shared/ui/back-link";
 import {
   PAGE_STATUS_SLOT_ID,
@@ -79,24 +79,25 @@ export default async function PageView({ params }: PagePageProps) {
   const jobResult = await getImportJobStatus({ pageId: page.id });
   const initialJob = jobResult.ok ? jobResult.value : null;
 
-  // The "Técnicas" panel always renders its three techniques on real data
-  // (Flashcards, Examen and, since Phase 6 T5, Active recall). The server
-  // only decides whether the sample "Vista previa" saved items (Active
-  // recall sessions, recent exams) show up in it.
-  const showPreviews = designPreviewsEnabled();
-
-  // Initial panel data is read here and refreshed client-side after each
-  // generation. Both actions never throw; a failed read degrades to an empty
-  // deck / unknown counter instead of blocking the editor route.
+  // Initial panel data (the "Técnicas de estudio" panel always shows its
+  // three techniques on real data, Phase 6 T5b) is read here and refreshed
+  // client-side after each generation. A failed read degrades to an empty
+  // deck / no recall questions / unknown counter instead of blocking the
+  // editor route.
   // Review before retaking (Phase 5 T8): a page waiting for an exam retake
   // lists the failed concepts above the editor. Derived from the page's
   // exam state on every visit (not from the results link's `?repaso`
   // query); a failed read shows no notice.
-  const [cardsResult, statusResult, noticeResult] = await Promise.all([
-    listFlashcardsAction({ pageId: page.id }),
-    getGenerationStatusAction().catch(() => null),
-    getExamReviewNoticeAction({ pageId: page.id }).catch(() => null),
-  ]);
+  const [cardsResult, statusResult, noticeResult, recallResult] =
+    await Promise.all([
+      listFlashcardsAction({ pageId: page.id }),
+      getGenerationStatusAction().catch(() => null),
+      getExamReviewNoticeAction({ pageId: page.id }).catch(() => null),
+      getRecallPageSummaryAction({ pageId: page.id }).catch(() => null),
+    ]);
+  const initialRecallQuestionCount = recallResult?.ok
+    ? recallResult.value.questionCount
+    : 0;
   const reviewNotice = noticeResult?.ok ? noticeResult.value : null;
   const initialFlashcards: FlashcardView[] = cardsResult.ok
     ? cardsResult.value
@@ -186,8 +187,8 @@ export default async function PageView({ params }: PagePageProps) {
         initialCollapsed={techniquesPanelCollapsed}
         notebookId={notebookId}
         pageId={page.id}
-        showPreviews={showPreviews}
         initialFlashcards={initialFlashcards}
+        initialRecallQuestionCount={initialRecallQuestionCount}
         initialRemaining={initialRemaining}
       />
     </>

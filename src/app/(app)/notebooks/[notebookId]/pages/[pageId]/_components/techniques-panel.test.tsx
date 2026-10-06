@@ -1,4 +1,4 @@
-import { act, render, screen, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { FlashcardView } from "@/modules/flashcards";
@@ -30,10 +30,15 @@ vi.mock("@/modules/exams", () => ({
   getExamStartAction,
 }));
 
-const { generateRecallQuestionsAction } = vi.hoisted(() => ({
-  generateRecallQuestionsAction: vi.fn(),
+const { generateRecallQuestionsAction, getRecallPageSummaryAction } =
+  vi.hoisted(() => ({
+    generateRecallQuestionsAction: vi.fn(),
+    getRecallPageSummaryAction: vi.fn(),
+  }));
+vi.mock("@/modules/active-recall", () => ({
+  generateRecallQuestionsAction,
+  getRecallPageSummaryAction,
 }));
-vi.mock("@/modules/active-recall", () => ({ generateRecallQuestionsAction }));
 
 const NOTEBOOK_ID = "nb-1";
 const PAGE_ID = "0a1b2c3d-4e5f-4061-8798-a1b2c3d4e5f6";
@@ -52,8 +57,8 @@ const baseProps: TechniquesPanelProps = {
   initialCollapsed: false,
   notebookId: NOTEBOOK_ID,
   pageId: PAGE_ID,
-  showPreviews: true,
   initialFlashcards: [],
+  initialRecallQuestionCount: 0,
   initialRemaining: 6,
 };
 
@@ -81,6 +86,12 @@ async function renderPanel(
   return view;
 }
 
+async function waitForText(testId: string, text: string) {
+  await waitFor(() =>
+    expect(screen.getByTestId(testId)).toHaveTextContent(text),
+  );
+}
+
 describe("TechniquesPanel", () => {
   beforeEach(() => {
     clearCookie();
@@ -89,6 +100,8 @@ describe("TechniquesPanel", () => {
     generateExamQuestionsAction.mockReset();
     getExamStartAction.mockReset();
     generateRecallQuestionsAction.mockReset();
+    getRecallPageSummaryAction.mockReset();
+    getRecallPageSummaryAction.mockResolvedValue(ok({ questionCount: 0 }));
     getExamStartAction.mockResolvedValue(
       ok({
         activeQuestionCount: 0,
@@ -115,11 +128,15 @@ describe("TechniquesPanel", () => {
     expect(screen.queryByTestId("techniques-panel")).not.toBeInTheDocument();
   });
 
-  it("lists the three techniques with previews on, all three Generar live", async () => {
+  it("shows the 'Técnicas de estudio' header and the three techniques, all three Generar live", async () => {
     await renderPanel(false);
 
+    expect(screen.getByText("Técnicas de estudio")).toBeInTheDocument();
+    expect(
+      screen.getByText("Genera contenido de estudio con IA"),
+    ).toBeInTheDocument();
     expect(screen.getByText("Flashcards")).toBeInTheDocument();
-    expect(screen.getByText("Active recall")).toBeInTheDocument();
+    expect(screen.getByText("Recordación activa")).toBeInTheDocument();
     expect(screen.getByText("Examen")).toBeInTheDocument();
     expect(screen.getByTestId("generate-flashcards")).toBeEnabled();
     expect(screen.getByTestId("generate-recall-questions")).toBeEnabled();
@@ -131,31 +148,61 @@ describe("TechniquesPanel", () => {
     ).toHaveLength(0);
   });
 
-  it("shows every collapsed technique icon as available, Active recall included", async () => {
+  it("colours each Generar with its technique: Flashcards yellow, Recordación activa green, Examen red", async () => {
+    await renderPanel(false);
+
+    expect(screen.getByTestId("generate-flashcards")).toHaveClass(
+      "bg-warning-500",
+    );
+    expect(screen.getByTestId("generate-recall-questions")).toHaveClass(
+      "bg-success-700",
+    );
+    expect(screen.getByTestId("generate-exam-questions")).toHaveClass(
+      "bg-rose-600",
+    );
+  });
+
+  it("shows every collapsed technique icon as available", async () => {
     await renderPanel(true);
 
-    for (const title of ["Flashcards", "Active recall", "Examen"]) {
+    for (const title of ["Flashcards", "Recordación activa", "Examen"]) {
       expect(screen.getByTitle(title)).not.toHaveClass("opacity-35");
     }
   });
 
-  it("shows the three techniques, Active recall included (Phase 6 T5), but no sample sections with previews off", async () => {
-    await renderPanel(false, { showPreviews: false });
+  it("has no practice buttons or deck links inside the cards and no sample items", async () => {
+    getExamStartAction.mockResolvedValue(
+      ok({
+        activeQuestionCount: 12,
+        retakePending: true,
+        failedRootCount: 4,
+        openSessionId: null,
+        openRetakeSessionId: null,
+        lastFinishedSessionId: null,
+      }),
+    );
+    await renderPanel(false, {
+      initialFlashcards: [card(0), card(1)],
+      initialRecallQuestionCount: 10,
+    });
+    await screen.findByTestId("generated-item-exam");
 
-    expect(screen.getByText("Flashcards")).toBeInTheDocument();
-    expect(screen.getByText("Active recall")).toBeInTheDocument();
-    expect(screen.getByTestId("generate-recall-questions")).toBeEnabled();
-    expect(screen.getByText("Examen")).toBeInTheDocument();
+    for (const id of [
+      "take-exam-button",
+      "retake-exam-button",
+      "exam-retake-note",
+      "flashcard-item",
+      "flashcard-deck-link",
+      "practice-recall-link",
+    ]) {
+      expect(screen.queryByTestId(id)).not.toBeInTheDocument();
+    }
     expect(screen.queryByText("Vista previa")).not.toBeInTheDocument();
-    expect(
-      screen.queryByText("Sesiones de Active Recall"),
-    ).not.toBeInTheDocument();
-    expect(screen.queryByText("Exámenes recientes")).not.toBeInTheDocument();
     expect(screen.queryByText("Mitocondria")).not.toBeInTheDocument();
   });
 
-  it("links the Examen card to the page's questions, with every Generar live", async () => {
-    await renderPanel(false, { showPreviews: false });
+  it("keeps the exam questions screen reachable from the Examen card", async () => {
+    await renderPanel(false);
 
     expect(screen.getByTestId("exam-questions-link")).toHaveAttribute(
       "href",
@@ -164,50 +211,210 @@ describe("TechniquesPanel", () => {
     expect(screen.getByTestId("exam-questions-link")).toHaveTextContent(
       "Preguntas",
     );
-    const generate = screen.getAllByRole("button", { name: "Generar" });
-    expect(generate).toHaveLength(3);
-    expect(
-      generate.filter((b) => (b as HTMLButtonElement).disabled),
-    ).toHaveLength(0);
   });
 
-  it("keeps the active recall and exam saved items as a labelled sample preview", async () => {
-    await renderPanel(false);
+  describe("generated items list", () => {
+    function examStart(
+      activeQuestionCount: number,
+      retakePending = false,
+      failedRootCount = retakePending ? 4 : 0,
+    ) {
+      getExamStartAction.mockResolvedValue(
+        ok({
+          activeQuestionCount,
+          retakePending,
+          failedRootCount,
+          openSessionId: null,
+          openRetakeSessionId: null,
+          lastFinishedSessionId: null,
+        }),
+      );
+    }
 
-    expect(screen.getByText("Generado en esta página")).toBeInTheDocument();
-    expect(screen.getByText("Vista previa")).toBeInTheDocument();
-    expect(screen.getByText("Sesiones de Active Recall")).toBeInTheDocument();
-    expect(screen.getByText("Exámenes recientes")).toBeInTheDocument();
-    // The flashcards deck is real now, never the sample one.
-    expect(screen.queryByRole("link", { name: /Mitocondria/ })).toBeNull();
+    it("shows an empty state under its label when nothing was generated", async () => {
+      await renderPanel(false);
+
+      expect(screen.getByText("Generado en esta página")).toBeInTheDocument();
+      expect(
+        screen.getByText("Aún no generaste nada en esta página"),
+      ).toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: /Flashcards/ })).toBeNull();
+    });
+
+    it("lists one row per generated technique, in panel order, each opening its practice route", async () => {
+      examStart(12);
+      await renderPanel(false, {
+        initialFlashcards: [card(0), card(1), card(2)],
+        initialRecallQuestionCount: 10,
+      });
+
+      const exam = await screen.findByTestId("generated-item-exam");
+      const flashcards = screen.getByTestId("generated-item-flashcards");
+      const recall = screen.getByTestId("generated-item-active-recall");
+      expect(flashcards).toHaveTextContent("Flashcards");
+      expect(flashcards).toHaveTextContent("3 tarjetas");
+      expect(flashcards).toHaveAttribute(
+        "href",
+        `/flashcards/${NOTEBOOK_ID}/${PAGE_ID}?repasar=1`,
+      );
+      expect(recall).toHaveTextContent("Recordación activa");
+      expect(recall).toHaveTextContent("10 preguntas");
+      expect(recall).toHaveAttribute(
+        "href",
+        `/active-recall/${NOTEBOOK_ID}/${PAGE_ID}`,
+      );
+      expect(exam).toHaveTextContent("Examen");
+      expect(exam).toHaveTextContent("12 preguntas");
+      expect(exam).toHaveAttribute("href", `/exams/${NOTEBOOK_ID}/${PAGE_ID}`);
+      expect(
+        screen
+          .getAllByRole("link")
+          .filter((l) => l.dataset.testid?.startsWith("generated-item-"))
+          .map((l) => l.dataset.testid),
+      ).toEqual([
+        "generated-item-flashcards",
+        "generated-item-active-recall",
+        "generated-item-exam",
+      ]);
+      expect(
+        screen.queryByText("Aún no generaste nada en esta página"),
+      ).not.toBeInTheDocument();
+    });
+
+    it("uses the singular for one card or one question", async () => {
+      examStart(1);
+      await renderPanel(false, {
+        initialFlashcards: [card(0)],
+        initialRecallQuestionCount: 1,
+      });
+
+      expect(
+        await screen.findByTestId("generated-item-exam"),
+      ).toHaveTextContent("1 pregunta");
+      expect(screen.getByTestId("generated-item-flashcards")).toHaveTextContent(
+        "1 tarjeta",
+      );
+      expect(
+        screen.getByTestId("generated-item-active-recall"),
+      ).toHaveTextContent("1 pregunta");
+    });
+
+    it("notes a pending retake on the exam row, which opens the exam route that runs it", async () => {
+      examStart(12, true);
+      await renderPanel(false);
+
+      const exam = await screen.findByTestId("generated-item-exam");
+      expect(exam).toHaveTextContent("12 preguntas · Repetición pendiente");
+      expect(exam).toHaveAttribute("href", `/exams/${NOTEBOOK_ID}/${PAGE_ID}`);
+    });
+
+    it("reads the exam state for the page and shows no exam row when it fails", async () => {
+      getExamStartAction.mockRejectedValue(new Error("offline"));
+      await renderPanel(false);
+      await act(async () => {});
+
+      expect(getExamStartAction).toHaveBeenCalledWith({ pageId: PAGE_ID });
+      expect(
+        screen.queryByTestId("generated-item-exam"),
+      ).not.toBeInTheDocument();
+    });
+
+    it("adds the Flashcards row after a generation", async () => {
+      const user = userEvent.setup();
+      generateFlashcardsAction.mockResolvedValue(
+        ok({
+          cards: [card(0), card(1)],
+          remainingToday: 3,
+          truncated: false,
+          wordsUsed: 10,
+          wordsTotal: 10,
+        }),
+      );
+      listFlashcardsAction.mockResolvedValue(ok([card(0), card(1)]));
+      await renderPanel(false);
+
+      await user.click(screen.getByTestId("generate-flashcards"));
+
+      expect(
+        await screen.findByTestId("generated-item-flashcards"),
+      ).toHaveTextContent("2 tarjetas");
+    });
+
+    it("adds the Examen row after a generation", async () => {
+      const user = userEvent.setup();
+      generateExamQuestionsAction.mockResolvedValue(
+        ok({
+          questions: [],
+          created: 10,
+          skipped: 0,
+          remainingToday: 5,
+          truncated: false,
+          wordsUsed: 10,
+          wordsTotal: 10,
+        }),
+      );
+      await renderPanel(false);
+      await act(async () => {});
+      expect(
+        screen.queryByTestId("generated-item-exam"),
+      ).not.toBeInTheDocument();
+      examStart(10);
+
+      await user.click(screen.getByTestId("generate-exam-questions"));
+
+      expect(
+        await screen.findByTestId("generated-item-exam"),
+      ).toHaveTextContent("10 preguntas");
+    });
+
+    it("re-reads the recall summary after a generation and adds its row", async () => {
+      const user = userEvent.setup();
+      generateRecallQuestionsAction.mockResolvedValue(
+        ok({
+          questions: [],
+          created: 10,
+          remainingToday: 3,
+          truncated: false,
+          wordsUsed: 10,
+          wordsTotal: 10,
+        }),
+      );
+      getRecallPageSummaryAction.mockResolvedValue(ok({ questionCount: 20 }));
+      await renderPanel(false, { initialRecallQuestionCount: 10 });
+
+      await user.click(screen.getByTestId("generate-recall-questions"));
+
+      await waitForText("generated-item-active-recall", "20 preguntas");
+      expect(getRecallPageSummaryAction).toHaveBeenCalledWith({
+        pageId: PAGE_ID,
+      });
+    });
+
+    it("keeps the previous recall row when re-reading the summary fails", async () => {
+      const user = userEvent.setup();
+      generateRecallQuestionsAction.mockResolvedValue(
+        ok({
+          questions: [],
+          created: 10,
+          remainingToday: 3,
+          truncated: false,
+          wordsUsed: 10,
+          wordsTotal: 10,
+        }),
+      );
+      getRecallPageSummaryAction.mockRejectedValue(new Error("offline"));
+      await renderPanel(false, { initialRecallQuestionCount: 10 });
+
+      await user.click(screen.getByTestId("generate-recall-questions"));
+
+      await screen.findByTestId("recall-generation-notice");
+      expect(
+        screen.getByTestId("generated-item-active-recall"),
+      ).toHaveTextContent("10 preguntas");
+    });
   });
 
   describe("flashcards (real data)", () => {
-    it("renders the page's cards from the initial data, linking to the deck", async () => {
-      await renderPanel(false, {
-        initialFlashcards: [card(0), card(1)],
-      });
-
-      expect(screen.getByText("Mazo de esta página")).toBeInTheDocument();
-      const items = screen.getAllByTestId("flashcard-item");
-      expect(items).toHaveLength(2);
-      expect(items[0]).toHaveTextContent("Pregunta 0");
-      expect(items[0]).toHaveAttribute("title", "Respuesta 0");
-      expect(items[0]).toHaveAttribute(
-        "href",
-        expect.stringContaining(`/flashcards/${NOTEBOOK_ID}/${PAGE_ID}`),
-      );
-    });
-
-    it("shows an empty state when the page has no cards yet", async () => {
-      await renderPanel(false);
-
-      expect(screen.queryByTestId("flashcard-item")).not.toBeInTheDocument();
-      expect(
-        screen.getByText("Aún no hay tarjetas en esta página"),
-      ).toBeInTheDocument();
-    });
-
     it("shows the remaining generations from the status", async () => {
       await renderPanel(false, { initialRemaining: 4 });
 
@@ -275,7 +482,9 @@ describe("TechniquesPanel", () => {
       });
 
       expect(listFlashcardsAction).toHaveBeenCalledWith({ pageId: PAGE_ID });
-      expect(screen.getAllByTestId("flashcard-item")).toHaveLength(3);
+      expect(screen.getByTestId("generated-item-flashcards")).toHaveTextContent(
+        "3 tarjetas",
+      );
       expect(screen.getByTestId("generation-remaining")).toHaveTextContent(
         "Te quedan 3 generaciones hoy",
       );
@@ -302,7 +511,9 @@ describe("TechniquesPanel", () => {
 
       await user.click(screen.getByTestId("generate-flashcards"));
 
-      expect(await screen.findAllByTestId("flashcard-item")).toHaveLength(1);
+      expect(
+        await screen.findByTestId("generated-item-flashcards"),
+      ).toHaveTextContent("1 tarjeta");
     });
 
     it("tells the student how many words were used when the page was truncated", async () => {
@@ -392,7 +603,7 @@ describe("TechniquesPanel", () => {
       listFlashcardsAction.mockResolvedValue(ok([card(0)]));
       await user.click(screen.getByTestId("generate-flashcards"));
 
-      await screen.findAllByTestId("flashcard-item");
+      await screen.findByTestId("generated-item-flashcards");
       expect(screen.queryByTestId("generation-error")).not.toBeInTheDocument();
     });
 
@@ -406,117 +617,6 @@ describe("TechniquesPanel", () => {
       expect(await screen.findByTestId("generation-error")).toHaveTextContent(
         "No pudimos generar las tarjetas. Intenta de nuevo.",
       );
-    });
-  });
-
-  describe("Rendir examen (exam card)", () => {
-    function start(
-      activeQuestionCount: number,
-      retakePending = false,
-      failedRootCount = retakePending ? 4 : 0,
-    ) {
-      getExamStartAction.mockResolvedValue(
-        ok({
-          activeQuestionCount,
-          retakePending,
-          failedRootCount,
-          openSessionId: null,
-          openRetakeSessionId: null,
-          lastFinishedSessionId: null,
-        }),
-      );
-    }
-
-    it("links to the page's exam once the page has 10 questions", async () => {
-      start(12);
-      await renderPanel(false);
-
-      const link = await screen.findByRole("link", { name: /Rendir examen/ });
-      expect(link).toHaveAttribute("href", `/exams/${NOTEBOOK_ID}/${PAGE_ID}`);
-      expect(getExamStartAction).toHaveBeenCalledWith({ pageId: PAGE_ID });
-    });
-
-    it("is disabled with the 10-question note below 10 questions", async () => {
-      start(4);
-      await renderPanel(false);
-
-      expect(
-        await screen.findByText(
-          "Necesitas al menos 10 preguntas para rendir un examen.",
-        ),
-      ).toBeInTheDocument();
-      expect(screen.getByTestId("take-exam-button")).toBeDisabled();
-    });
-
-    it("offers the retake instead of a normal exam while one is pending", async () => {
-      start(12, true);
-      await renderPanel(false);
-
-      const retake = await screen.findByTestId("retake-exam-button");
-      expect(retake).toHaveTextContent("Repetir examen");
-      expect(retake).toHaveAttribute(
-        "href",
-        `/exams/${NOTEBOOK_ID}/${PAGE_ID}`,
-      );
-      expect(screen.getByTestId("exam-retake-note")).toHaveTextContent(
-        "4 conceptos",
-      );
-      expect(
-        screen.queryByRole("link", { name: /Rendir examen/ }),
-      ).not.toBeInTheDocument();
-    });
-
-    it("asks for more questions instead of a retake that cannot reach 10", async () => {
-      start(9, true);
-      await renderPanel(false);
-
-      expect(
-        await screen.findByTestId("exam-retake-needs-questions"),
-      ).toHaveTextContent("Agrega o genera preguntas para repetir el examen.");
-      expect(
-        screen.queryByTestId("retake-exam-button"),
-      ).not.toBeInTheDocument();
-      expect(screen.getByTestId("generate-exam-questions")).toBeInTheDocument();
-    });
-
-    it("points to the exam to continue when every failed question was retired", async () => {
-      start(12, true, 0);
-      await renderPanel(false);
-
-      const retake = await screen.findByTestId("retake-exam-button");
-      expect(retake).toHaveTextContent("Continuar");
-      expect(retake).toHaveAttribute(
-        "href",
-        `/exams/${NOTEBOOK_ID}/${PAGE_ID}`,
-      );
-      expect(screen.getByTestId("exam-retake-note")).toHaveTextContent(
-        "Retiraste las preguntas que fallaste",
-      );
-    });
-
-    it("re-reads the question count after a generation", async () => {
-      start(0);
-      generateExamQuestionsAction.mockResolvedValue(
-        ok({
-          questions: [],
-          created: 10,
-          skipped: 0,
-          remainingToday: 5,
-          truncated: false,
-          wordsUsed: 10,
-          wordsTotal: 10,
-        }),
-      );
-      const user = userEvent.setup();
-      await renderPanel(false);
-      await screen.findByTestId("take-exam-button");
-      start(10);
-
-      await user.click(screen.getByTestId("generate-exam-questions"));
-
-      expect(
-        await screen.findByRole("link", { name: /Rendir examen/ }),
-      ).toBeInTheDocument();
     });
   });
 
@@ -535,7 +635,7 @@ describe("TechniquesPanel", () => {
 
     it("offers 10 to 30 questions in steps of 5, starting at 10", async () => {
       const user = userEvent.setup();
-      await renderPanel(false, { showPreviews: false });
+      await renderPanel(false);
 
       const count = screen.getByRole("group", {
         name: "Preguntas a generar",
@@ -652,7 +752,7 @@ describe("TechniquesPanel", () => {
     });
   });
 
-  describe("active recall questions (real data, preview card)", () => {
+  describe("active recall questions (real data)", () => {
     function generated(created: number, truncated = false) {
       return ok({
         questions: [],

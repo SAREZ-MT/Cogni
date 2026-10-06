@@ -91,6 +91,34 @@ describe("active recall session actions", () => {
     expect(current.uow.repos.sessions.rows.size).toBe(0);
   });
 
+  it("summarises the page's active questions for the techniques panel", async () => {
+    await seed();
+    const { getRecallPageSummaryAction } = await actions();
+
+    expect(await getRecallPageSummaryAction({ pageId: PAGE })).toEqual(
+      ok({ questionCount: 2 }),
+    );
+    expect(
+      await getRecallPageSummaryAction({
+        pageId: "9a1b2c3d-4e5f-4061-8798-a1b2c3d4e5f6",
+      }),
+    ).toEqual(ok({ questionCount: 0 }));
+  });
+
+  it("refuses a summary without a session or with an invalid page id", async () => {
+    const { getRecallPageSummaryAction } = await actions();
+
+    const invalid = await getRecallPageSummaryAction({ pageId: "nope" });
+    expect(invalid.ok).toBe(false);
+
+    getCurrentUser.mockResolvedValue(null);
+    const anonymous = await getRecallPageSummaryAction({ pageId: PAGE });
+    expect(anonymous.ok).toBe(false);
+    if (!anonymous.ok) {
+      expect(anonymous.error.code).toBe("RECALL_SESSION_REQUIRED");
+    }
+  });
+
   it("starts, saves, skips and finishes a session", async () => {
     await seed();
     const {

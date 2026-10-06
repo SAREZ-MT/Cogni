@@ -40,6 +40,12 @@ export interface RecallSessionPlanView {
   questions: RecallSessionQuestionView[];
 }
 
+// What the page's techniques panel lists for active recall.
+export interface RecallPageSummaryView {
+  // Active (not archived) questions on the page.
+  questionCount: number;
+}
+
 export interface StartedRecallSessionView {
   sessionId: string;
   questions: RecallSessionQuestionView[];
@@ -105,6 +111,24 @@ export async function getRecallSessionPlanAction(
       ownerId.value,
     );
     return ok(plan);
+  });
+}
+
+// The techniques panel's "generated" row (Phase 6 T5b): how many active
+// questions the page holds; read only.
+export async function getRecallPageSummaryAction(
+  input: unknown,
+): Promise<Result<RecallPageSummaryView, ActionError>> {
+  return withBoundary(async () => {
+    const ownerId = await requireOwnerId();
+    if (!ownerId.ok) return ownerId;
+    const parsed = parseInput(pageInput, input);
+    if (!parsed.ok) return parsed;
+
+    const questions = await new DrizzleRecallQuestionRepository(
+      getDb(),
+    ).listActiveByPage(parsed.value.pageId, ownerId.value);
+    return ok({ questionCount: questions.length });
   });
 }
 

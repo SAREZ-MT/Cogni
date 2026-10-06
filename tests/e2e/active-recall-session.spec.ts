@@ -110,7 +110,12 @@ test.describe("active recall session", () => {
       { timeout: 30000 },
     );
 
-    await page.goto(`/active-recall/${notebookId}/${pageId}`);
+    // The panel's generated list opens the session (Phase 6 T5b).
+    await expect(
+      panel.getByTestId("generated-item-active-recall"),
+    ).toContainText("10 preguntas");
+    await panel.getByTestId("generated-item-active-recall").click();
+    await expect(page).toHaveURL(`/active-recall/${notebookId}/${pageId}`);
     await expect(page.getByTestId("active-recall-session")).toBeVisible();
     await expect(page.getByText("Pregunta 1 de 10")).toBeVisible();
     // Opening the route writes nothing.

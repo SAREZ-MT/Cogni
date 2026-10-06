@@ -128,7 +128,7 @@ test.describe("exam feedback and review before retaking", () => {
     await expect(page.getByTestId("exam-review-notice")).toHaveCount(0);
 
     // 1. Fail the exam (questions 1-4 wrong): the results explain it.
-    await panel.getByTestId("take-exam-button").click();
+    await panel.getByTestId("generated-item-exam").click();
     await expect(page).toHaveURL(examHref);
     await page.getByTestId("start-exam-button").click();
     await expect(page.getByTestId("exam-session")).toBeVisible({
