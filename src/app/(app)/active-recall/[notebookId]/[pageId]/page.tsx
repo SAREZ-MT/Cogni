@@ -1,46 +1,48 @@
 import { notFound } from "next/navigation";
-import { requireDesignPreviews } from "@/shared/config/design-previews";
+import { getRecallSessionPlanAction } from "@/modules/active-recall";
+import { getNotebookTitleForRoute, getPageForRoute } from "@/modules/notebooks";
 import { SetBreadcrumb } from "../../../_components/breadcrumb";
-import { getSampleNotebook } from "../../../flashcards/_data/sample";
 import { ActiveRecallPlayer } from "../../_components/active-recall-player";
-import { getRecallPage, getRecallQuestions } from "../../_data/sample";
 
 interface ActiveRecallSessionPageProps {
   params: Promise<{ notebookId: string; pageId: string }>;
 }
 
-// Active recall session route (design preview). One page owns at most one
-// study unit (documento-maestro §3.3), so the session is identified by
-// [notebookId]/[pageId] — same contract as the flashcards session route.
-// Hands the page's fixed sample questions to the client ActiveRecallPlayer;
-// no session state lives on the server. An unknown notebook or page 404s.
+// Active recall session route on real data (Phase 6 T5). One page owns at
+// most one study unit (documento-maestro §3.3), so the session is identified
+// by [notebookId]/[pageId] — same contract as the flashcards and exams
+// session routes. It reads the questions a session would show now (up to
+// 10: due, new, then the least recently reviewed) and writes nothing: the
+// player starts the session with the first saved answer. A page without
+// questions shows the player's empty state. A page that is unknown,
+// archived, in another notebook or not the caller's 404s. It left the
+// design-preview gate in T5; the hub and notebook views follow in T7.
 export default async function ActiveRecallSessionPage({
   params,
 }: ActiveRecallSessionPageProps) {
-  requireDesignPreviews();
   const { notebookId, pageId } = await params;
-  const notebook = getSampleNotebook(notebookId);
-  if (!notebook) notFound();
-
-  const page = getRecallPage(notebookId, pageId);
+  const page = await getPageForRoute(notebookId, pageId);
   if (!page) notFound();
-
-  const questions = getRecallQuestions(page.id);
+  const plan = await getRecallSessionPlanAction({ pageId: page.id });
+  if (!plan.ok) notFound();
+  const notebookTitle =
+    (await getNotebookTitleForRoute(notebookId)) ?? "Cuaderno";
 
   return (
     <section className="flex flex-1 flex-col">
       <SetBreadcrumb
         items={[
           { label: "Active recall", href: "/active-recall" },
-          { label: notebook.title, href: `/active-recall/${notebookId}` },
+          { label: notebookTitle, href: `/active-recall/${notebookId}` },
           { label: page.title },
         ]}
       />
       <ActiveRecallPlayer
         notebookId={notebookId}
-        notebookTitle={notebook.title}
+        notebookTitle={notebookTitle}
         pageTitle={page.title}
-        questions={questions}
+        pageId={page.id}
+        questions={plan.value.questions}
       />
     </section>
   );

@@ -14,9 +14,9 @@ export interface TechniqueDefinition {
 // icon + name + description per technique. Flashcards are wired to real
 // Server Actions since Phase 3 (the panel adds the live "Generar"); Examen
 // links to the page's questions since Phase 5 T4 and generates AI questions
-// since T5; Active recall generates AI open questions since Phase 6 T4 but
-// stays preview-only (`showPreviews`) until its session ships (T5); no meta
-// line, no "pronto" pill (user decision 2026-09-24).
+// since T5; Active recall generates AI open questions since Phase 6 T4 and
+// shows in production since T5 (its session route left the preview gate);
+// no meta line, no "pronto" pill (user decision 2026-09-24).
 // Icons match the ones the main Sidebar's "Técnicas" section already uses
 // for the same three entries (sidebar.tsx's TECNICAS_SECTION), so the icon
 // vocabulary stays consistent across the shell.

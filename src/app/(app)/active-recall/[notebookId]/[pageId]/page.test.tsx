@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { err, ok } from "@/shared/kernel/result";
 
 vi.mock("server-only", () => ({}));
 
@@ -10,49 +11,110 @@ const { notFound } = vi.hoisted(() => ({
 }));
 vi.mock("next/navigation", () => ({ notFound }));
 
+const {
+  getPageForRoute,
+  getNotebookTitleForRoute,
+  getRecallSessionPlanAction,
+} = vi.hoisted(() => ({
+  getPageForRoute: vi.fn(),
+  getNotebookTitleForRoute: vi.fn(),
+  getRecallSessionPlanAction: vi.fn(),
+}));
+vi.mock("@/modules/notebooks", () => ({
+  getPageForRoute,
+  getNotebookTitleForRoute,
+}));
+vi.mock("@/modules/active-recall", () => ({
+  getRecallSessionPlanAction,
+  startRecallSessionAction: vi.fn(),
+  saveRecallAnswerAction: vi.fn(),
+  finishRecallSessionAction: vi.fn(),
+}));
+
 import ActiveRecallSessionPage from "./page";
 
-const props = (notebookId: string, pageId: string) => ({
-  params: Promise.resolve({ notebookId, pageId }),
-});
+const NOTEBOOK = "5e6f7a8b-9c0d-4e1f-8a2b-3c4d5e6f7a8b";
+const PAGE = "0a1b2c3d-4e5f-4061-8798-a1b2c3d4e5f6";
+
+function props(notebookId = NOTEBOOK, pageId = PAGE) {
+  return { params: Promise.resolve({ notebookId, pageId }) };
+}
 
 describe("ActiveRecallSessionPage", () => {
+  beforeEach(() => {
+    getPageForRoute.mockReset();
+    getPageForRoute.mockResolvedValue({ id: PAGE, title: "Mitocondria" });
+    getNotebookTitleForRoute.mockReset();
+    getNotebookTitleForRoute.mockResolvedValue("Biología celular");
+    getRecallSessionPlanAction.mockReset();
+    getRecallSessionPlanAction.mockResolvedValue(
+      ok({
+        questions: [
+          { id: "q1", prompt: "¿Qué produce la mitocondria?" },
+          { id: "q2", prompt: "¿Dónde ocurre la glucólisis?" },
+        ],
+      }),
+    );
+  });
+
   afterEach(() => {
     vi.unstubAllEnvs();
     notFound.mockClear();
   });
 
-  it("starts the session of the page while design previews are enabled", async () => {
-    vi.stubEnv("NODE_ENV", "development");
-
-    render(
-      await ActiveRecallSessionPage(
-        props("biologia-celular", "membrana-celular"),
-      ),
-    );
-
-    expect(screen.getByTestId("active-recall-session")).toBeInTheDocument();
-    expect(screen.getByText("Pregunta 1 de 6")).toBeInTheDocument();
-  });
-
-  it("answers 404 in production even for a known page", async () => {
+  it("plays the page's real questions, in production too", async () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("COGNI_DESIGN_PREVIEWS", "");
 
-    await expect(
-      ActiveRecallSessionPage(props("biologia-celular", "membrana-celular")),
-    ).rejects.toThrow("NEXT_NOT_FOUND");
+    render(await ActiveRecallSessionPage(props()));
+
+    expect(getPageForRoute).toHaveBeenCalledWith(NOTEBOOK, PAGE);
+    expect(getRecallSessionPlanAction).toHaveBeenCalledWith({ pageId: PAGE });
+    expect(screen.getByTestId("active-recall-session")).toBeInTheDocument();
+    expect(screen.getByText("Pregunta 1 de 2")).toBeInTheDocument();
+    expect(
+      screen.getByText("¿Qué produce la mitocondria?"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Active recall — Biología celular"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Mitocondria")).toBeInTheDocument();
   });
 
-  it.each([
-    ["an unknown notebook", "no-existe", "membrana-celular"],
-    ["a page of another notebook", "calculo-iii", "membrana-celular"],
-    ["an unknown page", "biologia-celular", "no-existe"],
-  ])("answers 404 for %s", async (_name, notebookId, pageId) => {
-    vi.stubEnv("NODE_ENV", "development");
+  it("shows the existing empty state for a page without questions", async () => {
+    getRecallSessionPlanAction.mockResolvedValue(ok({ questions: [] }));
 
-    await expect(
-      ActiveRecallSessionPage(props(notebookId, pageId)),
-    ).rejects.toThrow("NEXT_NOT_FOUND");
+    render(await ActiveRecallSessionPage(props()));
+
+    expect(
+      screen.getByText("Esta página no tiene preguntas todavía."),
+    ).toBeInTheDocument();
+  });
+
+  it("answers 404 for an unknown, archived or another owner's page", async () => {
+    getPageForRoute.mockResolvedValue(null);
+
+    await expect(ActiveRecallSessionPage(props())).rejects.toThrow(
+      "NEXT_NOT_FOUND",
+    );
+    expect(getRecallSessionPlanAction).not.toHaveBeenCalled();
+  });
+
+  it("answers 404 when the questions cannot be read", async () => {
+    getRecallSessionPlanAction.mockResolvedValue(
+      err({ code: "RECALL_UNEXPECTED", message: "x" }),
+    );
+
+    await expect(ActiveRecallSessionPage(props())).rejects.toThrow(
+      "NEXT_NOT_FOUND",
+    );
+  });
+
+  it("falls back to a generic notebook title", async () => {
+    getNotebookTitleForRoute.mockResolvedValue(null);
+
+    render(await ActiveRecallSessionPage(props()));
+
+    expect(screen.getByText("Active recall — Cuaderno")).toBeInTheDocument();
   });
 });

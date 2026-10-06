@@ -1,7 +1,12 @@
 "use client";
 
 import { ArrowRight, X } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import {
+  finishRecallSessionAction,
+  saveRecallAnswerAction,
+  startRecallSessionAction,
+} from "@/modules/active-recall";
 import { AnswerTextarea } from "@/shared/ui/answer-textarea";
 import { BackLink } from "@/shared/ui/back-link";
 import { Button } from "@/shared/ui/button";
@@ -10,7 +15,6 @@ import { FeedbackBlock } from "@/shared/ui/feedback-block";
 import { ProgressBar } from "@/shared/ui/progress-bar";
 import { QuestionCard } from "@/shared/ui/question-card";
 import { type StatDotItem, StatDots } from "@/shared/ui/stat-dots";
-import type { RecallQuestion } from "../_data/sample";
 import { ActiveRecallResultsView } from "./active-recall-results-view";
 import {
   type QuestionRecord,
@@ -19,29 +23,55 @@ import {
   selfRatingBucketFor,
 } from "./self-rating";
 
+// What the player shows of a question (never its rubric).
+export interface RecallPlayerQuestion {
+  id: string;
+  prompt: string;
+}
+
 export interface ActiveRecallPlayerProps {
   notebookId: string;
   notebookTitle: string;
   pageTitle: string;
-  questions: RecallQuestion[];
+  // The page of a real session (Phase 6 T5): every answer is saved through
+  // the session Server Actions. Without it (design preview) nothing is
+  // persisted.
+  pageId?: string;
+  questions: RecallPlayerQuestion[];
 }
+
+const SKIPPED_ANSWER = "(sin respuesta)";
 
 type Phase = "answer" | "review";
 
-// Client Active recall session (design preview, documento-maestro §3.3 +
+// Client Active recall session (documento-maestro §3.3 +
 // studyplatform-active-recall-style.md, adapted so feedback only shows at
 // the end — never between questions). Each answered/skipped question is
 // kept as a `QuestionRecord` so the end-of-session `ActiveRecallResultsView`
 // (documento-maestro §8.5: async evaluation, in-page results instead of an
-// overlay) can render its own per-question feedback list. All state is
-// local and resets on remount; nothing is persisted (no backend yet, same
-// scope as FlashcardPlayer).
+// overlay) can render its own per-question feedback list.
+//
+// With a `pageId` the session is real (Phase 6 T5) and the screen stays the
+// same: the first saved answer starts the session (so opening the route
+// never leaves an empty one), each "Calificar respuesta" + self-rating and
+// each "Saltar" is saved as it is given, and "Terminar" or the last
+// question finishes the session once its saves are done. Saves run in
+// order on a queue in the background, so the player never waits for the
+// network; a failed save or start is not shown (no error UI under the Phase
+// 6 UI freeze): the flow goes on and the next answer starts the session
+// again if it never started. "Nueva sesión" starts a new session and shows
+// its questions.
 export function ActiveRecallPlayer({
   notebookId,
   notebookTitle,
   pageTitle,
-  questions,
+  pageId,
+  questions: initialQuestions,
 }: ActiveRecallPlayerProps) {
+  const [questions, setQuestions] = useState(initialQuestions);
+  const sessionIdRef = useRef<string | null>(null);
+  const queueRef = useRef<Promise<void>>(Promise.resolve());
+  const restartingRef = useRef(false);
   const [index, setIndex] = useState(0);
   const [phase, setPhase] = useState<Phase>("answer");
   const [answerText, setAnswerText] = useState("");
@@ -54,8 +84,47 @@ export function ActiveRecallPlayer({
   const question = questions[index];
   const sessionsHref = `/active-recall/${notebookId}`;
 
+  // Runs `task` after every earlier one; a failure never stops the queue.
+  function enqueue(task: () => Promise<void>): Promise<void> {
+    const next = queueRef.current.then(task).catch(() => {});
+    queueRef.current = next;
+    return next;
+  }
+
+  async function ensureSession(page: string): Promise<string | null> {
+    if (sessionIdRef.current) return sessionIdRef.current;
+    const started = await startRecallSessionAction({ pageId: page });
+    if (started.ok) sessionIdRef.current = started.value.sessionId;
+    return sessionIdRef.current;
+  }
+
+  function persistAnswer(questionId: string, answer: string, rating: number) {
+    if (!pageId) return;
+    enqueue(async () => {
+      const sessionId = await ensureSession(pageId);
+      if (!sessionId) return;
+      await saveRecallAnswerAction({
+        sessionId,
+        questionId,
+        answerText: answer,
+        selfRating: rating,
+      });
+    });
+  }
+
+  function finish() {
+    setFinished(true);
+    if (!pageId) return;
+    enqueue(async () => {
+      const sessionId = sessionIdRef.current;
+      if (!sessionId) return;
+      await finishRecallSessionAction({ sessionId });
+    });
+  }
+
   function completeQuestion(rating: number, answer: string) {
     if (question) {
+      persistAnswer(question.id, answer, rating);
       setRecords((prev) => [
         ...prev,
         {
@@ -67,7 +136,7 @@ export function ActiveRecallPlayer({
       ]);
     }
     if (index + 1 >= total) {
-      setFinished(true);
+      finish();
       return;
     }
     setIndex((prev) => prev + 1);
@@ -77,23 +146,45 @@ export function ActiveRecallPlayer({
   }
 
   function handleSkip() {
-    const answer = "(sin respuesta)";
+    const answer = SKIPPED_ANSWER;
     setSubmittedAnswer(answer);
     completeQuestion(0, answer);
   }
 
   function handleCalificar() {
-    setSubmittedAnswer(answerText.trim() || "(sin respuesta)");
+    setSubmittedAnswer(answerText.trim() || SKIPPED_ANSWER);
     setPhase("review");
   }
 
-  function restart() {
+  function reset() {
     setIndex(0);
     setPhase("answer");
     setAnswerText("");
     setSubmittedAnswer("");
     setRecords([]);
     setFinished(false);
+  }
+
+  // "Nueva sesión": a real session starts a new one (after the previous
+  // finish) and shows its questions; if it cannot start, the same
+  // questions restart and the next saved answer starts the session.
+  function restart() {
+    if (!pageId) {
+      reset();
+      return;
+    }
+    if (restartingRef.current) return;
+    restartingRef.current = true;
+    sessionIdRef.current = null;
+    enqueue(async () => {
+      const started = await startRecallSessionAction({ pageId });
+      if (!started.ok) return;
+      sessionIdRef.current = started.value.sessionId;
+      setQuestions(started.value.questions);
+    }).finally(() => {
+      restartingRef.current = false;
+      reset();
+    });
   }
 
   const statDotItems: StatDotItem[] = SELF_RATING_BUCKET_ORDER.map(
@@ -149,7 +240,7 @@ export function ActiveRecallPlayer({
             variant="ghost"
             size="sm"
             className="text-fg-muted"
-            onClick={() => setFinished(true)}
+            onClick={finish}
           >
             <X aria-hidden="true" size={13} strokeWidth={2} />
             Terminar

@@ -139,11 +139,12 @@ describe("TechniquesPanel", () => {
     }
   });
 
-  it("shows Flashcards and Examen but no Active recall or sample sections with previews off", async () => {
+  it("shows the three techniques, Active recall included (Phase 6 T5), but no sample sections with previews off", async () => {
     await renderPanel(false, { showPreviews: false });
 
     expect(screen.getByText("Flashcards")).toBeInTheDocument();
-    expect(screen.queryByText("Active recall")).not.toBeInTheDocument();
+    expect(screen.getByText("Active recall")).toBeInTheDocument();
+    expect(screen.getByTestId("generate-recall-questions")).toBeEnabled();
     expect(screen.getByText("Examen")).toBeInTheDocument();
     expect(screen.queryByText("Vista previa")).not.toBeInTheDocument();
     expect(
@@ -153,7 +154,7 @@ describe("TechniquesPanel", () => {
     expect(screen.queryByText("Mitocondria")).not.toBeInTheDocument();
   });
 
-  it("links the Examen card to the page's questions, with both Generar live", async () => {
+  it("links the Examen card to the page's questions, with every Generar live", async () => {
     await renderPanel(false, { showPreviews: false });
 
     expect(screen.getByTestId("exam-questions-link")).toHaveAttribute(
@@ -164,7 +165,7 @@ describe("TechniquesPanel", () => {
       "Preguntas",
     );
     const generate = screen.getAllByRole("button", { name: "Generar" });
-    expect(generate).toHaveLength(2);
+    expect(generate).toHaveLength(3);
     expect(
       generate.filter((b) => (b as HTMLButtonElement).disabled),
     ).toHaveLength(0);

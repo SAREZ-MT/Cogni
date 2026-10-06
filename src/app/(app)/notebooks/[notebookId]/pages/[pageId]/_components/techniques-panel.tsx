@@ -49,8 +49,8 @@ import { TECHNIQUES } from "./techniques";
 // (T5), sharing the daily generation limit with Flashcards.
 //
 // Active recall's "Generar" creates 10 AI open questions since Phase 6 T4
-// (same daily limit), but its card still renders only with `showPreviews`
-// until its session ships (T5).
+// (same daily limit); its card shows in production since T5, when its
+// session route left the design-preview gate.
 //
 // PREVIEW ONLY: the Active recall and Exámenes saved items are still design previews (user
 // decision 2026-09-24): fixed sample items, not filtered by the real
@@ -167,8 +167,8 @@ export interface TechniquesPanelProps {
   initialCollapsed: boolean;
   notebookId: string;
   pageId: string;
-  // Server decision (designPreviewsEnabled): also list the Active recall
-  // preview and the Active recall / Exámenes sample saved items.
+  // Server decision (designPreviewsEnabled): also list the Active recall /
+  // Exámenes sample saved items.
   showPreviews: boolean;
   // Initial data is read by the server page and refreshed on the client
   // after each generation (the panel is hidden/collapsible, so nothing
@@ -347,9 +347,6 @@ export function TechniquesPanel({
       testId: "flashcard-deck-link",
     });
   }
-  const visibleTechniques = showPreviews
-    ? TECHNIQUES
-    : TECHNIQUES.filter((t) => t.id !== "active-recall");
   const examHref = `/exams/${notebookId}/${pageId}`;
   const questionsHref = `${examHref}/preguntas`;
   const canTakeExam =
@@ -396,7 +393,7 @@ export function TechniquesPanel({
       }
       collapsedContent={
         <div className="flex flex-col items-center gap-[5px] py-2.5">
-          {visibleTechniques.map((t) => (
+          {TECHNIQUES.map((t) => (
             <TechniqueIconStrip
               key={t.id}
               icon={t.icon}
@@ -409,7 +406,7 @@ export function TechniquesPanel({
       }
     >
       <div className="flex flex-col gap-[7px] p-2.5 pb-3.5">
-        {visibleTechniques.map((t) =>
+        {TECHNIQUES.map((t) =>
           t.id === "flashcards" ? (
             <TechniqueCard
               key={t.id}

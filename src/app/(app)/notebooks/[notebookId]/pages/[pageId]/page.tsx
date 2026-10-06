@@ -79,10 +79,10 @@ export default async function PageView({ params }: PagePageProps) {
   const jobResult = await getImportJobStatus({ pageId: page.id });
   const initialJob = jobResult.ok ? jobResult.value : null;
 
-  // The "Técnicas" panel always renders: Flashcards are real (Phase 3). The
-  // server only decides whether the still-sample techniques (Active recall,
-  // Exámenes) show up in it; with previews off (production) the panel holds
-  // just Flashcards and the page's real deck.
+  // The "Técnicas" panel always renders its three techniques on real data
+  // (Flashcards, Examen and, since Phase 6 T5, Active recall). The server
+  // only decides whether the sample "Vista previa" saved items (Active
+  // recall sessions, recent exams) show up in it.
   const showPreviews = designPreviewsEnabled();
 
   // Initial panel data is read here and refreshed client-side after each

@@ -9,15 +9,8 @@ import { createNotebookWithOpenPage } from "./helpers/notebooks";
 // → Active recall → Generar" and 10 open questions with their rubric are
 // stored with one recall_question study item each, spending one generation
 // of the daily limit. Runs against the fake AI provider
-// (AI_PROVIDER_MODE=fake).
-//
-// The Active recall card is still a design preview (it ships to production
-// with T5), so the e2e server must be started with previews on:
-//   COGNI_DESIGN_PREVIEWS=1 pnpm test:e2e tests/e2e/active-recall-generation.spec.ts
-// Without it this spec is skipped. Free port 3000 first: the config reuses
-// a running server, and one started without previews hides the card (and
-// shell-empty-state.spec.ts expects previews OFF, so the two cannot share a
-// server).
+// (AI_PROVIDER_MODE=fake). The Active recall card shows in production since
+// T5, so this spec runs with design previews off like every other one.
 
 const SENTENCES = [
   "La mitocondria produce la mayor parte del ATP de la célula.",
@@ -58,10 +51,7 @@ async function storedFor(pageId: string) {
 
 test.describe("active recall questions generation", () => {
   test.skip(!hasSupabaseEnv, "Supabase env (cogni-dev) is not configured");
-  test.skip(
-    process.env.COGNI_DESIGN_PREVIEWS !== "1" || !process.env.DATABASE_URL,
-    "needs COGNI_DESIGN_PREVIEWS=1 (Active recall is a preview until T5) and DATABASE_URL",
-  );
+  test.skip(!process.env.DATABASE_URL, "needs DATABASE_URL (cogni-dev)");
 
   // A test-scoped user: the fake AI daily limit (6 per owner, in server
   // memory) would otherwise be shared with every AI-spending spec in the

@@ -1,7 +1,17 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { RecallQuestion } from "../_data/sample";
+
+// Without a pageId the player calls none of these (design preview); the
+// module index is server code, so it is replaced here. Persistence is
+// covered by active-recall-player.persistence.test.tsx.
+vi.mock("@/modules/active-recall", () => ({
+  startRecallSessionAction: vi.fn(),
+  saveRecallAnswerAction: vi.fn(),
+  finishRecallSessionAction: vi.fn(),
+}));
+
 import { ActiveRecallPlayer } from "./active-recall-player";
 
 const QUESTIONS: RecallQuestion[] = [
