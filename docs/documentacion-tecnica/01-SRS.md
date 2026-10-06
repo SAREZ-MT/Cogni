@@ -15,7 +15,7 @@
 - Fase 2 (Importación de PDF) fue implementada bajo Organic Driven Development (ODD) el 2026-09-23; el módulo `src/modules/ingestion` es real, no un esqueleto.
 - Fase 3 (Capa de IA) no ha iniciado: el módulo `src/modules/ai` es un esqueleto vacío (`export {};`).
 - Las Fases 4 a 7 (flashcards, exámenes, recordación activa, calendario y dashboard) existen únicamente como vistas previas visuales con datos de muestra, integradas en `main` pero ocultas en producción tras `requireDesignPreviews()` (las rutas responden 404 y la barra lateral muestra "pronto"); los módulos `flashcards`, `study-engine`, `exams`, `active-recall`, `scheduling` y `analytics` siguen siendo esqueletos vacíos en el código base de este documento.
-- Fase 8 (Endurecimiento) está parcialmente cubierta: la Content Security Policy con nonce por petición, la redirección del dominio apex y la protección de sesión ya existen en `src/proxy.ts` y `src/shared/config/security-headers.ts`; el resto de los entregables (registro de logs externo, pruebas de carga, auditoría de accesibilidad, manual de usuario) no se han iniciado.
+- Fase 9 (Endurecimiento) está parcialmente cubierta: la Content Security Policy con nonce por petición, la redirección del dominio apex y la protección de sesión ya existen en `src/proxy.ts` y `src/shared/config/security-headers.ts`; el resto de los entregables (registro de logs externo, pruebas de carga, auditoría de accesibilidad, manual de usuario) no se han iniciado.
 - En este documento: las secciones 1, 2, 4 y 5 describen tanto lo implementado como lo planeado, marcado explícitamente por su columna Estado; la sección 3 (casos de uso) sigue el mismo criterio caso por caso.
 
 ### Documento vivo

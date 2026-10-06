@@ -2,8 +2,9 @@
 
 | Campo | Valor |
 |---|---|
-| Versión del documento | 1.3.1 |
-| Fecha | 2026-09-14 (actualizado 2026-10-05) |
+| Versión del documento | 1.4.0 |
+| Fecha | 2026-09-14 (actualizado 2026-10-06) |
+| Cambios de la versión 1.4.0 | ADR 0006: decisiones de implementación de la Fase 5 (exámenes de 10 a 30 preguntas, falladas primero; repetición con preguntas reformuladas y reglas para cuando no se puede armar; cronómetro solo dentro del examen; política de retroalimentación con reutilización; "Repasar contenido" antes de repetir). Notas en §3.3, §6.1, §7.2, §7.5 y §8.4; §13 (Fase 5 implementada). |
 | Cambios de la versión 1.3.1 | Nueva Fase 8 — Diseño y flujos de pantalla (solo interfaz y navegación, sin cambios de lógica de backend), justo después de la Fase 7. Endurecimiento pasa a ser la Fase 9. Actualizados §1, §4 y §13. |
 | Cambios de la versión 1.3.0 | ADR 0005: decisiones de implementación de la Fase 4 (repaso en la página del mazo, calificación solo de ítems vencidos, retroalimentación idempotente que no consume el límite diario de IA, trabajo diario de dominio acotado en tiempo y con bloqueo por página). Notas en §5.2, §6.1 y §7.3; §13 (Fase 4 implementada). |
 | Cambios de la versión 1.2.0 | ADR 0004: capa de IA con cuatro proveedores gratuitos (Mistral y Cerebras descartados), límite de 6 generaciones por usuario por día y tope de página con truncado. Actualizadas §4.2, §4.3, §8.1, §8.2, §8.3, §8.4, §8.5 y §13 (Fase 3 implementada). |
@@ -109,6 +110,15 @@ Decisión cerrada: **las técnicas se generan por página**. Un cuaderno de 100 
 - Si la nota del examen es menor a 70 %, la página queda marcada para repetir examen; el motor reprograma las preguntas falladas y el calendario lo muestra.
 - Cuando el usuario repita el examen fallido no le van a salir las mismas preguntas demanera identica a las que fallo, se deben genera preguntas diferentes o descritas de otra manera, pero que ataquen las falencias que el estudiante presento anteriormente.
 - Retroalimentación con IA al final: explicación de las preguntas falladas usando el contenido de la página.
+
+Notas de implementación de la Fase 5 (ADR 0006):
+
+- **Tamaño.** El estudiante elige N entre 10 y 30 (por defecto 10). Una página necesita al menos 10 preguntas raíz activas para tener examen; con menos, la interfaz pide agregar o generar preguntas. El orden es: raíces falladas en el último examen, luego raíces vencidas (la más antigua primero), luego las vistas hace más tiempo.
+- **Repetición.** Las preguntas falladas vuelven **reformuladas** (mismo concepto, redacción u enfoque distintos, nunca una redacción usada antes por su linaje, nunca otro tema), primero en la sesión; después, el resto de las preguntas de la página hasta N. La repetición exige N mayor o igual al número de conceptos fallados que siguen en la página.
+- **Cronómetro.** El examen muestra el tiempo transcurrido y los resultados muestran el tiempo total. Es una excepción acotada a la regla de no mostrar tiempo de estudio: solo dentro de la sesión y de sus resultados; el dashboard sigue sin mostrar tiempo. La duración se deriva de `started_at` y `finished_at`, no se guarda aparte.
+- **Retroalimentación.** Examen fallado → retroalimentación nueva con las debilidades actuales. Primera aprobación → retroalimentación nueva. Aprobación posterior a otra aprobación → sin llamada a la IA: se muestra la retroalimentación guardada de la aprobación anterior. Un fallo después de aprobar vuelve a pedir una nueva. La retroalimentación nunca impide ver la nota.
+- **Repasar antes de repetir.** Un resultado fallado ofrece "Repasar contenido", que abre la página del cuaderno con un aviso de los conceptos fallados y la acción "Repetir examen".
+- Editar una pregunta la cambia en el lugar y conserva su raíz; retirarla suspende el ítem de la raíz cuando su linaje no tiene otra pregunta activa. No hay límite de tiempo y una sesión abandonada queda abierta (como en flashcards).
 
 #### Recordación activa
 
@@ -362,6 +372,14 @@ Notas de implementación de la Fase 4 (ADR 0005):
 - `SessionFeedback` nace `pending` cuando se pide y pasa una sola vez a `done` (con contenido) o `failed`; ambos son definitivos. Una fila `pending` sin tocar durante 2 minutos se puede reclamar. Su tabla y su repositorio están en `study-engine`; el caso de uso, en `flashcards`.
 - `Flashcard.archived_at` se agregó en la migración 0009 (faltaba en la Fase 3). Archivar una tarjeta suspende su `StudyItem`; el último ítem activo de un mazo no se puede archivar.
 
+Notas de implementación de la Fase 5 (ADR 0006):
+
+- Migraciones `0010_exams` y `0011_exam_session_questions` (con sus `.down.sql`). Las preguntas de examen no se borran: se retiran (`retired_at`).
+- `ExamSession` agrega `requested_count` (N, entre 10 y 30) y `question_ids` (jsonb: los ids de las preguntas mostradas, en orden, fijados al iniciar; de 1 a `requested_count` ids). Responder, cerrar y leer una sesión usan solo esa lista, así que los cambios posteriores en las preguntas o en los ítems de la página no mueven un examen abierto. La duración no se guarda: se deriva de `started_at` y `finished_at`.
+- `ExamAnswer` tiene clave `(session_id, question_id)`, un único `(session_id, root_id)` y una clave foránea `(question_id, root_id)` que exige que `root_id` sea la raíz real de la pregunta.
+- `ExamPageState` tiene clave `page_id` y guarda `owner_id`. Su `upsert` no escribe nada para una página que no es del dueño.
+- Las claves foráneas del linaje (`root_id`, `variant_of`) son NO ACTION: una raíz con variantes o una pregunta reemplazada no se pueden borrar; borrar la página o el dueño borra el linaje completo.
+
 ### 6.2 Reglas de persistencia
 
 - Postgres en Supabase. Esquema y migraciones con Drizzle. Nunca cambios manuales en producción.
@@ -404,6 +422,8 @@ Implementación como función pura `applySm2(state, quality, now) → newState`.
 | Flashcards | Botón del estudiante | Otra vez 1, Difícil 3, Bien 4, Fácil 5 |
 | Exámenes | Corrección determinista | Incorrecta 1, Correcta 4 |
 | Recordación activa | Combinación IA + autoevaluación | Ver 7.4 |
+
+Nota de implementación de la Fase 5 (ADR 0006): un examen se puede rendir en cualquier momento, aunque no haya nada vencido. Una respuesta incorrecta registra siempre q = 1 en el ítem de la raíz (vence al día siguiente, así la página aparece en "Hoy"). Una correcta registra q = 4 solo si el ítem estaba vencido; si no, no toca SM-2 (sin inflar intervalos con intentos repetidos). El cálculo vive en `study-engine` (`recordExamReviews`, `examReviewQualityFor`), que no conoce el módulo de exámenes; `gradeFlashcard` no cambia.
 
 ### 7.3 Nivel de dominio por página (v1)
 
@@ -469,6 +489,17 @@ Repetición (decisión cerrada): el estudiante **nunca vuelve a ver la misma pre
 
 Las preguntas falladas vencen al día siguiente (q = 1), así la página aparece en "Hoy" con la acción "Repetir examen".
 
+Notas de implementación de la Fase 5 (ADR 0006), que precisan los puntos anteriores:
+
+- Al terminar, la calidad sigue §7.2 tal como la precisa la Fase 5: incorrecta → q = 1 siempre; correcta → q = 4 solo si el ítem estaba vencido. La sesión se cierra en una sola transacción: resultado, `ExamPageState` y repasos SM-2 se confirman o se revierten juntos.
+- El punto 3 queda reemplazado: la repetición tiene N entre 10 y 30 (no "hasta 5"); las variantes de las raíces falladas van primero y el resto de la página completa hasta N.
+- Generar las variantes cuesta **una** generación del límite diario (6) y solo si la generación tuvo éxito: un fallo no la consume. Si una raíz fallada ya tiene una variante activa que no se mostró, se reutiliza sin llamar a la IA.
+- Callejones sin salida resueltos:
+  - Si el estudiante retiró todas las preguntas de todas las raíces falladas, la repetición pendiente se borra (`retake_pending = false`, sin raíces falladas) y la página vuelve a tener un examen normal.
+  - Si la repetición no se puede armar (menos de 10 raíces en la página, o N menor que los conceptos fallados que siguen en la página), se rechaza **antes** de llamar a la IA y sin consumir generaciones.
+  - Las raíces falladas retiradas desde el examen se omiten; las demás se repiten.
+- La variante se compara con todas las redacciones anteriores de su linaje (incluidas las retiradas), no solo con la inmediatamente anterior.
+
 ---
 
 ## 8. Capa de servicio de IA
@@ -511,6 +542,8 @@ Upstash Ratelimit con ventana fija de un día. Límite inicial implementado: 6 g
 ### 8.4 Propósitos y esquemas
 
 En la Fase 3 solo `generate_flashcards` está cableado de extremo a extremo (prompt `generate_flashcards/v1`); los demás propósitos tienen esquema Zod y tipo, pero ningún caso de uso los invoca todavía.
+
+Nota de implementación de la Fase 5 (ADR 0006): quedan cableados `generate_exam_questions/v1` (recibe además las preguntas activas de la página para no duplicarlas), `generate_exam_variants/v1` (recibe el id de cada raíz fallada, su concepto, su respuesta correcta y todas sus redacciones anteriores) y `session_feedback/v2` (exámenes: hasta 10 preguntas falladas con concepto, enunciado, opción elegida, opción correcta y explicación, más el texto de la página dentro de `AI_PAGE_TOKEN_CAP`; `session_feedback/v1` sigue sirviendo a flashcards). Cada llamada al modelo pide como máximo 15 preguntas o variantes; una solicitud mayor se reparte en varias llamadas y sigue costando una sola generación.
 
 | Propósito | Entrada | Salida (Zod) |
 |---|---|---|
@@ -654,8 +687,15 @@ Estado (actualizado en la Fase 4):
 
 ### Fase 5 — Exámenes
 
+> **Implementada el 2026-10-06 en ocho PR apiladas (#78–#85) más la de cierre, construida con ODD.** Decisiones en `docs/adr/0006-examenes-y-repeticion-con-variantes.md`.
+
 Entregables: generación y edición manual de preguntas con `concept`, sesión de examen, corrección, alimentación del motor, `ExamPageState`, reprogramación por nota < 70 %, repetición con variantes generadas por IA (7.5), retroalimentación con IA.
 Hecho cuando: fallar un examen hace aparecer la página en "Hoy" al día siguiente, y al repetirlo el estudiante recibe preguntas distintas sobre los mismos conceptos fallados.
+
+Estado (actualizado en la Fase 5):
+
+- Entregado: dominio puro con cobertura del 100 % (`scoreExam`, `composeExam`, `composeRetake`, `examQualityFor`, `decideFeedback`); migraciones `0010_exams` y `0011_exam_session_questions`; caso de uso del motor `recordExamReviews`; preguntas manuales (crear, editar en el lugar, retirar); generación con IA (`generate_exam_questions/v1`) desde el panel de técnicas; sesión con selector de N (10–30), cronómetro, corrección pregunta a pregunta y resultados con nota y tiempo total; repetición con variantes (`generate_exam_variants/v1`); retroalimentación (`session_feedback/v2`) con reutilización tras una aprobación; "Repasar contenido" con aviso de conceptos fallados en la página; `/exams` y la vista por cuaderno con datos reales, con las preguntas vencidas hoy de cada página (leídas de la lista "Hoy" de `scheduling`: "Vence hoy" y "Rendir examen") y "Repetir examen" en las páginas con repetición pendiente; "Exámenes" habilitado en la barra lateral. Un e2e recorre fallar, volver a la página y repetir con preguntas reformuladas.
+- Pendiente: "Repasos de hoy" en `/flashcards` sigue listando solo flashcards; la vista "Hoy" con todas las técnicas llega en la Fase 7. La vista por cuaderno lee todo el listado de exámenes y luego filtra; unas 10 idas y vueltas a la base por respuesta; la diferencia visual de las pantallas de exámenes y flashcards con el sistema de diseño queda para la Fase 8; el e2e del criterio de "hecho" no inyecta un reloj del día siguiente (lo cubren las pruebas de base de datos y de casos de uso). Detalle en ADR 0006.
 
 ### Fase 6 — Recordación activa
 

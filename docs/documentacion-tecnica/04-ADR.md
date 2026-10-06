@@ -15,7 +15,7 @@
 - Fase 2 (Importación de PDF) se implementó bajo Organic Driven Development (ODD) el 2026-09-23.
 - Fase 3 (Capa de IA) no ha iniciado: `src/modules/ai` es un esqueleto (`export {};`).
 - Las Fases 4 a 7 (`study-engine`, `flashcards`, `exams`, `active-recall`, `scheduling`, `analytics`) son esqueletos vacíos en este código base; cuatro de ellas tienen una versión de diseño visual con datos de muestra en la rama `design/shell-look`, no integrada a `main`.
-- Fase 8 (Endurecimiento) está parcialmente cubierta: Content Security Policy con nonce, redirección del dominio apex y protección de sesión existen; el resto (registro de logs externo, pruebas de carga, auditoría de accesibilidad) no se ha iniciado.
+- Fase 9 (Endurecimiento) está parcialmente cubierta: Content Security Policy con nonce, redirección del dominio apex y protección de sesión existen; el resto (registro de logs externo, pruebas de carga, auditoría de accesibilidad) no se ha iniciado.
 - De las 11 decisiones registradas en este documento:
   - **Completamente implementadas y verificables en el código de `main`:** ADR-001, ADR-002, ADR-003, ADR-004, ADR-005, ADR-006, ADR-009, ADR-010.
   - **Implementada en la Fase 3 (2026-10-04):** ADR-008 (capa de IA con rotación multiproveedor); el registro de proveedores cambió respecto del texto original, ver `docs/adr/0004-capa-de-ia-con-proveedores-gratuitos.md`.

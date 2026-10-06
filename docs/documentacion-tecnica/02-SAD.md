@@ -15,7 +15,7 @@
 - Fase 2 (Importación de PDF) se implementó bajo Organic Driven Development (ODD) el 2026-09-23; `src/modules/ingestion` es el módulo más completo del código base y respalda la única vista de código C4 Nivel 4 con implementación real de este documento.
 - Fase 3 (Capa de IA) está implementada (registro de proveedores, rotación por cuota, circuit breaker, límite por usuario y generación de flashcards; ADR 0004 en `docs/adr/`). Esta nota de estado y el resto del documento aún no se han revisado completo contra ese código: hasta entonces, el contenido de este documento sobre proveedores de IA, rotación por cuota y rate limiting es especificación de `docs/documento-maestro.md`, marcada explícitamente Roadmap.
 - Las Fases 4 a 7 (`study-engine`, `flashcards`, `exams`, `active-recall`, `scheduling`, `analytics`) son esqueletos vacíos (`index.ts` con `export {};` y un `README.md`) en este código base. Cuatro de ellas tienen una versión de diseño visual con datos de muestra en la rama `design/shell-look`, no integrada a `main`; este documento describe la arquitectura de `main`, no la de esa rama.
-- Fase 8 (Endurecimiento) está parcialmente cubierta: la Content Security Policy con nonce por petición, la redirección del dominio apex y la protección de sesión en `src/proxy.ts` existen; el resto (registro de logs externo, pruebas de carga, auditoría de accesibilidad) no se ha iniciado.
+- Fase 9 (Endurecimiento) está parcialmente cubierta: la Content Security Policy con nonce por petición, la redirección del dominio apex y la protección de sesión en `src/proxy.ts` existen; el resto (registro de logs externo, pruebas de carga, auditoría de accesibilidad) no se ha iniciado.
 - En este documento: las secciones 2 a 4 (vistas de contexto, contenedores y componentes), 5.1 y 5.3 (código de `ingestion`), 7, 9, el flujo 1 de la sección 10, 11, 12 y 13 describen arquitectura implementada y verificable contra el código. La parte de IA en las secciones 2 a 4, la sección 5.2 (código de `study-engine`), la subsección 8.10 y los flujos 2 a 4 de la sección 10 son especificación (Roadmap), tomada de `docs/documento-maestro.md`.
 
 ### Documento vivo
@@ -839,5 +839,5 @@ Esta tabla documenta alineación, no cumplimiento ni certificación: describe qu
 - La lista de eventos de `docs/documento-maestro.md` §10.3 (`page_created`, `generation_requested`, `session_started`, `session_finished`, `item_rated`) es aspiracional; solo los tres eventos anteriores están implementados.
 - No hay trazas de rendimiento (`tracesSampleRate: 0`), ni *dashboards* de métricas de infraestructura propios.
 - No hay un `error.tsx` por ruta bajo `src/app` (solo `global-error.tsx` en la raíz) ni `loading.tsx` en ninguna ruta.
-- Better Stack (registro de logs externo, entregable de la Fase 8) no está integrado.
-- No existe auditoría de accesibilidad ni pruebas de carga (entregables de la Fase 8), más allá de `tests/e2e/editor-a11y.spec.ts`, que cubre solo el editor.
+- Better Stack (registro de logs externo, entregable de la Fase 9) no está integrado.
+- No existe auditoría de accesibilidad ni pruebas de carga (entregables de la Fase 9), más allá de `tests/e2e/editor-a11y.spec.ts`, que cubre solo el editor.
