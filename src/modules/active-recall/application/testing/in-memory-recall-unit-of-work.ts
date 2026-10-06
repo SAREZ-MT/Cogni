@@ -33,6 +33,18 @@ export class InMemoryRecallStudyItems implements RecallStudyItems {
     this.rows.set(item.id, item);
   }
 
+  // Every item of the page, suspended ones included, ordered by creation
+  // (StudyItemRepository.listByPage).
+  async listByPage(pageId: string, ownerId: string): Promise<StudyItem[]> {
+    return this.all()
+      .filter((item) => item.pageId === pageId && item.ownerId === ownerId)
+      .sort(
+        (a, b) =>
+          a.createdAt.getTime() - b.createdAt.getTime() ||
+          (a.id < b.id ? -1 : 1),
+      );
+  }
+
   all(): StudyItem[] {
     return [...this.rows.values()];
   }

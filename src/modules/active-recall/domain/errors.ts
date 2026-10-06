@@ -10,6 +10,15 @@ export const RECALL_ERROR = {
   INVALID_SCORE: "RECALL_INVALID_SCORE",
   // An answer's self-rating is not an integer in [0, 5].
   INVALID_ANSWER: "RECALL_INVALID_ANSWER",
+  // A session cannot start: the page has no active question to practise.
+  NO_QUESTIONS: "RECALL_NO_QUESTIONS",
+  // The owner has no such session.
+  SESSION_NOT_FOUND: "RECALL_SESSION_NOT_FOUND",
+  // An answer was sent to a session that already finished.
+  SESSION_FINISHED: "RECALL_SESSION_FINISHED",
+  // The question is unknown, another owner's or on another page than the
+  // session's.
+  QUESTION_NOT_IN_SESSION: "RECALL_QUESTION_NOT_IN_SESSION",
   // A Server Action was called without a signed-in user.
   SESSION_REQUIRED: "RECALL_SESSION_REQUIRED",
   // A Server Action input failed its Zod validation.
