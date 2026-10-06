@@ -16,6 +16,10 @@ function question(
   };
 }
 
+function at(day: number) {
+  return new Date(base.getTime() + day * 86_400_000);
+}
+
 function many(prefix: string, count: number) {
   return Array.from({ length: count }, (_, i) =>
     question(`${prefix}-${String(i).padStart(2, "0")}`, { createdDay: i }),
@@ -76,12 +80,101 @@ describe("composeRecallSession", () => {
     ).toEqual(["n-c", "n-a", "n-b"]);
   });
 
-  it("leaves out reviewed questions that are not due yet", () => {
-    const questions = [question("due"), question("new"), question("later")];
+  it("fills the rest with reviewed questions, least recently reviewed first", () => {
+    const questions = [
+      question("due"),
+      question("new"),
+      question("seen-yesterday"),
+      question("seen-last-week"),
+    ];
 
     expect(
-      composeRecallSession({ questions, dueIds: ["due"], newIds: ["new"] }),
-    ).toEqual(["due", "new"]);
+      composeRecallSession({
+        questions,
+        dueIds: ["due"],
+        newIds: ["new"],
+        reviewed: [
+          { id: "seen-yesterday", lastReviewedAt: at(9) },
+          { id: "seen-last-week", lastReviewedAt: at(3) },
+        ],
+      }),
+    ).toEqual(["due", "new", "seen-last-week", "seen-yesterday"]);
+  });
+
+  it("is never empty while reviewed questions remain (sessions any time)", () => {
+    const questions = [question("a"), question("b"), question("c")];
+
+    expect(
+      composeRecallSession({
+        questions,
+        dueIds: [],
+        newIds: [],
+        reviewed: [
+          { id: "c", lastReviewedAt: at(1) },
+          { id: "a", lastReviewedAt: at(2) },
+          { id: "b", lastReviewedAt: at(1) },
+        ],
+      }),
+    ).toEqual(["b", "c", "a"]);
+  });
+
+  it("breaks equal last reviews by id whatever the input order", () => {
+    const questions = [question("m"), question("z"), question("a")];
+    const reviewed = ["z", "a", "m"].map((id) => ({
+      id,
+      lastReviewedAt: at(1),
+    }));
+
+    expect(
+      composeRecallSession({ questions, dueIds: [], newIds: [], reviewed }),
+    ).toEqual(["a", "m", "z"]);
+    expect(
+      composeRecallSession({
+        questions,
+        dueIds: [],
+        newIds: [],
+        reviewed: [...reviewed].reverse(),
+      }),
+    ).toEqual(["a", "m", "z"]);
+  });
+
+  it("fills only up to the size and never repeats a due or new question", () => {
+    const questions = many("q", 6);
+
+    expect(
+      composeRecallSession({
+        questions,
+        dueIds: ["q-00"],
+        newIds: ["q-01"],
+        reviewed: [
+          { id: "q-00", lastReviewedAt: at(0) },
+          { id: "q-01", lastReviewedAt: at(0) },
+          { id: "q-04", lastReviewedAt: at(1) },
+          { id: "q-03", lastReviewedAt: at(2) },
+          { id: "q-03", lastReviewedAt: at(9) },
+          { id: "q-02", lastReviewedAt: at(3) },
+          { id: "q-02", lastReviewedAt: at(0) },
+          { id: "ghost", lastReviewedAt: at(0) },
+        ],
+        size: 4,
+      }),
+    ).toEqual(["q-00", "q-01", "q-02", "q-04"]);
+  });
+
+  it("leaves archived reviewed questions out of the fill", () => {
+    const questions = [question("kept"), question("gone", { archived: true })];
+
+    expect(
+      composeRecallSession({
+        questions,
+        dueIds: [],
+        newIds: [],
+        reviewed: [
+          { id: "gone", lastReviewedAt: at(0) },
+          { id: "kept", lastReviewedAt: at(5) },
+        ],
+      }),
+    ).toEqual(["kept"]);
   });
 
   it("excludes archived questions even when due or new", () => {
@@ -139,7 +232,7 @@ describe("composeRecallSession", () => {
     ).toEqual(["d-00", "d-01", "d-02"]);
   });
 
-  it("is empty when nothing is due or new, or the size is not positive", () => {
+  it("is empty when nothing is due, new or reviewed, or the size is not positive", () => {
     const questions = many("q", 3);
 
     expect(composeRecallSession({ questions, dueIds: [], newIds: [] })).toEqual(
