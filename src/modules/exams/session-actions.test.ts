@@ -3,6 +3,7 @@ import { DomainError } from "@/shared/kernel/domain-error";
 import { err, ok } from "@/shared/kernel/result";
 import { question } from "./application/testing/fixtures";
 import { InMemoryExamSessionUnitOfWork } from "./application/testing/in-memory-exam-session-unit-of-work";
+import { InMemorySessionFeedback } from "./application/testing/in-memory-session-feedback";
 
 // Session, composition roots and Sentry are mocked so this proves the
 // Server Action boundary (session, Zod validation, view mapping without
@@ -28,6 +29,13 @@ vi.mock("@/modules/notebooks", () => ({
       pageId === PAGE
         ? ok({ title: "Mitocondria", plainText: "" })
         : err(new DomainError("PAGE_NOT_FOUND", pageId)),
+  }),
+}));
+// The results read the stored AI feedback (feedback-actions.test.ts).
+vi.mock("@/modules/study-engine", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/modules/study-engine")>()),
+  createSessionFeedbackSources: () => ({
+    feedback: new InMemorySessionFeedback(),
   }),
 }));
 vi.mock("./infrastructure", () => ({

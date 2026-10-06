@@ -13,6 +13,7 @@ function results(overrides: Partial<Results> = {}): Results {
     scorePercent: 50,
     passed: false,
     durationSeconds: 450,
+    feedback: null,
     questions: [
       {
         id: "q1",

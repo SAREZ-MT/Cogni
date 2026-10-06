@@ -29,6 +29,10 @@ export {
   runExamWork,
   type UnitOfWorkOf,
 } from "./exam-unit-of-work";
+export {
+  type ExamReviewNotice,
+  getExamReviewNotice,
+} from "./get-exam-review-notice";
 export { listPageExamQuestions } from "./list-page-exam-questions";
 export {
   type ExamPageOverview,
@@ -37,6 +41,14 @@ export {
   getExamPageOverview,
   readExamSession,
 } from "./read-exam-session";
+export {
+  type ExamFeedback,
+  FEEDBACK_AI_TIMEOUT_MS,
+  type RequestExamFeedbackDeps,
+  readExamFeedback,
+  requestExamFeedback,
+  STALE_PENDING_MS,
+} from "./request-exam-feedback";
 export {
   EXAM_GENERATION_BATCH_SIZE,
   EXAM_PAGE_EMPTY_MESSAGE,

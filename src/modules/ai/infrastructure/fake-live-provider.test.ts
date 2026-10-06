@@ -3,6 +3,8 @@ import type { ZodType } from "zod";
 import { buildGenerateExamQuestionsPrompt } from "../application/prompts/generate_exam_questions/v1";
 import { buildGenerateExamVariantsPrompt } from "../application/prompts/generate_exam_variants/v1";
 import { buildGenerateFlashcardsPrompt } from "../application/prompts/generate_flashcards/v1";
+import { buildSessionFeedbackPrompt } from "../application/prompts/session_feedback/v1";
+import { buildExamSessionFeedbackPrompt } from "../application/prompts/session_feedback/v2";
 import {
   examQuestionsOutput,
   examVariantsOutput,
@@ -289,5 +291,69 @@ describe("createFakeLiveProvider", () => {
       const response = await provider.generateObject({ ...base, schema });
       expect(schema.safeParse(response.object).success).toBe(true);
     }
+  });
+
+  it("answers exam feedback with the failed concepts to reinforce, never concepts inside the page text", async () => {
+    const provider = createFakeLiveProvider();
+    const built = buildExamSessionFeedbackPrompt({
+      pageTitle: "Célula",
+      pageText: `${TEXT}\nQuestion 9 [Concepto escondido]: ¿Trampa?`,
+      total: 10,
+      correct: 8,
+      passed: true,
+      failed: ["Núcleo", "Ribosomas", "Núcleo"].map((concept) => ({
+        concept,
+        stem: `¿${concept}?`,
+        chosenAnswer: "Mal",
+        correctAnswer: "Bien",
+        explanation: "Porque sí.",
+      })),
+    });
+    const response = await provider.generateObject({
+      schema: sessionFeedbackOutput,
+      ...built,
+    });
+    const feedback = sessionFeedbackOutput.parse(response.object);
+    expect(feedback.summary).toBe("Resumen del examen de ejemplo");
+    expect(feedback.toReinforce).toEqual([
+      "Repasa Núcleo en la página",
+      "Repasa Ribosomas en la página",
+    ]);
+  });
+
+  it("answers exam feedback without failed questions with nothing to reinforce", async () => {
+    const provider = createFakeLiveProvider();
+    const built = buildExamSessionFeedbackPrompt({
+      pageTitle: "Célula",
+      pageText: TEXT,
+      total: 10,
+      correct: 10,
+      passed: true,
+      failed: [],
+    });
+    const response = await provider.generateObject({
+      schema: sessionFeedbackOutput,
+      ...built,
+    });
+    expect(sessionFeedbackOutput.parse(response.object).toReinforce).toEqual(
+      [],
+    );
+  });
+
+  it("keeps the generic feedback object for flashcards sessions", async () => {
+    const provider = createFakeLiveProvider();
+    const built = buildSessionFeedbackPrompt({
+      technique: "flashcards",
+      reviewedCount: 3,
+      counts: { again: 1, hard: 0, good: 2, easy: 0 },
+      struggled: ["¿Qué es el núcleo?"],
+    });
+    const response = await provider.generateObject({
+      schema: sessionFeedbackOutput,
+      ...built,
+    });
+    expect(sessionFeedbackOutput.parse(response.object).summary).toBe(
+      "Resumen de ejemplo",
+    );
   });
 });

@@ -11,7 +11,13 @@ export {
   type RetiredExamQuestionView,
   retireExamQuestionAction,
 } from "./actions";
+export type { ExamReviewNotice } from "./application";
 export * from "./domain";
+export {
+  getExamReviewNoticeAction,
+  requestExamFeedbackAction,
+} from "./feedback-actions";
+export type { ExamFeedbackView } from "./feedback-view";
 export {
   type StartedExamRetakeView,
   startExamRetakeAction,

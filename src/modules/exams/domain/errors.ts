@@ -43,6 +43,8 @@ export const EXAM_ERROR = {
   QUESTION_NOT_IN_SESSION: "EXAMS_QUESTION_NOT_IN_SESSION",
   // The session still has unanswered questions and cannot be finished.
   SESSION_INCOMPLETE: "EXAMS_SESSION_INCOMPLETE",
+  // AI feedback is given once the exam session is finished.
+  FEEDBACK_SESSION_OPEN: "EXAMS_FEEDBACK_SESSION_OPEN",
   // Server Action boundary: no signed-in user, input rejected by the
   // schema, or an unexpected failure (logged, never shown raw).
   SESSION_REQUIRED: "EXAMS_SESSION_REQUIRED",
