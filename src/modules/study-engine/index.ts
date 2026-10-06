@@ -7,8 +7,11 @@ export type {
   GradedFlashcard,
   MasteryRecomputeSummary,
   PageAccess,
+  RecallReview,
   RecordExamReviewsInput,
   RecordedExamReviews,
+  RecordedRecallReviews,
+  RecordRecallReviewsInput,
   StartedFlashcardSession,
 } from "./application";
 export * from "./domain";
@@ -16,10 +19,12 @@ export {
   createExamReviewRecorder,
   createFlashcardSessionsServerApi,
   createMasteryRecomputeJob,
+  createRecallReviewRecorder,
   createSessionFeedbackSources,
   createStudyItemRepository,
   type ExamReviewRecorder,
   type FlashcardSessionsServerApi,
   type MasteryRecomputeJob,
+  type RecallReviewRecorder,
   type SessionFeedbackSources,
 } from "./server-api";

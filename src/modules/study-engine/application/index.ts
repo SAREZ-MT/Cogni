@@ -18,6 +18,13 @@ export {
   recordExamReviews,
 } from "./record-exam-reviews";
 export {
+  type RecallReview,
+  type RecordedRecallReviews,
+  type RecordRecallReviewsDeps,
+  type RecordRecallReviewsInput,
+  recordRecallReviews,
+} from "./record-recall-reviews";
+export {
   type DueFlashcard,
   type PageAccess,
   type StartedFlashcardSession,
