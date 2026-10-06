@@ -6,6 +6,7 @@ import { DrizzleRecallSessionRepository } from "./drizzle-recall-session-reposit
 export { DrizzleRecallAnswerRepository } from "./drizzle-recall-answer-repository";
 export { DrizzleRecallQuestionRepository } from "./drizzle-recall-question-repository";
 export { DrizzleRecallSessionRepository } from "./drizzle-recall-session-repository";
+export { DrizzleRecallUnitOfWork } from "./drizzle-recall-unit-of-work";
 
 // Every active-recall repository on one executor. `db` may be an open
 // transaction (also shared with study-engine's repositories), so

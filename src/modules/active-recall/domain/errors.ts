@@ -10,4 +10,10 @@ export const RECALL_ERROR = {
   INVALID_SCORE: "RECALL_INVALID_SCORE",
   // An answer's self-rating is not an integer in [0, 5].
   INVALID_ANSWER: "RECALL_INVALID_ANSWER",
+  // A Server Action was called without a signed-in user.
+  SESSION_REQUIRED: "RECALL_SESSION_REQUIRED",
+  // A Server Action input failed its Zod validation.
+  INVALID_INPUT: "RECALL_INVALID_INPUT",
+  // A Server Action hit an unexpected failure (reported to Sentry).
+  UNEXPECTED: "RECALL_UNEXPECTED",
 } as const;

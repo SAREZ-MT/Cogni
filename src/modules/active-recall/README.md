@@ -17,8 +17,21 @@ Implementado:
   selección léxica del fragmento de página más relevante (§8.5) y puntaje
   por sesión.
 
-Pendiente: persistencia, enganche con `study-engine`, generación y
-evaluación con IA, Server Actions y pantallas sobre datos reales.
+- Persistencia: tablas `recall_questions`, `recall_sessions` y
+  `recall_answers` (migración `0012`) con repositorios Drizzle y en memoria.
+- `application/request-recall-generation.ts`: generación con IA de 10
+  preguntas abiertas con rúbrica por llamada (prompt
+  `generate_recall_questions/v1`, §8.4). Consulta el límite diario con
+  `peek` y lo consume con `check` solo después de guardar: una generación
+  fallida no gasta la unidad. Guarda las preguntas y un
+  `StudyItem(kind = "recall_question")` por pregunta en una sola unidad de
+  trabajo.
+- `actions.ts`: `generateRecallQuestionsAction` (nunca lanza; responde
+  `{ code, message }` y `resetAt` cuando se alcanza el límite).
+
+Pendiente: conectar "Generar" del panel de técnicas (requiere cambio de UI,
+pendiente de aprobación), sesión, evaluación con IA y pantallas sobre datos
+reales.
 
 ## Dependencias declaradas
 

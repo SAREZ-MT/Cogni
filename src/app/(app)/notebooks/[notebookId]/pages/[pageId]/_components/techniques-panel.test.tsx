@@ -30,6 +30,11 @@ vi.mock("@/modules/exams", () => ({
   getExamStartAction,
 }));
 
+const { generateRecallQuestionsAction } = vi.hoisted(() => ({
+  generateRecallQuestionsAction: vi.fn(),
+}));
+vi.mock("@/modules/active-recall", () => ({ generateRecallQuestionsAction }));
+
 const NOTEBOOK_ID = "nb-1";
 const PAGE_ID = "0a1b2c3d-4e5f-4061-8798-a1b2c3d4e5f6";
 
@@ -83,6 +88,7 @@ describe("TechniquesPanel", () => {
     listFlashcardsAction.mockReset();
     generateExamQuestionsAction.mockReset();
     getExamStartAction.mockReset();
+    generateRecallQuestionsAction.mockReset();
     getExamStartAction.mockResolvedValue(
       ok({
         activeQuestionCount: 0,
@@ -109,19 +115,28 @@ describe("TechniquesPanel", () => {
     expect(screen.queryByTestId("techniques-panel")).not.toBeInTheDocument();
   });
 
-  it("lists the three techniques with previews on: Flashcards and Examen are live, Active recall stays a disabled preview", async () => {
+  it("lists the three techniques with previews on, all three Generar live", async () => {
     await renderPanel(false);
 
     expect(screen.getByText("Flashcards")).toBeInTheDocument();
     expect(screen.getByText("Active recall")).toBeInTheDocument();
     expect(screen.getByText("Examen")).toBeInTheDocument();
     expect(screen.getByTestId("generate-flashcards")).toBeEnabled();
+    expect(screen.getByTestId("generate-recall-questions")).toBeEnabled();
     expect(screen.getByTestId("generate-exam-questions")).toBeEnabled();
     const generate = screen.getAllByRole("button", { name: "Generar" });
     expect(generate).toHaveLength(3);
     expect(
       generate.filter((b) => (b as HTMLButtonElement).disabled),
-    ).toHaveLength(1);
+    ).toHaveLength(0);
+  });
+
+  it("shows every collapsed technique icon as available, Active recall included", async () => {
+    await renderPanel(true);
+
+    for (const title of ["Flashcards", "Active recall", "Examen"]) {
+      expect(screen.getByTitle(title)).not.toHaveClass("opacity-35");
+    }
   });
 
   it("shows Flashcards and Examen but no Active recall or sample sections with previews off", async () => {
@@ -630,6 +645,125 @@ describe("TechniquesPanel", () => {
 
       expect(
         await screen.findByTestId("exam-generation-error"),
+      ).toHaveTextContent(
+        "No pudimos generar las preguntas. Intenta de nuevo.",
+      );
+    });
+  });
+
+  describe("active recall questions (real data, preview card)", () => {
+    function generated(created: number, truncated = false) {
+      return ok({
+        questions: [],
+        created,
+        skipped: 0,
+        remainingToday: 3,
+        truncated,
+        wordsUsed: 40,
+        wordsTotal: 90,
+      });
+    }
+
+    it("generates questions for the page, shows pending, then the created count and the counter", async () => {
+      const user = userEvent.setup();
+      let resolve: (value: unknown) => void = () => {};
+      generateRecallQuestionsAction.mockReturnValue(
+        new Promise((r) => {
+          resolve = r;
+        }),
+      );
+      await renderPanel(false, { initialRemaining: 4 });
+
+      await user.click(screen.getByTestId("generate-recall-questions"));
+
+      expect(generateRecallQuestionsAction).toHaveBeenCalledWith({
+        pageId: PAGE_ID,
+      });
+      expect(screen.getByTestId("generate-recall-questions")).toHaveTextContent(
+        "Generando…",
+      );
+      expect(screen.getByTestId("generate-recall-questions")).toBeDisabled();
+      await act(async () => resolve(generated(10)));
+
+      expect(
+        await screen.findByTestId("recall-generation-notice"),
+      ).toHaveTextContent("Se generaron 10 preguntas.");
+      expect(screen.getByTestId("generation-remaining")).toHaveTextContent(
+        "Te quedan 3 generaciones hoy",
+      );
+      expect(screen.getByTestId("generate-recall-questions")).toHaveTextContent(
+        "Generar",
+      );
+    });
+
+    it("says when the page was truncated", async () => {
+      const user = userEvent.setup();
+      generateRecallQuestionsAction.mockResolvedValue(generated(1, true));
+      await renderPanel(false);
+
+      await user.click(screen.getByTestId("generate-recall-questions"));
+
+      expect(
+        await screen.findByTestId("recall-generation-notice"),
+      ).toHaveTextContent(
+        "Se generó 1 pregunta. Se usaron las primeras 40 palabras de la página.",
+      );
+    });
+
+    it.each([
+      ["AI_DAILY_LIMIT_REACHED", "Llegaste al límite de hoy. Vuelve mañana."],
+      ["AI_PAGE_EMPTY", "La página está vacía: escribe algo antes de generar."],
+      [
+        "AI_GENERATION_FAILED",
+        "No pudimos generar las preguntas. Intenta de nuevo.",
+      ],
+    ])("maps %s to its message", async (code, message) => {
+      const user = userEvent.setup();
+      generateRecallQuestionsAction.mockResolvedValue(
+        err({ code, message: "x" }),
+      );
+      await renderPanel(false);
+
+      await user.click(screen.getByTestId("generate-recall-questions"));
+
+      const alert = await screen.findByTestId("recall-generation-error");
+      expect(alert).toHaveTextContent(message);
+      expect(alert).toHaveAttribute("role", "alert");
+    });
+
+    it("zeroes the shared counter on the daily limit, disabling every Generar", async () => {
+      const user = userEvent.setup();
+      generateRecallQuestionsAction.mockResolvedValue(
+        err({ code: "AI_DAILY_LIMIT_REACHED", message: "x" }),
+      );
+      await renderPanel(false, { initialRemaining: 2 });
+
+      await user.click(screen.getByTestId("generate-recall-questions"));
+
+      await screen.findByTestId("recall-generation-error");
+      expect(screen.getByTestId("generate-recall-questions")).toBeDisabled();
+      expect(screen.getByTestId("generate-exam-questions")).toBeDisabled();
+      expect(screen.getByTestId("generate-flashcards")).toBeDisabled();
+    });
+
+    it("explains a disabled Generar when no generations remain", async () => {
+      await renderPanel(false, { initialRemaining: 0 });
+
+      expect(screen.getByTestId("generate-recall-questions")).toBeDisabled();
+      expect(screen.getByTestId("recall-generation-limit")).toHaveTextContent(
+        "Llegaste al límite de hoy. Vuelve mañana.",
+      );
+    });
+
+    it("reports an unexpected rejection instead of throwing", async () => {
+      const user = userEvent.setup();
+      generateRecallQuestionsAction.mockRejectedValue(new Error("network"));
+      await renderPanel(false);
+
+      await user.click(screen.getByTestId("generate-recall-questions"));
+
+      expect(
+        await screen.findByTestId("recall-generation-error"),
       ).toHaveTextContent(
         "No pudimos generar las preguntas. Intenta de nuevo.",
       );

@@ -3,6 +3,7 @@ import {
   examQuestionsOutput,
   examVariantsOutput,
   flashcardsOutput,
+  recallQuestionsOutput,
   sessionFeedbackOutput,
 } from "../application/schemas";
 
@@ -150,6 +151,73 @@ function examQuestionsFrom(prompt: string) {
       correctIndex,
       explanation: `El texto dice: ${sentence}`,
       concept: short.slice(0, MAX_FAKE_CONCEPT_LENGTH),
+    });
+  }
+  return { questions };
+}
+
+// ADR 0006: at most 15 items per model call.
+const MAX_FAKE_RECALL_COUNT = 15;
+
+// Reads the prompt shape produced by `buildGenerateRecallQuestionsPrompt`:
+// "Number of questions: N", the "- prompt" lines under "Existing
+// questions:" and the page text after "Text:".
+function parseRecallQuestionsPrompt(prompt: string): {
+  count: number;
+  existingPrompts: Set<string>;
+  text: string;
+} {
+  const marker = prompt.indexOf("\nText:\n");
+  const head = marker === -1 ? prompt : prompt.slice(0, marker);
+  const text =
+    marker === -1 ? prompt : prompt.slice(marker + "\nText:\n".length);
+  const start = head.indexOf("Existing questions:\n");
+  const existingPrompts = new Set(
+    start === -1
+      ? []
+      : head
+          .slice(start)
+          .split("\n")
+          .filter((line) => line.startsWith("- "))
+          .map((line) => normalizeStem(line.slice(2))),
+  );
+  return {
+    count: headerCount(
+      prompt,
+      "questions",
+      DEFAULT_QUESTION_COUNT,
+      MAX_FAKE_RECALL_COUNT,
+    ),
+    existingPrompts,
+    text,
+  };
+}
+
+// Exactly `count` distinct open questions, cycling over the page
+// sentences, with numbered prompts that skip every existing one. The
+// rubric holds the sentence's first words as 2-3 key concepts and the
+// sentence itself as the acceptable answer.
+function recallQuestionsFrom(prompt: string) {
+  const { count, existingPrompts, text } = parseRecallQuestionsPrompt(prompt);
+  const sentences = splitSentences(text);
+  const source =
+    sentences.length > 0 ? sentences : ["Contenido de la página de ejemplo."];
+  const questions = [];
+  let number = existingPrompts.size;
+  while (questions.length < count) {
+    number += 1;
+    const sentence = source[questions.length % source.length] as string;
+    const words = sentence.replace(/[.!?]+$/, "").split(/\s+/);
+    const short = words.slice(0, 4).join(" ");
+    const questionPrompt = `Pregunta ${number}: explica con tus palabras qué dice el texto sobre «${short}».`;
+    if (existingPrompts.has(normalizeStem(questionPrompt))) continue;
+    const keyConcepts = [
+      words.slice(0, 2).join(" "),
+      words.slice(2, 4).join(" ") || "contenido",
+    ];
+    questions.push({
+      prompt: questionPrompt,
+      rubric: { keyConcepts, acceptableAnswerSummary: sentence },
     });
   }
   return { questions };
@@ -310,11 +378,13 @@ export function createFakeLiveProvider(): AiProvider {
           ? [flashcardsFrom(request.prompt)]
           : schema === examQuestionsOutput
             ? [examQuestionsFrom(request.prompt)]
-            : schema === examVariantsOutput
-              ? [examVariantsFrom(request.prompt), ...MINIMAL_OBJECTS]
-              : schema === sessionFeedbackOutput
-                ? [examFeedbackFrom(request.prompt), ...MINIMAL_OBJECTS]
-                : MINIMAL_OBJECTS;
+            : schema === recallQuestionsOutput
+              ? [recallQuestionsFrom(request.prompt)]
+              : schema === examVariantsOutput
+                ? [examVariantsFrom(request.prompt), ...MINIMAL_OBJECTS]
+                : schema === sessionFeedbackOutput
+                  ? [examFeedbackFrom(request.prompt), ...MINIMAL_OBJECTS]
+                  : MINIMAL_OBJECTS;
       const object = candidates.find(
         (candidate) => request.schema.safeParse(candidate).success,
       );
