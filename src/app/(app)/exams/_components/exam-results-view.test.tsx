@@ -1,7 +1,27 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { ExamResultsView as Results } from "@/modules/exams";
+
+const { requestExamFeedbackAction } = vi.hoisted(() => ({
+  requestExamFeedbackAction: vi.fn(async () => ({
+    ok: true,
+    value: { status: "failed", reused: false, content: null },
+  })),
+}));
+vi.mock("@/modules/exams", () => ({ requestExamFeedbackAction }));
+
 import { ExamResultsView } from "./exam-results-view";
+
+const FEEDBACK = {
+  status: "done" as const,
+  reused: false,
+  content: {
+    summary: "Confundiste la función de la mitocondria.",
+    strengths: ["El ADN mitocondrial"],
+    toReinforce: ["La mitocondria produce ATP según la página"],
+    nextStepSuggestion: "Repasa la sección de respiración celular.",
+  },
+};
 
 function results(overrides: Partial<Results> = {}): Results {
   return {
@@ -13,7 +33,7 @@ function results(overrides: Partial<Results> = {}): Results {
     scorePercent: 50,
     passed: false,
     durationSeconds: 450,
-    feedback: null,
+    feedback: FEEDBACK,
     questions: [
       {
         id: "q1",
@@ -79,7 +99,50 @@ describe("ExamResultsView", () => {
       "/exams/nb/pg",
     );
     expect(screen.queryByTestId("new-exam-link")).not.toBeInTheDocument();
-    expect(screen.getByTestId("feedback-status")).toHaveTextContent("pronto");
+    expect(screen.queryByText(/pronto/)).not.toBeInTheDocument();
+  });
+
+  it("sends a failed student to review the page before retaking", () => {
+    renderView(results());
+    const review = screen.getByRole("link", { name: "Repasar contenido" });
+    expect(review).toHaveAttribute(
+      "href",
+      "/notebooks/nb/pages/pg?repaso=examen",
+    );
+  });
+
+  it("shows the exam's AI feedback in place of the placeholder", () => {
+    renderView(results());
+    expect(screen.getByTestId("exam-feedback")).toHaveTextContent(
+      "Confundiste la función de la mitocondria.",
+    );
+    expect(requestExamFeedbackAction).not.toHaveBeenCalled();
+  });
+
+  it("labels the last passing exam's feedback shown again after a pass", () => {
+    renderView(
+      results({
+        correct: 2,
+        scorePercent: 100,
+        passed: true,
+        failedConcepts: [],
+        feedback: { ...FEEDBACK, reused: true },
+      }),
+    );
+    expect(screen.getByTestId("exam-feedback-reused")).toHaveTextContent(
+      "Retroalimentación de tu último examen aprobado",
+    );
+    expect(
+      screen.queryByRole("link", { name: "Repasar contenido" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("asks for the feedback when the results have none yet", async () => {
+    renderView(results({ feedback: null }));
+    expect(
+      await screen.findByText(/Tu examen quedó guardado/),
+    ).toBeInTheDocument();
+    expect(requestExamFeedbackAction).toHaveBeenCalledWith({ sessionId: "s1" });
   });
 
   it("offers a new exam after a pass", () => {
