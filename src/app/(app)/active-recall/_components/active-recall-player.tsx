@@ -61,6 +61,12 @@ type Phase = "answer" | "review";
 // 6 UI freeze): the flow goes on and the next answer starts the session
 // again if it never started. "Nueva sesión" starts a new session and shows
 // its questions.
+// One player run: the DB session its queued saves and finish target, set
+// when the run's session starts.
+interface RecallRun {
+  sessionId: string | null;
+}
+
 export function ActiveRecallPlayer({
   notebookId,
   notebookTitle,
@@ -69,7 +75,11 @@ export function ActiveRecallPlayer({
   questions: initialQuestions,
 }: ActiveRecallPlayerProps) {
   const [questions, setQuestions] = useState(initialQuestions);
-  const sessionIdRef = useRef<string | null>(null);
+  // The session the queued tasks write to. Each task captures the run that
+  // was current when it was queued, so "Nueva sesión" (a new run) never
+  // moves the previous run's pending answers into the new session and
+  // never stops its finish.
+  const runRef = useRef<RecallRun>({ sessionId: null });
   const queueRef = useRef<Promise<void>>(Promise.resolve());
   const restartingRef = useRef(false);
   const [index, setIndex] = useState(0);
@@ -91,17 +101,21 @@ export function ActiveRecallPlayer({
     return next;
   }
 
-  async function ensureSession(page: string): Promise<string | null> {
-    if (sessionIdRef.current) return sessionIdRef.current;
+  async function ensureSession(
+    run: RecallRun,
+    page: string,
+  ): Promise<string | null> {
+    if (run.sessionId) return run.sessionId;
     const started = await startRecallSessionAction({ pageId: page });
-    if (started.ok) sessionIdRef.current = started.value.sessionId;
-    return sessionIdRef.current;
+    if (started.ok) run.sessionId = started.value.sessionId;
+    return run.sessionId;
   }
 
   function persistAnswer(questionId: string, answer: string, rating: number) {
     if (!pageId) return;
+    const run = runRef.current;
     enqueue(async () => {
-      const sessionId = await ensureSession(pageId);
+      const sessionId = await ensureSession(run, pageId);
       if (!sessionId) return;
       await saveRecallAnswerAction({
         sessionId,
@@ -115,8 +129,9 @@ export function ActiveRecallPlayer({
   function finish() {
     setFinished(true);
     if (!pageId) return;
+    const run = runRef.current;
     enqueue(async () => {
-      const sessionId = sessionIdRef.current;
+      const sessionId = run.sessionId;
       if (!sessionId) return;
       await finishRecallSessionAction({ sessionId });
     });
@@ -175,11 +190,12 @@ export function ActiveRecallPlayer({
     }
     if (restartingRef.current) return;
     restartingRef.current = true;
-    sessionIdRef.current = null;
+    const run: RecallRun = { sessionId: null };
+    runRef.current = run;
     enqueue(async () => {
       const started = await startRecallSessionAction({ pageId });
       if (!started.ok) return;
-      sessionIdRef.current = started.value.sessionId;
+      run.sessionId = started.value.sessionId;
       setQuestions(started.value.questions);
     }).finally(() => {
       restartingRef.current = false;

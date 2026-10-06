@@ -186,6 +186,39 @@ describe("ActiveRecallPlayer persistence", () => {
     expect(actions.startRecallSessionAction).toHaveBeenCalledTimes(2);
   });
 
+  it("'Nueva sesión' during pending saves still saves into and finishes the old session", async () => {
+    // The first save hangs until released, so "Terminar" and "Nueva sesión"
+    // are both queued behind it.
+    let releaseSave: () => void = () => {};
+    const saveGate = new Promise<void>((resolve) => {
+      releaseSave = resolve;
+    });
+    const save = actions.saveRecallAnswerAction.getMockImplementation();
+    actions.saveRecallAnswerAction.mockImplementationOnce(async (input) => {
+      await saveGate;
+      return save?.(input);
+    });
+    const user = setup();
+    await answerWith(user, "a", 4);
+    await user.click(screen.getByRole("button", { name: "Saltar" }));
+    await user.click(screen.getByRole("button", { name: /Terminar/ }));
+    await user.click(screen.getByRole("button", { name: /Nueva sesión/ }));
+
+    releaseSave();
+
+    expect(
+      await screen.findByText("Pregunta de la nueva sesión"),
+    ).toBeInTheDocument();
+    await waitFor(() => expect(calls).toHaveLength(5));
+    expect(calls).toEqual([
+      "start:1",
+      "save:s1:q1",
+      "save:s1:q2",
+      "finish:s1",
+      "start:2",
+    ]);
+  });
+
   it("keeps the questions and starts lazily again when 'Nueva sesión' cannot start", async () => {
     const user = setup();
     await answerWith(user, "a", 4);
