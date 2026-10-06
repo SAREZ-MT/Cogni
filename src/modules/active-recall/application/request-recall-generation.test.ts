@@ -407,6 +407,46 @@ describe("requestRecallGeneration", () => {
     expect(uow.studyItems.all()).toHaveLength(10);
   });
 
+  it("answers with the stored questions when consuming the unit fails after the commit", async () => {
+    const limiter = new StubLimiter(3);
+    const failure = new Error("redis down");
+    limiter.check = async () => {
+      throw failure;
+    };
+    const reported: unknown[] = [];
+    const { deps, uow } = makeDeps({
+      limiter,
+      onLimiterFailure: (error) => reported.push(error),
+    });
+
+    const result = await requestRecallGeneration({ pageId: PAGE }, deps, OWNER);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.questions).toHaveLength(10);
+    // The unit could not be confirmed: the peeked count less this one.
+    expect(result.value.remainingToday).toBe(2);
+    expect(uow.studyItems.all()).toHaveLength(10);
+    expect(reported).toEqual([failure]);
+  });
+
+  it("survives a limiter failure after the commit without a reporter", async () => {
+    const limiter = new StubLimiter(0);
+    limiter.peek = async () => ({
+      allowed: true,
+      remaining: 0,
+      resetAt: RESET,
+    });
+    limiter.check = async () => {
+      throw new Error("redis down");
+    };
+    const { deps } = makeDeps({ limiter });
+
+    const result = await requestRecallGeneration({ pageId: PAGE }, deps, OWNER);
+
+    expect(result.ok && result.value.remainingToday).toBe(0);
+  });
+
   it("truncates the page text to the token cap and reports it", async () => {
     const long = Array.from({ length: 50 }, (_, i) => `palabra${i}`).join(" ");
     const { deps, ai } = makeDeps({ pages: stubPages(long), tokenCap: 10 });

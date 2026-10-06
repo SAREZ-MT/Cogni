@@ -62,6 +62,9 @@ export interface RequestRecallGenerationDeps {
   clock: Clock;
   ids: { next(): string };
   tokenCap: number;
+  // Told when consuming the unit fails after the questions were stored
+  // (the action reports it to Sentry). The generation still succeeds.
+  onLimiterFailure?: (error: unknown) => void;
 }
 
 export interface RequestRecallGenerationResult {
@@ -87,6 +90,24 @@ function normalizePrompt(text: string): string {
     .replace(/^[\s¿¡]+/, "")
     .replace(/[\s.,;:!?…]+$/, "")
     .toLocaleLowerCase();
+}
+
+// Consumes the unit of a stored generation and answers what is left today.
+// The questions are already committed, so a limiter failure here is never a
+// generation error: it is reported and the peeked count less this unit is
+// answered instead (the unit may stay unconsumed; the next peek tells).
+async function consumeUnit(
+  deps: RequestRecallGenerationDeps,
+  ownerId: string,
+  peekedRemaining: number,
+): Promise<number> {
+  try {
+    const consumed = await deps.limiter.check(ownerId);
+    return consumed.allowed ? consumed.remaining : 0;
+  } catch (error) {
+    deps.onLimiterFailure?.(error);
+    return Math.max(0, peekedRemaining - 1);
+  }
 }
 
 // Generates AI open questions with their rubric for a page (§3.3, §8.4
@@ -206,11 +227,10 @@ export async function requestRecallGeneration(
   );
   if (!persisted.ok) return persisted;
 
-  const consumed = await deps.limiter.check(ownerId);
   return ok({
     questions: persisted.value,
     skipped: skipped + (accepted.length - persisted.value.length),
-    remainingToday: consumed.allowed ? consumed.remaining : 0,
+    remainingToday: await consumeUnit(deps, ownerId, limit.remaining),
     truncated: truncation.truncated,
     wordsUsed: truncation.wordsUsed,
     wordsTotal: truncation.wordsTotal,
