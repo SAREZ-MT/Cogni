@@ -45,6 +45,7 @@ export {
   type NewStudyItemInput,
   newStudyItem,
   type Quality,
+  recallReviewQualityFor,
   type Sm2State,
   type StudyItem,
   type StudyItemKind,

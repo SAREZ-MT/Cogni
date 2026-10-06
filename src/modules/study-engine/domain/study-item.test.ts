@@ -5,6 +5,7 @@ import {
   INITIAL_EASINESS,
   MIN_EASINESS,
   newStudyItem,
+  recallReviewQualityFor,
 } from "./study-item";
 
 const NOW = new Date("2026-01-01T00:00:00.000Z");
@@ -65,5 +66,25 @@ describe("constants", () => {
 
   it("maps the four flashcard buttons to §7.2 qualities", () => {
     expect(FLASHCARD_QUALITY).toEqual({ again: 1, hard: 3, good: 4, easy: 5 });
+  });
+});
+
+// Recall answers carry their own 0–5 combined quality (§7.4). A failing
+// quality (< 3) always reviews, due or not; a passing one reviews only a
+// due item, so a recall answer evaluated after the item was already
+// reviewed never inflates its interval (same rule as exams).
+describe("recallReviewQualityFor", () => {
+  it("keeps a failing quality whether or not the item was due", () => {
+    for (const quality of [0, 1, 2] as const) {
+      expect(recallReviewQualityFor({ quality, wasDue: true })).toBe(quality);
+      expect(recallReviewQualityFor({ quality, wasDue: false })).toBe(quality);
+    }
+  });
+
+  it("keeps a passing quality only when the item was due", () => {
+    for (const quality of [3, 4, 5] as const) {
+      expect(recallReviewQualityFor({ quality, wasDue: true })).toBe(quality);
+      expect(recallReviewQualityFor({ quality, wasDue: false })).toBeNull();
+    }
   });
 });

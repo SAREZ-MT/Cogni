@@ -19,6 +19,10 @@ export {
   type SkippedEvaluation,
   skippedEvaluation,
 } from "./recall-answer";
+export type {
+  RecallAnswerRepository,
+  RecallEvaluationResult,
+} from "./recall-answer-repository";
 export {
   type NewRecallQuestion,
   newRecallQuestion,
@@ -26,6 +30,7 @@ export {
   type RecallQuestionOrigin,
   type RecallRubric,
 } from "./recall-question";
+export type { RecallQuestionRepository } from "./recall-question-repository";
 export {
   type NewRecallSessionInput,
   newRecallSession,
@@ -35,3 +40,4 @@ export {
   sessionEvaluationStatus,
   sessionScore,
 } from "./recall-session";
+export type { RecallSessionRepository } from "./recall-session-repository";

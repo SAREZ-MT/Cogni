@@ -40,6 +40,21 @@ export function examReviewQualityFor(answer: {
   return answer.wasDue ? EXAM_REVIEW_QUALITY.correct : null;
 }
 
+// A recall answer reviews its question's item with its combined quality
+// (§7.4, round(0.6·ai + 0.4·self), 0–5). Recall sessions hold only due or
+// new items, but the evaluation runs after the finish and may be retried
+// later, so the item can be reviewed meanwhile (an overlapping session).
+// Same rule as exams: a failing quality (< 3) always reviews, a passing one
+// reviews only a due item and otherwise leaves SM-2 untouched (null), so a
+// late evaluation never inflates the interval.
+export function recallReviewQualityFor(answer: {
+  quality: Quality;
+  wasDue: boolean;
+}): Quality | null {
+  if (answer.quality < 3) return answer.quality;
+  return answer.wasDue ? answer.quality : null;
+}
+
 // §6.1: easiness is >= 1.3 and starts at 2.5.
 export const MIN_EASINESS = 1.3;
 export const INITIAL_EASINESS = 2.5;

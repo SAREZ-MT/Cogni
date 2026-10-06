@@ -61,6 +61,9 @@ export const REVERSION_LOCK_ORDER = [
   "exam_sessions",
   "exam_answers",
   "exam_page_state",
+  "recall_questions",
+  "recall_sessions",
+  "recall_answers",
 ] as const;
 
 // A waiting lock gives up after this instead of hanging the suite.

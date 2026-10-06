@@ -13,8 +13,11 @@ import {
   type PageAccess,
   type RecordExamReviewsInput,
   type RecordedExamReviews,
+  type RecordedRecallReviews,
+  type RecordRecallReviewsInput,
   recomputeAllPageMastery,
   recordExamReviews,
+  recordRecallReviews,
   type StartedFlashcardSession,
   startFlashcardSession,
 } from "./application";
@@ -108,6 +111,28 @@ export function createExamReviewRecorder(deps: {
   return {
     record: (input) =>
       recordExamReviews(input, { uow: new DrizzleStudyUnitOfWork(db), ids }),
+  };
+}
+
+// Feeds evaluated recall answers to the SM-2 engine (recordRecallReviews).
+// `db` may be the active-recall module's open transaction: the reviews then
+// run in a savepoint of it and commit or roll back with the answers'
+// evaluations. Safe to call again for a session: an answer already
+// recorded in it is reported back, never recorded twice.
+export interface RecallReviewRecorder {
+  record(
+    input: RecordRecallReviewsInput,
+  ): Promise<Result<RecordedRecallReviews, DomainError>>;
+}
+
+export function createRecallReviewRecorder(deps: {
+  db: DbExecutor;
+  ids: { next(): string };
+}): RecallReviewRecorder {
+  const { db, ids } = deps;
+  return {
+    record: (input) =>
+      recordRecallReviews(input, { uow: new DrizzleStudyUnitOfWork(db), ids }),
   };
 }
 
