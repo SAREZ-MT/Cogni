@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from "@testing-library/react";
+import { StrictMode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ExamFeedbackView } from "@/modules/exams";
 
@@ -67,6 +68,41 @@ describe("ExamFeedbackPanel", () => {
     expect(requestExamFeedbackAction).toHaveBeenCalledWith({
       sessionId: SESSION,
     });
+  });
+
+  // React StrictMode runs every effect twice in development (mount, cleanup,
+  // mount): the result must still reach the panel, from one request only.
+  it("shows the requested feedback under StrictMode, asking only once", async () => {
+    requestExamFeedbackAction.mockResolvedValue({ ok: true, value: done() });
+
+    render(
+      <StrictMode>
+        <ExamFeedbackPanel sessionId={SESSION} initial={null} />
+      </StrictMode>,
+    );
+
+    expect(await screen.findByText("Buen intento.")).toBeVisible();
+    expect(
+      screen.getByRole("region", { name: "Retroalimentación con IA" }),
+    ).toHaveAttribute("aria-busy", "false");
+    expect(requestExamFeedbackAction).toHaveBeenCalledOnce();
+  });
+
+  it("shows the calm note under StrictMode when the request fails", async () => {
+    requestExamFeedbackAction.mockRejectedValue(new Error("network"));
+
+    render(
+      <StrictMode>
+        <ExamFeedbackPanel sessionId={SESSION} initial={null} />
+      </StrictMode>,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("exam-feedback")).toHaveTextContent(
+        "Tu examen quedó guardado.",
+      ),
+    );
+    expect(requestExamFeedbackAction).toHaveBeenCalledOnce();
   });
 
   it.each([

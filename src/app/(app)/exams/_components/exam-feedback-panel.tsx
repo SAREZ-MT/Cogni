@@ -27,6 +27,20 @@ function fromView(view: ExamFeedbackView | null): PanelState {
   return { status: "unavailable" };
 }
 
+// Asks for the feedback once; any failure is the calm note (never throws).
+async function requestFeedback(sessionId: string): Promise<PanelState> {
+  try {
+    const result = await requestExamFeedbackAction({ sessionId });
+    if (result.ok) {
+      const view = fromView(result.value);
+      if (view.status === "done") return view;
+    }
+  } catch {
+    // Network drop or a crashed action: same calm note.
+  }
+  return { status: "unavailable" };
+}
+
 function FeedbackList({ label, items }: { label: string; items: string[] }) {
   const id = useId();
   if (items.length === 0) return null;
@@ -51,7 +65,7 @@ function FeedbackList({ label, items }: { label: string; items: string[] }) {
 // The exam's AI feedback on the results screen (documento-maestro §3.3: at
 // the end the AI explains the failed questions with the page's content).
 // Stored feedback renders at once; with none yet (or a pending row) the
-// panel asks requestExamFeedbackAction once and shows a loading state. A
+// panel asks requestExamFeedbackAction once per session (StrictMode-safe) and shows a loading state. A
 // pass after an earlier pass shows that pass's feedback with a label (user
 // decision 2026-10-05). Any failure is a calm note: the exam is saved.
 // Same chrome as the flashcards session feedback.
@@ -64,26 +78,24 @@ export function ExamFeedbackPanel({
 }) {
   const titleId = useId();
   const [state, setState] = useState<PanelState>(() => fromView(initial));
-  const requested = useRef(false);
+  // The one request of this session, shared by every run of the effect:
+  // StrictMode runs effects twice in development (mount, cleanup, mount), so
+  // the request is started once and each run subscribes to its result.
+  const request = useRef<{
+    sessionId: string;
+    result: Promise<PanelState>;
+  } | null>(null);
   const needsRequest = state.status === "loading";
 
   useEffect(() => {
-    if (!needsRequest || requested.current) return;
-    requested.current = true;
+    if (!needsRequest) return;
+    if (request.current?.sessionId !== sessionId) {
+      request.current = { sessionId, result: requestFeedback(sessionId) };
+    }
     let active = true;
-    (async () => {
-      let next: PanelState = { status: "unavailable" };
-      try {
-        const result = await requestExamFeedbackAction({ sessionId });
-        if (result.ok) {
-          const view = fromView(result.value);
-          if (view.status === "done") next = view;
-        }
-      } catch {
-        // Network drop or a crashed action: same calm note.
-      }
+    request.current.result.then((next) => {
       if (active) setState(next);
-    })();
+    });
     return () => {
       active = false;
     };

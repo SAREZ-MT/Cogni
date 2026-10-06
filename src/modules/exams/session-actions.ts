@@ -1,5 +1,6 @@
 "use server";
 
+import * as Sentry from "@sentry/nextjs";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createNotebooksServerApi } from "@/modules/notebooks";
@@ -349,6 +350,30 @@ export async function finishExamSessionAction(
   });
 }
 
+// The stored feedback of a finished session, best-effort: feedback never
+// blocks the exam, so a failed read (an error or a throw) is reported and
+// answered as null, the results keep the score and the panel asks for it.
+async function readStoredFeedback(
+  sessionId: string,
+  uow: DrizzleExamSessionUnitOfWork,
+  ownerId: string,
+): Promise<ExamFeedbackView | null> {
+  try {
+    const feedback = await readExamFeedback(
+      { sessionId },
+      { uow, feedback: createSessionFeedbackSources(getDb()).feedback },
+      ownerId,
+    );
+    if (feedback.ok) {
+      return feedback.value && toExamFeedbackView(feedback.value);
+    }
+    Sentry.captureException(feedback.error);
+  } catch (error) {
+    Sentry.captureException(error);
+  }
+  return null;
+}
+
 // The results of a finished session of the page: `sessionId` when given,
 // otherwise the page's last finished session. EXAMS_SESSION_NOT_FOUND when
 // there is none, the session is open or it belongs to another page.
@@ -381,16 +406,8 @@ export async function getExamResultsAction(
     if (!detail.ok) return err(toActionError(detail.error));
     if (detail.value.session.pageId !== parsed.value.pageId) return notFound;
     if (detail.value.session.finishedAt === null) return notFound;
-    const feedback = await readExamFeedback(
-      { sessionId },
-      { uow, feedback: createSessionFeedbackSources(getDb()).feedback },
-      ownerId.value,
-    );
-    if (!feedback.ok) return err(toActionError(feedback.error));
-    const view = toResultsView(
-      detail.value,
-      feedback.value && toExamFeedbackView(feedback.value),
-    );
+    const feedback = await readStoredFeedback(sessionId, uow, ownerId.value);
+    const view = toResultsView(detail.value, feedback);
     return view ? ok(view) : notFound;
   });
 }

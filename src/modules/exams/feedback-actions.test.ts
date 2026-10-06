@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   AiGeneration,
   GenerateStructuredInput,
@@ -75,6 +75,21 @@ vi.mock("@/modules/notebooks", () => ({
         : err(new DomainError("PAGE_NOT_FOUND", pageId)),
   }),
 }));
+// readExamFeedback passes through unless a test replaces it (a failing
+// feedback read must never hide the exam's score).
+const { readFeedbackOverride } = vi.hoisted(() => ({
+  readFeedbackOverride: { run: null as null | (() => Promise<unknown>) },
+}));
+vi.mock("./application", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./application")>();
+  return {
+    ...actual,
+    readExamFeedback: (...args: Parameters<typeof actual.readExamFeedback>) =>
+      readFeedbackOverride.run
+        ? readFeedbackOverride.run()
+        : actual.readExamFeedback(...args),
+  };
+});
 vi.mock("./infrastructure", () => ({
   DrizzleExamSessionUnitOfWork: vi.fn(function DrizzleExamSessionUnitOfWork() {
     return current.uow;
@@ -133,8 +148,13 @@ async function actions() {
 }
 
 describe("exam feedback actions", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
+    readFeedbackOverride.run = null;
     getCurrentUser.mockResolvedValue({ id: OWNER });
     current = {
       uow: new InMemoryExamSessionUnitOfWork(),
@@ -175,11 +195,14 @@ describe("exam feedback actions", () => {
   });
 
   it("shows the last pass's feedback again for a later pass", async () => {
+    // Only Date is faked: the actions' system clock reads it, promises run.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-05T10:00:00.000Z"));
     const first = await finishedExam(0);
     const { requestExamFeedbackAction } = await actions();
     await requestExamFeedbackAction({ sessionId: first });
     // Finish strictly later than the first exam.
-    await new Promise((resolve) => setTimeout(resolve, 5));
+    vi.setSystemTime(new Date("2026-10-05T11:00:00.000Z"));
     const second = await finishedExam(1);
 
     const result = await requestExamFeedbackAction({ sessionId: second });
@@ -207,6 +230,34 @@ describe("exam feedback actions", () => {
       reused: false,
       content: FEEDBACK_OBJECT,
     });
+  });
+
+  it.each([
+    [
+      "throws",
+      async () => {
+        throw new Error("feedback table down");
+      },
+    ],
+    [
+      "returns an error",
+      async () => err(new DomainError("EXAMS_SESSION_NOT_FOUND", "gone")),
+    ],
+  ])("still returns the score when the feedback read %s", async (_, run) => {
+    await finishedExam(4);
+    const { getExamResultsAction } = await import("./session-actions");
+    readFeedbackOverride.run = run;
+
+    const result = await getExamResultsAction({ pageId: PAGE });
+
+    if (!result.ok) throw new Error(result.error.code);
+    expect(result.value).toMatchObject({
+      total: 10,
+      correct: 6,
+      passed: false,
+      feedback: null,
+    });
+    expect(captureException).toHaveBeenCalledOnce();
   });
 
   it("refuses feedback for an open session", async () => {
