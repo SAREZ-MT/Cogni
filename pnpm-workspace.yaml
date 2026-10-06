@@ -1,3 +1,7 @@
 ignoredBuiltDependencies:
   - sharp
   - unrs-resolver
+
+# GHSA-68fv-2mgg-jv7q: source-map-js <1.2.2 (transitive via tailwind, vitest, jsdom).
+overrides:
+  source-map-js: ^1.2.2

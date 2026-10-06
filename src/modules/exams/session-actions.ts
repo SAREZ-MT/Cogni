@@ -1,8 +1,10 @@
 "use server";
 
+import * as Sentry from "@sentry/nextjs";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createNotebooksServerApi } from "@/modules/notebooks";
+import { createSessionFeedbackSources } from "@/modules/study-engine";
 import { getDb } from "@/shared/db/client";
 import { systemClock } from "@/shared/kernel/clock";
 import { type ActionError, toActionError } from "@/shared/kernel/domain-error";
@@ -19,6 +21,7 @@ import {
   completeExamSession,
   type ExamSessionDetail,
   getExamPageOverview,
+  readExamFeedback,
   readExamSession,
   startExamSession,
 } from "./application";
@@ -30,6 +33,7 @@ import {
   EXAM_MIN_QUESTIONS,
   examSessionDurationMs,
 } from "./domain/exam-session";
+import { type ExamFeedbackView, toExamFeedbackView } from "./feedback-view";
 import { DrizzleExamSessionUnitOfWork } from "./infrastructure";
 
 // Server Actions of an exam session (§3.3): start, answer one question at a
@@ -114,6 +118,9 @@ export interface ExamResultsView {
   questions: ExamResultQuestionView[];
   // Concepts of the wrong answers, once each, in the exam's question order.
   failedConcepts: string[];
+  // The stored AI feedback (the session's own or, for a pass after a pass,
+  // the last pass's); null until it is requested (requestExamFeedbackAction).
+  feedback: ExamFeedbackView | null;
 }
 
 const pageInput = z.object({ pageId: z.uuid() });
@@ -182,7 +189,10 @@ function toPlayerView(detail: ExamSessionDetail): ExamSessionView {
   };
 }
 
-function toResultsView(detail: ExamSessionDetail): ExamResultsView | null {
+function toResultsView(
+  detail: ExamSessionDetail,
+  feedback: ExamFeedbackView | null,
+): ExamResultsView | null {
   const { session } = detail;
   if (
     session.finishedAt === null ||
@@ -221,6 +231,7 @@ function toResultsView(detail: ExamSessionDetail): ExamResultsView | null {
     failedConcepts: [
       ...new Set(questions.filter((q) => !q.isCorrect).map((q) => q.concept)),
     ],
+    feedback,
   };
 }
 
@@ -339,6 +350,30 @@ export async function finishExamSessionAction(
   });
 }
 
+// The stored feedback of a finished session, best-effort: feedback never
+// blocks the exam, so a failed read (an error or a throw) is reported and
+// answered as null, the results keep the score and the panel asks for it.
+async function readStoredFeedback(
+  sessionId: string,
+  uow: DrizzleExamSessionUnitOfWork,
+  ownerId: string,
+): Promise<ExamFeedbackView | null> {
+  try {
+    const feedback = await readExamFeedback(
+      { sessionId },
+      { uow, feedback: createSessionFeedbackSources(getDb()).feedback },
+      ownerId,
+    );
+    if (feedback.ok) {
+      return feedback.value && toExamFeedbackView(feedback.value);
+    }
+    Sentry.captureException(feedback.error);
+  } catch (error) {
+    Sentry.captureException(error);
+  }
+  return null;
+}
+
 // The results of a finished session of the page: `sessionId` when given,
 // otherwise the page's last finished session. EXAMS_SESSION_NOT_FOUND when
 // there is none, the session is open or it belongs to another page.
@@ -370,7 +405,9 @@ export async function getExamResultsAction(
     const detail = await readExamSession({ sessionId }, { uow }, ownerId.value);
     if (!detail.ok) return err(toActionError(detail.error));
     if (detail.value.session.pageId !== parsed.value.pageId) return notFound;
-    const view = toResultsView(detail.value);
+    if (detail.value.session.finishedAt === null) return notFound;
+    const feedback = await readStoredFeedback(sessionId, uow, ownerId.value);
+    const view = toResultsView(detail.value, feedback);
     return view ? ok(view) : notFound;
   });
 }

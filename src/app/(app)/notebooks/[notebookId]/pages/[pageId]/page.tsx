@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
+import { getExamReviewNoticeAction } from "@/modules/exams";
 import {
   type FlashcardView,
   getGenerationStatusAction,
@@ -25,6 +26,7 @@ import {
   TECHNIQUES_PANEL_COLLAPSED,
   TECHNIQUES_PANEL_COOKIE,
 } from "../../../../_components/techniques-panel-cookie";
+import { ExamReviewNotice } from "./_components/exam-review-notice";
 import { PageEditor } from "./_components/page-editor";
 import { PageTitle } from "./_components/page-title";
 import { TechniquesPanel } from "./_components/techniques-panel";
@@ -86,10 +88,16 @@ export default async function PageView({ params }: PagePageProps) {
   // Initial panel data is read here and refreshed client-side after each
   // generation. Both actions never throw; a failed read degrades to an empty
   // deck / unknown counter instead of blocking the editor route.
-  const [cardsResult, statusResult] = await Promise.all([
+  // Review before retaking (Phase 5 T8): a page waiting for an exam retake
+  // lists the failed concepts above the editor. Derived from the page's
+  // exam state on every visit (not from the results link's `?repaso`
+  // query); a failed read shows no notice.
+  const [cardsResult, statusResult, noticeResult] = await Promise.all([
     listFlashcardsAction({ pageId: page.id }),
     getGenerationStatusAction().catch(() => null),
+    getExamReviewNoticeAction({ pageId: page.id }).catch(() => null),
   ]);
+  const reviewNotice = noticeResult?.ok ? noticeResult.value : null;
   const initialFlashcards: FlashcardView[] = cardsResult.ok
     ? cardsResult.value
     : [];
@@ -141,6 +149,12 @@ export default async function PageView({ params }: PagePageProps) {
           updatedAt={page.updatedAt}
           statusSlot={<span id={PAGE_STATUS_SLOT_ID} />}
         />
+        {reviewNotice && (
+          <ExamReviewNotice
+            failedConcepts={reviewNotice.failedConcepts}
+            examHref={`/exams/${notebookId}/${page.id}`}
+          />
+        )}
         <PageImportView
           initial={initialJob}
           pageId={page.id}

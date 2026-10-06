@@ -21,7 +21,10 @@ vi.mock("@/modules/notebooks", () => ({
   getPageForRoute,
   getNotebookTitleForRoute,
 }));
-vi.mock("@/modules/exams", () => ({ getExamResultsAction }));
+vi.mock("@/modules/exams", () => ({
+  getExamResultsAction,
+  requestExamFeedbackAction: vi.fn(),
+}));
 
 import ExamResultsPage from "./page";
 
@@ -57,6 +60,7 @@ describe("ExamResultsPage", () => {
         durationSeconds: 95,
         questions: [],
         failedConcepts: [],
+        feedback: { status: "failed", reused: false, content: null },
       }),
     );
   });

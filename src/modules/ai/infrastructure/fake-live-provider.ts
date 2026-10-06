@@ -3,6 +3,7 @@ import {
   examQuestionsOutput,
   examVariantsOutput,
   flashcardsOutput,
+  sessionFeedbackOutput,
 } from "../application/schemas";
 
 export const FAKE_PROVIDER_ID = "fake";
@@ -226,6 +227,32 @@ function examVariantsFrom(prompt: string) {
   return { variants };
 }
 
+// Exam feedback (session_feedback/v2, first line "Technique: exam"): one
+// item to reinforce per failed question's concept, read only from the
+// "Failed questions:" block that precedes the page text. Any other
+// feedback prompt (flashcards v1) gets the generic minimal object.
+function examFeedbackFrom(prompt: string) {
+  const lines = prompt.split("\n");
+  if (lines[0] !== "Technique: exam") return null;
+  const start = lines.indexOf("Failed questions:");
+  const end = lines.indexOf("Text:");
+  const concepts =
+    start === -1 || end === -1
+      ? []
+      : lines.slice(start + 1, end).flatMap((line) => {
+          const match = /^Question \d+ \[(.+?)\]: /.exec(line);
+          return match ? [match[1]] : [];
+        });
+  return {
+    summary: "Resumen del examen de ejemplo",
+    strengths: ["Respondiste bien el resto del examen"],
+    toReinforce: [...new Set(concepts)].map(
+      (concept) => `Repasa ${concept} en la página`,
+    ),
+    nextStepSuggestion: "Repasa la página y vuelve a rendir el examen",
+  };
+}
+
 // One schema-valid minimal object per purpose without a prompt-aware
 // branch. The first candidate the request schema accepts is returned.
 const MINIMAL_OBJECTS: readonly unknown[] = [
@@ -284,7 +311,9 @@ export function createFakeLiveProvider(): AiProvider {
             ? [examQuestionsFrom(request.prompt)]
             : schema === examVariantsOutput
               ? [examVariantsFrom(request.prompt), ...MINIMAL_OBJECTS]
-              : MINIMAL_OBJECTS;
+              : schema === sessionFeedbackOutput
+                ? [examFeedbackFrom(request.prompt), ...MINIMAL_OBJECTS]
+                : MINIMAL_OBJECTS;
       const object = candidates.find(
         (candidate) => request.schema.safeParse(candidate).success,
       );

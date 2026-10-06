@@ -49,6 +49,11 @@ vi.mock("@/modules/flashcards", () => ({
   getGenerationStatusAction,
 }));
 
+const { getExamReviewNoticeAction } = vi.hoisted(() => ({
+  getExamReviewNoticeAction: vi.fn(),
+}));
+vi.mock("@/modules/exams", () => ({ getExamReviewNoticeAction }));
+
 const { PageEditor } = vi.hoisted(() => ({ PageEditor: vi.fn(() => null) }));
 vi.mock("./_components/page-editor", () => ({ PageEditor }));
 
@@ -103,11 +108,13 @@ async function renderRoute() {
   const section = (await renderSection()) as ReactElement<{
     children: ReactElement[];
   }>;
-  // Section children are now [BackLink, PageHeader, PageImportView] — a
-  // BackLink to the notebook was added as the first child (user feedback:
-  // no way back from the editor except the sidebar).
+  // Section children are [BackLink, PageHeader, exam review notice | null,
+  // PageImportView] — a BackLink to the notebook was added as the first
+  // child (user feedback: no way back from the editor except the sidebar).
   const children = section.props.children;
-  const importView = children[2] as ReactElement<{
+  const importView = children.find(
+    (child) => child?.type === PageImportView,
+  ) as ReactElement<{
     initial: unknown;
     pageId: string;
     editor: unknown;
@@ -124,6 +131,8 @@ describe("page route ingestion wiring", () => {
     getNotebookTitleForRoute.mockResolvedValue("Biología Celular");
     listFlashcardsAction.mockReset();
     listFlashcardsAction.mockResolvedValue({ ok: true, value: [] });
+    getExamReviewNoticeAction.mockReset();
+    getExamReviewNoticeAction.mockResolvedValue({ ok: true, value: null });
     getGenerationStatusAction.mockReset();
     getGenerationStatusAction.mockResolvedValue({
       ok: true,
@@ -286,7 +295,7 @@ describe("page route ingestion wiring", () => {
     }>;
     expect(header.props.statusSlot?.props.id).toBe(PAGE_STATUS_SLOT_ID);
 
-    const importView = section.props.children[2] as ReactElement<{
+    const importView = section.props.children[3] as ReactElement<{
       editor: ReactElement<{
         children: ReactElement<{ statusPortalId?: string }>;
       }>;
@@ -308,7 +317,7 @@ describe("page route ingestion wiring", () => {
       children: ReactElement[];
     }>;
 
-    const importView = section.props.children[2] as ReactElement<{
+    const importView = section.props.children[3] as ReactElement<{
       editor: ReactElement<{
         children: ReactElement<{ notebookId?: string }>;
       }>;
@@ -316,6 +325,58 @@ describe("page route ingestion wiring", () => {
     expect(importView.props.editor.props.children.props.notebookId).toBe(
       "nb-1",
     );
+  });
+
+  describe("exam review notice", () => {
+    async function noticeElement() {
+      getPageForRoute.mockResolvedValue(page());
+      const section = (await renderSection()) as ReactElement<{
+        children: (ReactElement | null | false)[];
+      }>;
+      return section.props.children.find(
+        (child) =>
+          !!child &&
+          (child.type as { name?: string }).name === "ExamReviewNotice",
+      ) as ReactElement<{ failedConcepts: string[]; examHref: string }>;
+    }
+
+    it("shows the failed concepts of a pending retake above the editor, linking to the exam route", async () => {
+      getExamReviewNoticeAction.mockResolvedValue({
+        ok: true,
+        value: { failedConcepts: ["Función de la mitocondria"] },
+      });
+
+      const notice = await noticeElement();
+
+      expect(getExamReviewNoticeAction).toHaveBeenCalledWith({
+        pageId: "page-1",
+      });
+      expect(notice.props).toEqual({
+        failedConcepts: ["Función de la mitocondria"],
+        examHref: "/exams/nb-1/page-1",
+      });
+    });
+
+    it.each([
+      ["no retake is pending", async () => ({ ok: true, value: null })],
+      [
+        "the read fails",
+        async () => ({
+          ok: false,
+          error: { code: "EXAMS_UNEXPECTED", message: "x" },
+        }),
+      ],
+      [
+        "the read throws",
+        async () => {
+          throw new Error("boom");
+        },
+      ],
+    ])("shows no notice when %s", async (_, read) => {
+      getExamReviewNoticeAction.mockImplementation(read);
+
+      expect(await noticeElement()).toBeUndefined();
+    });
   });
 
   // Flashcards are real since Phase 3, so the panel always renders; the

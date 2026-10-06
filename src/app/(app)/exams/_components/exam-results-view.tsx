@@ -7,6 +7,7 @@ import { Pill } from "@/shared/ui/pill";
 import { ScoreCard } from "@/shared/ui/score-card";
 import { SectionTitle } from "@/shared/ui/section-header";
 import { StatusBanner } from "@/shared/ui/status-banner";
+import { ExamFeedbackPanel } from "./exam-feedback-panel";
 
 export interface ExamResultsViewProps {
   notebookTitle: string;
@@ -36,8 +37,10 @@ function optionLabel(options: string[], index: number): string {
 // decision 2026-10-05: the only place besides the player a time metric is
 // shown), the failed concepts and every question with its explanation.
 // "Repetir examen" opens the page's exam route, where the retake with
-// reformulated questions starts (T7); the AI feedback and "Repasar
-// contenido" (T8) are placeholders until their task ships.
+// reformulated questions starts (T7). "Repasar contenido" (T8, user
+// decision 2026-10-05: review before retaking) opens the notebook page,
+// which lists the failed concepts with its own "Repetir examen". The AI
+// feedback panel explains the errors with the page's content (§3.3).
 export function ExamResultsView({
   notebookTitle,
   pageTitle,
@@ -86,8 +89,13 @@ export function ExamResultsView({
                   Repetir examen
                 </Link>
               </Button>
-              <Button size="sm" variant="outline" disabled>
-                Repasar contenido · pronto
+              <Button asChild size="sm" variant="outline">
+                <Link
+                  href={`${pageHref}?repaso=examen`}
+                  data-testid="review-content-link"
+                >
+                  Repasar contenido
+                </Link>
               </Button>
             </div>
           }
@@ -107,11 +115,10 @@ export function ExamResultsView({
         </div>
       )}
 
-      <StatusBanner
-        data-testid="feedback-status"
-        tone="pending"
-        title="Retroalimentación con IA · pronto"
-        description="Pronto la IA explicará tus errores usando el contenido de la página."
+      <ExamFeedbackPanel
+        key={results.sessionId}
+        sessionId={results.sessionId}
+        initial={results.feedback}
       />
 
       <div>

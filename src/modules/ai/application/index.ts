@@ -43,4 +43,12 @@ export {
   type SessionFeedbackPromptInput,
   type SessionFeedbackTechnique,
 } from "./prompts/session_feedback/v1";
+export {
+  buildExamSessionFeedbackPrompt,
+  EXAM_SESSION_FEEDBACK_PROMPT_VERSION,
+  type ExamSessionFeedbackPromptInput,
+  type FailedExamQuestion,
+  MAX_FAILED_FIELD_LENGTH,
+  MAX_FAILED_QUESTIONS,
+} from "./prompts/session_feedback/v2";
 export * from "./schemas";

@@ -96,6 +96,25 @@ feature document is `odd/tasks/phase-5-exams.md`.
   record every answer with `recordExamReviews` (a savepoint of the same
   transaction). Any failure rolls all of it back.
 
+## Feedback and review before retaking (T8)
+
+- `requestExamFeedback(sessionId)`: finished, owned sessions only
+  (`EXAMS_FEEDBACK_SESSION_OPEN`). Policy via `decideFeedback`: a failed
+  exam, the first pass and a failure after a pass get new feedback; a pass
+  after an earlier pass returns that pass's stored row with `reused: true`,
+  with no AI call and no row of its own (a chain of passes carries the last
+  generated feedback forward). Generation mirrors flashcards: one
+  `session_feedback` row per exam session (`session_kind = exam`) claimed
+  once, stale pending rows reclaimed, settled only while pending, 25 s AI
+  timeout, every failure stored as `failed` and returned as ok; the daily
+  limit is only peeked. Prompt `session_feedback/v2`: failed questions
+  (concept, stem, chosen and correct option, explanation; capped) plus the
+  page text cut to `AI_PAGE_TOKEN_CAP`. `readExamFeedback` is the read-only
+  variant the results view uses.
+- `getExamReviewNotice(pageId)`: while a retake is pending, the current
+  concepts of the failed roots (latest active wording); null otherwise or
+  when every failed root was retired.
+
 ## Domain
 
 - `exam-question.ts`: `ExamQuestion` (4 distinct options, one correct index,
