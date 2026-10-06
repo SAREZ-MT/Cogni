@@ -98,6 +98,10 @@ describe("ExamsHubPage (real data)", () => {
   });
 
   it("links the retake banner to the failed page's exam", async () => {
+    listExamHubAction.mockResolvedValue({
+      ok: true,
+      value: [{ ...ENTRIES[0], dueToday: 0 }, ENTRIES[1], ENTRIES[2]],
+    });
     render(await ExamsHubPage());
 
     expect(
@@ -189,12 +193,34 @@ describe("ExamsHubPage (real data)", () => {
     expect(screen.queryByRole("link", { name: /Nuevo examen/ })).toBeNull();
   });
 
-  it("fails loudly instead of showing a false empty state when the pages cannot load", async () => {
+  it("shows the load error in the empty state when the pages cannot load", async () => {
     listExamHubAction.mockResolvedValue({
       ok: false,
       error: { code: "EXAMS_UNEXPECTED", message: "x" },
     });
 
-    await expect(ExamsHubPage()).rejects.toThrow();
+    render(await ExamsHubPage());
+
+    expect(
+      screen.getByText("No pudimos cargar tus exámenes. Intenta de nuevo."),
+    ).toBeInTheDocument();
+    // Same EmptyState as Flashcards' load error: its title stays.
+    expect(screen.getByText("Aún no tienes exámenes")).toBeInTheDocument();
+  });
+
+  it("has no 'Vista previa' pill on real data", async () => {
+    render(await ExamsHubPage());
+
+    expect(screen.queryByText("Vista previa")).toBeNull();
+  });
+
+  it("says the failed questions are ready once they are due", async () => {
+    render(await ExamsHubPage());
+
+    expect(
+      screen.getByText(
+        "Fallaste el último examen de Mitocondria; las preguntas falladas ya están para repasar.",
+      ),
+    ).toBeInTheDocument();
   });
 });

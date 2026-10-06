@@ -61,11 +61,10 @@ function latestScoreOf(pages: readonly ExamHubPageView[]): number | null {
 // keep their look; the data adapts to them).
 export default async function ExamsHubPage() {
   const result = await listExamHubAction();
-  // Never a false "Aún no tienes exámenes": a failed read surfaces as an
-  // error instead of the empty state.
-  if (!result.ok) throw new Error(result.error.message);
-  const notebooksWithPages = groupByNotebook(result.value);
-  const allPages = result.value;
+  // A failed read shows the load error in the empty state, never a false
+  // "Aún no tienes exámenes".
+  const allPages = result.ok ? result.value : [];
+  const notebooksWithPages = groupByNotebook(allPages);
 
   const examenesPresentados = allPages.reduce(
     (sum, page) => sum + page.attempts,
@@ -89,14 +88,7 @@ export default async function ExamsHubPage() {
       <SetBreadcrumb items={[{ label: "Exámenes" }]} />
 
       <SectionHeader
-        eyebrow={
-          <span className="flex items-center gap-2">
-            Técnicas de estudio
-            <Pill size="sm" tone="neutral">
-              Vista previa
-            </Pill>
-          </span>
-        }
+        eyebrow="Técnicas de estudio"
         title="Exámenes"
         titleClassName="text-[26px]"
         description={`${plural(examenesPresentados, "examen", "exámenes")} · ${plural(activeNotebookCount, "cuaderno", "cuadernos")}`}
@@ -134,7 +126,13 @@ export default async function ExamsHubPage() {
               ? "Tienes 1 página pendiente de repetir examen"
               : `Tienes ${pendientesDeRepetir.length} páginas pendientes de repetir examen`
           }
-          description={`Fallaste el último examen de ${retakePage.pageTitle}; las preguntas falladas vencen mañana.`}
+          description={`Fallaste el último examen de ${retakePage.pageTitle}; las preguntas falladas ${
+            // Failed questions are due one SM-2 day after the exam; "Hoy"
+            // counts an item once its due instant has passed.
+            (retakePage.dueToday ?? 0) > 0
+              ? "ya están para repasar"
+              : "vencen mañana"
+          }.`}
           action={
             <Button
               asChild
@@ -182,7 +180,11 @@ export default async function ExamsHubPage() {
           }
           title="Aún no tienes exámenes"
           titleClassName="text-base"
-          description="Abre una página en el editor y usa Técnicas → Examen → Generar."
+          description={
+            result.ok
+              ? "Abre una página en el editor y usa Técnicas → Examen → Generar."
+              : "No pudimos cargar tus exámenes. Intenta de nuevo."
+          }
           descriptionClassName="max-w-[340px]"
         />
       ) : (

@@ -757,11 +757,17 @@ The "Exámenes por página" grid item (one per page with generated
 questions on a notebook's `/exams/[notebookId]` list): a 4px rose/pink
 gradient top accent bar, page title, a preguntas/intentos meta line, a
 score-or-"Sin intentar" `Pill` row (+ a "Repetir pendiente" `Pill` when
-`retakePending`), the last attempt date, and a CTA that reads the page's
-state ("Presentar examen" / "Repetir examen" / "Ver resultados").
+`retakePending`, or a "Vence hoy" `Pill` when questions are due today), the
+last attempt date, and a CTA that reads the page's state ("Presentar
+examen" / "Repetir examen" / "Rendir examen" / "Ver resultados").
 
-- `href`, `pageTitle`, `questionCount`, `attempts`, `lastScore: number |
-  null`, `retakePending`, `lastDate?`, `className?`.
+- `notebookId`, `pageId`, `pageTitle`, `questionCount`, `attempts`,
+  `lastScore: number | null`, `retakePending`, `lastDate?`, `dueToday?`,
+  `className?`.
+- Due state (user decision 2026-10-06): `dueToday > 0` on an examined page
+  with no pending retake shows the pink "Vence hoy" pill and the CTA
+  "Rendir examen →" on the exam route. A pending retake ("Repetir examen")
+  and a never-attempted page ("Presentar examen") take precedence.
 
 Used by: `exams/[notebookId]/page.tsx`.
 

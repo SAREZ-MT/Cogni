@@ -136,12 +136,32 @@ describe("ExamsNotebookPage (real data)", () => {
     ).toBeInTheDocument();
   });
 
-  it("fails loudly instead of showing a false empty state when the pages cannot load", async () => {
+  it("shows the load error in the empty state when the pages cannot load", async () => {
     listExamHubAction.mockResolvedValue({
       ok: false,
       error: { code: "EXAMS_UNEXPECTED", message: "x" },
     });
 
-    await expect(ExamsNotebookPage(params(NOTEBOOK))).rejects.toThrow();
+    render(await ExamsNotebookPage(params(NOTEBOOK)));
+
+    expect(
+      screen.getByText("No pudimos cargar tus exámenes. Intenta de nuevo."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Vista previa")).toBeNull();
+  });
+
+  it("marks a passed page with questions due today", async () => {
+    listExamHubAction.mockResolvedValue({
+      ok: true,
+      value: [{ ...ENTRIES[1], dueToday: 2 }],
+    });
+
+    render(await ExamsNotebookPage(params(NOTEBOOK)));
+
+    expect(screen.getByText("Vence hoy")).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Membrana celular" }),
+    ).toHaveAttribute("href", `/exams/${NOTEBOOK}/membrana`);
+    expect(screen.getByText("Rendir examen →")).toBeInTheDocument();
   });
 });

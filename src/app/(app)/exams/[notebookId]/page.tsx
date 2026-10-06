@@ -6,7 +6,6 @@ import { BackLink } from "@/shared/ui/back-link";
 import { EmptyState } from "@/shared/ui/empty-state";
 import { ExamPageCard } from "@/shared/ui/exam-page-card";
 import { IconTile } from "@/shared/ui/icon-tile";
-import { Pill } from "@/shared/ui/pill";
 import { SectionHeader, SectionTitle } from "@/shared/ui/section-header";
 import { SetBreadcrumb } from "../../_components/breadcrumb";
 import { formatUpdatedAt } from "../../_components/format";
@@ -30,10 +29,11 @@ export default async function ExamsNotebookPage({
   if (!notebookTitle) notFound();
 
   const result = await listExamHubAction();
-  // Never a false "Sin exámenes todavía": a failed read surfaces as an
-  // error instead of the empty state.
-  if (!result.ok) throw new Error(result.error.message);
-  const pages = result.value.filter((page) => page.notebookId === notebookId);
+  // A failed read shows the load error in the empty state, never a false
+  // "Sin exámenes todavía".
+  const pages = result.ok
+    ? result.value.filter((page) => page.notebookId === notebookId)
+    : [];
   const totalAttempts = pages.reduce((sum, page) => sum + page.attempts, 0);
 
   return (
@@ -49,14 +49,7 @@ export default async function ExamsNotebookPage({
         <BackLink href="/exams">Exámenes</BackLink>
 
         <SectionHeader
-          eyebrow={
-            <span className="flex items-center gap-2">
-              Exámenes
-              <Pill size="sm" tone="neutral">
-                Vista previa
-              </Pill>
-            </span>
-          }
+          eyebrow="Exámenes"
           title={notebookTitle}
           titleClassName="text-xl"
           description={`${plural(totalAttempts, "examen", "exámenes")} · ${plural(pages.length, "página", "páginas")} con preguntas`}
@@ -73,7 +66,11 @@ export default async function ExamsNotebookPage({
           }
           title="Sin exámenes todavía"
           titleClassName="text-base"
-          description="Abre una página de este cuaderno y usa Técnicas → Examen → Generar."
+          description={
+            result.ok
+              ? "Abre una página de este cuaderno y usa Técnicas → Examen → Generar."
+              : "No pudimos cargar tus exámenes. Intenta de nuevo."
+          }
           descriptionClassName="max-w-[320px]"
         />
       ) : (
@@ -90,6 +87,7 @@ export default async function ExamsNotebookPage({
                 attempts={page.attempts}
                 lastScore={page.lastScore}
                 retakePending={page.retakePending}
+                dueToday={page.dueToday ?? 0}
                 lastDate={
                   page.lastFinishedAt
                     ? formatUpdatedAt(new Date(page.lastFinishedAt))

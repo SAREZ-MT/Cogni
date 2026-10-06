@@ -104,4 +104,46 @@ describe("ExamPageCard", () => {
 
     expect(screen.getByText(`${score} %`)).toHaveClass(className);
   });
+
+  it("sends an examined page with questions due today to its exam with 'Rendir examen'", () => {
+    render(<ExamPageCard {...BASE} dueToday={3} />);
+
+    expect(screen.getByRole("link", { name: "Mitocondria" })).toHaveAttribute(
+      "href",
+      "/exams/nb/p",
+    );
+    expect(screen.getByText("Rendir examen →")).toBeInTheDocument();
+    expect(screen.getByText("Vence hoy")).toBeInTheDocument();
+    expect(screen.queryByText("Ver resultados →")).toBeNull();
+  });
+
+  it("keeps the retake ahead of questions due today", () => {
+    render(
+      <ExamPageCard {...BASE} lastScore={60} retakePending dueToday={4} />,
+    );
+
+    expect(screen.getByRole("link", { name: "Mitocondria" })).toHaveAttribute(
+      "href",
+      "/exams/nb/p?retake=1",
+    );
+    expect(screen.getByText("Repetir examen →")).toBeInTheDocument();
+    expect(screen.getByText("Repetir pendiente")).toBeInTheDocument();
+    expect(screen.queryByText("Vence hoy")).toBeNull();
+  });
+
+  it("keeps 'Presentar examen' for a never-attempted page", () => {
+    render(
+      <ExamPageCard {...BASE} attempts={0} lastScore={null} dueToday={2} />,
+    );
+
+    expect(screen.getByText("Presentar examen →")).toBeInTheDocument();
+    expect(screen.queryByText("Vence hoy")).toBeNull();
+  });
+
+  it("shows no due state when nothing is due", () => {
+    render(<ExamPageCard {...BASE} dueToday={0} />);
+
+    expect(screen.getByText("Ver resultados →")).toBeInTheDocument();
+    expect(screen.queryByText("Vence hoy")).toBeNull();
+  });
 });
