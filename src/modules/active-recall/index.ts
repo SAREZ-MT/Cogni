@@ -7,3 +7,14 @@ export {
   type RecallQuestionView,
 } from "./actions";
 export * from "./domain";
+export {
+  type FinishedRecallSessionView,
+  finishRecallSessionAction,
+  getRecallSessionPlanAction,
+  type RecallSessionPlanView,
+  type RecallSessionQuestionView,
+  type SavedRecallAnswerView,
+  type StartedRecallSessionView,
+  saveRecallAnswerAction,
+  startRecallSessionAction,
+} from "./session-actions";
