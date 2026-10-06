@@ -7,17 +7,19 @@ import { describe, expect, it } from "vitest";
 // the tree must keep, so a deleted or renamed page cannot silently shrink
 // the guarded surface. `flashcards` is not listed: its list routes run on real
 // data since Phase 3, and its deck route serves the sample player only behind
-// `designPreviewsEnabled()` (covered by that route's own test).
+// `designPreviewsEnabled()` (covered by that route's own test). `exams` left
+// the list in Phase 5 T9: every exams route runs on real data.
 const PREVIEW_TREES: [tree: string, routes: number][] = [
   ["active-recall", 3],
-  ["exams", 2],
   ["dashboard", 1],
 ];
 
-// Real-data routes leave the gate (Phase 5 T4: an exam page's questions;
-// T6: its exam player and results). The exams hub and notebook view stay
-// previews until T9.
+// Real-data routes that leave the gate (Phase 5 T4: an exam page's
+// questions; T6: its exam player and results; T9: the exams hub and
+// notebook view). Every listed route must exist and must not be guarded.
 const REAL_DATA_PAGES = new Set([
+  "exams/page.tsx",
+  "exams/[notebookId]/page.tsx",
   "exams/[notebookId]/[pageId]/page.tsx",
   "exams/[notebookId]/[pageId]/preguntas/page.tsx",
   "exams/[notebookId]/[pageId]/resultados/page.tsx",
@@ -71,5 +73,16 @@ describe.each(PREVIEW_TREES)("%s preview gate", (tree, routes) => {
 
     expect(source).toContain("requireDesignPreviews");
     expect(firstStatement(source)).toBe("requireDesignPreviews();");
+  });
+});
+
+describe("real-data routes", () => {
+  it.each([
+    ...REAL_DATA_PAGES,
+  ])("%s exists and is not behind the gate", (page) => {
+    const source = readFileSync(path.join(import.meta.dirname, page), "utf8");
+
+    expect(source).not.toContain("requireDesignPreviews");
+    expect(source).not.toContain("_data/sample");
   });
 });

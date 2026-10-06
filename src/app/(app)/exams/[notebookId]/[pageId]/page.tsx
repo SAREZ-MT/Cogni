@@ -20,9 +20,9 @@ interface ExamSessionPageProps {
 // page has an open session the player resumes it (its questions, answers
 // and clock; the open retake while one is pending, T7); otherwise the start
 // screen picks N (10-30) and opens an exam, or the retake of a failed one. It
-// left the design-preview gate in T6; the exams hub stays a preview until
-// T9, so the breadcrumb's "Exámenes" has no link yet. A page that is
-// unknown, archived, in another notebook or not the caller's 404s.
+// left the design-preview gate in T6 (the hub, linked from the breadcrumb's
+// "Exámenes", in T9). A page that is unknown, archived, in another notebook
+// or not the caller's 404s.
 export default async function ExamSessionPage({
   params,
 }: ExamSessionPageProps) {
@@ -53,7 +53,7 @@ export default async function ExamSessionPage({
     <section className="flex flex-1 flex-col">
       <SetBreadcrumb
         items={[
-          { label: "Exámenes" },
+          { label: "Exámenes", href: "/exams" },
           { label: notebookTitle, href: `/notebooks/${notebookId}` },
           { label: page.title, href: pageHref },
           { label: "Examen" },

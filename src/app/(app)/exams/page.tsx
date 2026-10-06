@@ -1,6 +1,7 @@
 import { ClipboardList, Zap } from "lucide-react";
 import Link from "next/link";
-import { requireDesignPreviews } from "@/shared/config/design-previews";
+import { type ExamHubPageView, listExamHubAction } from "@/modules/exams";
+import { COLOR_PALETTE, type NotebookColor } from "@/modules/notebooks";
 import { Button } from "@/shared/ui/button";
 import { DeckSummaryCard } from "@/shared/ui/deck-summary-card";
 import { EmptyState } from "@/shared/ui/empty-state";
@@ -9,23 +10,62 @@ import { Pill } from "@/shared/ui/pill";
 import { SectionHeader } from "@/shared/ui/section-header";
 import { StatusBanner } from "@/shared/ui/status-banner";
 import { SetBreadcrumb } from "../_components/breadcrumb";
-import { getExamPagesWithQuestions, SAMPLE_NOTEBOOKS } from "./_data/sample";
+import { plural } from "../flashcards/_lib/plural";
 
-// Exams hub (design preview, mirrors flashcards/page.tsx and
-// active-recall/page.tsx — user decision 2026-09-24: "solo vamos a
-// construir esas pantallas para validar el diseño"). Every notebook, page
-// and question below comes from ./_data/sample.ts, never a real query.
-// Product rule (documento-maestro §3.3/§7.5): a page appears here once it
-// has generated exam questions, independent of whether it has been
-// attempted yet — so "Derivadas parciales" (0 attempts) still shows up,
-// with a "Sin intentar" pill instead of a score.
-export default function ExamsHubPage() {
-  requireDesignPreviews();
-  const notebooksWithPages = SAMPLE_NOTEBOOKS.map((notebook) => ({
-    notebook,
-    pages: getExamPagesWithQuestions(notebook.id),
-  })).filter((entry) => entry.pages.length > 0);
-  const allPages = notebooksWithPages.flatMap((entry) => entry.pages);
+const DEFAULT_TONE: NotebookColor = "purple";
+
+function toTone(color: string | null): NotebookColor {
+  return COLOR_PALETTE.find((candidate) => candidate === color) ?? DEFAULT_TONE;
+}
+
+interface NotebookEntry {
+  notebook: { id: string; title: string; color: NotebookColor };
+  pages: ExamHubPageView[];
+}
+
+// The notebooks holding exam pages, in the hub's order (notebook title,
+// then page title).
+function groupByNotebook(pages: readonly ExamHubPageView[]): NotebookEntry[] {
+  const byNotebook = new Map<string, NotebookEntry>();
+  for (const page of pages) {
+    const entry = byNotebook.get(page.notebookId) ?? {
+      notebook: {
+        id: page.notebookId,
+        title: page.notebookTitle,
+        color: toTone(page.notebookColor),
+      },
+      pages: [],
+    };
+    entry.pages.push(page);
+    byNotebook.set(page.notebookId, entry);
+  }
+  return [...byNotebook.values()];
+}
+
+// The score of the notebook's most recently finished exam; null when none
+// of its pages was examined.
+function latestScoreOf(pages: readonly ExamHubPageView[]): number | null {
+  let latest: ExamHubPageView | undefined;
+  for (const page of pages) {
+    if (page.lastFinishedAt === null) continue;
+    if (!latest?.lastFinishedAt || page.lastFinishedAt > latest.lastFinishedAt)
+      latest = page;
+  }
+  return latest?.lastScore ?? null;
+}
+
+// Exams hub on real data (Phase 5 T9, documento-maestro §3.3/§7.5): every
+// page holding exam questions, grouped by notebook, whether or not it was
+// ever examined (a never-examined notebook reads "sin intentar"). The
+// layout is the design preview's (user decision 2026-10-06: the screens
+// keep their look; the data adapts to them).
+export default async function ExamsHubPage() {
+  const result = await listExamHubAction();
+  // Never a false "Aún no tienes exámenes": a failed read surfaces as an
+  // error instead of the empty state.
+  if (!result.ok) throw new Error(result.error.message);
+  const notebooksWithPages = groupByNotebook(result.value);
+  const allPages = result.value;
 
   const examenesPresentados = allPages.reduce(
     (sum, page) => sum + page.attempts,
@@ -39,15 +79,10 @@ export default function ExamsHubPage() {
   const firstPage = firstEntry?.pages[0];
   const quickStartHref =
     firstEntry && firstPage
-      ? `/exams/${firstEntry.notebook.id}/${firstPage.id}`
+      ? `/exams/${firstEntry.notebook.id}/${firstPage.pageId}`
       : undefined;
 
-  // Only one retake-pending page exists in this preview (Mitocondria), but
-  // the banner still reads off the real data instead of hardcoding its copy.
   const retakePage = pendientesDeRepetir[0];
-  const retakeNotebook = retakePage
-    ? SAMPLE_NOTEBOOKS.find((notebook) => notebook.id === retakePage.notebookId)
-    : undefined;
 
   return (
     <section className="flex flex-1 flex-col gap-6">
@@ -64,7 +99,7 @@ export default function ExamsHubPage() {
         }
         title="Exámenes"
         titleClassName="text-[26px]"
-        description={`${examenesPresentados} exámenes · ${activeNotebookCount} cuadernos`}
+        description={`${plural(examenesPresentados, "examen", "exámenes")} · ${plural(activeNotebookCount, "cuaderno", "cuadernos")}`}
         actions={
           quickStartHref && (
             <Link
@@ -83,7 +118,7 @@ export default function ExamsHubPage() {
                   Nuevo examen
                 </span>
                 <span className="block text-[10.5px] text-white/[55%]">
-                  {allPages.length} páginas con preguntas
+                  {plural(allPages.length, "página", "páginas")} con preguntas
                 </span>
               </span>
             </Link>
@@ -91,7 +126,7 @@ export default function ExamsHubPage() {
         }
       />
 
-      {retakePage && retakeNotebook && (
+      {retakePage && (
         <StatusBanner
           tone="rose"
           title={
@@ -99,7 +134,7 @@ export default function ExamsHubPage() {
               ? "Tienes 1 página pendiente de repetir examen"
               : `Tienes ${pendientesDeRepetir.length} páginas pendientes de repetir examen`
           }
-          description={`Fallaste el último examen de ${retakePage.title}; las preguntas falladas vencen mañana.`}
+          description={`Fallaste el último examen de ${retakePage.pageTitle}; las preguntas falladas vencen mañana.`}
           action={
             <Button
               asChild
@@ -107,7 +142,7 @@ export default function ExamsHubPage() {
               className="bg-pastel-pink-fg text-white hover:bg-pastel-pink-fg"
             >
               <Link
-                href={`/exams/${retakeNotebook.id}/${retakePage.id}?retake=1`}
+                href={`/exams/${retakePage.notebookId}/${retakePage.pageId}?retake=1`}
               >
                 Repetir examen
               </Link>
@@ -157,7 +192,7 @@ export default function ExamsHubPage() {
               (sum, page) => sum + page.attempts,
               0,
             );
-            const latestScore = pages[0]?.lastScore ?? null;
+            const latestScore = latestScoreOf(pages);
 
             return (
               <DeckSummaryCard

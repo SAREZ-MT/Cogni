@@ -8,6 +8,11 @@ export {
 } from "./composition";
 export { EXAM_ERROR } from "./errors";
 export type { ExamAnswerRepository } from "./exam-answer-repository";
+export type {
+  ExamHubLastSession,
+  ExamHubPage,
+  ExamHubReader,
+} from "./exam-hub-reader";
 export type { ExamPageStateRepository } from "./exam-page-state-repository";
 export {
   EXAM_QUALITY,
