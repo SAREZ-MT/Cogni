@@ -12,6 +12,7 @@ import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { getSampleStudyItemsForPage } from "@/app/(app)/flashcards/_data/sample";
+import { generateRecallQuestionsAction } from "@/modules/active-recall";
 import {
   EXAM_DEFAULT_QUESTIONS,
   EXAM_MAX_QUESTIONS,
@@ -47,7 +48,11 @@ import { TECHNIQUES } from "./techniques";
 // ("Preguntas", real data, T4) and its "Generar" creates 10-30 AI questions
 // (T5), sharing the daily generation limit with Flashcards.
 //
-// PREVIEW ONLY: Active recall and Exámenes' saved items are still design previews (user
+// Active recall's "Generar" creates 10 AI open questions since Phase 6 T4
+// (same daily limit), but its card still renders only with `showPreviews`
+// until its session ships (T5).
+//
+// PREVIEW ONLY: the Active recall and Exámenes saved items are still design previews (user
 // decision 2026-09-24): fixed sample items, not filtered by the real
 // notebookId/pageId this panel is mounted on — see
 // getSampleStudyItemsForPage's own doc comment. They render only when the
@@ -83,6 +88,14 @@ const EXAM_ERROR_COPY: Record<string, string> = {
   EXAMS_SESSION_REQUIRED: "Tu sesión expiró. Inicia sesión de nuevo.",
 };
 
+// Spanish copy per ActionError code of generateRecallQuestionsAction; the
+// rest (PAGE_NOT_FOUND, AI_GENERATION_FAILED, RECALL_*…) reads as the
+// generic failure, which is the exam card's copy.
+const RECALL_ERROR_COPY: Record<string, string> = {
+  AI_DAILY_LIMIT_REACHED: LIMIT_REACHED,
+  AI_PAGE_EMPTY: "La página está vacía: escribe algo antes de generar.",
+};
+
 // The count stepper moves in steps of 5 between 10 and 30.
 const EXAM_COUNT_STEP = 5;
 
@@ -113,6 +126,26 @@ function examNoticeCopy(value: {
   } else if (value.skipped > 1) {
     parts.push(`${value.skipped} se descartaron por repetidas o inválidas.`);
   }
+  if (value.truncated) {
+    parts.push(
+      `Se usaron las primeras ${value.wordsUsed} palabras de la página.`,
+    );
+  }
+  return parts.join(" ");
+}
+
+// Phase 6 T4 (user-approved copy): the created count plus the truncation
+// note; recall generation has no count to choose and reports no discards.
+function recallNoticeCopy(value: {
+  created: number;
+  truncated: boolean;
+  wordsUsed: number;
+}): string {
+  const parts = [
+    value.created === 1
+      ? "Se generó 1 pregunta."
+      : `Se generaron ${value.created} preguntas.`,
+  ];
   if (value.truncated) {
     parts.push(
       `Se usaron las primeras ${value.wordsUsed} palabras de la página.`,
@@ -170,6 +203,9 @@ export function TechniquesPanel({
   const [examNotice, setExamNotice] = useState<string | null>(null);
   const [examError, setExamError] = useState<string | null>(null);
   const [examPending, startExamTransition] = useTransition();
+  const [recallNotice, setRecallNotice] = useState<string | null>(null);
+  const [recallError, setRecallError] = useState<string | null>(null);
+  const [recallPending, startRecallTransition] = useTransition();
   // Whether the page can hold an exam ("Rendir examen"); read on mount and
   // after each question generation. Null until read or when it fails.
   const [examStart, setExamStart] = useState<ExamStartView | null>(null);
@@ -262,6 +298,31 @@ export function TechniquesPanel({
     });
   }
 
+  // Active recall questions have no panel list yet (T5 adds the session),
+  // so the panel only reports what was created, like Examen.
+  function generateRecall() {
+    setRecallNotice(null);
+    setRecallError(null);
+    startRecallTransition(async () => {
+      let result: Awaited<ReturnType<typeof generateRecallQuestionsAction>>;
+      try {
+        result = await generateRecallQuestionsAction({ pageId });
+      } catch {
+        setRecallError(EXAM_GENERIC_FAILURE);
+        return;
+      }
+      if (!result.ok) {
+        setRecallError(
+          RECALL_ERROR_COPY[result.error.code] ?? EXAM_GENERIC_FAILURE,
+        );
+        if (result.error.code === "AI_DAILY_LIMIT_REACHED") setRemaining(0);
+        return;
+      }
+      setRemaining(result.value.remainingToday);
+      setRecallNotice(recallNoticeCopy(result.value));
+    });
+  }
+
   if (!slotNode) return null;
 
   const limitReached = remaining !== null && remaining <= 0;
@@ -341,7 +402,7 @@ export function TechniquesPanel({
               icon={t.icon}
               tone={t.tone}
               title={t.name}
-              available={t.id !== "active-recall"}
+              available
             />
           ))}
         </div>
@@ -542,7 +603,37 @@ export function TechniquesPanel({
               tone={t.tone}
               name={t.name}
               description={t.description}
-            />
+              onGenerate={generateRecall}
+              pending={recallPending}
+              disabled={limitReached}
+              generateTestId="generate-recall-questions"
+            >
+              {limitReached && !recallError && (
+                <p
+                  data-testid="recall-generation-limit"
+                  className="text-[10.5px] text-fg-muted"
+                >
+                  {LIMIT_REACHED}
+                </p>
+              )}
+              {recallNotice && (
+                <p
+                  data-testid="recall-generation-notice"
+                  className="text-[10.5px] text-fg-muted"
+                >
+                  {recallNotice}
+                </p>
+              )}
+              {recallError && (
+                <p
+                  role="alert"
+                  data-testid="recall-generation-error"
+                  className="text-[10.5px] text-error-600"
+                >
+                  {recallError}
+                </p>
+              )}
+            </TechniqueCard>
           ),
         )}
 
