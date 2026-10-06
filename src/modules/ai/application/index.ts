@@ -36,6 +36,13 @@ export {
   GENERATE_FLASHCARDS_PROMPT_VERSION,
 } from "./prompts/generate_flashcards/v1";
 export {
+  buildGenerateRecallQuestionsPrompt,
+  type ExistingRecallQuestion,
+  GENERATE_RECALL_QUESTIONS_PROMPT_VERSION,
+  type GenerateRecallQuestionsPromptInput,
+  MAX_EXISTING_RECALL_QUESTIONS,
+} from "./prompts/generate_recall_questions/v1";
+export {
   buildSessionFeedbackPrompt,
   MAX_STRUGGLED_ITEM_LENGTH,
   MAX_STRUGGLED_ITEMS,

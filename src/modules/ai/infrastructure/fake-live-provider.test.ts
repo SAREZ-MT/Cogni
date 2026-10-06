@@ -3,6 +3,7 @@ import type { ZodType } from "zod";
 import { buildGenerateExamQuestionsPrompt } from "../application/prompts/generate_exam_questions/v1";
 import { buildGenerateExamVariantsPrompt } from "../application/prompts/generate_exam_variants/v1";
 import { buildGenerateFlashcardsPrompt } from "../application/prompts/generate_flashcards/v1";
+import { buildGenerateRecallQuestionsPrompt } from "../application/prompts/generate_recall_questions/v1";
 import { buildSessionFeedbackPrompt } from "../application/prompts/session_feedback/v1";
 import { buildExamSessionFeedbackPrompt } from "../application/prompts/session_feedback/v2";
 import {
@@ -40,6 +41,20 @@ function examRequest(
     existing,
   });
   return { schema: examQuestionsOutput, ...built };
+}
+
+function recallRequest(
+  count: number,
+  existing: { prompt: string }[] = [],
+  pageText = TEXT,
+) {
+  const built = buildGenerateRecallQuestionsPrompt({
+    pageTitle: "Célula",
+    pageText,
+    count,
+    existing,
+  });
+  return { schema: recallQuestionsOutput, ...built };
 }
 
 // Same comparison the exams domain applies to stems and options.
@@ -330,6 +345,50 @@ describe("createFakeLiveProvider", () => {
     );
     const { variants } = examVariantsOutput.parse(response.object);
     expect(variants.map((v) => v.forRootId)).toEqual(["root-a"]);
+  });
+
+  it("derives exactly `count` distinct recall questions with a 2-6 concept rubric from the page", async () => {
+    const response = await createFakeLiveProvider().generateObject(
+      recallRequest(10),
+    );
+    const { questions } = recallQuestionsOutput.parse(response.object);
+
+    expect(questions).toHaveLength(10);
+    expect(new Set(questions.map((q) => normalized(q.prompt))).size).toBe(10);
+    for (const question of questions) {
+      expect(question.rubric.keyConcepts.length).toBeGreaterThanOrEqual(2);
+      expect(question.rubric.keyConcepts.length).toBeLessThanOrEqual(6);
+    }
+    // The acceptable answer is the page sentence the question is about.
+    expect(questions[0]?.rubric.acceptableAnswerSummary).toBe(
+      "La mitocondria produce energía para la célula.",
+    );
+  });
+
+  it("never repeats a recall prompt listed as an existing question", async () => {
+    const provider = createFakeLiveProvider();
+    const first = recallQuestionsOutput.parse(
+      (await provider.generateObject(recallRequest(10))).object,
+    ).questions;
+
+    const second = recallQuestionsOutput.parse(
+      (await provider.generateObject(recallRequest(10, first))).object,
+    ).questions;
+
+    const seen = new Set(first.map((q) => normalized(q.prompt)));
+    expect(second).toHaveLength(10);
+    expect(second.some((q) => seen.has(normalized(q.prompt)))).toBe(false);
+  });
+
+  it("still returns recall questions for a blank page and clamps the count to 15", async () => {
+    const provider = createFakeLiveProvider();
+    const blank = await provider.generateObject(recallRequest(10, [], "   "));
+    expect(recallQuestionsOutput.parse(blank.object).questions).toHaveLength(
+      10,
+    );
+
+    const huge = await provider.generateObject(recallRequest(5000));
+    expect(recallQuestionsOutput.parse(huge.object).questions).toHaveLength(15);
   });
 
   it("returns a schema-valid minimal object for the other purposes", async () => {
