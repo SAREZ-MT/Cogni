@@ -791,3 +791,228 @@ export const examPageState = pgTable(
 ).enableRLS();
 
 export type ExamPageStateRow = typeof examPageState.$inferSelect;
+
+// Active recall (documento-maestro §3.3, §6.1, §7.4, §8.5). Literal tuples
+// mirror RecallQuestionOrigin, RecallSessionEvaluationStatus and
+// RecallEvaluationStatus in modules/active-recall/domain; RLS on with no
+// policies, like every table here.
+export const RECALL_QUESTION_ORIGINS = ["ai", "manual"] as const;
+export type RecallQuestionOriginValue =
+  (typeof RECALL_QUESTION_ORIGINS)[number];
+
+export const RECALL_SESSION_EVALUATION_STATUSES = [
+  "pending",
+  "done",
+  "partial",
+] as const;
+export type RecallSessionEvaluationStatusValue =
+  (typeof RECALL_SESSION_EVALUATION_STATUSES)[number];
+
+export const RECALL_ANSWER_EVALUATION_STATUSES = [
+  "pending",
+  "done",
+  "failed",
+] as const;
+export type RecallAnswerEvaluationStatusValue =
+  (typeof RECALL_ANSWER_EVALUATION_STATUSES)[number];
+
+// One open question of a page with the rubric its answers are scored
+// against. The study item of kind recall_question points at it. Questions
+// are archived, never deleted; deleting the page (or the owner) removes
+// them with their answers.
+export const recallQuestions = pgTable(
+  "recall_questions",
+  {
+    id: uuid("id").primaryKey(),
+    ownerId: uuid("owner_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    pageId: uuid("page_id")
+      .notNull()
+      .references(() => pages.id, { onDelete: "cascade" }),
+    prompt: text("prompt").notNull(),
+    rubric: jsonb("rubric").notNull().$type<{
+      keyConcepts: string[];
+      acceptableAnswerSummary: string;
+    }>(),
+    origin: text("origin").notNull().$type<RecallQuestionOriginValue>(),
+    generationId: uuid("generation_id").references(() => aiGenerations.id, {
+      onDelete: "set null",
+    }),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    // Serves listActiveByPage: the page's questions a session may show.
+    index("recall_questions_page_active_idx")
+      .on(table.pageId, table.createdAt)
+      .where(sql`${table.archivedAt} is null`),
+    index("recall_questions_owner_id_idx").on(table.ownerId),
+    // Target of recall_answers_question_owner_fk.
+    unique("recall_questions_id_owner_key").on(table.id, table.ownerId),
+    check(
+      "recall_questions_origin_check",
+      sql`${table.origin} in ('ai', 'manual')`,
+    ),
+    check(
+      "recall_questions_prompt_not_blank",
+      sql`length(btrim(${table.prompt})) > 0`,
+    ),
+    // { keyConcepts: non-empty array, acceptableAnswerSummary: non-blank
+    // string }. A missing key reads as NULL, which a CHECK would accept,
+    // hence the coalesce; the CASE keeps jsonb_array_length off scalars.
+    check(
+      "recall_questions_rubric_shape",
+      sql`coalesce(jsonb_typeof(${table.rubric}) = 'object'
+        and case when jsonb_typeof(${table.rubric} -> 'keyConcepts') = 'array'
+          then jsonb_array_length(${table.rubric} -> 'keyConcepts') > 0
+          else false end
+        and jsonb_typeof(${table.rubric} -> 'acceptableAnswerSummary') = 'string'
+        and length(btrim(${table.rubric} ->> 'acceptableAnswerSummary')) > 0, false)`,
+    ),
+  ],
+).enableRLS();
+
+export type RecallQuestionRow = typeof recallQuestions.$inferSelect;
+
+// One active-recall session. evaluation_status leaves pending only once
+// the session is finished: the AI evaluation runs after closing (§8.5).
+export const recallSessions = pgTable(
+  "recall_sessions",
+  {
+    id: uuid("id").primaryKey(),
+    ownerId: uuid("owner_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    pageId: uuid("page_id")
+      .notNull()
+      .references(() => pages.id, { onDelete: "cascade" }),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    evaluationStatus: text("evaluation_status")
+      .notNull()
+      .default("pending")
+      .$type<RecallSessionEvaluationStatusValue>(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    // Serve listByPage and listRecentByOwner (latest started first).
+    index("recall_sessions_page_started_idx").on(
+      table.pageId,
+      table.startedAt.desc(),
+    ),
+    index("recall_sessions_owner_started_idx").on(
+      table.ownerId,
+      table.startedAt.desc(),
+    ),
+    // Target of recall_answers_session_owner_fk.
+    unique("recall_sessions_id_owner_key").on(table.id, table.ownerId),
+    check(
+      "recall_sessions_evaluation_status_check",
+      sql`${table.evaluationStatus} in ('pending', 'done', 'partial')
+        and (${table.evaluationStatus} = 'pending' or ${table.finishedAt} is not null)`,
+    ),
+    check(
+      "recall_sessions_finished_after_start",
+      sql`${table.finishedAt} is null or ${table.finishedAt} >= ${table.startedAt}`,
+    ),
+  ],
+).enableRLS();
+
+export type RecallSessionRow = typeof recallSessions.$inferSelect;
+
+// One written answer with its self-rating and AI evaluation, at most one
+// per question in a session. The composite keys tie the session and the
+// question to the answer's owner. A done answer has its raw evaluation, AI
+// score and combined quality; a failed one keeps the raw attempt and no
+// score; a pending one has no score yet (it may keep the attempt of a
+// failed run being retried). evaluation_claimed_at marks the evaluation
+// run that took a pending answer; a stale claim may be taken over.
+export const recallAnswers = pgTable(
+  "recall_answers",
+  {
+    id: uuid("id").primaryKey(),
+    ownerId: uuid("owner_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    sessionId: uuid("session_id").notNull(),
+    questionId: uuid("question_id").notNull(),
+    answerText: text("answer_text").notNull(),
+    selfRating: integer("self_rating").notNull(),
+    evaluationStatus: text("evaluation_status")
+      .notNull()
+      .default("pending")
+      .$type<RecallAnswerEvaluationStatusValue>(),
+    aiEvaluation: jsonb("ai_evaluation").$type<unknown>(),
+    aiScore: integer("ai_score"),
+    combinedQuality: integer("combined_quality"),
+    generationId: uuid("generation_id").references(() => aiGenerations.id, {
+      onDelete: "set null",
+    }),
+    disagreed: boolean("disagreed").notNull().default(false),
+    evaluationClaimedAt: timestamp("evaluation_claimed_at", {
+      withTimezone: true,
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    // Also serves listBySession.
+    unique("recall_answers_session_question_key").on(
+      table.sessionId,
+      table.questionId,
+    ),
+    foreignKey({
+      name: "recall_answers_session_owner_fk",
+      columns: [table.sessionId, table.ownerId],
+      foreignColumns: [recallSessions.id, recallSessions.ownerId],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "recall_answers_question_owner_fk",
+      columns: [table.questionId, table.ownerId],
+      foreignColumns: [recallQuestions.id, recallQuestions.ownerId],
+    }).onDelete("cascade"),
+    // Serves claimPendingForEvaluation.
+    index("recall_answers_session_pending_idx")
+      .on(table.sessionId)
+      .where(sql`${table.evaluationStatus} = 'pending'`),
+    index("recall_answers_question_id_idx").on(table.questionId),
+    index("recall_answers_owner_id_idx").on(table.ownerId),
+    check(
+      "recall_answers_self_rating_range",
+      sql`${table.selfRating} between 0 and 5`,
+    ),
+    check(
+      "recall_answers_ai_score_range",
+      sql`${table.aiScore} between 0 and 5`,
+    ),
+    check(
+      "recall_answers_combined_quality_range",
+      sql`${table.combinedQuality} between 0 and 5`,
+    ),
+    check(
+      "recall_answers_evaluation_check",
+      sql`(${table.evaluationStatus} = 'pending' and ${table.aiScore} is null and ${table.combinedQuality} is null)
+        or (${table.evaluationStatus} = 'done' and ${table.aiEvaluation} is not null
+          and ${table.aiScore} is not null and ${table.combinedQuality} is not null)
+        or (${table.evaluationStatus} = 'failed' and ${table.aiEvaluation} is not null
+          and ${table.aiScore} is null and ${table.combinedQuality} is null)`,
+    ),
+  ],
+).enableRLS();
+
+export type RecallAnswerRow = typeof recallAnswers.$inferSelect;

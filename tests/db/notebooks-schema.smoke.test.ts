@@ -12,6 +12,7 @@ const url = process.env.DATABASE_URL;
 // (0010) reference pages, so they must be reverted before 0003 can drop the
 // tables they depend on.
 const REVERSIONS_DOWN_TO_0003 = [
+  "0012_active_recall",
   "0011_exam_session_questions",
   "0010_exams",
   "0009_study_engine",
