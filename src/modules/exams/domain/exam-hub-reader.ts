@@ -25,6 +25,9 @@ export interface ExamHubPage {
   // The page's most recently finished session; null when never finished.
   readonly lastSession: ExamHubLastSession | null;
   readonly retakePending: boolean;
+  // Roots failed in the page's last failed exam (ExamPageState), in the
+  // state's order; empty when the page has no state.
+  readonly failedRootIds: readonly string[];
 }
 
 export interface ExamHubReader {

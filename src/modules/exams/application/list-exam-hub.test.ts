@@ -15,6 +15,7 @@ function hubPage(overrides: Partial<ExamHubPage> = {}): ExamHubPage {
     attempts: 0,
     lastSession: null,
     retakePending: false,
+    failedRootIds: [],
     ...overrides,
   };
 }
@@ -22,6 +23,7 @@ function hubPage(overrides: Partial<ExamHubPage> = {}): ExamHubPage {
 function deps(
   pages: ExamHubPage[],
   due: ReadonlyMap<string, number> | null = new Map(),
+  rootsDue: ReadonlySet<string> | null = new Set(),
 ) {
   const calls: string[] = [];
   return {
@@ -37,6 +39,10 @@ function deps(
         async examQuestionsDueByPage(ownerId: string) {
           calls.push(`due:${ownerId}`);
           return due;
+        },
+        async examRootsDueNow(ownerId: string) {
+          calls.push(`roots:${ownerId}`);
+          return rootsDue;
         },
       },
     },
@@ -73,6 +79,7 @@ describe("listExamHub", () => {
         retakePending: false,
         ready: true,
         dueToday: 0,
+        failedDueNow: false,
       },
     ]);
   });
@@ -125,6 +132,60 @@ describe("listExamHub", () => {
     const result = await listExamHub(d, OWNER);
 
     expect(result.ok && result.value[0]?.dueToday).toBeNull();
+  });
+
+  it("says the failed questions are not due when only other questions of the page are", async () => {
+    const { calls, deps: d } = deps(
+      [hubPage({ retakePending: true, failedRootIds: ["failed-1"] })],
+      new Map([["page-1", 3]]),
+      new Set(["passed-1", "passed-2", "passed-3"]),
+    );
+
+    const result = await listExamHub(d, OWNER);
+
+    expect(result.ok && result.value[0]).toMatchObject({
+      dueToday: 3,
+      failedDueNow: false,
+    });
+    expect(calls).toContain(`roots:${OWNER}`);
+  });
+
+  it("says the failed questions are due once one of them is", async () => {
+    const { deps: d } = deps(
+      [
+        hubPage({
+          retakePending: true,
+          failedRootIds: ["failed-1", "failed-2"],
+        }),
+      ],
+      new Map([["page-1", 1]]),
+      new Set(["failed-2"]),
+    );
+
+    const result = await listExamHub(d, OWNER);
+
+    expect(result.ok && result.value[0]?.failedDueNow).toBe(true);
+  });
+
+  it("leaves the failed questions' due state unknown when their due items cannot load", async () => {
+    const { deps: d } = deps(
+      [hubPage({ retakePending: true, failedRootIds: ["failed-1"] })],
+      new Map(),
+      null,
+    );
+
+    const result = await listExamHub(d, OWNER);
+
+    expect(result.ok && result.value[0]?.failedDueNow).toBeNull();
+  });
+
+  it("skips the due items read when no page waits for a retake", async () => {
+    const { calls, deps: d } = deps([hubPage()], new Map(), null);
+
+    const result = await listExamHub(d, OWNER);
+
+    expect(result.ok && result.value[0]?.failedDueNow).toBe(false);
+    expect(calls).not.toContain(`roots:${OWNER}`);
   });
 
   it("keeps the reader's order", async () => {

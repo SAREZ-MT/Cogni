@@ -54,6 +54,31 @@ function latestScoreOf(pages: readonly ExamHubPageView[]): number | null {
   return latest?.lastScore ?? null;
 }
 
+// "Nuevo examen": the first page (hub order) with enough questions to start
+// an exam; when none has, the first page's Preguntas screen, where the
+// "needs 10" note lives.
+function quickStartHrefOf(pages: readonly ExamHubPageView[]) {
+  const ready = pages.find((page) => page.ready);
+  if (ready) return `/exams/${ready.notebookId}/${ready.pageId}`;
+  const first = pages[0];
+  return first
+    ? `/exams/${first.notebookId}/${first.pageId}/preguntas`
+    : undefined;
+}
+
+// The retake banner's advice, from the failed questions only (not every
+// exam question of the page): they are due one SM-2 day after the exam,
+// and "Hoy" counts an item once its due instant has passed. Unknown (the
+// due items could not be read) gives neutral advice.
+function retakeAdvice(failedDueNow: boolean | null): string {
+  if (failedDueNow === null) {
+    return "repasa los conceptos fallados antes de repetir.";
+  }
+  return failedDueNow
+    ? "las preguntas falladas ya están para repasar."
+    : "las preguntas falladas vencen mañana.";
+}
+
 // Exams hub on real data (Phase 5 T9, documento-maestro §3.3/§7.5): every
 // page holding exam questions, grouped by notebook, whether or not it was
 // ever examined (a never-examined notebook reads "sin intentar"). The
@@ -74,12 +99,9 @@ export default async function ExamsHubPage() {
   const pendientesDeRepetir = allPages.filter((page) => page.retakePending);
   const activeNotebookCount = notebooksWithPages.length;
 
-  const firstEntry = notebooksWithPages[0];
-  const firstPage = firstEntry?.pages[0];
-  const quickStartHref =
-    firstEntry && firstPage
-      ? `/exams/${firstEntry.notebook.id}/${firstPage.pageId}`
-      : undefined;
+  const quickStartHref = quickStartHrefOf(
+    notebooksWithPages.flatMap((entry) => entry.pages),
+  );
 
   const retakePage = pendientesDeRepetir[0];
 
@@ -126,13 +148,7 @@ export default async function ExamsHubPage() {
               ? "Tienes 1 página pendiente de repetir examen"
               : `Tienes ${pendientesDeRepetir.length} páginas pendientes de repetir examen`
           }
-          description={`Fallaste el último examen de ${retakePage.pageTitle}; las preguntas falladas ${
-            // Failed questions are due one SM-2 day after the exam; "Hoy"
-            // counts an item once its due instant has passed.
-            (retakePage.dueToday ?? 0) > 0
-              ? "ya están para repasar"
-              : "vencen mañana"
-          }.`}
+          description={`Fallaste el último examen de ${retakePage.pageTitle}; ${retakeAdvice(retakePage.failedDueNow)}`}
           action={
             <Button
               asChild

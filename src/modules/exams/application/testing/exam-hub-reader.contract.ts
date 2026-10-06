@@ -146,6 +146,7 @@ export function runExamHubReaderContract(
         attempts: 0,
         lastSession: null,
         retakePending: false,
+        failedRootIds: [],
       });
     });
 
@@ -247,6 +248,7 @@ export function runExamHubReaderContract(
       );
 
       expect(row?.retakePending).toBe(true);
+      expect(row?.failedRootIds).toEqual([q.rootId]);
     });
 
     it("never lists another owner's pages", async () => {

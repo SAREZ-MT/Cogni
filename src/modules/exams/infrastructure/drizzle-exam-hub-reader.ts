@@ -36,6 +36,7 @@ export class DrizzleExamHubReader implements ExamHubReader {
         notebookColor: notebooks.color,
         activeQuestionCount: countDistinct(examQuestions.rootId),
         retakePending: sql<boolean>`coalesce(${examPageState.retakePending}, false)`,
+        failedRootIds: examPageState.failedRootIds,
       })
       .from(examQuestions)
       .innerJoin(pages, eq(pages.id, examQuestions.pageId))
@@ -56,7 +57,12 @@ export class DrizzleExamHubReader implements ExamHubReader {
           isNull(notebooks.archivedAt),
         ),
       )
-      .groupBy(pages.id, notebooks.id, examPageState.retakePending)
+      .groupBy(
+        pages.id,
+        notebooks.id,
+        examPageState.retakePending,
+        examPageState.failedRootIds,
+      )
       .orderBy(asc(notebooks.title), asc(pages.title), asc(pages.id));
     if (rows.length === 0) return [];
 
@@ -91,6 +97,8 @@ export class DrizzleExamHubReader implements ExamHubReader {
       const session = byPage.get(row.pageId);
       return {
         ...row,
+        // No page state row yet (never examined): no failed roots.
+        failedRootIds: row.failedRootIds ?? [],
         attempts: session?.attempts ?? 0,
         // A finished session always carries its result (0010 CHECK).
         lastSession:

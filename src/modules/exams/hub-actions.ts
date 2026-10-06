@@ -2,6 +2,7 @@
 
 import * as Sentry from "@sentry/nextjs";
 import { createSchedulingServerApi } from "@/modules/scheduling";
+import { createStudyItemRepository } from "@/modules/study-engine";
 import { getDb } from "@/shared/db/client";
 import { systemClock } from "@/shared/kernel/clock";
 import { type ActionError, toActionError } from "@/shared/kernel/domain-error";
@@ -22,11 +23,27 @@ export type ExamHubPageView = Omit<ExamHubEntry, "lastFinishedAt"> & {
   lastFinishedAt: string | null;
 };
 
-// Exam questions due today from scheduling's "Repasos de hoy". A failing
-// due list never hides the hub: it degrades to unknown counts (null).
+// Exam questions due today from scheduling's "Repasos de hoy", and the
+// roots whose exam item is due from study-engine's due items (the same
+// "due" as "Hoy"). A failing read never hides the hub: it degrades to
+// unknown (null).
 function dueCounts(db: ReturnType<typeof getDb>): ExamDueCounts {
   const scheduling = createSchedulingServerApi({ db, clock: systemClock });
+  const studyItems = createStudyItemRepository(db);
   return {
+    async examRootsDueNow(ownerId) {
+      try {
+        const items = await studyItems.listDue(ownerId, systemClock.now());
+        return new Set(
+          items
+            .filter((item) => item.kind === "exam_question")
+            .map((item) => item.sourceId),
+        );
+      } catch (error) {
+        Sentry.captureException(error);
+        return null;
+      }
+    },
     async examQuestionsDueByPage(ownerId) {
       try {
         const pages = await scheduling.listDueToday(ownerId);

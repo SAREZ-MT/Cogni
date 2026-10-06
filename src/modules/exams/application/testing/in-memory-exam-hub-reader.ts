@@ -55,6 +55,7 @@ export class InMemoryExamHubReader implements ExamHubReader {
             (a.id < b.id ? 1 : -1),
         );
       const last = finished[0];
+      const state = states.find((candidate) => candidate.pageId === pageId);
       rows.push({
         pageId,
         pageTitle: page.pageTitle,
@@ -72,9 +73,8 @@ export class InMemoryExamHubReader implements ExamHubReader {
                 passed: last.passed === true,
               }
             : null,
-        retakePending:
-          states.find((state) => state.pageId === pageId)?.retakePending ??
-          false,
+        retakePending: state?.retakePending ?? false,
+        failedRootIds: [...(state?.failedRootIds ?? [])],
       });
     }
     return rows.sort(

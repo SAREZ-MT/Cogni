@@ -20,6 +20,8 @@ const state = vi.hoisted(() => ({
   readerOwners: [] as string[],
   dueOwners: [] as string[],
   due: (async () => []) as () => Promise<unknown[]>,
+  dueItemOwners: [] as string[],
+  dueItems: (async () => []) as () => Promise<unknown[]>,
 }));
 
 vi.mock("./infrastructure", async (importOriginal) => ({
@@ -42,6 +44,16 @@ vi.mock("@/modules/scheduling", () => ({
   }),
 }));
 
+vi.mock("@/modules/study-engine", () => ({
+  createStudyItemRepository: () => ({
+    async listDue(ownerId: string, now: Date) {
+      expect(now).toBeInstanceOf(Date);
+      state.dueItemOwners.push(ownerId);
+      return state.dueItems();
+    },
+  }),
+}));
+
 import { listExamHubAction } from "./hub-actions";
 
 function hubPage(overrides: Partial<ExamHubPage> = {}): ExamHubPage {
@@ -55,6 +67,7 @@ function hubPage(overrides: Partial<ExamHubPage> = {}): ExamHubPage {
     attempts: 2,
     lastSession: { finishedAt: FINISHED, total: 10, correct: 6, passed: false },
     retakePending: true,
+    failedRootIds: ["root-failed"],
     ...overrides,
   };
 }
@@ -78,6 +91,8 @@ describe("listExamHubAction", () => {
     state.readerOwners = [];
     state.dueOwners = [];
     state.due = async () => [dueRow("page-1", 3, 5), dueRow("page-9", 2)];
+    state.dueItemOwners = [];
+    state.dueItems = async () => [];
   });
 
   afterEach(() => {
@@ -121,6 +136,7 @@ describe("listExamHubAction", () => {
           retakePending: true,
           ready: true,
           dueToday: 3,
+          failedDueNow: false,
         },
         expect.objectContaining({
           pageId: "page-2",
@@ -144,6 +160,34 @@ describe("listExamHubAction", () => {
       null,
       null,
     ]);
+    expect(captureException).toHaveBeenCalledWith(failure);
+  });
+
+  it("says the failed questions are due from the roots' due exam items only", async () => {
+    state.dueItems = async () => [
+      { kind: "exam_question", sourceId: "root-other" },
+      { kind: "flashcard", sourceId: "root-failed" },
+    ];
+    const notYet = await listExamHubAction();
+    state.dueItems = async () => [
+      { kind: "exam_question", sourceId: "root-failed" },
+    ];
+    const due = await listExamHubAction();
+
+    expect(state.dueItemOwners).toEqual([OWNER, OWNER]);
+    expect(notYet.ok && notYet.value[0]?.failedDueNow).toBe(false);
+    expect(due.ok && due.value[0]?.failedDueNow).toBe(true);
+  });
+
+  it("leaves the failed questions' due state unknown when the due items fail", async () => {
+    const failure = new Error("study items down");
+    state.dueItems = async () => {
+      throw failure;
+    };
+
+    const result = await listExamHubAction();
+
+    expect(result.ok && result.value[0]?.failedDueNow).toBeNull();
     expect(captureException).toHaveBeenCalledWith(failure);
   });
 

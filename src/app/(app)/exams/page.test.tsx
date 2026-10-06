@@ -39,6 +39,7 @@ function entry(
     retakePending: false,
     ready: true,
     dueToday: 0,
+    failedDueNow: false,
     ...overrides,
   };
 }
@@ -215,6 +216,10 @@ describe("ExamsHubPage (real data)", () => {
   });
 
   it("says the failed questions are ready once they are due", async () => {
+    listExamHubAction.mockResolvedValue({
+      ok: true,
+      value: [{ ...ENTRIES[0], failedDueNow: true }, ENTRIES[1], ENTRIES[2]],
+    });
     render(await ExamsHubPage());
 
     expect(
@@ -222,5 +227,74 @@ describe("ExamsHubPage (real data)", () => {
         "Fallaste el último examen de Mitocondria; las preguntas falladas ya están para repasar.",
       ),
     ).toBeInTheDocument();
+  });
+
+  it("says the failed questions are due tomorrow while only the page's other questions are due", async () => {
+    // Mitocondria has 4 exam questions due today, none of them failed.
+    render(await ExamsHubPage());
+
+    expect(
+      screen.getByText(
+        "Fallaste el último examen de Mitocondria; las preguntas falladas vencen mañana.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/ya están para repasar/)).toBeNull();
+  });
+
+  it("gives neutral advice when the failed questions' due state is unknown", async () => {
+    listExamHubAction.mockResolvedValue({
+      ok: true,
+      value: [
+        { ...ENTRIES[0], dueToday: null, failedDueNow: null },
+        ENTRIES[1],
+        ENTRIES[2],
+      ],
+    });
+
+    render(await ExamsHubPage());
+
+    expect(
+      screen.getByText(
+        "Fallaste el último examen de Mitocondria; repasa los conceptos fallados antes de repetir.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/vencen mañana/)).toBeNull();
+  });
+
+  it("starts a new exam on the first page that is ready", async () => {
+    listExamHubAction.mockResolvedValue({
+      ok: true,
+      value: [
+        { ...ENTRIES[0], questionCount: 6, ready: false },
+        ENTRIES[1],
+        ENTRIES[2],
+      ],
+    });
+
+    render(await ExamsHubPage());
+
+    expect(screen.getByRole("link", { name: /Nuevo examen/ })).toHaveAttribute(
+      "href",
+      "/exams/biologia/membrana",
+    );
+  });
+
+  it("sends a new exam to the first page's questions when no page is ready", async () => {
+    listExamHubAction.mockResolvedValue({
+      ok: true,
+      value: ENTRIES.map((page) => ({
+        ...page,
+        questionCount: 4,
+        ready: false,
+      })),
+    });
+
+    render(await ExamsHubPage());
+
+    expect(screen.getByRole("link", { name: /Nuevo examen/ })).toHaveAttribute(
+      "href",
+      "/exams/biologia/mitocondria/preguntas",
+    );
+    expect(screen.getByText("3 páginas con preguntas")).toBeInTheDocument();
   });
 });
