@@ -15,11 +15,17 @@ en memoria y adaptadores Drizzle, la sesión de repaso de flashcards (iniciar,
 calificar, terminar), el almacenamiento de la retroalimentación de sesión y
 el trabajo diario que recalcula el dominio de todas las páginas.
 
+Fase 5 completa (decisiones en `docs/adr/0006-examenes-y-repeticion-con-variantes.md`):
+el motor recibe los exámenes por `recordExamReviews` sin conocer el módulo
+`exams` (regla de calidad propia `examReviewQualityFor`), y `runInUnitOfWork`
+hace que un `err` revierta lo escrito tanto al calificar flashcards como al
+registrar un examen. `gradeFlashcard` no cambió de contrato.
+
 ## Dominio (`domain/`)
 
 | Archivo | Contenido |
 |---|---|
-| `study-item.ts` | `StudyItem`, `StudyItemKind`, `Sm2State`, `Quality` (0–5), `FLASHCARD_QUALITY` (§7.2: Otra vez 1, Difícil 3, Bien 4, Fácil 5), `MIN_EASINESS` 1.3, `INITIAL_EASINESS` 2.5 y `newStudyItem(...)`, que crea un ítem vencido de inmediato (`intervalDays` 0, `repetitions` 0, `lapses` 0, `dueAt` = `now`). |
+| `study-item.ts` | `StudyItem`, `StudyItemKind`, `Sm2State`, `Quality` (0–5), `FLASHCARD_QUALITY` (§7.2: Otra vez 1, Difícil 3, Bien 4, Fácil 5), `EXAM_REVIEW_QUALITY` (incorrecta 1, correcta 4) y `examReviewQualityFor({ correct, wasDue })` (incorrecta → 1 siempre; correcta → 4 solo si estaba vencida, si no `null`: no se toca SM-2; `exams/application/exam-quality-consistency.test.ts` la compara con `examQualityFor` de exams en las 4 combinaciones), `MIN_EASINESS` 1.3, `INITIAL_EASINESS` 2.5 y `newStudyItem(...)`, que crea un ítem vencido de inmediato (`intervalDays` 0, `repetitions` 0, `lapses` 0, `dueAt` = `now`). |
 | `sm2.ts` | `applySm2(state, quality, now)`: SM-2 exacto según §7.1. Devuelve `Result<Sm2State, DomainError>`; una calidad no entera o fuera de 0–5 produce `STUDY_ENGINE_INVALID_QUALITY`. El intervalo usa la facilidad previa a la revisión, porque la especificación actualiza EF después del intervalo. `dueAt` se calcula en UTC sumando `I × 86 400 000 ms`. |
 | `mastery.ts` | `computeMastery(items, now)`: nivel de dominio v1 según §7.3 (solo ítems no suspendidos; estabilidad `min(1, intervalDays / 21)`; acierto si `lastQuality >= 3`; umbrales 0,35 y 0,70). Exporta `MASTERY_LEVELS`, `MasteryLevel` y `MasterySnapshot` (`level`, `score`, `itemsTotal`, `itemsDue`). |
 | `review-log.ts` | `ReviewLog` y `SessionKind` (`flashcards` / `exam` / `recall`). |
@@ -89,6 +95,13 @@ los límites 0,35 y 0,70, ítems suspendidos y el conteo de vencidos.
 contratos contra los fakes (el fake de ítems respeta el único `(kind, source_id)` y el de dominio no deja que otro dueño sobrescriba una página); `tests/db/drizzle-study-engine-repositories.contract.test.ts`
 los corre contra Postgres y `tests/db/study-engine-schema.smoke.test.ts`
 prueba el relleno, las restricciones y la reversión de la migración 0009.
+`run-in-unit-of-work.test.ts` prueba que un `err` o una excepción revierten
+todos los repositorios del fake transaccional. `record-exam-reviews.test.ts`
+cubre la regla de calidad, los ítems suspendidos, los rechazos y el recálculo
+único del dominio; `tests/db/record-exam-reviews.test.ts` prueba contra
+Postgres que repasos, logs de examen y dominio se confirman juntos, que todo
+se revierte si falla un paso o la transacción del llamador, que una sesión ya
+registrada se rechaza y que un `err` tras escribir no deja filas parciales.
 Los casos de uso tienen pruebas propias con fakes y reloj fijo;
 `flashcard-review.integration.test.ts` recorre iniciar → calificar →
 terminar durante 3 días simulados (y el día 7, cuando vence la tercera

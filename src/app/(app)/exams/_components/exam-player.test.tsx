@@ -82,12 +82,72 @@ describe("ExamPlayer", () => {
   });
 
   it("counts the elapsed time from the session start", () => {
-    renderPlayer([question(1), question(2)]);
+    // A fully controlled clock: shouldAdvanceTime would let real time leak
+    // into Date.now() and make the exact clock strings flaky on a slow run.
+    vi.useRealTimers();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(STARTED.getTime() + 65_000));
+    render(
+      <ExamPlayer
+        notebookId="nb"
+        pageTitle="Mitocondria"
+        pageHref="/notebooks/nb/pages/pg"
+        session={session([question(1), question(2)])}
+      />,
+    );
     expect(screen.getByText("01:05")).toBeInTheDocument();
     act(() => {
       vi.advanceTimersByTime(2000);
     });
     expect(screen.getByText("01:07")).toBeInTheDocument();
+  });
+
+  it("lets the progress dots jump back to answered questions and to the first unanswered one, never past it", async () => {
+    const user = renderPlayer([
+      question(1, answered(1, 0)),
+      question(2, answered(2, 0)),
+      question(3),
+      question(4),
+    ]);
+    expect(screen.getByText("¿Pregunta 3?")).toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole("button", { name: "Ir a la pregunta 4" }),
+    );
+    expect(screen.getByText("¿Pregunta 3?")).toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole("button", { name: "Ir a la pregunta 1" }),
+    );
+    expect(screen.getByText("¿Pregunta 1?")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Ir a la pregunta 1" }),
+    ).toHaveAttribute("aria-current", "step");
+
+    await user.click(
+      screen.getByRole("button", { name: "Ir a la pregunta 3" }),
+    );
+    expect(screen.getByText("¿Pregunta 3?")).toBeInTheDocument();
+  });
+
+  it("shows Ver resultados only on the last question once every question is answered", async () => {
+    answerExamQuestionAction.mockResolvedValue(ok(answered(2, 0)));
+    const user = renderPlayer([question(1, answered(1, 0)), question(2)]);
+
+    // Last question, still unanswered: no way to finish yet.
+    expect(screen.getByText("¿Pregunta 2?")).toBeInTheDocument();
+    expect(screen.queryByTestId("finish-exam-button")).not.toBeInTheDocument();
+    expect(screen.getByTestId("next-question-button")).toBeDisabled();
+
+    await user.click(screen.getByRole("button", { name: /A2/ }));
+    expect(await screen.findByTestId("finish-exam-button")).toBeEnabled();
+
+    // Back on an earlier question, the finish button gives way to Siguiente.
+    await user.click(
+      screen.getByRole("button", { name: "Ir a la pregunta 1" }),
+    );
+    expect(screen.queryByTestId("finish-exam-button")).not.toBeInTheDocument();
+    expect(screen.getByTestId("next-question-button")).toBeEnabled();
   });
 
   it("grades a choice and reveals right or wrong with the explanation", async () => {

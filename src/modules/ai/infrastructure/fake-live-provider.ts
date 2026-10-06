@@ -16,7 +16,8 @@ const MAX_FAKE_CARD_COUNT = 20;
 // Reads the count from the prompt header the builders emit as its first two
 // lines ("Page title: …" then "Number of <label>: N"), never from the page
 // text, and clamps it to [1, max] so a prompt can never ask for an unbounded
-// answer.
+// answer. Any number of digits is clamped (a huge count reads as Infinity
+// and becomes `max`); only a missing or malformed header falls back.
 function headerCount(
   prompt: string,
   label: string,
@@ -24,7 +25,7 @@ function headerCount(
   max: number,
 ): number {
   const [, countLine] = prompt.split("\n", 2);
-  const match = new RegExp(`^Number of ${label}: (\\d{1,6})$`).exec(
+  const match = new RegExp(`^Number of ${label}: (\\d+)$`).exec(
     countLine ?? "",
   );
   if (!match) return fallback;

@@ -12,6 +12,11 @@ del mazo con `?repasar=1`, que inicia el repaso en el mismo lugar; no hay
 sesión multipágina en la interfaz. El calendario mensual y semanal y la vista
 "Hoy" completa llegan en la Fase 7.
 
+Fase 5 (cerrada, ADR 0006): `createSchedulingServerApi` expone la misma lista
+a otros módulos; el hub de exámenes la usa para marcar las páginas con
+preguntas vencidas hoy. "Repasos de hoy" en `/flashcards` sigue mostrando solo
+flashcards.
+
 ## Dominio (`domain/`)
 
 | Archivo | Contenido |
@@ -33,9 +38,14 @@ sesión multipágina en la interfaz. El calendario mensual y semanal y la vista
 
 ## API pública (`index.ts`)
 
-`listDueTodayAction()` (Server Action: sesión primero, nunca lanza) y el
-dominio. La ruta `/flashcards` muestra "Repasos de hoy" y los conteos de
-vencidas de cada mazo.
+| Exportación | Para quién | Contrato |
+|---|---|---|
+| `listDueTodayAction()` | Interfaz (Server Action) | Sesión primero, nunca lanza. La ruta `/flashcards` muestra "Repasos de hoy" y los conteos de vencidas de cada mazo. |
+| `createSchedulingServerApi({ db, clock? })` | Otros módulos en el servidor | Devuelve `SchedulingServerApi.listDueToday(ownerId)`: la misma lectura que la acción (páginas del dueño con ítems vencidos ahora, la que más esperó primero), con el reloj del sistema por defecto. No es una Server Action: el llamador ya autenticó al dueño. `db` puede ser una transacción abierta. La usa `exams` (`hub-actions.ts`) para `due.exam_question`. |
+| Dominio | Todos | `DueTodayPage`, `DueCounts`, `DUE_KINDS`, `emptyDueCounts`, `compareDueTodayPages`. |
+
+`server-api.test.ts` prueba que la fábrica consulta al lector con el dueño
+pedido y el `now` del reloj inyectado.
 
 ## Dependencias
 

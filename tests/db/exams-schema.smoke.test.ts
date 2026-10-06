@@ -1,7 +1,11 @@
 import { randomUUID } from "node:crypto";
 import postgres from "postgres";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { inRolledBackTx, readDownSql } from "./helpers/rollback";
+import {
+  inRolledBackReversion,
+  inRolledBackTx,
+  readDownSql,
+} from "./helpers/rollback";
 import {
   createTestOwner,
   deleteTestOwner,
@@ -266,7 +270,7 @@ describe.skipIf(!url)("0010 exams schema", () => {
   });
 
   it("reverting 0011 drops the question list and its check", async () => {
-    await inRolledBackTx(sql, async (tx) => {
+    await inRolledBackReversion(sql, async (tx) => {
       await tx.unsafe(readDownSql("0011_exam_session_questions"));
       const columns = await tx`
         select column_name from information_schema.columns
@@ -278,7 +282,7 @@ describe.skipIf(!url)("0010 exams schema", () => {
   });
 
   it("reversion drops the four exam tables", async () => {
-    await inRolledBackTx(sql, async (tx) => {
+    await inRolledBackReversion(sql, async (tx) => {
       await tx.unsafe(readDownSql("0011_exam_session_questions"));
       await tx.unsafe(readDownSql("0010_exams"));
       const tables = await tx`

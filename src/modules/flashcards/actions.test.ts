@@ -113,7 +113,9 @@ describe("flashcards Server Actions", () => {
     getCurrentUser.mockReset();
     getCurrentUser.mockResolvedValue({ id: OWNER });
     captureException.mockClear();
-    track.mockClear();
+    // mockReset also drops a one-shot rejection a test left unconsumed.
+    track.mockReset();
+    track.mockResolvedValue(undefined);
     revalidatePath.mockClear();
     current = {
       flashcards: new InMemoryFlashcardRepository(),
@@ -248,6 +250,9 @@ describe("flashcards Server Actions", () => {
       expect(result.ok).toBe(true);
       expect(await current.flashcards.countByPage(PAGE, OWNER)).toBe(1);
       expect(track).toHaveBeenCalledTimes(1);
+      expect(captureException).toHaveBeenCalledWith(
+        expect.objectContaining({ message: "posthog down" }),
+      );
     });
 
     it("keeps the domain error of a refused generation when analytics rejects", async () => {
@@ -258,6 +263,10 @@ describe("flashcards Server Actions", () => {
       const result = await generateFlashcardsAction({ pageId: PAGE });
 
       expect(!result.ok && result.error.code).toBe(AI_ERROR.PAGE_EMPTY);
+      expect(track).toHaveBeenCalledTimes(1);
+      expect(captureException).toHaveBeenCalledWith(
+        expect.objectContaining({ message: "posthog down" }),
+      );
     });
 
     it("never throws: an unexpected failure is reported to Sentry", async () => {

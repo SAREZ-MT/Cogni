@@ -2,7 +2,12 @@ import { randomUUID } from "node:crypto";
 import postgres from "postgres";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { IMPORT_JOB_STATUSES } from "@/shared/db/schema";
-import { ForceRollback, inRolledBackTx, readDownSql } from "./helpers/rollback";
+import {
+  ForceRollback,
+  inRolledBackReversion,
+  inRolledBackTx,
+  readDownSql,
+} from "./helpers/rollback";
 import {
   createTestOwner,
   deleteTestOwner,
@@ -169,7 +174,7 @@ describe.skipIf(!url)("0005 import_jobs schema", () => {
   });
 
   it("reversion drops import_jobs and keeps the phase 0 and 1 tables", async () => {
-    await inRolledBackTx(sql, async (tx) => {
+    await inRolledBackReversion(sql, async (tx) => {
       await tx.unsafe(readDownSql("0005_import_jobs"));
 
       const tables = await tx`

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { afterAll, describe, expect, it } from "vitest";
 import {
   answerExamQuestion,
@@ -168,15 +168,24 @@ if (process.env.DATABASE_URL) {
     await connection.$client`select 1`;
   }
 
-  // Resolves once `count` backends wait on an exam session's row lock.
-  // Counted from pg_stat_activity, not by backend pid: cogni-dev is reached
-  // through a transaction pooler, so a connection's pid is not stable.
-  async function waiting(count: number): Promise<void> {
+  // Resolves once `count` backends queue on the session row held by the
+  // backend `holderPid`. Scoped by pg_blocking_pids, so lock waits of other
+  // tests or sessions in the same database never count. Followed
+  // transitively: the first waiter takes the row's tuple lock, so a second
+  // one is blocked by that waiter, not by the holder. The holder's pid is
+  // read inside its open transaction: through cogni-dev's transaction
+  // pooler a backend is only pinned for the length of a transaction.
+  async function waiting(holderPid: number, count: number): Promise<void> {
     for (let attempt = 0; attempt < 400; attempt += 1) {
       const [row] = await observer.$client<{ n: number }[]>`
-        select count(*)::int as n from pg_stat_activity
-        where wait_event_type = 'Lock'
-          and query ilike '%from "exam_sessions"%for update%'
+        with recursive queued(pid) as (
+          select pid from pg_stat_activity
+          where ${holderPid}::int = any(pg_blocking_pids(pid))
+          union
+          select activity.pid from pg_stat_activity activity
+          join queued on queued.pid = any(pg_blocking_pids(activity.pid))
+        )
+        select count(*)::int as n from queued
       `;
       if (row && row.n >= count) return;
       await new Promise((resolve) => setTimeout(resolve, 25));
@@ -186,24 +195,31 @@ if (process.env.DATABASE_URL) {
 
   // Row-locks the session on holderConnection until `release` is called,
   // so the racing calls queue behind it in the order they arrive.
+  // `waiting(count)` resolves once `count` calls queue on that lock.
   async function holdSession(sessionId: string) {
     let release = () => {};
     const released = new Promise<void>((resolve) => {
       release = resolve;
     });
-    let held = () => {};
-    const isHeld = new Promise<void>((resolve) => {
+    let held: (pid: number) => void = () => {};
+    const isHeld = new Promise<number>((resolve) => {
       held = resolve;
     });
     const holder = holderConnection.transaction(async (tx) => {
       await new DrizzleExamSessionRepository(tx).lockById(sessionId, owner.id);
-      held();
+      const [row] = await tx.execute<{ pid: number }>(
+        sql`select pg_backend_pid() as pid`,
+      );
+      held(Number(row?.pid));
       await released;
     });
-    await isHeld;
-    return async () => {
-      release();
-      await holder;
+    const holderPid = await isHeld;
+    return {
+      waiting: (count: number) => waiting(holderPid, count),
+      release: async () => {
+        release();
+        await holder;
+      },
     };
   }
 
@@ -287,17 +303,17 @@ if (process.env.DATABASE_URL) {
       const target = questionIds[0] as string;
       await warm(db);
       await warm(otherConnection);
-      const release = await holdSession(sessionId);
+      const hold = await holdSession(sessionId);
       let settled = 0;
       const first = answer(sessionId, target).finally(() => (settled += 1));
       const second = answer(sessionId, target, otherConnection).finally(
         () => (settled += 1),
       );
       try {
-        await waiting(2);
+        await hold.waiting(2);
         expect(settled).toBe(0);
       } finally {
-        await release();
+        await hold.release();
       }
       const results = await Promise.all([first, second]);
       expect(results.filter((r) => r.ok)).toHaveLength(1);
@@ -315,15 +331,15 @@ if (process.env.DATABASE_URL) {
       const last = questionIds[9] as string;
       await warm(db);
       await warm(otherConnection);
-      const release = await holdSession(sessionId);
+      const hold = await holdSession(sessionId);
       const answered = answer(sessionId, last);
       let finished: ReturnType<typeof finish> | undefined;
       try {
-        await waiting(1);
+        await hold.waiting(1);
         finished = finish(sessionId, otherConnection);
-        await waiting(2);
+        await hold.waiting(2);
       } finally {
-        await release();
+        await hold.release();
       }
       const [answerResult, finishResult] = await Promise.all([
         answered,
@@ -345,15 +361,15 @@ if (process.env.DATABASE_URL) {
       const { sessionId, questionIds } = await answeredExam(pageId, 0);
       await warm(db);
       await warm(otherConnection);
-      const release = await holdSession(sessionId);
+      const hold = await holdSession(sessionId);
       const finished = finish(sessionId, otherConnection);
       let answered: ReturnType<typeof answer> | undefined;
       try {
-        await waiting(1);
+        await hold.waiting(1);
         answered = answer(sessionId, questionIds[0] as string);
-        await waiting(2);
+        await hold.waiting(2);
       } finally {
-        await release();
+        await hold.release();
       }
       const [finishResult, answerResult] = await Promise.all([
         finished,

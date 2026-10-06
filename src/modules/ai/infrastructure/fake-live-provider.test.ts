@@ -184,6 +184,61 @@ describe("createFakeLiveProvider", () => {
     );
   });
 
+  it("clamps a header count with 7 or more digits instead of falling back to the default", async () => {
+    const provider = createFakeLiveProvider();
+    const exam = await provider.generateObject(examRequest(5_000_000));
+    expect(examQuestionsOutput.parse(exam.object).questions).toHaveLength(30);
+
+    const pageText = Array.from(
+      { length: 40 },
+      (_, i) => `Oración número ${i + 1}.`,
+    ).join(" ");
+    const cards = await provider.generateObject(
+      flashcardsRequest(12_345_678_901, pageText),
+    );
+    expect(flashcardsOutput.parse(cards.object).cards).toHaveLength(20);
+  });
+
+  it("dispatches the prompt-aware answers by schema identity: a derived schema only gets the generic minimal objects", async () => {
+    const provider = createFakeLiveProvider();
+    const feedbackPrompt = buildExamSessionFeedbackPrompt({
+      pageTitle: "Célula",
+      pageText: TEXT,
+      total: 10,
+      correct: 9,
+      passed: true,
+      failed: [
+        {
+          concept: "Núcleo",
+          stem: "¿Núcleo?",
+          chosenAnswer: "Mal",
+          correctAnswer: "Bien",
+          explanation: "Porque sí.",
+        },
+      ],
+    });
+    const derivedFeedback = sessionFeedbackOutput.describe("derived");
+    expect(derivedFeedback).not.toBe(sessionFeedbackOutput);
+
+    const response = await provider.generateObject({
+      schema: derivedFeedback,
+      ...feedbackPrompt,
+    });
+
+    // The exam-aware answer would say "Resumen del examen de ejemplo".
+    expect(sessionFeedbackOutput.parse(response.object).summary).toBe(
+      "Resumen de ejemplo",
+    );
+    // No minimal object fits a derived exam questions schema: the fake
+    // refuses instead of inventing questions the use case never asked for.
+    await expect(
+      provider.generateObject({
+        ...examRequest(10),
+        schema: examQuestionsOutput.describe("derived"),
+      }),
+    ).rejects.toThrow("fake provider has no object for this schema");
+  });
+
   it("clamps the flashcard count to the domain maximum of 20", async () => {
     const pageText = Array.from(
       { length: 40 },

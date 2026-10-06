@@ -15,6 +15,7 @@ import { type ExamQuestion, newVariant } from "../domain/exam-question";
 import { finishExamSession, newExamSession } from "../domain/exam-session";
 import { answerExamQuestion } from "./answer-exam-question";
 import { completeExamSession } from "./complete-exam-session";
+import { getExamPageOverview } from "./read-exam-session";
 import {
   type ClearedExamRetake,
   type StartExamRetakeDeps,
@@ -711,5 +712,146 @@ describe("startExamRetake after questions were retired", () => {
       await uow.repos.questions.listByIds(session.questionIds, OWNER)
     ).map((q) => q.rootId);
     expect(roots).not.toContain(seeded[0]?.rootId);
+  });
+  it("refuses N below the failed roots still on the page before calling the AI: nothing stored, no unit peeked or consumed", async () => {
+    const { uow, ai, limiter, deps } = setup();
+    await seedFailedExam(uow, { seeded: 14, asked: 14, failed: 11 });
+    const before = await storedState(uow);
+
+    const result = await startExamRetake(
+      { pageId: PAGE, requestedCount: 10 },
+      deps,
+      OWNER,
+    );
+
+    expectError(result, EXAM_ERROR.INVALID_QUESTION_COUNT);
+    expect(ai.calls).toHaveLength(0);
+    expect(limiter.peeks + limiter.checks).toBe(0);
+    expect(await storedState(uow)).toEqual(before);
+    expect((await uow.repos.pageStates.get(PAGE, OWNER))?.retakePending).toBe(
+      true,
+    );
+  });
+
+  it("counts only the live failed roots against N: a retired failed concept lets N equal the rest", async () => {
+    const { uow, ai, deps } = setup();
+    const seeded = await seedFailedExam(uow, {
+      seeded: 14,
+      asked: 14,
+      failed: 11,
+    });
+    await retire(uow, seeded.slice(0, 1));
+
+    const result = await startExamRetake(
+      { pageId: PAGE, requestedCount: 10 },
+      deps,
+      OWNER,
+    );
+
+    expect(startedOf(result).session.questionIds).toHaveLength(10);
+    expect(
+      promptRoots((ai.calls[0] as GenerateStructuredInput).prompt),
+    ).toHaveLength(10);
+  });
+
+  // The start screen (overview.failedRootCount) and the retake planner
+  // decide independently which failed roots are still live: both must
+  // agree on the same page, or the screen offers a retake the planner
+  // builds differently (or clears).
+  describe("failedRootCount parity with the retake planner", () => {
+    async function retakenRoots(
+      setupResult: ReturnType<typeof setup>,
+      failedRootIds: readonly string[],
+    ): Promise<number> {
+      const { uow, deps } = setupResult;
+      const result = await startExamRetake(
+        { pageId: PAGE, requestedCount: 10 },
+        deps,
+        OWNER,
+      );
+      if (!result.ok) throw result.error;
+      if (result.value.kind === "cleared") return 0;
+      const questions = await uow.repos.questions.listByIds(
+        result.value.session.questionIds,
+        OWNER,
+      );
+      const failed = new Set(failedRootIds);
+      return questions.filter((q) => failed.has(q.rootId)).length;
+    }
+
+    const scenarios: {
+      name: string;
+      arrange: (
+        uow: InMemoryExamSessionUnitOfWork,
+        failed: readonly ExamQuestion[],
+      ) => Promise<void>;
+      expected: number;
+    }[] = [
+      {
+        name: "no failed concept retired",
+        arrange: async () => {},
+        expected: 4,
+      },
+      {
+        name: "one failed concept retired",
+        arrange: (uow, failed) => retire(uow, failed.slice(0, 1)),
+        expected: 3,
+      },
+      {
+        name: "a failed wording retired but its unshown variant active",
+        arrange: async (uow, failed) => {
+          const previous = failed[0] as ExamQuestion;
+          const variant = newVariant(
+            previous,
+            await uow.repos.questions.listLineage(previous.rootId, OWNER),
+            {
+              id: `pre-${previous.id}`,
+              stem: `¿Ya reformulada ${previous.id}?`,
+              options: ["Energía", "ADN", "Lípidos", "Almidón"],
+              correctIndex: 0,
+              explanation: "",
+              generationId: "gen-earlier",
+            },
+            LATER,
+          );
+          if (!variant.ok) throw variant.error;
+          await uow.repos.questions.save(variant.value);
+          await retire(uow, [previous]);
+        },
+        expected: 4,
+      },
+      {
+        name: "every failed concept retired",
+        arrange: (uow, failed) => retire(uow, failed),
+        expected: 0,
+      },
+    ];
+
+    for (const scenario of scenarios) {
+      it(`agrees when ${scenario.name}`, async () => {
+        const context = setup();
+        const seeded = await seedFailedExam(context.uow, {
+          seeded: 16,
+          asked: 10,
+          failed: 4,
+        });
+        const failed = seeded.slice(0, 4);
+        await scenario.arrange(context.uow, failed);
+
+        const overview = await getExamPageOverview(
+          { pageId: PAGE },
+          { uow: context.uow },
+          OWNER,
+        );
+        if (!overview.ok) throw overview.error;
+        const retaken = await retakenRoots(
+          context,
+          failed.map((q) => q.rootId),
+        );
+
+        expect(overview.value.failedRootCount).toBe(scenario.expected);
+        expect(retaken).toBe(overview.value.failedRootCount);
+      });
+    }
   });
 });

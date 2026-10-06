@@ -9,7 +9,12 @@ import {
   SESSION_FEEDBACK_STATUSES,
   STUDY_ITEM_KINDS,
 } from "@/shared/db/schema";
-import { ForceRollback, inRolledBackTx, readDownSql } from "./helpers/rollback";
+import {
+  ForceRollback,
+  inRolledBackReversion,
+  inRolledBackTx,
+  readDownSql,
+} from "./helpers/rollback";
 import {
   createTestOwner,
   deleteTestOwner,
@@ -233,7 +238,7 @@ describe.skipIf(!url)("0009 study_engine schema", () => {
   });
 
   it("reversion drops the study-engine tables and flashcards.archived_at", async () => {
-    await inRolledBackTx(sql, async (tx) => {
+    await inRolledBackReversion(sql, async (tx) => {
       await tx.unsafe(readDownSql("0009_study_engine"));
 
       const tables = await tx`
