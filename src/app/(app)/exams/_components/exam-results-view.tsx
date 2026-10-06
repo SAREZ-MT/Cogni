@@ -35,8 +35,9 @@ function optionLabel(options: string[], index: number): string {
 // questions are due tomorrow). Shows the score, the total time taken (user
 // decision 2026-10-05: the only place besides the player a time metric is
 // shown), the failed concepts and every question with its explanation.
-// "Repetir examen" (T7), the AI feedback and "Repasar contenido" (T8) are
-// placeholders until their tasks ship.
+// "Repetir examen" opens the page's exam route, where the retake with
+// reformulated questions starts (T7); the AI feedback and "Repasar
+// contenido" (T8) are placeholders until their task ships.
 export function ExamResultsView({
   notebookTitle,
   pageTitle,
@@ -80,8 +81,10 @@ export function ExamResultsView({
           description="La página queda marcada para repetir el examen. Las preguntas falladas vencen mañana y aparecerán en Hoy."
           action={
             <div className="flex flex-wrap items-center gap-2">
-              <Button size="sm" disabled data-testid="retake-exam-soon">
-                Repetir examen · pronto
+              <Button asChild size="sm">
+                <Link href={examHref} data-testid="retake-exam-link">
+                  Repetir examen
+                </Link>
               </Button>
               <Button size="sm" variant="outline" disabled>
                 Repasar contenido · pronto

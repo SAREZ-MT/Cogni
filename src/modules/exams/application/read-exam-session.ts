@@ -56,7 +56,15 @@ export interface ExamPageOverview {
   // Roots with an active question: an exam needs at least 10.
   activeQuestionCount: number;
   retakePending: boolean;
+  // Roots failed in the last failed exam that still have an active
+  // question, while a retake is pending (a retake holds at least
+  // max(10, failedRootCount) questions). 0 with a pending retake: every
+  // failed question was retired, and starting the retake clears it.
+  failedRootCount: number;
+  // The open normal exam; null while none.
   openSession: ExamSession | null;
+  // The open retake (§7.5); null while none.
+  openRetake: ExamSession | null;
   lastFinishedSession: ExamSession | null;
 }
 
@@ -77,14 +85,24 @@ export async function getExamPageOverview(
       input.pageId,
       ownerId,
     );
+    const openRetake = await repos.sessions.findOpenRetakeByPage(
+      input.pageId,
+      ownerId,
+    );
     const finished = await repos.sessions.listFinishedByPage(
       input.pageId,
       ownerId,
     );
+    const activeRoots = new Set(active.map((q) => q.rootId));
     return ok({
-      activeQuestionCount: new Set(active.map((q) => q.rootId)).size,
+      activeQuestionCount: activeRoots.size,
       retakePending: state?.retakePending ?? false,
+      // Failed roots retired since the exam leave the retake.
+      failedRootCount: state?.retakePending
+        ? new Set(state.failedRootIds.filter((id) => activeRoots.has(id))).size
+        : 0,
       openSession,
+      openRetake,
       lastFinishedSession: finished.at(-1) ?? null,
     });
   });

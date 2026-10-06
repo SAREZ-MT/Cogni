@@ -57,20 +57,18 @@ export async function loadSessionQuestions(
   });
 }
 
-// The question ids of a new normal exam on a page, in the order shown:
+// The page's candidates of an exam at `now`, one per root:
 //   - the page's questions shown at `now`, the latest wording of each root;
 //   - due dates from the roots' study items, failed roots from the page
-//     state and lastSeenAt from the page's earlier answers;
-//   - composeExam (fewer than 10 roots is EXAMS_NOT_ENOUGH_QUESTIONS).
-// Called once, by startExamSession; the result is stored on the session.
-export async function composeNormalExam(
-  input: { pageId: string; requestedCount: number; now: Date },
+//     state and lastSeenAt from the page's earlier answers.
+export async function listExamCandidates(
+  input: { pageId: string; now: Date },
   ownerId: string,
   repos: Pick<
     ExamSessionRepositories,
     "questions" | "answers" | "pageStates" | "studyItems"
   >,
-): Promise<Result<string[], DomainError>> {
+): Promise<ExamCandidate[]> {
   const { pageId, now } = input;
   const shown = await repos.questions.listShownAt(pageId, ownerId, now);
   // listShownAt is oldest first: the last question of a root wins.
@@ -87,19 +85,32 @@ export async function composeNormalExam(
   );
   const seen = await repos.answers.lastAnsweredAtByRoot(pageId, ownerId, now);
 
-  const candidates: ExamCandidate[] = [...latestByRoot.values()].map(
-    (question) => ({
-      rootId: question.rootId,
-      questionId: question.id,
-      failedLastTime: failed.has(question.rootId),
-      dueAt: dueByRoot.get(question.rootId) ?? null,
-      lastSeenAt: seen.get(question.rootId) ?? null,
-    }),
-  );
+  return [...latestByRoot.values()].map((question) => ({
+    rootId: question.rootId,
+    questionId: question.id,
+    failedLastTime: failed.has(question.rootId),
+    dueAt: dueByRoot.get(question.rootId) ?? null,
+    lastSeenAt: seen.get(question.rootId) ?? null,
+  }));
+}
+
+// The question ids of a new normal exam on a page, in the order shown:
+// composeExam over listExamCandidates (fewer than 10 roots is
+// EXAMS_NOT_ENOUGH_QUESTIONS). Called once, by startExamSession; the
+// result is stored on the session.
+export async function composeNormalExam(
+  input: { pageId: string; requestedCount: number; now: Date },
+  ownerId: string,
+  repos: Pick<
+    ExamSessionRepositories,
+    "questions" | "answers" | "pageStates" | "studyItems"
+  >,
+): Promise<Result<string[], DomainError>> {
+  const candidates = await listExamCandidates(input, ownerId, repos);
   const composed = composeExam({
     requestedCount: input.requestedCount,
     candidates,
-    now,
+    now: input.now,
   });
   if (!composed.ok) return composed;
   return ok(composed.value.map(({ questionId }) => questionId));

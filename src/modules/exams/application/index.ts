@@ -19,6 +19,7 @@ export {
   type ExamReviews,
   type ExamSessionRepositories,
   type ExamSessionUnitOfWork,
+  listExamCandidates,
   loadSessionQuestions,
 } from "./exam-session-work";
 export {
@@ -46,6 +47,11 @@ export {
   splitIntoBatches,
 } from "./request-exam-generation";
 export { retireExamQuestion } from "./retire-exam-question";
+export {
+  type StartExamRetakeDeps,
+  type StartedExamRetake,
+  startExamRetake,
+} from "./start-exam-retake";
 export {
   type StartExamSessionDeps,
   type StartedExamSession,

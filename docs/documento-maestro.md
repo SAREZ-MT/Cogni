@@ -2,8 +2,9 @@
 
 | Campo | Valor |
 |---|---|
-| Versión del documento | 1.3.0 |
-| Fecha | 2026-09-14 (actualizado 2026-10-04) |
+| Versión del documento | 1.3.1 |
+| Fecha | 2026-09-14 (actualizado 2026-10-05) |
+| Cambios de la versión 1.3.1 | Nueva Fase 8 — Diseño y flujos de pantalla (solo interfaz y navegación, sin cambios de lógica de backend), justo después de la Fase 7. Endurecimiento pasa a ser la Fase 9. Actualizados §1, §4 y §13. |
 | Cambios de la versión 1.3.0 | ADR 0005: decisiones de implementación de la Fase 4 (repaso en la página del mazo, calificación solo de ítems vencidos, retroalimentación idempotente que no consume el límite diario de IA, trabajo diario de dominio acotado en tiempo y con bloqueo por página). Notas en §5.2, §6.1 y §7.3; §13 (Fase 4 implementada). |
 | Cambios de la versión 1.2.0 | ADR 0004: capa de IA con cuatro proveedores gratuitos (Mistral y Cerebras descartados), límite de 6 generaciones por usuario por día y tope de página con truncado. Actualizadas §4.2, §4.3, §8.1, §8.2, §8.3, §8.4, §8.5 y §13 (Fase 3 implementada). |
 | Cambios de la versión 1.1.0 | ADR 0003: Vercel Fluid Compute y Vercel Cron reemplazan a Trigger.dev. Fase 2 (importación de PDF) implementada y fuera de "Próximamente". La métrica por técnica "tiempo de estudio" se reemplaza por "repasos completados". |
@@ -38,7 +39,7 @@ La **repetición espaciada** es transversal: un único motor decide cuándo debe
 - No expone una API pública.
 - No cobra a los usuarios en esta etapa.
 
-Estos puntos pueden reabrirse después de la Fase 8 mediante ADR.
+Estos puntos pueden reabrirse después de la Fase 9 mediante ADR.
 
 ### 1.3 Definición de "producto rápido por fases"
 
@@ -182,7 +183,7 @@ Regla de versiones: en la Fase 0 se instala **la última versión estable** de c
 | Vercel Functions (Fluid Compute) + Vercel Cron | Trabajo síncrono acotado (procesar PDF, generación con IA, evaluación) y tareas programadas diarias (keep-alive, cálculo de repasos) | Hobby | 300 s por función con `maxDuration` explícito; crons diarios | ADR 0003. Si un trabajo supera los 300 s, se reintroduce un servicio de jobs con un ADR nuevo. |
 | Sentry | Errores en cliente y servidor | Free | Eventos/mes del plan free | Muestreo si se acerca al límite. |
 | PostHog | Analítica de producto | Free | Eventos/mes del plan free | Eventos definidos explícitamente, sin autocaptura masiva. |
-| Better Stack | Logs centralizados | Free | — | **Diferido a Fase 8.** Se conecta con log drain de Vercel. |
+| Better Stack | Logs centralizados | Free | — | **Diferido a Fase 9.** Se conecta con log drain de Vercel. |
 | GitHub | Código, PRs, Actions (CI) | Free | Minutos de Actions del plan free | Ninguna |
 
 ### 4.3 Proveedores de IA (todos vía Vercel AI SDK)
@@ -212,7 +213,7 @@ Restricción conocida: los modelos Pro de Gemini no están en el tier gratuito. 
 | Documentación de código | TSDoc en puertos, entidades y servicios de aplicación. |
 | Documentación de proyecto | Este documento, ADRs en `docs/adr/`, artefactos SDD de gentle-ai en `openspec/` (Fases 0 y 1) y documentos de feature ODD en `odd/tasks/`. |
 | Diagramas | archify, generados desde el agente hacia `docs/diagramas/`. |
-| Manual de usuario | Fase 8. |
+| Manual de usuario | Fase 9. |
 | Swagger / Scalar / Mintlify | No aplica en esta etapa. No hay API pública. |
 | Docker | No para la app. Solo lo usa la Supabase CLI para Postgres local. |
 
@@ -666,7 +667,15 @@ Hecho cuando: una sesión completa funciona aunque un proveedor falle a mitad, y
 Entregables: calendario mensual y semanal, vista "Hoy" completa, dashboard con progreso por cuaderno y página, métricas por técnica, calibración metacognitiva, gráficos shadcn.
 Hecho cuando: el usuario puede responder "qué estudio hoy" y "cómo voy" sin abrir ninguna página.
 
-### Fase 8 — Endurecimiento
+### Fase 8 — Diseño y flujos de pantalla
+
+> Fase de solo interfaz, decidida el 2026-10-05. Se ejecuta justo después de la Fase 7.
+
+Entregables: revisión y mejora de la UI/UX de todas las pantallas construidas en las fases anteriores, flujos de navegación coherentes entre cuadernos, páginas, técnicas, "Hoy", calendario y dashboard, consistencia con el sistema de diseño (`docs/design-system/`) y con los átomos de `src/shared/ui`, verificación visual en navegador y pruebas e2e de los flujos.
+Restricción: **no se modifica la lógica de backend**. Quedan fuera los cambios de dominio, casos de uso, infraestructura, esquema y migraciones; las pantallas componen los casos de uso y acciones existentes. Cualquier necesidad de backend detectada se registra como pendiente para una fase posterior.
+Hecho cuando: cada flujo principal (tomar apuntes, generar y repasar cada técnica, revisar "Hoy" y el progreso) se recorre sin pasos ambiguos ni callejones sin salida, y las pantallas coinciden con el sistema de diseño.
+
+### Fase 9 — Endurecimiento
 
 Entregables: Better Stack con log drain, revisión de límites y cuotas, pruebas de carga ligeras, auditoría de accesibilidad, manual de usuario, documentación final y diagramas con archify, entregables académicos.
 Hecho cuando: la plataforma se publica para uso abierto.

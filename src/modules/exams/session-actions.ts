@@ -41,7 +41,12 @@ export interface ExamStartView {
   // Roots with an active question; an exam needs at least 10.
   activeQuestionCount: number;
   retakePending: boolean;
+  // Roots failed in the last exam while a retake is pending: a retake
+  // holds at least max(10, failedRootCount) questions.
+  failedRootCount: number;
   openSessionId: string | null;
+  // The page's open retake (§7.5), resumed by the player.
+  openRetakeSessionId: string | null;
   lastFinishedSessionId: string | null;
 }
 
@@ -73,6 +78,8 @@ export interface ExamSessionView {
   // ISO instant: the player counts the elapsed time from it.
   startedAt: string;
   finished: boolean;
+  // A retake of a failed exam (reformulated questions first).
+  isRetake: boolean;
   questions: ExamPlayerQuestionView[];
 }
 
@@ -158,6 +165,7 @@ function toPlayerView(detail: ExamSessionDetail): ExamSessionView {
     pageId: detail.session.pageId,
     startedAt: detail.session.startedAt.toISOString(),
     finished: detail.session.finishedAt !== null,
+    isRetake: detail.session.isRetake,
     questions: detail.questions.map(({ question, answer }) => ({
       id: question.id,
       stem: question.stem,
@@ -236,7 +244,9 @@ export async function getExamStartAction(
     return ok({
       activeQuestionCount: overview.activeQuestionCount,
       retakePending: overview.retakePending,
+      failedRootCount: overview.failedRootCount,
       openSessionId: overview.openSession?.id ?? null,
+      openRetakeSessionId: overview.openRetake?.id ?? null,
       lastFinishedSessionId: overview.lastFinishedSession?.id ?? null,
     });
   });

@@ -669,6 +669,48 @@ export function runExamRepositoriesContract(
       ).toBeNull();
     });
 
+    it("findOpenRetakeByPage returns the latest open retake only", async () => {
+      const ctx = options.context();
+      const repos = options.createRepositories();
+      const pageId = await ctx.newPageId();
+      const q = question(ctx, pageId);
+      await repos.questions.save(q);
+      const failed = session(ctx, pageId);
+      await repos.sessions.create(failed);
+      await repos.sessions.finish(
+        unwrap(finishExamSession(failed, [answer(failed.id, q, false)], T1)),
+      );
+      expect(
+        await repos.sessions.findOpenRetakeByPage(pageId, ctx.ownerId),
+      ).toBeNull();
+      await repos.sessions.create(session(ctx, pageId));
+      expect(
+        await repos.sessions.findOpenRetakeByPage(pageId, ctx.ownerId),
+      ).toBeNull();
+
+      const finishedRetake = session(ctx, pageId, failed.id);
+      await repos.sessions.create(finishedRetake);
+      await repos.sessions.finish(
+        unwrap(
+          finishExamSession(
+            finishedRetake,
+            [answer(finishedRetake.id, q, false)],
+            T1,
+          ),
+        ),
+      );
+      const older = session(ctx, pageId, failed.id);
+      const newer = { ...session(ctx, pageId, failed.id), startedAt: T1 };
+      await repos.sessions.create(older);
+      await repos.sessions.create(newer);
+      expect(
+        await repos.sessions.findOpenRetakeByPage(pageId, ctx.ownerId),
+      ).toEqual(newer);
+      expect(
+        await repos.sessions.findOpenRetakeByPage(pageId, ctx.otherOwnerId),
+      ).toBeNull();
+    });
+
     it("lockPageForStart resolves", async () => {
       const ctx = options.context();
       const { sessions } = options.createRepositories();

@@ -132,7 +132,9 @@ describe("exam session actions", () => {
       value: {
         activeQuestionCount: 10,
         retakePending: false,
+        failedRootCount: 0,
         openSessionId: sessionId,
+        openRetakeSessionId: null,
         lastFinishedSessionId: null,
       },
     });
@@ -160,6 +162,7 @@ describe("exam session actions", () => {
     const view = await getExamSessionAction({ sessionId });
     if (!view.ok) throw new Error(view.error.code);
     expect(view.value.finished).toBe(false);
+    expect(view.value.isRetake).toBe(false);
     expect(view.value.questions).toHaveLength(10);
     expect(view.value.questions[0]?.answer?.correctIndex).toBe(0);
     const unanswered = view.value.questions[1];

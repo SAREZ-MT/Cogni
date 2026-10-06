@@ -13,6 +13,10 @@ export {
 } from "./actions";
 export * from "./domain";
 export {
+  type StartedExamRetakeView,
+  startExamRetakeAction,
+} from "./retake-actions";
+export {
   answerExamQuestionAction,
   type ExamAnswerView,
   type ExamPlayerQuestionView,

@@ -51,6 +51,7 @@ function session(questions: ExamPlayerQuestionView[]): ExamSessionView {
     pageId: PAGE_ID,
     startedAt: STARTED.toISOString(),
     finished: false,
+    isRetake: false,
     questions,
   };
 }
@@ -110,6 +111,25 @@ describe("ExamPlayer", () => {
 
     await user.click(screen.getByTestId("next-question-button"));
     expect(screen.getByText("¿Pregunta 2?")).toBeInTheDocument();
+  });
+
+  it("labels a retake and says its failed concepts come back reformulated", () => {
+    render(
+      <ExamPlayer
+        notebookId="nb"
+        pageTitle="Mitocondria"
+        pageHref="/notebooks/nb/pages/pg"
+        session={{ ...session([question(1)]), isRetake: true }}
+      />,
+    );
+    expect(screen.getByTestId("exam-retake-label")).toHaveTextContent(
+      "Repetición",
+    );
+  });
+
+  it("does not label a normal exam as a retake", () => {
+    renderPlayer([question(1)]);
+    expect(screen.queryByTestId("exam-retake-label")).not.toBeInTheDocument();
   });
 
   it("resumes at the first unanswered question", () => {

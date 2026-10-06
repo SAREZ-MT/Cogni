@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createFixedClock } from "@/shared/kernel/clock";
 import { EXAM_ERROR } from "../domain/errors";
+import { newExamSession } from "../domain/exam-session";
 import { answerExamQuestion } from "./answer-exam-question";
 import { completeExamSession } from "./complete-exam-session";
 import { getExamPageOverview, readExamSession } from "./read-exam-session";
@@ -103,7 +104,9 @@ describe("getExamPageOverview", () => {
       value: {
         activeQuestionCount: 10,
         retakePending: false,
+        failedRootCount: 0,
         openSession: null,
+        openRetake: null,
         lastFinishedSession: null,
       },
     });
@@ -132,8 +135,58 @@ describe("getExamPageOverview", () => {
     if (!done.ok) throw done.error;
     expect(done.value).toMatchObject({
       retakePending: true,
+      failedRootCount: 10,
       openSession: null,
+      openRetake: null,
       lastFinishedSession: { id: "session-1", passed: false },
+    });
+  });
+
+  it("reports the page's open retake apart from its open normal session", async () => {
+    const { uow } = await setup(10);
+    const retake = newExamSession(
+      {
+        id: "retake-1",
+        ownerId: OWNER,
+        pageId: PAGE,
+        requestedCount: 10,
+        retakeOfSessionId: "failed-1",
+        questionIds: ["q-01"],
+      },
+      LATER,
+    );
+    if (!retake.ok) throw retake.error;
+    await uow.repos.sessions.create(retake.value);
+    const overview = await getExamPageOverview(
+      { pageId: PAGE },
+      { uow },
+      OWNER,
+    );
+    if (!overview.ok) throw overview.error;
+    expect(overview.value.openSession).toBeNull();
+    expect(overview.value.openRetake?.id).toBe("retake-1");
+  });
+
+  it("counts only the failed roots that still have an active question", async () => {
+    const { uow } = await setup(12);
+    await uow.repos.pageStates.upsert({
+      pageId: PAGE,
+      ownerId: OWNER,
+      retakePending: true,
+      failedRootIds: ["q-01", "q-02", "q-03"],
+      lastPassedSessionId: null,
+    });
+    await uow.repos.questions.retire("q-01", OWNER, LATER);
+    const overview = await getExamPageOverview(
+      { pageId: PAGE },
+      { uow },
+      OWNER,
+    );
+    if (!overview.ok) throw overview.error;
+    expect(overview.value).toMatchObject({
+      activeQuestionCount: 11,
+      retakePending: true,
+      failedRootCount: 2,
     });
   });
 });

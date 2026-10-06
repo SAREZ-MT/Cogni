@@ -109,8 +109,11 @@ async function takeExam(
 test.describe("exam session", () => {
   test.skip(!hasSupabaseEnv, "Supabase env (cogni-dev) is not configured");
 
-  test.beforeEach(async ({ page, verifiedUser }) => {
-    await signIn(page, verifiedUser);
+  // A test-scoped user: the fake AI daily limit (6 per owner, in server
+  // memory) would otherwise be shared with every AI-spending spec in the
+  // worker and run out depending on spec order.
+  test.beforeEach(async ({ page, freshUser }) => {
+    await signIn(page, freshUser);
   });
 
   test("takes a 10-question exam, fails it and schedules the page for tomorrow", async ({
@@ -157,7 +160,8 @@ test.describe("exam session", () => {
 
     // The failed page waits for its retake (T7): no new normal exam.
     await page.goto(`/exams/${notebookId}/${pageId}`);
-    await expect(page.getByTestId("exam-retake-soon")).toBeVisible();
+    await expect(page.getByTestId("exam-retake")).toBeVisible();
+    await expect(page.getByTestId("start-exam-button")).toHaveCount(0);
   });
 
   test("passes an exam and offers a new one", async ({ page }) => {

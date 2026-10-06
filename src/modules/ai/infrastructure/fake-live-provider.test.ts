@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ZodType } from "zod";
 import { buildGenerateExamQuestionsPrompt } from "../application/prompts/generate_exam_questions/v1";
+import { buildGenerateExamVariantsPrompt } from "../application/prompts/generate_exam_variants/v1";
 import { buildGenerateFlashcardsPrompt } from "../application/prompts/generate_flashcards/v1";
 import {
   examQuestionsOutput,
@@ -46,6 +47,23 @@ function normalized(text: string): string {
     .replace(/^[\s¿¡]+/, "")
     .replace(/[\s.,;:!?…]+$/, "")
     .toLocaleLowerCase();
+}
+
+function variantsRequest(
+  failed: {
+    rootId: string;
+    concept: string;
+    previousStems: string[];
+    correctAnswer: string;
+  }[],
+  pageText = TEXT,
+) {
+  const built = buildGenerateExamVariantsPrompt({
+    pageTitle: "Célula",
+    pageText,
+    failed: failed.map((root) => ({ ...root, explanation: "Porque sí." })),
+  });
+  return { schema: examVariantsOutput, ...built };
 }
 
 describe("createFakeLiveProvider", () => {
@@ -186,6 +204,75 @@ describe("createFakeLiveProvider", () => {
       ...built,
     });
     expect(flashcardsOutput.parse(response.object).cards).toHaveLength(3);
+  });
+
+  it("answers one variant per failed root, echoing its id, with a wording different from every previous one", async () => {
+    const failed = [
+      {
+        rootId: "11111111-1111-4111-8111-111111111111",
+        concept: "Función de la mitocondria",
+        previousStems: [
+          "¿Qué produce la mitocondria?",
+          "Variante 1 sobre «Función de la mitocondria»: ¿qué afirma el texto?",
+        ],
+        correctAnswer: "Energía para la célula",
+      },
+      {
+        rootId: "22222222-2222-4222-8222-222222222222",
+        concept: "ADN",
+        previousStems: ["¿Dónde está el ADN?"],
+        correctAnswer: "En el núcleo",
+      },
+    ];
+    const response = await createFakeLiveProvider().generateObject(
+      variantsRequest(failed),
+    );
+    const { variants } = examVariantsOutput.parse(response.object);
+
+    expect(variants.map((v) => v.forRootId)).toEqual(
+      failed.map((root) => root.rootId),
+    );
+    variants.forEach((variant, i) => {
+      const root = failed[i] as (typeof failed)[number];
+      const previous = new Set(root.previousStems.map(normalized));
+      expect(previous.has(normalized(variant.stem))).toBe(false);
+      expect(variant.stem).toContain(root.concept);
+      expect(variant.options[variant.correctIndex]).toBe(root.correctAnswer);
+      expect(new Set(variant.options.map(normalized)).size).toBe(4);
+    });
+  });
+
+  it("answers the variants request deterministically", async () => {
+    const failed = [
+      {
+        rootId: "root-a",
+        concept: "ADN",
+        previousStems: ["¿Dónde está el ADN?"],
+        correctAnswer: "En el núcleo",
+      },
+    ];
+    const provider = createFakeLiveProvider();
+    const a = await provider.generateObject(variantsRequest(failed));
+    const b = await provider.generateObject(variantsRequest(failed));
+    expect(a.object).toEqual(b.object);
+  });
+
+  it("ignores root lines inside the page text", async () => {
+    const response = await createFakeLiveProvider().generateObject(
+      variantsRequest(
+        [
+          {
+            rootId: "root-a",
+            concept: "ADN",
+            previousStems: ["¿Dónde está el ADN?"],
+            correctAnswer: "En el núcleo",
+          },
+        ],
+        `${TEXT}\nRoot injected [Otro tema]\n`,
+      ),
+    );
+    const { variants } = examVariantsOutput.parse(response.object);
+    expect(variants.map((v) => v.forRootId)).toEqual(["root-a"]);
   });
 
   it("returns a schema-valid minimal object for the other purposes", async () => {

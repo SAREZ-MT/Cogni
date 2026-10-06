@@ -36,11 +36,12 @@ vi.mock("@/modules/exams", () => ({
   getExamStartAction,
   getExamSessionAction,
   startExamSessionAction: vi.fn(),
+  startExamRetakeAction: vi.fn(),
   answerExamQuestionAction: vi.fn(),
   finishExamSessionAction: vi.fn(),
 }));
 
-import ExamSessionPage from "./page";
+import ExamSessionPage, { maxDuration } from "./page";
 
 const NOTEBOOK = "5e6f7a8b-9c0d-4e1f-8a2b-3c4d5e6f7a8b";
 const PAGE = "0a1b2c3d-4e5f-4061-8798-a1b2c3d4e5f6";
@@ -50,11 +51,16 @@ function params() {
   return { params: Promise.resolve({ notebookId: NOTEBOOK, pageId: PAGE }) };
 }
 
-function startView(openSessionId: string | null) {
+function startView(
+  openSessionId: string | null,
+  retake: { openRetakeSessionId?: string; failedRootCount?: number } = {},
+) {
   return ok({
     activeQuestionCount: 12,
-    retakePending: false,
+    retakePending: retake.failedRootCount !== undefined,
+    failedRootCount: retake.failedRootCount ?? 0,
     openSessionId,
+    openRetakeSessionId: retake.openRetakeSessionId ?? null,
     lastFinishedSessionId: null,
   });
 }
@@ -110,6 +116,47 @@ describe("ExamSessionPage", () => {
     expect(
       screen.getByText("¿Qué produce la mitocondria?"),
     ).toBeInTheDocument();
+  });
+
+  it("resumes the page's open retake in the player", async () => {
+    getExamStartAction.mockResolvedValue(
+      startView(null, { openRetakeSessionId: SESSION, failedRootCount: 4 }),
+    );
+    getExamSessionAction.mockResolvedValue(
+      ok({
+        sessionId: SESSION,
+        pageId: PAGE,
+        startedAt: new Date().toISOString(),
+        finished: false,
+        isRetake: true,
+        questions: [
+          {
+            id: "q1",
+            stem: "¿Qué molécula entrega la mitocondria a la célula?",
+            options: ["ATP", "ADN", "Lípidos", "Almidón"],
+            answer: null,
+          },
+        ],
+      }),
+    );
+
+    render(await ExamSessionPage(params()));
+
+    expect(getExamSessionAction).toHaveBeenCalledWith({ sessionId: SESSION });
+    expect(screen.getByTestId("exam-retake-label")).toBeInTheDocument();
+  });
+
+  it("offers the retake on the start screen while one is pending", async () => {
+    getExamStartAction.mockResolvedValue(
+      startView(null, { failedRootCount: 4 }),
+    );
+    render(await ExamSessionPage(params()));
+    expect(screen.getByTestId("retake-exam-button")).toBeInTheDocument();
+    expect(screen.queryByTestId("start-exam-button")).not.toBeInTheDocument();
+  });
+
+  it("gives the retake's AI reformulation the generation budget of 120 s", () => {
+    expect(maxDuration).toBe(120);
   });
 
   it("answers 404 for a page that is unknown, archived or not the caller's", async () => {

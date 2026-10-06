@@ -6,6 +6,7 @@ import {
   ListChecks,
   PanelRightClose,
   PanelRightOpen,
+  RotateCcw,
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
@@ -432,14 +433,56 @@ export function TechniquesPanel({
                     Rendir examen
                   </Link>
                 </Button>
-              ) : examStart?.retakePending ? (
+              ) : examStart?.retakePending &&
+                examStart.failedRootCount === 0 ? (
+                // Every failed question was retired: the exam route clears
+                // the retake and returns to the normal exam.
+                <>
+                  <Button asChild size="sm" className="w-full text-[11.5px]">
+                    <Link href={examHref} data-testid="retake-exam-button">
+                      <FileCheck
+                        aria-hidden="true"
+                        size={14}
+                        strokeWidth={1.75}
+                      />
+                      Continuar
+                    </Link>
+                  </Button>
+                  <p
+                    data-testid="exam-retake-note"
+                    className="text-[10.5px] text-fg-muted"
+                  >
+                    Retiraste las preguntas que fallaste: no queda nada por
+                    repetir.
+                  </p>
+                </>
+              ) : examStart?.retakePending &&
+                examStart.activeQuestionCount < EXAM_MIN_QUESTIONS ? (
                 <p
-                  data-testid="exam-retake-soon"
+                  data-testid="exam-retake-needs-questions"
                   className="text-[10.5px] text-fg-muted"
                 >
-                  Repetir examen (próximamente): pronto podrás repetirlo con
-                  preguntas nuevas sobre lo que fallaste.
+                  Agrega o genera preguntas para repetir el examen.
                 </p>
+              ) : examStart?.retakePending ? (
+                <>
+                  <Button asChild size="sm" className="w-full text-[11.5px]">
+                    <Link href={examHref} data-testid="retake-exam-button">
+                      <RotateCcw
+                        aria-hidden="true"
+                        size={14}
+                        strokeWidth={1.75}
+                      />
+                      Repetir examen
+                    </Link>
+                  </Button>
+                  <p
+                    data-testid="exam-retake-note"
+                    className="text-[10.5px] text-fg-muted"
+                  >
+                    {`Fallaste el último examen: ${examStart.failedRootCount} conceptos vuelven con preguntas reformuladas.`}
+                  </p>
+                </>
               ) : (
                 <>
                   <Button
