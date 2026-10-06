@@ -11,9 +11,9 @@ interface ExamQuestionsPageProps {
 // "Preguntas" of one page (Phase 5 T4, documento-maestro §3.3 "creadas
 // manualmente"): the page's active questions on real data, with manual
 // create, edit and retire, and "Rendir examen". It left the design-preview
-// gate in T4 (the player and results in T6); the exams hub stays a preview
-// until T9, so the breadcrumb's "Exámenes" has no link yet. A page that is unknown,
-// archived, in another notebook or not the caller's 404s.
+// gate in T4 (the player and results in T6; the hub, linked from the
+// breadcrumb's "Exámenes", in T9). A page that is unknown, archived, in
+// another notebook or not the caller's 404s.
 export default async function ExamQuestionsPage({
   params,
 }: ExamQuestionsPageProps) {
@@ -34,7 +34,7 @@ export default async function ExamQuestionsPage({
     <section className="flex flex-1 flex-col">
       <SetBreadcrumb
         items={[
-          { label: "Exámenes" },
+          { label: "Exámenes", href: "/exams" },
           { label: notebookTitle, href: `/notebooks/${notebookId}` },
           { label: page.title, href: pageHref },
           { label: "Preguntas" },

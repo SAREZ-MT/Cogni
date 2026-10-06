@@ -36,7 +36,7 @@ export default async function ExamResultsPage({
     <section className="flex flex-1 flex-col">
       <SetBreadcrumb
         items={[
-          { label: "Exámenes" },
+          { label: "Exámenes", href: "/exams" },
           { label: notebookTitle, href: `/notebooks/${notebookId}` },
           { label: page.title, href: pageHref },
           { label: "Resultados" },

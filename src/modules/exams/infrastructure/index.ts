@@ -5,6 +5,7 @@ import { DrizzleExamQuestionRepository } from "./drizzle-exam-question-repositor
 import { DrizzleExamSessionRepository } from "./drizzle-exam-session-repository";
 
 export { DrizzleExamAnswerRepository } from "./drizzle-exam-answer-repository";
+export { DrizzleExamHubReader } from "./drizzle-exam-hub-reader";
 export { DrizzleExamPageStateRepository } from "./drizzle-exam-page-state-repository";
 export { DrizzleExamQuestionRepository } from "./drizzle-exam-question-repository";
 export { DrizzleExamSessionRepository } from "./drizzle-exam-session-repository";

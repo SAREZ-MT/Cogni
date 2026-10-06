@@ -33,6 +33,11 @@ export {
   type ExamReviewNotice,
   getExamReviewNotice,
 } from "./get-exam-review-notice";
+export {
+  type ExamDueCounts,
+  type ExamHubEntry,
+  listExamHub,
+} from "./list-exam-hub";
 export { listPageExamQuestions } from "./list-page-exam-questions";
 export {
   type ExamPageOverview,

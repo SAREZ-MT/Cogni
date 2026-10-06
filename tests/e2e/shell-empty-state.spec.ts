@@ -63,11 +63,11 @@ test.describe("app shell", () => {
     ).toHaveCount(0);
   });
 
-  // Design previews (Dashboard, Active recall, Exámenes) are hidden in
-  // production builds, which is what this suite runs against
-  // (`next build && next start`): they render as disabled "pronto" rows
-  // instead of links. Flashcards left the preview set in Phase 3 (real
-  // decks per page), so it is always a live link.
+  // Design previews (Dashboard, Active recall) are hidden in production
+  // builds, which is what this suite runs against (`next build && next
+  // start`): they render as disabled "pronto" rows instead of links.
+  // Flashcards (Phase 3) and Exámenes (Phase 5 T9) run on real data, so
+  // they are always live links.
   test("sidebar lists the preview areas as disabled 'pronto' entries", async ({
     page,
   }) => {
@@ -77,7 +77,10 @@ test.describe("app shell", () => {
     await expect(
       sidebar.getByRole("link", { name: "Flashcards" }),
     ).toHaveAttribute("href", "/flashcards");
-    for (const label of ["Dashboard", "Active recall", "Exámenes"]) {
+    await expect(
+      sidebar.getByRole("link", { name: "Exámenes" }),
+    ).toHaveAttribute("href", "/exams");
+    for (const label of ["Dashboard", "Active recall"]) {
       await expect(sidebar.getByRole("link", { name: label })).toHaveCount(0);
       await expect(
         sidebar.locator('[aria-disabled="true"]').filter({ hasText: label }),
@@ -132,11 +135,21 @@ test.describe("app shell", () => {
     }
   });
 
-  test("hides the exams preview routes: /exams answers not-found", async ({
+  // Phase 5 T9: /exams serves the user's real exam pages and never the
+  // sample data; the sample notebook/page slugs are not real ids, so every
+  // other former preview path answers not-found.
+  test("serves /exams on real data and hides the sample exams routes", async ({
     page,
   }) => {
+    const hub = await page.goto("/exams");
+    expect(hub?.status()).toBe(200);
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Exámenes" }),
+    ).toBeVisible();
+    await expect(page.getByText("Biología Celular")).toHaveCount(0);
+    await expect(page.getByText("Mitocondria")).toHaveCount(0);
+
     for (const path of [
-      "/exams",
       "/exams/biologia-celular",
       "/exams/biologia-celular/mitocondria",
       "/exams/biologia-celular/mitocondria?retake=1",
@@ -147,7 +160,7 @@ test.describe("app shell", () => {
       const response = await page.goto(path);
 
       expect(response?.status(), path).toBe(404);
-      await expect(page.getByText("Exámenes presentados")).toHaveCount(0);
+      await expect(page.getByText("Biología Celular")).toHaveCount(0);
       await expect(page.getByText("Pregunta 1 de")).toHaveCount(0);
       await expect(page.getByText("Nueva pregunta")).toHaveCount(0);
       await expect(

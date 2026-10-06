@@ -1,32 +1,39 @@
 import { ClipboardList } from "lucide-react";
 import { notFound } from "next/navigation";
-import { requireDesignPreviews } from "@/shared/config/design-previews";
+import { listExamHubAction } from "@/modules/exams";
+import { getNotebookTitleForRoute } from "@/modules/notebooks";
 import { BackLink } from "@/shared/ui/back-link";
 import { EmptyState } from "@/shared/ui/empty-state";
 import { ExamPageCard } from "@/shared/ui/exam-page-card";
 import { IconTile } from "@/shared/ui/icon-tile";
-import { Pill } from "@/shared/ui/pill";
 import { SectionHeader, SectionTitle } from "@/shared/ui/section-header";
 import { SetBreadcrumb } from "../../_components/breadcrumb";
-import { getSampleNotebook } from "../../flashcards/_data/sample";
-import { getExamPagesWithQuestions } from "../_data/sample";
+import { formatUpdatedAt } from "../../_components/format";
+import { plural } from "../../flashcards/_lib/plural";
 
 interface ExamsNotebookPageProps {
   params: Promise<{ notebookId: string }>;
 }
 
-// Exams-by-page list for one notebook (design preview). Same not-found
-// contract as flashcards/[notebookId]/page.tsx and
-// active-recall/[notebookId]/page.tsx: an unknown notebookId 404s.
+// Exams-by-page list for one notebook on real data (Phase 5 T9): every page
+// of the notebook holding exam questions, each card opening its exam (the
+// retake while one is pending) or its last results. Same not-found contract
+// as flashcards/[notebookId]/page.tsx: a notebookId that is unknown,
+// archived or another user's 404s. The layout is the design preview's
+// (user decision 2026-10-06).
 export default async function ExamsNotebookPage({
   params,
 }: ExamsNotebookPageProps) {
-  requireDesignPreviews();
   const { notebookId } = await params;
-  const notebook = getSampleNotebook(notebookId);
-  if (!notebook) notFound();
+  const notebookTitle = await getNotebookTitleForRoute(notebookId);
+  if (!notebookTitle) notFound();
 
-  const pages = getExamPagesWithQuestions(notebookId);
+  const result = await listExamHubAction();
+  // A failed read shows the load error in the empty state, never a false
+  // "Sin exámenes todavía".
+  const pages = result.ok
+    ? result.value.filter((page) => page.notebookId === notebookId)
+    : [];
   const totalAttempts = pages.reduce((sum, page) => sum + page.attempts, 0);
 
   return (
@@ -34,7 +41,7 @@ export default async function ExamsNotebookPage({
       <SetBreadcrumb
         items={[
           { label: "Exámenes", href: "/exams" },
-          { label: notebook.title },
+          { label: notebookTitle },
         ]}
       />
 
@@ -42,17 +49,10 @@ export default async function ExamsNotebookPage({
         <BackLink href="/exams">Exámenes</BackLink>
 
         <SectionHeader
-          eyebrow={
-            <span className="flex items-center gap-2">
-              Exámenes
-              <Pill size="sm" tone="neutral">
-                Vista previa
-              </Pill>
-            </span>
-          }
-          title={notebook.title}
+          eyebrow="Exámenes"
+          title={notebookTitle}
           titleClassName="text-xl"
-          description={`${totalAttempts} exámenes · ${pages.length} páginas con preguntas`}
+          description={`${plural(totalAttempts, "examen", "exámenes")} · ${plural(pages.length, "página", "páginas")} con preguntas`}
         />
       </div>
 
@@ -66,7 +66,11 @@ export default async function ExamsNotebookPage({
           }
           title="Sin exámenes todavía"
           titleClassName="text-base"
-          description="Abre una página de este cuaderno y usa Técnicas → Examen → Generar."
+          description={
+            result.ok
+              ? "Abre una página de este cuaderno y usa Técnicas → Examen → Generar."
+              : "No pudimos cargar tus exámenes. Intenta de nuevo."
+          }
           descriptionClassName="max-w-[320px]"
         />
       ) : (
@@ -75,15 +79,20 @@ export default async function ExamsNotebookPage({
           <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4">
             {pages.map((page) => (
               <ExamPageCard
-                key={page.id}
+                key={page.pageId}
                 notebookId={notebookId}
-                pageId={page.id}
-                pageTitle={page.title}
+                pageId={page.pageId}
+                pageTitle={page.pageTitle}
                 questionCount={page.questionCount}
                 attempts={page.attempts}
                 lastScore={page.lastScore}
                 retakePending={page.retakePending}
-                lastDate={page.lastDate || undefined}
+                dueToday={page.dueToday ?? 0}
+                lastDate={
+                  page.lastFinishedAt
+                    ? formatUpdatedAt(new Date(page.lastFinishedAt))
+                    : undefined
+                }
               />
             ))}
           </div>

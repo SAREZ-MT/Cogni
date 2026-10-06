@@ -27,6 +27,11 @@ export interface ExamPageCardProps {
   // pattern as the other technique previews' date strings. Omitted (never
   // attempted) renders an empty date slot.
   lastDate?: string;
+  // Exam questions of the page due today (scheduling's "Repasos de hoy").
+  // On an examined page with no pending retake, > 0 shows a "Vence hoy"
+  // pill and turns the CTA into "Rendir examen" on the exam route (user
+  // decision 2026-10-06). Omitted or 0: no due state.
+  dueToday?: number;
   className?: string;
 }
 
@@ -36,7 +41,8 @@ export interface ExamPageCardProps {
 // top accent bar, a body with the page title, a preguntas/intentos meta
 // line, a score-or-"Sin intentar" row (+ a "Repetir pendiente" pill when
 // applicable), the last attempt date, and a CTA that reads the page's exact
-// state ("Presentar examen" / "Repetir examen" / "Ver resultados").
+// state ("Presentar examen" / "Repetir examen" / "Rendir examen" when
+// questions are due today, with a "Vence hoy" pill / "Ver resultados").
 //
 // Fixed 2026-09-24 (design audit vs documento-maestro §7.5): the card now
 // computes its own destination from `notebookId`/`pageId` instead of taking
@@ -57,12 +63,15 @@ export function ExamPageCard({
   lastScore,
   retakePending,
   lastDate,
+  dueToday = 0,
   className,
 }: ExamPageCardProps) {
   const sessionHref = `/exams/${notebookId}/${pageId}`;
+  // A pending retake and a never-attempted page keep their own state.
+  const dueNow = !retakePending && lastScore !== null && dueToday > 0;
   const primaryHref = retakePending
     ? `${sessionHref}?retake=1`
-    : lastScore === null
+    : lastScore === null || dueNow
       ? sessionHref
       : `${sessionHref}/resultados`;
   const questionsHref = `${sessionHref}/preguntas`;
@@ -71,7 +80,9 @@ export function ExamPageCard({
     ? "Repetir examen →"
     : lastScore === null
       ? "Presentar examen →"
-      : "Ver resultados →";
+      : dueNow
+        ? "Rendir examen →"
+        : "Ver resultados →";
 
   return (
     <div
@@ -113,6 +124,11 @@ export function ExamPageCard({
           {retakePending && (
             <Pill size="sm" tone="pink">
               Repetir pendiente
+            </Pill>
+          )}
+          {dueNow && (
+            <Pill size="sm" tone="pink">
+              Vence hoy
             </Pill>
           )}
         </div>

@@ -21,7 +21,9 @@ feature document is `odd/tasks/phase-5-exams.md`.
 - Exam session — done (T6): `startExamSession`, `answerExamQuestion`,
   `completeExamSession`, `readExamSession`, `getExamPageOverview` +
   `session-actions.ts`; the player and results routes on real data.
-- Retakes, feedback and the hub — pending (T7–T9).
+- Retakes (T7) and feedback (T8) — done.
+- The hub — done (T9): `ExamHubReader` + `listExamHub` + `hub-actions.ts`;
+  `/exams` and `/exams/[notebookId]` on real data.
 
 ## Manual questions (T4)
 
@@ -114,6 +116,23 @@ feature document is `odd/tasks/phase-5-exams.md`.
 - `getExamReviewNotice(pageId)`: while a retake is pending, the current
   concepts of the failed roots (latest active wording); null otherwise or
   when every failed root was retired.
+
+## Exams hub (T9)
+
+- `ExamHubReader.listExamPages(ownerId)`: one row per page holding at least
+  one active question (pages and notebooks not archived), ordered by
+  notebook title then page title: active roots, finished sessions
+  (retakes included), the latest finished session (`finishedAt`, `total`,
+  `correct`, `passed`) and `retakePending`. The Drizzle reader runs two
+  owner-wide queries (grouped questions; `DISTINCT ON` latest session with
+  a window count), never one per page. Shared contract
+  `application/testing/exam-hub-reader.contract.ts` (fake + `pnpm test:db`).
+- `listExamHub` adds the whole-percent last score (rounded down, as on the
+  results screen), `ready` (at least 10 roots) and `dueToday`, the page's
+  exam questions due now from scheduling's "Repasos de hoy"
+  (`createSchedulingServerApi().listDueToday`, `due.exam_question`). A
+  failing due list degrades to `dueToday: null` (reported to Sentry), never
+  hiding the hub.
 
 ## Domain
 

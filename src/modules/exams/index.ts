@@ -18,6 +18,7 @@ export {
   requestExamFeedbackAction,
 } from "./feedback-actions";
 export type { ExamFeedbackView } from "./feedback-view";
+export { type ExamHubPageView, listExamHubAction } from "./hub-actions";
 export {
   type StartedExamRetakeView,
   startExamRetakeAction,
