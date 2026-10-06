@@ -310,6 +310,9 @@ describe("exams Server Actions", () => {
       );
       expect(revalidatePath).toHaveBeenCalledWith("/exams", "layout");
       expect(track).toHaveBeenCalledTimes(1);
+      expect(captureException).toHaveBeenCalledWith(
+        expect.objectContaining({ message: "posthog down" }),
+      );
     });
 
     it("keeps the domain error of a refused generation when analytics rejects", async () => {
@@ -323,6 +326,9 @@ describe("exams Server Actions", () => {
 
       expect(!result.ok && result.error.code).toBe("PAGE_NOT_FOUND");
       expect(track).toHaveBeenCalledTimes(1);
+      expect(captureException).toHaveBeenCalledWith(
+        expect.objectContaining({ message: "posthog down" }),
+      );
     });
   });
 });

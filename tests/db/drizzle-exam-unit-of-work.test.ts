@@ -27,6 +27,8 @@ if (process.env.DATABASE_URL) {
   const db = createTestDb();
   // A second connection, so two transactions can really overlap.
   const otherConnection = createTestDb();
+  // Watches which backends are blocked; never takes part in a race.
+  const observer = createTestDb();
   const owner = await createTestOwner("exam-uow-owner");
   const notebookId = randomUUID();
   const pageId = randomUUID();
@@ -39,6 +41,7 @@ if (process.env.DATABASE_URL) {
     } finally {
       await db.$client.end();
       await otherConnection.$client.end();
+      await observer.$client.end();
     }
   });
 
@@ -65,6 +68,21 @@ if (process.env.DATABASE_URL) {
         : err(new DomainError("PAGE_NOT_FOUND", id));
     },
   };
+
+  // Resolves once a backend waits on a lock held by `holderPid`. Scoped by
+  // pg_blocking_pids, so lock waits of other tests never count.
+  async function blockedBy(holderPid: number): Promise<void> {
+    for (let attempt = 0; attempt < 400; attempt += 1) {
+      const [row] = await observer.$client<{ n: number }[]>`
+        select count(*)::int as n from pg_stat_activity
+        where wait_event_type = 'Lock'
+          and ${holderPid}::int = any(pg_blocking_pids(pid))
+      `;
+      if (row && row.n >= 1) return;
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    throw new Error("the root's retire never waited on the lineage lock");
+  }
 
   const CONTENT = {
     pageId,
@@ -211,13 +229,20 @@ if (process.env.DATABASE_URL) {
       // behind the first one while it connects.
       await otherConnection.execute(sql`select 1`);
 
+      await observer.execute(sql`select 1`);
+
       // The second connection retires the variant and holds its transaction
-      // open; meanwhile the first one retires the root. Without a lineage
-      // lock each sees the other's question still active and neither
-      // suspends the root's item.
+      // open, so it keeps the lineage lock; only once it holds it does the
+      // first connection retire the root. Without a lineage lock each sees
+      // the other's question still active and neither suspends the root's
+      // item.
       let release: () => void = () => {};
       const held = new Promise<void>((done) => {
         release = done;
+      });
+      let lockAcquired: (pid: number) => void = () => {};
+      const variantHoldsLock = new Promise<number>((done) => {
+        lockAcquired = done;
       });
       const variantRetire = otherConnection.transaction(async (tx) => {
         const result = await retireExamQuestion(
@@ -228,20 +253,33 @@ if (process.env.DATABASE_URL) {
           },
           owner.id,
         );
+        // The lineage lock stays held until this transaction ends. The
+        // backend pid is read inside it: through the transaction pooler a
+        // backend is only pinned while a transaction is open.
+        const [row] = await tx.execute<{ pid: number }>(
+          sql`select pg_backend_pid() as pid`,
+        );
+        lockAcquired(Number(row?.pid));
         await held;
         return result;
       });
+      const holderPid = await variantHoldsLock;
+
+      let rootSettled = false;
       const rootRetire = retireExamQuestion(
         { questionId: root.id },
         { uow: new DrizzleExamUnitOfWork(db), clock: createFixedClock(LATER) },
         owner.id,
-      );
-      // Gives the root's retire time to finish unless the lock holds it.
-      await Promise.race([
-        rootRetire,
-        new Promise((done) => setTimeout(done, 2_000)),
-      ]);
-      release();
+      ).finally(() => {
+        rootSettled = true;
+      });
+      try {
+        // The root's retire queues on the lineage lock the variant holds.
+        await blockedBy(holderPid);
+        expect(rootSettled).toBe(false);
+      } finally {
+        release();
+      }
 
       const [first, second] = await Promise.all([rootRetire, variantRetire]);
       expect(first.ok && second.ok).toBe(true);
