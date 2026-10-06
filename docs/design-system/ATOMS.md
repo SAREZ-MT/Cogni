@@ -210,10 +210,11 @@ anatomy; simplified per user decision 2026-09-24 — a card has **only** a
 - Anatomy: icon tile (`IconTile` size `"30"` — closest existing token to the
   reference's 32px — radius `"md"`) + name + description, then one
   full-width `Button` reading "Generar" with a leading `Sparkles` icon
-  (12px, strokeWidth 2). The button is a **solid** tone-colored fill with
-  white text (`bg-primary-600`/`bg-success-600`/`bg-pastel-pink-fg`, not the
-  pastel `IconTile` pair) — matching studyplatform's `ActiveRecallCard`/
-  `ExamCard` buttons (`#059669`/`#9B2C4A`, both exact token matches) — kept
+  (12px, strokeWidth 2). The button is a **solid** technique-coloured fill
+  (Phase 6 T5b, user decision 2026-10-06): yellow `bg-warning-500` with
+  near-black `text-fg` (8.2:1; white would be 2.1:1), green `bg-success-700`
+  with white (7.7:1; `success-600` is only 3.8:1) and rose `bg-rose-600`
+  with white (4.7:1) — every label meets WCAG AA at 11.5px — kept
   at `disabled:opacity-60` + `disabled:cursor-not-allowed` (explicit
   `disabled:` variants so they replace, not stack with, Button's own
   `disabled:opacity-50`) instead of going fully gray, so the panel still
@@ -221,10 +222,12 @@ anatomy; simplified per user decision 2026-09-24 — a card has **only** a
   also get `aria-disabled` and `title="Disponible pronto"`.
 - `TechniqueIconStrip`: the collapsed-state 36x36 tinted tile (`IconTile`
   size `"36"` radius `"input"`) with a native `title` tooltip; `opacity-35`
-  when `available` is false (default). Unchanged by this pass.
-- `TechniqueTone`: `"primary" | "green" | "pink"` — mapped onto **existing**
-  `IconTile` tones for the icon tile, and onto `primary-600`/`success-600`/
-  `pastel-pink-fg` for the solid button fill. No new tone was needed.
+  when `available` is false (default).
+- `TechniqueTone`: `"yellow" | "green" | "rose"` (Flashcards / Recordación
+  activa / Examen) — mapped onto the **existing** semantic `IconTile` tones
+  `warning` / `success` / `rose` for the icon tile (the flashcards hub
+  already shows Flashcards on `warning`) and onto the solid button fills
+  above. No new token was needed.
 
 - `controls?` (Phase 5 T5): options of the action rendered between the
   description and the button — Examen passes a `CountStepper` ("Preguntas a
@@ -244,17 +247,18 @@ need distinct hrefs.
 
 ## StudyItemRow (`study-item-row.tsx`)
 
-A single saved-study-item row inside the "Técnicas" panel (design/
-shell-look, studyplatform `StudyPanel.tsx` "Mazos guardados" row anatomy):
-a `bg-neutral-50`/`border-border-subtle` pill-radius (`rounded-[9px]`) row
-with a 6px tone dot, an 11.5px/500 truncating label, a 10px muted detail
-string, and a muted `ChevronRight` (10/2). The whole row is a `Link` —
-clicking it goes straight to that item's study session.
+A single generated-item row inside the "Técnicas de estudio" panel
+(Phase 6 T5b, `docs/design-system/screenshots/editor.png` "Mazos guardados"
+row anatomy): a white `bg-card`/`border-border-subtle` `rounded-input` row
+(`px-3 py-2`) with a 6px tone dot, an 11.5px/500 truncating label over a
+10px muted meta line, and a muted `ChevronRight` (12/2). The whole row is a
+`Link` — clicking it goes straight to that item's practice route.
 
-- `href`, `label`, `detail` (free-form right-aligned text, e.g. "8 tarjetas
-  · 5 pendientes"), `tone: "primary" | "green" | "pink"` (dot color —
-  `primary-600`/`success-600`/`pastel-pink-fg`), `testId?` (e2e hook),
-  `title?` (native tooltip), `className?`.
+- `href`, `label`, `detail` (free-form meta line under the label, e.g. "24
+  tarjetas" or "12 preguntas · Repetición pendiente"), `tone: "yellow" |
+  "green" | "rose"` (dot colour — `warning-500`/`success-600`/`rose-600`,
+  the technique colours of `TechniqueCard`), `testId?` (e2e hook), `title?`
+  (native tooltip), `className?`.
 - `StudyItemTone` is its own type (not imported from `technique-card.tsx`)
   so this atom has no dependency on the technique-card module.
 
@@ -269,7 +273,9 @@ label (`tracking-[0.06em]`), then the rows. Renders nothing when `items` is
 empty, so a group with no content simply disappears — same behavior as the
 reference.
 
-- `label`, `items: StudyItemRowProps[]`, `className?`.
+- `label`, `items: StudyItemRowProps[]`, `empty?: ReactNode` (shown under
+  the label when `items` is empty; without it an empty group renders
+  nothing), `className?`.
 
 Used by: `techniques-panel.tsx`, once per technique (`Mazo de esta página` /
 `Sesiones de Active Recall` / `Exámenes recientes`), below a "Generado en

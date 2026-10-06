@@ -8,7 +8,7 @@ describe("SavedStudySection", () => {
       <SavedStudySection
         label="Mazo de esta página"
         items={[
-          { href: "/a", label: "Uno", detail: "1", tone: "primary" },
+          { href: "/a", label: "Uno", detail: "1", tone: "yellow" },
           { href: "/b", label: "Dos", detail: "2", tone: "green" },
         ]}
       />,
@@ -18,6 +18,20 @@ describe("SavedStudySection", () => {
     expect(
       screen.getAllByRole("link").map((l) => l.getAttribute("href")),
     ).toEqual(["/a", "/b"]);
+  });
+
+  it("keeps its label and shows the empty content when given one", () => {
+    render(
+      <SavedStudySection
+        label="Generado en esta página"
+        items={[]}
+        empty={<p>Nada todavía</p>}
+      />,
+    );
+
+    expect(screen.getByText("Generado en esta página")).toBeInTheDocument();
+    expect(screen.getByText("Nada todavía")).toBeInTheDocument();
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
   });
 
   it("renders nothing when the group has no items", () => {

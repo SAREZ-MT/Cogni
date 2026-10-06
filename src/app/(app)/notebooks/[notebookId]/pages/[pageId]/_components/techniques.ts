@@ -25,7 +25,7 @@ export const TECHNIQUES: readonly TechniqueDefinition[] = [
     id: "flashcards",
     name: "Flashcards",
     icon: Layers,
-    tone: "primary",
+    tone: "yellow",
     description: "Tarjetas con repetición espaciada",
   },
   {
@@ -39,7 +39,7 @@ export const TECHNIQUES: readonly TechniqueDefinition[] = [
     id: "exam",
     name: "Examen",
     icon: ClipboardList,
-    tone: "pink",
+    tone: "rose",
     description: "Opción múltiple con retroalimentación",
   },
 ] as const;

@@ -9,7 +9,7 @@ describe("TechniqueCard", () => {
     return render(
       <TechniqueCard
         icon={Layers}
-        tone="primary"
+        tone="yellow"
         name="Flashcards"
         description="Tarjetas con repetición espaciada"
         {...props}
@@ -51,7 +51,7 @@ describe("TechniqueCard", () => {
       return render(
         <TechniqueCard
           icon={Layers}
-          tone="primary"
+          tone="yellow"
           name="Flashcards"
           description="d"
           onGenerate={() => {}}
@@ -133,6 +133,32 @@ describe("TechniqueCard", () => {
   });
 });
 
+describe("TechniqueCard technique colours", () => {
+  // Phase 6 T5b (user, 2026-10-06): Flashcards yellow, Recordación activa
+  // green, Examen red — solid "Generar" fills with an accessible foreground
+  // (WCAG AA for 11.5px text) and the matching pastel icon tile.
+  it.each([
+    ["yellow", ["bg-warning-500", "text-fg"], "bg-warning-100"],
+    ["green", ["bg-success-700", "text-white"], "bg-success-100"],
+    ["rose", ["bg-rose-600", "text-white"], "bg-rose-500/10"],
+  ] as const)("colours a %s card's Generar and icon tile", (tone, button, tile) => {
+    const { container } = render(
+      <TechniqueCard
+        icon={Layers}
+        tone={tone}
+        name="n"
+        description="d"
+        onGenerate={() => {}}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Generar" })).toHaveClass(
+      ...button,
+    );
+    expect(container.querySelector(`[class~="${tile}"]`)).not.toBeNull();
+  });
+});
+
 describe("TechniqueIconStrip", () => {
   it("exposes the technique name as a tooltip title", () => {
     render(
@@ -140,6 +166,12 @@ describe("TechniqueIconStrip", () => {
     );
 
     expect(screen.getByTitle("Active recall")).toBeInTheDocument();
+  });
+
+  it("uses the technique's pastel tile", () => {
+    render(<TechniqueIconStrip icon={Layers} tone="yellow" title="t" />);
+
+    expect(screen.getByTitle("t")).toHaveClass("bg-warning-100");
   });
 
   it("is dimmed unless the technique is available", () => {

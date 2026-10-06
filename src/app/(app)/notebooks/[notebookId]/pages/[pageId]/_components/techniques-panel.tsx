@@ -59,7 +59,22 @@ import { TECHNIQUES } from "./techniques";
 // page route passes `showPreviews`. Flashcards are real (Phase 3) and never
 // read this sample. `sample.ts` is a plain data module (no server-only
 // imports), so importing it here is safe.
-const STUDY_ITEMS = getSampleStudyItemsForPage();
+const SAMPLE_ITEMS = getSampleStudyItemsForPage();
+const SAMPLE_TONE = {
+  primary: "yellow",
+  green: "green",
+  pink: "rose",
+} as const;
+const STUDY_ITEMS = {
+  activeRecall: SAMPLE_ITEMS.activeRecall.map((item) => ({
+    ...item,
+    tone: SAMPLE_TONE[item.tone],
+  })),
+  exam: SAMPLE_ITEMS.exam.map((item) => ({
+    ...item,
+    tone: SAMPLE_TONE[item.tone],
+  })),
+};
 
 // Rows shown in the panel before pointing at the full deck page.
 const VISIBLE_CARDS = 5;
@@ -334,7 +349,7 @@ export function TechniquesPanel({
       href: `${deckHref}#${card.id}`,
       label: card.front,
       detail: `${card.position + 1}`,
-      tone: "primary",
+      tone: "yellow",
       testId: "flashcard-item",
       title: card.back,
     }));
@@ -343,7 +358,7 @@ export function TechniquesPanel({
       href: deckHref,
       label: "Ver el mazo completo",
       detail: `${cards.length} tarjetas`,
-      tone: "primary",
+      tone: "yellow",
       testId: "flashcard-deck-link",
     });
   }

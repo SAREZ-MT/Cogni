@@ -2,15 +2,15 @@ import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/shared/ui/utils";
 
-// Reuses the same tone vocabulary as TechniqueCard/TechniqueTone (primary
-// violet, success green, pink) instead of importing it, so this atom stays
-// usable outside the "Técnicas" panel without a technique-card dependency.
-export type StudyItemTone = "primary" | "green" | "pink";
+// Same colour vocabulary as TechniqueCard/TechniqueTone (Flashcards yellow,
+// Recordación activa green, Examen red) without importing it, so this atom
+// stays usable outside the "Técnicas" panel.
+export type StudyItemTone = "yellow" | "green" | "rose";
 
 const DOT_TONE_CLASS: Record<StudyItemTone, string> = {
-  primary: "bg-primary-600",
+  yellow: "bg-warning-500",
   green: "bg-success-600",
-  pink: "bg-pastel-pink-fg",
+  rose: "bg-rose-600",
 };
 
 export interface StudyItemRowProps {
@@ -24,10 +24,10 @@ export interface StudyItemRowProps {
   className?: string;
 }
 
-// Saved-study-item row (design/shell-look, studyplatform StudyPanel.tsx
-// "Mazos guardados" / "Sesiones de Active Recall" / "Exámenes recientes"
-// rows): a tone dot + truncated label + right-aligned detail text + a
-// muted chevron, linking straight to that item's study session.
+// Generated-item row (docs/design-system/screenshots/editor.png, "Mazos
+// guardados" rows): a white bordered row with a tone dot, the label over a
+// muted meta line, and a muted chevron. The whole row is a link straight to
+// that item's practice route.
 export function StudyItemRow({
   href,
   label,
@@ -43,7 +43,7 @@ export function StudyItemRow({
       data-testid={testId}
       title={title}
       className={cn(
-        "flex items-center gap-2 rounded-[9px] border border-border-subtle bg-neutral-50 px-[9px] py-[7px] no-underline transition-colors hover:bg-hover",
+        "flex items-center gap-2.5 rounded-input border border-border-subtle bg-card px-3 py-2 no-underline transition-colors hover:bg-hover",
         className,
       )}
     >
@@ -51,13 +51,15 @@ export function StudyItemRow({
         aria-hidden="true"
         className={cn("size-1.5 shrink-0 rounded-full", DOT_TONE_CLASS[tone])}
       />
-      <span className="min-w-0 flex-1 truncate text-[11.5px] font-medium text-fg">
-        {label}
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="truncate font-medium text-[11.5px] text-fg">
+          {label}
+        </span>
+        <span className="truncate text-[10px] text-fg-muted">{detail}</span>
       </span>
-      <span className="shrink-0 text-[10px] text-fg-muted">{detail}</span>
       <ChevronRight
         aria-hidden="true"
-        size={10}
+        size={12}
         strokeWidth={2}
         className="shrink-0 text-fg-muted"
       />

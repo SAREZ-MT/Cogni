@@ -6,25 +6,27 @@ import { Card } from "@/shared/ui/card";
 import { IconTile } from "@/shared/ui/icon-tile";
 import { cn } from "@/shared/ui/utils";
 
-// Study-technique color vocabulary (design/shell-look, studyplatform
-// StudyPanel.tsx palette): mapped onto existing IconTile tones instead
-// of adding new ones — `primary` (violet) already matches the reference's
-// flashcards brand color, and `green`/`pink` already match its active-recall
-// and exam hex pairs almost exactly (pastel-green-fg #1b7a43 vs reference
-// #059669; pastel-pink-fg #9b2c4a is an exact match). No new IconTile tone
-// was needed.
-export type TechniqueTone = "primary" | "green" | "pink";
+// Study-technique colour vocabulary (Phase 6 T5b, user decision
+// 2026-10-06): Flashcards yellow, Recordación activa green, Examen red. The
+// icon tile uses the existing semantic IconTile pastel pairs (the flashcards
+// hub already shows Flashcards on `warning`, exams on `rose`).
+export type TechniqueTone = "yellow" | "green" | "rose";
 
-// Solid, tone-colored "Generar" button (user decision 2026-09-24: only a
-// full-width "Generar" action per card, no navigation). `green`/`pink` use
-// success-600/pastel-pink-fg instead of the pastel IconTile pair so the
-// button reads as a solid brand color with white text, matching
-// studyplatform StudyPanel.tsx's ActiveRecallCard/ExamCard buttons
-// (#059669/#9B2C4A, both exact token matches).
+const TONE_TILE: Record<TechniqueTone, "warning" | "success" | "rose"> = {
+  yellow: "warning",
+  green: "success",
+  rose: "rose",
+};
+
+// Solid, tone-coloured "Generar" button (full width, sparkles icon — the
+// look of docs/design-system/screenshots "Generar"). Foregrounds meet WCAG
+// AA for the 11.5px label: near-black on warning-500 (8.2:1, white would be
+// 2.1:1), white on success-700 (7.7:1; success-600 is only 3.8:1) and white
+// on rose-600 (4.7:1).
 const TONE_BUTTON_CLASS: Record<TechniqueTone, string> = {
-  primary: "bg-primary-600 text-white hover:bg-primary-600",
-  green: "bg-success-600 text-white hover:bg-success-600",
-  pink: "bg-pastel-pink-fg text-white hover:bg-pastel-pink-fg",
+  yellow: "bg-warning-500 text-fg hover:bg-warning-600",
+  green: "bg-success-700 text-white hover:bg-success-700/90",
+  rose: "bg-rose-600 text-white hover:bg-rose-600/90",
 };
 
 export interface TechniqueCardProps {
@@ -81,7 +83,7 @@ export function TechniqueCard({
       className={cn("flex flex-col gap-2.5 rounded-lg p-2.5", className)}
     >
       <div className="flex items-start gap-2.5">
-        <IconTile tone={tone} size="30" radius="md">
+        <IconTile tone={TONE_TILE[tone]} size="30" radius="md">
           <Icon aria-hidden="true" size={16} strokeWidth={1.75} />
         </IconTile>
         <div className="min-w-0 flex-1">
@@ -130,7 +132,7 @@ export function TechniqueIconStrip({
 }: TechniqueIconStripProps) {
   return (
     <IconTile
-      tone={tone}
+      tone={TONE_TILE[tone]}
       size="36"
       radius="input"
       title={title}
