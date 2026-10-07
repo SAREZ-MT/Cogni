@@ -374,5 +374,64 @@ describe("ActiveRecallResultsView on a real session", () => {
     expect(disagreeRecallAnswerAction).toHaveBeenCalledWith({
       answerId: "answer-q1",
     });
+    const marked = within(first as HTMLElement).getByRole("button", {
+      name: "Marcado como desacuerdo",
+    });
+    expect(marked).toBeDisabled();
+  });
+
+  it("shows a disagreement recorded earlier as marked", async () => {
+    getRecallSessionResultsAction.mockResolvedValue(
+      ok({
+        ...DONE,
+        answers: DONE.answers.map((a, i) =>
+          i === 0 ? { ...a, disagreed: true } : a,
+        ),
+      }),
+    );
+    live();
+
+    const [first, second] = await waitFor(() => {
+      const items = screen.getAllByTestId("question-feedback-item");
+      expect(items[0]).toHaveTextContent("IA 2 / 5");
+      return items;
+    });
+    expect(
+      within(first as HTMLElement).getByRole("button", {
+        name: "Marcado como desacuerdo",
+      }),
+    ).toBeDisabled();
+    expect(
+      within(second as HTMLElement).getByRole("button", {
+        name: "No estoy de acuerdo",
+      }),
+    ).toBeEnabled();
+  });
+
+  it("offers the button again when the disagreement cannot be saved", async () => {
+    getRecallSessionResultsAction.mockResolvedValue(ok(DONE));
+    disagreeRecallAnswerAction.mockResolvedValue(
+      err({ code: "RECALL_UNEXPECTED", message: "x" }),
+    );
+    live();
+
+    const [first] = await waitFor(() => {
+      const items = screen.getAllByTestId("question-feedback-item");
+      expect(items[0]).toHaveTextContent("IA 2 / 5");
+      return items;
+    });
+    await userEvent.click(
+      within(first as HTMLElement).getByRole("button", {
+        name: "No estoy de acuerdo",
+      }),
+    );
+
+    await waitFor(() =>
+      expect(
+        within(first as HTMLElement).getByRole("button", {
+          name: "No estoy de acuerdo",
+        }),
+      ).toBeEnabled(),
+    );
   });
 });

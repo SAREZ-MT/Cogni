@@ -211,11 +211,22 @@ test.describe("active recall evaluation", () => {
     await items.nth(0).scrollIntoViewIfNeeded();
     await shot(page, "results-feedback");
 
-    // "No estoy de acuerdo" is recorded and never changes the score.
+    // "No estoy de acuerdo" is recorded and never changes the score; the
+    // same button turns into a disabled "Marcado como desacuerdo".
     await items
       .nth(0)
       .getByRole("button", { name: "No estoy de acuerdo" })
       .click();
+    const marked = items
+      .nth(0)
+      .getByRole("button", { name: "Marcado como desacuerdo" });
+    await expect(marked).toBeVisible();
+    await expect(marked).toBeDisabled();
+    await expect(
+      items.nth(1).getByRole("button", { name: "No estoy de acuerdo" }),
+    ).toBeEnabled();
+    await items.nth(0).scrollIntoViewIfNeeded();
+    await shot(page, "results-disagreed");
     await expect
       .poll(
         async () =>

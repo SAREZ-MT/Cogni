@@ -733,6 +733,12 @@ button.
   neutral pill reads "IA {aiScore} / 5" (still "IA — / 5" without a score)
   and the justification renders as a 13px `text-fg-secondary` paragraph in
   the slot the skeleton used. While pending both are ignored.
+- `disagreed?: boolean` (default `false`; user-approved 2026-10-07): once
+  evaluated and disagreed, the same outline `sm` button turns `disabled` and
+  reads "Marcado como desacuerdo" (same icon, style and size, no new
+  element). The results view passes it from the stored `disagreed` flag
+  (so a later read shows it) and sets it at once on click, undoing it if
+  the save fails.
 - `onDisagree?`, `className?`.
 
 Used by: `active-recall/_components/active-recall-results-view.tsx`.

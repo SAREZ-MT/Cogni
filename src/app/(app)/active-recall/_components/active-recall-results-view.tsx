@@ -119,8 +119,9 @@ function useSessionResults(
 // tone with "Reintentar". Resolved, the combined-quality and calibration
 // blocks show their numbers (no "pronto" badge) and each evaluated
 // question fills the approved QuestionFeedbackItem slots (AI score,
-// justification) and enables "No estoy de acuerdo"; a failed one keeps
-// its pending state until it is retried.
+// justification) and enables "No estoy de acuerdo", which turns into a
+// disabled "Marcado como desacuerdo" once recorded (also on a later read);
+// a failed one keeps its pending state until it is retried.
 export function ActiveRecallResultsView({
   pageTitle,
   records,
@@ -136,6 +137,23 @@ export function ActiveRecallResultsView({
     (resolved?.answers ?? []).map((answer) => [answer.questionId, answer]),
   );
   const averageCombined = resolved?.averageCombinedQuality ?? null;
+  // Answers marked "No estoy de acuerdo" in this view, shown at once; the
+  // stored flag (disagreed) keeps them marked on the next read.
+  const [markedIds, setMarkedIds] = useState<ReadonlySet<string>>(new Set());
+  const setMarked = (answerId: string, marked: boolean) =>
+    setMarkedIds((prev) => {
+      const next = new Set(prev);
+      if (marked) next.add(answerId);
+      else next.delete(answerId);
+      return next;
+    });
+  const disagree = async (answerId: string) => {
+    setMarked(answerId, true);
+    const saved = await disagreeRecallAnswerAction({ answerId }).catch(
+      () => null,
+    );
+    if (!saved?.ok) setMarked(answerId, false);
+  };
   const answeredCount = records.length;
   const ratingSum = records.reduce((sum, record) => sum + record.selfRating, 0);
   const averageRating = answeredCount > 0 ? ratingSum / answeredCount : 0;
@@ -303,13 +321,12 @@ export function ActiveRecallResultsView({
                   justification={
                     evaluated ? evaluation.feedback?.justification : undefined
                   }
+                  disagreed={
+                    evaluated &&
+                    (evaluation.disagreed || markedIds.has(evaluation.id))
+                  }
                   onDisagree={
-                    evaluation
-                      ? () =>
-                          void disagreeRecallAnswerAction({
-                            answerId: evaluation.id,
-                          }).catch(() => null)
-                      : undefined
+                    evaluation ? () => void disagree(evaluation.id) : undefined
                   }
                 />
               );

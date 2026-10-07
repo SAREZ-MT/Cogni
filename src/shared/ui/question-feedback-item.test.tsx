@@ -113,4 +113,19 @@ describe("QuestionFeedbackItem", () => {
 
     expect(screen.getByText("IA 0 / 5")).toBeInTheDocument();
   });
+
+  it("turns the disagree button into a disabled 'Marcado como desacuerdo' once disagreed", async () => {
+    const onDisagree = vi.fn();
+    setup({ pending: false, aiScore: 3, disagreed: true, onDisagree });
+
+    expect(
+      screen.queryByRole("button", { name: "No estoy de acuerdo" }),
+    ).not.toBeInTheDocument();
+    const button = screen.getByRole("button", {
+      name: "Marcado como desacuerdo",
+    });
+    expect(button).toBeDisabled();
+    await userEvent.click(button);
+    expect(onDisagree).not.toHaveBeenCalled();
+  });
 });

@@ -28,6 +28,9 @@ export interface QuestionFeedbackItemProps {
   // was. Both render only once `pending` is false.
   aiScore?: number | null;
   justification?: string;
+  // "No estoy de acuerdo" was recorded (user-approved 2026-10-07): the same
+  // button turns disabled and reads "Marcado como desacuerdo".
+  disagreed?: boolean;
   onDisagree?: () => void;
   className?: string;
 }
@@ -49,6 +52,7 @@ export function QuestionFeedbackItem({
   pending = true,
   aiScore,
   justification,
+  disagreed = false,
   onDisagree,
   className,
 }: QuestionFeedbackItemProps) {
@@ -98,12 +102,14 @@ export function QuestionFeedbackItem({
         variant="outline"
         size="sm"
         className="mt-3"
-        disabled={pending}
+        disabled={pending || disagreed}
         title={pending ? "Disponible cuando termine la evaluación" : undefined}
         onClick={onDisagree}
       >
         <ThumbsDown aria-hidden="true" size={14} strokeWidth={1.75} />
-        No estoy de acuerdo
+        {!pending && disagreed
+          ? "Marcado como desacuerdo"
+          : "No estoy de acuerdo"}
       </Button>
     </div>
   );
