@@ -139,16 +139,6 @@ describe("ExamsHubPage (real data)", () => {
     expect(screen.getByText("0 pendientes de repetir")).toBeInTheDocument();
   });
 
-  it("starts a new exam on the first page with questions", async () => {
-    render(await ExamsHubPage());
-
-    expect(screen.getByRole("link", { name: /Nuevo examen/ })).toHaveAttribute(
-      "href",
-      "/exams/biologia/mitocondria",
-    );
-    expect(screen.getByText("3 páginas con preguntas")).toBeInTheDocument();
-  });
-
   it("shows one card per notebook with its exams and latest score", async () => {
     render(await ExamsHubPage());
 
@@ -197,10 +187,10 @@ describe("ExamsHubPage (real data)", () => {
     expect(screen.getByText("Aún no tienes exámenes")).toBeInTheDocument();
     expect(
       screen.getByText(
-        "Abre una página en el editor y usa Técnicas → Examen → Generar.",
+        "Usa «Crear examen» para elegir una página y generar o escribir sus preguntas.",
       ),
     ).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /Nuevo examen/ })).toBeNull();
+    expect(screen.queryByText(/Técnicas → Examen/)).toBeNull();
   });
 
   it("shows the load error in the empty state when the pages cannot load", async () => {
@@ -270,41 +260,12 @@ describe("ExamsHubPage (real data)", () => {
     expect(screen.queryByText(/vencen mañana/)).toBeNull();
   });
 
-  it("starts a new exam on the first page that is ready", async () => {
-    listExamHubAction.mockResolvedValue({
-      ok: true,
-      value: [
-        { ...ENTRIES[0], questionCount: 6, ready: false },
-        ENTRIES[1],
-        ENTRIES[2],
-      ],
-    });
-
+  it("offers only 'Crear examen' in the header: no 'Nuevo examen' quick start", async () => {
     render(await ExamsHubPage());
 
-    expect(screen.getByRole("link", { name: /Nuevo examen/ })).toHaveAttribute(
-      "href",
-      "/exams/biologia/membrana",
-    );
-  });
-
-  it("sends a new exam to the first page's questions when no page is ready", async () => {
-    listExamHubAction.mockResolvedValue({
-      ok: true,
-      value: ENTRIES.map((page) => ({
-        ...page,
-        questionCount: 4,
-        ready: false,
-      })),
-    });
-
-    render(await ExamsHubPage());
-
-    expect(screen.getByRole("link", { name: /Nuevo examen/ })).toHaveAttribute(
-      "href",
-      "/exams/biologia/mitocondria/preguntas",
-    );
-    expect(screen.getByText("3 páginas con preguntas")).toBeInTheDocument();
+    expect(CreateExamDialog).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("Nuevo examen")).toBeNull();
+    expect(screen.queryByText(/páginas con preguntas/)).toBeNull();
   });
 
   describe("Crear examen (Phase 6 T5b)", () => {

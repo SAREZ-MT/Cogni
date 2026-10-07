@@ -1,4 +1,4 @@
-import { ClipboardList, Zap } from "lucide-react";
+import { ClipboardList } from "lucide-react";
 import Link from "next/link";
 import { type ExamHubPageView, listExamHubAction } from "@/modules/exams";
 import { COLOR_PALETTE, type NotebookColor } from "@/modules/notebooks";
@@ -56,18 +56,6 @@ function latestScoreOf(pages: readonly ExamHubPageView[]): number | null {
   return latest?.lastScore ?? null;
 }
 
-// "Nuevo examen": the first page (hub order) with enough questions to start
-// an exam; when none has, the first page's Preguntas screen, where the
-// "needs 10" note lives.
-function quickStartHrefOf(pages: readonly ExamHubPageView[]) {
-  const ready = pages.find((page) => page.ready);
-  if (ready) return `/exams/${ready.notebookId}/${ready.pageId}`;
-  const first = pages[0];
-  return first
-    ? `/exams/${first.notebookId}/${first.pageId}/preguntas`
-    : undefined;
-}
-
 // The retake banner's advice, from the failed questions only (not every
 // exam question of the page): they are due one SM-2 day after the exam,
 // and "Hoy" counts an item once its due instant has passed. Unknown (the
@@ -104,10 +92,6 @@ export default async function ExamsHubPage() {
   const pendientesDeRepetir = allPages.filter((page) => page.retakePending);
   const activeNotebookCount = notebooksWithPages.length;
 
-  const quickStartHref = quickStartHrefOf(
-    notebooksWithPages.flatMap((entry) => entry.pages),
-  );
-
   const retakePage = pendientesDeRepetir[0];
 
   return (
@@ -119,33 +103,7 @@ export default async function ExamsHubPage() {
         title="Exámenes"
         titleClassName="text-[26px]"
         description={`${plural(examenesPresentados, "examen", "exámenes")} · ${plural(activeNotebookCount, "cuaderno", "cuadernos")}`}
-        actions={
-          <div className="flex flex-wrap items-center gap-2.5">
-            <CreateExamDialog notebooks={createExamNotebooks} />
-            {quickStartHref && (
-              <Link
-                href={quickStartHref}
-                className="flex items-center gap-2.5 rounded-[14px] bg-neutral-900 px-4 py-3 transition-transform hover:-translate-y-0.5"
-              >
-                <IconTile
-                  size="30"
-                  radius="md"
-                  className="bg-white/[12%] text-white"
-                >
-                  <Zap aria-hidden="true" size={15} strokeWidth={2} />
-                </IconTile>
-                <span className="text-left">
-                  <span className="block font-semibold text-white text-xs">
-                    Nuevo examen
-                  </span>
-                  <span className="block text-[10.5px] text-white/[55%]">
-                    {plural(allPages.length, "página", "páginas")} con preguntas
-                  </span>
-                </span>
-              </Link>
-            )}
-          </div>
-        }
+        actions={<CreateExamDialog notebooks={createExamNotebooks} />}
       />
 
       {retakePage && (
@@ -206,7 +164,7 @@ export default async function ExamsHubPage() {
           titleClassName="text-base"
           description={
             result.ok
-              ? "Abre una página en el editor y usa Técnicas → Examen → Generar."
+              ? "Usa «Crear examen» para elegir una página y generar o escribir sus preguntas."
               : "No pudimos cargar tus exámenes. Intenta de nuevo."
           }
           descriptionClassName="max-w-[340px]"

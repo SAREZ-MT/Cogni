@@ -1,7 +1,6 @@
 import type { DomainError } from "@/shared/kernel/domain-error";
 import { ok, type Result } from "@/shared/kernel/result";
 import type { ExamHubPage, ExamHubReader } from "../domain/exam-hub-reader";
-import { EXAM_MIN_QUESTIONS } from "../domain/exam-session";
 
 // Exam questions due now per page (scheduling's "Repasos de hoy",
 // `due.exam_question`); null when that list could not be read.
@@ -32,8 +31,6 @@ export interface ExamHubEntry {
   passed: boolean;
   lastFinishedAt: Date | null;
   retakePending: boolean;
-  // Enough questions to start an exam (at least 10).
-  ready: boolean;
   // The page's exam questions due today; null when unknown.
   dueToday: number | null;
   // Whether a question failed in the page's last failed exam is due now
@@ -80,7 +77,6 @@ export async function listExamHub(
       passed: page.lastSession?.passed ?? false,
       lastFinishedAt: page.lastSession?.finishedAt ?? null,
       retakePending: page.retakePending,
-      ready: page.activeQuestionCount >= EXAM_MIN_QUESTIONS,
       dueToday: due === null ? null : (due.get(page.pageId) ?? 0),
       failedDueNow: failedDueNow(page),
     })),

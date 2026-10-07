@@ -54,7 +54,14 @@ test.describe("Crear examen", () => {
 
     await page.goto("/exams");
     await expect(page.getByText("Aún no tienes exámenes")).toBeVisible();
-    await shot(page, "exams-hub-create-button");
+    await expect(
+      page.getByText(
+        "Usa «Crear examen» para elegir una página y generar o escribir sus preguntas.",
+      ),
+    ).toBeVisible();
+    // Only "Crear examen" in the header: the "Nuevo examen" quick start is gone.
+    await expect(page.getByText("Nuevo examen")).toHaveCount(0);
+    await shot(page, "exams-hub-empty-v2");
     await page.getByTestId("create-exam-button").click();
 
     const create = page.getByRole("dialog", { name: "Crear examen" });
@@ -80,5 +87,7 @@ test.describe("Crear examen", () => {
     await expect(
       page.getByRole("link", { name: new RegExp(notebookTitle) }),
     ).toBeVisible();
+    await expect(page.getByText("Nuevo examen")).toHaveCount(0);
+    await shot(page, "exams-hub-with-exams");
   });
 });
