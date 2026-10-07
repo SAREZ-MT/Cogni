@@ -35,6 +35,17 @@ import {
   sessionEvaluationStatus,
 } from "../domain/recall-session";
 import type { RecallSessionRepository } from "../domain/recall-session-repository";
+import { runRecallWork, type UnitOfWorkOf } from "./recall-unit-of-work";
+
+// What the final status write needs: the session row lock and a fresh read
+// of the answers, in one unit of work (RecallSessionUnitOfWork fits).
+export type RecallStatusUnitOfWork = UnitOfWorkOf<{
+  readonly sessions: Pick<
+    RecallSessionRepository,
+    "lockById" | "setEvaluationStatus"
+  >;
+  readonly answers: Pick<RecallAnswerRepository, "listBySession">;
+}>;
 
 // How long a run's claim on an answer holds. Longer than the function
 // budget (maxDuration 300 s, ADR 0003): a claim this old belongs to a run
@@ -53,7 +64,12 @@ export interface FailedEvaluation {
 }
 
 export interface EvaluateRecallSessionDeps {
-  sessions: Pick<RecallSessionRepository, "findById" | "setEvaluationStatus">;
+  // The final status write (review R3-001): overlapping runs (the finish's
+  // and a "Reintentar") each derive the status from the answers as they
+  // are under the session lock, so a stale run never overwrites a newer
+  // status.
+  uow: RecallStatusUnitOfWork;
+  sessions: Pick<RecallSessionRepository, "findById">;
   answers: Pick<
     RecallAnswerRepository,
     "claimPendingForEvaluation" | "saveEvaluation" | "listBySession"
@@ -193,7 +209,19 @@ async function evaluateAnswer(
     return failed(AI_ERROR.GENERATION_FAILED, generation.id);
   }
   try {
-    await deps.limiter.check(ownerId);
+    const consumed = await deps.limiter.check(ownerId);
+    if (!consumed.allowed) {
+      // A concurrent evaluation spent the last unit after this run's peek
+      // (review R3-002): the evaluation already happened, so it stands; the
+      // overage is reported and the rest of the run calls no model.
+      state.limitResetAt = consumed.resetAt;
+      deps.onError?.(
+        new DomainError(
+          AI_ERROR.DAILY_LIMIT_REACHED,
+          "the daily evaluation limit ran out after this evaluation was allowed",
+        ),
+      );
+    }
   } catch (error) {
     // The evaluation stands; at worst the unit stays unconsumed.
     deps.onError?.(error);
@@ -245,6 +273,38 @@ async function recordReviews(
   }
 }
 
+// Stores the session status derived from its answers as they are now:
+// the session row is locked first and the answers are read after the lock,
+// so two overlapping runs write in turn and the later one sees every answer
+// the earlier one saved (review R3-001). Writes only a change.
+async function storeSessionStatus(
+  session: RecallSession,
+  deps: EvaluateRecallSessionDeps,
+  ownerId: string,
+): Promise<RecallSession> {
+  const written = await runRecallWork<
+    Parameters<Parameters<RecallStatusUnitOfWork["run"]>[0]>[0],
+    RecallSession,
+    never
+  >(deps.uow, async ({ sessions, answers }) => {
+    const locked = await sessions.lockById(session.id, ownerId);
+    if (!locked) return ok(session);
+    const status = sessionEvaluationStatus(
+      await answers.listBySession(session.id, ownerId),
+    );
+    if (status === locked.evaluationStatus) return ok(locked);
+    return ok(
+      (await sessions.setEvaluationStatus(
+        session.id,
+        ownerId,
+        status,
+        deps.clock.now(),
+      )) ?? locked,
+    );
+  });
+  return written.ok ? written.value : session;
+}
+
 // The asynchronous evaluation of a finished session (§8.5, SAD §10.4, CU-09),
 // run after the finish through `after()` and again by "Reintentar". It
 // claims the session's pending answers (a claim older than the lease is
@@ -255,7 +315,7 @@ async function recordReviews(
 // combined quality (done), or the failed attempt (failed: no score, no
 // SM-2 review, so the question stays due). Then it records the SM-2 reviews
 // of the done answers and stores the session status derived from all the
-// answers. Idempotent and safe to re-run: resolved answers are never
+// answers, read again under the session lock. Idempotent and safe to re-run: resolved answers are never
 // evaluated again, and answers another live run claimed are left to it. An
 // open session is left alone. Missing or another owner's session:
 // RECALL_SESSION_NOT_FOUND.
@@ -336,15 +396,6 @@ export async function evaluateRecallSession(
 
   const answers = await deps.answers.listBySession(session.id, ownerId);
   await recordReviews(session, answers, deps, ownerId, now);
-  const status = sessionEvaluationStatus(answers);
-  const stored =
-    status === session.evaluationStatus
-      ? session
-      : ((await deps.sessions.setEvaluationStatus(
-          session.id,
-          ownerId,
-          status,
-          deps.clock.now(),
-        )) ?? session);
+  const stored = await storeSessionStatus(session, deps, ownerId);
   return ok({ session: stored, evaluated, failed: failedCount });
 }

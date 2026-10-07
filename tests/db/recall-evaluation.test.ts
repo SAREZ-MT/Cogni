@@ -11,7 +11,10 @@ import {
 } from "@/modules/active-recall/domain/recall-answer";
 import { newRecallQuestion } from "@/modules/active-recall/domain/recall-question";
 import { newRecallSession } from "@/modules/active-recall/domain/recall-session";
-import { createDrizzleRecallRepositories } from "@/modules/active-recall/infrastructure";
+import {
+  createDrizzleRecallRepositories,
+  DrizzleRecallSessionUnitOfWork,
+} from "@/modules/active-recall/infrastructure";
 import type { AiGeneration, GenerateStructuredInput } from "@/modules/ai";
 import { createInMemoryGenerationLimiter } from "@/modules/ai/infrastructure";
 import {
@@ -163,6 +166,7 @@ if (process.env.DATABASE_URL) {
     const clock = createFixedClock(new Date(NOW.getTime() + 120_000));
     return {
       ...repos,
+      uow: new DrizzleRecallSessionUnitOfWork(db),
       pages: {
         getPageText: async () =>
           ok({

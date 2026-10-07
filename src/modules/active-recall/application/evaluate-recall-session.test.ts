@@ -172,6 +172,7 @@ async function setup(
   const limiter = options.limiter ?? new StubLimiter();
   const errors: unknown[] = [];
   const deps: EvaluateRecallSessionDeps = {
+    uow,
     sessions,
     answers: answerRepo,
     questions,
@@ -596,5 +597,111 @@ describe("evaluateRecallSession", () => {
 
     expect((await stored(uow))[0]?.evaluationStatus).toBe("done");
     expect(errors).toHaveLength(1);
+  });
+
+  // Review R3-001: the status is derived from a fresh read under the
+  // session lock, never from this run's earlier snapshot.
+  it("stores the status of the answers as they are when it writes, not as this run last saw them", async () => {
+    const { uow, deps, run } = await setup([
+      { questionId: "q-1", text: "ATP", self: 3 },
+      { questionId: "q-2", text: "ATP", self: 3 },
+    ]);
+    const { answers, sessions } = uow.repos;
+    // A live run (Reintentar's) holds q-2.
+    const claimedAt = new Date(EVAL_AT.getTime() - 1_000);
+    const [, held] = await answers.claimPendingForEvaluation(
+      SESSION,
+      OWNER,
+      claimedAt,
+      claimedAt,
+    );
+    await answers.saveEvaluation(
+      "answer-1",
+      OWNER,
+      {
+        status: "failed",
+        aiEvaluation: { source: "failed", code: "X" },
+        generationId: null,
+      },
+      claimedAt,
+    );
+    await answers.requeueFailed(SESSION, OWNER, claimedAt);
+    // This run starts while the session still reads partial.
+    await sessions.setEvaluationStatus(SESSION, OWNER, "partial", claimedAt);
+    // That run finishes (q-2 done, session done) right after this run
+    // read the answers for its reviews, before it writes the status.
+    const reviews = {
+      record: async (input: RecordRecallReviewsInput) => {
+        await answers.saveEvaluation(
+          held?.id as string,
+          OWNER,
+          {
+            status: "done",
+            aiEvaluation: {},
+            aiScore: 4,
+            combinedQuality: 4,
+            generationId: null,
+          },
+          EVAL_AT,
+        );
+        await sessions.setEvaluationStatus(SESSION, OWNER, "done", EVAL_AT);
+        return new StubReviews().record(input);
+      },
+    };
+
+    const result = await run({ ...deps, reviews });
+
+    expect(result.ok && result.value.session.evaluationStatus).toBe("done");
+    expect((await sessions.findById(SESSION, OWNER))?.evaluationStatus).toBe(
+      "done",
+    );
+  });
+
+  it("writes the status under the session lock in one unit of work", async () => {
+    const { uow, run } = await setup([
+      { questionId: "q-1", text: "ATP", self: 3 },
+    ]);
+    const locked: number[] = [];
+    const lockById = uow.repos.sessions.lockById.bind(uow.repos.sessions);
+    uow.repos.sessions.lockById = async (id, ownerId) => {
+      locked.push(uow.runs);
+      return lockById(id, ownerId);
+    };
+
+    await run();
+
+    expect(locked).toEqual([1]);
+  });
+
+  // Review R3-002: a unit consumed after a peek that allowed it may find
+  // the limit already spent by a concurrent evaluation.
+  it("keeps a done evaluation when consuming its unit finds the limit spent, reports it and stops calling the model", async () => {
+    const limiter = new StubLimiter(1);
+    limiter.check = async () => ({
+      allowed: false,
+      remaining: 0,
+      resetAt: RESET,
+    });
+    const { uow, ai, errors, run } = await setup(
+      [
+        { questionId: "q-1", text: "ATP", self: 3 },
+        { questionId: "q-2", text: "ATP", self: 3 },
+      ],
+      { limiter },
+    );
+
+    const result = await run();
+
+    expect(result.ok).toBe(true);
+    const answers = await stored(uow);
+    expect(answers[0]?.evaluationStatus).toBe("done");
+    expect(answers[1]?.aiEvaluation).toMatchObject({
+      source: "failed",
+      code: AI_ERROR.DAILY_LIMIT_REACHED,
+    });
+    expect(ai.calls).toHaveLength(1);
+    expect(errors).toEqual([
+      expect.objectContaining({ code: AI_ERROR.DAILY_LIMIT_REACHED }),
+    ]);
   });
 });

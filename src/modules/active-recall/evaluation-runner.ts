@@ -11,7 +11,10 @@ import {
   type EvaluateRecallSessionDeps,
   evaluateRecallSession,
 } from "./application";
-import { createDrizzleRecallRepositories } from "./infrastructure";
+import {
+  createDrizzleRecallRepositories,
+  DrizzleRecallSessionUnitOfWork,
+} from "./infrastructure";
 
 // Runs a session's asynchronous evaluation after the Server Action
 // answered (Phase 6 T6, ADR 0003: no queue). No "use server" here: this is
@@ -30,6 +33,8 @@ export function buildEvaluationDeps(): EvaluateRecallSessionDeps {
   const ai = createAiServerApi({ env, db, clock: systemClock, ids });
   const { sessions, answers, questions } = createDrizzleRecallRepositories(db);
   return {
+    // The final status write locks the session in its own transaction.
+    uow: new DrizzleRecallSessionUnitOfWork(db),
     sessions,
     answers,
     questions,
