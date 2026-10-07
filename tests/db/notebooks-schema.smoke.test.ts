@@ -8,10 +8,12 @@ import { inRolledBackReversion, readDownSql } from "./helpers/rollback";
 const url = process.env.DATABASE_URL;
 
 // Reversions run newest first. import_jobs (0005), ai_generations /
-// flashcards (0007), the study-engine tables (0009) and the exam tables
-// (0010) reference pages, so they must be reverted before 0003 can drop the
+// flashcards (0007), the study-engine tables (0009), the exam tables
+// (0010), the recall tables (0012) and generation_fingerprints (0013)
+// reference pages, so they must be reverted before 0003 can drop the
 // tables they depend on.
 const REVERSIONS_DOWN_TO_0003 = [
+  "0013_generation_fingerprints",
   "0012_active_recall",
   "0011_exam_session_questions",
   "0010_exams",
