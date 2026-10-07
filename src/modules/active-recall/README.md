@@ -27,7 +27,13 @@ Implementado:
   fallida no gasta la unidad. Guarda las preguntas y un
   `StudyItem(kind = "recall_question")` por pregunta en una sola unidad de
   trabajo. Si consumir la unidad falla después de guardar, la generación
-  igual responde con éxito y el fallo se reporta a Sentry.
+  igual responde con éxito y el fallo se reporta a Sentry. Generación
+  incremental (Fase 6 T5c): solo se envían los párrafos que recordación
+  activa aún no usó en la página (nuevos o editados, por huella en
+  `generation_fingerprints`, migración `0013`) y sus huellas se guardan con
+  las preguntas; sin nada nuevo responde `RECALL_NO_NEW_CONTENT` sin llamar
+  a la IA ni consumir unidad. Una página generada antes de T5c envía todos
+  sus párrafos una vez.
 - Sesión (`application/`): `planRecallSession` (lectura de la ruta, no
   escribe), `startRecallSession` (hasta 10 preguntas: vencidas, nuevas y
   las repasadas hace más tiempo; `RECALL_NO_QUESTIONS` si la página no

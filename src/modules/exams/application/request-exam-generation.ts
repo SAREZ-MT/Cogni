@@ -13,6 +13,12 @@ import type { PageTextReader } from "@/modules/notebooks";
 import { newStudyItem } from "@/modules/study-engine";
 import type { Clock } from "@/shared/kernel/clock";
 import { DomainError } from "@/shared/kernel/domain-error";
+import type { GenerationFingerprintRepository } from "@/shared/kernel/generation-fingerprints";
+import {
+  joinParagraphs,
+  paragraphsWithinWords,
+  selectNewParagraphs,
+} from "@/shared/kernel/page-paragraphs";
 import { err, ok, type Result } from "@/shared/kernel/result";
 import { EXAM_ERROR } from "../domain/errors";
 import {
@@ -39,6 +45,8 @@ export const EXAM_GENERATION_BATCH_SIZE = 15;
 
 export const EXAM_PAGE_EMPTY_MESSAGE =
   "The page has no text to generate questions from";
+export const EXAM_NO_NEW_CONTENT_MESSAGE =
+  "Every paragraph of the page was already used to generate exam questions";
 
 // The daily limit error carries when the window resets so the UI can say
 // so (same shape as flashcards' DailyLimitReachedError, which this module
@@ -69,6 +77,9 @@ export interface RequestExamGenerationDeps {
   // Reads the page's active questions before the model call (the prompt
   // lists them so the model avoids duplicates).
   questions: Pick<ExamQuestionRepository, "listActiveByPage">;
+  // Reads the paragraphs exams already used on the page; the new ones are
+  // stored through the unit of work.
+  fingerprints: Pick<GenerationFingerprintRepository, "listByPage">;
   uow: ExamUnitOfWork;
   clock: Clock;
   ids: { next(): string };
@@ -116,6 +127,14 @@ function invalidCount(count: number) {
 // too). Every call of the request is made before anything is written, and
 // the valid questions are written with their study items in ONE unit of
 // work: a failure at any point stores nothing.
+// Incremental (Phase 6 T5c): only the paragraphs exams has not used yet on
+// this page (new or edited) are sent, in page order and truncated to the
+// token cap; with none, NO_NEW_CONTENT is answered before the limiter (no
+// call, no unit). The used paragraphs (paragraphsWithinWords) are stored
+// in the same unit of work. A page with questions but no fingerprints
+// (generated before T5c) sends every paragraph once; the prompt still lists
+// the active questions, so they are not repeated. Removed paragraphs never
+// retire questions.
 export async function requestExamGeneration(
   input: { pageId: string; count?: number },
   deps: RequestExamGenerationDeps,
@@ -130,11 +149,25 @@ export async function requestExamGeneration(
     return err(new DomainError(AI_ERROR.PAGE_EMPTY, EXAM_PAGE_EMPTY_MESSAGE));
   }
 
+  const newParagraphs = selectNewParagraphs(
+    page.value.plainText,
+    await deps.fingerprints.listByPage(input.pageId, ownerId),
+  );
+  if (newParagraphs.length === 0) {
+    return err(
+      new DomainError(EXAM_ERROR.NO_NEW_CONTENT, EXAM_NO_NEW_CONTENT_MESSAGE),
+    );
+  }
+
   const limit = await deps.limiter.check(ownerId);
   if (!limit.allowed) return err(new ExamDailyLimitReachedError(limit.resetAt));
 
   const active = await deps.questions.listActiveByPage(input.pageId, ownerId);
-  const truncation = truncateToTokenCap(page.value.plainText, deps.tokenCap);
+  const truncation = truncateToTokenCap(
+    joinParagraphs(newParagraphs),
+    deps.tokenCap,
+  );
+  const sent = paragraphsWithinWords(newParagraphs, truncation.wordsUsed);
   const now = deps.clock.now();
   const seen = new Set(active.map((q) => normalizeWording(q.stem)));
   const accepted: ExamQuestion[] = [];
@@ -205,7 +238,7 @@ export async function requestExamGeneration(
 
   const persisted = await runExamWork(
     deps.uow,
-    async ({ questions, studyItems }) => {
+    async ({ questions, studyItems, fingerprints }) => {
       // A manual question may have landed during the model calls.
       const current = new Set(
         (await questions.listActiveByPage(input.pageId, ownerId)).map((q) =>
@@ -231,6 +264,12 @@ export async function requestExamGeneration(
           }),
         );
       }
+      await fingerprints.addMany({
+        ownerId,
+        pageId: input.pageId,
+        fingerprints: sent.map((p) => p.fingerprint),
+        now,
+      });
       return ok(fresh);
     },
   );

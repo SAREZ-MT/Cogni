@@ -45,6 +45,9 @@ export const EXAM_ERROR = {
   SESSION_INCOMPLETE: "EXAMS_SESSION_INCOMPLETE",
   // AI feedback is given once the exam session is finished.
   FEEDBACK_SESSION_OPEN: "EXAMS_FEEDBACK_SESSION_OPEN",
+  // "Generar" found no paragraph exams has not used yet on the page (Phase
+  // 6 T5c incremental generation): no AI call, no unit consumed.
+  NO_NEW_CONTENT: "EXAMS_NO_NEW_CONTENT",
   // Server Action boundary: no signed-in user, input rejected by the
   // schema, or an unexpected failure (logged, never shown raw).
   SESSION_REQUIRED: "EXAMS_SESSION_REQUIRED",

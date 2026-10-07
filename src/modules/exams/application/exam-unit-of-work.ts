@@ -1,4 +1,5 @@
 import type { StudyItemRepository } from "@/modules/study-engine";
+import type { GenerationFingerprintRepository } from "@/shared/kernel/generation-fingerprints";
 import type { Result } from "@/shared/kernel/result";
 import type { ExamQuestionRepository } from "../domain/exam-question-repository";
 
@@ -14,6 +15,9 @@ export type ExamStudyItems = Pick<
 export interface ExamQuestionRepositories {
   readonly questions: ExamQuestionRepository;
   readonly studyItems: ExamStudyItems;
+  // The "exam" paragraph fingerprints of a generation (Phase 6 T5c), stored
+  // with its questions.
+  readonly fingerprints: GenerationFingerprintRepository;
 }
 
 // Unit of work over a page's questions and their study items: everything

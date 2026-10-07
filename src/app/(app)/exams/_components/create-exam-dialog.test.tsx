@@ -248,6 +248,59 @@ describe("CreateExamDialog", () => {
     expect(within(dialog).getByTestId("create-exam-submit")).toBeDisabled();
   });
 
+  it("says there is nothing new to generate as a notice, keeping the dialog open", async () => {
+    generateExamQuestionsAction.mockResolvedValue({
+      ok: false,
+      error: { code: "EXAMS_NO_NEW_CONTENT", message: "x" },
+    });
+    const { user, dialog } = await open();
+    await user.selectOptions(
+      within(dialog).getByRole("combobox", { name: "Página" }),
+      "p-mito",
+    );
+
+    await user.click(within(dialog).getByTestId("create-exam-submit"));
+
+    expect(
+      await within(dialog).findByTestId("create-exam-notice"),
+    ).toHaveTextContent("No hay contenido nuevo para generar");
+    expect(within(dialog).queryByRole("alert")).not.toBeInTheDocument();
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("clears the notice when the page changes", async () => {
+    generateExamQuestionsAction.mockResolvedValue({
+      ok: false,
+      error: { code: "EXAMS_NO_NEW_CONTENT", message: "x" },
+    });
+    const { user, dialog } = await open();
+    const page = within(dialog).getByRole("combobox", { name: "Página" });
+    await user.selectOptions(page, "p-mito");
+    await user.click(within(dialog).getByTestId("create-exam-submit"));
+    await within(dialog).findByTestId("create-exam-notice");
+
+    await user.selectOptions(page, "p-ribo");
+
+    expect(
+      within(dialog).queryByTestId("create-exam-notice"),
+    ).not.toBeInTheDocument();
+  });
+
+  // T5b review follow-up: a failed notebook read is not "no notebooks".
+  it("shows a load error instead of the empty state when the notebooks could not be read", async () => {
+    const { dialog } = await open({ notebooks: null });
+
+    expect(within(dialog).getByRole("alert")).toHaveTextContent(
+      "No pudimos cargar tus cuadernos. Intenta de nuevo.",
+    );
+    expect(
+      within(dialog).queryByText(
+        "Aún no tienes cuadernos. Crea uno para empezar.",
+      ),
+    ).not.toBeInTheDocument();
+    expect(within(dialog).getByTestId("create-exam-submit")).toBeDisabled();
+  });
+
   it("closes on Cancelar without creating anything", async () => {
     const { user, dialog } = await open();
 

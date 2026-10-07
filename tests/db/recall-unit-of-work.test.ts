@@ -3,12 +3,14 @@ import { and, eq } from "drizzle-orm";
 import { afterAll, describe, expect, it } from "vitest";
 import { requestRecallGeneration } from "@/modules/active-recall/application/request-recall-generation";
 import { newRecallQuestion } from "@/modules/active-recall/domain/recall-question";
+import { DrizzleRecallFingerprints } from "@/modules/active-recall/infrastructure/drizzle-recall-fingerprints";
 import { DrizzleRecallQuestionRepository } from "@/modules/active-recall/infrastructure/drizzle-recall-question-repository";
 import { DrizzleRecallUnitOfWork } from "@/modules/active-recall/infrastructure/drizzle-recall-unit-of-work";
 import type { AiGeneration } from "@/modules/ai";
 import { newStudyItem } from "@/modules/study-engine/domain/study-item";
 import {
   aiGenerations,
+  generationFingerprints,
   notebooks,
   pages,
   profiles,
@@ -17,6 +19,7 @@ import {
 } from "@/shared/db/schema";
 import { createFixedClock } from "@/shared/kernel/clock";
 import { DomainError } from "@/shared/kernel/domain-error";
+import { fingerprintParagraph } from "@/shared/kernel/page-paragraphs";
 import { err, ok } from "@/shared/kernel/result";
 import { createTestDb } from "./helpers/test-db";
 import { createTestOwner, deleteTestOwner } from "./helpers/test-owner";
@@ -114,6 +117,7 @@ if (process.env.DATABASE_URL) {
               }),
           },
           questions: new DrizzleRecallQuestionRepository(db),
+          fingerprints: new DrizzleRecallFingerprints(db),
           uow: new DrizzleRecallUnitOfWork(db),
           clock: createFixedClock(NOW),
           ids: { next: () => randomUUID() },
@@ -150,6 +154,14 @@ if (process.env.DATABASE_URL) {
       expect(items.every((i) => i.dueAt.getTime() === NOW.getTime())).toBe(
         true,
       );
+      // Phase 6 T5c: the sent paragraph's fingerprint commits with them.
+      const fingerprints = await db
+        .select()
+        .from(generationFingerprints)
+        .where(eq(generationFingerprints.pageId, pageId));
+      expect(fingerprints.map((f) => [f.technique, f.fingerprint])).toEqual([
+        ["recall", fingerprintParagraph("La mitocondria.")],
+      ]);
     });
 
     it("rolls the questions back when a study item cannot be written", async () => {
@@ -184,6 +196,12 @@ if (process.env.DATABASE_URL) {
       await expect(
         new DrizzleRecallUnitOfWork(db).run(async (repositories) => {
           await repositories.questions.saveMany([question.value]);
+          await repositories.fingerprints.addMany({
+            ownerId: owner.id,
+            pageId,
+            fingerprints: ["d".repeat(64)],
+            now: NOW,
+          });
           await repositories.studyItems.save(item());
           await repositories.studyItems.save(item());
         }),
@@ -199,6 +217,11 @@ if (process.env.DATABASE_URL) {
         .from(studyItems)
         .where(eq(studyItems.sourceId, question.value.id));
       expect(items).toEqual([]);
+      const fingerprints = await db
+        .select()
+        .from(generationFingerprints)
+        .where(eq(generationFingerprints.fingerprint, "d".repeat(64)));
+      expect(fingerprints).toEqual([]);
     });
   });
 }

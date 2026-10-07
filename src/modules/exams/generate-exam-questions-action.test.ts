@@ -103,6 +103,9 @@ vi.mock("./infrastructure", () => ({
       return current.uow.questions;
     },
   ),
+  DrizzleExamFingerprints: vi.fn(function DrizzleExamFingerprints() {
+    return current.uow.fingerprints;
+  }),
 }));
 
 const OWNER = "3d2f9a1e-5b6c-4d7e-8f90-1a2b3c4d5e6f";

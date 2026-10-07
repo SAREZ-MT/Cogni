@@ -1016,3 +1016,60 @@ export const recallAnswers = pgTable(
 ).enableRLS();
 
 export type RecallAnswerRow = typeof recallAnswers.$inferSelect;
+
+// Incremental generation (Phase 6 T5c, user decision 2026-10-06): the
+// fingerprints (sha256 hex of the normalized text) of the page paragraphs
+// each technique already sent to the AI (shared/kernel/page-paragraphs.ts). "Generar" only sends paragraphs
+// whose fingerprint is not stored for that technique; rows are never
+// deleted by an edit (deleted content keeps its generated items).
+// Same values as shared/kernel/generation-fingerprints.ts's
+// GENERATION_TECHNIQUES (schema.test.ts keeps them equal).
+export const GENERATION_FINGERPRINT_TECHNIQUES = [
+  "flashcards",
+  "exam",
+  "recall",
+] as const;
+export type GenerationTechniqueValue =
+  (typeof GENERATION_FINGERPRINT_TECHNIQUES)[number];
+
+export const generationFingerprints = pgTable(
+  "generation_fingerprints",
+  {
+    ownerId: uuid("owner_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    pageId: uuid("page_id")
+      .notNull()
+      .references(() => pages.id, { onDelete: "cascade" }),
+    technique: text("technique").notNull().$type<GenerationTechniqueValue>(),
+    fingerprint: text("fingerprint").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    // The unique (page, owner, technique, fingerprint) rule; its prefix
+    // serves listByPage and the page cascade.
+    primaryKey({
+      name: "generation_fingerprints_pkey",
+      columns: [
+        table.pageId,
+        table.ownerId,
+        table.technique,
+        table.fingerprint,
+      ],
+    }),
+    index("generation_fingerprints_owner_id_idx").on(table.ownerId),
+    check(
+      "generation_fingerprints_technique_check",
+      sql`${table.technique} in ('flashcards', 'exam', 'recall')`,
+    ),
+    check(
+      "generation_fingerprints_fingerprint_format",
+      sql`${table.fingerprint} ~ '^[0-9a-f]{64}$'`,
+    ),
+  ],
+).enableRLS();
+
+export type GenerationFingerprintRow =
+  typeof generationFingerprints.$inferSelect;

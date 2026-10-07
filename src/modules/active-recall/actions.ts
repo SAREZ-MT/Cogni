@@ -28,11 +28,13 @@ import {
   RecallDailyLimitReachedError,
   requestRecallGeneration,
 } from "./application";
+import { RECALL_ERROR } from "./domain/errors";
 import type {
   RecallQuestion,
   RecallQuestionOrigin,
 } from "./domain/recall-question";
 import {
+  DrizzleRecallFingerprints,
   DrizzleRecallQuestionRepository,
   DrizzleRecallUnitOfWork,
 } from "./infrastructure";
@@ -85,6 +87,7 @@ function generationDeps() {
     }),
     pages: createNotebooksServerApi({ db, clock: systemClock }),
     questions: new DrizzleRecallQuestionRepository(db),
+    fingerprints: new DrizzleRecallFingerprints(db),
     uow: new DrizzleRecallUnitOfWork(db),
     analytics: createServerAnalytics({
       key: env.NEXT_PUBLIC_POSTHOG_KEY,
@@ -106,8 +109,11 @@ async function trackSafely(
   }
 }
 
-function statusFor(error: DomainError): "limit" | "empty" | "failed" {
+function statusFor(
+  error: DomainError,
+): "limit" | "empty" | "no_new_content" | "failed" {
   if (error.code === AI_ERROR.DAILY_LIMIT_REACHED) return "limit";
+  if (error.code === RECALL_ERROR.NO_NEW_CONTENT) return "no_new_content";
   if (error.code === AI_ERROR.PAGE_EMPTY) return "empty";
   return "failed";
 }
@@ -137,7 +143,8 @@ export async function generateRecallQuestionsAction(
     const parsed = parseInput(generateInput, input);
     if (!parsed.ok) return parsed;
 
-    const { env, ai, pages, questions, uow, analytics } = generationDeps();
+    const { env, ai, pages, questions, fingerprints, uow, analytics } =
+      generationDeps();
     const result = await requestRecallGeneration(
       { pageId: parsed.value.pageId },
       {
@@ -145,6 +152,7 @@ export async function generateRecallQuestionsAction(
         pages,
         ai,
         questions,
+        fingerprints,
         uow,
         clock: systemClock,
         ids: { next: createId },

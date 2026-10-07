@@ -82,8 +82,8 @@ export default async function PageView({ params }: PagePageProps) {
   // Initial panel data (the "Técnicas de estudio" panel always shows its
   // three techniques on real data, Phase 6 T5b) is read here and refreshed
   // client-side after each generation. A failed read degrades to an empty
-  // deck / no recall questions / unknown counter instead of blocking the
-  // editor route.
+  // deck / an unknown recall count (re-read by the panel) / unknown counter
+  // instead of blocking the editor route.
   // Review before retaking (Phase 5 T8): a page waiting for an exam retake
   // lists the failed concepts above the editor. Derived from the page's
   // exam state on every visit (not from the results link's `?repaso`
@@ -95,9 +95,11 @@ export default async function PageView({ params }: PagePageProps) {
       getExamReviewNoticeAction({ pageId: page.id }).catch(() => null),
       getRecallPageSummaryAction({ pageId: page.id }).catch(() => null),
     ]);
+  // A failed recall read is unknown, never "no questions": the panel reads
+  // it again on the client (the action already reported the failure).
   const initialRecallQuestionCount = recallResult?.ok
     ? recallResult.value.questionCount
-    : 0;
+    : null;
   const reviewNotice = noticeResult?.ok ? noticeResult.value : null;
   const initialFlashcards: FlashcardView[] = cardsResult.ok
     ? cardsResult.value

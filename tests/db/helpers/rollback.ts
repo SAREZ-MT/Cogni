@@ -64,6 +64,7 @@ export const REVERSION_LOCK_ORDER = [
   "recall_questions",
   "recall_sessions",
   "recall_answers",
+  "generation_fingerprints",
 ] as const;
 
 // A waiting lock gives up after this instead of hanging the suite.

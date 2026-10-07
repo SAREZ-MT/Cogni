@@ -2,6 +2,8 @@
 // Truncation keeps the start of the page; the UI tells the user how many
 // words were used.
 
+import { WORD_PATTERN } from "@/shared/kernel/words";
+
 const WORDS_PER_TOKEN = 0.75;
 
 export interface TruncationResult {
@@ -15,7 +17,7 @@ export function truncateToTokenCap(
   text: string,
   cap: number,
 ): TruncationResult {
-  const matches = [...text.matchAll(/\S+/g)];
+  const matches = [...text.matchAll(WORD_PATTERN)];
   const wordsTotal = matches.length;
   if (wordsTotal === 0) {
     return { text: "", truncated: false, wordsUsed: 0, wordsTotal: 0 };

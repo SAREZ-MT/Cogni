@@ -946,6 +946,112 @@ describe("TechniquesPanel", () => {
     });
   });
 
+  // Incremental generation (Phase 6 T5c): an unchanged page is not an
+  // error — the card's notice line says there is nothing new and the
+  // shared counter stays as it was.
+  describe("nothing new to generate", () => {
+    it.each([
+      [
+        "flashcards",
+        "FLASHCARDS_NO_NEW_CONTENT",
+        "generation-notice",
+        "generation-error",
+      ],
+      [
+        "recall",
+        "RECALL_NO_NEW_CONTENT",
+        "recall-generation-notice",
+        "recall-generation-error",
+      ],
+      [
+        "exam",
+        "EXAMS_NO_NEW_CONTENT",
+        "exam-generation-notice",
+        "exam-generation-error",
+      ],
+    ])("%s: shows the notice, no error, and keeps the counter", async (technique, code, noticeId, errorId) => {
+      const user = userEvent.setup();
+      const failure = err({ code, message: "nothing new" });
+      generateFlashcardsAction.mockResolvedValue(failure);
+      generateRecallQuestionsAction.mockResolvedValue(failure);
+      generateExamQuestionsAction.mockResolvedValue(failure);
+      await renderPanel(false, { initialRemaining: 4 });
+
+      if (technique === "flashcards") {
+        await user.click(screen.getByTestId("generate-flashcards"));
+      } else if (technique === "recall") {
+        await user.click(screen.getByTestId("generate-recall-questions"));
+      } else {
+        await generateExamViaDialog(user);
+      }
+
+      await waitForText(noticeId, "No hay contenido nuevo para generar");
+      expect(screen.queryByTestId(errorId)).toBeNull();
+      expect(screen.getAllByText("Te quedan 4 generaciones hoy")).toHaveLength(
+        3,
+      );
+    });
+  });
+
+  // T5b review follow-up: a failed server read of the recall summary is
+  // unknown, not "no questions": the panel reads it again on mount.
+  describe("unknown recall summary", () => {
+    it("reads the recall summary again when the server could not", async () => {
+      getRecallPageSummaryAction.mockResolvedValue(ok({ questionCount: 7 }));
+      await renderPanel(false, { initialRecallQuestionCount: null });
+
+      await waitFor(() =>
+        expect(
+          screen.getByTestId("generated-item-active-recall"),
+        ).toHaveTextContent("7 preguntas"),
+      );
+      expect(getRecallPageSummaryAction).toHaveBeenCalledWith({
+        pageId: PAGE_ID,
+      });
+    });
+
+    it("ignores the mount-time read when a generation's newer count already arrived", async () => {
+      const user = userEvent.setup();
+      let resolveMountRead: (value: unknown) => void = () => {};
+      getRecallPageSummaryAction
+        .mockImplementationOnce(
+          () =>
+            new Promise((resolve) => {
+              resolveMountRead = resolve;
+            }),
+        )
+        .mockResolvedValueOnce(ok({ questionCount: 10 }));
+      generateRecallQuestionsAction.mockResolvedValue(
+        ok({
+          questions: [],
+          created: 10,
+          remainingToday: 3,
+          truncated: false,
+          wordsUsed: 10,
+          wordsTotal: 10,
+        }),
+      );
+      await renderPanel(false, { initialRecallQuestionCount: null });
+
+      await user.click(screen.getByTestId("generate-recall-questions"));
+      await waitForText("generated-item-active-recall", "10 preguntas");
+      await act(async () => resolveMountRead(ok({ questionCount: 0 })));
+
+      expect(
+        screen.getByTestId("generated-item-active-recall"),
+      ).toHaveTextContent("10 preguntas");
+    });
+
+    it("does not read it again when the server count is known", async () => {
+      await renderPanel(false, { initialRecallQuestionCount: 3 });
+
+      expect(
+        screen.getByTestId("generated-item-active-recall"),
+      ).toHaveTextContent("3 preguntas");
+      expect(getRecallPageSummaryAction).not.toHaveBeenCalled();
+    });
+  });
+
   it("starts collapsed from the server-read cookie and offers to expand", async () => {
     await renderPanel(true);
 

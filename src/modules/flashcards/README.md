@@ -35,7 +35,11 @@ sessions are scheduled by `study-engine`; this module adds the card text.
     positions and their study items in one unit of work. The page is read
     before the limiter, so a missing or blank page
     never costs a generation. Zero valid cards is `GENERATION_FAILED` and
-    nothing is persisted.
+    nothing is persisted. Incremental (Phase 6 T5c): only the paragraphs
+    flashcards has not used on the page yet (new or edited, by fingerprint in
+    `generation_fingerprints`) are sent; their fingerprints are stored with
+    the cards. Nothing new answers `FLASHCARDS_NO_NEW_CONTENT` with no AI call
+    and no unit; a page generated before T5c sends every paragraph once.
   - `listFlashcardsByPage`, `listDecks` (one deck per page, count derived from
     its cards), `getGenerationStatus` (remaining generations, does not consume).
   - `requestSessionFeedback` (§3.3, §8.4) asks the AI for feedback on a

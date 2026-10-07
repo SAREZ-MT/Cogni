@@ -10,6 +10,7 @@ import {
 import type { PageTextReader } from "@/modules/notebooks";
 import { createFixedClock } from "@/shared/kernel/clock";
 import { DomainError } from "@/shared/kernel/domain-error";
+import { fingerprintParagraph } from "@/shared/kernel/page-paragraphs";
 import { err, ok, type Result } from "@/shared/kernel/result";
 import { EXAM_ERROR } from "../domain/errors";
 import {
@@ -130,6 +131,7 @@ function makeDeps(overrides: Partial<RequestExamGenerationDeps> = {}) {
     pages: stubPages(TEXT),
     ai,
     questions: uow.questions,
+    fingerprints: uow.fingerprints,
     uow,
     clock: createFixedClock(NOW),
     ids: { next: () => `id-${++ids}` },
@@ -457,5 +459,133 @@ describe("requestExamGeneration", () => {
 
     expect(result.ok && result.value.truncated).toBe(true);
     expect(ai.calls[0]?.prompt).not.toContain("palabra49");
+  });
+});
+
+// Incremental generation (Phase 6 T5c): only paragraphs exams has not sent
+// yet reach the model; nothing new means no call and no unit.
+describe("requestExamGeneration — incremental", () => {
+  beforeEach(() => {
+    ids = 0;
+  });
+
+  it("stores the fingerprints of the sent paragraphs with the questions", async () => {
+    const { deps, uow } = makeDeps({ pages: stubPages("Uno dos\n\nTres") });
+
+    const result = await requestExamGeneration({ pageId: PAGE }, deps, OWNER);
+
+    expect(result.ok).toBe(true);
+    expect((await uow.fingerprints.listByPage(PAGE, OWNER)).sort()).toEqual(
+      [fingerprintParagraph("uno dos"), fingerprintParagraph("tres")].sort(),
+    );
+  });
+
+  it("answers NO_NEW_CONTENT without calling the AI nor consuming a unit", async () => {
+    const { deps, uow, limiter, ai } = makeDeps();
+    await requestExamGeneration({ pageId: PAGE }, deps, OWNER);
+    const checks = limiter.checks;
+    const calls = ai.calls.length;
+
+    const again = await requestExamGeneration(
+      { pageId: PAGE },
+      { ...deps, pages: stubPages(`  ${TEXT.toUpperCase()}  \n\n`) },
+      OWNER,
+    );
+
+    expect(!again.ok && again.error.code).toBe(EXAM_ERROR.NO_NEW_CONTENT);
+    expect(limiter.checks).toBe(checks);
+    expect(ai.calls).toHaveLength(calls);
+    expect(await stored(uow)).toHaveLength(10);
+  });
+
+  it("checks the question count before the page content", async () => {
+    const { deps } = makeDeps();
+    await requestExamGeneration({ pageId: PAGE }, deps, OWNER);
+
+    const again = await requestExamGeneration(
+      { pageId: PAGE, count: 3 },
+      deps,
+      OWNER,
+    );
+
+    expect(!again.ok && again.error.code).toBe(
+      EXAM_ERROR.INVALID_QUESTION_COUNT,
+    );
+  });
+
+  it("sends only the added and the edited paragraphs, in page order", async () => {
+    const { deps, ai } = makeDeps({
+      pages: stubPages("Primero viejo\nSegundo viejo"),
+    });
+    await requestExamGeneration({ pageId: PAGE }, deps, OWNER);
+    const before = ai.calls.length;
+
+    const second = await requestExamGeneration(
+      { pageId: PAGE },
+      {
+        ...deps,
+        pages: stubPages("Nuevo inicio\nPrimero viejo\nSegundo editado"),
+      },
+      OWNER,
+    );
+
+    expect(second.ok).toBe(true);
+    const prompt = ai.calls[before]?.prompt ?? "";
+    expect(prompt).toContain("Nuevo inicio\nSegundo editado");
+    expect(prompt).not.toContain("Primero viejo");
+  });
+
+  it("keeps the paragraphs a truncation cut new for the next generation", async () => {
+    const { deps, uow } = makeDeps({
+      pages: stubPages("a b c\nd e f\ng h i"),
+      tokenCap: 6, // 4 words: "a b c" whole, "d" of the second paragraph
+    });
+
+    const first = await requestExamGeneration({ pageId: PAGE }, deps, OWNER);
+
+    expect(first.ok && first.value.truncated).toBe(true);
+    expect(await uow.fingerprints.listByPage(PAGE, OWNER)).toEqual([
+      fingerprintParagraph("a b c"),
+    ]);
+  });
+
+  it("uses a paragraph longer than the cap once: the next Generar has nothing new", async () => {
+    const { deps, ai } = makeDeps({
+      pages: stubPages("a b c d e f"),
+      tokenCap: 4, // 3 words: only the start of the one paragraph fits
+    });
+    await requestExamGeneration({ pageId: PAGE }, deps, OWNER);
+    const calls = ai.calls.length;
+
+    const again = await requestExamGeneration({ pageId: PAGE }, deps, OWNER);
+
+    expect(!again.ok && again.error.code).toBe(EXAM_ERROR.NO_NEW_CONTENT);
+    expect(ai.calls).toHaveLength(calls);
+  });
+
+  it("stores no fingerprint when the provider fails or the write rolls back", async () => {
+    const failing = makeDeps({ ai: makeAi(["fail"]) });
+    await requestExamGeneration({ pageId: PAGE }, failing.deps, OWNER);
+    expect(await failing.uow.fingerprints.listByPage(PAGE, OWNER)).toEqual([]);
+
+    const { deps, uow } = makeDeps();
+    uow.studyItems.failNextSave = true;
+    await expect(
+      requestExamGeneration({ pageId: PAGE }, deps, OWNER),
+    ).rejects.toThrow("study item write failed");
+    expect(await uow.fingerprints.listByPage(PAGE, OWNER)).toEqual([]);
+  });
+
+  it("sends the whole page when questions exist but no fingerprint (generated before T5c)", async () => {
+    const { deps, uow, ai } = makeDeps();
+    await requestExamGeneration({ pageId: PAGE }, deps, OWNER);
+    uow.fingerprints.store.rows.clear();
+    const before = ai.calls.length;
+
+    const again = await requestExamGeneration({ pageId: PAGE }, deps, OWNER);
+
+    expect(ai.calls.length).toBeGreaterThan(before);
+    expect(ai.calls[before]?.prompt).toContain(TEXT);
+    expect(again.ok).toBe(true);
   });
 });

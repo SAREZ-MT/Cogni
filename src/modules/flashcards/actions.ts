@@ -35,9 +35,11 @@ import {
   MIN_CARD_COUNT,
   requestGeneration as requestGenerationUseCase,
 } from "./application";
+import { FLASHCARD_ERROR } from "./domain/errors";
 import { type Flashcard, MAX_FLASHCARD_SIDE_LENGTH } from "./domain/flashcard";
 import {
   DrizzleDeckUnitOfWork,
+  DrizzleFlashcardFingerprints,
   DrizzleFlashcardRepository,
 } from "./infrastructure";
 
@@ -122,6 +124,7 @@ function deps() {
     pages: createNotebooksServerApi({ db, clock: systemClock }),
     flashcards: new DrizzleFlashcardRepository(db),
     deck: new DrizzleDeckUnitOfWork(db),
+    fingerprints: new DrizzleFlashcardFingerprints(db),
     analytics: createServerAnalytics({
       key: env.NEXT_PUBLIC_POSTHOG_KEY,
       host: env.NEXT_PUBLIC_POSTHOG_HOST,
@@ -152,8 +155,11 @@ async function trackSafely(
   }
 }
 
-function statusFor(error: DomainError): "limit" | "empty" | "failed" {
+function statusFor(
+  error: DomainError,
+): "limit" | "empty" | "no_new_content" | "failed" {
   if (error.code === AI_ERROR.DAILY_LIMIT_REACHED) return "limit";
+  if (error.code === FLASHCARD_ERROR.NO_NEW_CONTENT) return "no_new_content";
   if (error.code === AI_ERROR.PAGE_EMPTY) return "empty";
   return "failed";
 }
@@ -167,7 +173,7 @@ export async function generateFlashcardsAction(
     const parsed = parseInput(generateInput, input);
     if (!parsed.ok) return parsed;
 
-    const { env, ai, pages, deck, analytics } = deps();
+    const { env, ai, pages, deck, fingerprints, analytics } = deps();
     const result = await requestGenerationUseCase(
       parsed.value,
       {
@@ -175,6 +181,7 @@ export async function generateFlashcardsAction(
         pages,
         ai,
         deck,
+        fingerprints,
         clock: systemClock,
         ids: { next: createId },
         tokenCap: env.AI_PAGE_TOKEN_CAP,

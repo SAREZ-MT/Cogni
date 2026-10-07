@@ -1,4 +1,8 @@
 import type { StudyItem } from "@/modules/study-engine";
+import {
+  InMemoryGenerationFingerprintStore,
+  type InMemoryGenerationFingerprints,
+} from "@/shared/kernel/testing/in-memory-generation-fingerprints";
 import type { RecallQuestion } from "../../domain/recall-question";
 import type {
   RecallQuestionRepositories,
@@ -68,6 +72,9 @@ export class InMemoryRecallUnitOfWork implements RecallUnitOfWork {
   constructor(
     readonly questions = new InMemoryRecallQuestionRepository(),
     readonly studyItems = new InMemoryRecallStudyItems(),
+    readonly fingerprints: InMemoryGenerationFingerprints = new InMemoryGenerationFingerprintStore().forTechnique(
+      "recall",
+    ),
   ) {}
 
   async run<T>(
@@ -79,12 +86,15 @@ export class InMemoryRecallUnitOfWork implements RecallUnitOfWork {
     if (hook) await hook(this.questions);
     const questions: RecallQuestion[] = [...this.questions.rows.values()];
     const items = this.studyItems.all();
+    const fingerprints = this.fingerprints.store.snapshot();
     try {
       return await work({
         questions: this.questions,
         studyItems: this.studyItems,
+        fingerprints: this.fingerprints,
       });
     } catch (error) {
+      this.fingerprints.store.restore(fingerprints);
       this.questions.rows.clear();
       for (const q of questions) this.questions.rows.set(q.id, q);
       this.studyItems.restore(items);

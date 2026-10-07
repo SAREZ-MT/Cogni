@@ -8,6 +8,7 @@ import { DrizzleExamUnitOfWork } from "@/modules/exams/infrastructure/drizzle-ex
 import { newStudyItem } from "@/modules/study-engine/domain/study-item";
 import {
   examQuestions,
+  generationFingerprints,
   notebooks,
   pages,
   profiles,
@@ -156,6 +157,12 @@ if (process.env.DATABASE_URL) {
       await expect(
         new DrizzleExamUnitOfWork(db).run(async (repositories) => {
           await repositories.questions.save(question.value);
+          await repositories.fingerprints.addMany({
+            ownerId: owner.id,
+            pageId,
+            fingerprints: ["e".repeat(64)],
+            now: NOW,
+          });
           await repositories.studyItems.save(item());
           await repositories.studyItems.save(item());
         }),
@@ -167,6 +174,18 @@ if (process.env.DATABASE_URL) {
         .where(eq(examQuestions.id, question.value.id));
       expect(rows).toEqual([]);
       expect(await itemFor(question.value.id)).toBeUndefined();
+      // The generation's paragraph fingerprints roll back with the question.
+      expect(
+        await db
+          .select()
+          .from(generationFingerprints)
+          .where(
+            and(
+              eq(generationFingerprints.pageId, pageId),
+              eq(generationFingerprints.fingerprint, "e".repeat(64)),
+            ),
+          ),
+      ).toEqual([]);
     });
 
     it("retires a root and suspends its item in one transaction, idempotently", async () => {

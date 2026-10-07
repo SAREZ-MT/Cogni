@@ -4,6 +4,7 @@ import type {
   RecallQuestionRepositories,
   RecallUnitOfWork,
 } from "../application/recall-unit-of-work";
+import { DrizzleRecallFingerprints } from "./drizzle-recall-fingerprints";
 import { DrizzleRecallQuestionRepository } from "./drizzle-recall-question-repository";
 
 // One Postgres transaction per run: the question repository and the
@@ -20,6 +21,7 @@ export class DrizzleRecallUnitOfWork implements RecallUnitOfWork {
       work({
         questions: new DrizzleRecallQuestionRepository(tx),
         studyItems: createStudyItemRepository(tx),
+        fingerprints: new DrizzleRecallFingerprints(tx),
       }),
     );
   }

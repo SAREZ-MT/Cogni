@@ -9,6 +9,9 @@ export const FLASHCARD_ERROR = {
   FEEDBACK_SESSION_OPEN: "FLASHCARDS_FEEDBACK_SESSION_OPEN",
   // Session feedback is requested for a session without graded answers.
   FEEDBACK_NOTHING_REVIEWED: "FLASHCARDS_FEEDBACK_NOTHING_REVIEWED",
+  // "Generar" found no paragraph this technique has not used yet (Phase 6
+  // T5c incremental generation): no AI call, no unit consumed.
+  NO_NEW_CONTENT: "FLASHCARDS_NO_NEW_CONTENT",
   SESSION_REQUIRED: "FLASHCARDS_SESSION_REQUIRED",
   INVALID_INPUT: "FLASHCARDS_INVALID_INPUT",
   UNEXPECTED: "FLASHCARDS_UNEXPECTED",

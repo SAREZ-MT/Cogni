@@ -1,7 +1,7 @@
 "use client";
 
 import { Layers, PanelRightClose, PanelRightOpen } from "lucide-react";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import {
   generateRecallQuestionsAction,
@@ -55,6 +55,16 @@ import { TECHNIQUES, type TechniqueDefinition } from "./techniques";
 
 const GENERIC_FAILURE = "No pudimos generar las tarjetas. Intenta de nuevo.";
 const LIMIT_REACHED = "Llegaste al límite de hoy. Vuelve mañana.";
+
+// Incremental generation (Phase 6 T5c): every paragraph of the page was
+// already used by that technique. Not a failure — no AI call and no unit
+// were spent — so it reads in the card's notice line, not as an error.
+const NO_NEW_CONTENT = "No hay contenido nuevo para generar";
+const NO_NEW_CONTENT_CODES = new Set([
+  "FLASHCARDS_NO_NEW_CONTENT",
+  "EXAMS_NO_NEW_CONTENT",
+  "RECALL_NO_NEW_CONTENT",
+]);
 
 // Spanish copy per ActionError code of generateFlashcardsAction; anything
 // not listed (PAGE_NOT_FOUND, FLASHCARDS_UNEXPECTED, AI_GENERATION_FAILED,
@@ -234,7 +244,9 @@ export interface TechniquesPanelProps {
   // refetches on mount).
   initialFlashcards: FlashcardView[];
   // Active recall questions on the page; refreshed after a recall generation.
-  initialRecallQuestionCount: number;
+  // null when the server could not read it: the panel reads it again on
+  // mount instead of treating the page as having no questions.
+  initialRecallQuestionCount: number | null;
   // Generations left today; null when the status could not be read.
   initialRemaining: number | null;
 }
@@ -295,6 +307,31 @@ export function TechniquesPanel({
     };
   }, [pageId]);
 
+  // Every recall count read takes a ticket; only the latest one may set the
+  // count, so a slow mount-time read never overwrites the newer count a
+  // finished generation already read.
+  const recallReadTicket = useRef(0);
+  async function refreshRecallQuestionCount(): Promise<void> {
+    recallReadTicket.current += 1;
+    const ticket = recallReadTicket.current;
+    const count = await readRecallQuestionCount(pageId);
+    if (ticket === recallReadTicket.current && count !== null) {
+      setRecallQuestionCount(count);
+    }
+  }
+
+  // Only the server read's outcome at mount matters here: a later
+  // generation re-reads the count itself.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: mount-time retry
+  useEffect(() => {
+    if (initialRecallQuestionCount !== null) return;
+    void refreshRecallQuestionCount();
+    return () => {
+      // An unmounted panel ignores the answer.
+      recallReadTicket.current += 1;
+    };
+  }, [pageId]);
+
   function toggle() {
     const next = !collapsed;
     setCollapsed(next);
@@ -315,6 +352,10 @@ export function TechniquesPanel({
         return;
       }
       if (!result.ok) {
+        if (NO_NEW_CONTENT_CODES.has(result.error.code)) {
+          setNotice(NO_NEW_CONTENT);
+          return;
+        }
         setError(ERROR_COPY[result.error.code] ?? GENERIC_FAILURE);
         if (result.error.code === "AI_DAILY_LIMIT_REACHED") setRemaining(0);
         return;
@@ -352,6 +393,10 @@ export function TechniquesPanel({
         return;
       }
       if (!result.ok) {
+        if (NO_NEW_CONTENT_CODES.has(result.error.code)) {
+          setExamNotice(NO_NEW_CONTENT);
+          return;
+        }
         setExamError(
           EXAM_ERROR_COPY[result.error.code] ?? EXAM_GENERIC_FAILURE,
         );
@@ -377,6 +422,10 @@ export function TechniquesPanel({
         return;
       }
       if (!result.ok) {
+        if (NO_NEW_CONTENT_CODES.has(result.error.code)) {
+          setRecallNotice(NO_NEW_CONTENT);
+          return;
+        }
         setRecallError(
           RECALL_ERROR_COPY[result.error.code] ?? EXAM_GENERIC_FAILURE,
         );
@@ -385,8 +434,7 @@ export function TechniquesPanel({
       }
       setRemaining(result.value.remainingToday);
       setRecallNotice(recallNoticeCopy(result.value));
-      const count = await readRecallQuestionCount(pageId);
-      if (count !== null) setRecallQuestionCount(count);
+      await refreshRecallQuestionCount();
     });
   }
 
@@ -407,7 +455,7 @@ export function TechniquesPanel({
         : [];
     }
     if (t.id === "active-recall") {
-      return recallQuestionCount > 0
+      return recallQuestionCount !== null && recallQuestionCount > 0
         ? [
             generatedRow(
               t,

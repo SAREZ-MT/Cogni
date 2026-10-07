@@ -10,7 +10,9 @@ import {
 import type { PageTextReader } from "@/modules/notebooks";
 import { createFixedClock } from "@/shared/kernel/clock";
 import { DomainError } from "@/shared/kernel/domain-error";
+import { fingerprintParagraph } from "@/shared/kernel/page-paragraphs";
 import { err, ok, type Result } from "@/shared/kernel/result";
+import { FLASHCARD_ERROR } from "../domain";
 import {
   DailyLimitReachedError,
   PAGE_EMPTY_MESSAGE,
@@ -114,6 +116,7 @@ function makeDeps(overrides: Partial<RequestGenerationDeps> = {}) {
     }),
     ai,
     deck,
+    fingerprints: deck.fingerprints,
     clock: createFixedClock(NOW),
     ids: { next: () => `card-${++ids}` },
     tokenCap: 12000,
@@ -294,11 +297,142 @@ describe("requestGeneration", () => {
     const { deps, flashcards } = makeDeps();
     await requestGeneration({ pageId: PAGE }, deps, OWNER);
 
-    const second = await requestGeneration({ pageId: PAGE }, deps, OWNER);
+    const second = await requestGeneration(
+      { pageId: PAGE },
+      {
+        ...deps,
+        pages: stubPages({
+          title: "Fotosíntesis",
+          plainText: "uno dos tres cuatro\ncinco seis",
+        }),
+      },
+      OWNER,
+    );
 
     expect(second.ok && second.value.cards.map((c) => c.position)).toEqual([
       2, 3,
     ]);
     expect(await flashcards.countByPage(PAGE, OWNER)).toBe(4);
+  });
+});
+
+// Incremental generation (Phase 6 T5c): only paragraphs this technique has
+// not sent yet reach the model; nothing new means no call and no unit.
+describe("requestGeneration — incremental", () => {
+  beforeEach(() => {
+    ids = 0;
+  });
+
+  function withText(plainText: string) {
+    return stubPages({ title: "Fotosíntesis", plainText });
+  }
+
+  it("stores the fingerprints of the sent paragraphs with the cards", async () => {
+    const { deps, deck } = makeDeps({ pages: withText("Uno dos\n\nTres") });
+
+    const result = await requestGeneration({ pageId: PAGE }, deps, OWNER);
+
+    expect(result.ok).toBe(true);
+    expect((await deck.fingerprints.listByPage(PAGE, OWNER)).sort()).toEqual(
+      [fingerprintParagraph("uno dos"), fingerprintParagraph("tres")].sort(),
+    );
+  });
+
+  it("answers NO_NEW_CONTENT without calling the AI nor consuming a unit", async () => {
+    const { deps, deck, limiter, ai } = makeDeps({
+      pages: withText("Uno dos\nTres"),
+    });
+    await requestGeneration({ pageId: PAGE }, deps, OWNER);
+    const checksBefore = limiter.checks;
+
+    const again = await requestGeneration(
+      { pageId: PAGE },
+      { ...deps, pages: withText("  UNO   dos \n\n tres ") },
+      OWNER,
+    );
+
+    expect(!again.ok && again.error.code).toBe(FLASHCARD_ERROR.NO_NEW_CONTENT);
+    expect(ai.calls).toHaveLength(1);
+    expect(limiter.checks).toBe(checksBefore);
+    expect(await deck.flashcards.countByPage(PAGE, OWNER)).toBe(2);
+  });
+
+  it("sends only the added and the edited paragraphs, in page order", async () => {
+    const { deps, ai } = makeDeps({
+      pages: withText("Primero viejo\nSegundo viejo"),
+    });
+    await requestGeneration({ pageId: PAGE }, deps, OWNER);
+
+    const second = await requestGeneration(
+      { pageId: PAGE },
+      {
+        ...deps,
+        pages: withText("Nuevo inicio\nPrimero viejo\nSegundo editado"),
+      },
+      OWNER,
+    );
+
+    expect(second.ok).toBe(true);
+    const prompt = ai.calls[1]?.prompt ?? "";
+    expect(prompt).toContain("Nuevo inicio\nSegundo editado");
+    expect(prompt).not.toContain("Primero viejo");
+    expect(second.ok && second.value).toMatchObject({
+      wordsUsed: 4,
+      wordsTotal: 4,
+    });
+  });
+
+  it("keeps the paragraphs a truncation cut new for the next generation", async () => {
+    const { deps, deck, ai } = makeDeps({
+      pages: withText("a b c\nd e f\ng h i"),
+      tokenCap: 6, // 4 words: "a b c" whole, "d" of the second paragraph
+    });
+
+    const first = await requestGeneration({ pageId: PAGE }, deps, OWNER);
+
+    expect(first.ok && first.value.truncated).toBe(true);
+    expect(await deck.fingerprints.listByPage(PAGE, OWNER)).toEqual([
+      fingerprintParagraph("a b c"),
+    ]);
+
+    await requestGeneration({ pageId: PAGE }, deps, OWNER);
+    expect(ai.calls[1]?.prompt).toContain("d e f");
+    expect(ai.calls[1]?.prompt).not.toContain("a b c");
+  });
+
+  it("uses a paragraph longer than the cap once: the next Generar has nothing new", async () => {
+    const { deps, ai, limiter } = makeDeps({
+      pages: withText("a b c d e f"),
+      tokenCap: 4, // 3 words: only the start of the one paragraph fits
+    });
+    await requestGeneration({ pageId: PAGE }, deps, OWNER);
+    const checks = limiter.checks;
+
+    const again = await requestGeneration({ pageId: PAGE }, deps, OWNER);
+
+    expect(!again.ok && again.error.code).toBe(FLASHCARD_ERROR.NO_NEW_CONTENT);
+    expect(ai.calls).toHaveLength(1);
+    expect(limiter.checks).toBe(checks);
+  });
+
+  it("stores no fingerprint when the generation fails", async () => {
+    const { deps, deck } = makeDeps({ ai: makeAi("fail") });
+
+    await requestGeneration({ pageId: PAGE }, deps, OWNER);
+
+    expect(await deck.fingerprints.listByPage(PAGE, OWNER)).toEqual([]);
+  });
+
+  it("sends the whole page when cards exist but no fingerprint (generated before T5c)", async () => {
+    const { deps, deck, ai } = makeDeps({ pages: withText("Uno\nDos") });
+    await requestGeneration({ pageId: PAGE }, deps, OWNER);
+    // A page generated before the fingerprints existed: cards, no rows.
+    deck.fingerprints.store.rows.clear();
+
+    const again = await requestGeneration({ pageId: PAGE }, deps, OWNER);
+
+    expect(again.ok).toBe(true);
+    expect(ai.calls[1]?.prompt).toContain("Uno\nDos");
+    expect(await deck.flashcards.countByPage(PAGE, OWNER)).toBe(4);
   });
 });

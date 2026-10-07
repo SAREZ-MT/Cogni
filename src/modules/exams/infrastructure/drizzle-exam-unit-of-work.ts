@@ -4,6 +4,7 @@ import type {
   ExamQuestionRepositories,
   ExamUnitOfWork,
 } from "../application/exam-unit-of-work";
+import { DrizzleExamFingerprints } from "./drizzle-exam-fingerprints";
 import { DrizzleExamQuestionRepository } from "./drizzle-exam-question-repository";
 
 // One Postgres transaction per run: the question repository and the
@@ -20,6 +21,7 @@ export class DrizzleExamUnitOfWork implements ExamUnitOfWork {
       work({
         questions: new DrizzleExamQuestionRepository(tx),
         studyItems: createStudyItemRepository(tx),
+        fingerprints: new DrizzleExamFingerprints(tx),
       }),
     );
   }

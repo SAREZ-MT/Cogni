@@ -1,4 +1,5 @@
 import type { StudyItemRepository } from "@/modules/study-engine";
+import type { GenerationFingerprintRepository } from "@/shared/kernel/generation-fingerprints";
 import type { Result } from "@/shared/kernel/result";
 import type { RecallQuestionRepository } from "../domain/recall-question-repository";
 
@@ -10,6 +11,9 @@ export type RecallStudyItems = Pick<StudyItemRepository, "save">;
 export interface RecallQuestionRepositories {
   readonly questions: RecallQuestionRepository;
   readonly studyItems: RecallStudyItems;
+  // The "recall" paragraph fingerprints of a generation (Phase 6 T5c),
+  // stored with its questions.
+  readonly fingerprints: GenerationFingerprintRepository;
 }
 
 // A unit of work over some repositories R: everything `work` writes
