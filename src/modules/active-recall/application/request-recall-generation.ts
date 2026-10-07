@@ -134,7 +134,7 @@ async function consumeUnit(
 // Incremental (Phase 6 T5c): only the paragraphs active recall has not used
 // yet on this page (new or edited) are sent, in page order and truncated to
 // the token cap; with none, NO_NEW_CONTENT is answered before the peek (no
-// call, no unit). The fingerprints of the paragraphs sent whole are stored
+// call, no unit). The used paragraphs (paragraphsWithinWords) are stored
 // in the same unit of work. A page with questions but no fingerprints
 // (generated before T5c) sends every paragraph once; the prompt still lists
 // the active questions. Removed paragraphs never archive questions.

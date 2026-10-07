@@ -86,7 +86,7 @@ function clampCount(count: number): number {
 // Incremental (Phase 6 T5c): only the paragraphs flashcards has not used
 // yet on this page (new or edited) are sent, in page order and truncated to
 // the token cap; with none, NO_NEW_CONTENT is answered before the limiter
-// (no call, no unit). The fingerprints of the paragraphs sent whole are
+// (no call, no unit). The used paragraphs (paragraphsWithinWords) are
 // stored with the cards. A page with cards but no fingerprints (generated
 // before T5c) sends every paragraph once. Removed paragraphs never remove
 // cards.

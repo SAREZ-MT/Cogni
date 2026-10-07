@@ -549,6 +549,20 @@ describe("requestExamGeneration — incremental", () => {
     ]);
   });
 
+  it("uses a paragraph longer than the cap once: the next Generar has nothing new", async () => {
+    const { deps, ai } = makeDeps({
+      pages: stubPages("a b c d e f"),
+      tokenCap: 4, // 3 words: only the start of the one paragraph fits
+    });
+    await requestExamGeneration({ pageId: PAGE }, deps, OWNER);
+    const calls = ai.calls.length;
+
+    const again = await requestExamGeneration({ pageId: PAGE }, deps, OWNER);
+
+    expect(!again.ok && again.error.code).toBe(EXAM_ERROR.NO_NEW_CONTENT);
+    expect(ai.calls).toHaveLength(calls);
+  });
+
   it("stores no fingerprint when the provider fails or the write rolls back", async () => {
     const failing = makeDeps({ ai: makeAi(["fail"]) });
     await requestExamGeneration({ pageId: PAGE }, failing.deps, OWNER);

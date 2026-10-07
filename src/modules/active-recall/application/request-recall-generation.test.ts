@@ -539,6 +539,19 @@ describe("requestRecallGeneration — incremental", () => {
     ]);
   });
 
+  it("uses a paragraph longer than the cap once: the next Generar has nothing new", async () => {
+    const { deps, ai } = makeDeps({
+      pages: stubPages("a b c d e f"),
+      tokenCap: 4, // 3 words: only the start of the one paragraph fits
+    });
+    await requestRecallGeneration({ pageId: PAGE }, deps, OWNER);
+
+    const again = await requestRecallGeneration({ pageId: PAGE }, deps, OWNER);
+
+    expect(!again.ok && again.error.code).toBe(RECALL_ERROR.NO_NEW_CONTENT);
+    expect(ai.calls).toHaveLength(1);
+  });
+
   it("stores no fingerprint when the provider fails or the write rolls back", async () => {
     const failing = makeDeps({ ai: makeAi("fail") });
     await requestRecallGeneration({ pageId: PAGE }, failing.deps, OWNER);

@@ -400,6 +400,21 @@ describe("requestGeneration — incremental", () => {
     expect(ai.calls[1]?.prompt).not.toContain("a b c");
   });
 
+  it("uses a paragraph longer than the cap once: the next Generar has nothing new", async () => {
+    const { deps, ai, limiter } = makeDeps({
+      pages: withText("a b c d e f"),
+      tokenCap: 4, // 3 words: only the start of the one paragraph fits
+    });
+    await requestGeneration({ pageId: PAGE }, deps, OWNER);
+    const checks = limiter.checks;
+
+    const again = await requestGeneration({ pageId: PAGE }, deps, OWNER);
+
+    expect(!again.ok && again.error.code).toBe(FLASHCARD_ERROR.NO_NEW_CONTENT);
+    expect(ai.calls).toHaveLength(1);
+    expect(limiter.checks).toBe(checks);
+  });
+
   it("stores no fingerprint when the generation fails", async () => {
     const { deps, deck } = makeDeps({ ai: makeAi("fail") });
 

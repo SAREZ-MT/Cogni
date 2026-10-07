@@ -26,6 +26,15 @@ describe("fingerprintParagraph", () => {
     expect(fingerprintParagraph("La célula")).toBe(sha256("la célula"));
   });
 
+  it("ignores composed vs decomposed accents (NFC)", () => {
+    const composed = "La c\u00e9lula";
+    const decomposed = "La ce\u0301lula";
+    expect(decomposed).not.toBe(composed);
+    expect(fingerprintParagraph(decomposed)).toBe(
+      fingerprintParagraph(composed),
+    );
+  });
+
   it("ignores case and whitespace differences", () => {
     expect(fingerprintParagraph("  LA   célula ")).toBe(
       fingerprintParagraph("la célula"),
@@ -150,8 +159,14 @@ describe("paragraphsWithinWords", () => {
     ]);
   });
 
-  it("keeps nothing when the first paragraph was cut", () => {
-    expect(paragraphsWithinWords(paragraphs, 1)).toEqual([]);
+  it("keeps the first paragraph when only its start fit (an oversized paragraph is used once)", () => {
+    expect(paragraphsWithinWords(paragraphs, 1).map((p) => p.text)).toEqual([
+      "uno dos",
+    ]);
+  });
+
+  it("keeps nothing when no word was sent", () => {
     expect(paragraphsWithinWords(paragraphs, 0)).toEqual([]);
+    expect(paragraphsWithinWords([], 5)).toEqual([]);
   });
 });

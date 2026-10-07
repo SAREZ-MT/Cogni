@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { countWords } from "./words";
 
 // Incremental generation (Phase 6 T5c, user decision 2026-10-06): a page's
 // plain text is split into paragraphs and each technique remembers the
@@ -11,25 +12,22 @@ export interface PageParagraph {
   readonly text: string;
   // sha256 hex of normalizeParagraph(text).
   readonly fingerprint: string;
-  // Whitespace-separated words, counted like ai's truncateToTokenCap.
+  // Words as kernel/words.ts counts them (the same count as ai's
+  // truncateToTokenCap).
   readonly words: number;
 }
 
-// Case, inner whitespace and surrounding whitespace never make a paragraph
-// new: "  La  Célula " and "la célula" are the same paragraph.
+// Case, inner whitespace, surrounding whitespace and the Unicode form of
+// accents (composed "é" or "e" + combining accent, NFC) never make a
+// paragraph new: "  La  Célula " and "la célula" are the same paragraph.
 export function normalizeParagraph(text: string): string {
-  return text.replace(/\s+/g, " ").trim().toLowerCase();
+  return text.normalize("NFC").replace(/\s+/g, " ").trim().toLowerCase();
 }
 
 export function fingerprintParagraph(text: string): string {
   return createHash("sha256")
     .update(normalizeParagraph(text), "utf8")
     .digest("hex");
-}
-
-// `text` is trimmed and never blank, so every split part is a word.
-function countWords(text: string): number {
-  return text.split(/\s+/).length;
 }
 
 // Every non-blank line is a paragraph (notebooks' extractPlainText writes
@@ -69,10 +67,13 @@ export function joinParagraphs(paragraphs: readonly PageParagraph[]): string {
   return paragraphs.map((p) => p.text).join("\n");
 }
 
-// The paragraphs of joinParagraphs(paragraphs) that a word truncation kept
-// whole: `wordsUsed` is truncateToTokenCap's count. A paragraph cut in the
-// middle (and every one after it) was not fully sent, so it stays new for
-// the next generation.
+// The paragraphs of joinParagraphs(paragraphs) a word truncation counts as
+// used: `wordsUsed` is truncateToTokenCap's count. Every paragraph it kept
+// whole is used; a paragraph cut in the middle (and every one after it)
+// stays new for the next generation — unless it is the FIRST one, i.e. a
+// single paragraph longer than the whole cap: its start was sent, so it is
+// used as is (its tail is never sent). Otherwise every "Generar" would send
+// the same cut start again and spend a generation without progress.
 export function paragraphsWithinWords(
   paragraphs: readonly PageParagraph[],
   wordsUsed: number,
@@ -83,6 +84,9 @@ export function paragraphsWithinWords(
     words += paragraph.words;
     if (words > wordsUsed) break;
     kept.push(paragraph);
+  }
+  if (kept.length === 0 && wordsUsed > 0 && paragraphs.length > 0) {
+    return [paragraphs[0]];
   }
   return kept;
 }
