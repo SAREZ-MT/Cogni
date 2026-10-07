@@ -1,4 +1,8 @@
 import type { StudyItem, StudyItemKind } from "@/modules/study-engine";
+import {
+  InMemoryGenerationFingerprintStore,
+  type InMemoryGenerationFingerprints,
+} from "@/shared/kernel/testing/in-memory-generation-fingerprints";
 import type {
   ExamQuestionRepositories,
   ExamStudyItems,
@@ -85,6 +89,9 @@ export class InMemoryExamUnitOfWork implements ExamUnitOfWork {
   constructor(
     readonly questions = new InMemoryExamQuestionRepository(),
     readonly studyItems = new InMemoryExamStudyItems(),
+    readonly fingerprints: InMemoryGenerationFingerprints = new InMemoryGenerationFingerprintStore().forTechnique(
+      "exam",
+    ),
   ) {}
 
   async run<T>(
@@ -93,14 +100,17 @@ export class InMemoryExamUnitOfWork implements ExamUnitOfWork {
     this.runs += 1;
     const questions = this.questions.snapshot();
     const items = this.studyItems.snapshot();
+    const fingerprints = this.fingerprints.store.snapshot();
     try {
       return await work({
         questions: this.questions,
         studyItems: this.studyItems,
+        fingerprints: this.fingerprints,
       });
     } catch (error) {
       this.questions.restore(questions);
       this.studyItems.restore(items);
+      this.fingerprints.store.restore(fingerprints);
       throw error;
     }
   }

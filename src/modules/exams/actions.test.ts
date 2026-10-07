@@ -55,6 +55,9 @@ vi.mock("./infrastructure", () => ({
   DrizzleExamUnitOfWork: vi.fn(function DrizzleExamUnitOfWork() {
     return current.uow;
   }),
+  DrizzleExamFingerprints: vi.fn(function DrizzleExamFingerprints() {
+    return FINGERPRINTS;
+  }),
   DrizzleExamQuestionRepository: vi.fn(
     function DrizzleExamQuestionRepository() {
       return current.uow.questions;
@@ -62,6 +65,9 @@ vi.mock("./infrastructure", () => ({
   ),
 }));
 
+const { FINGERPRINTS } = vi.hoisted(() => ({
+  FINGERPRINTS: { listByPage: async () => [], addMany: async () => {} },
+}));
 const OWNER = "3d2f9a1e-5b6c-4d7e-8f90-1a2b3c4d5e6f";
 const PAGE = "0a1b2c3d-4e5f-4061-8798-a1b2c3d4e5f6";
 const MISSING = "9f8e7d6c-5b4a-4392-8180-7f6e5d4c3b2a";
@@ -312,6 +318,28 @@ describe("exams Server Actions", () => {
       expect(track).toHaveBeenCalledTimes(1);
       expect(captureException).toHaveBeenCalledWith(
         expect.objectContaining({ message: "posthog down" }),
+      );
+    });
+
+    it("passes the exam fingerprints and tracks no_new_content for an unchanged page", async () => {
+      requestExamGeneration.mockResolvedValue(
+        err(new DomainError("EXAMS_NO_NEW_CONTENT", "nothing new")),
+      );
+      const { generateExamQuestionsAction } = await actions();
+
+      const result = await generateExamQuestionsAction({ pageId: PAGE });
+
+      expect(!result.ok && result.error.code).toBe("EXAMS_NO_NEW_CONTENT");
+      expect(requestExamGeneration).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ fingerprints: FINGERPRINTS }),
+        OWNER,
+      );
+      expect(revalidatePath).not.toHaveBeenCalled();
+      expect(track).toHaveBeenCalledWith(
+        "generation_requested",
+        OWNER,
+        expect.objectContaining({ status: "no_new_content" }),
       );
     });
 

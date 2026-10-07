@@ -84,6 +84,11 @@ is dropped), and a feedback read failure in `getExamResultsAction` returns
   blank (`AI_PAGE_EMPTY`) are checked BEFORE `limiter.check`, which
   consumes ONE unit per request; a provider failure after the check keeps
   the unit consumed, as in flashcards.
+- Incremental (Phase 6 T5c): only the paragraphs exams has not used on the
+  page yet (new or edited, by fingerprint in `generation_fingerprints`) are
+  sent; their fingerprints are stored with the questions. Nothing new
+  answers `EXAMS_NO_NEW_CONTENT` before the limiter (no AI call, no unit); a
+  page generated before T5c sends every paragraph once.
 - Prompt `generate_exam_questions/v1` (ai module) receives the truncated
   page text, the count and the page's active questions (`[concept] stem`,
   last 60) so the model avoids duplicates.

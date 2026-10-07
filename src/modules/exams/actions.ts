@@ -32,6 +32,7 @@ import {
   requestExamGeneration,
   retireExamQuestion,
 } from "./application";
+import { EXAM_ERROR } from "./domain/errors";
 import {
   EXAM_OPTION_COUNT,
   type ExamQuestion,
@@ -47,6 +48,7 @@ import {
   EXAM_MIN_QUESTIONS,
 } from "./domain/exam-session";
 import {
+  DrizzleExamFingerprints,
   DrizzleExamQuestionRepository,
   DrizzleExamUnitOfWork,
 } from "./infrastructure";
@@ -143,6 +145,7 @@ function generationDeps() {
     }),
     pages: createNotebooksServerApi({ db, clock: systemClock }),
     questions: new DrizzleExamQuestionRepository(db),
+    fingerprints: new DrizzleExamFingerprints(db),
     uow: new DrizzleExamUnitOfWork(db),
     analytics: createServerAnalytics({
       key: env.NEXT_PUBLIC_POSTHOG_KEY,
@@ -164,8 +167,11 @@ async function trackSafely(
   }
 }
 
-function statusFor(error: DomainError): "limit" | "empty" | "failed" {
+function statusFor(
+  error: DomainError,
+): "limit" | "empty" | "no_new_content" | "failed" {
   if (error.code === AI_ERROR.DAILY_LIMIT_REACHED) return "limit";
+  if (error.code === EXAM_ERROR.NO_NEW_CONTENT) return "no_new_content";
   if (error.code === AI_ERROR.PAGE_EMPTY) return "empty";
   return "failed";
 }
@@ -279,7 +285,8 @@ export async function generateExamQuestionsAction(
     const parsed = parseInput(generateInput, input);
     if (!parsed.ok) return parsed;
 
-    const { env, ai, pages, questions, uow, analytics } = generationDeps();
+    const { env, ai, pages, questions, fingerprints, uow, analytics } =
+      generationDeps();
     const result = await requestExamGeneration(
       {
         pageId: parsed.value.pageId,
@@ -290,6 +297,7 @@ export async function generateExamQuestionsAction(
         pages,
         ai,
         questions,
+        fingerprints,
         uow,
         clock: systemClock,
         ids: { next: createId },
