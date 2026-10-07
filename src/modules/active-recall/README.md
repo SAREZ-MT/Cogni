@@ -50,12 +50,38 @@ Implementado:
   `startRecallSessionAction`, `saveRecallAnswerAction` y
   `finishRecallSessionAction`. Ninguna lanza: responden `{ code, message }`
   (y `resetAt` en el límite diario).
+- Evaluación asíncrona (T6, §8.5, CU-09): `finishRecallSessionAction`
+  programa `evaluateRecallSession` con `after()` (la página de la sesión
+  declara `maxDuration = 300`, ADR 0003); cerrar nunca espera a la IA.
+  `evaluateRecallSession` reclama las respuestas pendientes (un reclamo de
+  más de 6 minutos se retoma), y por cada una: saltada → registro
+  `skipped`, puntaje IA 0, sin modelo ni unidad; escrita → una llamada
+  `evaluate_recall_answer/v1` con la rúbrica y el fragmento de la página más
+  parecido a la pregunta (`selectRelevantFragment`, recortado a
+  `AI_PAGE_TOKEN_CAP`), se guarda la salida cruda, el puntaje IA y la
+  calidad combinada (`done`); si fallan todos los proveedores se guarda el
+  intento fallido `{ source: "failed", code, generationId }` (`failed`: sin
+  calidad combinada, sin repaso SM-2, la pregunta sigue vencida). Límite
+  `AI_DAILY_EVALUATIONS` (60 respuestas evaluadas por el modelo al día): se
+  consulta antes de la llamada y se consume solo tras una evaluación
+  `done`; **si se alcanzó, la respuesta queda `failed`** con
+  `code: AI_DAILY_LIMIT_REACHED` y `resetAt` (nunca queda pendiente, así la
+  sesión termina `partial` y "Reintentar" la evalúa cuando se renueve la
+  ventana). Después registra los repasos SM-2 de las respuestas `done`
+  (calidad = combinada; seguro de repetir) y guarda el estado de la sesión
+  (`sessionEvaluationStatus`). Idempotente.
+- `evaluation-actions.ts`: `getRecallSessionResultsAction` (sondeo de
+  resultados: estado, puntajes, justificación y conceptos, promedio
+  combinado y calibración; si la sesión terminada sigue `pending` programa
+  otra corrida, que se detiene si otra corrida viva tiene los reclamos),
+  `retryRecallEvaluationAction` ("Reintentar": vuelve a `pending` las
+  fallidas y programa la evaluación) y `disagreeRecallAnswerAction` ("No
+  estoy de acuerdo": `disagreed = true`, nunca cambia el puntaje).
 - Panel "Técnicas de estudio": "Generar" conectado desde la tarea T4; desde
   T5b, la fila "Recordación activa" de "Generado en esta página" abre la
   sesión (`/active-recall/{notebookId}/{pageId}`).
 
-Pendiente: evaluación con IA (T6) y el hub y la vista de cuaderno sobre
-datos reales (T7).
+Pendiente: el hub y la vista de cuaderno sobre datos reales (T7).
 
 ## Dependencias declaradas
 

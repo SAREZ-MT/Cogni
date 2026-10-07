@@ -16,6 +16,10 @@ const { captureException } = vi.hoisted(() => ({ captureException: vi.fn() }));
 vi.mock("@sentry/nextjs", () => ({ captureException }));
 const { revalidatePath } = vi.hoisted(() => ({ revalidatePath: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath }));
+const { scheduleRecallEvaluation } = vi.hoisted(() => ({
+  scheduleRecallEvaluation: vi.fn(),
+}));
+vi.mock("./evaluation-runner", () => ({ scheduleRecallEvaluation }));
 
 const OWNER = "3d2f9a1e-5b6c-4d7e-8f90-1a2b3c4d5e6f";
 const PAGE = "0a1b2c3d-4e5f-4061-8798-a1b2c3d4e5f6";
@@ -68,6 +72,7 @@ describe("active recall session actions", () => {
     getCurrentUser.mockResolvedValue({ id: OWNER });
     captureException.mockClear();
     revalidatePath.mockClear();
+    scheduleRecallEvaluation.mockClear();
     current = {
       uow: new InMemoryRecallSessionUnitOfWork(),
       throwOnPage: false,
@@ -155,6 +160,24 @@ describe("active recall session actions", () => {
       ok({ sessionId, answeredCount: 2, evaluationStatus: "pending" }),
     );
     expect(revalidatePath).toHaveBeenCalledWith("/active-recall", "layout");
+    // The evaluation runs after the response (§8.5): closing never waits.
+    expect(scheduleRecallEvaluation).toHaveBeenCalledOnce();
+    expect(scheduleRecallEvaluation).toHaveBeenCalledWith(sessionId, OWNER);
+  });
+
+  it("schedules no evaluation for a session closed without answers", async () => {
+    await seed();
+    const { finishRecallSessionAction, startRecallSessionAction } =
+      await actions();
+    const started = await startRecallSessionAction({ pageId: PAGE });
+    if (!started.ok) throw new Error("start failed");
+
+    const finished = await finishRecallSessionAction({
+      sessionId: started.value.sessionId,
+    });
+
+    expect(finished.ok && finished.value.evaluationStatus).toBe("done");
+    expect(scheduleRecallEvaluation).not.toHaveBeenCalled();
   });
 
   it("maps refusals to their codes", async () => {

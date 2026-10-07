@@ -19,6 +19,8 @@ export const RECALL_ERROR = {
   // The question is unknown, another owner's or on another page than the
   // session's.
   QUESTION_NOT_IN_SESSION: "RECALL_QUESTION_NOT_IN_SESSION",
+  // The owner has no such answer ("No estoy de acuerdo").
+  ANSWER_NOT_FOUND: "RECALL_ANSWER_NOT_FOUND",
   // "Generar" found no paragraph active recall has not used yet on the page
   // (Phase 6 T5c incremental generation): no AI call, no unit consumed.
   NO_NEW_CONTENT: "RECALL_NO_NEW_CONTENT",

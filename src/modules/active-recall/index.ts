@@ -8,6 +8,15 @@ export {
 } from "./actions";
 export * from "./domain";
 export {
+  type DisagreedRecallAnswerView,
+  disagreeRecallAnswerAction,
+  getRecallSessionResultsAction,
+  type RecallAnswerResultView,
+  type RecallSessionResultsView,
+  type RetriedRecallEvaluationView,
+  retryRecallEvaluationAction,
+} from "./evaluation-actions";
+export {
   type FinishedRecallSessionView,
   finishRecallSessionAction,
   getRecallPageSummaryAction,

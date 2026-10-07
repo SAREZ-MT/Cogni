@@ -29,9 +29,12 @@ vi.mock("@/modules/active-recall", () => ({
   startRecallSessionAction: vi.fn(),
   saveRecallAnswerAction: vi.fn(),
   finishRecallSessionAction: vi.fn(),
+  getRecallSessionResultsAction: vi.fn(),
+  retryRecallEvaluationAction: vi.fn(),
+  disagreeRecallAnswerAction: vi.fn(),
 }));
 
-import ActiveRecallSessionPage from "./page";
+import ActiveRecallSessionPage, { maxDuration } from "./page";
 
 const NOTEBOOK = "5e6f7a8b-9c0d-4e1f-8a2b-3c4d5e6f7a8b";
 const PAGE = "0a1b2c3d-4e5f-4061-8798-a1b2c3d4e5f6";
@@ -116,5 +119,11 @@ describe("ActiveRecallSessionPage", () => {
     render(await ActiveRecallSessionPage(props()));
 
     expect(screen.getByText("Active recall — Cuaderno")).toBeInTheDocument();
+  });
+
+  // ADR 0003: the evaluation scheduled with after() by the finish action
+  // runs within this page's function budget, at most 300 s.
+  it("declares a maxDuration of 300 s for the evaluation run", () => {
+    expect(maxDuration).toBe(300);
   });
 });

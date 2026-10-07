@@ -16,6 +16,16 @@ export {
   type RecallSessionPlan,
 } from "./plan-recall-session";
 export {
+  disagreeRecallAnswer,
+  evaluationFeedbackOf,
+  getRecallSessionResults,
+  type RecallAnswerResult,
+  type RecallEvaluationFeedback,
+  type RecallResultsDeps,
+  type RecallSessionResults,
+  retryRecallEvaluation,
+} from "./recall-session-results";
+export {
   composeRecallQuestions,
   type RecallSessionRepositories,
   type RecallSessionUnitOfWork,
