@@ -68,6 +68,7 @@ let current: {
   pageText: string | null;
   generate: () => Promise<unknown>;
   throwOnPageRead: boolean;
+  checkFails: boolean;
 };
 
 vi.mock("@/modules/ai", async (importOriginal) => ({
@@ -78,6 +79,7 @@ vi.mock("@/modules/ai", async (importOriginal) => ({
     generationLimiter: {
       check: async () => {
         current.checks += 1;
+        if (current.checkFails) throw new Error("redis down");
         return current.limit;
       },
       peek: async () => current.limit,
@@ -127,6 +129,7 @@ describe("generateRecallQuestionsAction", () => {
       generate: async () =>
         ok({ object: { questions: questions(10) }, generation }),
       throwOnPageRead: false,
+      checkFails: false,
     };
   });
 
@@ -162,6 +165,22 @@ describe("generateRecallQuestionsAction", () => {
       status: "done",
       truncated: false,
     });
+  });
+
+  it("answers with the stored questions and reports a limiter failure after the commit", async () => {
+    current.checkFails = true;
+    const generate = await action();
+
+    const result = await generate({ pageId: PAGE });
+
+    expect(result.ok && result.value.created).toBe(10);
+    expect(result.ok && result.value.remainingToday).toBe(3);
+    expect(captureException).toHaveBeenCalledWith(new Error("redis down"));
+    expect(track).toHaveBeenCalledWith(
+      "generation_requested",
+      OWNER,
+      expect.objectContaining({ status: "done" }),
+    );
   });
 
   it("rejects an unauthenticated caller before doing anything", async () => {

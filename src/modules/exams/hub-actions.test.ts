@@ -134,7 +134,6 @@ describe("listExamHubAction", () => {
           passed: false,
           lastFinishedAt: FINISHED.toISOString(),
           retakePending: true,
-          ready: true,
           dueToday: 3,
           failedDueNow: false,
         },

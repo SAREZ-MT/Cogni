@@ -1,18 +1,12 @@
 "use client";
 
-import {
-  FileCheck,
-  Layers,
-  ListChecks,
-  PanelRightClose,
-  PanelRightOpen,
-  RotateCcw,
-} from "lucide-react";
-import Link from "next/link";
+import { Layers, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
-import { getSampleStudyItemsForPage } from "@/app/(app)/flashcards/_data/sample";
-import { generateRecallQuestionsAction } from "@/modules/active-recall";
+import {
+  generateRecallQuestionsAction,
+  getRecallPageSummaryAction,
+} from "@/modules/active-recall";
 import {
   EXAM_DEFAULT_QUESTIONS,
   EXAM_MAX_QUESTIONS,
@@ -26,12 +20,9 @@ import {
   generateFlashcardsAction,
   listFlashcardsAction,
 } from "@/modules/flashcards";
-import { Button } from "@/shared/ui/button";
-import { CountStepper } from "@/shared/ui/count-stepper";
 import { EmptyState } from "@/shared/ui/empty-state";
 import { IconTile } from "@/shared/ui/icon-tile";
 import { PanelToggleButton } from "@/shared/ui/panel-toggle-button";
-import { Pill } from "@/shared/ui/pill";
 import { SavedStudySection } from "@/shared/ui/saved-study-section";
 import { SidePanel } from "@/shared/ui/side-panel";
 import type { StudyItemRowProps } from "@/shared/ui/study-item-row";
@@ -42,27 +33,25 @@ import {
   TECHNIQUES_PANEL_EXPANDED,
 } from "../../../../../_components/techniques-panel-cookie";
 import { TECHNIQUES_PANEL_SLOT_ID } from "../../../../../_components/techniques-panel-slot";
-import { TECHNIQUES } from "./techniques";
+import { ExamGenerateDialog } from "./exam-generate-dialog";
+import { TECHNIQUES, type TechniqueDefinition } from "./techniques";
 
-// Examen is live since Phase 5: its card links to the page's questions
-// ("Preguntas", real data, T4) and its "Generar" creates 10-30 AI questions
-// (T5), sharing the daily generation limit with Flashcards.
-//
-// Active recall's "Generar" creates 10 AI open questions since Phase 6 T4
-// (same daily limit), but its card still renders only with `showPreviews`
-// until its session ships (T5).
-//
-// PREVIEW ONLY: the Active recall and Exámenes saved items are still design previews (user
-// decision 2026-09-24): fixed sample items, not filtered by the real
-// notebookId/pageId this panel is mounted on — see
-// getSampleStudyItemsForPage's own doc comment. They render only when the
-// page route passes `showPreviews`. Flashcards are real (Phase 3) and never
-// read this sample. `sample.ts` is a plain data module (no server-only
-// imports), so importing it here is safe.
-const STUDY_ITEMS = getSampleStudyItemsForPage();
-
-// Rows shown in the panel before pointing at the full deck page.
-const VISIBLE_CARDS = 5;
+// "Técnicas de estudio" panel (Phase 6 T5b, user decision 2026-10-06:
+// NotebookLM Studio model on the docs/design-system/screenshots/editor.png
+// layout, without the AI status card). The three technique cards only
+// generate ("Generar", coloured per technique, sharing the daily limit);
+// below, "Generado en esta página" lists one row per technique that has
+// content on this page, and a row opens that technique's practice route:
+// - Flashcards: the deck route with `?repasar=1`, which starts the graded
+//   review at once (the deck itself stays one "Volver al mazo" away);
+// - Recordación activa: the recall session route;
+// - Examen: the exam route, which itself offers the normal exam, the
+//   pending retake or the "not enough questions" state (the same href the
+//   former "Rendir examen"/"Repetir examen" buttons used).
+// The three cards are identical (user decision 2026-10-06): the same pastel
+// "Generar" and the same feedback lines; Examen's "Generar" first opens
+// ExamGenerateDialog to choose the question count. Manual exam questions
+// live in the Exams section (Exámenes → cuaderno → página → Preguntas).
 
 const GENERIC_FAILURE = "No pudimos generar las tarjetas. Intenta de nuevo.";
 const LIMIT_REACHED = "Llegaste al límite de hoy. Vuelve mañana.";
@@ -99,8 +88,8 @@ const RECALL_ERROR_COPY: Record<string, string> = {
 // The count stepper moves in steps of 5 between 10 and 30.
 const EXAM_COUNT_STEP = 5;
 
-// The page's exam start state, or null when it cannot be read (the card
-// then keeps "Rendir examen" disabled without a note).
+// The page's exam start state, or null when it cannot be read (the panel
+// then lists no exam row).
 async function readExamStart(pageId: string): Promise<ExamStartView | null> {
   try {
     const result = await getExamStartAction({ pageId });
@@ -154,6 +143,79 @@ function recallNoticeCopy(value: {
   return parts.join(" ");
 }
 
+// Recall questions on the page, or null when they cannot be read (the
+// panel then keeps the count it had).
+async function readRecallQuestionCount(pageId: string): Promise<number | null> {
+  try {
+    const result = await getRecallPageSummaryAction({ pageId });
+    return result.ok ? result.value.questionCount : null;
+  } catch {
+    return null;
+  }
+}
+
+function countCopy(count: number, one: string, many: string): string {
+  return count === 1 ? `1 ${one}` : `${count} ${many}`;
+}
+
+function generatedRow(
+  technique: TechniqueDefinition,
+  href: string,
+  detail: string,
+): StudyItemRowProps {
+  return {
+    href,
+    label: technique.name,
+    detail,
+    tone: technique.tone,
+    testId: `generated-item-${technique.id}`,
+  };
+}
+
+// The feedback lines under every technique card, identical for the three
+// (remaining generations, notice, error); `prefix` namespaces the test ids.
+function CardFeedback({
+  prefix,
+  remaining,
+  notice,
+  error,
+}: {
+  prefix: string;
+  remaining: number | null;
+  notice: string | null;
+  error: string | null;
+}) {
+  return (
+    <>
+      {remaining !== null && (
+        <p
+          data-testid={`${prefix}generation-remaining`}
+          className="text-[10.5px] text-fg-muted"
+        >
+          {remainingCopy(remaining)}
+        </p>
+      )}
+      {notice && (
+        <p
+          data-testid={`${prefix}generation-notice`}
+          className="text-[10.5px] text-fg-muted"
+        >
+          {notice}
+        </p>
+      )}
+      {error && (
+        <p
+          role="alert"
+          data-testid={`${prefix}generation-error`}
+          className="text-[10.5px] text-error-600"
+        >
+          {error}
+        </p>
+      )}
+    </>
+  );
+}
+
 function remainingCopy(remaining: number): string {
   if (remaining <= 0) return LIMIT_REACHED;
   return remaining === 1
@@ -167,13 +229,12 @@ export interface TechniquesPanelProps {
   initialCollapsed: boolean;
   notebookId: string;
   pageId: string;
-  // Server decision (designPreviewsEnabled): also list the Active recall
-  // preview and the Active recall / Exámenes sample saved items.
-  showPreviews: boolean;
   // Initial data is read by the server page and refreshed on the client
   // after each generation (the panel is hidden/collapsible, so nothing
   // refetches on mount).
   initialFlashcards: FlashcardView[];
+  // Active recall questions on the page; refreshed after a recall generation.
+  initialRecallQuestionCount: number;
   // Generations left today; null when the status could not be read.
   initialRemaining: number | null;
 }
@@ -189,8 +250,8 @@ export function TechniquesPanel({
   initialCollapsed,
   notebookId,
   pageId,
-  showPreviews,
   initialFlashcards,
+  initialRecallQuestionCount,
   initialRemaining,
 }: TechniquesPanelProps) {
   const [collapsed, setCollapsed] = useState(initialCollapsed);
@@ -200,14 +261,19 @@ export function TechniquesPanel({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [examCount, setExamCount] = useState(EXAM_DEFAULT_QUESTIONS);
+  const [examDialogOpen, setExamDialogOpen] = useState(false);
   const [examNotice, setExamNotice] = useState<string | null>(null);
   const [examError, setExamError] = useState<string | null>(null);
   const [examPending, startExamTransition] = useTransition();
   const [recallNotice, setRecallNotice] = useState<string | null>(null);
   const [recallError, setRecallError] = useState<string | null>(null);
   const [recallPending, startRecallTransition] = useTransition();
-  // Whether the page can hold an exam ("Rendir examen"); read on mount and
-  // after each question generation. Null until read or when it fails.
+  const [recallQuestionCount, setRecallQuestionCount] = useState(
+    initialRecallQuestionCount,
+  );
+  // The page's exam state (question count, pending retake) behind the exam
+  // row; read on mount and after each question generation. Null until read
+  // or when it fails.
   const [examStart, setExamStart] = useState<ExamStartView | null>(null);
   // The slot element (rendered by AppLayout) doesn't exist as a portal
   // target concept until this component looks it up after mount —
@@ -269,9 +335,9 @@ export function TechniquesPanel({
     });
   }
 
-  // The questions live on their own route (revalidated by the action), so
-  // the panel only reports what was created; "Preguntas" opens the list.
-  function generateExam() {
+  // The questions live on their own route (revalidated by the action): the
+  // panel reports what was created and re-reads the exam row.
+  function generateExam(count: number) {
     setExamNotice(null);
     setExamError(null);
     startExamTransition(async () => {
@@ -279,7 +345,7 @@ export function TechniquesPanel({
       try {
         result = await generateExamQuestionsAction({
           pageId,
-          count: examCount,
+          count,
         });
       } catch {
         setExamError(EXAM_GENERIC_FAILURE);
@@ -298,8 +364,7 @@ export function TechniquesPanel({
     });
   }
 
-  // Active recall questions have no panel list yet (T5 adds the session),
-  // so the panel only reports what was created, like Examen.
+  // Reports what was created and re-reads the recall row's count.
   function generateRecall() {
     setRecallNotice(null);
     setRecallError(null);
@@ -320,6 +385,8 @@ export function TechniquesPanel({
       }
       setRemaining(result.value.remainingToday);
       setRecallNotice(recallNoticeCopy(result.value));
+      const count = await readRecallQuestionCount(pageId);
+      if (count !== null) setRecallQuestionCount(count);
     });
   }
 
@@ -327,35 +394,41 @@ export function TechniquesPanel({
 
   const limitReached = remaining !== null && remaining <= 0;
 
-  const deckHref = `/flashcards/${notebookId}/${pageId}`;
-  const cardRows: StudyItemRowProps[] = cards
-    .slice(0, VISIBLE_CARDS)
-    .map((card) => ({
-      href: `${deckHref}#${card.id}`,
-      label: card.front,
-      detail: `${card.position + 1}`,
-      tone: "primary",
-      testId: "flashcard-item",
-      title: card.back,
-    }));
-  if (cards.length > VISIBLE_CARDS) {
-    cardRows.push({
-      href: deckHref,
-      label: "Ver el mazo completo",
-      detail: `${cards.length} tarjetas`,
-      tone: "primary",
-      testId: "flashcard-deck-link",
-    });
-  }
-  const visibleTechniques = showPreviews
-    ? TECHNIQUES
-    : TECHNIQUES.filter((t) => t.id !== "active-recall");
-  const examHref = `/exams/${notebookId}/${pageId}`;
-  const questionsHref = `${examHref}/preguntas`;
-  const canTakeExam =
-    examStart !== null &&
-    !examStart.retakePending &&
-    examStart.activeQuestionCount >= EXAM_MIN_QUESTIONS;
+  const generatedRows: StudyItemRowProps[] = TECHNIQUES.flatMap((t) => {
+    if (t.id === "flashcards") {
+      return cards.length > 0
+        ? [
+            generatedRow(
+              t,
+              `/flashcards/${notebookId}/${pageId}?repasar=1`,
+              countCopy(cards.length, "tarjeta", "tarjetas"),
+            ),
+          ]
+        : [];
+    }
+    if (t.id === "active-recall") {
+      return recallQuestionCount > 0
+        ? [
+            generatedRow(
+              t,
+              `/active-recall/${notebookId}/${pageId}`,
+              countCopy(recallQuestionCount, "pregunta", "preguntas"),
+            ),
+          ]
+        : [];
+    }
+    if (!examStart) return [];
+    const { activeQuestionCount, retakePending } = examStart;
+    if (activeQuestionCount === 0 && !retakePending) return [];
+    const count = countCopy(activeQuestionCount, "pregunta", "preguntas");
+    return [
+      generatedRow(
+        t,
+        `/exams/${notebookId}/${pageId}`,
+        retakePending ? `${count} · Repetición pendiente` : count,
+      ),
+    ];
+  });
 
   const toggleButton = (
     <PanelToggleButton
@@ -385,9 +458,11 @@ export function TechniquesPanel({
         ) : (
           <>
             <div>
-              <p className="font-semibold text-[12.5px] text-fg">Técnicas</p>
+              <p className="font-semibold text-[12.5px] text-fg">
+                Técnicas de estudio
+              </p>
               <p className="mt-0.5 text-[10px] text-fg-muted">
-                Genera contenido de estudio desde esta página
+                Genera contenido de estudio con IA
               </p>
             </div>
             {toggleButton}
@@ -396,7 +471,7 @@ export function TechniquesPanel({
       }
       collapsedContent={
         <div className="flex flex-col items-center gap-[5px] py-2.5">
-          {visibleTechniques.map((t) => (
+          {TECHNIQUES.map((t) => (
             <TechniqueIconStrip
               key={t.id}
               icon={t.icon}
@@ -409,278 +484,87 @@ export function TechniquesPanel({
       }
     >
       <div className="flex flex-col gap-[7px] p-2.5 pb-3.5">
-        {visibleTechniques.map((t) =>
-          t.id === "flashcards" ? (
+        {TECHNIQUES.map((t) => {
+          const card =
+            t.id === "flashcards"
+              ? {
+                  onGenerate: generate,
+                  pending,
+                  testId: "generate-flashcards",
+                  prefix: "",
+                  notice,
+                  error,
+                }
+              : t.id === "exam"
+                ? {
+                    onGenerate: () => setExamDialogOpen(true),
+                    pending: examPending,
+                    testId: "generate-exam-questions",
+                    prefix: "exam-",
+                    notice: examNotice,
+                    error: examError,
+                  }
+                : {
+                    onGenerate: generateRecall,
+                    pending: recallPending,
+                    testId: "generate-recall-questions",
+                    prefix: "recall-",
+                    notice: recallNotice,
+                    error: recallError,
+                  };
+          return (
             <TechniqueCard
               key={t.id}
               icon={t.icon}
               tone={t.tone}
               name={t.name}
               description={t.description}
-              onGenerate={generate}
-              pending={pending}
+              onGenerate={card.onGenerate}
+              pending={card.pending}
               disabled={limitReached}
-              generateTestId="generate-flashcards"
+              generateTestId={card.testId}
             >
-              {remaining !== null && (
-                <p
-                  data-testid="generation-remaining"
-                  className="text-[10.5px] text-fg-muted"
-                >
-                  {remainingCopy(remaining)}
-                </p>
-              )}
-              {notice && (
-                <p
-                  data-testid="generation-notice"
-                  className="text-[10.5px] text-fg-muted"
-                >
-                  {notice}
-                </p>
-              )}
-              {error && (
-                <p
-                  role="alert"
-                  data-testid="generation-error"
-                  className="text-[10.5px] text-error-600"
-                >
-                  {error}
-                </p>
-              )}
+              <CardFeedback
+                prefix={card.prefix}
+                remaining={remaining}
+                notice={card.notice}
+                error={card.error}
+              />
             </TechniqueCard>
-          ) : t.id === "exam" ? (
-            <TechniqueCard
-              key={t.id}
-              icon={t.icon}
-              tone={t.tone}
-              name={t.name}
-              description={t.description}
-              onGenerate={generateExam}
-              pending={examPending}
-              disabled={limitReached}
-              generateTestId="generate-exam-questions"
-              controls={
-                <CountStepper
-                  label="Preguntas a generar"
-                  value={examCount}
-                  min={EXAM_MIN_QUESTIONS}
-                  max={EXAM_MAX_QUESTIONS}
-                  step={EXAM_COUNT_STEP}
-                  onChange={setExamCount}
-                  disabled={examPending}
-                  testId="exam-count"
-                />
-              }
-            >
-              <Button
-                asChild
-                variant="outline"
-                size="sm"
-                className="w-full text-[11.5px]"
-              >
-                <Link href={questionsHref} data-testid="exam-questions-link">
-                  <ListChecks aria-hidden="true" size={14} strokeWidth={1.75} />
-                  Preguntas
-                </Link>
-              </Button>
-              {canTakeExam ? (
-                <Button asChild size="sm" className="w-full text-[11.5px]">
-                  <Link href={examHref} data-testid="take-exam-button">
-                    <FileCheck
-                      aria-hidden="true"
-                      size={14}
-                      strokeWidth={1.75}
-                    />
-                    Rendir examen
-                  </Link>
-                </Button>
-              ) : examStart?.retakePending &&
-                examStart.failedRootCount === 0 ? (
-                // Every failed question was retired: the exam route clears
-                // the retake and returns to the normal exam.
-                <>
-                  <Button asChild size="sm" className="w-full text-[11.5px]">
-                    <Link href={examHref} data-testid="retake-exam-button">
-                      <FileCheck
-                        aria-hidden="true"
-                        size={14}
-                        strokeWidth={1.75}
-                      />
-                      Continuar
-                    </Link>
-                  </Button>
-                  <p
-                    data-testid="exam-retake-note"
-                    className="text-[10.5px] text-fg-muted"
-                  >
-                    Retiraste las preguntas que fallaste: no queda nada por
-                    repetir.
-                  </p>
-                </>
-              ) : examStart?.retakePending &&
-                examStart.activeQuestionCount < EXAM_MIN_QUESTIONS ? (
-                <p
-                  data-testid="exam-retake-needs-questions"
-                  className="text-[10.5px] text-fg-muted"
-                >
-                  Agrega o genera preguntas para repetir el examen.
-                </p>
-              ) : examStart?.retakePending ? (
-                <>
-                  <Button asChild size="sm" className="w-full text-[11.5px]">
-                    <Link href={examHref} data-testid="retake-exam-button">
-                      <RotateCcw
-                        aria-hidden="true"
-                        size={14}
-                        strokeWidth={1.75}
-                      />
-                      Repetir examen
-                    </Link>
-                  </Button>
-                  <p
-                    data-testid="exam-retake-note"
-                    className="text-[10.5px] text-fg-muted"
-                  >
-                    {`Fallaste el último examen: ${examStart.failedRootCount} conceptos vuelven con preguntas reformuladas.`}
-                  </p>
-                </>
-              ) : (
-                <>
-                  <Button
-                    type="button"
-                    size="sm"
-                    disabled
-                    className="w-full text-[11.5px]"
-                    data-testid="take-exam-button"
-                  >
-                    <FileCheck
-                      aria-hidden="true"
-                      size={14}
-                      strokeWidth={1.75}
-                    />
-                    Rendir examen
-                  </Button>
-                  {examStart && (
-                    <p
-                      data-testid="exam-needs-questions"
-                      className="text-[10.5px] text-fg-muted"
-                    >
-                      {`Necesitas al menos ${EXAM_MIN_QUESTIONS} preguntas para rendir un examen.`}
-                    </p>
-                  )}
-                </>
-              )}
-              {limitReached && !examError && (
-                <p
-                  data-testid="exam-generation-limit"
-                  className="text-[10.5px] text-fg-muted"
-                >
-                  {LIMIT_REACHED}
-                </p>
-              )}
-              {examNotice && (
-                <p
-                  data-testid="exam-generation-notice"
-                  className="text-[10.5px] text-fg-muted"
-                >
-                  {examNotice}
-                </p>
-              )}
-              {examError && (
-                <p
-                  role="alert"
-                  data-testid="exam-generation-error"
-                  className="text-[10.5px] text-error-600"
-                >
-                  {examError}
-                </p>
-              )}
-            </TechniqueCard>
-          ) : (
-            <TechniqueCard
-              key={t.id}
-              icon={t.icon}
-              tone={t.tone}
-              name={t.name}
-              description={t.description}
-              onGenerate={generateRecall}
-              pending={recallPending}
-              disabled={limitReached}
-              generateTestId="generate-recall-questions"
-            >
-              {limitReached && !recallError && (
-                <p
-                  data-testid="recall-generation-limit"
-                  className="text-[10.5px] text-fg-muted"
-                >
-                  {LIMIT_REACHED}
-                </p>
-              )}
-              {recallNotice && (
-                <p
-                  data-testid="recall-generation-notice"
-                  className="text-[10.5px] text-fg-muted"
-                >
-                  {recallNotice}
-                </p>
-              )}
-              {recallError && (
-                <p
-                  role="alert"
-                  data-testid="recall-generation-error"
-                  className="text-[10.5px] text-error-600"
-                >
-                  {recallError}
-                </p>
-              )}
-            </TechniqueCard>
-          ),
-        )}
+          );
+        })}
+        <ExamGenerateDialog
+          open={examDialogOpen}
+          onOpenChange={setExamDialogOpen}
+          count={examCount}
+          onCountChange={setExamCount}
+          min={EXAM_MIN_QUESTIONS}
+          max={EXAM_MAX_QUESTIONS}
+          step={EXAM_COUNT_STEP}
+          onConfirm={generateExam}
+        />
 
-        <div className="mt-1 flex items-center gap-1.5 px-0.5">
-          <p className="font-medium text-[10px] text-fg-muted uppercase tracking-[0.06em]">
-            Generado en esta página
-          </p>
-        </div>
-        <div className="flex flex-col gap-2">
-          {cardRows.length > 0 ? (
-            <SavedStudySection label="Mazo de esta página" items={cardRows} />
-          ) : (
+        <SavedStudySection
+          label="Generado en esta página"
+          items={generatedRows}
+          className="mt-1"
+          empty={
             <EmptyState
               variant="tinted"
               icon={
-                <IconTile size="30" tone="primary" radius="md">
+                <IconTile size="30" tone="warning" radius="md">
                   <Layers aria-hidden="true" size={16} strokeWidth={1.75} />
                 </IconTile>
               }
-              title="Aún no hay tarjetas en esta página"
+              title="Aún no generaste nada en esta página"
               titleAs="p"
               titleClassName="text-xs"
-              description="Pulsa Generar en Flashcards para crearlas."
+              description="Pulsa Generar en una técnica para crear tu material de estudio."
               descriptionClassName="text-[10.5px]"
               className="px-3 py-4"
             />
-          )}
-        </div>
-        {showPreviews && (
-          <>
-            <div className="mt-1 flex items-center gap-1.5 px-0.5">
-              <Pill size="sm" tone="neutral">
-                Vista previa
-              </Pill>
-            </div>
-            <div className="flex flex-col gap-2">
-              <SavedStudySection
-                label="Sesiones de Active Recall"
-                items={STUDY_ITEMS.activeRecall}
-              />
-              <SavedStudySection
-                label="Exámenes recientes"
-                items={STUDY_ITEMS.exam}
-              />
-            </div>
-          </>
-        )}
+          }
+        />
       </div>
     </SidePanel>,
     slotNode,

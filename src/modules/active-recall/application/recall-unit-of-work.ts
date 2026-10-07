@@ -12,15 +12,16 @@ export interface RecallQuestionRepositories {
   readonly studyItems: RecallStudyItems;
 }
 
-// Unit of work over a page's questions and their study items: everything
-// `work` writes through the given repositories commits together, and a
-// thrown error rolls it back. Questions and study items live in two
-// modules, so the transaction boundary is this port.
-export interface RecallUnitOfWork {
-  run<T>(
-    work: (repositories: RecallQuestionRepositories) => Promise<T>,
-  ): Promise<T>;
+// A unit of work over some repositories R: everything `work` writes
+// through them commits together, and a thrown error rolls it back.
+export interface UnitOfWorkOf<R> {
+  run<T>(work: (repositories: R) => Promise<T>): Promise<T>;
 }
+
+// Unit of work over a page's questions and their study items. Questions
+// and study items live in two modules, so the transaction boundary is this
+// port.
+export type RecallUnitOfWork = UnitOfWorkOf<RecallQuestionRepositories>;
 
 // Carries an err Result out of RecallUnitOfWork.run as a throw, so the
 // unit of work rolls back; runRecallWork turns it back into the Result.
@@ -34,9 +35,9 @@ class RollbackSignal<E> extends Error {
 // Runs a Result-returning work in one unit of work. Returning err from
 // inside `run` would commit whatever was written before the refusal, so an
 // err rolls everything back and is returned as is. Thrown errors propagate.
-export async function runRecallWork<T, E>(
-  uow: RecallUnitOfWork,
-  work: (repositories: RecallQuestionRepositories) => Promise<Result<T, E>>,
+export async function runRecallWork<R, T, E>(
+  uow: UnitOfWorkOf<R>,
+  work: (repositories: R) => Promise<Result<T, E>>,
 ): Promise<Result<T, E>> {
   try {
     return await uow.run(async (repositories) => {

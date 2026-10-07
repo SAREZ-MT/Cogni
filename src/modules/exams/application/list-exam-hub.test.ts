@@ -59,7 +59,7 @@ describe("listExamHub", () => {
     expect(calls.sort()).toEqual([`due:${OWNER}`, `reader:${OWNER}`]);
   });
 
-  it("maps a never-examined page: no score, not passed, ready with 10 questions", async () => {
+  it("maps a never-examined page: no score, not passed", async () => {
     const { deps: d } = deps([hubPage()]);
 
     const result = await listExamHub(d, OWNER);
@@ -77,19 +77,10 @@ describe("listExamHub", () => {
         passed: false,
         lastFinishedAt: null,
         retakePending: false,
-        ready: true,
         dueToday: 0,
         failedDueNow: false,
       },
     ]);
-  });
-
-  it("is not ready below 10 active questions", async () => {
-    const { deps: d } = deps([hubPage({ activeQuestionCount: 9 })]);
-
-    const result = await listExamHub(d, OWNER);
-
-    expect(result.ok && result.value[0]?.ready).toBe(false);
   });
 
   it("reports the last exam's whole percent rounded down and its outcome", async () => {

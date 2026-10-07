@@ -10,6 +10,8 @@ import { SectionHeader, SectionTitle } from "@/shared/ui/section-header";
 import { SetBreadcrumb } from "../../_components/breadcrumb";
 import { formatUpdatedAt } from "../../_components/format";
 import { plural } from "../../flashcards/_lib/plural";
+import { CreateExamDialog } from "../_components/create-exam-dialog";
+import { loadCreateExamNotebooks } from "../_lib/create-exam-notebooks";
 
 interface ExamsNotebookPageProps {
   params: Promise<{ notebookId: string }>;
@@ -28,7 +30,10 @@ export default async function ExamsNotebookPage({
   const notebookTitle = await getNotebookTitleForRoute(notebookId);
   if (!notebookTitle) notFound();
 
-  const result = await listExamHubAction();
+  const [result, createExamNotebooks] = await Promise.all([
+    listExamHubAction(),
+    loadCreateExamNotebooks(),
+  ]);
   // A failed read shows the load error in the empty state, never a false
   // "Sin exámenes todavía".
   const pages = result.ok
@@ -53,6 +58,12 @@ export default async function ExamsNotebookPage({
           title={notebookTitle}
           titleClassName="text-xl"
           description={`${plural(totalAttempts, "examen", "exámenes")} · ${plural(pages.length, "página", "páginas")} con preguntas`}
+          actions={
+            <CreateExamDialog
+              notebooks={createExamNotebooks}
+              initialNotebookId={notebookId}
+            />
+          }
         />
       </div>
 

@@ -149,6 +149,7 @@ export async function generateRecallQuestionsAction(
         clock: systemClock,
         ids: { next: createId },
         tokenCap: env.AI_PAGE_TOKEN_CAP,
+        onLimiterFailure: (error) => Sentry.captureException(error),
       },
       ownerId.value,
     );

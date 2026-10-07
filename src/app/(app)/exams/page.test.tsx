@@ -5,7 +5,13 @@ const { listExamHubAction } = vi.hoisted(() => ({
   listExamHubAction: vi.fn(),
 }));
 vi.mock("@/modules/exams", () => ({ listExamHubAction }));
+const { getSidebarTree, CreateExamDialog } = vi.hoisted(() => ({
+  getSidebarTree: vi.fn(),
+  CreateExamDialog: vi.fn(() => null),
+}));
+vi.mock("./_components/create-exam-dialog", () => ({ CreateExamDialog }));
 vi.mock("@/modules/notebooks", () => ({
+  getSidebarTree,
   COLOR_PALETTE: [
     "pink",
     "green",
@@ -70,6 +76,9 @@ const ENTRIES = [
 
 describe("ExamsHubPage (real data)", () => {
   beforeEach(() => {
+    getSidebarTree.mockReset();
+    getSidebarTree.mockResolvedValue([]);
+    CreateExamDialog.mockClear();
     listExamHubAction.mockReset();
     listExamHubAction.mockResolvedValue({ ok: true, value: ENTRIES });
   });
@@ -130,16 +139,6 @@ describe("ExamsHubPage (real data)", () => {
     expect(screen.getByText("0 pendientes de repetir")).toBeInTheDocument();
   });
 
-  it("starts a new exam on the first page with questions", async () => {
-    render(await ExamsHubPage());
-
-    expect(screen.getByRole("link", { name: /Nuevo examen/ })).toHaveAttribute(
-      "href",
-      "/exams/biologia/mitocondria",
-    );
-    expect(screen.getByText("3 páginas con preguntas")).toBeInTheDocument();
-  });
-
   it("shows one card per notebook with its exams and latest score", async () => {
     render(await ExamsHubPage());
 
@@ -188,10 +187,10 @@ describe("ExamsHubPage (real data)", () => {
     expect(screen.getByText("Aún no tienes exámenes")).toBeInTheDocument();
     expect(
       screen.getByText(
-        "Abre una página en el editor y usa Técnicas → Examen → Generar.",
+        "Usa «Crear examen» para elegir una página y generar o escribir sus preguntas.",
       ),
     ).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /Nuevo examen/ })).toBeNull();
+    expect(screen.queryByText(/Técnicas → Examen/)).toBeNull();
   });
 
   it("shows the load error in the empty state when the pages cannot load", async () => {
@@ -261,40 +260,55 @@ describe("ExamsHubPage (real data)", () => {
     expect(screen.queryByText(/vencen mañana/)).toBeNull();
   });
 
-  it("starts a new exam on the first page that is ready", async () => {
-    listExamHubAction.mockResolvedValue({
-      ok: true,
-      value: [
-        { ...ENTRIES[0], questionCount: 6, ready: false },
-        ENTRIES[1],
-        ENTRIES[2],
-      ],
-    });
-
+  it("offers only 'Crear examen' in the header: no 'Nuevo examen' quick start", async () => {
     render(await ExamsHubPage());
 
-    expect(screen.getByRole("link", { name: /Nuevo examen/ })).toHaveAttribute(
-      "href",
-      "/exams/biologia/membrana",
-    );
+    expect(CreateExamDialog).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("Nuevo examen")).toBeNull();
+    expect(screen.queryByText(/páginas con preguntas/)).toBeNull();
   });
 
-  it("sends a new exam to the first page's questions when no page is ready", async () => {
-    listExamHubAction.mockResolvedValue({
-      ok: true,
-      value: ENTRIES.map((page) => ({
-        ...page,
-        questionCount: 4,
-        ready: false,
-      })),
+  describe("Crear examen (Phase 6 T5b)", () => {
+    const TREE = [
+      {
+        id: "nb-1",
+        title: "Biología",
+        icon: null,
+        color: "green",
+        pages: [{ id: "p-1", title: "Mitocondria" }],
+      },
+    ];
+
+    it("offers 'Crear examen' with the owner's notebooks and their pages", async () => {
+      getSidebarTree.mockResolvedValue(TREE);
+      listExamHubAction.mockResolvedValue({ ok: true, value: [] });
+
+      render(await ExamsHubPage());
+
+      expect(CreateExamDialog).toHaveBeenCalledTimes(1);
+      const [props] = CreateExamDialog.mock.calls[0] as unknown as [
+        Record<string, unknown>,
+      ];
+      expect(props.notebooks).toEqual([
+        {
+          id: "nb-1",
+          title: "Biología",
+          pages: [{ id: "p-1", title: "Mitocondria" }],
+        },
+      ]);
+      expect(props.initialNotebookId).toBeUndefined();
     });
 
-    render(await ExamsHubPage());
+    it("still offers it with no notebooks when the tree cannot be read", async () => {
+      getSidebarTree.mockRejectedValue(new Error("db down"));
+      listExamHubAction.mockResolvedValue({ ok: true, value: [] });
 
-    expect(screen.getByRole("link", { name: /Nuevo examen/ })).toHaveAttribute(
-      "href",
-      "/exams/biologia/mitocondria/preguntas",
-    );
-    expect(screen.getByText("3 páginas con preguntas")).toBeInTheDocument();
+      render(await ExamsHubPage());
+
+      const [props] = CreateExamDialog.mock.calls[0] as unknown as [
+        Record<string, unknown>,
+      ];
+      expect(props.notebooks).toEqual([]);
+    });
   });
 });

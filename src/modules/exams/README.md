@@ -188,7 +188,7 @@ is dropped), and a feedback read failure in `getExamResultsAction` returns
   a window count), never one per page. Shared contract
   `application/testing/exam-hub-reader.contract.ts` (fake + `pnpm test:db`).
 - `listExamHub` adds the whole-percent last score (rounded down, as on the
-  results screen), `ready` (at least 10 roots) and `dueToday`, the page's
+  results screen) and `dueToday`, the page's
   exam questions due now from scheduling's "Repasos de hoy"
   (`createSchedulingServerApi().listDueToday`, `due.exam_question`). A
   failing due list degrades to `dueToday: null` (reported to Sentry), never
@@ -197,8 +197,10 @@ is dropped), and a feedback read failure in `getExamResultsAction` returns
   the last exam has its item due now (study-engine `listDue` filtered to
   those roots through the `ExamDueCounts` port, built in `hub-actions.ts`);
   `null` when unreadable, and the banner falls back to neutral copy.
-- The hub's "Nuevo examen" opens the first ready page, else the first
-  page's `/preguntas`.
+- The hub's header offers only "Crear examen" (Phase 6 T5b): pick a
+  notebook and a page, then generate the questions with AI or write them on
+  the page's `/preguntas` screen; the former "Nuevo examen" quick start was
+  removed.
 
 ## Domain
 

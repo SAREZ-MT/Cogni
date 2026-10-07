@@ -1,8 +1,24 @@
 export {
+  type FinishedRecallSession,
+  type FinishRecallSessionDeps,
+  finishRecallSession,
+} from "./finish-recall-session";
+export {
+  type PlanRecallSessionDeps,
+  planRecallSession,
+  type RecallSessionPlan,
+} from "./plan-recall-session";
+export {
+  composeRecallQuestions,
+  type RecallSessionRepositories,
+  type RecallSessionUnitOfWork,
+} from "./recall-session-work";
+export {
   type RecallQuestionRepositories,
   type RecallStudyItems,
   type RecallUnitOfWork,
   runRecallWork,
+  type UnitOfWorkOf,
 } from "./recall-unit-of-work";
 export {
   RECALL_GENERATION_COUNT,
@@ -12,3 +28,14 @@ export {
   type RequestRecallGenerationResult,
   requestRecallGeneration,
 } from "./request-recall-generation";
+export {
+  type SaveRecallAnswerDeps,
+  type SaveRecallAnswerInput,
+  saveRecallAnswer,
+} from "./save-recall-answer";
+export {
+  type RecallSessionQuestion,
+  type StartedRecallSession,
+  type StartRecallSessionDeps,
+  startRecallSession,
+} from "./start-recall-session";

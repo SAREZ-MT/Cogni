@@ -210,10 +210,14 @@ anatomy; simplified per user decision 2026-09-24 — a card has **only** a
 - Anatomy: icon tile (`IconTile` size `"30"` — closest existing token to the
   reference's 32px — radius `"md"`) + name + description, then one
   full-width `Button` reading "Generar" with a leading `Sparkles` icon
-  (12px, strokeWidth 2). The button is a **solid** tone-colored fill with
-  white text (`bg-primary-600`/`bg-success-600`/`bg-pastel-pink-fg`, not the
-  pastel `IconTile` pair) — matching studyplatform's `ActiveRecallCard`/
-  `ExamCard` buttons (`#059669`/`#9B2C4A`, both exact token matches) — kept
+  (12px, strokeWidth 2). The three buttons share every class
+  (`w-full font-semibold text-[11.5px] hover:brightness-95`) except the
+  technique's **soft pastel pair** (Phase 6 T5b, user decision 2026-10-06 —
+  solid fills were too strong): yellow `bg-pastel-yellow` +
+  `text-pastel-yellow-fg` (6.4:1), green `bg-pastel-mint` +
+  `text-pastel-mint-fg` (6.8:1; chosen over `pastel-green-fg`, 4.6:1) and
+  rose `bg-pastel-pink` + `text-pastel-pink-fg` (5.9:1) — every label meets
+  WCAG AA at 11.5px; hover darkens the same pair (`brightness-95`), kept
   at `disabled:opacity-60` + `disabled:cursor-not-allowed` (explicit
   `disabled:` variants so they replace, not stack with, Button's own
   `disabled:opacity-50`) instead of going fully gray, so the panel still
@@ -221,40 +225,43 @@ anatomy; simplified per user decision 2026-09-24 — a card has **only** a
   also get `aria-disabled` and `title="Disponible pronto"`.
 - `TechniqueIconStrip`: the collapsed-state 36x36 tinted tile (`IconTile`
   size `"36"` radius `"input"`) with a native `title` tooltip; `opacity-35`
-  when `available` is false (default). Unchanged by this pass.
-- `TechniqueTone`: `"primary" | "green" | "pink"` — mapped onto **existing**
-  `IconTile` tones for the icon tile, and onto `primary-600`/`success-600`/
-  `pastel-pink-fg` for the solid button fill. No new tone was needed.
+  when `available` is false (default).
+- `TechniqueTone`: `"yellow" | "green" | "rose"` (Flashcards / Recordación
+  activa / Examen) — mapped onto the **existing** pastel `IconTile` tones
+  `yellow` / `mint` / `pink`, the same pairs as the button, for the icon tile
+  (tagged `data-part="technique-icon"`). No new token was needed.
 
 - `controls?` (Phase 5 T5): options of the action rendered between the
-  description and the button — Examen passes a `CountStepper` ("Preguntas a
-  generar", 10–30 in steps of 5). Flashcards passes none.
+  description and the button. No card passes it since Phase 6 T5b v2:
+  Examen's question count moved into `ExamGenerateDialog` (page route
+  component composing `Dialog` + `CountStepper` + `Button`), so the three
+  cards look the same.
 
 Used by: `techniques-panel.tsx`.
 
-**Preview gate.** Flashcards are real since Phase 3 (Generar, quota counter,
-the page's cards); active recall and exams are still sample-data previews
-until their routes land. The page route (`pages/[pageId]/page.tsx`) always
-renders `TechniquesPanel` and passes `showPreviews={designPreviewsEnabled()}`:
-with previews off (production) the panel shows only the Flashcards card and
-the page's real deck; with previews on it also lists the two preview
-techniques and their sample saved sections under a "Vista previa" pill.
+**Generated list (Phase 6 T5b).** The panel no longer has sample previews:
+all three techniques are real, and below the cards one `SavedStudySection`
+("Generado en esta página") lists one `StudyItemRow` per technique with
+content on the page (NotebookLM Studio model). Cards only generate — no
+practice button or deck/exam link inside a card; Examen's "Preguntas" link
+was removed too (manual questions live in Exámenes → cuaderno → página).
 `SavedStudySection` keys rows by tone + href + label, so rows sharing a label
 need distinct hrefs.
 
 ## StudyItemRow (`study-item-row.tsx`)
 
-A single saved-study-item row inside the "Técnicas" panel (design/
-shell-look, studyplatform `StudyPanel.tsx` "Mazos guardados" row anatomy):
-a `bg-neutral-50`/`border-border-subtle` pill-radius (`rounded-[9px]`) row
-with a 6px tone dot, an 11.5px/500 truncating label, a 10px muted detail
-string, and a muted `ChevronRight` (10/2). The whole row is a `Link` —
-clicking it goes straight to that item's study session.
+A single generated-item row inside the "Técnicas de estudio" panel
+(Phase 6 T5b, `docs/design-system/screenshots/editor.png` "Mazos guardados"
+row anatomy): a white `bg-card`/`border-border-subtle` `rounded-input` row
+(`px-3 py-2`) with a 6px tone dot, an 11.5px/500 truncating label over a
+10px muted meta line, and a muted `ChevronRight` (12/2). The whole row is a
+`Link` — clicking it goes straight to that item's practice route.
 
-- `href`, `label`, `detail` (free-form right-aligned text, e.g. "8 tarjetas
-  · 5 pendientes"), `tone: "primary" | "green" | "pink"` (dot color —
-  `primary-600`/`success-600`/`pastel-pink-fg`), `testId?` (e2e hook),
-  `title?` (native tooltip), `className?`.
+- `href`, `label`, `detail` (free-form meta line under the label, e.g. "24
+  tarjetas" or "12 preguntas · Repetición pendiente"), `tone: "yellow" |
+  "green" | "rose"` (dot colour — `warning-500`/`success-600`/`rose-600`,
+  the technique colours of `TechniqueCard`), `testId?` (e2e hook), `title?`
+  (native tooltip), `className?`.
 - `StudyItemTone` is its own type (not imported from `technique-card.tsx`)
   so this atom has no dependency on the technique-card module.
 
@@ -269,16 +276,40 @@ label (`tracking-[0.06em]`), then the rows. Renders nothing when `items` is
 empty, so a group with no content simply disappears — same behavior as the
 reference.
 
-- `label`, `items: StudyItemRowProps[]`, `className?`.
+- `label`, `items: StudyItemRowProps[]`, `empty?: ReactNode` (shown under
+  the label when `items` is empty; without it an empty group renders
+  nothing), `className?`.
 
-Used by: `techniques-panel.tsx`, once per technique (`Mazo de esta página` /
-`Sesiones de Active Recall` / `Exámenes recientes`), below a "Generado en
-esta página" title + a neutral `Pill` "Vista previa" (the section's data
-comes from `flashcards/_data/sample.ts`'s `getSampleStudyItemsForPage()` —
-fixed sample items, not filtered by the real page, since there's no backend
-yet). The flashcards group is always at most one item: one page owns at most
-one deck (product rule 2026-09-24), so "Mazo de esta página" never lists more
-than the page's own deck.
+Used by: `techniques-panel.tsx`, once, as "Generado en esta página": one row
+per technique with content on the page (Flashcards → "N tarjetas", deck
+route with `?repasar=1`; Recordación activa → "N preguntas", recall session
+route; Examen → "N preguntas" plus "· Repetición pendiente" while a retake is
+pending, exam route), with a tinted `EmptyState` as `empty` when nothing was
+generated yet.
+
+## NativeSelect (`native-select.tsx`)
+
+A native `<select>` with the `Input` atom's field chrome (`h-8`,
+`rounded-lg`, `border-input`, focus ring, disabled opacity) for short pick
+lists (Phase 6 T5b, "Crear examen" notebook and page pickers). Native on
+purpose: keyboard, screen readers and mobile pickers work without a custom
+listbox. Forwards every `<select>` prop; `className` merges.
+
+Used by: `exams/_components/create-exam-dialog.tsx`.
+
+## ChoiceGroup (`choice-group.tsx`)
+
+A single-choice list of bordered rows with radio semantics
+(`role="radiogroup"` + `role="radio"`/`aria-checked`), each with a label and
+an optional muted description. Unchecked rows use `OptionRow`'s default
+palette (`border-neutral-200/80 bg-card`), the checked row its selected
+palette (`border-rose-500 bg-pastel-pink/30`).
+
+- `options: { value, label, description? }[]`, `value`, `onChange`,
+  `aria-label`, `testId?` (each row gets `${testId}-${value}`), `className?`.
+
+Used by: `exams/_components/create-exam-dialog.tsx` ("Generar con IA" /
+"Crear mis preguntas").
 
 ## ViewToggle (`view-toggle.tsx`)
 

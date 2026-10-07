@@ -30,10 +30,10 @@ vi.mock("next/headers", () => ({
   cookies: async () => ({ get: cookieGet }),
 }));
 
-const { designPreviewsEnabled } = vi.hoisted(() => ({
-  designPreviewsEnabled: vi.fn(() => true),
+const { getRecallPageSummaryAction } = vi.hoisted(() => ({
+  getRecallPageSummaryAction: vi.fn(),
 }));
-vi.mock("@/shared/config/design-previews", () => ({ designPreviewsEnabled }));
+vi.mock("@/modules/active-recall", () => ({ getRecallPageSummaryAction }));
 
 const { TechniquesPanel } = vi.hoisted(() => ({
   TechniquesPanel: vi.fn(() => null),
@@ -125,8 +125,11 @@ async function renderRoute() {
 describe("page route ingestion wiring", () => {
   beforeEach(() => {
     cookieGet.mockReset();
-    designPreviewsEnabled.mockReset();
-    designPreviewsEnabled.mockReturnValue(true);
+    getRecallPageSummaryAction.mockReset();
+    getRecallPageSummaryAction.mockResolvedValue({
+      ok: true,
+      value: { questionCount: 0 },
+    });
     getNotebookTitleForRoute.mockReset();
     getNotebookTitleForRoute.mockResolvedValue("Biología Celular");
     listFlashcardsAction.mockReset();
@@ -379,9 +382,9 @@ describe("page route ingestion wiring", () => {
     });
   });
 
-  // Flashcards are real since Phase 3, so the panel always renders; the
-  // server decides only whether the still-sample techniques (Active recall,
-  // Exámenes) appear in it, via `showPreviews`.
+  // The "Técnicas de estudio" panel always renders on real data (Phase 6
+  // T5b): the server reads its initial cards, recall question count and
+  // remaining generations; there are no sample items any more.
   describe("techniques panel", () => {
     beforeEach(() => {
       getPageForRoute.mockResolvedValue(page());
@@ -389,10 +392,10 @@ describe("page route ingestion wiring", () => {
     });
 
     type PanelProps = {
-      showPreviews: boolean;
       notebookId: string;
       pageId: string;
       initialFlashcards: unknown[];
+      initialRecallQuestionCount: number;
       initialRemaining: number | null;
     };
 
@@ -402,28 +405,48 @@ describe("page route ingestion wiring", () => {
       return (panel as ReactElement<PanelProps>).props;
     }
 
-    it("renders the panel with previews on, passing the page identity", async () => {
-      designPreviewsEnabled.mockReturnValue(true);
+    it("renders the panel with the page identity and no preview flag", async () => {
+      const props = await renderPanelProps();
+
+      expect(props.notebookId).toBe("nb-1");
+      expect(props.pageId).toBe("page-1");
+      expect(props).not.toHaveProperty("showPreviews");
+    });
+
+    it("loads the page's recall question count on the server", async () => {
+      getRecallPageSummaryAction.mockResolvedValue({
+        ok: true,
+        value: { questionCount: 10 },
+      });
 
       const props = await renderPanelProps();
 
-      expect(props.showPreviews).toBe(true);
-      expect(props.notebookId).toBe("nb-1");
-      expect(props.pageId).toBe("page-1");
+      expect(getRecallPageSummaryAction).toHaveBeenCalledWith({
+        pageId: "page-1",
+      });
+      expect(props.initialRecallQuestionCount).toBe(10);
     });
 
-    it("still renders the panel with previews off, flagged as no previews", async () => {
-      designPreviewsEnabled.mockReturnValue(false);
+    it.each([
+      [
+        "refuses",
+        async () => ({
+          ok: false,
+          error: { code: "RECALL_UNEXPECTED", message: "x" },
+        }),
+      ],
+      [
+        "throws",
+        async () => {
+          throw new Error("boom");
+        },
+      ],
+    ])("degrades to no recall questions when the summary %s", async (_, read) => {
+      getRecallPageSummaryAction.mockImplementation(read);
 
-      const [section, panel] = await renderFragment();
+      const props = await renderPanelProps();
 
-      expect((panel as ReactElement).type).toBe(TechniquesPanel);
-      expect((panel as ReactElement<PanelProps>).props.showPreviews).toBe(
-        false,
-      );
-      expect((section.props as { className: string }).className).toContain(
-        "max-w-2xl",
-      );
+      expect(props.initialRecallQuestionCount).toBe(0);
     });
 
     it("loads the page's cards and the remaining generations on the server", async () => {

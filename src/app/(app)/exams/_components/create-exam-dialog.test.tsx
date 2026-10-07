@@ -1,0 +1,259 @@
+import { act, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const { push, refresh } = vi.hoisted(() => ({
+  push: vi.fn(),
+  refresh: vi.fn(),
+}));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push, refresh }) }));
+const { generateExamQuestionsAction } = vi.hoisted(() => ({
+  generateExamQuestionsAction: vi.fn(),
+}));
+vi.mock("@/modules/exams", () => ({
+  EXAM_DEFAULT_QUESTIONS: 10,
+  EXAM_MAX_QUESTIONS: 30,
+  EXAM_MIN_QUESTIONS: 10,
+  generateExamQuestionsAction,
+}));
+
+import {
+  CreateExamDialog,
+  type CreateExamNotebook,
+} from "./create-exam-dialog";
+
+const NOTEBOOKS: CreateExamNotebook[] = [
+  {
+    id: "nb-bio",
+    title: "Biología",
+    pages: [
+      { id: "p-mito", title: "Mitocondria" },
+      { id: "p-ribo", title: "Ribosomas" },
+    ],
+  },
+  {
+    id: "nb-calc",
+    title: "Cálculo",
+    pages: [{ id: "p-der", title: "Derivadas" }],
+  },
+  { id: "nb-empty", title: "Vacío", pages: [] },
+];
+
+function generated(created = 10) {
+  return {
+    ok: true,
+    value: {
+      questions: [],
+      created,
+      skipped: 0,
+      remainingToday: 4,
+      truncated: false,
+      wordsUsed: 10,
+      wordsTotal: 10,
+    },
+  };
+}
+
+async function open(
+  props: Partial<React.ComponentProps<typeof CreateExamDialog>> = {},
+) {
+  const user = userEvent.setup();
+  render(<CreateExamDialog notebooks={NOTEBOOKS} {...props} />);
+  await user.click(screen.getByRole("button", { name: "Crear examen" }));
+  return {
+    user,
+    dialog: screen.getByRole("dialog", { name: "Crear examen" }),
+  };
+}
+
+describe("CreateExamDialog", () => {
+  beforeEach(() => {
+    push.mockReset();
+    refresh.mockReset();
+    generateExamQuestionsAction.mockReset();
+  });
+
+  it("opens from the 'Crear examen' button with the first notebook and no page chosen", async () => {
+    const { dialog } = await open();
+
+    expect(
+      within(dialog).getByRole("combobox", { name: "Cuaderno" }),
+    ).toHaveValue("nb-bio");
+    const page = within(dialog).getByRole("combobox", { name: "Página" });
+    expect(page).toHaveValue("");
+    expect(
+      within(page)
+        .getAllByRole("option")
+        .map((o) => o.textContent),
+    ).toEqual(["Elige una página", "Mitocondria", "Ribosomas"]);
+    // A page is mandatory: the exam belongs to a page (SM-2).
+    expect(within(dialog).getByTestId("create-exam-submit")).toBeDisabled();
+  });
+
+  it("preselects the given notebook", async () => {
+    const { dialog } = await open({ initialNotebookId: "nb-calc" });
+
+    expect(
+      within(dialog).getByRole("combobox", { name: "Cuaderno" }),
+    ).toHaveValue("nb-calc");
+    expect(
+      within(dialog).getByRole("option", { name: "Derivadas" }),
+    ).toBeInTheDocument();
+  });
+
+  it("clears the page when the notebook changes", async () => {
+    const { user, dialog } = await open();
+    await user.selectOptions(
+      within(dialog).getByRole("combobox", { name: "Página" }),
+      "p-ribo",
+    );
+
+    await user.selectOptions(
+      within(dialog).getByRole("combobox", { name: "Cuaderno" }),
+      "nb-calc",
+    );
+
+    expect(
+      within(dialog).getByRole("combobox", { name: "Página" }),
+    ).toHaveValue("");
+  });
+
+  it("generates with AI by default: count 10–30 in steps of 5, then opens the notebook's exams", async () => {
+    generateExamQuestionsAction.mockResolvedValue(generated(15));
+    const { user, dialog } = await open();
+    expect(
+      within(dialog).getByRole("radio", { name: /Generar con IA/ }),
+    ).toBeChecked();
+    await user.selectOptions(
+      within(dialog).getByRole("combobox", { name: "Página" }),
+      "p-ribo",
+    );
+    await user.click(
+      within(dialog).getByRole("button", { name: "Más preguntas a generar" }),
+    );
+    expect(within(dialog).getByTestId("exam-count-value")).toHaveTextContent(
+      "15",
+    );
+
+    await user.click(within(dialog).getByTestId("create-exam-submit"));
+
+    expect(generateExamQuestionsAction).toHaveBeenCalledWith({
+      pageId: "p-ribo",
+      count: 15,
+    });
+    expect(push).toHaveBeenCalledWith("/exams/nb-bio");
+    expect(refresh).toHaveBeenCalled();
+  });
+
+  it("shows 'Generando…' while the questions are generated", async () => {
+    let resolve: (value: unknown) => void = () => {};
+    generateExamQuestionsAction.mockReturnValue(
+      new Promise((r) => {
+        resolve = r;
+      }),
+    );
+    const { user, dialog } = await open();
+    await user.selectOptions(
+      within(dialog).getByRole("combobox", { name: "Página" }),
+      "p-mito",
+    );
+
+    await user.click(within(dialog).getByTestId("create-exam-submit"));
+
+    const submit = within(dialog).getByTestId("create-exam-submit");
+    expect(submit).toBeDisabled();
+    expect(submit).toHaveTextContent("Generando…");
+    await act(async () => resolve(generated()));
+  });
+
+  it.each([
+    ["AI_DAILY_LIMIT_REACHED", "Llegaste al límite de hoy. Vuelve mañana."],
+    ["AI_PAGE_EMPTY", "La página está vacía: escribe algo antes de generar."],
+    ["EXAMS_SESSION_REQUIRED", "Tu sesión expiró. Inicia sesión de nuevo."],
+    [
+      "AI_GENERATION_FAILED",
+      "No pudimos generar las preguntas. Intenta de nuevo.",
+    ],
+  ])("keeps the dialog open and explains %s", async (code, message) => {
+    generateExamQuestionsAction.mockResolvedValue({
+      ok: false,
+      error: { code, message: "x" },
+    });
+    const { user, dialog } = await open();
+    await user.selectOptions(
+      within(dialog).getByRole("combobox", { name: "Página" }),
+      "p-mito",
+    );
+
+    await user.click(within(dialog).getByTestId("create-exam-submit"));
+
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(message);
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("reports a rejected generation instead of throwing", async () => {
+    generateExamQuestionsAction.mockRejectedValue(new Error("offline"));
+    const { user, dialog } = await open();
+    await user.selectOptions(
+      within(dialog).getByRole("combobox", { name: "Página" }),
+      "p-mito",
+    );
+
+    await user.click(within(dialog).getByTestId("create-exam-submit"));
+
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+      "No pudimos generar las preguntas. Intenta de nuevo.",
+    );
+  });
+
+  it("'Crear mis preguntas' hides the count and opens the page's questions screen", async () => {
+    const { user, dialog } = await open();
+    await user.click(
+      within(dialog).getByRole("radio", { name: /Crear mis preguntas/ }),
+    );
+    expect(
+      within(dialog).queryByRole("group", { name: "Preguntas a generar" }),
+    ).not.toBeInTheDocument();
+    await user.selectOptions(
+      within(dialog).getByRole("combobox", { name: "Página" }),
+      "p-mito",
+    );
+
+    await user.click(within(dialog).getByTestId("create-exam-submit"));
+
+    expect(push).toHaveBeenCalledWith("/exams/nb-bio/p-mito/preguntas");
+    expect(generateExamQuestionsAction).not.toHaveBeenCalled();
+  });
+
+  it("explains a notebook without pages and keeps the submit disabled", async () => {
+    const { dialog } = await open({ initialNotebookId: "nb-empty" });
+
+    expect(
+      within(dialog).getByText("Este cuaderno aún no tiene páginas."),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).queryByRole("combobox", { name: "Página" }),
+    ).not.toBeInTheDocument();
+    expect(within(dialog).getByTestId("create-exam-submit")).toBeDisabled();
+  });
+
+  it("explains that there are no notebooks yet", async () => {
+    const { dialog } = await open({ notebooks: [] });
+
+    expect(
+      within(dialog).getByText(
+        "Aún no tienes cuadernos. Crea uno para empezar.",
+      ),
+    ).toBeInTheDocument();
+    expect(within(dialog).getByTestId("create-exam-submit")).toBeDisabled();
+  });
+
+  it("closes on Cancelar without creating anything", async () => {
+    const { user, dialog } = await open();
+
+    await user.click(within(dialog).getByRole("button", { name: "Cancelar" }));
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(push).not.toHaveBeenCalled();
+  });
+});

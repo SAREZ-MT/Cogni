@@ -10,13 +10,11 @@ export interface TechniqueDefinition {
   description: string;
 }
 
-// Study-technique content for the "Técnicas" panel (design/shell-look):
-// icon + name + description per technique. Flashcards are wired to real
-// Server Actions since Phase 3 (the panel adds the live "Generar"); Examen
-// links to the page's questions since Phase 5 T4 and generates AI questions
-// since T5; Active recall generates AI open questions since Phase 6 T4 but
-// stays preview-only (`showPreviews`) until its session ships (T5); no meta
-// line, no "pronto" pill (user decision 2026-09-24).
+// Study-technique content for the "Técnicas de estudio" panel: icon +
+// name + description per technique, and its colour (Phase 6 T5b, user
+// decision 2026-10-06: Flashcards yellow, Recordación activa green, Examen
+// red), shared by the card's "Generar", its collapsed icon and its row in
+// the panel's generated list.
 // Icons match the ones the main Sidebar's "Técnicas" section already uses
 // for the same three entries (sidebar.tsx's TECNICAS_SECTION), so the icon
 // vocabulary stays consistent across the shell.
@@ -25,12 +23,12 @@ export const TECHNIQUES: readonly TechniqueDefinition[] = [
     id: "flashcards",
     name: "Flashcards",
     icon: Layers,
-    tone: "primary",
+    tone: "yellow",
     description: "Tarjetas con repetición espaciada",
   },
   {
     id: "active-recall",
-    name: "Active recall",
+    name: "Recordación activa",
     icon: Brain,
     tone: "green",
     description: "Preguntas abiertas de memoria",
@@ -39,7 +37,7 @@ export const TECHNIQUES: readonly TechniqueDefinition[] = [
     id: "exam",
     name: "Examen",
     icon: ClipboardList,
-    tone: "pink",
+    tone: "rose",
     description: "Opción múltiple con retroalimentación",
   },
 ] as const;

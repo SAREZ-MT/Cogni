@@ -282,6 +282,19 @@ export class InMemoryRecallAnswerRepository implements RecallAnswerRepository {
     return updated;
   }
 
+  // Test hooks for a transactional fake: copy and put back every row and
+  // claim, as a rolled back transaction would.
+  snapshot(): { rows: RecallAnswer[]; claims: [string, Date][] } {
+    return { rows: [...this.rows.values()], claims: [...this.claims] };
+  }
+
+  restore(state: { rows: RecallAnswer[]; claims: [string, Date][] }): void {
+    this.rows.clear();
+    for (const row of state.rows) this.rows.set(row.id, row);
+    this.claims.clear();
+    for (const [id, at] of state.claims) this.claims.set(id, at);
+  }
+
   private find(id: string, ownerId: string): RecallAnswer | null {
     const answer = this.rows.get(id);
     return answer && answer.ownerId === ownerId ? answer : null;

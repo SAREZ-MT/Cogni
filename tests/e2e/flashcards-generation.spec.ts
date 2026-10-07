@@ -60,24 +60,30 @@ test.describe("flashcards generation", () => {
 
     const panel = page.getByTestId("techniques-panel");
     await expect(panel).toBeVisible();
-    await expect(page.getByTestId("flashcard-item")).toHaveCount(0);
+    await expect(panel.getByTestId("generated-item-flashcards")).toHaveCount(0);
     const before = await remainingToday(page);
 
     await page.getByTestId("generate-flashcards").click();
 
-    await expect(page.getByTestId("flashcard-item").first()).toBeVisible({
+    await expect(panel.getByTestId("generated-item-flashcards")).toBeVisible({
       timeout: 30000,
     });
     await expect(page.getByTestId("generation-error")).toHaveCount(0);
     await expect.poll(() => remainingToday(page)).toBe(before - 1);
 
-    // A second visit lists the persisted cards: open the deck from the panel.
+    // A second visit lists the persisted deck: its row opens the review.
     await page.reload();
-    await expect(page.getByTestId("flashcard-item").first()).toBeVisible();
-    await page.getByTestId("flashcard-item").first().click();
-    await expect(page).toHaveURL(/\/flashcards\/[^/]+\/[^/#]+/);
-    const cardCount = await page.getByTestId("flip-card").count();
+    const deckRow = panel.getByTestId("generated-item-flashcards");
+    await expect(deckRow).toContainText(/\d+ tarjetas?/);
+    const cardCount = Number(
+      ((await deckRow.innerText()).match(/(\d+) tarjeta/) ?? [])[1],
+    );
     expect(cardCount).toBeGreaterThanOrEqual(1);
+    await expect(deckRow).toHaveAttribute("href", /\?repasar=1$/);
+    await deckRow.click();
+    // New cards are due at once: the graded review starts on its own.
+    await expect(page.getByTestId("flashcard-player")).toBeVisible();
+    await expect(page).toHaveURL(/\/flashcards\/[^/]+\/[^/#?]+$/);
 
     // The hub lists the notebook and its notebook page lists the page deck,
     // both with the same real count.

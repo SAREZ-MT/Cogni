@@ -6,26 +6,31 @@ import { Card } from "@/shared/ui/card";
 import { IconTile } from "@/shared/ui/icon-tile";
 import { cn } from "@/shared/ui/utils";
 
-// Study-technique color vocabulary (design/shell-look, studyplatform
-// StudyPanel.tsx palette): mapped onto existing IconTile tones instead
-// of adding new ones — `primary` (violet) already matches the reference's
-// flashcards brand color, and `green`/`pink` already match its active-recall
-// and exam hex pairs almost exactly (pastel-green-fg #1b7a43 vs reference
-// #059669; pastel-pink-fg #9b2c4a is an exact match). No new IconTile tone
-// was needed.
-export type TechniqueTone = "primary" | "green" | "pink";
+// Study-technique colour vocabulary (Phase 6 T5b, user decisions
+// 2026-10-06): Flashcards yellow, Recordación activa green, Examen red, as
+// the design system's soft pastel pairs (solid fills were too strong). The
+// icon tile and the "Generar" button share the technique's pair.
+export type TechniqueTone = "yellow" | "green" | "rose";
 
-// Solid, tone-colored "Generar" button (user decision 2026-09-24: only a
-// full-width "Generar" action per card, no navigation). `green`/`pink` use
-// success-600/pastel-pink-fg instead of the pastel IconTile pair so the
-// button reads as a solid brand color with white text, matching
-// studyplatform StudyPanel.tsx's ActiveRecallCard/ExamCard buttons
-// (#059669/#9B2C4A, both exact token matches).
-const TONE_BUTTON_CLASS: Record<TechniqueTone, string> = {
-  primary: "bg-primary-600 text-white hover:bg-primary-600",
-  green: "bg-success-600 text-white hover:bg-success-600",
-  pink: "bg-pastel-pink-fg text-white hover:bg-pastel-pink-fg",
+const TONE_TILE: Record<TechniqueTone, "yellow" | "mint" | "pink"> = {
+  yellow: "yellow",
+  green: "mint",
+  rose: "pink",
 };
+
+// Pastel "Generar" fill per technique; everything else about the button is
+// shared (GENERATE_BUTTON_CLASS). Each -fg meets WCAG AA for the 11.5px
+// label on its pastel: pastel-yellow-fg 6.4:1, pastel-mint-fg 6.8:1 (chosen
+// over pastel-green-fg, 4.6:1), pastel-pink-fg 5.9:1. Hover darkens the
+// same pair slightly (brightness-95) instead of switching colour.
+const TONE_BUTTON_CLASS: Record<TechniqueTone, string> = {
+  yellow: "bg-pastel-yellow text-pastel-yellow-fg hover:bg-pastel-yellow",
+  green: "bg-pastel-mint text-pastel-mint-fg hover:bg-pastel-mint",
+  rose: "bg-pastel-pink text-pastel-pink-fg hover:bg-pastel-pink",
+};
+
+const GENERATE_BUTTON_CLASS =
+  "w-full font-semibold text-[11.5px] hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60";
 
 export interface TechniqueCardProps {
   icon: LucideIcon;
@@ -81,7 +86,12 @@ export function TechniqueCard({
       className={cn("flex flex-col gap-2.5 rounded-lg p-2.5", className)}
     >
       <div className="flex items-start gap-2.5">
-        <IconTile tone={tone} size="30" radius="md">
+        <IconTile
+          tone={TONE_TILE[tone]}
+          size="30"
+          radius="md"
+          data-part="technique-icon"
+        >
           <Icon aria-hidden="true" size={16} strokeWidth={1.75} />
         </IconTile>
         <div className="min-w-0 flex-1">
@@ -99,10 +109,7 @@ export function TechniqueCard({
         onClick={onGenerate}
         title={isDisabled && !wired ? "Disponible pronto" : undefined}
         size="sm"
-        className={cn(
-          "w-full text-[11.5px] disabled:cursor-not-allowed disabled:opacity-60",
-          TONE_BUTTON_CLASS[tone],
-        )}
+        className={cn(GENERATE_BUTTON_CLASS, TONE_BUTTON_CLASS[tone])}
       >
         <Sparkles aria-hidden="true" size={12} strokeWidth={2} />
         {pending ? "Generando…" : "Generar"}
@@ -130,7 +137,7 @@ export function TechniqueIconStrip({
 }: TechniqueIconStripProps) {
   return (
     <IconTile
-      tone={tone}
+      tone={TONE_TILE[tone]}
       size="36"
       radius="input"
       title={title}

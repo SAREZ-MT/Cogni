@@ -14,13 +14,20 @@ export interface ComposeRecallSessionInput {
   // due too; the application layer splits them by lastReviewedAt so that
   // real reviews come first. An id in both lists counts as due.
   newIds: readonly string[];
+  // Reviewed questions with their last review, whatever their due date.
+  // They fill the session after the due and new ones, least recently
+  // reviewed first, so a session can start any time, like an exam (user
+  // decision 2026-10-06). SM-2 stays safe: study-engine's
+  // recallReviewQualityFor never lets a good answer to a question that is
+  // not due advance its interval.
+  reviewed?: readonly { id: string; lastReviewedAt: Date }[];
   size?: number;
 }
 
-// Picks the question ids of a session: due questions first, in the given
-// order, then new ones by creation date and id, up to `size`. Archived
-// questions, unknown ids, repeated ids and reviewed questions that are not
-// due yet are left out, so a session never advances an interval early.
+// Picks the question ids of a session, up to `size`: due questions first,
+// in the given order; then new ones by creation date and id; then the
+// other reviewed questions, least recently reviewed first (ties by id).
+// Archived questions, unknown ids and repeated ids are left out.
 export function composeRecallSession(
   input: ComposeRecallSessionInput,
 ): string[] {
@@ -39,7 +46,27 @@ export function composeRecallSession(
     })
     .sort(byCreation)
     .map((question) => question.id);
-  return [...due, ...fresh].slice(0, Math.max(0, size));
+  const taken = new Set([...due, ...fresh]);
+  const fill = leastRecentlyReviewed(input.reviewed ?? []).filter(
+    (id) => active.has(id) && !taken.has(id),
+  );
+  return [...due, ...fresh, ...fill].slice(0, Math.max(0, size));
+}
+
+// Reviewed ids, least recently reviewed first, ties by id; a repeated id
+// keeps its earliest review.
+function leastRecentlyReviewed(
+  reviewed: readonly { id: string; lastReviewedAt: Date }[],
+): string[] {
+  const earliest = new Map<string, number>();
+  for (const { id, lastReviewedAt } of reviewed) {
+    const time = lastReviewedAt.getTime();
+    const known = earliest.get(id);
+    if (known === undefined || time < known) earliest.set(id, time);
+  }
+  return [...earliest.entries()]
+    .sort(([idA, a], [idB, b]) => a - b || (idA < idB ? -1 : 1))
+    .map(([id]) => id);
 }
 
 function unique(ids: readonly string[]): string[] {

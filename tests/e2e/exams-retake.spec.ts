@@ -118,13 +118,15 @@ test.describe("exam retake", () => {
     });
     const panel = page.getByTestId("techniques-panel");
     await panel.getByTestId("generate-exam-questions").click();
+    // The count is chosen in the dialog (default 10).
+    await page.getByTestId("confirm-exam-generation").click();
     await expect(panel.getByTestId("exam-generation-notice")).toHaveText(
       "Se generaron 10 preguntas.",
       { timeout: 30000 },
     );
 
     // 1. Fail the exam: questions 1-4 wrong.
-    await panel.getByTestId("take-exam-button").click();
+    await panel.getByTestId("generated-item-exam").click();
     await expect(page).toHaveURL(examHref);
     await page.getByTestId("start-exam-button").click();
     await expect(page.getByTestId("exam-session")).toBeVisible({

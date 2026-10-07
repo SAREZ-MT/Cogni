@@ -9,7 +9,7 @@ describe("TechniqueCard", () => {
     return render(
       <TechniqueCard
         icon={Layers}
-        tone="primary"
+        tone="yellow"
         name="Flashcards"
         description="Tarjetas con repetición espaciada"
         {...props}
@@ -51,7 +51,7 @@ describe("TechniqueCard", () => {
       return render(
         <TechniqueCard
           icon={Layers}
-          tone="primary"
+          tone="yellow"
           name="Flashcards"
           description="d"
           onGenerate={() => {}}
@@ -133,6 +133,61 @@ describe("TechniqueCard", () => {
   });
 });
 
+describe("TechniqueCard technique colours", () => {
+  // Phase 6 T5b v2 (user, 2026-10-06): every "Generar" has the same shape,
+  // size, icon and type; only its soft pastel pair changes — Flashcards
+  // pastel-yellow, Recordación activa pastel-mint, Examen pastel-pink (each
+  // -fg meets WCAG AA on its pastel). The icon tile uses the same pair.
+  const SHARED = ["w-full", "text-[11.5px]", "font-semibold"];
+  it.each([
+    ["yellow", ["bg-pastel-yellow", "text-pastel-yellow-fg"]],
+    ["green", ["bg-pastel-mint", "text-pastel-mint-fg"]],
+    ["rose", ["bg-pastel-pink", "text-pastel-pink-fg"]],
+  ] as const)("colours a %s card's Generar and icon tile with its pastel pair", (tone, pair) => {
+    const { container } = render(
+      <TechniqueCard
+        icon={Layers}
+        tone={tone}
+        name="n"
+        description="d"
+        onGenerate={() => {}}
+      />,
+    );
+
+    const button = screen.getByRole("button", { name: "Generar" });
+    expect(button).toHaveClass(...SHARED, ...pair, "hover:brightness-95");
+    expect(button.className).not.toMatch(
+      /text-white|bg-(warning|success|rose)-\d/,
+    );
+    const tile = container.querySelector("[data-part=technique-icon]");
+    expect(tile).toHaveClass(...pair);
+  });
+
+  it("gives the three Generar buttons the same classes apart from the colour pair", () => {
+    const classesOf = (tone: "yellow" | "green" | "rose") => {
+      const { unmount } = render(
+        <TechniqueCard
+          icon={Layers}
+          tone={tone}
+          name={tone}
+          description="d"
+          onGenerate={() => {}}
+        />,
+      );
+      const classes = screen
+        .getByRole("button", { name: "Generar" })
+        .className.split(" ")
+        .filter((c) => !/pastel-/.test(c))
+        .sort();
+      unmount();
+      return classes;
+    };
+
+    expect(classesOf("green")).toEqual(classesOf("yellow"));
+    expect(classesOf("rose")).toEqual(classesOf("yellow"));
+  });
+});
+
 describe("TechniqueIconStrip", () => {
   it("exposes the technique name as a tooltip title", () => {
     render(
@@ -140,6 +195,12 @@ describe("TechniqueIconStrip", () => {
     );
 
     expect(screen.getByTitle("Active recall")).toBeInTheDocument();
+  });
+
+  it("uses the technique's pastel tile", () => {
+    render(<TechniqueIconStrip icon={Layers} tone="yellow" title="t" />);
+
+    expect(screen.getByTitle("t")).toHaveClass("bg-pastel-yellow");
   });
 
   it("is dimmed unless the technique is available", () => {
