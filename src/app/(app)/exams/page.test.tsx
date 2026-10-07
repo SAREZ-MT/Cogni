@@ -5,7 +5,13 @@ const { listExamHubAction } = vi.hoisted(() => ({
   listExamHubAction: vi.fn(),
 }));
 vi.mock("@/modules/exams", () => ({ listExamHubAction }));
+const { getSidebarTree, CreateExamDialog } = vi.hoisted(() => ({
+  getSidebarTree: vi.fn(),
+  CreateExamDialog: vi.fn(() => null),
+}));
+vi.mock("./_components/create-exam-dialog", () => ({ CreateExamDialog }));
 vi.mock("@/modules/notebooks", () => ({
+  getSidebarTree,
   COLOR_PALETTE: [
     "pink",
     "green",
@@ -70,6 +76,9 @@ const ENTRIES = [
 
 describe("ExamsHubPage (real data)", () => {
   beforeEach(() => {
+    getSidebarTree.mockReset();
+    getSidebarTree.mockResolvedValue([]);
+    CreateExamDialog.mockClear();
     listExamHubAction.mockReset();
     listExamHubAction.mockResolvedValue({ ok: true, value: ENTRIES });
   });
@@ -296,5 +305,49 @@ describe("ExamsHubPage (real data)", () => {
       "/exams/biologia/mitocondria/preguntas",
     );
     expect(screen.getByText("3 páginas con preguntas")).toBeInTheDocument();
+  });
+
+  describe("Crear examen (Phase 6 T5b)", () => {
+    const TREE = [
+      {
+        id: "nb-1",
+        title: "Biología",
+        icon: null,
+        color: "green",
+        pages: [{ id: "p-1", title: "Mitocondria" }],
+      },
+    ];
+
+    it("offers 'Crear examen' with the owner's notebooks and their pages", async () => {
+      getSidebarTree.mockResolvedValue(TREE);
+      listExamHubAction.mockResolvedValue({ ok: true, value: [] });
+
+      render(await ExamsHubPage());
+
+      expect(CreateExamDialog).toHaveBeenCalledTimes(1);
+      const [props] = CreateExamDialog.mock.calls[0] as unknown as [
+        Record<string, unknown>,
+      ];
+      expect(props.notebooks).toEqual([
+        {
+          id: "nb-1",
+          title: "Biología",
+          pages: [{ id: "p-1", title: "Mitocondria" }],
+        },
+      ]);
+      expect(props.initialNotebookId).toBeUndefined();
+    });
+
+    it("still offers it with no notebooks when the tree cannot be read", async () => {
+      getSidebarTree.mockRejectedValue(new Error("db down"));
+      listExamHubAction.mockResolvedValue({ ok: true, value: [] });
+
+      render(await ExamsHubPage());
+
+      const [props] = CreateExamDialog.mock.calls[0] as unknown as [
+        Record<string, unknown>,
+      ];
+      expect(props.notebooks).toEqual([]);
+    });
   });
 });

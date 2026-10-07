@@ -11,6 +11,8 @@ import { SectionHeader } from "@/shared/ui/section-header";
 import { StatusBanner } from "@/shared/ui/status-banner";
 import { SetBreadcrumb } from "../_components/breadcrumb";
 import { plural } from "../flashcards/_lib/plural";
+import { CreateExamDialog } from "./_components/create-exam-dialog";
+import { loadCreateExamNotebooks } from "./_lib/create-exam-notebooks";
 
 const DEFAULT_TONE: NotebookColor = "purple";
 
@@ -85,7 +87,10 @@ function retakeAdvice(failedDueNow: boolean | null): string {
 // layout is the design preview's (user decision 2026-10-06: the screens
 // keep their look; the data adapts to them).
 export default async function ExamsHubPage() {
-  const result = await listExamHubAction();
+  const [result, createExamNotebooks] = await Promise.all([
+    listExamHubAction(),
+    loadCreateExamNotebooks(),
+  ]);
   // A failed read shows the load error in the empty state, never a false
   // "Aún no tienes exámenes".
   const allPages = result.ok ? result.value : [];
@@ -115,28 +120,31 @@ export default async function ExamsHubPage() {
         titleClassName="text-[26px]"
         description={`${plural(examenesPresentados, "examen", "exámenes")} · ${plural(activeNotebookCount, "cuaderno", "cuadernos")}`}
         actions={
-          quickStartHref && (
-            <Link
-              href={quickStartHref}
-              className="flex items-center gap-2.5 rounded-[14px] bg-neutral-900 px-4 py-3 transition-transform hover:-translate-y-0.5"
-            >
-              <IconTile
-                size="30"
-                radius="md"
-                className="bg-white/[12%] text-white"
+          <div className="flex flex-wrap items-center gap-2.5">
+            <CreateExamDialog notebooks={createExamNotebooks} />
+            {quickStartHref && (
+              <Link
+                href={quickStartHref}
+                className="flex items-center gap-2.5 rounded-[14px] bg-neutral-900 px-4 py-3 transition-transform hover:-translate-y-0.5"
               >
-                <Zap aria-hidden="true" size={15} strokeWidth={2} />
-              </IconTile>
-              <span className="text-left">
-                <span className="block font-semibold text-white text-xs">
-                  Nuevo examen
+                <IconTile
+                  size="30"
+                  radius="md"
+                  className="bg-white/[12%] text-white"
+                >
+                  <Zap aria-hidden="true" size={15} strokeWidth={2} />
+                </IconTile>
+                <span className="text-left">
+                  <span className="block font-semibold text-white text-xs">
+                    Nuevo examen
+                  </span>
+                  <span className="block text-[10.5px] text-white/[55%]">
+                    {plural(allPages.length, "página", "páginas")} con preguntas
+                  </span>
                 </span>
-                <span className="block text-[10.5px] text-white/[55%]">
-                  {plural(allPages.length, "página", "páginas")} con preguntas
-                </span>
-              </span>
-            </Link>
-          )
+              </Link>
+            )}
+          </div>
         }
       />
 

@@ -11,10 +11,17 @@ const { listExamHubAction } = vi.hoisted(() => ({
   listExamHubAction: vi.fn(),
 }));
 vi.mock("@/modules/exams", () => ({ listExamHubAction }));
-const { getNotebookTitleForRoute } = vi.hoisted(() => ({
-  getNotebookTitleForRoute: vi.fn(),
+const { getNotebookTitleForRoute, getSidebarTree, CreateExamDialog } =
+  vi.hoisted(() => ({
+    getNotebookTitleForRoute: vi.fn(),
+    getSidebarTree: vi.fn(),
+    CreateExamDialog: vi.fn(() => null),
+  }));
+vi.mock("@/modules/notebooks", () => ({
+  getNotebookTitleForRoute,
+  getSidebarTree,
 }));
-vi.mock("@/modules/notebooks", () => ({ getNotebookTitleForRoute }));
+vi.mock("../_components/create-exam-dialog", () => ({ CreateExamDialog }));
 
 import ExamsNotebookPage from "./page";
 
@@ -66,6 +73,9 @@ const ENTRIES = [
 describe("ExamsNotebookPage (real data)", () => {
   beforeEach(() => {
     notFound.mockClear();
+    getSidebarTree.mockReset();
+    getSidebarTree.mockResolvedValue([]);
+    CreateExamDialog.mockClear();
     getNotebookTitleForRoute.mockReset();
     getNotebookTitleForRoute.mockResolvedValue("Biología Celular");
     listExamHubAction.mockReset();
@@ -163,5 +173,33 @@ describe("ExamsNotebookPage (real data)", () => {
       screen.getByRole("link", { name: "Membrana celular" }),
     ).toHaveAttribute("href", `/exams/${NOTEBOOK}/membrana`);
     expect(screen.getByText("Rendir examen →")).toBeInTheDocument();
+  });
+
+  it("offers 'Crear examen' with this notebook preselected", async () => {
+    getSidebarTree.mockResolvedValue([
+      { id: "x", title: "Otro", icon: null, color: null, pages: [] },
+      {
+        id: NOTEBOOK,
+        title: "Biología Celular",
+        icon: null,
+        color: "green",
+        pages: [{ id: "p-1", title: "Mitocondria" }],
+      },
+    ]);
+
+    render(await ExamsNotebookPage(params(NOTEBOOK)));
+
+    const [props] = CreateExamDialog.mock.calls[0] as unknown as [
+      Record<string, unknown>,
+    ];
+    expect(props.initialNotebookId).toBe(NOTEBOOK);
+    expect(props.notebooks).toEqual([
+      { id: "x", title: "Otro", pages: [] },
+      {
+        id: NOTEBOOK,
+        title: "Biología Celular",
+        pages: [{ id: "p-1", title: "Mitocondria" }],
+      },
+    ]);
   });
 });
