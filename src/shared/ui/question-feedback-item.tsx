@@ -23,6 +23,11 @@ export interface QuestionFeedbackItemProps {
   // every evaluation finishes). Defaults to true since every real session
   // starts pending; the caller flips it once its own evaluation resolves.
   pending?: boolean;
+  // The AI evaluation (Phase 6 T6, approved slots): the 0–5 score shown in
+  // the "IA — / 5" pill and the justification shown where the skeleton
+  // was. Both render only once `pending` is false.
+  aiScore?: number | null;
+  justification?: string;
   onDisagree?: () => void;
   className?: string;
 }
@@ -32,7 +37,8 @@ export interface QuestionFeedbackItemProps {
 // 'no estoy de acuerdo' (se registra, no cambia el puntaje en v1)"). While
 // `pending`, the AI score pill stays "IA — / 5", the justification renders
 // as two skeleton lines, and the disagree button is disabled with an
-// explanatory `title`.
+// explanatory `title`. Once evaluated, the pill reads "IA {aiScore} / 5" and
+// the justification text takes the skeleton's place.
 export function QuestionFeedbackItem({
   index,
   question,
@@ -41,6 +47,8 @@ export function QuestionFeedbackItem({
   selfRatingLabel,
   selfRatingTone,
   pending = true,
+  aiScore,
+  justification,
   onDisagree,
   className,
 }: QuestionFeedbackItemProps) {
@@ -63,7 +71,7 @@ export function QuestionFeedbackItem({
           Autoevaluación {selfRating} · {selfRatingLabel}
         </Pill>
         <Pill size="sm" tone="neutral">
-          IA — / 5
+          IA {pending || aiScore == null ? "—" : aiScore} / 5
         </Pill>
       </div>
       <div className="mt-3">
@@ -78,6 +86,11 @@ export function QuestionFeedbackItem({
               Disponible cuando termine la evaluación
             </p>
           </div>
+        )}
+        {!pending && justification && (
+          <p className="mt-1.5 text-[13px] text-fg-secondary">
+            {justification}
+          </p>
         )}
       </div>
       <Button

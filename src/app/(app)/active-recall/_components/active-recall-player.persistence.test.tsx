@@ -10,6 +10,9 @@ const actions = vi.hoisted(() => ({
   startRecallSessionAction: vi.fn(),
   saveRecallAnswerAction: vi.fn(),
   finishRecallSessionAction: vi.fn(),
+  getRecallSessionResultsAction: vi.fn(),
+  retryRecallEvaluationAction: vi.fn(),
+  disagreeRecallAnswerAction: vi.fn(),
 }));
 vi.mock("@/modules/active-recall", () => actions);
 
@@ -51,6 +54,11 @@ let calls: string[];
 describe("ActiveRecallPlayer persistence", () => {
   beforeEach(() => {
     calls = [];
+    actions.getRecallSessionResultsAction.mockReset();
+    actions.getRecallSessionResultsAction.mockResolvedValue({
+      ok: false,
+      error: { code: "RECALL_UNEXPECTED", message: "x" },
+    });
     let sessions = 0;
     actions.startRecallSessionAction.mockReset();
     actions.startRecallSessionAction.mockImplementation(async () => {
@@ -145,6 +153,36 @@ describe("ActiveRecallPlayer persistence", () => {
     await waitFor(() =>
       expect(calls).toEqual(["start:1", "save:s1:q1", "finish:s1"]),
     );
+  });
+
+  it("polls the finished session's evaluation in the results (Phase 6 T6)", async () => {
+    const user = setup();
+    await answerWith(user, "Produce ATP", 5);
+
+    await user.click(screen.getByRole("button", { name: /Terminar/ }));
+
+    await waitFor(() =>
+      expect(actions.getRecallSessionResultsAction).toHaveBeenCalledWith({
+        sessionId: "s1",
+      }),
+    );
+  });
+
+  it("polls nothing when the finish fails", async () => {
+    actions.finishRecallSessionAction.mockResolvedValue({
+      ok: false,
+      error: { code: "RECALL_UNEXPECTED", message: "x" },
+    });
+    const user = setup();
+    await answerWith(user, "Produce ATP", 5);
+
+    await user.click(screen.getByRole("button", { name: /Terminar/ }));
+
+    await waitFor(() =>
+      expect(actions.finishRecallSessionAction).toHaveBeenCalled(),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(actions.getRecallSessionResultsAction).not.toHaveBeenCalled();
   });
 
   it("finishes the session after the last question", async () => {

@@ -88,6 +88,11 @@ export function ActiveRecallPlayer({
   const [submittedAnswer, setSubmittedAnswer] = useState("");
   const [records, setRecords] = useState<QuestionRecord[]>([]);
   const [finished, setFinished] = useState(false);
+  // The DB session whose finish succeeded: the results poll its evaluation
+  // (Phase 6 T6). Only the current run sets it.
+  const [finishedSessionId, setFinishedSessionId] = useState<string | null>(
+    null,
+  );
 
   const total = questions.length;
   const progress = total > 0 ? Math.round((index / total) * 100) : 0;
@@ -133,7 +138,10 @@ export function ActiveRecallPlayer({
     enqueue(async () => {
       const sessionId = run.sessionId;
       if (!sessionId) return;
-      await finishRecallSessionAction({ sessionId });
+      const closed = await finishRecallSessionAction({ sessionId });
+      if (closed.ok && runRef.current === run) {
+        setFinishedSessionId(sessionId);
+      }
     });
   }
 
@@ -178,6 +186,7 @@ export function ActiveRecallPlayer({
     setSubmittedAnswer("");
     setRecords([]);
     setFinished(false);
+    setFinishedSessionId(null);
   }
 
   // "Nueva sesión": a real session starts a new one (after the previous
@@ -231,6 +240,7 @@ export function ActiveRecallPlayer({
         records={records}
         sessionsHref={sessionsHref}
         onRestart={restart}
+        sessionId={finishedSessionId}
       />
     );
   }

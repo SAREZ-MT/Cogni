@@ -9,8 +9,9 @@ import { createNotebookWithOpenPage } from "./helpers/notebooks";
 // provider, AI_PROVIDER_MODE=fake), the session route plays the page's
 // questions; each answer is saved as it is given ("Calificar respuesta" +
 // self-rating, or "Saltar"), and "Terminar" closes the session with the
-// answered questions only. The results keep showing "Evaluando…" (the AI
-// evaluation is T6). Runs with design previews off.
+// answered questions only. Since T6 the evaluation runs right after the
+// finish (covered by active-recall-evaluation.spec.ts); here the session
+// only has to resolve. Runs with design previews off.
 
 const SENTENCES = [
   "La mitocondria produce la mayor parte del ATP de la célula.",
@@ -141,25 +142,24 @@ test.describe("active recall session", () => {
     const results = page.getByTestId("active-recall-results");
     await expect(results).toBeVisible();
     await expect(results).toContainText("3 preguntas respondidas");
-    await expect(page.getByTestId("evaluation-status")).toContainText(
-      "Evaluando tus respuestas…",
-    );
     await shot(page, "results", true);
 
-    // The saves and the finish run in the background: wait for the finish.
+    // The saves, the finish and the evaluation run in the background: wait
+    // for the evaluated session.
     await expect
       .poll(
         async () =>
-          (await storedFor(pageId as string)).sessions[0]?.finished_at ?? null,
-        { timeout: 20000 },
+          (await storedFor(pageId as string)).sessions[0]?.evaluation_status ??
+          null,
+        { timeout: 30000 },
       )
-      .not.toBeNull();
+      .toBe("done");
     const { sessions, answers, questionIds } = await storedFor(
       pageId as string,
     );
     const [first, second, third] = questionIds;
     expect(sessions).toHaveLength(1);
-    expect(sessions[0]?.evaluation_status).toBe("pending");
+    expect(sessions[0]?.finished_at).not.toBeNull();
     // Unanswered questions (4–10) are not recorded.
     expect(
       answers.map((a) => [
@@ -169,9 +169,9 @@ test.describe("active recall session", () => {
         a.evaluation_status,
       ]),
     ).toEqual([
-      [first, "Produce ATP en las crestas.", 4, "pending"],
-      [second, "(sin respuesta)", 0, "pending"],
-      [third, "El ciclo de Krebs ocurre en la matriz.", 2, "pending"],
+      [first, "Produce ATP en las crestas.", 4, "done"],
+      [second, "(sin respuesta)", 0, "done"],
+      [third, "El ciclo de Krebs ocurre en la matriz.", 2, "done"],
     ]);
   });
 });
