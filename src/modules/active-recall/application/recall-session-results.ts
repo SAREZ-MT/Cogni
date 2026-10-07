@@ -15,6 +15,7 @@ import {
   sessionCalibration,
 } from "../domain/recall-session";
 import type { RecallSessionRepository } from "../domain/recall-session-repository";
+import { EVALUATION_CLAIM_LEASE_MS } from "./evaluate-recall-session";
 
 // What the student reads of one evaluation (§8.5). The concepts and
 // misconceptions are kept in the payload even where the results view has no
@@ -74,6 +75,11 @@ export interface RecallSessionResults {
   // Average combined quality of the done answers, unrounded; null when none.
   averageCombinedQuality: number | null;
   calibration: RecallSessionCalibration;
+  // True when a finished session is still pending and no pending answer
+  // was saved or claimed within the claim lease: no run can be live, so a
+  // poll may schedule one (a run that died). Otherwise the live run, or
+  // the claim it holds, finishes the job (review part 2 R3-001).
+  evaluationRunNeeded: boolean;
 }
 
 export interface RecallResultsDeps {
@@ -110,18 +116,24 @@ function toResult(answer: RecallAnswer): RecallAnswerResult {
 }
 
 // The results page's polling read (§8.5): the session status, every
-// answer with its evaluation and the derived combined average and
-// calibration counts. Read only. Missing or another owner's session:
+// answer with its evaluation, the derived combined average and calibration
+// counts, and whether a new evaluation run is needed. Read only. Missing or another owner's session:
 // RECALL_SESSION_NOT_FOUND.
 export async function getRecallSessionResults(
   input: { sessionId: string },
-  deps: Pick<RecallResultsDeps, "sessions" | "answers">,
+  deps: Pick<RecallResultsDeps, "sessions" | "answers" | "clock">,
   ownerId: string,
 ): Promise<Result<RecallSessionResults, DomainError>> {
   const session = await deps.sessions.findById(input.sessionId, ownerId);
   if (!session) return err(sessionNotFound(input.sessionId));
   const answers = await deps.answers.listBySession(session.id, ownerId);
+  const liveSince = deps.clock.now().getTime() - EVALUATION_CLAIM_LEASE_MS;
+  const pending = answers.filter((a) => a.evaluationStatus === "pending");
   return ok({
+    evaluationRunNeeded:
+      session.finishedAt !== null &&
+      session.evaluationStatus === "pending" &&
+      pending.every((a) => a.updatedAt.getTime() < liveSince),
     session,
     answers: answers.map(toResult),
     averageCombinedQuality: averageCombinedQuality(answers),

@@ -25,8 +25,9 @@ const ANSWER_1 = "a0000000-0000-4000-8000-000000000001";
 const ANSWER_2 = "a0000000-0000-4000-8000-000000000002";
 const Q1 = "11111111-1111-4111-8111-111111111111";
 const Q2 = "22222222-2222-4222-8222-222222222222";
-const STARTED = new Date("2026-10-07T10:00:00.000Z");
-const FINISHED = new Date("2026-10-07T10:05:00.000Z");
+// Well before the real clock the actions use: nothing is inside the lease.
+const STARTED = new Date("2026-10-01T10:00:00.000Z");
+const FINISHED = new Date("2026-10-01T10:05:00.000Z");
 
 let current: { uow: InMemoryRecallSessionUnitOfWork; throwOnRead: boolean };
 
@@ -133,7 +134,36 @@ describe("active recall evaluation actions", () => {
       calibration: { overconfident: 0, underconfident: 0 },
     });
     expect(result.ok && result.value.answers).toHaveLength(2);
-    // A run that died leaves answers pending: polling takes them over.
+    // A run that died leaves answers pending: polling takes them over once
+    // nothing touched them within the claim lease (review part 2 R3-001).
+    expect(scheduleRecallEvaluation).toHaveBeenCalledWith(SESSION, OWNER);
+  });
+
+  it("schedules no run from a poll while a run may still be live", async () => {
+    await seed();
+    await current.uow.repos.answers.claimPendingForEvaluation(
+      SESSION,
+      OWNER,
+      new Date(),
+      new Date(),
+    );
+    const { getRecallSessionResultsAction } = await actions();
+
+    await getRecallSessionResultsAction({ sessionId: SESSION });
+
+    expect(scheduleRecallEvaluation).not.toHaveBeenCalled();
+  });
+
+  it("Reintentar on a session stuck pending schedules a run", async () => {
+    await seed();
+    const { retryRecallEvaluationAction } = await actions();
+
+    const result = await retryRecallEvaluationAction({ sessionId: SESSION });
+
+    expect(result.ok && result.value).toMatchObject({
+      requeued: 0,
+      evaluationStatus: "pending",
+    });
     expect(scheduleRecallEvaluation).toHaveBeenCalledWith(SESSION, OWNER);
   });
 

@@ -62,11 +62,10 @@ function repositories() {
   return createDrizzleRecallRepositories(getDb());
 }
 
-// The results page's polling read. While a finished session is still
-// pending it also schedules an evaluation run: a run that died (the
-// function was stopped) leaves its claims to expire, and the next run
-// takes them over. A run that finds every pending answer claimed by a
-// live run stops at once, so polling never evaluates an answer twice.
+// The results page's polling read. A finished session still pending with
+// no answer touched within the claim lease (a run that died) gets a new
+// evaluation run, which takes the expired claims over; while a run may be
+// live nothing is scheduled, so polls never pile up runs.
 export async function getRecallSessionResultsAction(
   input: unknown,
 ): Promise<Result<RecallSessionResultsView, ActionError>> {
@@ -78,15 +77,19 @@ export async function getRecallSessionResultsAction(
 
     const result = await getRecallSessionResults(
       parsed.value,
-      repositories(),
+      { ...repositories(), clock: systemClock },
       ownerId.value,
     );
     if (!result.ok) return err(toActionError(result.error));
-    const { session, answers, averageCombinedQuality, calibration } =
-      result.value;
-    if (session.finishedAt !== null && session.evaluationStatus === "pending") {
+    const {
+      session,
+      answers,
+      averageCombinedQuality,
+      calibration,
+      evaluationRunNeeded,
+    } = result.value;
+    if (evaluationRunNeeded)
       scheduleRecallEvaluation(session.id, ownerId.value);
-    }
     return ok({
       sessionId: session.id,
       startedAt: session.startedAt.toISOString(),
@@ -100,7 +103,8 @@ export async function getRecallSessionResultsAction(
 }
 
 // "Reintentar" (CU-09 alternate flow): the failed answers go back to
-// pending and a new evaluation run is scheduled after the response.
+// pending and a new evaluation run is scheduled after the response; a
+// session left pending also gets a run.
 export async function retryRecallEvaluationAction(
   input: unknown,
 ): Promise<Result<RetriedRecallEvaluationView, ActionError>> {
@@ -117,7 +121,14 @@ export async function retryRecallEvaluationAction(
     );
     if (!result.ok) return err(toActionError(result.error));
     const { session, requeued } = result.value;
-    if (requeued > 0) scheduleRecallEvaluation(session.id, ownerId.value);
+    // Also a session stuck pending (the page stopped polling): the run
+    // stops at once if a live run still holds the claims.
+    if (
+      requeued > 0 ||
+      (session.finishedAt !== null && session.evaluationStatus === "pending")
+    ) {
+      scheduleRecallEvaluation(session.id, ownerId.value);
+    }
     return ok({
       sessionId: session.id,
       requeued,

@@ -33,6 +33,7 @@ export interface ActiveRecallResultsViewProps {
   // never started) everything stays in its pending state.
   sessionId?: string | null;
   pollIntervalMs?: number;
+  maxPollAttempts?: number;
 }
 
 const DEFAULT_POLL_INTERVAL_MS = 2500;
@@ -56,20 +57,46 @@ function sessionDateLabel(results: RecallSessionResultsView | null): string {
   });
 }
 
-// Polls the session's evaluation every few seconds until it resolves
-// (done or partial); a failed read is retried on the next tick. `retry`
-// ("Reintentar") requeues the failed answers and polls again.
+// Polling is bounded (review part 2 R3-001): each wait grows by half up to
+// MAX_POLL_DELAY_MS, and after `maxAttempts` reads still pending (about 9
+// minutes by default, beyond the 6-minute claim lease a stuck run needs to
+// be taken over) it stops.
+export const MAX_POLL_DELAY_MS = 20_000;
+const DEFAULT_MAX_POLL_ATTEMPTS = 32;
+
+export function pollDelayMs(attempt: number, baseMs: number): number {
+  return Math.min(baseMs * 1.5 ** attempt, MAX_POLL_DELAY_MS);
+}
+
+// Failures a later read cannot heal: polling stops at once.
+const FINAL_READ_ERRORS = new Set([
+  "RECALL_SESSION_NOT_FOUND",
+  "RECALL_SESSION_REQUIRED",
+  "RECALL_INVALID_INPUT",
+]);
+
+// Polls the session's evaluation until it resolves (done or partial); a
+// failed read is retried on the next tick. Polling ends on a failure that
+// cannot heal or after the last allowed attempt (`stopped`: the view shows
+// the error banner with "Reintentar"). `retry` ("Reintentar") requeues the
+// failed answers (or reschedules a stuck run) and polls again from scratch.
 function useSessionResults(
   sessionId: string | null | undefined,
   intervalMs: number,
+  maxAttempts: number,
 ) {
   const [results, setResults] = useState<RecallSessionResultsView | null>(null);
   const [polling, setPolling] = useState(true);
+  const [stopped, setStopped] = useState(false);
+  // Bumped by "Reintentar" to restart the polling loop with fresh attempts.
+  const [round, setRound] = useState(0);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `round` is a deliberate re-run trigger ("Reintentar" restarts the loop with fresh attempts), not a missing reference.
   useEffect(() => {
     if (!sessionId || !polling) return;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let attempt = 0;
     const tick = async () => {
       const read = await getRecallSessionResultsAction({ sessionId }).catch(
         () => null,
@@ -81,26 +108,38 @@ function useSessionResults(
           setPolling(false);
           return;
         }
+      } else if (read && FINAL_READ_ERRORS.has(read.error.code)) {
+        setPolling(false);
+        setStopped(true);
+        return;
       }
-      timer = setTimeout(tick, intervalMs);
+      attempt += 1;
+      if (attempt >= maxAttempts) {
+        setPolling(false);
+        setStopped(true);
+        return;
+      }
+      timer = setTimeout(tick, pollDelayMs(attempt - 1, intervalMs));
     };
     void tick();
     return () => {
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [sessionId, polling, intervalMs]);
+  }, [sessionId, polling, intervalMs, maxAttempts, round]);
 
   const retry = useCallback(async () => {
     if (!sessionId) return;
+    setStopped(false);
     setResults((prev) =>
       prev ? { ...prev, evaluationStatus: "pending" } : prev,
     );
     await retryRecallEvaluationAction({ sessionId }).catch(() => null);
+    setRound((n) => n + 1);
     setPolling(true);
   }, [sessionId]);
 
-  return { results, retry };
+  return { results, stopped, retry };
 }
 
 // Active recall's end-of-session results (design/shell-look fix, 2026-09-24;
@@ -116,7 +155,8 @@ function useSessionResults(
 // It polls the evaluation; while any answer is pending everything stays
 // pending (§8.5: feedback only once every evaluation resolved). Done → the
 // banner turns success; partial (a provider failed every attempt) → error
-// tone with "Reintentar". Resolved, the combined-quality and calibration
+// tone with "Reintentar" — the same banner shows when polling stopped (a
+// read that cannot heal, or the attempts ran out). Resolved, the combined-quality and calibration
 // blocks show their numbers (no "pronto" badge) and each evaluated
 // question fills the approved QuestionFeedbackItem slots (AI score,
 // justification) and enables "No estoy de acuerdo", which turns into a
@@ -129,8 +169,13 @@ export function ActiveRecallResultsView({
   onRestart,
   sessionId,
   pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
+  maxPollAttempts = DEFAULT_MAX_POLL_ATTEMPTS,
 }: ActiveRecallResultsViewProps) {
-  const { results, retry } = useSessionResults(sessionId, pollIntervalMs);
+  const { results, stopped, retry } = useSessionResults(
+    sessionId,
+    pollIntervalMs,
+    maxPollAttempts,
+  );
   const resolved =
     results !== null && results.evaluationStatus !== "pending" ? results : null;
   const evaluationByQuestion = new Map(
@@ -183,7 +228,7 @@ export function ActiveRecallResultsView({
           title="Evaluación completa"
           description="La IA revisó cada respuesta con la rúbrica de la página."
         />
-      ) : resolved?.evaluationStatus === "partial" ? (
+      ) : resolved?.evaluationStatus === "partial" || stopped ? (
         <StatusBanner
           data-testid="evaluation-status"
           tone="error"

@@ -19,7 +19,11 @@ vi.mock("@/modules/active-recall", () => ({
   disagreeRecallAnswerAction,
 }));
 
-import { ActiveRecallResultsView } from "./active-recall-results-view";
+import {
+  ActiveRecallResultsView,
+  MAX_POLL_DELAY_MS,
+  pollDelayMs,
+} from "./active-recall-results-view";
 import type { QuestionRecord } from "./self-rating";
 
 const RECORDS: QuestionRecord[] = [
@@ -180,8 +184,10 @@ function results(
 ): RecallSessionResultsView {
   return {
     sessionId: SESSION,
-    startedAt: "2026-10-07T09:00:00.000Z",
-    finishedAt: "2026-10-07T09:10:00.000Z",
+    // Midday UTC: the same calendar day in every timezone within ±11 h, so
+    // the date label is deterministic (review part 2 R3-002).
+    startedAt: "2026-10-07T11:50:00.000Z",
+    finishedAt: "2026-10-07T12:00:00.000Z",
     evaluationStatus: "pending",
     averageCombinedQuality: null,
     calibration: { overconfident: 0, underconfident: 0 },
@@ -212,7 +218,7 @@ const PARTIAL = results({
   ],
 });
 
-function live() {
+function live(maxPollAttempts?: number) {
   render(
     <ActiveRecallResultsView
       pageTitle="Mitocondria"
@@ -221,6 +227,7 @@ function live() {
       onRestart={vi.fn()}
       sessionId={SESSION}
       pollIntervalMs={10}
+      maxPollAttempts={maxPollAttempts}
     />,
   );
 }
@@ -433,5 +440,53 @@ describe("ActiveRecallResultsView on a real session", () => {
         }),
       ).toBeEnabled(),
     );
+  });
+
+  // Review part 2 R3-001: polling always ends.
+  it("stops polling on a failure that cannot heal and shows the error banner", async () => {
+    getRecallSessionResultsAction.mockResolvedValue(
+      err({ code: "RECALL_SESSION_NOT_FOUND", message: "x" }),
+    );
+    live();
+
+    const banner = screen.getByTestId("evaluation-status");
+    await waitFor(() => expect(banner).toHaveAttribute("data-tone", "error"));
+    expect(banner).toHaveTextContent("No pudimos evaluar algunas respuestas");
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    expect(getRecallSessionResultsAction).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops after the last allowed poll and lets Reintentar poll again", async () => {
+    getRecallSessionResultsAction.mockResolvedValue(ok(results()));
+    retryRecallEvaluationAction.mockResolvedValue(
+      ok({ sessionId: SESSION, requeued: 0, evaluationStatus: "pending" }),
+    );
+    live(3);
+
+    const banner = screen.getByTestId("evaluation-status");
+    await waitFor(() => expect(banner).toHaveAttribute("data-tone", "error"), {
+      timeout: 2000,
+    });
+    expect(getRecallSessionResultsAction).toHaveBeenCalledTimes(3);
+
+    await userEvent.click(
+      within(banner).getByRole("button", { name: "Reintentar" }),
+    );
+
+    expect(retryRecallEvaluationAction).toHaveBeenCalledWith({
+      sessionId: SESSION,
+    });
+    await waitFor(() =>
+      expect(getRecallSessionResultsAction).toHaveBeenCalledTimes(4),
+    );
+  });
+});
+
+describe("pollDelayMs", () => {
+  it("backs off by half each attempt up to the cap", () => {
+    expect(pollDelayMs(0, 2000)).toBe(2000);
+    expect(pollDelayMs(1, 2000)).toBe(3000);
+    expect(pollDelayMs(2, 2000)).toBe(4500);
+    expect(pollDelayMs(50, 2000)).toBe(MAX_POLL_DELAY_MS);
   });
 });

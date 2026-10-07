@@ -3,6 +3,7 @@ import { createFixedClock } from "@/shared/kernel/clock";
 import { RECALL_ERROR } from "../domain/errors";
 import { newRecallAnswer, skippedEvaluation } from "../domain/recall-answer";
 import { newRecallSession } from "../domain/recall-session";
+import { EVALUATION_CLAIM_LEASE_MS } from "./evaluate-recall-session";
 import {
   disagreeRecallAnswer,
   evaluationFeedbackOf,
@@ -196,6 +197,61 @@ describe("getRecallSessionResults", () => {
     );
     expect(!result.ok && result.error.code).toBe(
       RECALL_ERROR.SESSION_NOT_FOUND,
+    );
+  });
+});
+
+// Review part 2 R3-001: polling schedules a run only when no run can be
+// live — no pending answer was touched (saved or claimed) within the lease.
+describe("getRecallSessionResults evaluationRunNeeded", () => {
+  async function read(
+    deps: Awaited<ReturnType<typeof setup>>["deps"],
+    now: Date,
+  ) {
+    const result = await getRecallSessionResults(
+      { sessionId: SESSION },
+      { ...deps, clock: createFixedClock(now) },
+      OWNER,
+    );
+    if (!result.ok) throw result.error;
+    return result.value.evaluationRunNeeded;
+  }
+
+  it("is false while a pending answer was touched within the claim lease", async () => {
+    const { uow, deps } = await setup();
+    const claimedAt = at(1);
+    await uow.repos.answers.claimPendingForEvaluation(
+      SESSION,
+      OWNER,
+      claimedAt,
+      claimedAt,
+    );
+
+    expect(
+      await read(
+        deps,
+        new Date(claimedAt.getTime() + EVALUATION_CLAIM_LEASE_MS - 1),
+      ),
+    ).toBe(false);
+    expect(
+      await read(
+        deps,
+        new Date(claimedAt.getTime() + EVALUATION_CLAIM_LEASE_MS + 1),
+      ),
+    ).toBe(true);
+  });
+
+  it("is false for a resolved or an open session", async () => {
+    const { uow, deps } = await setup();
+    await resolve(uow);
+    expect(await read(deps, at(30))).toBe(false);
+
+    const open = new InMemoryRecallSessionUnitOfWork();
+    await open.repos.sessions.create(
+      newRecallSession({ id: SESSION, ownerId: OWNER, pageId: PAGE }, NOW),
+    );
+    expect(await read({ ...deps, sessions: open.repos.sessions }, at(30))).toBe(
+      false,
     );
   });
 });

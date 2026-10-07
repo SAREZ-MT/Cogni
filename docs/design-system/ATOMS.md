@@ -772,7 +772,9 @@ session's date; the view polls the evaluation and keeps everything pending
 while any answer is pending; the banner turns `success` ("Evaluación
 completa") when every answer is evaluated or `error` ("No pudimos evaluar
 algunas respuestas") with an outline `sm` "Reintentar" in its `action` slot
-when a provider failed every attempt. Resolved, "Calidad combinada" shows
+when a provider failed every attempt; the same error banner shows when
+polling stops (a read that cannot heal, or about 9 minutes of backoff
+without a result). Resolved, "Calidad combinada" shows
 the average combined quality ("x,x / 5") and "Calibración" the over/under
 confidence counts, each without its "pronto" pill; evaluated rows pass
 `pending={false}`, `aiScore`, `justification` and `onDisagree`, while a
