@@ -101,6 +101,21 @@ describe("selectNewParagraphs", () => {
     expect(selectNewParagraphs(`${text}\n\n  primero `, known)).toEqual([]);
   });
 
+  it("treats both halves of a split paragraph as new (an Enter mid-text is an edit)", () => {
+    const known = splitParagraphs(
+      "La mitocondria produce la mayor parte del ATP de la célula.",
+    ).map((p) => p.fingerprint);
+    expect(
+      selectNewParagraphs(
+        "La mitocondria produce la mayor parte del AT\nEl ribosoma traduce el ARN mensajero en proteínas.P de la célula.",
+        known,
+      ).map((p) => p.text),
+    ).toEqual([
+      "La mitocondria produce la mayor parte del AT",
+      "El ribosoma traduce el ARN mensajero en proteínas.P de la célula.",
+    ]);
+  });
+
   it("keeps a repeated new paragraph only once (its first occurrence)", () => {
     expect(
       selectNewParagraphs("Repetido\nOtro\nrepetido", []).map((p) => p.text),

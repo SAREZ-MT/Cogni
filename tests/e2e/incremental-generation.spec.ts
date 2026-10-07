@@ -46,12 +46,28 @@ async function writeFirstParagraph(page: Page) {
 }
 
 // A new paragraph block after the existing text (a new line of plain text).
+// The caret is put at the very end of the last paragraph through the DOM
+// selection: a click lands mid-text and "ControlOrMeta+End" does not move it
+// on macOS (Meta+End is no editing command there), so Enter used to split
+// the first paragraph — editing it, which correctly made it new again.
 async function addSecondParagraph(page: Page) {
-  await editor(page).click();
+  const last = editor(page).locator("p").last();
+  await last.click();
+  await last.evaluate((paragraph) => {
+    const range = document.createRange();
+    range.selectNodeContents(paragraph);
+    range.collapse(false);
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+  });
+  // ProseMirror reads the DOM selection on selectionchange.
   await page.waitForTimeout(100);
-  await page.keyboard.press("ControlOrMeta+End");
   await page.keyboard.press("Enter");
   await page.keyboard.type(SECOND);
+  // The first paragraph must stay as it was: an edit to it makes it new
+  // again and it would be re-sent (correctly), breaking this spec's counts.
+  await expect(editor(page).locator("p")).toHaveText([FIRST, SECOND]);
   await waitForSaved(page);
 }
 
