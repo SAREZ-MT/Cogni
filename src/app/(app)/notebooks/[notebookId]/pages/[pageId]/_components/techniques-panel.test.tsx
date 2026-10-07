@@ -1010,6 +1010,38 @@ describe("TechniquesPanel", () => {
       });
     });
 
+    it("ignores the mount-time read when a generation's newer count already arrived", async () => {
+      const user = userEvent.setup();
+      let resolveMountRead: (value: unknown) => void = () => {};
+      getRecallPageSummaryAction
+        .mockImplementationOnce(
+          () =>
+            new Promise((resolve) => {
+              resolveMountRead = resolve;
+            }),
+        )
+        .mockResolvedValueOnce(ok({ questionCount: 10 }));
+      generateRecallQuestionsAction.mockResolvedValue(
+        ok({
+          questions: [],
+          created: 10,
+          remainingToday: 3,
+          truncated: false,
+          wordsUsed: 10,
+          wordsTotal: 10,
+        }),
+      );
+      await renderPanel(false, { initialRecallQuestionCount: null });
+
+      await user.click(screen.getByTestId("generate-recall-questions"));
+      await waitForText("generated-item-active-recall", "10 preguntas");
+      await act(async () => resolveMountRead(ok({ questionCount: 0 })));
+
+      expect(
+        screen.getByTestId("generated-item-active-recall"),
+      ).toHaveTextContent("10 preguntas");
+    });
+
     it("does not read it again when the server count is known", async () => {
       await renderPanel(false, { initialRecallQuestionCount: 3 });
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { Layers, PanelRightClose, PanelRightOpen } from "lucide-react";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import {
   generateRecallQuestionsAction,
@@ -307,17 +307,28 @@ export function TechniquesPanel({
     };
   }, [pageId]);
 
+  // Every recall count read takes a ticket; only the latest one may set the
+  // count, so a slow mount-time read never overwrites the newer count a
+  // finished generation already read.
+  const recallReadTicket = useRef(0);
+  async function refreshRecallQuestionCount(): Promise<void> {
+    recallReadTicket.current += 1;
+    const ticket = recallReadTicket.current;
+    const count = await readRecallQuestionCount(pageId);
+    if (ticket === recallReadTicket.current && count !== null) {
+      setRecallQuestionCount(count);
+    }
+  }
+
   // Only the server read's outcome at mount matters here: a later
   // generation re-reads the count itself.
   // biome-ignore lint/correctness/useExhaustiveDependencies: mount-time retry
   useEffect(() => {
     if (initialRecallQuestionCount !== null) return;
-    let active = true;
-    readRecallQuestionCount(pageId).then((count) => {
-      if (active && count !== null) setRecallQuestionCount(count);
-    });
+    void refreshRecallQuestionCount();
     return () => {
-      active = false;
+      // An unmounted panel ignores the answer.
+      recallReadTicket.current += 1;
     };
   }, [pageId]);
 
@@ -423,8 +434,7 @@ export function TechniquesPanel({
       }
       setRemaining(result.value.remainingToday);
       setRecallNotice(recallNoticeCopy(result.value));
-      const count = await readRecallQuestionCount(pageId);
-      if (count !== null) setRecallQuestionCount(count);
+      await refreshRecallQuestionCount();
     });
   }
 
