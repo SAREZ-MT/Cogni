@@ -244,7 +244,9 @@ export interface TechniquesPanelProps {
   // refetches on mount).
   initialFlashcards: FlashcardView[];
   // Active recall questions on the page; refreshed after a recall generation.
-  initialRecallQuestionCount: number;
+  // null when the server could not read it: the panel reads it again on
+  // mount instead of treating the page as having no questions.
+  initialRecallQuestionCount: number | null;
   // Generations left today; null when the status could not be read.
   initialRemaining: number | null;
 }
@@ -305,6 +307,19 @@ export function TechniquesPanel({
     };
   }, [pageId]);
 
+  // Only the server read's outcome at mount matters here: a later
+  // generation re-reads the count itself.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: mount-time retry
+  useEffect(() => {
+    if (initialRecallQuestionCount !== null) return;
+    let active = true;
+    readRecallQuestionCount(pageId).then((count) => {
+      if (active && count !== null) setRecallQuestionCount(count);
+    });
+    return () => {
+      active = false;
+    };
+  }, [pageId]);
 
   function toggle() {
     const next = !collapsed;
@@ -430,7 +445,7 @@ export function TechniquesPanel({
         : [];
     }
     if (t.id === "active-recall") {
-      return recallQuestionCount > 0
+      return recallQuestionCount !== null && recallQuestionCount > 0
         ? [
             generatedRow(
               t,

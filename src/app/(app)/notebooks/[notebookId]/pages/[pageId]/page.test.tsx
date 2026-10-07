@@ -395,7 +395,7 @@ describe("page route ingestion wiring", () => {
       notebookId: string;
       pageId: string;
       initialFlashcards: unknown[];
-      initialRecallQuestionCount: number;
+      initialRecallQuestionCount: number | null;
       initialRemaining: number | null;
     };
 
@@ -441,12 +441,13 @@ describe("page route ingestion wiring", () => {
           throw new Error("boom");
         },
       ],
-    ])("degrades to no recall questions when the summary %s", async (_, read) => {
+    ])("passes an unknown recall count (not zero) when the summary %s", async (_, read) => {
       getRecallPageSummaryAction.mockImplementation(read);
 
       const props = await renderPanelProps();
 
-      expect(props.initialRecallQuestionCount).toBe(0);
+      // The panel reads it again on the client (T5b review follow-up).
+      expect(props.initialRecallQuestionCount).toBeNull();
     });
 
     it("loads the page's cards and the remaining generations on the server", async () => {

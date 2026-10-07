@@ -31,7 +31,9 @@ export interface CreateExamNotebook {
 }
 
 export interface CreateExamDialogProps {
-  notebooks: readonly CreateExamNotebook[];
+  // null when the notebooks could not be read (a load error, never the
+  // "no notebooks yet" empty state).
+  notebooks: readonly CreateExamNotebook[] | null;
   // Preselected notebook (the exams notebook view); the first one otherwise.
   initialNotebookId?: string;
 }
@@ -56,6 +58,7 @@ const EXAM_COUNT_STEP = 5;
 
 const LIMIT_REACHED = "Llegaste al límite de hoy. Vuelve mañana.";
 const GENERIC_FAILURE = "No pudimos generar las preguntas. Intenta de nuevo.";
+const LOAD_FAILURE = "No pudimos cargar tus cuadernos. Intenta de nuevo.";
 // Incremental generation (Phase 6 T5c): the page has no paragraph exams
 // has not used yet. Same copy as the techniques panel; a notice, not an
 // error (no AI call and no generation were spent).
@@ -78,9 +81,10 @@ const ERROR_COPY: Record<string, string> = {
 // error copy as the techniques panel; on success the notebook's exams open)
 // or writes them on the page's questions screen.
 export function CreateExamDialog({
-  notebooks,
+  notebooks: loadedNotebooks,
   initialNotebookId,
 }: CreateExamDialogProps) {
+  const notebooks = loadedNotebooks ?? [];
   const router = useRouter();
   const notebookFieldId = useId();
   const pageFieldId = useId();
@@ -165,7 +169,11 @@ export function CreateExamDialog({
             Elige la página del examen y cómo crear sus preguntas.
           </DialogDescription>
         </DialogHeader>
-        {notebooks.length === 0 ? (
+        {loadedNotebooks === null ? (
+          <p role="alert" className="text-destructive text-sm">
+            {LOAD_FAILURE}
+          </p>
+        ) : notebooks.length === 0 ? (
           <p className="text-fg-muted text-sm">
             Aún no tienes cuadernos. Crea uno para empezar.
           </p>

@@ -299,7 +299,7 @@ describe("ExamsHubPage (real data)", () => {
       expect(props.initialNotebookId).toBeUndefined();
     });
 
-    it("still offers it with no notebooks when the tree cannot be read", async () => {
+    it("still offers it, with the notebooks unknown (a load error), when the tree cannot be read", async () => {
       getSidebarTree.mockRejectedValue(new Error("db down"));
       listExamHubAction.mockResolvedValue({ ok: true, value: [] });
 
@@ -308,7 +308,7 @@ describe("ExamsHubPage (real data)", () => {
       const [props] = CreateExamDialog.mock.calls[0] as unknown as [
         Record<string, unknown>,
       ];
-      expect(props.notebooks).toEqual([]);
+      expect(props.notebooks).toBeNull();
     });
   });
 });

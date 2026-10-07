@@ -993,6 +993,33 @@ describe("TechniquesPanel", () => {
     });
   });
 
+  // T5b review follow-up: a failed server read of the recall summary is
+  // unknown, not "no questions": the panel reads it again on mount.
+  describe("unknown recall summary", () => {
+    it("reads the recall summary again when the server could not", async () => {
+      getRecallPageSummaryAction.mockResolvedValue(ok({ questionCount: 7 }));
+      await renderPanel(false, { initialRecallQuestionCount: null });
+
+      await waitFor(() =>
+        expect(
+          screen.getByTestId("generated-item-active-recall"),
+        ).toHaveTextContent("7 preguntas"),
+      );
+      expect(getRecallPageSummaryAction).toHaveBeenCalledWith({
+        pageId: PAGE_ID,
+      });
+    });
+
+    it("does not read it again when the server count is known", async () => {
+      await renderPanel(false, { initialRecallQuestionCount: 3 });
+
+      expect(
+        screen.getByTestId("generated-item-active-recall"),
+      ).toHaveTextContent("3 preguntas");
+      expect(getRecallPageSummaryAction).not.toHaveBeenCalled();
+    });
+  });
+
   it("starts collapsed from the server-read cookie and offers to expand", async () => {
     await renderPanel(true);
 

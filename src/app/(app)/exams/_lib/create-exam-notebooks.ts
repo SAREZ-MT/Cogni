@@ -1,11 +1,15 @@
+import * as Sentry from "@sentry/nextjs";
 import { getSidebarTree } from "@/modules/notebooks";
 import type { CreateExamNotebook } from "../_components/create-exam-dialog";
 
 // The owner's notebooks with their active pages for "Crear examen"'s
 // pickers, from the notebooks module's public read API (the sidebar tree).
-// A failed read degrades to no notebooks (the dialog then says so) instead
-// of breaking the exams screens.
-export async function loadCreateExamNotebooks(): Promise<CreateExamNotebook[]> {
+// A failed read is reported and answered as null (unknown), so the dialog
+// shows a load error instead of a false "Aún no tienes cuadernos", and the
+// exams screens still render.
+export async function loadCreateExamNotebooks(): Promise<
+  CreateExamNotebook[] | null
+> {
   try {
     const tree = await getSidebarTree();
     return tree.map((notebook) => ({
@@ -13,7 +17,8 @@ export async function loadCreateExamNotebooks(): Promise<CreateExamNotebook[]> {
       title: notebook.title,
       pages: notebook.pages.map((page) => ({ id: page.id, title: page.title })),
     }));
-  } catch {
-    return [];
+  } catch (error) {
+    Sentry.captureException(error);
+    return null;
   }
 }
