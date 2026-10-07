@@ -10,7 +10,9 @@ import {
 import type { PageTextReader } from "@/modules/notebooks";
 import { createFixedClock } from "@/shared/kernel/clock";
 import { DomainError } from "@/shared/kernel/domain-error";
+import { fingerprintParagraph } from "@/shared/kernel/page-paragraphs";
 import { err, ok, type Result } from "@/shared/kernel/result";
+import { RECALL_ERROR } from "../domain/errors";
 import { newRecallQuestion } from "../domain/recall-question";
 import {
   RECALL_GENERATION_COUNT,
@@ -111,7 +113,11 @@ function makeAi(outcome?: Outcome) {
       }
       const object = outcome ?? {
         questions: Array.from({ length: requestedCount(input) }, (_, i) =>
-          rawQuestion(`Explica la idea ${i + 1}.`),
+          rawQuestion(
+            calls.length === 1
+              ? `Explica la idea ${i + 1}.`
+              : `Explica la idea ${i + 1} de la llamada ${calls.length}.`,
+          ),
         ),
       };
       return ok({ object, generation: generation("gen-1") });
@@ -129,6 +135,7 @@ function makeDeps(overrides: Partial<RequestRecallGenerationDeps> = {}) {
     pages: stubPages(TEXT),
     ai,
     questions: uow.questions,
+    fingerprints: uow.fingerprints,
     uow,
     clock: createFixedClock(NOW),
     ids: { next: () => `id-${++ids}` },
@@ -459,5 +466,100 @@ describe("requestRecallGeneration", () => {
     expect(result.value.wordsTotal).toBe(50);
     expect(result.value.wordsUsed).toBeLessThan(50);
     expect(ai.calls[0]?.prompt).not.toContain("palabra49");
+  });
+});
+
+// Incremental generation (Phase 6 T5c): only paragraphs active recall has
+// not sent yet reach the model; nothing new means no call and no unit.
+describe("requestRecallGeneration — incremental", () => {
+  beforeEach(() => {
+    ids = 0;
+  });
+
+  it("stores the fingerprints of the sent paragraphs with the questions", async () => {
+    const { deps, uow } = makeDeps({ pages: stubPages("Uno dos\n\nTres") });
+
+    const result = await requestRecallGeneration({ pageId: PAGE }, deps, OWNER);
+
+    expect(result.ok).toBe(true);
+    expect((await uow.fingerprints.listByPage(PAGE, OWNER)).sort()).toEqual(
+      [fingerprintParagraph("uno dos"), fingerprintParagraph("tres")].sort(),
+    );
+  });
+
+  it("answers NO_NEW_CONTENT without calling the AI nor touching the limit", async () => {
+    const { deps, uow, limiter, ai } = makeDeps();
+    await requestRecallGeneration({ pageId: PAGE }, deps, OWNER);
+    const { checks, peeks } = limiter;
+
+    const again = await requestRecallGeneration(
+      { pageId: PAGE },
+      { ...deps, pages: stubPages(`  ${TEXT.toUpperCase()}  \n\n`) },
+      OWNER,
+    );
+
+    expect(!again.ok && again.error.code).toBe(RECALL_ERROR.NO_NEW_CONTENT);
+    expect([limiter.checks, limiter.peeks]).toEqual([checks, peeks]);
+    expect(ai.calls).toHaveLength(1);
+    expect(await uow.questions.listActiveByPage(PAGE, OWNER)).toHaveLength(10);
+  });
+
+  it("sends only the added and the edited paragraphs, in page order", async () => {
+    const { deps, ai } = makeDeps({
+      pages: stubPages("Primero viejo\nSegundo viejo"),
+    });
+    await requestRecallGeneration({ pageId: PAGE }, deps, OWNER);
+
+    const second = await requestRecallGeneration(
+      { pageId: PAGE },
+      {
+        ...deps,
+        pages: stubPages("Nuevo inicio\nPrimero viejo\nSegundo editado"),
+      },
+      OWNER,
+    );
+
+    expect(second.ok).toBe(true);
+    const prompt = ai.calls[1]?.prompt ?? "";
+    expect(prompt).toContain("Nuevo inicio\nSegundo editado");
+    expect(prompt).not.toContain("Primero viejo");
+  });
+
+  it("keeps the paragraphs a truncation cut new for the next generation", async () => {
+    const { deps, uow } = makeDeps({
+      pages: stubPages("a b c\nd e f\ng h i"),
+      tokenCap: 6, // 4 words: "a b c" whole, "d" of the second paragraph
+    });
+
+    const first = await requestRecallGeneration({ pageId: PAGE }, deps, OWNER);
+
+    expect(first.ok && first.value.truncated).toBe(true);
+    expect(await uow.fingerprints.listByPage(PAGE, OWNER)).toEqual([
+      fingerprintParagraph("a b c"),
+    ]);
+  });
+
+  it("stores no fingerprint when the provider fails or the write rolls back", async () => {
+    const failing = makeDeps({ ai: makeAi("fail") });
+    await requestRecallGeneration({ pageId: PAGE }, failing.deps, OWNER);
+    expect(await failing.uow.fingerprints.listByPage(PAGE, OWNER)).toEqual([]);
+
+    const { deps, uow } = makeDeps();
+    uow.studyItems.failNextSave = true;
+    await expect(
+      requestRecallGeneration({ pageId: PAGE }, deps, OWNER),
+    ).rejects.toThrow("study item write failed");
+    expect(await uow.fingerprints.listByPage(PAGE, OWNER)).toEqual([]);
+  });
+
+  it("sends the whole page when questions exist but no fingerprint (generated before T5c)", async () => {
+    const { deps, uow, ai } = makeDeps();
+    await requestRecallGeneration({ pageId: PAGE }, deps, OWNER);
+    uow.fingerprints.store.rows.clear();
+
+    const again = await requestRecallGeneration({ pageId: PAGE }, deps, OWNER);
+
+    expect(again.ok).toBe(true);
+    expect(ai.calls[1]?.prompt).toContain(TEXT);
   });
 });

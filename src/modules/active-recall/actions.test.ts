@@ -100,6 +100,9 @@ vi.mock("./infrastructure", () => ({
   DrizzleRecallUnitOfWork: vi.fn(function DrizzleRecallUnitOfWork() {
     return current.uow;
   }),
+  DrizzleRecallFingerprints: vi.fn(function DrizzleRecallFingerprints() {
+    return current.uow.fingerprints;
+  }),
   DrizzleRecallQuestionRepository: vi.fn(
     function DrizzleRecallQuestionRepository() {
       return current.uow.questions;
@@ -251,6 +254,22 @@ describe("generateRecallQuestionsAction", () => {
     );
     expect(current.uow.studyItems.all()).toHaveLength(0);
     expect(current.checks).toBe(0);
+  });
+
+  it("answers RECALL_NO_NEW_CONTENT for an unchanged page, consuming nothing", async () => {
+    const generate = await action();
+    await generate({ pageId: PAGE });
+    const checks = current.checks;
+
+    const result = await generate({ pageId: PAGE });
+
+    expect(!result.ok && result.error.code).toBe("RECALL_NO_NEW_CONTENT");
+    expect(current.checks).toBe(checks);
+    expect(track).toHaveBeenLastCalledWith(
+      "generation_requested",
+      OWNER,
+      expect.objectContaining({ status: "no_new_content" }),
+    );
   });
 
   it("still answers with the result when analytics rejects", async () => {

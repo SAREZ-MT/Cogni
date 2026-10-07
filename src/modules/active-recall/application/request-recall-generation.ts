@@ -13,7 +13,14 @@ import type { PageTextReader } from "@/modules/notebooks";
 import { newStudyItem } from "@/modules/study-engine";
 import type { Clock } from "@/shared/kernel/clock";
 import { DomainError } from "@/shared/kernel/domain-error";
+import type { GenerationFingerprintRepository } from "@/shared/kernel/generation-fingerprints";
+import {
+  joinParagraphs,
+  paragraphsWithinWords,
+  selectNewParagraphs,
+} from "@/shared/kernel/page-paragraphs";
 import { err, ok, type Result } from "@/shared/kernel/result";
+import { RECALL_ERROR } from "../domain/errors";
 import {
   newRecallQuestion,
   type RecallQuestion,
@@ -28,6 +35,8 @@ export const RECALL_GENERATION_COUNT = 10;
 
 export const RECALL_PAGE_EMPTY_MESSAGE =
   "The page has no text to generate questions from";
+export const RECALL_NO_NEW_CONTENT_MESSAGE =
+  "Every paragraph of the page was already used to generate recall questions";
 
 // The daily limit error carries when the window resets so the UI can say
 // so (same shape as exams' ExamDailyLimitReachedError, which this module
@@ -58,6 +67,9 @@ export interface RequestRecallGenerationDeps {
   // Reads the page's active questions before the model call (the prompt
   // lists them so the model avoids duplicates).
   questions: Pick<RecallQuestionRepository, "listActiveByPage">;
+  // Reads the paragraphs active recall already used on the page; the new
+  // ones are stored through the unit of work.
+  fingerprints: Pick<GenerationFingerprintRepository, "listByPage">;
   uow: RecallUnitOfWork;
   clock: Clock;
   ids: { next(): string };
@@ -119,6 +131,13 @@ async function consumeUnit(
 // limit ran out between the peek and the commit (a concurrent generation),
 // the questions stand and remainingToday is 0. The questions are written
 // with their study items in ONE unit of work: a failure stores nothing.
+// Incremental (Phase 6 T5c): only the paragraphs active recall has not used
+// yet on this page (new or edited) are sent, in page order and truncated to
+// the token cap; with none, NO_NEW_CONTENT is answered before the peek (no
+// call, no unit). The fingerprints of the paragraphs sent whole are stored
+// in the same unit of work. A page with questions but no fingerprints
+// (generated before T5c) sends every paragraph once; the prompt still lists
+// the active questions. Removed paragraphs never archive questions.
 export async function requestRecallGeneration(
   input: { pageId: string },
   deps: RequestRecallGenerationDeps,
@@ -130,13 +149,30 @@ export async function requestRecallGeneration(
     return err(new DomainError(AI_ERROR.PAGE_EMPTY, RECALL_PAGE_EMPTY_MESSAGE));
   }
 
+  const newParagraphs = selectNewParagraphs(
+    page.value.plainText,
+    await deps.fingerprints.listByPage(input.pageId, ownerId),
+  );
+  if (newParagraphs.length === 0) {
+    return err(
+      new DomainError(
+        RECALL_ERROR.NO_NEW_CONTENT,
+        RECALL_NO_NEW_CONTENT_MESSAGE,
+      ),
+    );
+  }
+
   const limit = await deps.limiter.peek(ownerId);
   if (!limit.allowed) {
     return err(new RecallDailyLimitReachedError(limit.resetAt));
   }
 
   const active = await deps.questions.listActiveByPage(input.pageId, ownerId);
-  const truncation = truncateToTokenCap(page.value.plainText, deps.tokenCap);
+  const truncation = truncateToTokenCap(
+    joinParagraphs(newParagraphs),
+    deps.tokenCap,
+  );
+  const sent = paragraphsWithinWords(newParagraphs, truncation.wordsUsed);
   const prompt = buildGenerateRecallQuestionsPrompt({
     pageTitle: page.value.title,
     pageText: truncation.text,
@@ -196,7 +232,7 @@ export async function requestRecallGeneration(
 
   const persisted = await runRecallWork(
     deps.uow,
-    async ({ questions, studyItems }) => {
+    async ({ questions, studyItems, fingerprints }) => {
       // Another generation may have landed during the model call.
       const current = new Set(
         (await questions.listActiveByPage(input.pageId, ownerId)).map((q) =>
@@ -222,6 +258,12 @@ export async function requestRecallGeneration(
           }),
         );
       }
+      await fingerprints.addMany({
+        ownerId,
+        pageId: input.pageId,
+        fingerprints: sent.map((p) => p.fingerprint),
+        now,
+      });
       return ok(fresh);
     },
   );

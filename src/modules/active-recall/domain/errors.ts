@@ -19,6 +19,9 @@ export const RECALL_ERROR = {
   // The question is unknown, another owner's or on another page than the
   // session's.
   QUESTION_NOT_IN_SESSION: "RECALL_QUESTION_NOT_IN_SESSION",
+  // "Generar" found no paragraph active recall has not used yet on the page
+  // (Phase 6 T5c incremental generation): no AI call, no unit consumed.
+  NO_NEW_CONTENT: "RECALL_NO_NEW_CONTENT",
   // A Server Action was called without a signed-in user.
   SESSION_REQUIRED: "RECALL_SESSION_REQUIRED",
   // A Server Action input failed its Zod validation.

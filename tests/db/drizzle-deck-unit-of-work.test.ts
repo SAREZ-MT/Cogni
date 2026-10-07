@@ -9,6 +9,7 @@ import { DrizzleDeckUnitOfWork } from "@/modules/flashcards/infrastructure/drizz
 import { newStudyItem } from "@/modules/study-engine/domain/study-item";
 import {
   flashcards,
+  generationFingerprints,
   notebooks,
   pages,
   profiles,
@@ -145,6 +146,12 @@ if (process.env.DATABASE_URL) {
       await expect(
         new DrizzleDeckUnitOfWork(db).run(async (repositories) => {
           await repositories.flashcards.insertMany([card.value]);
+          await repositories.fingerprints.addMany({
+            ownerId: owner.id,
+            pageId,
+            fingerprints: ["f".repeat(64)],
+            now: NOW,
+          });
           await repositories.studyItems.save(item(randomUUID()));
           await repositories.studyItems.save(item(randomUUID()));
         }),
@@ -156,6 +163,13 @@ if (process.env.DATABASE_URL) {
         .where(eq(flashcards.id, card.value.id));
       expect(cards).toEqual([]);
       expect(await itemFor(card.value.id)).toBeUndefined();
+      // The generation's paragraph fingerprints roll back with the cards.
+      expect(
+        await db
+          .select()
+          .from(generationFingerprints)
+          .where(eq(generationFingerprints.pageId, pageId)),
+      ).toEqual([]);
     });
 
     it("archives a card and suspends its item, then refuses the last card", async () => {
