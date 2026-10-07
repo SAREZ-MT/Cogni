@@ -51,7 +51,8 @@ interface Unit {
 // its words are terms of the prompt or the rubric's key concepts, and
 // returns the contiguous run of sentences that fits the cap with the
 // highest score, the earliest on a tie. With no match at all it keeps the
-// start of the page, like the generation truncation.
+// start of the page, like the generation truncation. A NaN or non-positive
+// cap returns "" and an infinite one the whole text.
 export function selectRelevantFragment(
   plainText: string,
   question: FragmentQuestion,
@@ -59,7 +60,10 @@ export function selectRelevantFragment(
 ): string {
   const words = [...plainText.matchAll(/\S+/g)];
   if (words.length === 0) return "";
-  const maxWords = Math.max(0, Math.floor(tokenCap * WORDS_PER_TOKEN));
+  // A NaN cap (a broken setting) leaves no room; +Infinity has no limit.
+  const maxWords = Number.isNaN(tokenCap)
+    ? 0
+    : Math.max(0, Math.floor(tokenCap * WORDS_PER_TOKEN));
   if (words.length <= maxWords) return plainText;
   if (maxWords === 0) return "";
 

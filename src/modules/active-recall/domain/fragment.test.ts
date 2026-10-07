@@ -142,4 +142,17 @@ describe("selectRelevantFragment", () => {
       ),
     ).toBe(atp);
   });
+
+  // T1 review R3-001: the cap comes from the environment at evaluation time.
+  it("treats a NaN or negative cap as no room and an infinite cap as no limit", () => {
+    const text = [filler(1), relevant, filler(2)].join(" ");
+    expect(selectRelevantFragment(text, question, Number.NaN)).toBe("");
+    expect(selectRelevantFragment(text, question, -10)).toBe("");
+    expect(
+      selectRelevantFragment(text, question, Number.NEGATIVE_INFINITY),
+    ).toBe("");
+    expect(
+      selectRelevantFragment(text, question, Number.POSITIVE_INFINITY),
+    ).toBe(text);
+  });
 });

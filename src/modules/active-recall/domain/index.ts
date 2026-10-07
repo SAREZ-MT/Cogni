@@ -32,11 +32,14 @@ export {
 } from "./recall-question";
 export type { RecallQuestionRepository } from "./recall-question-repository";
 export {
+  averageCombinedQuality,
   type NewRecallSessionInput,
   newRecallSession,
   type RecallSession,
+  type RecallSessionCalibration,
   type RecallSessionEvaluationStatus,
   type RecallSessionScore,
+  sessionCalibration,
   sessionEvaluationStatus,
   sessionScore,
 } from "./recall-session";
