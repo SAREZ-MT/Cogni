@@ -210,11 +210,14 @@ anatomy; simplified per user decision 2026-09-24 — a card has **only** a
 - Anatomy: icon tile (`IconTile` size `"30"` — closest existing token to the
   reference's 32px — radius `"md"`) + name + description, then one
   full-width `Button` reading "Generar" with a leading `Sparkles` icon
-  (12px, strokeWidth 2). The button is a **solid** technique-coloured fill
-  (Phase 6 T5b, user decision 2026-10-06): yellow `bg-warning-500` with
-  near-black `text-fg` (8.2:1; white would be 2.1:1), green `bg-success-700`
-  with white (7.7:1; `success-600` is only 3.8:1) and rose `bg-rose-600`
-  with white (4.7:1) — every label meets WCAG AA at 11.5px — kept
+  (12px, strokeWidth 2). The three buttons share every class
+  (`w-full font-semibold text-[11.5px] hover:brightness-95`) except the
+  technique's **soft pastel pair** (Phase 6 T5b, user decision 2026-10-06 —
+  solid fills were too strong): yellow `bg-pastel-yellow` +
+  `text-pastel-yellow-fg` (6.4:1), green `bg-pastel-mint` +
+  `text-pastel-mint-fg` (6.8:1; chosen over `pastel-green-fg`, 4.6:1) and
+  rose `bg-pastel-pink` + `text-pastel-pink-fg` (5.9:1) — every label meets
+  WCAG AA at 11.5px; hover darkens the same pair (`brightness-95`), kept
   at `disabled:opacity-60` + `disabled:cursor-not-allowed` (explicit
   `disabled:` variants so they replace, not stack with, Button's own
   `disabled:opacity-50`) instead of going fully gray, so the panel still
@@ -224,14 +227,15 @@ anatomy; simplified per user decision 2026-09-24 — a card has **only** a
   size `"36"` radius `"input"`) with a native `title` tooltip; `opacity-35`
   when `available` is false (default).
 - `TechniqueTone`: `"yellow" | "green" | "rose"` (Flashcards / Recordación
-  activa / Examen) — mapped onto the **existing** semantic `IconTile` tones
-  `warning` / `success` / `rose` for the icon tile (the flashcards hub
-  already shows Flashcards on `warning`) and onto the solid button fills
-  above. No new token was needed.
+  activa / Examen) — mapped onto the **existing** pastel `IconTile` tones
+  `yellow` / `mint` / `pink`, the same pairs as the button, for the icon tile
+  (tagged `data-part="technique-icon"`). No new token was needed.
 
 - `controls?` (Phase 5 T5): options of the action rendered between the
-  description and the button — Examen passes a `CountStepper` ("Preguntas a
-  generar", 10–30 in steps of 5). Flashcards passes none.
+  description and the button. No card passes it since Phase 6 T5b v2:
+  Examen's question count moved into `ExamGenerateDialog` (page route
+  component composing `Dialog` + `CountStepper` + `Button`), so the three
+  cards look the same.
 
 Used by: `techniques-panel.tsx`.
 
@@ -239,8 +243,8 @@ Used by: `techniques-panel.tsx`.
 all three techniques are real, and below the cards one `SavedStudySection`
 ("Generado en esta página") lists one `StudyItemRow` per technique with
 content on the page (NotebookLM Studio model). Cards only generate — no
-practice button or deck/exam link inside a card, except Examen's
-"Preguntas" link, kept until the questions screen gets another entry.
+practice button or deck/exam link inside a card; Examen's "Preguntas" link
+was removed too (manual questions live in Exámenes → cuaderno → página).
 `SavedStudySection` keys rows by tone + href + label, so rows sharing a label
 need distinct hrefs.
 

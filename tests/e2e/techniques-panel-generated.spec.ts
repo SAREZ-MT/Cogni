@@ -96,12 +96,27 @@ test.describe("techniques panel generated list", () => {
     await expect(deckRow).toBeVisible();
     await expect(recallRow).toBeVisible();
     await panel.getByTestId("generate-exam-questions").click();
+    const dialog = page.getByRole("dialog", {
+      name: "Generar preguntas de examen",
+    });
+    await expect(dialog.getByTestId("exam-count-value")).toHaveText("10");
+    if (SCREENSHOT_DIR) {
+      await page.waitForTimeout(400);
+      await page.screenshot({
+        path: `${SCREENSHOT_DIR}/exam-generate-modal.png`,
+      });
+    }
+    await dialog.getByTestId("confirm-exam-generation").click();
+    await expect(dialog).toHaveCount(0);
     const examRow = panel.getByTestId("generated-item-exam");
     await expect(examRow).toContainText("10 preguntas", { timeout: 30000 });
     await expect(panel.getByTestId("generation-remaining")).toHaveText(
       "Te quedan 3 generaciones hoy",
     );
-    await shot(page, "panel-all");
+    await expect(panel.getByTestId("generate-exam-questions")).toHaveText(
+      "Generar",
+    );
+    await shot(page, "panel-all-v2");
     await examRow.click();
     await expect(page).toHaveURL(`/exams/${notebookId}/${pageId}`);
     await expect(page.getByTestId("start-exam-button")).toBeVisible();

@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  Layers,
-  ListChecks,
-  PanelRightClose,
-  PanelRightOpen,
-} from "lucide-react";
-import Link from "next/link";
+import { Layers, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -26,8 +20,6 @@ import {
   generateFlashcardsAction,
   listFlashcardsAction,
 } from "@/modules/flashcards";
-import { Button } from "@/shared/ui/button";
-import { CountStepper } from "@/shared/ui/count-stepper";
 import { EmptyState } from "@/shared/ui/empty-state";
 import { IconTile } from "@/shared/ui/icon-tile";
 import { PanelToggleButton } from "@/shared/ui/panel-toggle-button";
@@ -41,6 +33,7 @@ import {
   TECHNIQUES_PANEL_EXPANDED,
 } from "../../../../../_components/techniques-panel-cookie";
 import { TECHNIQUES_PANEL_SLOT_ID } from "../../../../../_components/techniques-panel-slot";
+import { ExamGenerateDialog } from "./exam-generate-dialog";
 import { TECHNIQUES, type TechniqueDefinition } from "./techniques";
 
 // "Técnicas de estudio" panel (Phase 6 T5b, user decision 2026-10-06:
@@ -55,9 +48,10 @@ import { TECHNIQUES, type TechniqueDefinition } from "./techniques";
 // - Examen: the exam route, which itself offers the normal exam, the
 //   pending retake or the "not enough questions" state (the same href the
 //   former "Rendir examen"/"Repetir examen" buttons used).
-// The exam card keeps its "Preguntas" link: without it the questions
-// screen (manual questions included) would be unreachable from the page —
-// its final place awaits a user decision.
+// The three cards are identical (user decision 2026-10-06): the same pastel
+// "Generar" and the same feedback lines; Examen's "Generar" first opens
+// ExamGenerateDialog to choose the question count. Manual exam questions
+// live in the Exams section (Exámenes → cuaderno → página → Preguntas).
 
 const GENERIC_FAILURE = "No pudimos generar las tarjetas. Intenta de nuevo.";
 const LIMIT_REACHED = "Llegaste al límite de hoy. Vuelve mañana.";
@@ -178,6 +172,50 @@ function generatedRow(
   };
 }
 
+// The feedback lines under every technique card, identical for the three
+// (remaining generations, notice, error); `prefix` namespaces the test ids.
+function CardFeedback({
+  prefix,
+  remaining,
+  notice,
+  error,
+}: {
+  prefix: string;
+  remaining: number | null;
+  notice: string | null;
+  error: string | null;
+}) {
+  return (
+    <>
+      {remaining !== null && (
+        <p
+          data-testid={`${prefix}generation-remaining`}
+          className="text-[10.5px] text-fg-muted"
+        >
+          {remainingCopy(remaining)}
+        </p>
+      )}
+      {notice && (
+        <p
+          data-testid={`${prefix}generation-notice`}
+          className="text-[10.5px] text-fg-muted"
+        >
+          {notice}
+        </p>
+      )}
+      {error && (
+        <p
+          role="alert"
+          data-testid={`${prefix}generation-error`}
+          className="text-[10.5px] text-error-600"
+        >
+          {error}
+        </p>
+      )}
+    </>
+  );
+}
+
 function remainingCopy(remaining: number): string {
   if (remaining <= 0) return LIMIT_REACHED;
   return remaining === 1
@@ -223,6 +261,7 @@ export function TechniquesPanel({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [examCount, setExamCount] = useState(EXAM_DEFAULT_QUESTIONS);
+  const [examDialogOpen, setExamDialogOpen] = useState(false);
   const [examNotice, setExamNotice] = useState<string | null>(null);
   const [examError, setExamError] = useState<string | null>(null);
   const [examPending, startExamTransition] = useTransition();
@@ -298,7 +337,7 @@ export function TechniquesPanel({
 
   // The questions live on their own route (revalidated by the action): the
   // panel reports what was created and re-reads the exam row.
-  function generateExam() {
+  function generateExam(count: number) {
     setExamNotice(null);
     setExamError(null);
     startExamTransition(async () => {
@@ -306,7 +345,7 @@ export function TechniquesPanel({
       try {
         result = await generateExamQuestionsAction({
           pageId,
-          count: examCount,
+          count,
         });
       } catch {
         setExamError(EXAM_GENERIC_FAILURE);
@@ -355,7 +394,6 @@ export function TechniquesPanel({
 
   const limitReached = remaining !== null && remaining <= 0;
 
-  const questionsHref = `/exams/${notebookId}/${pageId}/preguntas`;
   const generatedRows: StudyItemRowProps[] = TECHNIQUES.flatMap((t) => {
     if (t.id === "flashcards") {
       return cards.length > 0
@@ -446,146 +484,65 @@ export function TechniquesPanel({
       }
     >
       <div className="flex flex-col gap-[7px] p-2.5 pb-3.5">
-        {TECHNIQUES.map((t) =>
-          t.id === "flashcards" ? (
+        {TECHNIQUES.map((t) => {
+          const card =
+            t.id === "flashcards"
+              ? {
+                  onGenerate: generate,
+                  pending,
+                  testId: "generate-flashcards",
+                  prefix: "",
+                  notice,
+                  error,
+                }
+              : t.id === "exam"
+                ? {
+                    onGenerate: () => setExamDialogOpen(true),
+                    pending: examPending,
+                    testId: "generate-exam-questions",
+                    prefix: "exam-",
+                    notice: examNotice,
+                    error: examError,
+                  }
+                : {
+                    onGenerate: generateRecall,
+                    pending: recallPending,
+                    testId: "generate-recall-questions",
+                    prefix: "recall-",
+                    notice: recallNotice,
+                    error: recallError,
+                  };
+          return (
             <TechniqueCard
               key={t.id}
               icon={t.icon}
               tone={t.tone}
               name={t.name}
               description={t.description}
-              onGenerate={generate}
-              pending={pending}
+              onGenerate={card.onGenerate}
+              pending={card.pending}
               disabled={limitReached}
-              generateTestId="generate-flashcards"
+              generateTestId={card.testId}
             >
-              {remaining !== null && (
-                <p
-                  data-testid="generation-remaining"
-                  className="text-[10.5px] text-fg-muted"
-                >
-                  {remainingCopy(remaining)}
-                </p>
-              )}
-              {notice && (
-                <p
-                  data-testid="generation-notice"
-                  className="text-[10.5px] text-fg-muted"
-                >
-                  {notice}
-                </p>
-              )}
-              {error && (
-                <p
-                  role="alert"
-                  data-testid="generation-error"
-                  className="text-[10.5px] text-error-600"
-                >
-                  {error}
-                </p>
-              )}
+              <CardFeedback
+                prefix={card.prefix}
+                remaining={remaining}
+                notice={card.notice}
+                error={card.error}
+              />
             </TechniqueCard>
-          ) : t.id === "exam" ? (
-            <TechniqueCard
-              key={t.id}
-              icon={t.icon}
-              tone={t.tone}
-              name={t.name}
-              description={t.description}
-              onGenerate={generateExam}
-              pending={examPending}
-              disabled={limitReached}
-              generateTestId="generate-exam-questions"
-              controls={
-                <CountStepper
-                  label="Preguntas a generar"
-                  value={examCount}
-                  min={EXAM_MIN_QUESTIONS}
-                  max={EXAM_MAX_QUESTIONS}
-                  step={EXAM_COUNT_STEP}
-                  onChange={setExamCount}
-                  disabled={examPending}
-                  testId="exam-count"
-                />
-              }
-            >
-              <Button
-                asChild
-                variant="outline"
-                size="sm"
-                className="w-full text-[11.5px]"
-              >
-                <Link href={questionsHref} data-testid="exam-questions-link">
-                  <ListChecks aria-hidden="true" size={14} strokeWidth={1.75} />
-                  Preguntas
-                </Link>
-              </Button>
-              {limitReached && !examError && (
-                <p
-                  data-testid="exam-generation-limit"
-                  className="text-[10.5px] text-fg-muted"
-                >
-                  {LIMIT_REACHED}
-                </p>
-              )}
-              {examNotice && (
-                <p
-                  data-testid="exam-generation-notice"
-                  className="text-[10.5px] text-fg-muted"
-                >
-                  {examNotice}
-                </p>
-              )}
-              {examError && (
-                <p
-                  role="alert"
-                  data-testid="exam-generation-error"
-                  className="text-[10.5px] text-error-600"
-                >
-                  {examError}
-                </p>
-              )}
-            </TechniqueCard>
-          ) : (
-            <TechniqueCard
-              key={t.id}
-              icon={t.icon}
-              tone={t.tone}
-              name={t.name}
-              description={t.description}
-              onGenerate={generateRecall}
-              pending={recallPending}
-              disabled={limitReached}
-              generateTestId="generate-recall-questions"
-            >
-              {limitReached && !recallError && (
-                <p
-                  data-testid="recall-generation-limit"
-                  className="text-[10.5px] text-fg-muted"
-                >
-                  {LIMIT_REACHED}
-                </p>
-              )}
-              {recallNotice && (
-                <p
-                  data-testid="recall-generation-notice"
-                  className="text-[10.5px] text-fg-muted"
-                >
-                  {recallNotice}
-                </p>
-              )}
-              {recallError && (
-                <p
-                  role="alert"
-                  data-testid="recall-generation-error"
-                  className="text-[10.5px] text-error-600"
-                >
-                  {recallError}
-                </p>
-              )}
-            </TechniqueCard>
-          ),
-        )}
+          );
+        })}
+        <ExamGenerateDialog
+          open={examDialogOpen}
+          onOpenChange={setExamDialogOpen}
+          count={examCount}
+          onCountChange={setExamCount}
+          min={EXAM_MIN_QUESTIONS}
+          max={EXAM_MAX_QUESTIONS}
+          step={EXAM_COUNT_STEP}
+          onConfirm={generateExam}
+        />
 
         <SavedStudySection
           label="Generado en esta página"

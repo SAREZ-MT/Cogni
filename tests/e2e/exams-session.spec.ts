@@ -62,6 +62,8 @@ async function takeExam(
   // Nothing generated yet: no exam row in the panel's generated list.
   await expect(panel.getByTestId("generated-item-exam")).toHaveCount(0);
   await panel.getByTestId("generate-exam-questions").click();
+  // The count is chosen in the dialog (default 10).
+  await page.getByTestId("confirm-exam-generation").click();
   await expect(panel.getByTestId("exam-generation-notice")).toHaveText(
     "Se generaron 10 preguntas.",
     { timeout: 30000 },

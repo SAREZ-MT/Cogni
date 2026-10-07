@@ -86,6 +86,11 @@ async function renderPanel(
   return view;
 }
 
+async function generateExamViaDialog(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByTestId("generate-exam-questions"));
+  await user.click(screen.getByTestId("confirm-exam-generation"));
+}
+
 async function waitForText(testId: string, text: string) {
   await waitFor(() =>
     expect(screen.getByTestId(testId)).toHaveTextContent(text),
@@ -152,13 +157,16 @@ describe("TechniquesPanel", () => {
     await renderPanel(false);
 
     expect(screen.getByTestId("generate-flashcards")).toHaveClass(
-      "bg-warning-500",
+      "bg-pastel-yellow",
+      "text-pastel-yellow-fg",
     );
     expect(screen.getByTestId("generate-recall-questions")).toHaveClass(
-      "bg-success-700",
+      "bg-pastel-mint",
+      "text-pastel-mint-fg",
     );
     expect(screen.getByTestId("generate-exam-questions")).toHaveClass(
-      "bg-rose-600",
+      "bg-pastel-pink",
+      "text-pastel-pink-fg",
     );
   });
 
@@ -201,16 +209,34 @@ describe("TechniquesPanel", () => {
     expect(screen.queryByText("Mitocondria")).not.toBeInTheDocument();
   });
 
-  it("keeps the exam questions screen reachable from the Examen card", async () => {
+  it("keeps the three cards alike: no Preguntas link and no inline question count", async () => {
     await renderPanel(false);
 
-    expect(screen.getByTestId("exam-questions-link")).toHaveAttribute(
-      "href",
-      `/exams/${NOTEBOOK_ID}/${PAGE_ID}/preguntas`,
-    );
-    expect(screen.getByTestId("exam-questions-link")).toHaveTextContent(
-      "Preguntas",
-    );
+    expect(screen.queryByTestId("exam-questions-link")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("group", { name: "Preguntas a generar" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+  });
+
+  it("shows the same remaining-generations line under each card", async () => {
+    await renderPanel(false, { initialRemaining: 4 });
+
+    for (const id of [
+      "generation-remaining",
+      "recall-generation-remaining",
+      "exam-generation-remaining",
+    ]) {
+      expect(screen.getByTestId(id)).toHaveTextContent(
+        "Te quedan 4 generaciones hoy",
+      );
+    }
+  });
+
+  it("hides every remaining line when the status is unknown", async () => {
+    await renderPanel(false, { initialRemaining: null });
+
+    expect(screen.queryByText(/generaciones hoy/)).not.toBeInTheDocument();
   });
 
   describe("generated items list", () => {
@@ -360,7 +386,7 @@ describe("TechniquesPanel", () => {
       ).not.toBeInTheDocument();
       examStart(10);
 
-      await user.click(screen.getByTestId("generate-exam-questions"));
+      await generateExamViaDialog(user);
 
       expect(
         await screen.findByTestId("generated-item-exam"),
@@ -633,17 +659,64 @@ describe("TechniquesPanel", () => {
       });
     }
 
-    it("offers 10 to 30 questions in steps of 5, starting at 10", async () => {
+    it("opens a dialog with the question count (10 to 30 in steps of 5, from 10) instead of generating", async () => {
       const user = userEvent.setup();
       await renderPanel(false);
 
-      const count = screen.getByRole("group", {
+      await user.click(screen.getByTestId("generate-exam-questions"));
+
+      const dialog = screen.getByRole("dialog", {
+        name: "Generar preguntas de examen",
+      });
+      expect(generateExamQuestionsAction).not.toHaveBeenCalled();
+      const count = within(dialog).getByRole("group", {
         name: "Preguntas a generar",
       });
-      expect(screen.getByTestId("exam-count-value")).toHaveTextContent("10");
-      await user.click(
-        within(count).getByRole("button", { name: "Más preguntas a generar" }),
+      expect(within(dialog).getByTestId("exam-count-value")).toHaveTextContent(
+        "10",
       );
+      expect(
+        within(count).getByRole("button", {
+          name: "Menos preguntas a generar",
+        }),
+      ).toBeDisabled();
+      for (const expected of ["15", "20", "25", "30"]) {
+        await user.click(
+          within(count).getByRole("button", {
+            name: "Más preguntas a generar",
+          }),
+        );
+        expect(
+          within(dialog).getByTestId("exam-count-value"),
+        ).toHaveTextContent(expected);
+      }
+      expect(
+        within(count).getByRole("button", { name: "Más preguntas a generar" }),
+      ).toBeDisabled();
+    });
+
+    it("closes the dialog on Cancelar without generating", async () => {
+      const user = userEvent.setup();
+      await renderPanel(false);
+      await user.click(screen.getByTestId("generate-exam-questions"));
+
+      await user.click(screen.getByRole("button", { name: "Cancelar" }));
+
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(generateExamQuestionsAction).not.toHaveBeenCalled();
+    });
+
+    it("keeps the chosen count the next time the dialog opens", async () => {
+      const user = userEvent.setup();
+      await renderPanel(false);
+      await user.click(screen.getByTestId("generate-exam-questions"));
+      await user.click(
+        screen.getByRole("button", { name: "Más preguntas a generar" }),
+      );
+      await user.click(screen.getByRole("button", { name: "Cancelar" }));
+
+      await user.click(screen.getByTestId("generate-exam-questions"));
+
       expect(screen.getByTestId("exam-count-value")).toHaveTextContent("15");
     });
 
@@ -657,11 +730,13 @@ describe("TechniquesPanel", () => {
       );
       await renderPanel(false, { initialRemaining: 4 });
 
+      await user.click(screen.getByTestId("generate-exam-questions"));
       await user.click(
         screen.getByRole("button", { name: "Más preguntas a generar" }),
       );
-      await user.click(screen.getByTestId("generate-exam-questions"));
+      await user.click(screen.getByTestId("confirm-exam-generation"));
 
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
       expect(generateExamQuestionsAction).toHaveBeenCalledWith({
         pageId: PAGE_ID,
         count: 15,
@@ -684,7 +759,7 @@ describe("TechniquesPanel", () => {
       generateExamQuestionsAction.mockResolvedValue(generated(9, 1, true));
       await renderPanel(false);
 
-      await user.click(screen.getByTestId("generate-exam-questions"));
+      await generateExamViaDialog(user);
 
       expect(
         await screen.findByTestId("exam-generation-notice"),
@@ -707,7 +782,7 @@ describe("TechniquesPanel", () => {
       );
       await renderPanel(false);
 
-      await user.click(screen.getByTestId("generate-exam-questions"));
+      await generateExamViaDialog(user);
 
       expect(
         await screen.findByTestId("exam-generation-error"),
@@ -721,7 +796,7 @@ describe("TechniquesPanel", () => {
       );
       await renderPanel(false, { initialRemaining: 2 });
 
-      await user.click(screen.getByTestId("generate-exam-questions"));
+      await generateExamViaDialog(user);
 
       await screen.findByTestId("exam-generation-error");
       expect(screen.getByTestId("generate-exam-questions")).toBeDisabled();
@@ -732,7 +807,7 @@ describe("TechniquesPanel", () => {
       await renderPanel(false, { initialRemaining: 0 });
 
       expect(screen.getByTestId("generate-exam-questions")).toBeDisabled();
-      expect(screen.getByTestId("exam-generation-limit")).toHaveTextContent(
+      expect(screen.getByTestId("exam-generation-remaining")).toHaveTextContent(
         "Llegaste al límite de hoy. Vuelve mañana.",
       );
     });
@@ -742,7 +817,7 @@ describe("TechniquesPanel", () => {
       generateExamQuestionsAction.mockRejectedValue(new Error("network"));
       await renderPanel(false);
 
-      await user.click(screen.getByTestId("generate-exam-questions"));
+      await generateExamViaDialog(user);
 
       expect(
         await screen.findByTestId("exam-generation-error"),
@@ -851,9 +926,9 @@ describe("TechniquesPanel", () => {
       await renderPanel(false, { initialRemaining: 0 });
 
       expect(screen.getByTestId("generate-recall-questions")).toBeDisabled();
-      expect(screen.getByTestId("recall-generation-limit")).toHaveTextContent(
-        "Llegaste al límite de hoy. Vuelve mañana.",
-      );
+      expect(
+        screen.getByTestId("recall-generation-remaining"),
+      ).toHaveTextContent("Llegaste al límite de hoy. Vuelve mañana.");
     });
 
     it("reports an unexpected rejection instead of throwing", async () => {

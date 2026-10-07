@@ -6,28 +6,31 @@ import { Card } from "@/shared/ui/card";
 import { IconTile } from "@/shared/ui/icon-tile";
 import { cn } from "@/shared/ui/utils";
 
-// Study-technique colour vocabulary (Phase 6 T5b, user decision
-// 2026-10-06): Flashcards yellow, Recordación activa green, Examen red. The
-// icon tile uses the existing semantic IconTile pastel pairs (the flashcards
-// hub already shows Flashcards on `warning`, exams on `rose`).
+// Study-technique colour vocabulary (Phase 6 T5b, user decisions
+// 2026-10-06): Flashcards yellow, Recordación activa green, Examen red, as
+// the design system's soft pastel pairs (solid fills were too strong). The
+// icon tile and the "Generar" button share the technique's pair.
 export type TechniqueTone = "yellow" | "green" | "rose";
 
-const TONE_TILE: Record<TechniqueTone, "warning" | "success" | "rose"> = {
-  yellow: "warning",
-  green: "success",
-  rose: "rose",
+const TONE_TILE: Record<TechniqueTone, "yellow" | "mint" | "pink"> = {
+  yellow: "yellow",
+  green: "mint",
+  rose: "pink",
 };
 
-// Solid, tone-coloured "Generar" button (full width, sparkles icon — the
-// look of docs/design-system/screenshots "Generar"). Foregrounds meet WCAG
-// AA for the 11.5px label: near-black on warning-500 (8.2:1, white would be
-// 2.1:1), white on success-700 (7.7:1; success-600 is only 3.8:1) and white
-// on rose-600 (4.7:1).
+// Pastel "Generar" fill per technique; everything else about the button is
+// shared (GENERATE_BUTTON_CLASS). Each -fg meets WCAG AA for the 11.5px
+// label on its pastel: pastel-yellow-fg 6.4:1, pastel-mint-fg 6.8:1 (chosen
+// over pastel-green-fg, 4.6:1), pastel-pink-fg 5.9:1. Hover darkens the
+// same pair slightly (brightness-95) instead of switching colour.
 const TONE_BUTTON_CLASS: Record<TechniqueTone, string> = {
-  yellow: "bg-warning-500 text-fg hover:bg-warning-600",
-  green: "bg-success-700 text-white hover:bg-success-700/90",
-  rose: "bg-rose-600 text-white hover:bg-rose-600/90",
+  yellow: "bg-pastel-yellow text-pastel-yellow-fg hover:bg-pastel-yellow",
+  green: "bg-pastel-mint text-pastel-mint-fg hover:bg-pastel-mint",
+  rose: "bg-pastel-pink text-pastel-pink-fg hover:bg-pastel-pink",
 };
+
+const GENERATE_BUTTON_CLASS =
+  "w-full font-semibold text-[11.5px] hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60";
 
 export interface TechniqueCardProps {
   icon: LucideIcon;
@@ -83,7 +86,12 @@ export function TechniqueCard({
       className={cn("flex flex-col gap-2.5 rounded-lg p-2.5", className)}
     >
       <div className="flex items-start gap-2.5">
-        <IconTile tone={TONE_TILE[tone]} size="30" radius="md">
+        <IconTile
+          tone={TONE_TILE[tone]}
+          size="30"
+          radius="md"
+          data-part="technique-icon"
+        >
           <Icon aria-hidden="true" size={16} strokeWidth={1.75} />
         </IconTile>
         <div className="min-w-0 flex-1">
@@ -101,10 +109,7 @@ export function TechniqueCard({
         onClick={onGenerate}
         title={isDisabled && !wired ? "Disponible pronto" : undefined}
         size="sm"
-        className={cn(
-          "w-full text-[11.5px] disabled:cursor-not-allowed disabled:opacity-60",
-          TONE_BUTTON_CLASS[tone],
-        )}
+        className={cn(GENERATE_BUTTON_CLASS, TONE_BUTTON_CLASS[tone])}
       >
         <Sparkles aria-hidden="true" size={12} strokeWidth={2} />
         {pending ? "Generando…" : "Generar"}

@@ -57,10 +57,15 @@ test.describe("exam questions generation", () => {
 
     const panel = page.getByTestId("techniques-panel");
     await expect(panel).toBeVisible();
-    await expect(panel.getByTestId("exam-count-value")).toHaveText("10");
     await shot(page, "panel-before");
 
+    // "Generar" opens the count dialog (default 10); confirming generates.
     await panel.getByTestId("generate-exam-questions").click();
+    const dialog = page.getByRole("dialog", {
+      name: "Generar preguntas de examen",
+    });
+    await expect(dialog.getByTestId("exam-count-value")).toHaveText("10");
+    await dialog.getByTestId("confirm-exam-generation").click();
     await expect(panel.getByTestId("exam-generation-notice")).toHaveText(
       "Se generaron 10 preguntas.",
       { timeout: 30000 },
@@ -71,7 +76,10 @@ test.describe("exam questions generation", () => {
     );
     await shot(page, "panel-after");
 
-    await panel.getByTestId("exam-questions-link").click();
+    // The questions live in the Exams section: Exámenes → cuaderno →
+    // página → Preguntas.
+    await page.goto(`/exams/${notebookId}`);
+    await page.getByRole("link", { name: "Preguntas (10)" }).click();
     await expect(page).toHaveURL(`/exams/${notebookId}/${pageId}/preguntas`);
     const rows = page.getByTestId("exam-question-row");
     await expect(rows).toHaveCount(10);

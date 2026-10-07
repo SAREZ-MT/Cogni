@@ -49,6 +49,8 @@ async function pageWithQuestions(
   });
   const panel = page.getByTestId("techniques-panel");
   await panel.getByTestId("generate-exam-questions").click();
+  // The count is chosen in the dialog (default 10).
+  await page.getByTestId("confirm-exam-generation").click();
   await expect(panel.getByTestId("exam-generation-notice")).toHaveText(
     "Se generaron 10 preguntas.",
     { timeout: 30000 },

@@ -134,14 +134,16 @@ describe("TechniqueCard", () => {
 });
 
 describe("TechniqueCard technique colours", () => {
-  // Phase 6 T5b (user, 2026-10-06): Flashcards yellow, Recordación activa
-  // green, Examen red — solid "Generar" fills with an accessible foreground
-  // (WCAG AA for 11.5px text) and the matching pastel icon tile.
+  // Phase 6 T5b v2 (user, 2026-10-06): every "Generar" has the same shape,
+  // size, icon and type; only its soft pastel pair changes — Flashcards
+  // pastel-yellow, Recordación activa pastel-mint, Examen pastel-pink (each
+  // -fg meets WCAG AA on its pastel). The icon tile uses the same pair.
+  const SHARED = ["w-full", "text-[11.5px]", "font-semibold"];
   it.each([
-    ["yellow", ["bg-warning-500", "text-fg"], "bg-warning-100"],
-    ["green", ["bg-success-700", "text-white"], "bg-success-100"],
-    ["rose", ["bg-rose-600", "text-white"], "bg-rose-500/10"],
-  ] as const)("colours a %s card's Generar and icon tile", (tone, button, tile) => {
+    ["yellow", ["bg-pastel-yellow", "text-pastel-yellow-fg"]],
+    ["green", ["bg-pastel-mint", "text-pastel-mint-fg"]],
+    ["rose", ["bg-pastel-pink", "text-pastel-pink-fg"]],
+  ] as const)("colours a %s card's Generar and icon tile with its pastel pair", (tone, pair) => {
     const { container } = render(
       <TechniqueCard
         icon={Layers}
@@ -152,10 +154,37 @@ describe("TechniqueCard technique colours", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: "Generar" })).toHaveClass(
-      ...button,
+    const button = screen.getByRole("button", { name: "Generar" });
+    expect(button).toHaveClass(...SHARED, ...pair, "hover:brightness-95");
+    expect(button.className).not.toMatch(
+      /text-white|bg-(warning|success|rose)-\d/,
     );
-    expect(container.querySelector(`[class~="${tile}"]`)).not.toBeNull();
+    const tile = container.querySelector("[data-part=technique-icon]");
+    expect(tile).toHaveClass(...pair);
+  });
+
+  it("gives the three Generar buttons the same classes apart from the colour pair", () => {
+    const classesOf = (tone: "yellow" | "green" | "rose") => {
+      const { unmount } = render(
+        <TechniqueCard
+          icon={Layers}
+          tone={tone}
+          name={tone}
+          description="d"
+          onGenerate={() => {}}
+        />,
+      );
+      const classes = screen
+        .getByRole("button", { name: "Generar" })
+        .className.split(" ")
+        .filter((c) => !/pastel-/.test(c))
+        .sort();
+      unmount();
+      return classes;
+    };
+
+    expect(classesOf("green")).toEqual(classesOf("yellow"));
+    expect(classesOf("rose")).toEqual(classesOf("yellow"));
   });
 });
 
@@ -171,7 +200,7 @@ describe("TechniqueIconStrip", () => {
   it("uses the technique's pastel tile", () => {
     render(<TechniqueIconStrip icon={Layers} tone="yellow" title="t" />);
 
-    expect(screen.getByTitle("t")).toHaveClass("bg-warning-100");
+    expect(screen.getByTitle("t")).toHaveClass("bg-pastel-yellow");
   });
 
   it("is dimmed unless the technique is available", () => {

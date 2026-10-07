@@ -7,8 +7,8 @@ import {
 } from "./helpers/notebooks";
 
 // Phase 5 T4 manual exam questions (documento-maestro §3.3 "creadas
-// manualmente"): a page's "Técnicas → Examen → Preguntas" opens its
-// questions on real data; a question is created, edited in place and
+// manualmente"): a page's questions screen (Exámenes → cuaderno → página →
+// Preguntas) shows its questions on real data; a question is created, edited in place and
 // retired after a confirmation, and every change survives a reload.
 
 // Optional: a directory to drop the screenshots in (visual check).
@@ -35,11 +35,11 @@ test.describe("manual exam questions", () => {
     );
     const [, , notebookId, , pageId] = new URL(page.url()).pathname.split("/");
 
-    // Entry point: the page's techniques panel, Examen → Preguntas.
-    const panel = page.getByTestId("techniques-panel");
-    await expect(panel).toBeVisible();
-    await panel.getByTestId("exam-questions-link").click();
-    await expect(page).toHaveURL(`/exams/${notebookId}/${pageId}/preguntas`);
+    // The questions screen of a page that has no questions yet. The
+    // Exams section only lists pages that already have questions, so this
+    // spec opens the route directly (no UI entry for a page's first
+    // manual question since Phase 6 T5b v2 removed the panel's link).
+    await page.goto(`/exams/${notebookId}/${pageId}/preguntas`);
     await expect(
       page.getByText("Esta página aún no tiene preguntas"),
     ).toBeVisible();
