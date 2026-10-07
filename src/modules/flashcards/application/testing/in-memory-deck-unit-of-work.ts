@@ -1,4 +1,8 @@
 import type { StudyItem, StudyItemKind } from "@/modules/study-engine";
+import {
+  InMemoryGenerationFingerprintStore,
+  type InMemoryGenerationFingerprints,
+} from "@/shared/kernel/testing/in-memory-generation-fingerprints";
 import type {
   DeckRepositories,
   DeckStudyItems,
@@ -72,10 +76,17 @@ export class InMemoryDeckUnitOfWork implements DeckUnitOfWork {
   constructor(
     readonly flashcards = new InMemoryFlashcardRepository(),
     readonly studyItems = new InMemoryDeckStudyItems(),
+    readonly fingerprints: InMemoryGenerationFingerprints = new InMemoryGenerationFingerprintStore().forTechnique(
+      "flashcards",
+    ),
   ) {}
 
   async run<T>(work: (repositories: DeckRepositories) => Promise<T>) {
     this.runs += 1;
-    return work({ flashcards: this.flashcards, studyItems: this.studyItems });
+    return work({
+      flashcards: this.flashcards,
+      studyItems: this.studyItems,
+      fingerprints: this.fingerprints,
+    });
   }
 }

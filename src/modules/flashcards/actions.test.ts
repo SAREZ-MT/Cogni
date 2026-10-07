@@ -7,6 +7,10 @@ import {
 } from "@/modules/ai";
 import { DomainError } from "@/shared/kernel/domain-error";
 import { err, ok } from "@/shared/kernel/result";
+import {
+  InMemoryGenerationFingerprintStore,
+  type InMemoryGenerationFingerprints,
+} from "@/shared/kernel/testing/in-memory-generation-fingerprints";
 import { InMemoryDeckStudyItems } from "./application/testing/in-memory-deck-unit-of-work";
 import { InMemoryFlashcardRepository } from "./application/testing/in-memory-flashcard-repository";
 
@@ -55,6 +59,7 @@ const generation: AiGeneration = {
 let current: {
   flashcards: InMemoryFlashcardRepository;
   studyItems: InMemoryDeckStudyItems;
+  fingerprints: InMemoryGenerationFingerprints;
   limit: GenerationRateLimit;
   checks: number;
   pageText: { title: string; plainText: string } | null;
@@ -90,12 +95,16 @@ vi.mock("./infrastructure", () => ({
   DrizzleFlashcardRepository: vi.fn(function DrizzleFlashcardRepository() {
     return current.flashcards;
   }),
+  DrizzleFlashcardFingerprints: vi.fn(function DrizzleFlashcardFingerprints() {
+    return current.fingerprints;
+  }),
   DrizzleDeckUnitOfWork: vi.fn(function DrizzleDeckUnitOfWork() {
     return {
       run: (work: (repositories: unknown) => Promise<unknown>) =>
         work({
           flashcards: current.flashcards,
           studyItems: current.studyItems,
+          fingerprints: current.fingerprints,
         }),
     };
   }),
@@ -120,6 +129,9 @@ describe("flashcards Server Actions", () => {
     current = {
       flashcards: new InMemoryFlashcardRepository(),
       studyItems: new InMemoryDeckStudyItems(),
+      fingerprints: new InMemoryGenerationFingerprintStore().forTechnique(
+        "flashcards",
+      ),
       limit: { allowed: true, remaining: 4, resetAt: RESET },
       checks: 0,
       pageText: { title: "Tema", plainText: "uno dos tres" },
@@ -224,6 +236,22 @@ describe("flashcards Server Actions", () => {
         "generation_requested",
         OWNER,
         expect.objectContaining({ status: "empty" }),
+      );
+    });
+
+    it("answers FLASHCARDS_NO_NEW_CONTENT for an unchanged page without a unit", async () => {
+      const { generateFlashcardsAction } = await actions();
+      await generateFlashcardsAction({ pageId: PAGE });
+      const checks = current.checks;
+
+      const result = await generateFlashcardsAction({ pageId: PAGE });
+
+      expect(!result.ok && result.error.code).toBe("FLASHCARDS_NO_NEW_CONTENT");
+      expect(current.checks).toBe(checks);
+      expect(track).toHaveBeenLastCalledWith(
+        "generation_requested",
+        OWNER,
+        expect.objectContaining({ status: "no_new_content" }),
       );
     });
 

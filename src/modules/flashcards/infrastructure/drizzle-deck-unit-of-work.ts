@@ -4,6 +4,7 @@ import type {
   DeckRepositories,
   DeckUnitOfWork,
 } from "../application/deck-unit-of-work";
+import { DrizzleFlashcardFingerprints } from "./drizzle-flashcard-fingerprints";
 import { DrizzleFlashcardRepository } from "./drizzle-flashcard-repository";
 
 // One Postgres transaction per run: the flashcard repository and the
@@ -18,6 +19,7 @@ export class DrizzleDeckUnitOfWork implements DeckUnitOfWork {
       work({
         flashcards: new DrizzleFlashcardRepository(tx),
         studyItems: createStudyItemRepository(tx),
+        fingerprints: new DrizzleFlashcardFingerprints(tx),
       }),
     );
   }
