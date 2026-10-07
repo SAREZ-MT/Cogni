@@ -47,6 +47,9 @@ const serverObject = clientSchema.extend({
   // `fake` swaps real providers for a deterministic one (CI, e2e).
   AI_PROVIDER_MODE: z.enum(["live", "fake"]).default("live"),
   AI_DAILY_GENERATIONS: z.coerce.number().int().positive().default(6),
+  // Per-user daily answers evaluated by the model (active recall, SRS
+  // RF-AI-03); a skipped answer never counts.
+  AI_DAILY_EVALUATIONS: z.coerce.number().int().positive().default(60),
   AI_PAGE_TOKEN_CAP: z.coerce.number().int().positive().default(12000),
 });
 

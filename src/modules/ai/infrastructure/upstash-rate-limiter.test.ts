@@ -60,6 +60,17 @@ describe("createDailyGenerationLimiter", () => {
     expect(state.constructorOptions[0]?.prefix).toBe("cogni:test:ai:gen");
   });
 
+  it("keeps the evaluation limit under its own key", () => {
+    createDailyGenerationLimiter({
+      redis: new InMemoryRedis() as never,
+      prefix: "cogni:test",
+      limit: 60,
+      scope: "eval",
+    });
+    expect(state.fixedWindowArgs).toEqual([[60, "1 d"]]);
+    expect(state.constructorOptions[0]?.prefix).toBe("cogni:test:ai:eval");
+  });
+
   it("allows `limit` checks then blocks with remaining 0", async () => {
     const limiter = createDailyGenerationLimiter({
       redis: new InMemoryRedis() as never,

@@ -19,6 +19,12 @@ export type {
   QuotaStore,
 } from "./ports";
 export {
+  type BuiltEvaluateRecallAnswerPrompt,
+  buildEvaluateRecallAnswerPrompt,
+  EVALUATE_RECALL_ANSWER_PROMPT_VERSION,
+  type EvaluateRecallAnswerPromptInput,
+} from "./prompts/evaluate_recall_answer/v1";
+export {
   buildGenerateExamQuestionsPrompt,
   type ExistingExamQuestion,
   GENERATE_EXAM_QUESTIONS_PROMPT_VERSION,

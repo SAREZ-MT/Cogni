@@ -21,7 +21,9 @@ and rate limiting (documento-maestro §8).
   - `generate-structured.ts` the single entry point for model calls: select
     provider, call, validate with the purpose schema, audit every attempt,
     retry once on the next provider, never a third call.
-  - `prompts/<purpose>/v1.ts` versioned prompt builders (`generate_flashcards`).
+  - `prompts/<purpose>/v1.ts` versioned prompt builders (`generate_flashcards`,
+    `evaluate_recall_answer/v1`: explicit 0–5 rubric scale, page fragment and
+    answer sent as tagged data, Spanish justification, temperature 0.2).
   - `schemas/` Zod output schema per purpose (§8.4) and `outputSchemaFor`.
   - `testing/` in-memory fakes, re-exported by `src/modules/ai/testing.ts`.
 - `infrastructure/` the only place the AI SDK and Upstash packages may be
@@ -37,7 +39,12 @@ and rate limiting (documento-maestro §8).
     they depend on the `RedisLike` subset (`redis-like.ts`), with an in-memory
     double in `testing/in-memory-redis.ts`.
   - `fake-live-provider.ts` deterministic provider for `AI_PROVIDER_MODE=fake`;
-    `in-memory-rate-limiter.ts` its daily limiter.
+    `in-memory-rate-limiter.ts` its daily limiters. Its recall evaluation
+    scores an answer by the share of the rubric's key concepts it mentions.
+    Failure switches for e2e (evaluation prompts only): an answer holding
+    `[falla-ia]` fails on every call; one holding `[falla-ia-una-vez]` fails
+    the first time that exact prompt is seen in the server process, then
+    succeeds (so "Reintentar" can evaluate it).
   - `drizzle-ai-generation-repository.ts` Postgres adapter.
 - `server-api.ts` composition root (`createAiServerApi`), exported from
   `index.ts`; live mode uses Upstash, fake mode keeps in-memory quota, breaker
@@ -57,7 +64,10 @@ Server only, never `NEXT_PUBLIC_*` (validated in `src/shared/config/env.schema.t
   `OPENROUTER_API_KEY`, or `CLOUDFLARE_ACCOUNT_ID` plus `CLOUDFLARE_API_TOKEN`
   (set together). `GROQ_API_KEY` enables the evaluation-only entry.
 - `REDIS_KEY_PREFIX` (default `cogni:dev`, `cogni:prod` in production),
-  `AI_DAILY_GENERATIONS` (default 6), `AI_PAGE_TOKEN_CAP` (default 12000).
+  `AI_DAILY_GENERATIONS` (default 6, key `{prefix}:ai:gen`),
+  `AI_DAILY_EVALUATIONS` (default 60 answers evaluated by the model per user
+  and day, own key `{prefix}:ai:eval`, exposed as `evaluationLimiter`),
+  `AI_PAGE_TOKEN_CAP` (default 12000).
 
 Decisions and dropped providers: `docs/adr/0004-capa-de-ia-con-proveedores-gratuitos.md`.
 

@@ -3,6 +3,7 @@ import {
   examQuestionsOutput,
   examVariantsOutput,
   flashcardsOutput,
+  recallEvaluationOutput,
   recallQuestionsOutput,
   sessionFeedbackOutput,
 } from "../application/schemas";
@@ -223,6 +224,91 @@ function recallQuestionsFrom(prompt: string) {
   return { questions };
 }
 
+// Lower case, accents removed and inner whitespace collapsed: how the fake
+// evaluation decides whether an answer mentions a key concept.
+function looseText(text: string): string {
+  return text
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// Reads the prompt shape produced by `buildEvaluateRecallAnswerPrompt`: the
+// "- concept" lines between "Key concepts:" and "Acceptable answer
+// summary:", and the student answer inside its tag (never the fragment).
+function parseEvaluationPrompt(prompt: string): {
+  keyConcepts: string[];
+  answer: string;
+} {
+  const lines = prompt.split("\n");
+  const start = lines.indexOf("Key concepts:");
+  const end = lines.findIndex((line) =>
+    line.startsWith("Acceptable answer summary:"),
+  );
+  const keyConcepts =
+    start === -1 || end === -1
+      ? []
+      : lines
+          .slice(start + 1, end)
+          .filter((line) => line.startsWith("- "))
+          .map((line) => line.slice(2));
+  const open = prompt.lastIndexOf("<student_answer>\n");
+  const close = prompt.lastIndexOf("\n</student_answer>");
+  const answer =
+    open === -1 || close < open
+      ? ""
+      : prompt.slice(open + "<student_answer>\n".length, close);
+  return { keyConcepts, answer };
+}
+
+// A deterministic evaluation: the score is the share of the rubric's key
+// concepts the answer mentions (case and accents ignored), scaled to 0–5.
+// A prompt without key concepts yields null, so the minimal object answers.
+function recallEvaluationFrom(prompt: string) {
+  const { keyConcepts, answer } = parseEvaluationPrompt(prompt);
+  if (keyConcepts.length === 0) return null;
+  const said = looseText(answer);
+  const presentConcepts = keyConcepts.filter((concept) =>
+    said.includes(looseText(concept)),
+  );
+  const missingConcepts = keyConcepts.filter(
+    (concept) => !presentConcepts.includes(concept),
+  );
+  const total = keyConcepts.length;
+  const justification =
+    missingConcepts.length === 0
+      ? `Mencionaste los ${total} conceptos clave de la rúbrica.`
+      : `Mencionaste ${presentConcepts.length} de ${total} conceptos clave de la rúbrica. Te faltó: ${missingConcepts.join(", ")}.`;
+  return {
+    score: Math.round((5 * presentConcepts.length) / total),
+    presentConcepts,
+    missingConcepts,
+    misconceptions: [],
+    justification,
+  };
+}
+
+// Failure switches for e2e and CI (Phase 6 T6, CU-09 alternate flow "a
+// provider fails mid-session"). An evaluation prompt (only that purpose)
+// holding FAKE_AI_FAIL_MARKER fails on every call; one holding
+// FAKE_AI_FAIL_ONCE_MARKER fails the first time that exact prompt is seen
+// in this server process and answers it from then on, so "Reintentar" can
+// evaluate it. The seen prompts live at module level because every request
+// builds a new provider.
+export const FAKE_AI_FAIL_MARKER = "[falla-ia]";
+export const FAKE_AI_FAIL_ONCE_MARKER = "[falla-ia-una-vez]";
+const failedOncePrompts = new Set<string>();
+
+function shouldFail(prompt: string): boolean {
+  if (prompt.includes(FAKE_AI_FAIL_MARKER)) return true;
+  if (!prompt.includes(FAKE_AI_FAIL_ONCE_MARKER)) return false;
+  if (failedOncePrompts.has(prompt)) return false;
+  failedOncePrompts.add(prompt);
+  return true;
+}
+
 interface FakeFailedRoot {
   rootId: string;
   concept: string;
@@ -373,6 +459,9 @@ export function createFakeLiveProvider(): AiProvider {
       // The port carries no purpose, but each purpose passes its own output
       // schema: only the matching prompt-aware answer is built.
       const schema: unknown = request.schema;
+      if (schema === recallEvaluationOutput && shouldFail(request.prompt)) {
+        throw new Error("fake provider failure");
+      }
       const candidates =
         schema === flashcardsOutput
           ? [flashcardsFrom(request.prompt)]
@@ -380,11 +469,13 @@ export function createFakeLiveProvider(): AiProvider {
             ? [examQuestionsFrom(request.prompt)]
             : schema === recallQuestionsOutput
               ? [recallQuestionsFrom(request.prompt)]
-              : schema === examVariantsOutput
-                ? [examVariantsFrom(request.prompt), ...MINIMAL_OBJECTS]
-                : schema === sessionFeedbackOutput
-                  ? [examFeedbackFrom(request.prompt), ...MINIMAL_OBJECTS]
-                  : MINIMAL_OBJECTS;
+              : schema === recallEvaluationOutput
+                ? [recallEvaluationFrom(request.prompt), ...MINIMAL_OBJECTS]
+                : schema === examVariantsOutput
+                  ? [examVariantsFrom(request.prompt), ...MINIMAL_OBJECTS]
+                  : schema === sessionFeedbackOutput
+                    ? [examFeedbackFrom(request.prompt), ...MINIMAL_OBJECTS]
+                    : MINIMAL_OBJECTS;
       const object = candidates.find(
         (candidate) => request.schema.safeParse(candidate).success,
       );

@@ -39,6 +39,9 @@ export interface AiServerApi {
   ): Promise<Result<GenerateStructuredOutput, DomainError>>;
   // `check` consumes one unit per allowed call: invoke once per request.
   generationLimiter: GenerationRateLimiter;
+  // Per-owner daily answers evaluated by the model (AI_DAILY_EVALUATIONS),
+  // under its own key: one unit per answer the model evaluates.
+  evaluationLimiter: GenerationRateLimiter;
   entries: readonly ProviderEntry[];
 }
 
@@ -49,18 +52,25 @@ export interface FakeAiInfra {
   quota: QuotaStore;
   breakers: BreakerStore;
   limiter: GenerationRateLimiter;
+  evaluationLimiter: GenerationRateLimiter;
 }
 
 export function createFakeAiInfra(options?: {
   limit?: number;
+  evaluationLimit?: number;
   clock?: Clock;
 }): FakeAiInfra {
+  const clock = options?.clock ?? { now: () => new Date() };
   return {
     quota: new InMemoryQuotaStore(),
     breakers: new InMemoryBreakerStore(),
     limiter: createInMemoryGenerationLimiter({
       limit: options?.limit ?? 6,
-      clock: options?.clock ?? { now: () => new Date() },
+      clock,
+    }),
+    evaluationLimiter: createInMemoryGenerationLimiter({
+      limit: options?.evaluationLimit ?? 60,
+      clock,
     }),
   };
 }
@@ -86,13 +96,15 @@ export function createAiServerApi(deps: {
   let quota: QuotaStore;
   let breakers: BreakerStore;
   let generationLimiter: GenerationRateLimiter;
+  let evaluationLimiter: GenerationRateLimiter;
   if (env.AI_PROVIDER_MODE === "fake") {
     sharedFakeInfra ??= createFakeAiInfra({
       limit: env.AI_DAILY_GENERATIONS,
+      evaluationLimit: env.AI_DAILY_EVALUATIONS,
       clock,
     });
     const infra = deps.fakeInfra ?? sharedFakeInfra;
-    ({ quota, breakers } = infra);
+    ({ quota, breakers, evaluationLimiter } = infra);
     generationLimiter = infra.limiter;
   } else {
     if (!env.UPSTASH_REDIS_REST_URL || !env.UPSTASH_REDIS_REST_TOKEN) {
@@ -109,11 +121,18 @@ export function createAiServerApi(deps: {
       prefix: env.REDIS_KEY_PREFIX,
       limit: env.AI_DAILY_GENERATIONS,
     });
+    evaluationLimiter = createDailyGenerationLimiter({
+      redis,
+      prefix: env.REDIS_KEY_PREFIX,
+      limit: env.AI_DAILY_EVALUATIONS,
+      scope: "eval",
+    });
   }
 
   return {
     entries,
     generationLimiter,
+    evaluationLimiter,
     generateStructured: (input, ownerId) =>
       generateStructured(
         input,
