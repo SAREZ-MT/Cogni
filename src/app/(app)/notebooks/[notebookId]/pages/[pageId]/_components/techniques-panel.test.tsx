@@ -946,6 +946,53 @@ describe("TechniquesPanel", () => {
     });
   });
 
+  // Incremental generation (Phase 6 T5c): an unchanged page is not an
+  // error — the card's notice line says there is nothing new and the
+  // shared counter stays as it was.
+  describe("nothing new to generate", () => {
+    it.each([
+      [
+        "flashcards",
+        "FLASHCARDS_NO_NEW_CONTENT",
+        "generation-notice",
+        "generation-error",
+      ],
+      [
+        "recall",
+        "RECALL_NO_NEW_CONTENT",
+        "recall-generation-notice",
+        "recall-generation-error",
+      ],
+      [
+        "exam",
+        "EXAMS_NO_NEW_CONTENT",
+        "exam-generation-notice",
+        "exam-generation-error",
+      ],
+    ])("%s: shows the notice, no error, and keeps the counter", async (technique, code, noticeId, errorId) => {
+      const user = userEvent.setup();
+      const failure = err({ code, message: "nothing new" });
+      generateFlashcardsAction.mockResolvedValue(failure);
+      generateRecallQuestionsAction.mockResolvedValue(failure);
+      generateExamQuestionsAction.mockResolvedValue(failure);
+      await renderPanel(false, { initialRemaining: 4 });
+
+      if (technique === "flashcards") {
+        await user.click(screen.getByTestId("generate-flashcards"));
+      } else if (technique === "recall") {
+        await user.click(screen.getByTestId("generate-recall-questions"));
+      } else {
+        await generateExamViaDialog(user);
+      }
+
+      await waitForText(noticeId, "No hay contenido nuevo para generar");
+      expect(screen.queryByTestId(errorId)).toBeNull();
+      expect(screen.getAllByText("Te quedan 4 generaciones hoy")).toHaveLength(
+        3,
+      );
+    });
+  });
+
   it("starts collapsed from the server-read cookie and offers to expand", async () => {
     await renderPanel(true);
 

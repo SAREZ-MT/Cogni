@@ -56,6 +56,11 @@ const EXAM_COUNT_STEP = 5;
 
 const LIMIT_REACHED = "Llegaste al límite de hoy. Vuelve mañana.";
 const GENERIC_FAILURE = "No pudimos generar las preguntas. Intenta de nuevo.";
+// Incremental generation (Phase 6 T5c): the page has no paragraph exams
+// has not used yet. Same copy as the techniques panel; a notice, not an
+// error (no AI call and no generation were spent).
+const NO_NEW_CONTENT_CODE = "EXAMS_NO_NEW_CONTENT";
+const NO_NEW_CONTENT = "No hay contenido nuevo para generar";
 
 // Spanish copy per ActionError code of generateExamQuestionsAction — the
 // same messages the techniques panel's Examen card shows; anything else
@@ -89,6 +94,7 @@ export function CreateExamDialog({
   const [mode, setMode] = useState<CreateMode>("ai");
   const [count, setCount] = useState(EXAM_DEFAULT_QUESTIONS);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   const notebook = notebooks.find((n) => n.id === notebookId);
@@ -100,6 +106,7 @@ export function CreateExamDialog({
     setOpen(next);
     if (!next) {
       setError(null);
+      setNotice(null);
       return;
     }
     setNotebookId(firstNotebookId);
@@ -110,11 +117,13 @@ export function CreateExamDialog({
     setNotebookId(next);
     setPageId("");
     setError(null);
+    setNotice(null);
   }
 
   function submit() {
     if (!canSubmit) return;
     setError(null);
+    setNotice(null);
     if (mode === "manual") {
       router.push(`/exams/${notebookId}/${pageId}/preguntas`);
       return;
@@ -128,6 +137,10 @@ export function CreateExamDialog({
         return;
       }
       if (!result.ok) {
+        if (result.error.code === NO_NEW_CONTENT_CODE) {
+          setNotice(NO_NEW_CONTENT);
+          return;
+        }
         setError(ERROR_COPY[result.error.code] ?? GENERIC_FAILURE);
         return;
       }
@@ -197,6 +210,7 @@ export function CreateExamDialog({
                   onChange={(event) => {
                     setPageId(event.target.value);
                     setError(null);
+                    setNotice(null);
                   }}
                   disabled={pending}
                   required
@@ -231,6 +245,14 @@ export function CreateExamDialog({
                 disabled={pending}
                 testId="exam-count"
               />
+            )}
+            {notice && (
+              <p
+                data-testid="create-exam-notice"
+                className="text-fg-muted text-sm"
+              >
+                {notice}
+              </p>
             )}
             {error && (
               <p role="alert" className="text-destructive text-sm">

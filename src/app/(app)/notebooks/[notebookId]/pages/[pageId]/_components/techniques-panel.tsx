@@ -56,6 +56,16 @@ import { TECHNIQUES, type TechniqueDefinition } from "./techniques";
 const GENERIC_FAILURE = "No pudimos generar las tarjetas. Intenta de nuevo.";
 const LIMIT_REACHED = "Llegaste al límite de hoy. Vuelve mañana.";
 
+// Incremental generation (Phase 6 T5c): every paragraph of the page was
+// already used by that technique. Not a failure — no AI call and no unit
+// were spent — so it reads in the card's notice line, not as an error.
+const NO_NEW_CONTENT = "No hay contenido nuevo para generar";
+const NO_NEW_CONTENT_CODES = new Set([
+  "FLASHCARDS_NO_NEW_CONTENT",
+  "EXAMS_NO_NEW_CONTENT",
+  "RECALL_NO_NEW_CONTENT",
+]);
+
 // Spanish copy per ActionError code of generateFlashcardsAction; anything
 // not listed (PAGE_NOT_FOUND, FLASHCARDS_UNEXPECTED, AI_GENERATION_FAILED,
 // invalid input…) reads as the generic failure.
@@ -295,6 +305,7 @@ export function TechniquesPanel({
     };
   }, [pageId]);
 
+
   function toggle() {
     const next = !collapsed;
     setCollapsed(next);
@@ -315,6 +326,10 @@ export function TechniquesPanel({
         return;
       }
       if (!result.ok) {
+        if (NO_NEW_CONTENT_CODES.has(result.error.code)) {
+          setNotice(NO_NEW_CONTENT);
+          return;
+        }
         setError(ERROR_COPY[result.error.code] ?? GENERIC_FAILURE);
         if (result.error.code === "AI_DAILY_LIMIT_REACHED") setRemaining(0);
         return;
@@ -352,6 +367,10 @@ export function TechniquesPanel({
         return;
       }
       if (!result.ok) {
+        if (NO_NEW_CONTENT_CODES.has(result.error.code)) {
+          setExamNotice(NO_NEW_CONTENT);
+          return;
+        }
         setExamError(
           EXAM_ERROR_COPY[result.error.code] ?? EXAM_GENERIC_FAILURE,
         );
@@ -377,6 +396,10 @@ export function TechniquesPanel({
         return;
       }
       if (!result.ok) {
+        if (NO_NEW_CONTENT_CODES.has(result.error.code)) {
+          setRecallNotice(NO_NEW_CONTENT);
+          return;
+        }
         setRecallError(
           RECALL_ERROR_COPY[result.error.code] ?? EXAM_GENERIC_FAILURE,
         );
