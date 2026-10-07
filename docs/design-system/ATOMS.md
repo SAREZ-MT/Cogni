@@ -287,6 +287,30 @@ route; Examen → "N preguntas" plus "· Repetición pendiente" while a retake i
 pending, exam route), with a tinted `EmptyState` as `empty` when nothing was
 generated yet.
 
+## NativeSelect (`native-select.tsx`)
+
+A native `<select>` with the `Input` atom's field chrome (`h-8`,
+`rounded-lg`, `border-input`, focus ring, disabled opacity) for short pick
+lists (Phase 6 T5b, "Crear examen" notebook and page pickers). Native on
+purpose: keyboard, screen readers and mobile pickers work without a custom
+listbox. Forwards every `<select>` prop; `className` merges.
+
+Used by: `exams/_components/create-exam-dialog.tsx`.
+
+## ChoiceGroup (`choice-group.tsx`)
+
+A single-choice list of bordered rows with radio semantics
+(`role="radiogroup"` + `role="radio"`/`aria-checked`), each with a label and
+an optional muted description. Unchecked rows use `OptionRow`'s default
+palette (`border-neutral-200/80 bg-card`), the checked row its selected
+palette (`border-rose-500 bg-pastel-pink/30`).
+
+- `options: { value, label, description? }[]`, `value`, `onChange`,
+  `aria-label`, `testId?` (each row gets `${testId}-${value}`), `className?`.
+
+Used by: `exams/_components/create-exam-dialog.tsx` ("Generar con IA" /
+"Crear mis preguntas").
+
 ## ViewToggle (`view-toggle.tsx`)
 
 The segmented grid/list control (`LayoutGrid`/`List` icons, `rounded-input`
