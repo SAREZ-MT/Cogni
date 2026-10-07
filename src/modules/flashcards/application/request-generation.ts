@@ -101,11 +101,11 @@ export async function requestGeneration(
     return err(new DomainError(AI_ERROR.PAGE_EMPTY, PAGE_EMPTY_MESSAGE));
   }
 
-  const fresh = selectNewParagraphs(
+  const newParagraphs = selectNewParagraphs(
     page.value.plainText,
     await deps.fingerprints.listByPage(input.pageId, ownerId),
   );
-  if (fresh.length === 0) {
+  if (newParagraphs.length === 0) {
     return err(
       new DomainError(FLASHCARD_ERROR.NO_NEW_CONTENT, NO_NEW_CONTENT_MESSAGE),
     );
@@ -114,8 +114,11 @@ export async function requestGeneration(
   const limit = await deps.limiter.check(ownerId);
   if (!limit.allowed) return err(new DailyLimitReachedError(limit.resetAt));
 
-  const truncation = truncateToTokenCap(joinParagraphs(fresh), deps.tokenCap);
-  const sent = paragraphsWithinWords(fresh, truncation.wordsUsed);
+  const truncation = truncateToTokenCap(
+    joinParagraphs(newParagraphs),
+    deps.tokenCap,
+  );
+  const sent = paragraphsWithinWords(newParagraphs, truncation.wordsUsed);
   const prompt = buildGenerateFlashcardsPrompt({
     pageTitle: page.value.title,
     pageText: truncation.text,
