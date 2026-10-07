@@ -294,17 +294,25 @@ function recallEvaluationFrom(prompt: string) {
 // provider fails mid-session"). An evaluation prompt (only that purpose)
 // holding FAKE_AI_FAIL_MARKER fails on every call; one holding
 // FAKE_AI_FAIL_ONCE_MARKER fails the first time that exact prompt is seen
-// in this server process and answers it from then on, so "Reintentar" can
-// evaluate it. The seen prompts live at module level because every request
-// builds a new provider.
+// in this server process and is answered on the next call, so "Reintentar"
+// can evaluate it. The failed prompts live at module level because every
+// request builds a new provider; the set stays bounded (review R3-003): a
+// prompt is forgotten once it is answered, and beyond
+// FAKE_FAIL_ONCE_CAPACITY the oldest failed prompt is dropped.
 export const FAKE_AI_FAIL_MARKER = "[falla-ia]";
 export const FAKE_AI_FAIL_ONCE_MARKER = "[falla-ia-una-vez]";
+export const FAKE_FAIL_ONCE_CAPACITY = 100;
+// Insertion-ordered: the first entry is the oldest failed prompt.
 const failedOncePrompts = new Set<string>();
 
 function shouldFail(prompt: string): boolean {
   if (prompt.includes(FAKE_AI_FAIL_MARKER)) return true;
   if (!prompt.includes(FAKE_AI_FAIL_ONCE_MARKER)) return false;
-  if (failedOncePrompts.has(prompt)) return false;
+  if (failedOncePrompts.delete(prompt)) return false;
+  if (failedOncePrompts.size >= FAKE_FAIL_ONCE_CAPACITY) {
+    const [oldest] = failedOncePrompts;
+    if (oldest !== undefined) failedOncePrompts.delete(oldest);
+  }
   failedOncePrompts.add(prompt);
   return true;
 }

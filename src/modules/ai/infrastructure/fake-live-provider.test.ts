@@ -19,6 +19,7 @@ import {
   createFakeLiveProvider,
   FAKE_AI_FAIL_MARKER,
   FAKE_AI_FAIL_ONCE_MARKER,
+  FAKE_FAIL_ONCE_CAPACITY,
 } from "./fake-live-provider";
 
 const TEXT =
@@ -564,6 +565,42 @@ describe("createFakeLiveProvider recall evaluation", () => {
     expect(recallEvaluationOutput.parse(retried.object).score).toBeGreaterThan(
       0,
     );
+  });
+
+  // Review R3-003: the remembered prompts stay bounded.
+  it("forgets a fail-once prompt once it was answered, so it fails again as new", async () => {
+    const request = evaluationRequest(
+      `Energía ${FAKE_AI_FAIL_ONCE_MARKER} ${Math.random()}`,
+    );
+    const provider = createFakeLiveProvider();
+    await expect(provider.generateObject(request)).rejects.toThrow();
+    await expect(provider.generateObject(request)).resolves.toBeDefined();
+
+    await expect(provider.generateObject(request)).rejects.toThrow(
+      /fake provider failure/,
+    );
+  });
+
+  it("remembers at most FAKE_FAIL_ONCE_CAPACITY failed prompts, dropping the oldest", async () => {
+    const provider = createFakeLiveProvider();
+    const requests = Array.from(
+      { length: FAKE_FAIL_ONCE_CAPACITY + 1 },
+      (_, i) =>
+        evaluationRequest(
+          `Energía ${FAKE_AI_FAIL_ONCE_MARKER} ${i} ${Math.random()}`,
+        ),
+    );
+    for (const request of requests) {
+      await expect(provider.generateObject(request)).rejects.toThrow();
+    }
+
+    // The oldest was dropped: it fails again; the newest is answered.
+    await expect(
+      provider.generateObject(requests[0] as (typeof requests)[number]),
+    ).rejects.toThrow(/fake provider failure/);
+    await expect(
+      provider.generateObject(requests.at(-1) as (typeof requests)[number]),
+    ).resolves.toBeDefined();
   });
 
   it("never fails another purpose because its text holds a marker", async () => {

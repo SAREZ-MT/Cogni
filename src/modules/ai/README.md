@@ -44,7 +44,8 @@ and rate limiting (documento-maestro §8).
     Failure switches for e2e (evaluation prompts only): an answer holding
     `[falla-ia]` fails on every call; one holding `[falla-ia-una-vez]` fails
     the first time that exact prompt is seen in the server process, then
-    succeeds (so "Reintentar" can evaluate it).
+    succeeds once (so "Reintentar" can evaluate it); at most 100 failed
+    prompts are remembered.
   - `drizzle-ai-generation-repository.ts` Postgres adapter.
 - `server-api.ts` composition root (`createAiServerApi`), exported from
   `index.ts`; live mode uses Upstash, fake mode keeps in-memory quota, breaker
