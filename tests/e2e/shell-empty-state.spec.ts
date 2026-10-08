@@ -118,13 +118,24 @@ test.describe("app shell", () => {
     }
   });
 
-  test("hides the active recall preview routes: /active-recall answers not-found", async ({
+  // Phase 6 T7: /active-recall serves the user's real sessions and never the
+  // sample data; the sample notebook/page slugs are not real ids, so every
+  // former preview path answers not-found.
+  test("serves /active-recall on real data and hides the sample recall routes", async ({
     page,
   }) => {
+    const hub = await page.goto("/active-recall");
+    expect(hub?.status()).toBe(200);
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Active recall" }),
+    ).toBeVisible();
+    await expect(page.getByText("Biología Celular")).toHaveCount(0);
+    await expect(page.getByText("Vista previa")).toHaveCount(0);
+
     for (const path of [
-      "/active-recall",
       "/active-recall/biologia-celular",
       "/active-recall/biologia-celular/mitocondria",
+      "/active-recall/biologia-celular/mitocondria/resultados?sesion=x",
     ]) {
       const response = await page.goto(path);
 

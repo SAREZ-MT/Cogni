@@ -1,7 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import type { RecallQuestion } from "../_data/sample";
+import type { RecallPlayerQuestion as RecallQuestion } from "./active-recall-player";
 
 // Without a pageId the player calls none of these (design preview); the
 // module index is server code, so it is replaced here. Persistence is
@@ -18,9 +18,9 @@ vi.mock("@/modules/active-recall", () => ({
 import { ActiveRecallPlayer } from "./active-recall-player";
 
 const QUESTIONS: RecallQuestion[] = [
-  { id: "q1", pageId: "p", prompt: "Primera pregunta" },
-  { id: "q2", pageId: "p", prompt: "Segunda pregunta" },
-  { id: "q3", pageId: "p", prompt: "Tercera pregunta" },
+  { id: "q1", prompt: "Primera pregunta" },
+  { id: "q2", prompt: "Segunda pregunta" },
+  { id: "q3", prompt: "Tercera pregunta" },
 ];
 
 function setup(questions: RecallQuestion[] = QUESTIONS) {
@@ -119,10 +119,7 @@ describe("ActiveRecallPlayer session flow", () => {
   });
 
   it("buckets self-ratings in the live tally: 0-1 difícil, 2-3 regular, 4-5 fácil", async () => {
-    const user = setup([
-      ...QUESTIONS,
-      { id: "q4", pageId: "p", prompt: "Cuarta" },
-    ]);
+    const user = setup([...QUESTIONS, { id: "q4", prompt: "Cuarta" }]);
     expect(tally()).toEqual(["0", "0", "0"]);
 
     await answerWith(user, "a", 1);
