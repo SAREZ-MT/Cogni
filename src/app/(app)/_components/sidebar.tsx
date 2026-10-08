@@ -45,10 +45,10 @@ function SectionLabel({ children }: { children: ReactNode }) {
 // Static nav content (design/shell-look, studyplatform obs 140 app shell):
 // no module import needed, so it lives in Sidebar directly instead of being
 // threaded in as a prop. Entries for areas that are sample-data design
-// previews (Dashboard, Active recall) get a `preview` route once that route
-// ships; until then, and whenever design previews are disabled, they render
-// as disabled "pronto" rows (nav-entries.ts). Flashcards and Exámenes run on
-// real data, so they are plain links.
+// previews (Dashboard) get a `preview` route once that route ships; until
+// then, and whenever design previews are disabled, they render as disabled
+// "pronto" rows (nav-entries.ts). Flashcards, Exámenes and Active recall run
+// on real data, so they are plain links.
 const MAIN_SECTION: { label: string; items: NavEntry[] } = {
   label: "Menú principal",
   items: [
@@ -89,14 +89,10 @@ const TECNICAS_SECTION: { label: string; items: NavEntry[] } = {
       isActive: (path) => path.startsWith("/flashcards"),
     },
     {
+      href: "/active-recall",
       icon: Brain,
       label: "Active recall",
-      disabled: true,
-      hint: "pronto",
-      preview: {
-        href: "/active-recall",
-        isActive: (path) => path.startsWith("/active-recall"),
-      },
+      isActive: (path) => path.startsWith("/active-recall"),
     },
     {
       href: "/exams",

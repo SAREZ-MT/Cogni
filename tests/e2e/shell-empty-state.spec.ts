@@ -63,11 +63,11 @@ test.describe("app shell", () => {
     ).toHaveCount(0);
   });
 
-  // Design previews (Dashboard, Active recall) are hidden in production
-  // builds, which is what this suite runs against (`next build && next
-  // start`): they render as disabled "pronto" rows instead of links.
-  // Flashcards (Phase 3) and Exámenes (Phase 5 T9) run on real data, so
-  // they are always live links.
+  // Design previews (Dashboard) are hidden in production builds, which is
+  // what this suite runs against (`next build && next start`): they render
+  // as disabled "pronto" rows instead of links. Flashcards (Phase 3),
+  // Exámenes (Phase 5 T9) and Active recall (Phase 6 T7) run on real data,
+  // so they are always live links.
   test("sidebar lists the preview areas as disabled 'pronto' entries", async ({
     page,
   }) => {
@@ -80,7 +80,10 @@ test.describe("app shell", () => {
     await expect(
       sidebar.getByRole("link", { name: "Exámenes" }),
     ).toHaveAttribute("href", "/exams");
-    for (const label of ["Dashboard", "Active recall"]) {
+    await expect(
+      sidebar.getByRole("link", { name: "Active recall" }),
+    ).toHaveAttribute("href", "/active-recall");
+    for (const label of ["Dashboard"]) {
       await expect(sidebar.getByRole("link", { name: label })).toHaveCount(0);
       await expect(
         sidebar.locator('[aria-disabled="true"]').filter({ hasText: label }),

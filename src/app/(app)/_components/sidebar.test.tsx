@@ -130,7 +130,8 @@ describe("Sidebar", () => {
     ).toBeNull();
   });
 
-  // Active recall is a design preview too: same treatment as Flashcards.
+  // Active recall runs on real data (Phase 6 T7): a plain link to
+  // /active-recall whatever the design-preview flag says, like Exámenes.
   it("links the Active recall nav item to /active-recall while previews are enabled", () => {
     render(<Sidebar initialCollapsed={false} user={USER} previewsEnabled />);
 
@@ -150,17 +151,18 @@ describe("Sidebar", () => {
     );
   });
 
-  it("keeps Active recall as a disabled 'pronto' row when previews are disabled", () => {
+  it("keeps Active recall a live link when previews are disabled (production)", () => {
+    pathname.current = "/active-recall/biologia-celular";
     render(
       <Sidebar initialCollapsed={false} user={USER} previewsEnabled={false} />,
     );
 
+    const link = screen.getByRole("link", { name: "Active recall" });
+    expect(link).toHaveAttribute("href", "/active-recall");
+    expect(link).toHaveAttribute("aria-current", "page");
     expect(
-      screen.queryByRole("link", { name: "Active recall" }),
-    ).not.toBeInTheDocument();
-    const row = screen.getByText("Active recall").closest("[aria-disabled]");
-    expect(row).toHaveAttribute("aria-disabled", "true");
-    expect(row).toHaveTextContent("pronto");
+      screen.getByText("Active recall").closest("[aria-disabled]"),
+    ).toBeNull();
   });
 
   // design pass 2: "Cuadernos" is now a plain nav item to /notebooks
@@ -245,8 +247,8 @@ describe("Sidebar", () => {
     ).toBeInTheDocument();
   });
 
-  // Every design preview (Dashboard, Active recall) has its route now and
-  // Flashcards and Exámenes run on real data; "Horarios" is the only row without one, so it stays a
+  // Every design preview (Dashboard) has its route now and Flashcards,
+  // Exámenes and Active recall run on real data; "Horarios" is the only row without one, so it stays a
   // disabled "pronto" row whatever the server-computed flag says.
   describe.each([
     ["enabled", true],
