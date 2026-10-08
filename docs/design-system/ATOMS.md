@@ -672,7 +672,10 @@ notebook's `/active-recall/[notebookId]` list): a tinted `success-100/35`
 header (notebook name + page title), a body with the latest session's date
 and a preguntas/sesiones meta line, and a footer with the latest session's
 mastery/"dominio" (tone by threshold: ≥70 success, ≥40 warning, else error)
-+ its AI-score breakdown, plus a "Repasar →" success `Pill`.
++ its AI-score breakdown, plus a "Ver resultados →" success `Pill` (was
+"Repasar →" until Phase 6 T7, user decision 2026-10-08: the card opens the
+latest session's results, where "Nueva sesión →" starts a session). The
+meta line uses the singular for one session ("1 sesión").
 
 - `href`, `notebookTitle`, `pageTitle`, `lastSessionDate`, `questionCount`,
   `sessionCount`, `mastery`, `aiCorrect`, `aiPartial`, `aiIncorrect`.

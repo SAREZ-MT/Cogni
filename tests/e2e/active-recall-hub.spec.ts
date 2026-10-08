@@ -196,10 +196,13 @@ test.describe("active recall hub", () => {
     ).toBeVisible();
     const pageCard = page.getByRole("link", { name: new RegExp(pageTitle) });
     await expect(pageCard).toContainText(SHORT_DATE.format(new Date()));
-    await expect(pageCard).toContainText("3 preguntas · 1 sesiones");
+    await expect(pageCard).toContainText("3 preguntas · 1 sesión");
+    await expect(pageCard).toContainText("Ver resultados →");
+    await expect(pageCard).not.toContainText("Repasar");
     await expect(pageCard).toContainText("33%");
     await expect(pageCard).toContainText("1✓ · 0~ · 2✗");
     await shot(page, "notebook");
+    await shot(page, "notebook-v2");
 
     // The card opens the past session's results.
     await pageCard.click();

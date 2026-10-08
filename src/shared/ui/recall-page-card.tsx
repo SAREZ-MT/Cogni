@@ -9,6 +9,7 @@ function masteryToneClassName(mastery: number): string {
 }
 
 export interface RecallPageCardProps {
+  // The latest session's results route (Phase 6 T7).
   href: string;
   notebookTitle: string;
   pageTitle: string;
@@ -35,7 +36,8 @@ export interface RecallPageCardProps {
 // a tinted success header (notebook name + page title), a body with the
 // last session date and a preguntas/sesiones meta line, and a footer with
 // the latest accuracy (tone by threshold) + its correct/partial/incorrect
-// breakdown, plus a "Repasar →" pill.
+// breakdown, plus a "Ver resultados →" pill: the card opens the latest
+// session's results (user decision 2026-10-08, Phase 6 T7; was "Repasar →").
 export function RecallPageCard({
   href,
   notebookTitle,
@@ -68,7 +70,8 @@ export function RecallPageCard({
       <div className="px-4 pt-3 pb-4">
         <p className="font-medium text-fg-muted text-xs">{lastSessionDate}</p>
         <p className="mt-0.5 text-fg-muted text-xs">
-          {questionCount} preguntas · {sessionCount} sesiones
+          {questionCount} preguntas · {sessionCount}{" "}
+          {sessionCount === 1 ? "sesión" : "sesiones"}
         </p>
         <div className="mt-3 flex items-end justify-between">
           <div>
@@ -85,7 +88,7 @@ export function RecallPageCard({
             </p>
           </div>
           <Pill size="sm" tone="success">
-            Repasar →
+            Ver resultados →
           </Pill>
         </div>
       </div>
