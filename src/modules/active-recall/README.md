@@ -81,7 +81,23 @@ Implementado:
   T5b, la fila "Recordación activa" de "Generado en esta página" abre la
   sesión (`/active-recall/{notebookId}/{pageId}`).
 
-Pendiente: el hub y la vista de cuaderno sobre datos reales (T7).
+- Hub y vista de cuaderno (T7, §3.3): `listRecallHub` lista las páginas
+  del dueño con al menos una sesión terminada con respuestas (puerto
+  `RecallHubReader`, `DrizzleRecallHubReader`: una sola lectura, sin
+  páginas ni cuadernos archivados, sin sesiones abiertas), sus sesiones de
+  la más reciente a la más antigua con fecha, cantidad de preguntas,
+  aciertos/parciales/fallos según `ai_score` (≥ 4 / 2–3 / ≤ 1) y
+  porcentaje (promedio de la calidad combinada × 20, `sessionScore`); el
+  dominio de cada página y el promedio del hub vienen del dominio de página
+  de `study-engine` (`createPageMasteryReader`, nunca una fórmula local; una
+  página sin fila cuenta 0) y las preguntas vencidas hoy, de sus ítems de
+  estudio vencidos (`createStudyItemRepository().listDue`). Si el dominio o
+  los vencimientos no se pueden leer quedan desconocidos (`null`) y el
+  error va a Sentry. `getRecallSessionReview` reconstruye una sesión
+  terminada (pregunta, respuesta y autoevaluación en el orden en que se
+  respondió) para volver a abrir sus resultados; una sesión ajena, abierta
+  o de otra página es `RECALL_SESSION_NOT_FOUND`.
+- `hub-actions.ts`: `listRecallHubAction` y `getRecallSessionReviewAction`.
 
 ## Dependencias declaradas
 

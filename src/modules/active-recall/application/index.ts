@@ -11,6 +11,20 @@ export {
   finishRecallSession,
 } from "./finish-recall-session";
 export {
+  getRecallSessionReview,
+  type RecallReviewRecord,
+  type RecallSessionReview,
+  type RecallSessionReviewDeps,
+} from "./get-recall-session-review";
+export {
+  listRecallHub,
+  type RecallDueCounts,
+  type RecallHub,
+  type RecallHubEntry,
+  type RecallHubSessionEntry,
+  type RecallPageMasterySource,
+} from "./list-recall-hub";
+export {
   type PlanRecallSessionDeps,
   planRecallSession,
   type RecallSessionPlan,
