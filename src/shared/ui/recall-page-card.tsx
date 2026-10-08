@@ -70,8 +70,8 @@ export function RecallPageCard({
       <div className="px-4 pt-3 pb-4">
         <p className="font-medium text-fg-muted text-xs">{lastSessionDate}</p>
         <p className="mt-0.5 text-fg-muted text-xs">
-          {questionCount} preguntas · {sessionCount}{" "}
-          {sessionCount === 1 ? "sesión" : "sesiones"}
+          {questionCount} {questionCount === 1 ? "pregunta" : "preguntas"} ·{" "}
+          {sessionCount} {sessionCount === 1 ? "sesión" : "sesiones"}
         </p>
         <div className="mt-3 flex items-end justify-between">
           <div>

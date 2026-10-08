@@ -49,6 +49,12 @@ describe("RecallPageCard", () => {
     expect(screen.queryByText("Repasar →")).toBeNull();
   });
 
+  it("uses the singular for one question", () => {
+    render(<RecallPageCard {...BASE} questionCount={1} />);
+
+    expect(screen.getByText("1 pregunta · 2 sesiones")).toBeInTheDocument();
+  });
+
   it("uses the singular for one session", () => {
     render(<RecallPageCard {...BASE} sessionCount={1} />);
 

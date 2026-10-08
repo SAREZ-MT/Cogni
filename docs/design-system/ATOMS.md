@@ -675,7 +675,7 @@ mastery/"dominio" (tone by threshold: ≥70 success, ≥40 warning, else error)
 + its AI-score breakdown, plus a "Ver resultados →" success `Pill` (was
 "Repasar →" until Phase 6 T7, user decision 2026-10-08: the card opens the
 latest session's results, where "Nueva sesión →" starts a session). The
-meta line uses the singular for one session ("1 sesión").
+meta line uses the singular for one question or one session ("1 pregunta", "1 sesión").
 
 - `href`, `notebookTitle`, `pageTitle`, `lastSessionDate`, `questionCount`,
   `sessionCount`, `mastery`, `aiCorrect`, `aiPartial`, `aiIncorrect`.

@@ -505,6 +505,13 @@ export function runRecallRepositoriesContract(
         { ...a, updatedAt: T2 },
         { ...b, updatedAt: T2 },
       ]);
+      // The claim stores the bumped updatedAt: getRecallSessionResults'
+      // evaluationRunNeeded reads it to tell a live run from a dead one.
+      expect(
+        (await repos.answers.listBySession(s.id, ctx.ownerId)).map(
+          (row) => row.updatedAt,
+        ),
+      ).toEqual([T2, T2]);
       // A live claim (stamped T2, not before T1) is not taken again.
       expect(
         await repos.answers.claimPendingForEvaluation(

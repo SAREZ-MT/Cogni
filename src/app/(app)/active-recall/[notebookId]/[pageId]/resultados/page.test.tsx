@@ -179,6 +179,16 @@ describe("ActiveRecallResultsPage", () => {
     expect(getRecallSessionReviewAction).not.toHaveBeenCalled();
   });
 
+  it("answers 404 for a malformed session id without reading the page or the session", async () => {
+    for (const sesion of ["not-a-uuid", "", `${SESSION}x`]) {
+      await expect(ActiveRecallResultsPage(props(sesion))).rejects.toThrow(
+        "NEXT_NOT_FOUND",
+      );
+    }
+    expect(getPageForRoute).not.toHaveBeenCalled();
+    expect(getRecallSessionReviewAction).not.toHaveBeenCalled();
+  });
+
   it("answers 404 for a page that is unknown, archived or another user's", async () => {
     getPageForRoute.mockResolvedValue(null);
 

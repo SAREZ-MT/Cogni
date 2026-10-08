@@ -250,6 +250,15 @@ test.describe("active recall hub", () => {
     await items.nth(0).scrollIntoViewIfNeeded();
     await shot(page, "past-results-disagreed-after-reload");
 
+    // A malformed session id is a plain 404, never a server error.
+    const malformed = await page.goto(
+      `/active-recall/${notebookId}/${pageId}/resultados?sesion=not-a-uuid`,
+    );
+    expect(malformed?.status()).toBe(404);
+    await expect(results).toHaveCount(0);
+    await page.goBack();
+    await expect(results).toBeVisible();
+
     // Every link out of the results resolves: "Todas las sesiones" back to
     // the notebook view, "Nueva sesión →" to the page's session.
     await page.getByRole("link", { name: /Todas las sesiones/ }).click();
