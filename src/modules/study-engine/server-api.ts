@@ -23,6 +23,7 @@ import {
 } from "./application";
 import type { FlashcardSession } from "./domain/flashcard-session";
 import type { FlashcardSessionRepository } from "./domain/flashcard-session-repository";
+import type { PageMastery } from "./domain/page-mastery";
 import type { ReviewLogRepository } from "./domain/review-log-repository";
 import type { SessionFeedbackRepository } from "./domain/session-feedback-repository";
 import type { StudiedPage } from "./domain/studied-page-reader";
@@ -30,6 +31,7 @@ import type { FlashcardRating } from "./domain/study-item";
 import type { StudyItemRepository } from "./domain/study-item-repository";
 import {
   DrizzleFlashcardSessionRepository,
+  DrizzlePageMasteryRepository,
   DrizzleReviewLogRepository,
   DrizzleSessionFeedbackRepository,
   DrizzleStudiedPageReader,
@@ -41,6 +43,18 @@ import {
 // (flashcards' DrizzleDeckUnitOfWork creates a card and its item together).
 export function createStudyItemRepository(db: DbExecutor): StudyItemRepository {
   return new DrizzleStudyItemRepository(db);
+}
+
+// Page mastery (§7.3, RF-SE-02) as other modules read it: the owner's
+// PageMastery rows (score 0–1), ordered by page id. A page never reviewed
+// has no row. Read only; study-engine alone writes mastery.
+export interface PageMasteryReader {
+  listByOwner(ownerId: string): Promise<PageMastery[]>;
+}
+
+export function createPageMasteryReader(db: DbExecutor): PageMasteryReader {
+  const repository = new DrizzlePageMasteryRepository(db);
+  return { listByOwner: (ownerId) => repository.listByOwner(ownerId) };
 }
 
 // The flashcard review session (§3.3) as the flashcards Server Actions

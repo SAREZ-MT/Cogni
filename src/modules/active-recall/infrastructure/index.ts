@@ -5,6 +5,7 @@ import { DrizzleRecallSessionRepository } from "./drizzle-recall-session-reposit
 
 export { DrizzleRecallAnswerRepository } from "./drizzle-recall-answer-repository";
 export { DrizzleRecallFingerprints } from "./drizzle-recall-fingerprints";
+export { DrizzleRecallHubReader } from "./drizzle-recall-hub-reader";
 export { DrizzleRecallQuestionRepository } from "./drizzle-recall-question-repository";
 export { DrizzleRecallSessionRepository } from "./drizzle-recall-session-repository";
 export { DrizzleRecallSessionUnitOfWork } from "./drizzle-recall-session-unit-of-work";

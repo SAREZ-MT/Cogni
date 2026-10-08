@@ -1,60 +1,95 @@
 import { Brain, Zap } from "lucide-react";
 import Link from "next/link";
-import { requireDesignPreviews } from "@/shared/config/design-previews";
+import {
+  listRecallHubAction,
+  type RecallHubPageView,
+} from "@/modules/active-recall";
+import { COLOR_PALETTE, type NotebookColor } from "@/modules/notebooks";
 import { DeckSummaryCard } from "@/shared/ui/deck-summary-card";
 import { EmptyState } from "@/shared/ui/empty-state";
 import { IconTile } from "@/shared/ui/icon-tile";
 import { Pill } from "@/shared/ui/pill";
 import { SectionHeader } from "@/shared/ui/section-header";
 import { SetBreadcrumb } from "../_components/breadcrumb";
-import { getRecallPagesWithSessions, SAMPLE_NOTEBOOKS } from "./_data/sample";
+import { plural } from "../flashcards/_lib/plural";
 
-// Active recall hub (design preview, mirrors flashcards/page.tsx — user
-// decision 2026-09-24: "solo vamos a construir esas pantallas para validar
-// el diseño"). Every notebook, page and session below comes from
-// ./_data/sample.ts, never a real query.
-export default function ActiveRecallHubPage() {
-  requireDesignPreviews();
-  const notebooksWithPages = SAMPLE_NOTEBOOKS.map((notebook) => ({
-    notebook,
-    pages: getRecallPagesWithSessions(notebook.id),
-  })).filter((entry) => entry.pages.length > 0);
-  const allPages = notebooksWithPages.flatMap((entry) => entry.pages);
-  const allSessions = allPages.flatMap((page) => page.sessions);
+const DEFAULT_TONE: NotebookColor = "purple";
 
-  const totalSessions = allSessions.length;
+function toTone(color: string | null): NotebookColor {
+  return COLOR_PALETTE.find((candidate) => candidate === color) ?? DEFAULT_TONE;
+}
+
+interface NotebookEntry {
+  notebook: { id: string; title: string; color: NotebookColor };
+  pages: RecallHubPageView[];
+}
+
+// The notebooks holding recall pages, in the hub's order (notebook title,
+// then page title).
+function groupByNotebook(pages: readonly RecallHubPageView[]): NotebookEntry[] {
+  const byNotebook = new Map<string, NotebookEntry>();
+  for (const page of pages) {
+    const entry = byNotebook.get(page.notebookId) ?? {
+      notebook: {
+        id: page.notebookId,
+        title: page.notebookTitle,
+        color: toTone(page.notebookColor),
+      },
+      pages: [],
+    };
+    entry.pages.push(page);
+    byNotebook.set(page.notebookId, entry);
+  }
+  return [...byNotebook.values()];
+}
+
+// The percentage of the notebook's most recently finished session; 0 while
+// that session is still being evaluated.
+function latestPercentageOf(pages: readonly RecallHubPageView[]): number {
+  let latest: RecallHubPageView["sessions"][number] | undefined;
+  for (const page of pages) {
+    const newest = page.sessions[0];
+    if (newest && (!latest || newest.finishedAt > latest.finishedAt)) {
+      latest = newest;
+    }
+  }
+  return latest?.percentage ?? 0;
+}
+
+// Active recall hub on real data (Phase 6 T7, documento-maestro §3.3):
+// every page with a finished session, grouped by notebook. The average
+// mastery is study-engine's page mastery (decision in force), each notebook
+// card badges its recall questions due today, and the quick start opens the first page with recall questions due today (the
+// first page otherwise). The layout is the design preview's (Phase 6 UI
+// freeze: the screens keep their look; the data adapts to them).
+export default async function ActiveRecallHubPage() {
+  const result = await listRecallHubAction();
+  const hub = result.ok ? result.value : { pages: [], averageMastery: null };
+  const notebooksWithPages = groupByNotebook(hub.pages);
+  const allPages = hub.pages;
+
+  const totalSessions = allPages.reduce(
+    (sum, page) => sum + page.sessions.length,
+    0,
+  );
   const activeNotebookCount = notebooksWithPages.length;
-  const averageMastery =
-    allSessions.length > 0
-      ? Math.round(
-          allSessions.reduce((sum, session) => sum + session.mastery, 0) /
-            allSessions.length,
-        )
-      : 0;
+  const averageMastery = hub.averageMastery ?? 0;
 
-  const firstEntry = notebooksWithPages[0];
-  const firstPage = firstEntry?.pages[0];
-  const quickStartHref =
-    firstEntry && firstPage
-      ? `/active-recall/${firstEntry.notebook.id}/${firstPage.id}`
-      : undefined;
+  const quickStartPage =
+    allPages.find((page) => (page.dueToday ?? 0) > 0) ?? allPages[0];
+  const quickStartHref = quickStartPage
+    ? `/active-recall/${quickStartPage.notebookId}/${quickStartPage.pageId}`
+    : undefined;
 
   return (
     <section className="flex flex-1 flex-col gap-6">
       <SetBreadcrumb items={[{ label: "Active recall" }]} />
 
       <SectionHeader
-        eyebrow={
-          <span className="flex items-center gap-2">
-            Técnicas de estudio
-            <Pill size="sm" tone="neutral">
-              Vista previa
-            </Pill>
-          </span>
-        }
+        eyebrow="Técnicas de estudio"
         title="Active recall"
         titleClassName="text-[26px]"
-        description={`${totalSessions} sesiones · ${activeNotebookCount} cuadernos`}
+        description={`${plural(totalSessions, "sesión", "sesiones")} · ${plural(activeNotebookCount, "cuaderno", "cuadernos")}`}
         actions={
           quickStartHref && (
             <Link
@@ -73,7 +108,11 @@ export default function ActiveRecallHubPage() {
                   Nueva sesión
                 </span>
                 <span className="block text-[10.5px] text-white/[55%]">
-                  {allPages.length} páginas con preguntas
+                  {plural(
+                    allPages.length,
+                    "página con preguntas",
+                    "páginas con preguntas",
+                  )}
                 </span>
               </span>
             </Link>
@@ -108,7 +147,11 @@ export default function ActiveRecallHubPage() {
           }
           title="Sin sesiones todavía"
           titleClassName="text-base"
-          description="Abre una página en el editor y usa Técnicas → Active recall → Generar."
+          description={
+            result.ok
+              ? "Abre una página en el editor y usa Técnicas → Active recall → Generar."
+              : "No pudimos cargar tus sesiones. Intenta de nuevo."
+          }
           descriptionClassName="max-w-[340px]"
         />
       ) : (
@@ -118,7 +161,13 @@ export default function ActiveRecallHubPage() {
               (sum, page) => sum + page.sessions.length,
               0,
             );
-            const latestMastery = pages[0]?.sessions[0]?.mastery ?? 0;
+            // The notebook's recall questions due today (user decision
+            // 2026-10-08: the card's existing red due badge, as in the
+            // flashcards hub); unknown counts show no badge.
+            const dueCount = pages.reduce(
+              (sum, page) => sum + (page.dueToday ?? 0),
+              0,
+            );
 
             return (
               <DeckSummaryCard
@@ -126,7 +175,8 @@ export default function ActiveRecallHubPage() {
                 href={`/active-recall/${notebook.id}`}
                 tone={notebook.color}
                 title={notebook.title}
-                meta={`${sessionCount} sesiones · último dominio ${latestMastery} %`}
+                dueCount={dueCount}
+                meta={`${plural(sessionCount, "sesión", "sesiones")} · último dominio ${latestPercentageOf(pages)} %`}
               />
             );
           })}

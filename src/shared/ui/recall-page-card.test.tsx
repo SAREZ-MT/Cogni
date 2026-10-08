@@ -16,7 +16,7 @@ const BASE: RecallPageCardProps = {
 };
 
 describe("RecallPageCard", () => {
-  it("links to the page's session", () => {
+  it("links to the given href (the latest session's results)", () => {
     render(<RecallPageCard {...BASE} />);
 
     expect(screen.getByRole("link")).toHaveAttribute(
@@ -39,7 +39,26 @@ describe("RecallPageCard", () => {
 
     expect(screen.getByText("80%")).toBeInTheDocument();
     expect(screen.getByText("6✓ · 2~ · 1✗")).toBeInTheDocument();
-    expect(screen.getByText("Repasar →")).toBeInTheDocument();
+  });
+
+  it("labels its call to action «Ver resultados →» in the same success pill", () => {
+    render(<RecallPageCard {...BASE} />);
+
+    const cta = screen.getByText("Ver resultados →");
+    expect(cta).toHaveClass("bg-success-100", "text-success-700");
+    expect(screen.queryByText("Repasar →")).toBeNull();
+  });
+
+  it("uses the singular for one question", () => {
+    render(<RecallPageCard {...BASE} questionCount={1} />);
+
+    expect(screen.getByText("1 pregunta · 2 sesiones")).toBeInTheDocument();
+  });
+
+  it("uses the singular for one session", () => {
+    render(<RecallPageCard {...BASE} sessionCount={1} />);
+
+    expect(screen.getByText("8 preguntas · 1 sesión")).toBeInTheDocument();
   });
 
   it.each([

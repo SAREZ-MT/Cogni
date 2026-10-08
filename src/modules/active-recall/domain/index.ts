@@ -23,6 +23,12 @@ export type {
   RecallAnswerRepository,
   RecallEvaluationResult,
 } from "./recall-answer-repository";
+export type {
+  RecallHubAnswerScore,
+  RecallHubPage,
+  RecallHubReader,
+  RecallHubSession,
+} from "./recall-hub-reader";
 export {
   type NewRecallQuestion,
   newRecallQuestion,

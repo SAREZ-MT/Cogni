@@ -240,11 +240,20 @@ describe("ActiveRecallResultsView on a real session", () => {
   });
 
   it("shows the session's real date", async () => {
-    getRecallSessionResultsAction.mockResolvedValue(ok(results()));
+    const session = results();
+    getRecallSessionResultsAction.mockResolvedValue(ok(session));
     live();
 
+    // The finish instant read in the runner's own timezone ("7 oct" in UTC,
+    // "8 oct" in UTC+13), so the test passes wherever it runs.
+    const date = new Date(session.finishedAt as string).toLocaleDateString(
+      "es-ES",
+      { day: "numeric", month: "short" },
+    );
     expect(
-      await screen.findByText(/Mitocondria — 3 preguntas respondidas · 7 oct/),
+      await screen.findByText(
+        `Mitocondria — 3 preguntas respondidas · ${date}`,
+      ),
     ).toBeInTheDocument();
   });
 

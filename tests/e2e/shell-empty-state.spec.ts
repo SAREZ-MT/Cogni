@@ -63,11 +63,11 @@ test.describe("app shell", () => {
     ).toHaveCount(0);
   });
 
-  // Design previews (Dashboard, Active recall) are hidden in production
-  // builds, which is what this suite runs against (`next build && next
-  // start`): they render as disabled "pronto" rows instead of links.
-  // Flashcards (Phase 3) and Exámenes (Phase 5 T9) run on real data, so
-  // they are always live links.
+  // Design previews (Dashboard) are hidden in production builds, which is
+  // what this suite runs against (`next build && next start`): they render
+  // as disabled "pronto" rows instead of links. Flashcards (Phase 3),
+  // Exámenes (Phase 5 T9) and Active recall (Phase 6 T7) run on real data,
+  // so they are always live links.
   test("sidebar lists the preview areas as disabled 'pronto' entries", async ({
     page,
   }) => {
@@ -80,7 +80,10 @@ test.describe("app shell", () => {
     await expect(
       sidebar.getByRole("link", { name: "Exámenes" }),
     ).toHaveAttribute("href", "/exams");
-    for (const label of ["Dashboard", "Active recall"]) {
+    await expect(
+      sidebar.getByRole("link", { name: "Active recall" }),
+    ).toHaveAttribute("href", "/active-recall");
+    for (const label of ["Dashboard"]) {
       await expect(sidebar.getByRole("link", { name: label })).toHaveCount(0);
       await expect(
         sidebar.locator('[aria-disabled="true"]').filter({ hasText: label }),
@@ -118,13 +121,24 @@ test.describe("app shell", () => {
     }
   });
 
-  test("hides the active recall preview routes: /active-recall answers not-found", async ({
+  // Phase 6 T7: /active-recall serves the user's real sessions and never the
+  // sample data; the sample notebook/page slugs are not real ids, so every
+  // former preview path answers not-found.
+  test("serves /active-recall on real data and hides the sample recall routes", async ({
     page,
   }) => {
+    const hub = await page.goto("/active-recall");
+    expect(hub?.status()).toBe(200);
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Active recall" }),
+    ).toBeVisible();
+    await expect(page.getByText("Biología Celular")).toHaveCount(0);
+    await expect(page.getByText("Vista previa")).toHaveCount(0);
+
     for (const path of [
-      "/active-recall",
       "/active-recall/biologia-celular",
       "/active-recall/biologia-celular/mitocondria",
+      "/active-recall/biologia-celular/mitocondria/resultados?sesion=x",
     ]) {
       const response = await page.goto(path);
 
