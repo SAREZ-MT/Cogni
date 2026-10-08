@@ -87,4 +87,45 @@ describe("QuestionFeedbackItem", () => {
     expect(screen.getByText("(sin respuesta)")).toBeInTheDocument();
     expect(screen.getByText("Autoevaluación 0 · Difícil")).toBeInTheDocument();
   });
+
+  it("shows the AI score and the justification once evaluated", () => {
+    setup({
+      pending: false,
+      aiScore: 3,
+      justification: "Te faltó explicar la respiración celular.",
+    });
+
+    expect(screen.getByText("IA 3 / 5")).toBeInTheDocument();
+    expect(
+      screen.getByText("Te faltó explicar la respiración celular."),
+    ).toBeInTheDocument();
+  });
+
+  it("keeps the unscored pill and the skeleton while pending, even with data", () => {
+    setup({ pending: true, aiScore: 3, justification: "Oculta." });
+
+    expect(screen.getByText("IA — / 5")).toBeInTheDocument();
+    expect(screen.queryByText("Oculta.")).not.toBeInTheDocument();
+  });
+
+  it("shows a score of 0 instead of the unscored dash", () => {
+    setup({ pending: false, aiScore: 0 });
+
+    expect(screen.getByText("IA 0 / 5")).toBeInTheDocument();
+  });
+
+  it("turns the disagree button into a disabled 'Marcado como desacuerdo' once disagreed", async () => {
+    const onDisagree = vi.fn();
+    setup({ pending: false, aiScore: 3, disagreed: true, onDisagree });
+
+    expect(
+      screen.queryByRole("button", { name: "No estoy de acuerdo" }),
+    ).not.toBeInTheDocument();
+    const button = screen.getByRole("button", {
+      name: "Marcado como desacuerdo",
+    });
+    expect(button).toBeDisabled();
+    await userEvent.click(button);
+    expect(onDisagree).not.toHaveBeenCalled();
+  });
 });

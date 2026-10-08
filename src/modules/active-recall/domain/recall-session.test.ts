@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { RecallEvaluationStatus } from "./recall-answer";
 import {
+  averageCombinedQuality,
   newRecallSession,
+  sessionCalibration,
   sessionEvaluationStatus,
   sessionScore,
 } from "./recall-session";
@@ -119,5 +121,51 @@ describe("sessionScore", () => {
         { aiScore: null, combinedQuality: null },
       ]),
     ).toEqual({ correct: 1, partial: 0, incorrect: 0, percentage: 100 });
+  });
+});
+
+describe("averageCombinedQuality", () => {
+  it("averages the combined quality of the evaluated answers only", () => {
+    expect(
+      averageCombinedQuality([
+        { combinedQuality: 4 },
+        { combinedQuality: null },
+        { combinedQuality: 3 },
+        { combinedQuality: 3 },
+      ]),
+    ).toBeCloseTo(10 / 3);
+  });
+
+  it("is null when nothing was evaluated", () => {
+    expect(averageCombinedQuality([])).toBeNull();
+    expect(averageCombinedQuality([{ combinedQuality: null }])).toBeNull();
+  });
+});
+
+describe("sessionCalibration", () => {
+  it("counts over- and underconfident evaluated answers (RF-AR-05)", () => {
+    expect(
+      sessionCalibration([
+        { selfRating: 5, aiScore: 1 },
+        { selfRating: 4, aiScore: 2 },
+        { selfRating: 1, aiScore: 4 },
+        { selfRating: 3, aiScore: 3 },
+        { selfRating: 5, aiScore: null },
+      ]),
+    ).toEqual({ overconfident: 2, underconfident: 1 });
+  });
+
+  it("counts nothing for a session without evaluated answers", () => {
+    expect(sessionCalibration([])).toEqual({
+      overconfident: 0,
+      underconfident: 0,
+    });
+  });
+
+  it("leaves out an answer whose scores are out of range", () => {
+    expect(sessionCalibration([{ selfRating: 9, aiScore: 0 }])).toEqual({
+      overconfident: 0,
+      underconfident: 0,
+    });
   });
 });

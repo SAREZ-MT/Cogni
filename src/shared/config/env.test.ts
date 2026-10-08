@@ -126,6 +126,7 @@ describe("parseServerEnv AI layer", () => {
     expect(parsed).toMatchObject({
       AI_PROVIDER_MODE: "fake",
       AI_DAILY_GENERATIONS: 6,
+      AI_DAILY_EVALUATIONS: 60,
       AI_PAGE_TOKEN_CAP: 12000,
       REDIS_KEY_PREFIX: "cogni:dev",
     });
@@ -186,9 +187,14 @@ describe("parseServerEnv AI layer", () => {
     const parsed = parseServerEnv({
       ...live,
       AI_DAILY_GENERATIONS: "10",
+      AI_DAILY_EVALUATIONS: "30",
       AI_PAGE_TOKEN_CAP: "8000",
     });
     expect(parsed.AI_DAILY_GENERATIONS).toBe(10);
+    expect(parsed.AI_DAILY_EVALUATIONS).toBe(30);
+    expect(() =>
+      parseServerEnv({ ...live, AI_DAILY_EVALUATIONS: "0" }),
+    ).toThrow(/AI_DAILY_EVALUATIONS/);
     expect(parsed.AI_PAGE_TOKEN_CAP).toBe(8000);
     expect(() =>
       parseServerEnv({ ...live, AI_DAILY_GENERATIONS: "0" }),

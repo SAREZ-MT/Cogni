@@ -728,6 +728,17 @@ button.
   renders two `animate-pulse` skeleton bars + "Disponible cuando termine la
   evaluación", and the disagree button is `disabled` with that same string
   as its `title`.
+- `aiScore?: number | null` and `justification?: string` (Phase 6 T6,
+  approved 2026-10-06, no layout change): once `pending` is false the
+  neutral pill reads "IA {aiScore} / 5" (still "IA — / 5" without a score)
+  and the justification renders as a 13px `text-fg-secondary` paragraph in
+  the slot the skeleton used. While pending both are ignored.
+- `disagreed?: boolean` (default `false`; user-approved 2026-10-07): once
+  evaluated and disagreed, the same outline `sm` button turns `disabled` and
+  reads "Marcado como desacuerdo" (same icon, style and size, no new
+  element). The results view passes it from the stored `disagreed` flag
+  (so a later read shows it) and sets it at once on click, undoing it if
+  the save fails.
 - `onDisagree?`, `className?`.
 
 Used by: `active-recall/_components/active-recall-results-view.tsx`.
@@ -755,6 +766,20 @@ and `ActiveRecallPlayer` build from — `ActiveRecallPlayer` now keeps one
 tallies, so the results view can render each one's own feedback row.
 `data-testid`s: `active-recall-results` (root), `evaluation-status`
 (`StatusBanner`), `question-feedback-item` (each row).
+
+Phase 6 T6 (2026-10-07), same layout on real data: the header shows the
+session's date; the view polls the evaluation and keeps everything pending
+while any answer is pending; the banner turns `success` ("Evaluación
+completa") when every answer is evaluated or `error` ("No pudimos evaluar
+algunas respuestas") with an outline `sm` "Reintentar" in its `action` slot
+when a provider failed every attempt; the same error banner shows when
+polling stops (a read that cannot heal, or about 9 minutes of backoff
+without a result). Resolved, "Calidad combinada" shows
+the average combined quality ("x,x / 5") and "Calibración" the over/under
+confidence counts, each without its "pronto" pill; evaluated rows pass
+`pending={false}`, `aiScore`, `justification` and `onDisagree`, while a
+failed row stays pending until retried. New `data-testid`s (no visual
+change): `combined-quality`, `calibration-over`, `calibration-under`.
 
 ## Exams design preview (2026-09-24)
 

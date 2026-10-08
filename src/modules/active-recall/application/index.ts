@@ -1,4 +1,11 @@
 export {
+  EVALUATION_CLAIM_LEASE_MS,
+  type EvaluatedRecallSession,
+  type EvaluateRecallSessionDeps,
+  evaluateRecallSession,
+  type FailedEvaluation,
+} from "./evaluate-recall-session";
+export {
   type FinishedRecallSession,
   type FinishRecallSessionDeps,
   finishRecallSession,
@@ -8,6 +15,16 @@ export {
   planRecallSession,
   type RecallSessionPlan,
 } from "./plan-recall-session";
+export {
+  disagreeRecallAnswer,
+  evaluationFeedbackOf,
+  getRecallSessionResults,
+  type RecallAnswerResult,
+  type RecallEvaluationFeedback,
+  type RecallResultsDeps,
+  type RecallSessionResults,
+  retryRecallEvaluation,
+} from "./recall-session-results";
 export {
   composeRecallQuestions,
   type RecallSessionRepositories,

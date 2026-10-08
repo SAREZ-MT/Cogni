@@ -4,6 +4,12 @@ import { getNotebookTitleForRoute, getPageForRoute } from "@/modules/notebooks";
 import { SetBreadcrumb } from "../../../_components/breadcrumb";
 import { ActiveRecallPlayer } from "../../_components/active-recall-player";
 
+// ADR 0003 (no queue): Next applies a Server Action's maxDuration from the
+// page segment hosting it, and `after()` runs within it. Finishing the
+// session schedules the AI evaluation of every answer (one model call each,
+// up to 10) with after(), so the session page gets the 300 s maximum.
+export const maxDuration = 300;
+
 interface ActiveRecallSessionPageProps {
   params: Promise<{ notebookId: string; pageId: string }>;
 }

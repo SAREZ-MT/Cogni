@@ -1,4 +1,8 @@
-import type { RecallAnswer, RecallEvaluationStatus } from "./recall-answer";
+import {
+  calibrationOf,
+  type RecallAnswer,
+  type RecallEvaluationStatus,
+} from "./recall-answer";
 
 // pending → some answer still awaits its evaluation; done → every answer
 // resolved with a score; partial → none pending but some failed (CU-09
@@ -81,4 +85,39 @@ export function sessionScore(
   const percentage =
     combinedCount === 0 ? null : Math.round((combinedSum / combinedCount) * 20);
   return { correct, partial, incorrect, percentage };
+}
+
+// The average combined quality (0–5) of the evaluated answers, unrounded;
+// null when nothing was evaluated. The results view shows it as "x,x / 5".
+export function averageCombinedQuality(
+  answers: readonly Pick<RecallAnswer, "combinedQuality">[],
+): number | null {
+  const scores = answers.flatMap(({ combinedQuality }) =>
+    combinedQuality === null ? [] : [combinedQuality],
+  );
+  if (scores.length === 0) return null;
+  return scores.reduce((sum, score) => sum + score, 0) / scores.length;
+}
+
+export interface RecallSessionCalibration {
+  readonly overconfident: number;
+  readonly underconfident: number;
+}
+
+// How many evaluated answers show over- or underconfidence (§7.4, RF-AR-05;
+// calibrationOf). Derived, never stored. Answers without an AI score
+// (pending or failed) are left out.
+export function sessionCalibration(
+  answers: readonly Pick<RecallAnswer, "selfRating" | "aiScore">[],
+): RecallSessionCalibration {
+  let overconfident = 0;
+  let underconfident = 0;
+  for (const { selfRating, aiScore } of answers) {
+    if (aiScore === null) continue;
+    const calibration = calibrationOf(selfRating, aiScore);
+    if (!calibration.ok) continue;
+    if (calibration.value === "overconfident") overconfident += 1;
+    if (calibration.value === "underconfident") underconfident += 1;
+  }
+  return { overconfident, underconfident };
 }

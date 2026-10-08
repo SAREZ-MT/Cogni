@@ -8,6 +8,7 @@ import { createAiServerApi, createFakeAiInfra } from "./server-api";
 const env = {
   AI_PROVIDER_MODE: "fake" as const,
   AI_DAILY_GENERATIONS: 2,
+  AI_DAILY_EVALUATIONS: 3,
   REDIS_KEY_PREFIX: "cogni:test",
 } as never;
 
@@ -19,7 +20,7 @@ function build() {
     clock: createFixedClock(new Date("2026-10-03T10:00:00Z")),
     ids: new SequentialIds(),
     generations,
-    fakeInfra: createFakeAiInfra({ limit: 2 }),
+    fakeInfra: createFakeAiInfra({ limit: 2, evaluationLimit: 3 }),
   });
   return { api, generations };
 }
@@ -64,5 +65,26 @@ describe("createAiServerApi in fake mode", () => {
     expect(third.allowed).toBe(false);
     expect(third.remaining).toBe(0);
     expect((await api.generationLimiter.check("owner-2")).allowed).toBe(true);
+  });
+
+  it("limits model evaluations per owner and day apart from generations", async () => {
+    const { api } = build();
+    await api.generationLimiter.check("owner-1");
+    await api.generationLimiter.check("owner-1");
+    expect((await api.generationLimiter.peek("owner-1")).allowed).toBe(false);
+
+    const first = await api.evaluationLimiter.check("owner-1");
+    expect(first).toMatchObject({ allowed: true, remaining: 2 });
+    await api.evaluationLimiter.check("owner-1");
+    await api.evaluationLimiter.check("owner-1");
+    expect((await api.evaluationLimiter.check("owner-1")).allowed).toBe(false);
+  });
+
+  it("defaults the fake evaluation limit to 60", async () => {
+    const infra = createFakeAiInfra();
+    expect(await infra.evaluationLimiter.peek("owner-1")).toMatchObject({
+      allowed: true,
+      remaining: 60,
+    });
   });
 });

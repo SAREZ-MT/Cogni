@@ -22,6 +22,7 @@ import {
   startRecallSession,
 } from "./application";
 import type { RecallSessionEvaluationStatus } from "./domain/recall-session";
+import { scheduleRecallEvaluation } from "./evaluation-runner";
 import {
   DrizzleRecallQuestionRepository,
   DrizzleRecallSessionUnitOfWork,
@@ -184,7 +185,10 @@ export async function saveRecallAnswerAction(
 }
 
 // "Terminar" or the last question: closes the session with the answers
-// saved so far. The evaluation runs afterwards (Phase 6 T6).
+// saved so far. The evaluation runs after the response (`after()`, Phase 6
+// T6) within the session page's `maxDuration`; closing never waits for it.
+// A repeated "Terminar" on a pending session schedules it again: the claim
+// keeps a live run's answers to that run.
 export async function finishRecallSessionAction(
   input: unknown,
 ): Promise<Result<FinishedRecallSessionView, ActionError>> {
@@ -201,6 +205,10 @@ export async function finishRecallSessionAction(
       ownerId.value,
     );
     if (!result.ok) return err(toActionError(result.error));
+    const { session } = result.value;
+    if (session.evaluationStatus === "pending") {
+      scheduleRecallEvaluation(session.id, ownerId.value);
+    }
     revalidateActiveRecall();
     return ok({
       sessionId: result.value.session.id,

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ZodType } from "zod";
+import { buildEvaluateRecallAnswerPrompt } from "../application/prompts/evaluate_recall_answer/v1";
 import { buildGenerateExamQuestionsPrompt } from "../application/prompts/generate_exam_questions/v1";
 import { buildGenerateExamVariantsPrompt } from "../application/prompts/generate_exam_variants/v1";
 import { buildGenerateFlashcardsPrompt } from "../application/prompts/generate_flashcards/v1";
@@ -14,7 +15,12 @@ import {
   recallQuestionsOutput,
   sessionFeedbackOutput,
 } from "../application/schemas";
-import { createFakeLiveProvider } from "./fake-live-provider";
+import {
+  createFakeLiveProvider,
+  FAKE_AI_FAIL_MARKER,
+  FAKE_AI_FAIL_ONCE_MARKER,
+  FAKE_FAIL_ONCE_CAPACITY,
+} from "./fake-live-provider";
 
 const TEXT =
   "La mitocondria produce energía para la célula. El núcleo guarda el ADN. " +
@@ -469,5 +475,139 @@ describe("createFakeLiveProvider", () => {
     expect(sessionFeedbackOutput.parse(response.object).summary).toBe(
       "Resumen de ejemplo",
     );
+  });
+});
+
+function evaluationRequest(answer: string, pageFragment = TEXT) {
+  const built = buildEvaluateRecallAnswerPrompt({
+    question: "¿Qué función cumple la mitocondria?",
+    keyConcepts: ["Mitocondria", "energía", "célula", "respiración celular"],
+    acceptableAnswerSummary: "La mitocondria produce energía para la célula.",
+    pageFragment,
+    answer,
+  });
+  return { schema: recallEvaluationOutput, ...built };
+}
+
+describe("createFakeLiveProvider recall evaluation", () => {
+  it("scores the answer by the rubric's key concepts it mentions, ignoring case and accents", async () => {
+    const provider = createFakeLiveProvider();
+    const response = await provider.generateObject(
+      evaluationRequest("La MITOCONDRIA produce energia para la celula."),
+    );
+    expect(recallEvaluationOutput.parse(response.object)).toEqual({
+      score: 4,
+      presentConcepts: ["Mitocondria", "energía", "célula"],
+      missingConcepts: ["respiración celular"],
+      misconceptions: [],
+      justification:
+        "Mencionaste 3 de 4 conceptos clave de la rúbrica. Te faltó: respiración celular.",
+    });
+  });
+
+  it("gives 5 to an answer with every concept and 0 to one with none", async () => {
+    const provider = createFakeLiveProvider();
+    const full = await provider.generateObject(
+      evaluationRequest(
+        "La mitocondria hace la respiración celular y da energía a la célula.",
+      ),
+    );
+    expect(recallEvaluationOutput.parse(full.object)).toMatchObject({
+      score: 5,
+      missingConcepts: [],
+      justification: "Mencionaste los 4 conceptos clave de la rúbrica.",
+    });
+
+    const none = await provider.generateObject(
+      evaluationRequest("No me acuerdo."),
+    );
+    expect(recallEvaluationOutput.parse(none.object)).toMatchObject({
+      score: 0,
+      presentConcepts: [],
+    });
+  });
+
+  it("reads the concepts from the answer only, never from the page fragment", async () => {
+    const provider = createFakeLiveProvider();
+    const response = await provider.generateObject(
+      evaluationRequest("Nada que ver.", "Mitocondria energía célula"),
+    );
+    expect(recallEvaluationOutput.parse(response.object).score).toBe(0);
+  });
+
+  it("is deterministic", async () => {
+    const provider = createFakeLiveProvider();
+    const request = evaluationRequest("La mitocondria da energía.");
+    const first = await provider.generateObject(request);
+    const second = await provider.generateObject(request);
+    expect(second.object).toEqual(first.object);
+  });
+
+  it("fails every evaluation whose prompt holds the failure marker", async () => {
+    const provider = createFakeLiveProvider();
+    const request = evaluationRequest(`La mitocondria ${FAKE_AI_FAIL_MARKER}`);
+    await expect(provider.generateObject(request)).rejects.toThrow(
+      /fake provider failure/,
+    );
+    await expect(
+      createFakeLiveProvider().generateObject(request),
+    ).rejects.toThrow(/fake provider failure/);
+  });
+
+  it("fails the first evaluation of a prompt holding the fail-once marker, then answers it", async () => {
+    const answer = `Energía ${FAKE_AI_FAIL_ONCE_MARKER} ${Math.random()}`;
+    const request = evaluationRequest(answer);
+    await expect(
+      createFakeLiveProvider().generateObject(request),
+    ).rejects.toThrow(/fake provider failure/);
+    // Another provider instance (the next request) remembers the failure.
+    const retried = await createFakeLiveProvider().generateObject(request);
+    expect(recallEvaluationOutput.parse(retried.object).score).toBeGreaterThan(
+      0,
+    );
+  });
+
+  // Review R3-003: the remembered prompts stay bounded.
+  it("forgets a fail-once prompt once it was answered, so it fails again as new", async () => {
+    const request = evaluationRequest(
+      `Energía ${FAKE_AI_FAIL_ONCE_MARKER} ${Math.random()}`,
+    );
+    const provider = createFakeLiveProvider();
+    await expect(provider.generateObject(request)).rejects.toThrow();
+    await expect(provider.generateObject(request)).resolves.toBeDefined();
+
+    await expect(provider.generateObject(request)).rejects.toThrow(
+      /fake provider failure/,
+    );
+  });
+
+  it("remembers at most FAKE_FAIL_ONCE_CAPACITY failed prompts, dropping the oldest", async () => {
+    const provider = createFakeLiveProvider();
+    const requests = Array.from(
+      { length: FAKE_FAIL_ONCE_CAPACITY + 1 },
+      (_, i) =>
+        evaluationRequest(
+          `Energía ${FAKE_AI_FAIL_ONCE_MARKER} ${i} ${Math.random()}`,
+        ),
+    );
+    for (const request of requests) {
+      await expect(provider.generateObject(request)).rejects.toThrow();
+    }
+
+    // The oldest was dropped: it fails again; the newest is answered.
+    await expect(
+      provider.generateObject(requests[0] as (typeof requests)[number]),
+    ).rejects.toThrow(/fake provider failure/);
+    await expect(
+      provider.generateObject(requests.at(-1) as (typeof requests)[number]),
+    ).resolves.toBeDefined();
+  });
+
+  it("never fails another purpose because its text holds a marker", async () => {
+    const provider = createFakeLiveProvider();
+    const response = await provider.generateObject(
+      recallRequest(2, [], `La mitocondria ${FAKE_AI_FAIL_MARKER}.`),
+    );
+    expect(recallQuestionsOutput.safeParse(response.object).success).toBe(true);
   });
 });

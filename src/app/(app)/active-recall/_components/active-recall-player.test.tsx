@@ -10,6 +10,9 @@ vi.mock("@/modules/active-recall", () => ({
   startRecallSessionAction: vi.fn(),
   saveRecallAnswerAction: vi.fn(),
   finishRecallSessionAction: vi.fn(),
+  getRecallSessionResultsAction: vi.fn(),
+  retryRecallEvaluationAction: vi.fn(),
+  disagreeRecallAnswerAction: vi.fn(),
 }));
 
 import { ActiveRecallPlayer } from "./active-recall-player";
