@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
@@ -175,6 +175,45 @@ describe("ActiveRecallHubPage", () => {
     expect(
       screen.getByText("1 sesión · último dominio 33 %"),
     ).toBeInTheDocument();
+  });
+
+  it("badges each notebook card with its recall questions due today", async () => {
+    listRecallHubAction.mockResolvedValue({
+      ok: true,
+      value: {
+        pages: [
+          { ...PAGES[0], dueToday: 4 },
+          { ...PAGES[1], dueToday: 3 },
+          { ...PAGES[2], dueToday: 0 },
+        ],
+        averageMastery: 47,
+      },
+    });
+
+    render(await ActiveRecallHubPage());
+
+    const biologia = screen.getByRole("link", { name: /Biología Celular/ });
+    expect(within(biologia).getByText("7")).toBeInTheDocument();
+    const calculo = screen.getByRole("link", { name: /Cálculo III/ });
+    expect(calculo.querySelector(".bg-error-500")).toBeNull();
+  });
+
+  it("shows no due badge when the due counts are unknown", async () => {
+    listRecallHubAction.mockResolvedValue({
+      ok: true,
+      value: {
+        pages: PAGES.map((page) => ({ ...page, dueToday: null })),
+        averageMastery: 47,
+      },
+    });
+
+    render(await ActiveRecallHubPage());
+
+    for (const link of screen.getAllByRole("link", {
+      name: /Biología|Cálculo/,
+    })) {
+      expect(link.querySelector(".bg-error-500")).toBeNull();
+    }
   });
 
   it("reads 0 % for a latest session still being evaluated", async () => {

@@ -59,6 +59,22 @@ async function stored(pageId: string) {
   }
 }
 
+// Moves every recall study item of the page to tomorrow, so none is due.
+async function postponeRecallItems(pageId: string) {
+  const sql = postgres(process.env.DATABASE_URL as string, {
+    prepare: false,
+    max: 1,
+  });
+  try {
+    await sql`
+      update study_items set due_at = now() + interval '1 day'
+      where page_id = ${pageId} and kind = 'recall_question'
+    `;
+  } finally {
+    await sql.end();
+  }
+}
+
 async function answer(page: Page, text: string, rating: number) {
   await page.getByTestId("answer-textarea").click();
   // Keys sent <15 ms after a click can precede Chrome's selectionchange.
@@ -155,7 +171,19 @@ test.describe("active recall hub", () => {
       name: new RegExp(notebookTitle),
     });
     await expect(notebookCard).toContainText("1 sesión · último dominio 33 %");
+    // The card's red due badge counts the notebook's recall questions due
+    // today (user decision 2026-10-08).
+    const dueBadge = notebookCard.locator("span.bg-error-500");
+    await expect(dueBadge).toHaveText(String(db.dueRecallQuestions));
     await shot(page, "hub");
+    await shot(page, "hub-due-badge");
+
+    // Nothing due (every recall item pushed to tomorrow): no badge.
+    await postponeRecallItems(pageId as string);
+    await page.reload();
+    await expect(notebookCard).toContainText("1 sesión · último dominio 33 %");
+    await expect(dueBadge).toHaveCount(0);
+    await shot(page, "hub-no-due-badge");
 
     // Notebook view: the page with its latest session.
     await notebookCard.click();

@@ -58,8 +58,8 @@ function latestPercentageOf(pages: readonly RecallHubPageView[]): number {
 
 // Active recall hub on real data (Phase 6 T7, documento-maestro §3.3):
 // every page with a finished session, grouped by notebook. The average
-// mastery is study-engine's page mastery (decision in force), and the
-// quick start opens the first page with recall questions due today (the
+// mastery is study-engine's page mastery (decision in force), each notebook
+// card badges its recall questions due today, and the quick start opens the first page with recall questions due today (the
 // first page otherwise). The layout is the design preview's (Phase 6 UI
 // freeze: the screens keep their look; the data adapts to them).
 export default async function ActiveRecallHubPage() {
@@ -161,6 +161,13 @@ export default async function ActiveRecallHubPage() {
               (sum, page) => sum + page.sessions.length,
               0,
             );
+            // The notebook's recall questions due today (user decision
+            // 2026-10-08: the card's existing red due badge, as in the
+            // flashcards hub); unknown counts show no badge.
+            const dueCount = pages.reduce(
+              (sum, page) => sum + (page.dueToday ?? 0),
+              0,
+            );
 
             return (
               <DeckSummaryCard
@@ -168,6 +175,7 @@ export default async function ActiveRecallHubPage() {
                 href={`/active-recall/${notebook.id}`}
                 tone={notebook.color}
                 title={notebook.title}
+                dueCount={dueCount}
                 meta={`${plural(sessionCount, "sesión", "sesiones")} · último dominio ${latestPercentageOf(pages)} %`}
               />
             );
