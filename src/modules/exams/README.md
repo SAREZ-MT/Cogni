@@ -47,7 +47,8 @@ is dropped), and a feedback read failure in `getExamResultsAction` returns
   in `actions.ts`, the `/exams/[notebookId]/[pageId]/preguntas` screen.
 - AI generation — done (T5): `requestExamGeneration` +
   `generateExamQuestionsAction`, "Examen → Generar" in the page's
-  techniques panel.
+  techniques panel (since Phase 6 it opens a count dialog, 10–30 in steps
+  of 5, default 10) and "Crear examen" in the hub (Phase 6, ADR 0007).
 - Exam session — done (T6): `startExamSession`, `answerExamQuestion`,
   `completeExamSession`, `readExamSession`, `getExamPageOverview` +
   `session-actions.ts`; the player and results routes on real data.

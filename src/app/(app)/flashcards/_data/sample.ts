@@ -351,10 +351,10 @@ export interface SampleStudyItemsForPage {
 // notebook/page). One page owns at most one deck, so the flashcards group
 // always has exactly one item — the deck of "this page" (fixed to the
 // biologia-celular sample notebook's "Mitocondria" page for the preview).
-// Active recall now points at the same page's real sessions
-// (active-recall/_data/sample.ts, Active recall design preview 2026-09-24)
-// instead of a placeholder "#" href. Examen still has no screens yet, so it
-// keeps its representative sample item.
+// The active recall and exam items are fixed sample hrefs. Since Phase 6
+// the techniques panel lists the real generated items (T5b) and the active
+// recall sample data was removed (T7), so nothing in the app renders this
+// preview any more; only its own test reads it.
 export function getSampleStudyItemsForPage(): SampleStudyItemsForPage {
   const page = getSamplePage("biologia-celular", "mitocondria");
 

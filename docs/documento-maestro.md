@@ -2,8 +2,9 @@
 
 | Campo | Valor |
 |---|---|
-| Versión del documento | 1.4.0 |
-| Fecha | 2026-09-14 (actualizado 2026-10-06) |
+| Versión del documento | 1.5.0 |
+| Fecha | 2026-09-14 (actualizado 2026-10-10) |
+| Cambios de la versión 1.5.0 | ADR 0007: decisiones de implementación de la Fase 6 (evaluación asíncrona con `after()`, reclamo y sondeo acotado, "Reintentar"; respuesta fallida sin SM-2 y respuesta saltada sin modelo; límite de 60 evaluaciones por usuario por día con clave propia; sin resumen de IA de la sesión; sesión fija de 10 preguntas; generación incremental por huellas de párrafo en las tres técnicas; panel de técnicas al estilo NotebookLM Studio, "Crear examen" y hub de recordación activa). Nueva entidad `GenerationFingerprint`. Notas en §3.1, §3.3, §6.1, §7.4, §8.2, §8.3, §8.4 y §8.5; §13 (Fase 6 implementada). |
 | Cambios de la versión 1.4.0 | ADR 0006: decisiones de implementación de la Fase 5 (exámenes de 10 a 30 preguntas, falladas primero; repetición con preguntas reformuladas y reglas para cuando no se puede armar; cronómetro solo dentro del examen; política de retroalimentación con reutilización; "Repasar contenido" antes de repetir). Notas en §3.3, §6.1, §7.2, §7.5 y §8.4; §13 (Fase 5 implementada). |
 | Cambios de la versión 1.3.1 | Nueva Fase 8 — Diseño y flujos de pantalla (solo interfaz y navegación, sin cambios de lógica de backend), justo después de la Fase 7. Endurecimiento pasa a ser la Fase 9. Actualizados §1, §4 y §13. |
 | Cambios de la versión 1.3.0 | ADR 0005: decisiones de implementación de la Fase 4 (repaso en la página del mazo, calificación solo de ítems vencidos, retroalimentación idempotente que no consume el límite diario de IA, trabajo diario de dominio acotado en tiempo y con bloqueo por página). Notas en §5.2, §6.1 y §7.3; §13 (Fase 4 implementada). |
@@ -84,6 +85,11 @@ Usuario
 
 Decisión cerrada: **las técnicas se generan por página**. Un cuaderno de 100 páginas no genera un examen de 100 páginas. Cada página tiene su propio conjunto de ítems y su propio nivel de dominio.
 
+Notas de implementación de la Fase 6 (ADR 0007):
+
+- **Panel "Técnicas de estudio".** Sigue el modelo de NotebookLM Studio: tres tarjetas (Flashcards, Recordación activa, Examen) con su botón "Generar" coloreado por técnica y la línea "Te quedan N generaciones hoy"; debajo, "Generado en esta página" muestra una fila por técnica con contenido, que abre su práctica (repaso del mazo, sesión de recordación o examen). El "Generar" de Examen abre un diálogo para elegir N (10–30).
+- **Generación incremental.** Cada técnica recuerda, por página, la huella de los párrafos que ya envió a la IA. "Generar" envía solo los párrafos nuevos o editados; sin nada nuevo responde "No hay contenido nuevo para generar", sin llamar a la IA ni consumir generación. Borrar contenido no borra los ítems ya generados. Una página generada antes de la Fase 6 envía todos sus párrafos una vez.
+
 ### 3.2 El editor
 
 - Motor: **Tiptap** (headless, sobre ProseMirror). Cogni construye su propia UI, su sistema de bloques y sus extensiones encima.
@@ -120,6 +126,8 @@ Notas de implementación de la Fase 5 (ADR 0006):
 - **Repasar antes de repetir.** Un resultado fallado ofrece "Repasar contenido", que abre la página del cuaderno con un aviso de los conceptos fallados y la acción "Repetir examen".
 - Editar una pregunta la cambia en el lugar y conserva su raíz; retirarla suspende el ítem de la raíz cuando su linaje no tiene otra pregunta activa. No hay límite de tiempo y una sesión abandonada queda abierta (como en flashcards).
 
+Nota de implementación de la Fase 6 (ADR 0007): `/exams` y la vista por cuaderno siguen listando solo las páginas con preguntas. Su encabezado ofrece "Crear examen" (en lugar del inicio rápido "Nuevo examen"): se elige cuaderno y página y luego "Generar con IA" (N de 10 a 30) o "Crear mis preguntas", que abre la pantalla de preguntas de la página; es la entrada para la primera pregunta manual de una página sin preguntas.
+
 #### Recordación activa
 
 - Preguntas abiertas generadas por IA desde la página. Sesión de N preguntas (por defecto 10).
@@ -127,6 +135,15 @@ Notas de implementación de la Fase 5 (ADR 0006):
 - La IA evalúa cada respuesta contra el contenido de la página con una rúbrica y devuelve JSON validado (ver 8.5).
 - La retroalimentación se muestra **al final de la sesión**, nunca entre preguntas.
 - La calificación SM-2 del ítem combina evaluación de IA y autoevaluación (ver 7.4).
+
+Notas de implementación de la Fase 6 (ADR 0007):
+
+- **Generación.** Cada "Generar" crea 10 preguntas abiertas con rúbrica (`generate_recall_questions/v1`) y cuesta una generación del límite diario solo si las preguntas se guardaron.
+- **Sesión.** Tamaño fijo de 10 (no hay selector): vencidas primero, luego nuevas y, para completar, las repasadas hace más tiempo. Cada respuesta y su autoevaluación se guardan al darlas. "Saltar" guarda la pregunta como no respondida. "Terminar" cierra con las respuestas dadas; las demás no se registran.
+- **Evaluación y resultados.** Al cerrar, la evaluación corre después de responder al navegador; la vista de resultados consulta el estado y muestra la calidad combinada, la calibración y, por pregunta, el puntaje de la IA y su justificación cuando todas las evaluaciones terminaron. Una evaluación fallida queda marcada y "Reintentar" la vuelve a pedir. "No estoy de acuerdo" se registra y no cambia el puntaje.
+- **Puntaje por sesión.** Porcentaje = promedio de la calidad combinada × 20; aciertos, parciales y fallos según el puntaje de la IA (≥ 4, 2–3, ≤ 1). El dominio de cada página viene del motor (§7.3).
+- **Sin resumen de IA de la sesión.** La retroalimentación del final es la justificación por pregunta más la calidad combinada y la calibración; no se crea `SessionFeedback` para recordación activa.
+- **Hub.** `/active-recall` y la vista por cuaderno muestran las páginas con sesiones terminadas, el porcentaje de cada sesión y el contador de preguntas vencidas hoy por cuaderno. La tarjeta de una página abre los resultados de su sesión más reciente ("Ver resultados →"), desde donde "Nueva sesión →" inicia otra.
 
 ### 3.4 El motor de repetición espaciada (transversal)
 
@@ -357,13 +374,14 @@ Convenciones comunes a todas las entidades de usuario: `id` (UUID v7), `owner_id
 | `RecallSession` | active-recall | `page_id`, `started_at`, `finished_at`, `evaluation_status` (pending/done/partial) |
 | `RecallAnswer` | active-recall | `session_id`, `question_id`, `answer_text`, `self_rating` (0–5), `evaluation_status` (pending/done/failed), `ai_evaluation` (jsonb crudo), `ai_score` (0–5), `combined_quality` (0–5), `generation_id`, `disagreed` (bool) |
 | `SessionFeedback` | técnicas | `session_kind`, `session_id`, `content` (jsonb), `generation_id`, `status` (pending/done/failed) |
+| `GenerationFingerprint` | técnicas (kernel compartido) | `page_id`, `technique` (flashcards/exam/recall), `fingerprint` (sha256 hexadecimal del párrafo normalizado), `created_at`; sin `id` ni `updated_at`: la clave es `(page_id, owner_id, technique, fingerprint)` |
 | `AiGeneration` | ai | `page_id` (nulo si no aplica), `purpose`, `provider`, `model`, `prompt_version`, `input_tokens`, `output_tokens`, `latency_ms`, `status` (queued/running/done/failed), `error` |
 
 Relaciones que importan:
 
 - Un `StudyItem` de tipo `exam_question` apunta a la pregunta **raíz** (`root_id`). Todas las variantes de esa raíz alimentan el mismo ítem. Así el motor sigue el concepto, no la redacción.
 - `ReviewLog.session_id` apunta a `FlashcardSession`, `ExamSession` o `RecallSession` según `session_kind`.
-- `SessionFeedback` existe una vez por sesión terminada.
+- `SessionFeedback` existe una vez por sesión terminada de flashcards o exámenes; la recordación activa no lo crea (ADR 0007).
 - `owner_id` se filtra en la capa de aplicación en toda consulta, sin excepción. La única excepción deliberada es el listado entre dueños del trabajo diario de dominio (`StudiedPageReader`), que corre sin sesión y devuelve solo identificadores.
 
 Notas de implementación de la Fase 4 (ADR 0005):
@@ -379,6 +397,14 @@ Notas de implementación de la Fase 5 (ADR 0006):
 - `ExamAnswer` tiene clave `(session_id, question_id)`, un único `(session_id, root_id)` y una clave foránea `(question_id, root_id)` que exige que `root_id` sea la raíz real de la pregunta.
 - `ExamPageState` tiene clave `page_id` y guarda `owner_id`. Su `upsert` no escribe nada para una página que no es del dueño.
 - Las claves foráneas del linaje (`root_id`, `variant_of`) son NO ACTION: una raíz con variantes o una pregunta reemplazada no se pueden borrar; borrar la página o el dueño borra el linaje completo.
+
+Notas de implementación de la Fase 6 (ADR 0007):
+
+- Migraciones `0012_active_recall` (`recall_questions`, `recall_sessions`, `recall_answers`) y `0013_generation_fingerprints` (con sus `.down.sql`). RLS activo sin políticas, como el resto de tablas de negocio.
+- `RecallQuestion`: `origin` es `ai` o `manual` (en la Fase 6 solo se generan con IA); la rúbrica debe tener al menos un concepto clave y un resumen no vacío (restricción `CHECK`). Las preguntas se archivan, no se borran.
+- `RecallSession` no guarda la lista de preguntas: una respuesta se acepta si su pregunta es del dueño y de la página de la sesión (una pregunta archivada después de que la sesión la mostró sigue contando). `evaluation_status` solo deja `pending` cuando la sesión terminó; una sesión cerrada sin respuestas queda `done`.
+- `RecallAnswer` tiene un único `(session_id, question_id)` y claves foráneas compuestas `(session_id, owner_id)` y `(question_id, owner_id)`. Agrega `evaluation_claimed_at` (no estaba en esta tabla): el instante en que una corrida de evaluación reclamó la respuesta; un reclamo de más de 6 minutos se retoma. Una restricción `CHECK` ata el estado a sus datos: `pending` sin puntajes; `done` con `ai_evaluation`, `ai_score` y `combined_quality`; `failed` con `ai_evaluation` (el intento crudo) y sin puntajes. Una respuesta saltada guarda el texto `(sin respuesta)`.
+- `GenerationFingerprint` (tabla `generation_fingerprints`) es la memoria de la generación incremental (§3.1): una fila por párrafo ya enviado a la IA por técnica y página. `technique` y el formato de la huella (64 caracteres hexadecimales) se validan con `CHECK`; borrar la página o el dueño borra sus huellas. Cada módulo escribe solo las de su técnica, en la misma transacción que sus ítems.
 
 ### 6.2 Reglas de persistencia
 
@@ -464,6 +490,12 @@ señal metacognitiva:
 
 Ninguna de las dos señales manda sola. Se registran las tres (cruda, autoevaluación, combinada).
 
+Notas de implementación de la Fase 6 (ADR 0007):
+
+- Se guardan la evaluación cruda (`ai_evaluation`), el puntaje de la IA, la autoevaluación y la calidad combinada. La señal metacognitiva no se guarda: se deriva al leer los resultados.
+- Solo una respuesta evaluada (`done`) alimenta SM-2, con la calidad combinada, mediante `recordRecallReviews` de `study-engine` (`ReviewLog` con `session_kind = recall`). Calidad < 3 se registra aunque el ítem no esté vencido; ≥ 3, solo si está vencido. Una respuesta `failed` no registra repaso: su pregunta sigue vencida y vuelve en la próxima sesión.
+- Una respuesta saltada recibe puntaje de IA 0 sin llamar al modelo, con el registro `{ source: "skipped", score: 0, justification: "Pregunta sin responder." }`.
+
 ### 7.5 Reprogramación y repetición de exámenes
 
 ```
@@ -527,7 +559,8 @@ Claves en Upstash Redis (prefijo REDIS_KEY_PREFIX: cogni:dev | cogni:prod):
   {prefijo}:ai:quota:{provider}:{yyyy-mm-dd}        contador diario, TTL 48 h
   {prefijo}:ai:quota:{provider}:{yyyy-mm-dd-hh-mm}  contador por minuto, TTL 120 s
   {prefijo}:ai:breaker:{provider}                   estado del breaker (JSON), TTL 1 h
-  {prefijo}:ai:gen:*                                límite por usuario (Upstash Ratelimit)
+  {prefijo}:ai:gen:*                                límite de generaciones por usuario (Upstash Ratelimit)
+  {prefijo}:ai:eval:*                               límite de evaluaciones por usuario (Upstash Ratelimit, Fase 6)
 
 Circuit breaker simple:
   3 fallos consecutivos → proveedor marcado no sano por 10 minutos
@@ -537,13 +570,17 @@ Circuit breaker simple:
 
 ### 8.3 Rate limiting por usuario
 
-Upstash Ratelimit con ventana fija de un día. Límite inicial implementado: 6 generaciones por usuario por día, configurable con `AI_DAILY_GENERATIONS` (antes 20, actualizado en la Fase 3). El límite de evaluaciones por usuario aún no está implementado; su valor se fija en la Fase 6, cuando exista `evaluate_recall_answer`. Se muestra al usuario como "Te quedan N generaciones hoy".
+Upstash Ratelimit con ventana fija de un día. Límite inicial implementado: 6 generaciones por usuario por día, configurable con `AI_DAILY_GENERATIONS` (antes 20, actualizado en la Fase 3). Se muestra al usuario como "Te quedan N generaciones hoy".
+
+Límite de evaluaciones (implementado en la Fase 6, ADR 0007): 60 respuestas evaluadas por el modelo por usuario por día, configurable con `AI_DAILY_EVALUATIONS`, con su propio contador (`{prefijo}:ai:eval`), separado del de generaciones. Se consulta antes de cada llamada a `evaluate_recall_answer` y se consume solo cuando la evaluación termina bien; las respuestas saltadas no lo tocan. Con el límite agotado, la respuesta queda `failed` con el código `AI_DAILY_LIMIT_REACHED` y la hora de renovación (nunca queda pendiente); "Reintentar" la evalúa cuando se renueve la ventana. No se muestra un contador de evaluaciones en la interfaz.
 
 ### 8.4 Propósitos y esquemas
 
 En la Fase 3 solo `generate_flashcards` está cableado de extremo a extremo (prompt `generate_flashcards/v1`); los demás propósitos tienen esquema Zod y tipo, pero ningún caso de uso los invoca todavía.
 
 Nota de implementación de la Fase 5 (ADR 0006): quedan cableados `generate_exam_questions/v1` (recibe además las preguntas activas de la página para no duplicarlas), `generate_exam_variants/v1` (recibe el id de cada raíz fallada, su concepto, su respuesta correcta y todas sus redacciones anteriores) y `session_feedback/v2` (exámenes: hasta 10 preguntas falladas con concepto, enunciado, opción elegida, opción correcta y explicación, más el texto de la página dentro de `AI_PAGE_TOKEN_CAP`; `session_feedback/v1` sigue sirviendo a flashcards). Cada llamada al modelo pide como máximo 15 preguntas o variantes; una solicitud mayor se reparte en varias llamadas y sigue costando una sola generación.
+
+Nota de implementación de la Fase 6 (ADR 0007): quedan cableados `generate_recall_questions/v1` (10 preguntas con rúbrica por llamada, temperatura 0,7; recibe además hasta 60 preguntas activas de la página para no repetirlas) y `evaluate_recall_answer/v1` (escala 0–5 explícita, fragmento y respuesta enviados como datos delimitados, justificación en español con "tú", nunca inventa contenido, temperatura 0,2). Con la generación incremental (§3.1), el `plain_text` que reciben los propósitos de generación son solo los párrafos nuevos o editados de la página, recortados a `AI_PAGE_TOKEN_CAP`. No se usa `session_feedback` para recordación activa.
 
 | Propósito | Entrada | Salida (Zod) |
 |---|---|---|
@@ -560,6 +597,12 @@ Nota de implementación de la Fase 5 (ADR 0006): quedan cableados `generate_exam
 - Un modelo puede puntuar mal. Mitigación: la calificación final combina la autoevaluación; el estudiante ve la justificación y puede marcar "no estoy de acuerdo" (se registra, no cambia el puntaje en v1).
 - Un proveedor puede caer a mitad de sesión. Mitigación: las respuestas se guardan primero; la evaluación es asíncrona y se reintenta con otro proveedor; la retroalimentación se muestra cuando todas las evaluaciones terminan.
 - Contenido de página muy largo. Mitigación implementada en la Fase 3 para la generación: se conserva el inicio del texto hasta el tope `AI_PAGE_TOKEN_CAP` (12.000 por defecto, estimación por palabras) y la interfaz avisa cuántas palabras se usaron; no hay selector de sección ni división en partes. Para recordación activa (Fase 6): se recorta `plain_text` a la ventana del modelo, priorizando el fragmento más similar a la pregunta (búsqueda léxica simple en v1; embeddings quedan fuera de alcance).
+
+Notas de implementación de la Fase 6 (ADR 0007):
+
+- **Selección del fragmento** (`selectRelevantFragment`). Si la página cabe en `AI_PAGE_TOKEN_CAP` se envía completa. Si no, se divide en oraciones (terminan en `.`, `!`, `?`, `…` o salto de línea; una oración más larga que el tope se corta en trozos del tope), cada oración suma cuántas de sus palabras son términos de la pregunta o de los conceptos clave de la rúbrica (en minúsculas, sin acentos ni puntuación, sin palabras vacías ni de menos de tres letras), y se envía el tramo continuo de oraciones que cabe en el tope con mayor puntaje (el primero, si empatan). Sin ninguna coincidencia se conserva el inicio de la página. Si la página no se puede leer, el fragmento va vacío.
+- **Proveedor caído a mitad de sesión.** Las respuestas ya están guardadas; cada una se evalúa con reintento en otro proveedor (§8.1). Si fallan los dos, la respuesta queda `failed` con el intento crudo, sin calidad combinada ni repaso SM-2, la sesión queda `partial` y la vista de resultados ofrece "Reintentar". La retroalimentación se muestra cuando todas las evaluaciones terminaron (bien o mal).
+- **Sin cola durable.** La evaluación corre con `after()` dentro de `maxDuration = 300` (ADR 0003). Un reclamo de más de 6 minutos se retoma, y la consulta de resultados vuelve a programar una evaluación cuando ninguna corrida viva tiene las respuestas pendientes.
 
 ---
 
@@ -699,8 +742,15 @@ Estado (actualizado en la Fase 5):
 
 ### Fase 6 — Recordación activa
 
+> **Implementada el 2026-10-08 en siete PR apiladas (#87–#93) más la de cierre, construida con ODD.** Decisiones en `docs/adr/0007-recordacion-activa-y-generacion-incremental.md`.
+
 Entregables: generación de preguntas abiertas con rúbrica, sesión con respuesta escrita y autoevaluación, evaluación asíncrona con esquema, calidad combinada, retroalimentación al final, registro de señales metacognitivas.
 Hecho cuando: una sesión completa funciona aunque un proveedor falle a mitad, y cada respuesta conserva su evaluación cruda.
+
+Estado (actualizado en la Fase 6):
+
+- Entregado: dominio puro con cobertura del 100 % (`combinedQuality`, `calibrationOf`, `composeRecallSession`, `sessionEvaluationStatus`, `selectRelevantFragment`, `sessionScore`); migraciones `0012_active_recall` y `0013_generation_fingerprints`; caso de uso del motor `recordRecallReviews`; generación con IA (`generate_recall_questions/v1`); sesión de 10 preguntas con cada respuesta guardada al darla; evaluación asíncrona (`evaluate_recall_answer/v1`) con `after()`, reclamo con plazo de 6 minutos, sondeo acotado y "Reintentar"; límite de 60 evaluaciones por usuario por día (`AI_DAILY_EVALUATIONS`); resultados con calidad combinada, calibración, puntaje y justificación por pregunta y "No estoy de acuerdo"; generación incremental por huellas de párrafo en flashcards, exámenes y recordación activa; panel "Técnicas de estudio" al estilo NotebookLM Studio con la lista "Generado en esta página"; "Crear examen" en el hub de exámenes; `/active-recall` y la vista por cuaderno con datos reales, contador de preguntas vencidas hoy por cuaderno y resultados de la sesión más reciente; "Active recall" habilitado en la barra lateral. Un e2e recorre una sesión con un proveedor que falla a mitad: la sesión termina, la respuesta fallida conserva su intento crudo y "Reintentar" la evalúa.
+- Pendiente: "Repasos de hoy" en `/flashcards` sigue listando solo flashcards (la vista "Hoy" completa llega en la Fase 7); los resultados de sesiones de recordación anteriores a la más reciente no tienen entrada en la interfaz y el flujo entre hub, resultados y sesión se revisa en la Fase 8; ante un error que no se cura, el aviso de resultados ofrece un "Reintentar" que no ayuda; en páginas generadas antes de la fase, flashcards puede repetir tarjetas una vez; el final de un párrafo más largo que el tope nunca se envía; los mensajes de error de exámenes están duplicados entre el panel y "Crear examen"; la prueba "across batches" de `drizzle-studied-page-reader` agota su tiempo en la base compartida; la documentación técnica de las Fases 3 a 5 está sin actualizar; acelerar la integración continua queda para después de la Fase 8. Detalle en ADR 0007.
 
 ### Fase 7 — Calendario y Dashboard
 

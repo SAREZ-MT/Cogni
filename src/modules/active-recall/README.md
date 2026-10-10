@@ -6,7 +6,10 @@ Preguntas abiertas, sesiones y evaluación combinada.
 
 ## Estado
 
-En construcción (Fase 6 — Recordación activa, ver `docs/documento-maestro.md` §13).
+Fase 6 completa (Recordación activa, `docs/documento-maestro.md` §13, versión
+1.5.0). Decisiones en
+`docs/adr/0007-recordacion-activa-y-generacion-incremental.md`; registro de
+la construcción en `odd/tasks/phase-6-active-recall.md`.
 
 Implementado:
 
@@ -98,6 +101,15 @@ Implementado:
   respondió) para volver a abrir sus resultados; una sesión ajena, abierta
   o de otra página es `RECALL_SESSION_NOT_FOUND`.
 - `hub-actions.ts`: `listRecallHubAction` y `getRecallSessionReviewAction`.
+
+## Pendientes
+
+Ver la sección "Pendientes" de ADR 0007. Los que tocan este módulo: ante un
+error de lectura que no se cura, el aviso de resultados sigue ofreciendo
+"Reintentar"; los resultados de sesiones anteriores a la más reciente no
+tienen entrada en la interfaz (la ruta `/resultados?sesion={id}` existe;
+Fase 8); el final de un párrafo más largo que `AI_PAGE_TOKEN_CAP` nunca se
+envía a la IA.
 
 ## Dependencias declaradas
 

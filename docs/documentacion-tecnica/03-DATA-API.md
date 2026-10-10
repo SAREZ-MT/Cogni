@@ -9,12 +9,14 @@
 
 ---
 
-## 0. Nota de estado actual (2026-09-25)
+## 0. Nota de estado actual (2026-09-25, actualizada el 2026-10-10 para la Fase 6)
 
 - Fase 0 (Cimientos) y Fase 1 (Cuadernos y editor) están desplegadas en producción; sus tablas (`profiles`, `notebooks`, `pages`, `page_assets`) existen en el esquema real.
 - Fase 2 (Importación de PDF) fue implementada bajo Organic Driven Development (ODD) el 2026-09-23; la tabla `import_jobs` y el bucket `page-pdfs` son reales.
 - Fase 3 (Capa de IA) no ha iniciado: no existe la tabla `AiGeneration` ni ninguna dependencia `ai`/`@ai-sdk/*` en `package.json`.
 - Las Fases 4 a 7 (motor de repetición espaciada, flashcards, exámenes, recordación activa, calendario y dashboard) no tienen esquema ni migración en este código base; existen únicamente como especificación en `docs/documento-maestro.md` §6.1 y, para su interfaz visual, como diseño con datos de muestra en la rama `design/shell-look` no integrada a `main`.
+- Fase 6 (Recordación activa) está implementada (2026-10-08; decisiones en `docs/adr/0007-recordacion-activa-y-generacion-incremental.md`): las tablas `recall_questions`, `recall_sessions` y `recall_answers` (migración `0012_active_recall`) y la nueva tabla `generation_fingerprints` (migración `0013_generation_fingerprints`, generación incremental de las tres técnicas) se documentan contra su migración y su `schema.ts` (§1, §2.4, §2.5, §2.6 y §5), junto con las Server Actions de `active-recall` (§4.4) y los límites de tasa reales (§4). Con `GenerationFingerprint`, el modelo de dominio pasa de 19 a 20 entidades.
+- Las Fases 3 a 5 (IA, motor de repetición y flashcards, exámenes) también están implementadas, con migraciones `0007` a `0011`, pero sus entidades siguen descritas aquí como especificación Roadmap: su actualización contra el código queda pendiente.
 - En este documento: 5 tablas reales (`profiles`, `notebooks`, `pages`, `page_assets`, `import_jobs`) están completamente documentadas contra su migración y su `schema.ts`; las 14 entidades restantes del modelo de dominio (§6.1 del documento maestro) se documentan como especificación de datos, marcadas Roadmap, sin migración asociada. El contrato de API (§4) cubre únicamente Server Actions y Route Handlers que existen hoy en el código; no se documenta ningún endpoint de las fases roadmap.
 
 ### Documento vivo
@@ -44,6 +46,7 @@ Este documento se actualiza a medida que avanza la construcción de Cogni. Por e
 > - **`ImportJob` como máquina de estados:** `import_jobs.status` (`queued → processing → done/failed`) es el único registro de progreso de una importación; no existe columna `trigger_run_id` (ver ADR-009: la importación corre de forma síncrona dentro de la propia Server Action, bajo `maxDuration`, sobre Vercel Fluid Compute).
 > - **`StudyItem.root_id` y referencias polimórficas (especificación, no implementadas):** el documento maestro especifica que cada `StudyItem` de examen apunta a la pregunta raíz de su linaje, y que `ReviewLog.session_id` es una referencia polimórfica según `session_kind` (sin FK física), para que el motor siga el concepto evaluado y no la redacción de una variante.
 > - **Identificadores UUID v7:** todo `id` se genera en la aplicación con `createId()` (48 bits de marca de tiempo en milisegundos + bits aleatorios, RFC 9562), nunca con un valor por defecto de Postgres.
+> - **Recordación activa (Fase 6):** las respuestas se atan al dueño de su sesión y de su pregunta con claves foráneas compuestas `(session_id, owner_id)` y `(question_id, owner_id)`, de modo que una respuesta nunca mezcla dueños; restricciones `CHECK` atan el estado de evaluación a sus datos. `generation_fingerprints` no tiene `id`: su clave natural es `(page_id, owner_id, technique, fingerprint)`.
 > - **Columnas comunes:** `id`, `owner_id`, `created_at`, `updated_at` son comunes a toda entidad de usuario (documento-maestro §6.1); se listan completas en cada tabla de esta sección aunque el documento maestro las omita por brevedad.
 
 > Diagrama a construir con archify a partir de esta descripción.
@@ -135,6 +138,8 @@ Se relaciona con Page: pertenece a una (`page_id`, `ON DELETE CASCADE`). Se rela
 Se relaciona con Page: pertenece a una (`page_id`, `ON DELETE CASCADE`). Se relaciona con Profile: pertenece a uno (`owner_id`, `ON DELETE CASCADE`). `storage_path` es único. A diferencia de la especificación original del documento maestro (§6.1), esta tabla **no** tiene columna `trigger_run_id`: el ADR-009 fija el procesamiento síncrono dentro de la propia Server Action (`maxDuration = 120`, Vercel Fluid Compute) como mecanismo de trabajo en segundo plano.
 
 ### Entidades roadmap (especificación, sin migración)
+
+> Desde la Fase 6, RecallQuestion, RecallSession y RecallAnswer ya tienen migración y se documentan como implementadas en esta misma lista; GenerationFingerprint se agrega a continuación de ellas. Las entidades de las Fases 3 a 5 también tienen migración (`0007`–`0011`), pendiente de documentar.
 
 #### StudyItem — Estado: Roadmap (Fase 4)
 
@@ -301,7 +306,7 @@ Se relacionará con Page: muchas ExamSession por página. `retake_of_session_id`
 
 Se relacionará con ExamSession: muchas ExamAnswer por sesión (`session_id`). `question_id` referencia la variante realmente mostrada al estudiante; `root_id` preserva el concepto evaluado independientemente de la redacción.
 
-#### RecallQuestion — Estado: Roadmap (Fase 6)
+#### RecallQuestion — Estado: Implementado (Fase 6)
 
 | Atributo | Tipo |
 |---|---|
@@ -316,9 +321,9 @@ Se relacionará con ExamSession: muchas ExamAnswer por sesión (`session_id`). `
 | generation_id | uuid |
 | archived_at | timestamptz |
 
-Se relacionará con Page: muchas RecallQuestion por página. `rubric` guarda `keyConcepts[]` y `acceptableAnswerSummary` (documento-maestro §8.4).
+Se relaciona con Page (`page_id`, `ON DELETE CASCADE`) y con Profile (`owner_id`, `ON DELETE CASCADE`): muchas RecallQuestion por página. `rubric` guarda `keyConcepts[]` (al menos uno) y `acceptableAnswerSummary` (no vacío), validados con `CHECK recall_questions_rubric_shape`; `prompt` no puede estar vacío; `origin` es `ai` o `manual` (en la Fase 6 solo se generan con IA). `generation_id` apunta a `ai_generations` (`ON DELETE SET NULL`). Se archiva (`archived_at`), no se borra. Su `StudyItem` es de tipo `recall_question` y `source_id` = id de la pregunta.
 
-#### RecallSession — Estado: Roadmap (Fase 6)
+#### RecallSession — Estado: Implementado (Fase 6)
 
 | Atributo | Tipo |
 |---|---|
@@ -331,9 +336,9 @@ Se relacionará con Page: muchas RecallQuestion por página. `rubric` guarda `ke
 | finished_at | timestamptz |
 | evaluation_status | text |
 
-Se relacionará con Page: muchas RecallSession por página. `evaluation_status` (`pending`/`done`/`partial`) refleja que la evaluación de IA de cada respuesta es asíncrona.
+Se relaciona con Page (`page_id`, `ON DELETE CASCADE`) y con Profile (`owner_id`, `ON DELETE CASCADE`): muchas RecallSession por página. `evaluation_status` (`pending`/`done`/`partial`) refleja que la evaluación de IA de cada respuesta es asíncrona: solo deja `pending` cuando la sesión terminó (`finished_at` no nulo), y `finished_at >= started_at`. No guarda la lista de preguntas: una respuesta se acepta si su pregunta es del dueño y de la página de la sesión (una pregunta archivada después de que la sesión la mostró sigue contando). Una sesión cerrada sin respuestas queda `done`; con alguna respuesta `failed`, `partial`.
 
-#### RecallAnswer — Estado: Roadmap (Fase 6)
+#### RecallAnswer — Estado: Implementado (Fase 6)
 
 | Atributo | Tipo |
 |---|---|
@@ -351,8 +356,21 @@ Se relacionará con Page: muchas RecallSession por página. `evaluation_status` 
 | combined_quality | integer |
 | generation_id | uuid |
 | disagreed | boolean |
+| evaluation_claimed_at | timestamptz |
 
-Se relacionará con RecallSession: muchas RecallAnswer por sesión. `combined_quality` es la calidad SM-2 calculada según la fórmula de §3.4 de este documento (documento-maestro §7.4).
+Se relaciona con RecallSession (`(session_id, owner_id)`, `ON DELETE CASCADE`) y con RecallQuestion (`(question_id, owner_id)`, `ON DELETE CASCADE`): muchas RecallAnswer por sesión, una por pregunta (único `(session_id, question_id)`). `combined_quality` es la calidad SM-2 calculada según la fórmula de §3.3 de este documento (documento-maestro §7.4). `self_rating`, `ai_score` y `combined_quality` van de 0 a 5. `evaluation_claimed_at` no figura en el documento maestro original: guarda cuándo una corrida de evaluación reclamó la respuesta (un reclamo de más de 6 minutos se retoma; ADR 0007). `CHECK recall_answers_evaluation_check` ata el estado a sus datos: `pending` sin `ai_score` ni `combined_quality` (puede conservar el intento fallido anterior tras "Reintentar"); `done` con `ai_evaluation`, `ai_score` y `combined_quality`; `failed` con `ai_evaluation` y sin puntajes. Contenido de `ai_evaluation`: la salida del modelo (`score`, `presentConcepts`, `missingConcepts`, `misconceptions`, `justification`), el registro `{ "source": "skipped", "score": 0, "justification": "Pregunta sin responder." }` de una pregunta saltada (texto `(sin respuesta)`), o el intento fallido `{ "source": "failed", "code", "generationId", "resetAt"? }`. `disagreed` registra "No estoy de acuerdo" y nunca cambia el puntaje.
+
+#### GenerationFingerprint — Estado: Implementado (Fase 6)
+
+| Atributo | Tipo |
+|---|---|
+| owner_id | uuid |
+| page_id | uuid |
+| technique | text |
+| fingerprint | text |
+| created_at | timestamptz |
+
+Memoria de la generación incremental (documento-maestro §3.1, ADR 0007): una fila por párrafo de una página que una técnica ya envió a la IA. Clave primaria `(page_id, owner_id, technique, fingerprint)`; sin `id` ni `updated_at`. `technique` es `flashcards`, `exam` o `recall` (`CHECK generation_fingerprints_technique_check`); `fingerprint` es el sha256 hexadecimal del párrafo normalizado (forma NFC, espacios colapsados, minúsculas), validado con `CHECK generation_fingerprints_fingerprint_format` (`^[0-9a-f]{64}$`). Se relaciona con Page y con Profile (`ON DELETE CASCADE`). La escribe el módulo de cada técnica, solo para su técnica y en la misma transacción que sus ítems; el puerto compartido es `GenerationFingerprintRepository` (`src/shared/kernel/generation-fingerprints.ts`).
 
 #### SessionFeedback — Estado: Roadmap (Fase 4-6)
 
@@ -368,7 +386,7 @@ Se relacionará con RecallSession: muchas RecallAnswer por sesión. `combined_qu
 | generation_id | uuid |
 | status | text |
 
-Se relacionará, de forma polimórfica según `session_kind`, con FlashcardSession, ExamSession o RecallSession (igual que ReviewLog); existirá una SessionFeedback por sesión terminada de cualquiera de las tres técnicas.
+Se relacionará, de forma polimórfica según `session_kind`, con FlashcardSession o ExamSession (igual que ReviewLog). Desviación deliberada de la Fase 6 (ADR 0007): la recordación activa no crea SessionFeedback; su retroalimentación es la justificación por pregunta guardada en `RecallAnswer.ai_evaluation`.
 
 #### AiGeneration — Estado: Roadmap (Fase 3)
 
@@ -409,17 +427,18 @@ Se relacionará con Page cuando el propósito lo requiera (`page_id` nulo si no 
 | ExamPageState | — | exams | Roadmap | Fase 5 |
 | ExamSession | — | exams | Roadmap | Fase 5 |
 | ExamAnswer | — | exams | Roadmap | Fase 5 |
-| RecallQuestion | — | active-recall | Roadmap | Fase 6 |
-| RecallSession | — | active-recall | Roadmap | Fase 6 |
-| RecallAnswer | — | active-recall | Roadmap | Fase 6 |
-| SessionFeedback | — | flashcards / exams / active-recall | Roadmap | Fase 4-6 |
+| RecallQuestion | recall_questions | active-recall | Implementado | Fase 6 |
+| RecallSession | recall_sessions | active-recall | Implementado | Fase 6 |
+| RecallAnswer | recall_answers | active-recall | Implementado | Fase 6 |
+| GenerationFingerprint | generation_fingerprints | flashcards / exams / active-recall | Implementado | Fase 6 |
+| SessionFeedback | — | flashcards / exams | Roadmap | Fase 4-5 |
 | AiGeneration | — | ai | Roadmap | Fase 3 |
 
 ---
 
 ## 2. Esquema por módulo
 
-Las 7 migraciones reales viven en `drizzle/*.sql`, generadas por `drizzle-kit generate` a partir de `src/shared/db/schema.ts` (`drizzle.config.ts`: `dialect: "postgresql"`, `schema: "./src/shared/db/schema.ts"`, `out: "./drizzle"`) y aplicadas con `drizzle-kit migrate`. Las migraciones de Storage (buckets y políticas RLS) son SQL escrito a mano, porque Drizzle no introspecta el esquema `storage` de Supabase.
+Las migraciones reales viven en `drizzle/*.sql` (14 desde la Fase 6; este documento detalla `0000`–`0006`, `0012` y `0013`), generadas por `drizzle-kit generate` a partir de `src/shared/db/schema.ts` (`drizzle.config.ts`: `dialect: "postgresql"`, `schema: "./src/shared/db/schema.ts"`, `out: "./drizzle"`) y aplicadas con `drizzle-kit migrate`. Las migraciones de Storage (buckets y políticas RLS) son SQL escrito a mano, porque Drizzle no introspecta el esquema `storage` de Supabase.
 
 ### 2.1 `identity` — `profiles`
 
@@ -628,9 +647,123 @@ create policy "page-pdfs delete own"
   using (bucket_id = 'page-pdfs' and (storage.foldername(name))[1] = auth.uid()::text);
 ```
 
-### 2.4 Módulos roadmap
+### 2.4 Módulos de las fases siguientes
 
-`ai`, `study-engine`, `flashcards`, `exams`, `active-recall`, `scheduling` y `analytics`: sin tablas en este código base; ver §1 para la especificación de sus entidades.
+`ai`, `study-engine`, `flashcards` y `exams` tienen tablas desde las Fases 3 a 5 (migraciones `0007`–`0011`), pendientes de documentar aquí; `scheduling` y `analytics` no tienen tablas. Ver §1 para la especificación de sus entidades.
+
+#### 2.4.1 `active-recall` — `recall_questions`, `recall_sessions`, `recall_answers` (Fase 6)
+
+```sql
+-- drizzle/0012_active_recall.sql
+CREATE TABLE "recall_answers" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"owner_id" uuid NOT NULL,
+	"session_id" uuid NOT NULL,
+	"question_id" uuid NOT NULL,
+	"answer_text" text NOT NULL,
+	"self_rating" integer NOT NULL,
+	"evaluation_status" text DEFAULT 'pending' NOT NULL,
+	"ai_evaluation" jsonb,
+	"ai_score" integer,
+	"combined_quality" integer,
+	"generation_id" uuid,
+	"disagreed" boolean DEFAULT false NOT NULL,
+	"evaluation_claimed_at" timestamp with time zone,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "recall_answers_session_question_key" UNIQUE("session_id","question_id"),
+	CONSTRAINT "recall_answers_self_rating_range" CHECK ("recall_answers"."self_rating" between 0 and 5),
+	CONSTRAINT "recall_answers_ai_score_range" CHECK ("recall_answers"."ai_score" between 0 and 5),
+	CONSTRAINT "recall_answers_combined_quality_range" CHECK ("recall_answers"."combined_quality" between 0 and 5),
+	CONSTRAINT "recall_answers_evaluation_check" CHECK (("recall_answers"."evaluation_status" = 'pending' and "recall_answers"."ai_score" is null and "recall_answers"."combined_quality" is null)
+        or ("recall_answers"."evaluation_status" = 'done' and "recall_answers"."ai_evaluation" is not null
+          and "recall_answers"."ai_score" is not null and "recall_answers"."combined_quality" is not null)
+        or ("recall_answers"."evaluation_status" = 'failed' and "recall_answers"."ai_evaluation" is not null
+          and "recall_answers"."ai_score" is null and "recall_answers"."combined_quality" is null))
+);
+--> statement-breakpoint
+ALTER TABLE "recall_answers" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
+CREATE TABLE "recall_questions" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"owner_id" uuid NOT NULL,
+	"page_id" uuid NOT NULL,
+	"prompt" text NOT NULL,
+	"rubric" jsonb NOT NULL,
+	"origin" text NOT NULL,
+	"generation_id" uuid,
+	"archived_at" timestamp with time zone,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "recall_questions_id_owner_key" UNIQUE("id","owner_id"),
+	CONSTRAINT "recall_questions_origin_check" CHECK ("recall_questions"."origin" in ('ai', 'manual')),
+	CONSTRAINT "recall_questions_prompt_not_blank" CHECK (length(btrim("recall_questions"."prompt")) > 0),
+	CONSTRAINT "recall_questions_rubric_shape" CHECK (coalesce(jsonb_typeof("recall_questions"."rubric") = 'object'
+        and case when jsonb_typeof("recall_questions"."rubric" -> 'keyConcepts') = 'array'
+          then jsonb_array_length("recall_questions"."rubric" -> 'keyConcepts') > 0
+          else false end
+        and jsonb_typeof("recall_questions"."rubric" -> 'acceptableAnswerSummary') = 'string'
+        and length(btrim("recall_questions"."rubric" ->> 'acceptableAnswerSummary')) > 0, false))
+);
+--> statement-breakpoint
+ALTER TABLE "recall_questions" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
+CREATE TABLE "recall_sessions" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"owner_id" uuid NOT NULL,
+	"page_id" uuid NOT NULL,
+	"started_at" timestamp with time zone NOT NULL,
+	"finished_at" timestamp with time zone,
+	"evaluation_status" text DEFAULT 'pending' NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "recall_sessions_id_owner_key" UNIQUE("id","owner_id"),
+	CONSTRAINT "recall_sessions_evaluation_status_check" CHECK ("recall_sessions"."evaluation_status" in ('pending', 'done', 'partial')
+        and ("recall_sessions"."evaluation_status" = 'pending' or "recall_sessions"."finished_at" is not null)),
+	CONSTRAINT "recall_sessions_finished_after_start" CHECK ("recall_sessions"."finished_at" is null or "recall_sessions"."finished_at" >= "recall_sessions"."started_at")
+);
+--> statement-breakpoint
+ALTER TABLE "recall_sessions" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
+ALTER TABLE "recall_answers" ADD CONSTRAINT "recall_answers_owner_id_profiles_id_fk" FOREIGN KEY ("owner_id") REFERENCES "public"."profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "recall_answers" ADD CONSTRAINT "recall_answers_generation_id_ai_generations_id_fk" FOREIGN KEY ("generation_id") REFERENCES "public"."ai_generations"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "recall_answers" ADD CONSTRAINT "recall_answers_session_owner_fk" FOREIGN KEY ("session_id","owner_id") REFERENCES "public"."recall_sessions"("id","owner_id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "recall_answers" ADD CONSTRAINT "recall_answers_question_owner_fk" FOREIGN KEY ("question_id","owner_id") REFERENCES "public"."recall_questions"("id","owner_id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "recall_questions" ADD CONSTRAINT "recall_questions_owner_id_profiles_id_fk" FOREIGN KEY ("owner_id") REFERENCES "public"."profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "recall_questions" ADD CONSTRAINT "recall_questions_page_id_pages_id_fk" FOREIGN KEY ("page_id") REFERENCES "public"."pages"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "recall_questions" ADD CONSTRAINT "recall_questions_generation_id_ai_generations_id_fk" FOREIGN KEY ("generation_id") REFERENCES "public"."ai_generations"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "recall_sessions" ADD CONSTRAINT "recall_sessions_owner_id_profiles_id_fk" FOREIGN KEY ("owner_id") REFERENCES "public"."profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "recall_sessions" ADD CONSTRAINT "recall_sessions_page_id_pages_id_fk" FOREIGN KEY ("page_id") REFERENCES "public"."pages"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "recall_answers_session_pending_idx" ON "recall_answers" USING btree ("session_id") WHERE "recall_answers"."evaluation_status" = 'pending';--> statement-breakpoint
+CREATE INDEX "recall_answers_question_id_idx" ON "recall_answers" USING btree ("question_id");--> statement-breakpoint
+CREATE INDEX "recall_answers_owner_id_idx" ON "recall_answers" USING btree ("owner_id");--> statement-breakpoint
+CREATE INDEX "recall_questions_page_active_idx" ON "recall_questions" USING btree ("page_id","created_at") WHERE "recall_questions"."archived_at" is null;--> statement-breakpoint
+CREATE INDEX "recall_questions_owner_id_idx" ON "recall_questions" USING btree ("owner_id");--> statement-breakpoint
+CREATE INDEX "recall_sessions_page_started_idx" ON "recall_sessions" USING btree ("page_id","started_at" DESC NULLS LAST);--> statement-breakpoint
+CREATE INDEX "recall_sessions_owner_started_idx" ON "recall_sessions" USING btree ("owner_id","started_at" DESC NULLS LAST);
+```
+
+`drizzle/0012_active_recall.down.sql` revierte la migración. RLS activa sin políticas, como el resto de tablas de negocio: solo la conexión de servidor las alcanza.
+
+#### 2.4.2 Generación incremental — `generation_fingerprints` (Fase 6)
+
+```sql
+-- drizzle/0013_generation_fingerprints.sql
+CREATE TABLE "generation_fingerprints" (
+	"owner_id" uuid NOT NULL,
+	"page_id" uuid NOT NULL,
+	"technique" text NOT NULL,
+	"fingerprint" text NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "generation_fingerprints_pkey" PRIMARY KEY("page_id","owner_id","technique","fingerprint"),
+	CONSTRAINT "generation_fingerprints_technique_check" CHECK ("generation_fingerprints"."technique" in ('flashcards', 'exam', 'recall')),
+	CONSTRAINT "generation_fingerprints_fingerprint_format" CHECK ("generation_fingerprints"."fingerprint" ~ '^[0-9a-f]{64}$')
+);
+--> statement-breakpoint
+ALTER TABLE "generation_fingerprints" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
+ALTER TABLE "generation_fingerprints" ADD CONSTRAINT "generation_fingerprints_owner_id_profiles_id_fk" FOREIGN KEY ("owner_id") REFERENCES "public"."profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "generation_fingerprints" ADD CONSTRAINT "generation_fingerprints_page_id_pages_id_fk" FOREIGN KEY ("page_id") REFERENCES "public"."pages"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "generation_fingerprints_owner_id_idx" ON "generation_fingerprints" USING btree ("owner_id");
+```
+
+`drizzle/0013_generation_fingerprints.down.sql` revierte la migración. Cada módulo de técnica tiene su adaptador Drizzle ligado a su técnica (`flashcards`, `exam`, `recall`); los módulos solo se encuentran a través de su `index.ts`.
 
 ### 2.5 Enumeraciones
 
@@ -641,7 +774,16 @@ No existe ningún `pgEnum` de Drizzle en `src/shared/db/schema.ts`. El único co
 | `queued` | Job creado, aún no reclamado por `processImportJob`. |
 | `processing` | Job reclamado; descarga, extracción y conversión en curso. |
 | `done` | Importación terminada con éxito; el contenido ya está escrito en `pages.content`. |
-| `failed` | Importación terminada sin éxito; `error` contiene el mensaje en español correspondiente (ver §4.4). |
+| `failed` | Importación terminada sin éxito; `error` contiene el mensaje en español correspondiente (ver §4.3). |
+
+Desde la Fase 6, otros conjuntos cerrados siguen el mismo patrón (`text` + `CHECK`):
+
+| Columna | Valores | Significado |
+|---|---|---|
+| `recall_questions.origin` | `ai`, `manual` | Origen de la pregunta (en la Fase 6 solo `ai`). |
+| `recall_sessions.evaluation_status` | `pending`, `done`, `partial` | Evaluación en curso; todas las respuestas evaluadas; alguna respuesta `failed`. |
+| `recall_answers.evaluation_status` | `pending`, `done`, `failed` | Sin evaluar o reclamada; evaluada (modelo o saltada); falló en todos los proveedores o por el límite diario. |
+| `generation_fingerprints.technique` | `flashcards`, `exam`, `recall` | Técnica que ya envió el párrafo a la IA. |
 
 ### 2.6 Relaciones y borrado en cascada
 
@@ -655,12 +797,23 @@ No existe ningún `pgEnum` de Drizzle en `src/shared/db/schema.ts`. El único co
 | `page_assets` | `page_id` | `pages.id` | cascade |
 | `import_jobs` | `owner_id` | `profiles.id` | cascade |
 | `import_jobs` | `page_id` | `pages.id` | cascade |
+| `recall_questions` | `owner_id` | `profiles.id` | cascade |
+| `recall_questions` | `page_id` | `pages.id` | cascade |
+| `recall_questions` | `generation_id` | `ai_generations.id` | set null |
+| `recall_sessions` | `owner_id` | `profiles.id` | cascade |
+| `recall_sessions` | `page_id` | `pages.id` | cascade |
+| `recall_answers` | `owner_id` | `profiles.id` | cascade |
+| `recall_answers` | `(session_id, owner_id)` | `recall_sessions(id, owner_id)` | cascade |
+| `recall_answers` | `(question_id, owner_id)` | `recall_questions(id, owner_id)` | cascade |
+| `recall_answers` | `generation_id` | `ai_generations.id` | set null |
+| `generation_fingerprints` | `owner_id` | `profiles.id` | cascade |
+| `generation_fingerprints` | `page_id` | `pages.id` | cascade |
 
-Todas las claves foráneas del esquema usan `ON DELETE cascade` y `ON UPDATE no action`; eliminar un `Profile` elimina en cadena sus cuadernos, páginas, adjuntos e importaciones.
+Las claves foráneas de las tablas de las Fases 0 a 2 usan `ON DELETE cascade` y `ON UPDATE no action`; eliminar un `Profile` elimina en cadena sus cuadernos, páginas, adjuntos e importaciones. En las tablas de la Fase 6 también es así, salvo `generation_id`, que queda nulo si se borra la generación auditada.
 
 ### 2.7 Estrategia de migraciones
 
-Incremental-aditiva: cada cambio de esquema es un nuevo archivo `NNNN_nombre.sql` generado por `drizzle-kit generate` (nunca se edita una migración ya aplicada), registrado en `drizzle/meta/_journal.json` (7 entradas, `0000_profiles` a `0006_page_pdfs_storage`). `drizzle-kit` no tiene comando `down`: 5 de las 7 migraciones (`0002`, `0003`, `0004`, `0005`, `0006`) traen un `.down.sql` hermano con la reversión manual documentada en comentarios, pensado para aplicarse a mano con `psql` o el editor SQL de Supabase; las dos primeras (`0000` crea la tabla, `0001` activa RLS) no lo necesitan. Las migraciones de Storage (`0004`, `0006`) son idempotentes por diseño (`on conflict (id) do update`), para que la misma migración sea la fuente de verdad de los límites del bucket tanto en `cogni-dev` como en `cogni-prod`.
+Incremental-aditiva: cada cambio de esquema es un nuevo archivo `NNNN_nombre.sql` generado por `drizzle-kit generate` (nunca se edita una migración ya aplicada), registrado en `drizzle/meta/_journal.json` (14 entradas desde la Fase 6, `0000_profiles` a `0013_generation_fingerprints`; este párrafo describe las 7 primeras). `drizzle-kit` no tiene comando `down`: 5 de las 7 migraciones (`0002`, `0003`, `0004`, `0005`, `0006`) traen un `.down.sql` hermano con la reversión manual documentada en comentarios, pensado para aplicarse a mano con `psql` o el editor SQL de Supabase; las dos primeras (`0000` crea la tabla, `0001` activa RLS) no lo necesitan. Las migraciones de Storage (`0004`, `0006`) son idempotentes por diseño (`on conflict (id) do update`), para que la misma migración sea la fuente de verdad de los límites del bucket tanto en `cogni-dev` como en `cogni-prod`.
 
 Las migraciones se aplican exclusivamente durante la construcción de producción en Vercel, nunca en previsualizaciones (`package.json`: `"build": "node scripts/migrate-in-build.mjs && next build"`). `scripts/migrate-in-build.mjs` expone el predicado puro `shouldRunMigrations(env)`, verdadero solo si `env.VERCEL_ENV === "production"` o `env.RUN_DB_MIGRATIONS === "1"` (esta última, una escotilla para migrar manualmente contra `cogni-dev` sin desplegar). Cuando el predicado es verdadero ejecuta `pnpm exec drizzle-kit migrate`; en cualquier otro caso lo omite con un mensaje en consola. `drizzle.config.ts` fija `dialect: "postgresql"`, `schema: "./src/shared/db/schema.ts"` y `out: "./drizzle"`.
 
@@ -702,7 +855,9 @@ Se especifica como una función pura `applySm2(state, quality, now) → newState
 
 ### 3.3 Calidad combinada en recordación activa (documento-maestro §7.4)
 
-`combined = round(0.6 * ai_score + 0.4 * self_rating)`, donde `ai_score` y `self_rating` son enteros de 0 a 5. Señales metacognitivas registradas junto a la calidad combinada: `self_rating >= 4 and ai_score <= 2` marca exceso de confianza; `self_rating <= 1 and ai_score >= 4` marca falta de confianza. Se registran las tres señales (puntaje crudo de IA, autoevaluación y calidad combinada) en `RecallAnswer`.
+`combined = round(0.6 * ai_score + 0.4 * self_rating)`, donde `ai_score` y `self_rating` son enteros de 0 a 5. Señales metacognitivas: `self_rating >= 4 and ai_score <= 2` marca exceso de confianza; `self_rating <= 1 and ai_score >= 4` marca falta de confianza. Se registran las tres señales (puntaje crudo de IA, autoevaluación y calidad combinada) en `RecallAnswer`.
+
+Implementado en la Fase 6 (ADR 0007): `combinedQuality` y `calibrationOf` (`src/modules/active-recall/domain/recall-answer.ts`). La señal metacognitiva se deriva al leer los resultados y no se guarda. Solo una respuesta `done` alimenta SM-2 (`recordRecallReviews` de `study-engine`, `ReviewLog.session_kind = recall`): calidad < 3 siempre; ≥ 3 solo si el ítem está vencido.
 
 ### 3.4 Nivel de dominio por página (documento-maestro §7.3)
 
@@ -848,6 +1003,26 @@ Ejemplo de retorno no trivial (`ImportJobStatusView`):
 }
 ```
 
+### 4.4 `active-recall`
+
+Corresponden a CU-09 y a RF-AR-01 a RF-AR-06 y RF-AI-03 (Fase 6, ADR 0007). Server Actions (`"use server"`) en `src/modules/active-recall/actions.ts`, `session-actions.ts`, `evaluation-actions.ts` y `hub-actions.ts`. Todas validan la entrada con Zod (ids `z.uuid()`), están envueltas en `withBoundary()` (una excepción no prevista se reporta a Sentry y se convierte en `RECALL_UNEXPECTED`) y nunca lanzan. Todas requieren sesión: sin ella responden `RECALL_SESSION_REQUIRED`; una entrada inválida, `RECALL_INVALID_INPUT`. La tabla lista solo los demás errores.
+
+| Acción | Parámetros | Retorno | Errores propios |
+|---|---|---|---|
+| `generateRecallQuestionsAction` | `{ pageId }` | `Result<RecallGenerationView, RecallGenerationActionError>` (`questions`, `created`, `skipped`, `remainingToday`, `truncated`, `wordsUsed`, `wordsTotal`) | `PAGE_NOT_FOUND`, `AI_PAGE_EMPTY`, `RECALL_NO_NEW_CONTENT`, `AI_DAILY_LIMIT_REACHED` (con `resetAt` ISO), `AI_GENERATION_FAILED` |
+| `getRecallSessionPlanAction` | `{ pageId }` | `Result<RecallSessionPlanView, ActionError>` | — (solo lectura; no crea sesión) |
+| `getRecallPageSummaryAction` | `{ pageId }` | `Result<{ questionCount }, ActionError>` | — |
+| `startRecallSessionAction` | `{ pageId }` | `Result<StartedRecallSessionView, ActionError>` (`sessionId`, `questions`) | `PAGE_NOT_FOUND`, `RECALL_NO_QUESTIONS` |
+| `saveRecallAnswerAction` | `{ sessionId, questionId, answerText (≤ 20 000 caracteres), selfRating }` | `Result<SavedRecallAnswerView, ActionError>` | `RECALL_SESSION_NOT_FOUND`, `RECALL_SESSION_FINISHED`, `RECALL_QUESTION_NOT_IN_SESSION`, `RECALL_INVALID_ANSWER` |
+| `finishRecallSessionAction` | `{ sessionId }` | `Result<FinishedRecallSessionView, ActionError>` (`sessionId`, `answeredCount`, `evaluationStatus`) | `RECALL_SESSION_NOT_FOUND` |
+| `getRecallSessionResultsAction` | `{ sessionId }` | `Result<RecallSessionResultsView, ActionError>` | `RECALL_SESSION_NOT_FOUND` |
+| `retryRecallEvaluationAction` | `{ sessionId }` | `Result<RetriedRecallEvaluationView, ActionError>` | `RECALL_SESSION_NOT_FOUND` |
+| `disagreeRecallAnswerAction` | `{ answerId }` | `Result<DisagreedRecallAnswerView, ActionError>` | `RECALL_ANSWER_NOT_FOUND` |
+| `listRecallHubAction` | — | `Result<RecallHubView, ActionError>` | — |
+| `getRecallSessionReviewAction` | `{ pageId, sessionId }` | `Result<RecallSessionReviewView, ActionError>` | `RECALL_SESSION_NOT_FOUND` |
+
+`finishRecallSessionAction` responde sin esperar a la IA: si la sesión queda `pending`, programa `evaluateRecallSession` con `after()` dentro de `maxDuration = 300` de la ruta de la sesión (ADR 0003). La evaluación no devuelve errores al cliente: cada respuesta queda `done` o `failed` con su registro crudo (§1, RecallAnswer); dentro de ese registro, `code` es `AI_GENERATION_FAILED`, `AI_DAILY_LIMIT_REACHED` o `RECALL_UNEXPECTED`. `getRecallSessionResultsAction` vuelve a programar una evaluación cuando la sesión terminada sigue `pending` y ninguna respuesta pendiente se guardó o reclamó dentro del plazo de 6 minutos. Los demás códigos de `RECALL_ERROR` (`RECALL_INVALID_QUESTION`, `RECALL_INVALID_SCORE`) son internos: una pregunta generada inválida se descarta y cuenta en `skipped`.
+
 ### Route Handlers
 
 | Método | Ruta | Cuerpo | Respuesta | Auth | Descripción |
@@ -857,7 +1032,12 @@ Ejemplo de retorno no trivial (`ImportJobStatusView`):
 
 ### Límites de tasa
 
-N/A — se incorpora con la Fase 3 (documento-maestro §8.3: 20 generaciones/día, 60 evaluaciones/día por usuario, mecanismo pendiente).
+Upstash Ratelimit con ventana fija de un día por usuario (`src/modules/ai/infrastructure/upstash-rate-limiter.ts`; documento-maestro §8.3). En `AI_PROVIDER_MODE=fake` (CI y e2e) los mismos límites viven en memoria.
+
+| Límite | Variable (por defecto) | Clave en Redis | Se consume | Al agotarse |
+|---|---|---|---|---|
+| Generaciones de IA | `AI_DAILY_GENERATIONS` (6) | `{REDIS_KEY_PREFIX}:ai:gen` | Una unidad por "Generar" (Fase 3); recordación activa la consume solo tras guardar las preguntas | `AI_DAILY_LIMIT_REACHED` con `resetAt` |
+| Evaluaciones de recordación activa | `AI_DAILY_EVALUATIONS` (60) | `{REDIS_KEY_PREFIX}:ai:eval` | Una unidad por respuesta evaluada por el modelo, solo si queda `done` (Fase 6); las respuestas saltadas no consumen | La respuesta queda `failed` con `code: "AI_DAILY_LIMIT_REACHED"` y `resetAt`; "Reintentar" la evalúa tras la renovación |
 
 ---
 
@@ -876,6 +1056,22 @@ CREATE INDEX "page_assets_page_id_idx" ON "page_assets" USING btree ("page_id");
 -- Importaciones de una página y cola de importaciones activas por propietario
 CREATE INDEX "import_jobs_page_id_idx" ON "import_jobs" USING btree ("page_id");
 CREATE INDEX "import_jobs_owner_status_idx" ON "import_jobs" USING btree ("owner_id","status");
+
+-- Fase 6 — preguntas activas de una página, en orden de creación
+CREATE INDEX "recall_questions_page_active_idx" ON "recall_questions" USING btree ("page_id","created_at") WHERE "recall_questions"."archived_at" is null;
+CREATE INDEX "recall_questions_owner_id_idx" ON "recall_questions" USING btree ("owner_id");
+
+-- Fase 6 — sesiones de una página y del dueño, la más reciente primero (hub)
+CREATE INDEX "recall_sessions_page_started_idx" ON "recall_sessions" USING btree ("page_id","started_at" DESC NULLS LAST);
+CREATE INDEX "recall_sessions_owner_started_idx" ON "recall_sessions" USING btree ("owner_id","started_at" DESC NULLS LAST);
+
+-- Fase 6 — respuestas pendientes de una sesión (reclamo de la evaluación)
+CREATE INDEX "recall_answers_session_pending_idx" ON "recall_answers" USING btree ("session_id") WHERE "recall_answers"."evaluation_status" = 'pending';
+CREATE INDEX "recall_answers_question_id_idx" ON "recall_answers" USING btree ("question_id");
+CREATE INDEX "recall_answers_owner_id_idx" ON "recall_answers" USING btree ("owner_id");
+
+-- Fase 6 — huellas por dueño (la clave primaria cubre la lectura por página y técnica)
+CREATE INDEX "generation_fingerprints_owner_id_idx" ON "generation_fingerprints" USING btree ("owner_id");
 ```
 
 ```sql
@@ -885,6 +1081,16 @@ CONSTRAINT "import_jobs_storage_path_key" UNIQUE("storage_path")
 
 -- Estado cerrado de ImportJob sin pgEnum de Postgres
 CONSTRAINT "import_jobs_status_check" CHECK ("import_jobs"."status" in ('queued', 'processing', 'done', 'failed'))
+
+-- Fase 6 — destino de las claves foráneas compuestas de recall_answers
+CONSTRAINT "recall_questions_id_owner_key" UNIQUE("id","owner_id")
+CONSTRAINT "recall_sessions_id_owner_key" UNIQUE("id","owner_id")
+-- Fase 6 — una respuesta por pregunta y sesión
+CONSTRAINT "recall_answers_session_question_key" UNIQUE("session_id","question_id")
+-- Fase 6 — una huella por página, dueño y técnica
+CONSTRAINT "generation_fingerprints_pkey" PRIMARY KEY("page_id","owner_id","technique","fingerprint")
 ```
 
-Ninguna tabla real declara una restricción `CHECK` adicional a `import_jobs_status_check`, y ninguna columna de las 5 tablas implementadas es nula salvo las explícitamente marcadas como opcionales en el esquema (`profiles.display_name`, `profiles.onboarding_completed_at`, `notebooks.icon`/`color`/`archived_at`, `pages.archived_at`, `import_jobs.page_count`/`error`/`started_at`/`finished_at`). Las dos restricciones `UNIQUE` sobre `storage_path` son la base de la idempotencia de `registerPageAsset` (`onConflictDoUpdate`) y de `DrizzleImportJobRepository.create()` (que traduce su violación en `IMPORT_JOB_STORAGE_PATH_CONFLICT`).
+Restricciones `CHECK` de la Fase 6 (texto completo en §2.4): `recall_questions_origin_check`, `recall_questions_prompt_not_blank`, `recall_questions_rubric_shape`; `recall_sessions_evaluation_status_check`, `recall_sessions_finished_after_start`; `recall_answers_self_rating_range`, `recall_answers_ai_score_range`, `recall_answers_combined_quality_range`, `recall_answers_evaluation_check`; `generation_fingerprints_technique_check`, `generation_fingerprints_fingerprint_format`.
+
+Entre las 5 tablas de las Fases 0 a 2, ninguna declara una restricción `CHECK` adicional a `import_jobs_status_check`, y ninguna columna de esas 5 tablas es nula salvo las explícitamente marcadas como opcionales en el esquema (`profiles.display_name`, `profiles.onboarding_completed_at`, `notebooks.icon`/`color`/`archived_at`, `pages.archived_at`, `import_jobs.page_count`/`error`/`started_at`/`finished_at`). Las dos restricciones `UNIQUE` sobre `storage_path` son la base de la idempotencia de `registerPageAsset` (`onConflictDoUpdate`) y de `DrizzleImportJobRepository.create()` (que traduce su violación en `IMPORT_JOB_STORAGE_PATH_CONFLICT`).

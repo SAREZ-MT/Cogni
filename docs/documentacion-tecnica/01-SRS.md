@@ -9,12 +9,14 @@
 
 ---
 
-## 0. Nota de estado actual (2026-10-01)
+## 0. Nota de estado actual (2026-10-01, actualizada el 2026-10-10 para la Fase 6)
 
 - Fase 0 (Cimientos) y Fase 1 (Cuadernos y editor) están desplegadas en producción.
 - Fase 2 (Importación de PDF) fue implementada bajo Organic Driven Development (ODD) el 2026-09-23; el módulo `src/modules/ingestion` es real, no un esqueleto.
 - Fase 3 (Capa de IA) no ha iniciado: el módulo `src/modules/ai` es un esqueleto vacío (`export {};`).
 - Las Fases 4 a 7 (flashcards, exámenes, recordación activa, calendario y dashboard) existen únicamente como vistas previas visuales con datos de muestra, integradas en `main` pero ocultas en producción tras `requireDesignPreviews()` (las rutas responden 404 y la barra lateral muestra "pronto"); los módulos `flashcards`, `study-engine`, `exams`, `active-recall`, `scheduling` y `analytics` siguen siendo esqueletos vacíos en el código base de este documento.
+- Fase 6 (Recordación activa) está implementada (2026-10-08, PR #87–#93; decisiones en `docs/adr/0007-recordacion-activa-y-generacion-incremental.md`): el módulo `src/modules/active-recall` es real y sus pantallas usan datos reales. Por eso CU-09, RF-AR-01 a RF-AR-06 y RF-AI-03 están marcados Implementado.
+- Las Fases 3 a 5 (IA, motor de repetición y flashcards, exámenes) también están implementadas (ADR 0004, 0005 y 0006), pero este documento todavía no se ha actualizado contra ese código: sus requisitos conservan el estado anterior hasta esa revisión, que queda pendiente.
 - Fase 9 (Endurecimiento) está parcialmente cubierta: la Content Security Policy con nonce por petición, la redirección del dominio apex y la protección de sesión ya existen en `src/proxy.ts` y `src/shared/config/security-headers.ts`; el resto de los entregables (registro de logs externo, pruebas de carga, auditoría de accesibilidad, manual de usuario) no se han iniciado.
 - En este documento: las secciones 1, 2, 4 y 5 describen tanto lo implementado como lo planeado, marcado explícitamente por su columna Estado; la sección 3 (casos de uso) sigue el mismo criterio caso por caso.
 
@@ -54,7 +56,7 @@ Cogni organiza su dominio en 11 módulos bajo `src/modules/`, cada uno con una �
 | `study-engine` | Estado SM-2 por ítem, nivel de dominio por página y cálculo de vencimientos. | Roadmap |
 | `flashcards` | Tarjetas de estudio, sesiones de repaso con SM-2 y retroalimentación. | Vista previa integrada (oculta en producción) |
 | `exams` | Preguntas de opción múltiple, sesiones de examen, corrección y repetición. | Vista previa integrada (oculta en producción) |
-| `active-recall` | Preguntas abiertas, sesiones de respuesta y evaluación combinada IA + autoevaluación. | Vista previa integrada (oculta en producción) |
+| `active-recall` | Preguntas abiertas, sesiones de respuesta y evaluación combinada IA + autoevaluación. | Implementado (Fase 6) |
 | `scheduling` | Calendario y vista "Hoy" de repasos vencidos. | Roadmap |
 | `analytics` | Dashboard de progreso, métricas por técnica y calibración metacognitiva. | Vista previa integrada (oculta en producción) |
 
@@ -65,8 +67,8 @@ Las cuatro filas marcadas "Vista previa integrada (oculta en producción)" tiene
 | Término | Definición |
 |---|---|
 | SM-2 | Algoritmo de repetición espaciada (Wozniak, 1987): a partir de una calificación de calidad entera 0–5, calcula el nuevo intervalo y factor de facilidad de un ítem (`docs/documento-maestro.md` §7.1). Roadmap: el módulo `study-engine` es un esqueleto vacío. |
-| Recordación activa (Active Recall) | Técnica de estudio con preguntas abiertas evaluadas por IA contra una rúbrica (`docs/documento-maestro.md` §3.3, §7.4). Roadmap. |
-| Calibración metacognitiva | Comparación entre la autoevaluación del estudiante y el resultado real de una evaluación, usada para detectar exceso o falta de confianza (`docs/documento-maestro.md` §7.4, §3.6). Roadmap. |
+| Recordación activa (Active Recall) | Técnica de estudio con preguntas abiertas evaluadas por IA contra una rúbrica (`docs/documento-maestro.md` §3.3, §7.4). Implementado (Fase 6). |
+| Calibración metacognitiva | Comparación entre la autoevaluación del estudiante y el resultado real de una evaluación, usada para detectar exceso o falta de confianza (`docs/documento-maestro.md` §7.4, §3.6). Implementada en los resultados de cada sesión de recordación activa (Fase 6); la tabla del dashboard es Roadmap (Fase 7). |
 | Nivel de dominio | Estado derivado de una página (`Nuevo`, `Aprendiendo`, `Consolidando`, `Dominado`) calculado a partir del estado SM-2 de sus ítems (`docs/documento-maestro.md` §7.3). Roadmap. |
 | Página | Unidad de estudio de Cogni; contiene el documento Tiptap (`content`) y, en el futuro, sus ítems de estudio. Tabla `pages` (`src/shared/db/schema.ts`). |
 | Cuaderno | Agrupación de páginas de un estudiante, sin semántica de estudio propia. Tabla `notebooks` (`src/shared/db/schema.ts`). |
@@ -194,16 +196,16 @@ Además del Estudiante, Cogni se apoya en los siguientes servicios para funciona
 | Flujo alternativo | La generación de variantes falla en todos los proveedores de IA → el sistema bloquea la repetición con un mensaje claro. |
 | Estado | Roadmap — vista previa visual integrada en `main` (oculta en producción); `exams` y `study-engine` son esqueletos vacíos en este código base (`docs/documento-maestro.md` §3.3, §7.5). |
 
-### CU-09 — Sesión de recordación activa (roadmap)
+### CU-09 — Sesión de recordación activa
 
 | Campo | Detalle |
 |---|---|
 | Actor principal | Estudiante |
-| Precondición | La página tiene preguntas abiertas generadas. |
-| Flujo principal | 1) El estudiante responde una pregunta abierta en texto libre.<br>2) Se autoevalúa en una escala 0–5 inmediatamente después de responder.<br>3) La IA evalúa la respuesta de forma asíncrona contra una rúbrica, devolviendo un puntaje, conceptos presentes/ausentes y una justificación.<br>4) La calidad combinada se calcula como `combined = round(0.6·puntaje_IA + 0.4·autoevaluación)`; se registran las tres señales (cruda, autoevaluación, combinada).<br>4a) Si la autoevaluación es ≥4 y el puntaje de IA es ≤2, se marca exceso de confianza.<br>4b) Si la autoevaluación es ≤1 y el puntaje de IA es ≥4, se marca falta de confianza.<br>5) La retroalimentación individual solo se muestra al final de la sesión, no pregunta por pregunta. |
-| Postcondición | Cada pregunta tiene un ítem de estudio con su calidad combinada registrada, que alimenta SM-2. |
-| Flujo alternativo | Un proveedor de IA falla a mitad de sesión → las respuestas ya guardadas se evalúan de forma asíncrona con reintento en otro proveedor, sin perder el progreso del estudiante. |
-| Estado | Roadmap — especificación en `docs/documento-maestro.md` §7.4–§8.5; `active-recall`, `ai` y `study-engine` son esqueletos vacíos en este código base. |
+| Precondición | La página tiene preguntas abiertas generadas ("Generar" de Recordación activa en el panel de técnicas: 10 preguntas con rúbrica por generación). |
+| Flujo principal | 1) El estudiante abre la sesión desde la fila "Recordación activa" del panel de técnicas o desde `/active-recall`; la sesión tiene hasta 10 preguntas (vencidas, nuevas y, para completar, las repasadas hace más tiempo).<br>2) Responde una pregunta abierta en texto libre (o la salta).<br>3) Se autoevalúa en una escala 0–5 inmediatamente después de responder; la respuesta y la autoevaluación se guardan en ese momento.<br>4) Al terminar, la IA evalúa cada respuesta de forma asíncrona contra la rúbrica y el fragmento de la página más parecido a la pregunta, devolviendo un puntaje, conceptos presentes/ausentes, ideas erróneas y una justificación.<br>5) La calidad combinada se calcula como `combined = round(0.6·puntaje_IA + 0.4·autoevaluación)`; se registran las tres señales (cruda, autoevaluación, combinada).<br>5a) Si la autoevaluación es ≥4 y el puntaje de IA es ≤2, se marca exceso de confianza.<br>5b) Si la autoevaluación es ≤1 y el puntaje de IA es ≥4, se marca falta de confianza.<br>6) La retroalimentación individual (puntaje y justificación por pregunta, calidad combinada y calibración) solo se muestra al final de la sesión, cuando todas las evaluaciones terminaron.<br>7) El estudiante puede marcar "No estoy de acuerdo"; se registra y no cambia el puntaje. |
+| Postcondición | Cada respuesta evaluada (`done`) alimenta SM-2 con su calidad combinada en el ítem de estudio de la pregunta; cada respuesta conserva su evaluación cruda. |
+| Flujo alternativo | Un proveedor de IA falla a mitad de sesión → las respuestas ya están guardadas; cada evaluación se reintenta en otro proveedor. Si fallan todos, la respuesta queda `failed` con el intento crudo, sin calidad combinada ni repaso SM-2 (la pregunta sigue vencida), la sesión queda `partial` y el estudiante pulsa "Reintentar" en los resultados. Una pregunta saltada recibe puntaje de IA 0 sin llamar al modelo. Con el límite diario de evaluaciones agotado, la respuesta queda `failed` y "Reintentar" la evalúa cuando se renueve la ventana. |
+| Estado | Implementado (Fase 6) — `src/modules/active-recall`, rutas `src/app/(app)/active-recall/**`; decisiones en `docs/adr/0007-recordacion-activa-y-generacion-incremental.md`; prueba de extremo a extremo `tests/e2e/active-recall-evaluation.spec.ts`. |
 
 ### CU-10 — Consultar "Hoy" / calendario (roadmap)
 
@@ -289,7 +291,7 @@ Prioridad: **Alta** (el producto queda incompleto sin él), **Media** (mejora re
 |---|---|---|---|
 | RF-AI-01 | El sistema debe generar todo resultado de IA como una salida estructurada validada contra un esquema, nunca como texto libre (`docs/documento-maestro.md` §3.7, §8.1). | Alta | Roadmap |
 | RF-AI-02 | El sistema debe reintentar con un proveedor distinto de la rotación cuando la salida de un proveedor de IA no cumple el esquema esperado, y marcar la generación como fallida si todos los proveedores fallan (`docs/documento-maestro.md` §8.1). | Alta | Roadmap |
-| RF-AI-03 | El sistema debe limitar el número de generaciones y evaluaciones de IA por estudiante por día (20 generaciones, 60 evaluaciones, `docs/documento-maestro.md` §8.3). | Media | Roadmap |
+| RF-AI-03 | El sistema debe limitar el número de generaciones y evaluaciones de IA por estudiante por día (6 generaciones, `AI_DAILY_GENERATIONS`, desde la Fase 3; 60 evaluaciones, `AI_DAILY_EVALUATIONS`, desde la Fase 6; `docs/documento-maestro.md` §8.3). | Media | Implementado (`src/modules/ai/infrastructure/upstash-rate-limiter.ts`, claves `{prefijo}:ai:gen` y `{prefijo}:ai:eval`) |
 | RF-AI-04 | El sistema debe versionar los prompts de cada propósito de IA en el código fuente (`docs/documento-maestro.md` §8.1). | Media | Roadmap |
 | RF-AI-05 | El sistema debe marcar un proveedor de IA como no saludable durante 10 minutos tras 3 fallos consecutivos (`docs/documento-maestro.md` §8.2). | Media | Roadmap |
 
@@ -328,12 +330,12 @@ Prioridad: **Alta** (el producto queda incompleto sin él), **Media** (mejora re
 
 | ID | Requisito | Prioridad | Estado |
 |---|---|---|---|
-| RF-AR-01 | El sistema debe generar preguntas abiertas de recordación activa con una rúbrica de evaluación por pregunta (`docs/documento-maestro.md` §3.3, §8.4). | Alta | Vista previa integrada (oculta en producción) |
-| RF-AR-02 | El sistema debe solicitar al estudiante una autoevaluación de 0 a 5 inmediatamente después de responder cada pregunta (`docs/documento-maestro.md` §3.3, §7.4). | Alta | Vista previa integrada (oculta en producción) |
-| RF-AR-03 | El sistema debe evaluar cada respuesta abierta de forma asíncrona contra la rúbrica mediante IA, devolviendo un puntaje y una justificación en un formato validado (`docs/documento-maestro.md` §3.7, §8.4). | Alta | Vista previa integrada (oculta en producción) |
-| RF-AR-04 | El sistema debe calcular la calidad combinada como `combined = round(0.6·puntaje_IA + 0.4·autoevaluación)` y registrar las tres señales (cruda, autoevaluación, combinada) (`docs/documento-maestro.md` §7.4). | Alta | Vista previa integrada (oculta en producción) |
-| RF-AR-05 | El sistema debe señalar exceso de confianza cuando la autoevaluación sea ≥4 y el puntaje de IA sea ≤2, y falta de confianza en el caso inverso (`docs/documento-maestro.md` §7.4). | Media | Vista previa integrada (oculta en producción) |
-| RF-AR-06 | El sistema debe mostrar la retroalimentación individual únicamente al final de la sesión, no después de cada pregunta (`docs/documento-maestro.md` §3.3). | Media | Vista previa integrada (oculta en producción) |
+| RF-AR-01 | El sistema debe generar preguntas abiertas de recordación activa con una rúbrica de evaluación por pregunta (`docs/documento-maestro.md` §3.3, §8.4). | Alta | Implementado (Fase 6) |
+| RF-AR-02 | El sistema debe solicitar al estudiante una autoevaluación de 0 a 5 inmediatamente después de responder cada pregunta (`docs/documento-maestro.md` §3.3, §7.4). | Alta | Implementado (Fase 6) |
+| RF-AR-03 | El sistema debe evaluar cada respuesta abierta de forma asíncrona contra la rúbrica mediante IA, devolviendo un puntaje y una justificación en un formato validado (`docs/documento-maestro.md` §3.7, §8.4). | Alta | Implementado (Fase 6) |
+| RF-AR-04 | El sistema debe calcular la calidad combinada como `combined = round(0.6·puntaje_IA + 0.4·autoevaluación)` y registrar las tres señales (cruda, autoevaluación, combinada) (`docs/documento-maestro.md` §7.4). | Alta | Implementado (Fase 6) |
+| RF-AR-05 | El sistema debe señalar exceso de confianza cuando la autoevaluación sea ≥4 y el puntaje de IA sea ≤2, y falta de confianza en el caso inverso (`docs/documento-maestro.md` §7.4). | Media | Implementado (Fase 6) |
+| RF-AR-06 | El sistema debe mostrar la retroalimentación individual únicamente al final de la sesión, no después de cada pregunta (`docs/documento-maestro.md` §3.3). | Media | Implementado (Fase 6) |
 
 ### 4.10 `scheduling` (SC)
 

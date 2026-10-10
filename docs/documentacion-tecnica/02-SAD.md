@@ -9,12 +9,13 @@
 
 ---
 
-## 0. Nota de estado actual (2026-09-25)
+## 0. Nota de estado actual (2026-09-25, actualizada el 2026-10-10 para la Fase 6)
 
 - Fase 0 (Cimientos) y Fase 1 (Cuadernos y editor) están desplegadas en producción; sus módulos (`identity`, `notebooks`, `editor`) son los únicos, junto con `ingestion`, con capas hexagonales reales.
 - Fase 2 (Importación de PDF) se implementó bajo Organic Driven Development (ODD) el 2026-09-23; `src/modules/ingestion` es el módulo más completo del código base y respalda la única vista de código C4 Nivel 4 con implementación real de este documento.
 - Fase 3 (Capa de IA) está implementada (registro de proveedores, rotación por cuota, circuit breaker, límite por usuario y generación de flashcards; ADR 0004 en `docs/adr/`). Esta nota de estado y el resto del documento aún no se han revisado completo contra ese código: hasta entonces, el contenido de este documento sobre proveedores de IA, rotación por cuota y rate limiting es especificación de `docs/documento-maestro.md`, marcada explícitamente Roadmap.
 - Las Fases 4 a 7 (`study-engine`, `flashcards`, `exams`, `active-recall`, `scheduling`, `analytics`) son esqueletos vacíos (`index.ts` con `export {};` y un `README.md`) en este código base. Cuatro de ellas tienen una versión de diseño visual con datos de muestra en la rama `design/shell-look`, no integrada a `main`; este documento describe la arquitectura de `main`, no la de esa rama.
+- Fase 6 (Recordación activa) está implementada (2026-10-08; decisiones en `docs/adr/0007-recordacion-activa-y-generacion-incremental.md`): `src/modules/active-recall` tiene dominio, aplicación, infraestructura y Server Actions, y el flujo 4 de la sección 10 (§10.4) describe la secuencia implementada. Las Fases 3 a 5 también están implementadas (ADR 0004, 0005 y 0006), pero las secciones 2 a 7 y los flujos 2 y 3 de la sección 10 todavía no se han revisado contra ese código; esa actualización queda pendiente.
 - Fase 9 (Endurecimiento) está parcialmente cubierta: la Content Security Policy con nonce por petición, la redirección del dominio apex y la protección de sesión en `src/proxy.ts` existen; el resto (registro de logs externo, pruebas de carga, auditoría de accesibilidad) no se ha iniciado.
 - En este documento: las secciones 2 a 4 (vistas de contexto, contenedores y componentes), 5.1 y 5.3 (código de `ingestion`), 7, 9, el flujo 1 de la sección 10, 11, 12 y 13 describen arquitectura implementada y verificable contra el código. La parte de IA en las secciones 2 a 4, la sección 5.2 (código de `study-engine`), la subsección 8.10 y los flujos 2 a 4 de la sección 10 son especificación (Roadmap), tomada de `docs/documento-maestro.md`.
 
@@ -141,7 +142,7 @@ La aplicación web Cogni (el contenedor Next.js) se descompone en el proxy, el �
 | `study-engine` | Estado SM-2 por ítem, nivel de dominio por página, cálculo de vencimientos. | — | Roadmap (esqueleto) |
 | `flashcards` | Tarjetas de estudio, sesiones de repaso con SM-2, retroalimentación. | — | Roadmap (esqueleto; diseño visual en rama no integrada) |
 | `exams` | Preguntas de opción múltiple, sesiones de examen, corrección, repetición con variantes. | — | Roadmap (esqueleto; diseño visual en rama no integrada) |
-| `active-recall` | Preguntas abiertas, sesiones de respuesta, evaluación combinada IA + autoevaluación. | — | Roadmap (esqueleto; diseño visual en rama no integrada) |
+| `active-recall` | Preguntas abiertas, sesiones de respuesta, evaluación combinada IA + autoevaluación. | — | Implementado (Fase 6; ver §10.4) |
 | `scheduling` | Calendario y vista "Hoy" de repasos vencidos. | — | Roadmap (esqueleto) |
 | `analytics` | Dashboard de progreso, métricas por técnica, calibración metacognitiva. | — | Roadmap (esqueleto; diseño visual en rama no integrada) |
 | `shared/config` | Validación de variables de entorno (Zod), cabeceras de seguridad, patrones de imágenes remotas. | Zod | Implementado |
@@ -396,6 +397,8 @@ En este código base, esa forma completa (`domain/`, `application/`, `infrastruc
 
 Los otros seis módulos (`ai`, `study-engine`, `flashcards`, `exams`, `active-recall`, `scheduling`, `analytics`) son esqueletos: cada uno contiene únicamente un `index.ts` con `export {};` y un `README.md` que documenta su responsabilidad futura y su fase pendiente, sin ninguna de las cuatro capas.
 
+Actualización de la Fase 6: `active-recall` ya no es un esqueleto. Tiene `domain/`, `application/` e `infrastructure/`, y sus Server Actions viven en la raíz del módulo (`actions.ts`, `session-actions.ts`, `evaluation-actions.ts`, `hub-actions.ts`, más `evaluation-runner.ts`, que programa la evaluación con `after()`); no tiene `ui/`, porque sus pantallas viven en `src/app/(app)/active-recall`. La descripción de `ai`, `study-engine`, `flashcards`, `exams` y `scheduling`, implementados en las Fases 3 a 5, queda pendiente de actualizar.
+
 ### 7.1 Estructura de directorios
 
 Recorte de `eza -T -L 2 src` (trimming: solo `page.tsx`/`layout.tsx`/`route.ts` significativos y los archivos de configuración de nivel raíz de `src`, sin repetir los `.test.ts` unitarios):
@@ -421,13 +424,13 @@ src
 │   ├── study-engine/             (index.ts, README.md — esqueleto)
 │   ├── flashcards/                (index.ts, README.md — esqueleto)
 │   ├── exams/                    (index.ts, README.md — esqueleto)
-│   ├── active-recall/            (index.ts, README.md — esqueleto)
+│   ├── active-recall/            (domain, application, infrastructure; Server Actions en la raíz)
 │   ├── scheduling/               (index.ts, README.md — esqueleto)
 │   └── analytics/                (index.ts, README.md — esqueleto)
 └── shared
     ├── config/       # env.schema.ts, env.server.ts, env.client.ts, security-headers.ts, image-remote-patterns.ts
     ├── db/           # client.ts, schema.ts
-    ├── kernel/       # clock.ts, domain-error.ts, id.ts, result.ts
+    ├── kernel/       # clock.ts, domain-error.ts, id.ts, result.ts; desde la Fase 6: page-paragraphs.ts, words.ts, generation-fingerprints.ts
     ├── observability/ # analytics.ts, sentry-options.ts
     └── ui/           # button.tsx, dialog.tsx, dropdown-menu.tsx, ...
 ```
@@ -448,7 +451,7 @@ Especificado en `docs/documento-maestro.md` §5.2 (mapa de módulos completo, in
 | `study-engine` | Ninguna del dominio de estudio (es la base) | Roadmap |
 | `flashcards` | `study-engine`, `ai`, `notebooks` | Roadmap |
 | `exams` | `study-engine`, `ai`, `notebooks` | Roadmap |
-| `active-recall` | `study-engine`, `ai`, `notebooks` | Roadmap |
+| `active-recall` | `study-engine`, `ai`, `notebooks` | Implementada (Fase 6) |
 | `scheduling` | `study-engine`, `notebooks` | Roadmap |
 | `analytics` | `study-engine`, técnicas (solo lectura) | Roadmap |
 
@@ -661,15 +664,28 @@ Toda operación que puede fallar de forma esperada devuelve `Result<T, E>` en ve
 
 > Diagrama a construir con archify a partir de esta descripción.
 
-**Roadmap** — `ai`, `active-recall` y `study-engine` son esqueletos vacíos; secuencia especificada en `docs/documento-maestro.md` §3.3, §7.4, §8.4 y el caso de uso CU-09.
+**Implementado (Fase 6, 2026-10-08)** — `src/modules/active-recall`, con `ai` y `study-engine` como dependencias a través de sus `index.ts`; decisiones en `docs/adr/0007-recordacion-activa-y-generacion-incremental.md`; trazabilidad con CU-09, RF-AR-01 a RF-AR-06 y RF-AI-03.
 
-1. El estudiante responde una pregunta abierta en texto libre.
-2. Inmediatamente después, se autoevalúa en una escala de 0 a 5.
-3. `active-recall.application` invocaría a `ai.application` con el propósito `evaluate_recall_answer` de forma asíncrona, contra la rúbrica de la pregunta.
-4. `ai.application` devolvería `{score, presentConcepts, missingConcepts, misconceptions, justification}`, validado contra el esquema Zod correspondiente.
-5. `active-recall.application` calcularía la calidad combinada como `combined = round(0.6·score_ia + 0.4·autoevaluación)` y registraría las tres señales (cruda, autoevaluación, combinada).
-6. Si la autoevaluación es ≥4 y el puntaje de IA es ≤2 (o el caso inverso), se marcaría una señal de calibración metacognitiva (exceso o falta de confianza).
-7. `active-recall` invocaría `RecordReview` de `study-engine` con la calidad combinada; la retroalimentación individual solo se mostraría al final de la sesión.
+Generación (previa a la sesión):
+
+1. En el panel de técnicas de la página, "Generar" de Recordación activa llama a `generateRecallQuestionsAction`. `requestRecallGeneration` lee el texto de la página (`notebooks`), selecciona los párrafos que la técnica aún no usó (`selectNewParagraphs` sobre `generation_fingerprints`; sin nada nuevo responde `RECALL_NO_NEW_CONTENT` sin llamar a la IA), consulta el límite diario de generaciones (`peek`) y llama a `ai.generateStructured` con `generate_recall_questions/v1` (10 preguntas con rúbrica).
+2. En una sola transacción (`DrizzleRecallUnitOfWork`) guarda las preguntas, un `StudyItem(kind = "recall_question")` por pregunta y las huellas de los párrafos enviados; después consume la unidad (`check`).
+
+Sesión y evaluación:
+
+3. La ruta `/active-recall/{cuaderno}/{página}` lee un plan (`planRecallSession`: hasta 10 preguntas, vencidas primero, luego nuevas y luego las repasadas hace más tiempo) sin escribir. Con la primera respuesta, el reproductor abre la sesión (`startRecallSessionAction`).
+4. Cada respuesta y su autoevaluación 0–5 se guardan al darlas (`saveRecallAnswerAction`, `recall_answers.evaluation_status = pending`); guardar y cerrar se serializan con el bloqueo de la fila de la sesión.
+5. "Terminar" (`finishRecallSessionAction`) cierra la sesión con las respuestas dadas y responde de inmediato; `evaluation-runner.ts` programa `evaluateRecallSession` con `after()`, dentro de `maxDuration = 300` de la ruta (ADR 0003).
+6. `evaluateRecallSession` reclama las respuestas pendientes (`evaluation_claimed_at`; un reclamo de más de 6 minutos se retoma). Por cada una: una respuesta saltada recibe el registro `skipped` (puntaje 0, sin modelo); una escrita consulta el límite de evaluaciones (`peek` sobre `{prefijo}:ai:eval`), elige el fragmento de la página más parecido a la pregunta (`selectRelevantFragment`, recortado a `AI_PAGE_TOKEN_CAP`) y llama a `ai.generateStructured` con `evaluate_recall_answer/v1`, que reintenta una vez con otro proveedor.
+7. `ai.application` devuelve `{score, presentConcepts, missingConcepts, misconceptions, justification}` validado con Zod. `active-recall` consume una unidad (`check`) y guarda la salida cruda, el puntaje y `combined = round(0.6·score_ia + 0.4·autoevaluación)` (`done`). Si fallan los proveedores o el límite está agotado, guarda el intento crudo `{ source: "failed", code, generationId }` (`failed`), sin calidad combinada.
+8. Para las respuestas `done`, `active-recall` llama a `recordRecallReviews` de `study-engine` (`createRecallReviewRecorder`) con la calidad combinada: SM-2, `ReviewLog(session_kind = recall)` y recálculo de `PageMastery`, con guarda por (sesión, ítem). Las `failed` no registran repaso.
+9. El estado final de la sesión (`done` o `partial`, `sessionEvaluationStatus`) se escribe con la fila de la sesión bloqueada.
+
+Resultados:
+
+10. La vista de resultados sondea `getRecallSessionResultsAction` con espera creciente (2,5 s × 1,5, tope de 20 s, 32 lecturas). Cuando todas las evaluaciones terminaron muestra la calidad combinada media, la calibración derivada (exceso o falta de confianza) y, por pregunta, el puntaje de la IA y su justificación. Si la sesión terminada sigue `pending` sin una corrida viva, el sondeo programa otra evaluación.
+11. "Reintentar" (`retryRecallEvaluationAction`) devuelve las respuestas `failed` a `pending` y vuelve a programar la evaluación; "No estoy de acuerdo" (`disagreeRecallAnswerAction`) guarda `disagreed = true` sin cambiar el puntaje.
+12. `/active-recall` y la vista por cuaderno leen `listRecallHubAction` (`DrizzleRecallHubReader`, dominio de página de `study-engine` con `createPageMasteryReader` y preguntas vencidas con `listDue`); la ruta `/resultados?sesion={id}` reabre una sesión terminada con `getRecallSessionReviewAction`.
 
 ---
 

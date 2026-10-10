@@ -21,6 +21,13 @@ el motor recibe los exámenes por `recordExamReviews` sin conocer el módulo
 hace que un `err` revierta lo escrito tanto al calificar flashcards como al
 registrar un examen. `gradeFlashcard` no cambió de contrato.
 
+Fase 6 completa (decisiones en `docs/adr/0007-recordacion-activa-y-generacion-incremental.md`):
+el motor recibe la recordación activa por `recordRecallReviews` (regla
+`recallReviewQualityFor`, guarda de repetición por sesión e ítem) sin
+conocer el módulo `active-recall`, y expone `createPageMasteryReader` para
+que el hub de recordación muestre el dominio de página del motor en lugar de
+una fórmula propia.
+
 ## Dominio (`domain/`)
 
 | Archivo | Contenido |
@@ -74,7 +81,7 @@ tablas: solo el servidor accede.
 |---|---|
 | `application/testing/` | Contratos compartidos `*-repository.contract.ts` y fakes `InMemory*Repository` (exportados por `testing.ts`). |
 | `infrastructure/` | `DrizzleStudyItemRepository` (`lock` y `lockPage` son `SELECT ... FOR UPDATE`; `lockPage` fija antes un `lock_timeout` local a la transacción con `set_config`), `DrizzleReviewLogRepository`, `DrizzlePageMasteryRepository`, `DrizzleFlashcardSessionRepository`, `DrizzleSessionFeedbackRepository` (reclamo y cierre con `UPDATE` condicional), `DrizzleStudiedPageReader` y `DrizzleStudyUnitOfWork` (una transacción por calificación o por página del trabajo diario). Aceptan la base o una transacción abierta (`DbExecutor`). |
-| `server-api.ts` | Exportado por `index.ts`. `createStudyItemRepository(db)`: otros módulos guardan ítems dentro de su propia transacción (flashcards lo usa en `DrizzleDeckUnitOfWork`). `createFlashcardSessionsServerApi({ db, pages, clock, ids })`: `start`, `grade` y `finish`, que llaman las acciones de servidor de flashcards (este módulo no conoce el texto de las tarjetas). `createSessionFeedbackSources(db)`: sesiones, logs, ítems y retroalimentación para el caso de uso `requestSessionFeedback` de flashcards. `createMasteryRecomputeJob({ db, clock, ids, timeBudgetMs, onPageError })`: el trabajo diario que ejecuta la ruta `/api/recompute-mastery`. `createExamReviewRecorder({ db, ids })`: `record` llama a `recordExamReviews`; con `db` = la transacción de exams, corre como savepoint y confirma o revierte junto con el cierre del examen. `createRecallReviewRecorder({ db, ids })`: `record` llama a `recordRecallReviews`; con `db` = la transacción de active-recall confirma o revierte junto con las evaluaciones. |
+| `server-api.ts` | Exportado por `index.ts`. `createStudyItemRepository(db)`: otros módulos guardan ítems dentro de su propia transacción (flashcards lo usa en `DrizzleDeckUnitOfWork`). `createFlashcardSessionsServerApi({ db, pages, clock, ids })`: `start`, `grade` y `finish`, que llaman las acciones de servidor de flashcards (este módulo no conoce el texto de las tarjetas). `createSessionFeedbackSources(db)`: sesiones, logs, ítems y retroalimentación para el caso de uso `requestSessionFeedback` de flashcards. `createMasteryRecomputeJob({ db, clock, ids, timeBudgetMs, onPageError })`: el trabajo diario que ejecuta la ruta `/api/recompute-mastery`. `createExamReviewRecorder({ db, ids })`: `record` llama a `recordExamReviews`; con `db` = la transacción de exams, corre como savepoint y confirma o revierte junto con el cierre del examen. `createRecallReviewRecorder({ db, ids })`: `record` llama a `recordRecallReviews`; con `db` = la transacción de active-recall confirma o revierte junto con las evaluaciones. `createPageMasteryReader(db)`: `listByOwner(ownerId)` devuelve las filas de `page_mastery` del dueño, de solo lectura; lo usa el hub de active-recall (una página sin fila cuenta como dominio 0). |
 
 ## Trabajo diario
 
