@@ -336,7 +336,7 @@ Se relaciona con Page (`page_id`, `ON DELETE CASCADE`) y con Profile (`owner_id`
 | finished_at | timestamptz |
 | evaluation_status | text |
 
-Se relaciona con Page (`page_id`, `ON DELETE CASCADE`) y con Profile (`owner_id`, `ON DELETE CASCADE`): muchas RecallSession por página. `evaluation_status` (`pending`/`done`/`partial`) refleja que la evaluación de IA de cada respuesta es asíncrona: solo deja `pending` cuando la sesión terminó (`finished_at` no nulo), y `finished_at >= started_at`. No guarda la lista de preguntas: una respuesta se acepta si su pregunta es activa, del dueño y de la página de la sesión. Una sesión cerrada sin respuestas queda `done`; con alguna respuesta `failed`, `partial`.
+Se relaciona con Page (`page_id`, `ON DELETE CASCADE`) y con Profile (`owner_id`, `ON DELETE CASCADE`): muchas RecallSession por página. `evaluation_status` (`pending`/`done`/`partial`) refleja que la evaluación de IA de cada respuesta es asíncrona: solo deja `pending` cuando la sesión terminó (`finished_at` no nulo), y `finished_at >= started_at`. No guarda la lista de preguntas: una respuesta se acepta si su pregunta es del dueño y de la página de la sesión (una pregunta archivada después de que la sesión la mostró sigue contando). Una sesión cerrada sin respuestas queda `done`; con alguna respuesta `failed`, `partial`.
 
 #### RecallAnswer — Estado: Implementado (Fase 6)
 
