@@ -12,7 +12,9 @@ and rate limiting (documento-maestro §8).
     transitions (`startGeneration`, `completeGeneration`, `failGeneration`).
   - `provider.ts` `ProviderEntry`, `selectProvider`, `nextProviders`.
   - `circuit-breaker.ts` 3 failures open a provider for 10 minutes (§8.2).
-  - `truncate.ts` `truncateToTokenCap`, word-based page cap.
+  - `truncate.ts` `truncateToTokenCap`, word-based page cap. Words are counted
+    with the shared definition in `src/shared/kernel/words.ts`, the same one
+    the incremental generation uses for its paragraph counts (Phase 6).
   - `errors.ts` `AI_ERROR` codes.
 - `application/`
   - `ports.ts` `AiProvider`, `QuotaStore`, `BreakerStore`,
@@ -21,9 +23,16 @@ and rate limiting (documento-maestro §8).
   - `generate-structured.ts` the single entry point for model calls: select
     provider, call, validate with the purpose schema, audit every attempt,
     retry once on the next provider, never a third call.
-  - `prompts/<purpose>/v1.ts` versioned prompt builders (`generate_flashcards`,
-    `evaluate_recall_answer/v1`: explicit 0–5 rubric scale, page fragment and
-    answer sent as tagged data, Spanish justification, temperature 0.2).
+  - `prompts/<purpose>/v<n>.ts` versioned prompt builders, registered in
+    `application/index.ts`: `generate_flashcards/v1`,
+    `generate_exam_questions/v1`, `generate_exam_variants/v1`,
+    `session_feedback/v1` (flashcards) and `v2` (exams),
+    `generate_recall_questions/v1` (10 open questions with a rubric per call,
+    lists up to 60 of the page's active questions to avoid repeats,
+    temperature 0.7) and `evaluate_recall_answer/v1` (explicit 0–5 rubric
+    scale, page fragment and answer sent as tagged data, Spanish
+    justification, temperature 0.2). Decisions for the recall prompts:
+    `docs/adr/0007-recordacion-activa-y-generacion-incremental.md`.
   - `schemas/` Zod output schema per purpose (§8.4) and `outputSchemaFor`.
   - `testing/` in-memory fakes, re-exported by `src/modules/ai/testing.ts`.
 - `infrastructure/` the only place the AI SDK and Upstash packages may be
