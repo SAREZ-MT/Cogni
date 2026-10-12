@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { adoptBrowserTimeZoneAction } from "../actions";
+import { browserTimeZone } from "./browser-time-zone";
 
 // First-use detection (Phase 7 T2a): the (app) layout mounts this only
 // while the profile has never chosen a time zone. It reports the browser's
@@ -16,12 +17,7 @@ export function TimeZoneAutoDetect() {
   useEffect(() => {
     if (sent.current) return;
     sent.current = true;
-    let detected: string | undefined;
-    try {
-      detected = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    } catch {
-      detected = undefined;
-    }
+    const detected = browserTimeZone();
     if (!detected) return;
     adoptBrowserTimeZoneAction(detected).catch(() => {
       // Best effort: the next hard load retries while the zone is unset.

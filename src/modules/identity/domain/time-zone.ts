@@ -4,6 +4,7 @@ import { DEFAULT_TIMEZONE, type Profile } from "./profile";
 
 export const PROFILE_ERROR = {
   INVALID_TIME_ZONE: "PROFILE_INVALID_TIME_ZONE",
+  NOT_FOUND: "PROFILE_NOT_FOUND",
 } as const;
 
 // `profiles.timezone` is NOT NULL DEFAULT 'UTC' (0000_profiles.sql), so the

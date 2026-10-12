@@ -106,6 +106,20 @@ describe("TimeZoneForm", () => {
     expect(screen.getByRole("status")).toHaveTextContent(TIME_ZONE_COPY.saved);
   });
 
+  it("shows the canonical stored zone after a successful save", () => {
+    state.current = {
+      status: "success",
+      message: TIME_ZONE_COPY.saved,
+      timeZone: "America/Mexico_City",
+    };
+
+    render(<TimeZoneForm groups={GROUPS} initialTimeZone="Etc/UTC" />);
+
+    expect(screen.getByLabelText(TIME_ZONE_COPY.fieldLabel)).toHaveValue(
+      "America/Mexico_City",
+    );
+  });
+
   it("announces an error as an alert", () => {
     state.current = { status: "error", message: TIME_ZONE_COPY.failed };
 

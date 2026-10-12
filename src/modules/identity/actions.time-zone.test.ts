@@ -88,6 +88,20 @@ describe("updateTimeZoneAction", () => {
     });
   });
 
+  it("maps a missing profile to the generic save failure", async () => {
+    updateProfileTimeZone.mockResolvedValue({
+      ok: false,
+      error: { code: PROFILE_ERROR.NOT_FOUND },
+    });
+
+    const state = await updateTimeZoneAction(IDLE, formWith("America/Bogota"));
+
+    expect(state).toEqual({
+      status: "error",
+      message: TIME_ZONE_COPY.failed,
+    });
+  });
+
   it("asks an anonymous caller to sign in without touching the use case", async () => {
     getUser.mockResolvedValue({ data: { user: null } });
 

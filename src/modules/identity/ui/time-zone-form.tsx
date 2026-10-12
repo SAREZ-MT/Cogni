@@ -4,19 +4,12 @@ import { useActionState, useEffect, useId, useState } from "react";
 import { Button } from "@/shared/ui/button";
 import { NativeSelect } from "@/shared/ui/native-select";
 import { updateTimeZoneAction } from "../actions";
+import { browserTimeZone } from "./browser-time-zone";
 import { TIME_ZONE_COPY } from "./time-zone-copy";
 import type { TimeZoneFormState } from "./time-zone-form-state";
 import type { TimeZoneGroup } from "./time-zone-options";
 
 const IDLE: TimeZoneFormState = { status: "idle" };
-
-function browserTimeZone(): string | undefined {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone;
-  } catch {
-    return undefined;
-  }
-}
 
 export interface TimeZoneFormProps {
   groups: readonly TimeZoneGroup[];
@@ -28,7 +21,9 @@ export interface TimeZoneFormProps {
 // grouped native select) and the save row, in the Profile Settings layout
 // (ui_kits/app/Profile Settings.html: form-row + save-row). With no stored
 // zone the browser's one is preselected when the list has it, matching what
-// TimeZoneAutoDetect saves in the background.
+// TimeZoneAutoDetect saves in the background. After a successful save the
+// select adopts the stored (canonical) zone the action returns, e.g. an
+// alias normalized by the server.
 export function TimeZoneForm({ groups, initialTimeZone }: TimeZoneFormProps) {
   const [state, action, pending] = useActionState(updateTimeZoneAction, IDLE);
   const [value, setValue] = useState(initialTimeZone ?? "");
@@ -43,6 +38,10 @@ export function TimeZoneForm({ groups, initialTimeZone }: TimeZoneFormProps) {
     );
     if (detected && listed) setValue(detected);
   }, [groups, initialTimeZone]);
+
+  useEffect(() => {
+    if (state.status === "success" && state.timeZone) setValue(state.timeZone);
+  }, [state]);
 
   const isError = state.status === "error";
   return (

@@ -3,7 +3,11 @@ import { DomainError } from "@/shared/kernel/domain-error";
 import { err, ok, type Result } from "@/shared/kernel/result";
 import type { Profile } from "../domain/profile";
 import type { ProfileRepository } from "../domain/profile-repository";
-import { hasChosenTimeZone, parseTimeZone } from "../domain/time-zone";
+import {
+  hasChosenTimeZone,
+  PROFILE_ERROR,
+  parseTimeZone,
+} from "../domain/time-zone";
 import { ensureProfile } from "./ensure-profile";
 
 export interface UpdateProfileTimeZoneDeps {
@@ -12,7 +16,9 @@ export interface UpdateProfileTimeZoneDeps {
 }
 
 function notFound(): Result<never, DomainError> {
-  return err(new DomainError("PROFILE_NOT_FOUND", "profile does not exist"));
+  return err(
+    new DomainError(PROFILE_ERROR.NOT_FOUND, "profile does not exist"),
+  );
 }
 
 // "Configuración › Zona horaria": the signed-in user picks the IANA zone

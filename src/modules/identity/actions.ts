@@ -179,6 +179,19 @@ async function profileDeps() {
   };
 }
 
+// Form copy per time-zone use-case error. A missing profile (lazy creation
+// raced or failed) is a save failure for the user, like any other.
+function timeZoneErrorMessage(code: string): string {
+  switch (code) {
+    case PROFILE_ERROR.INVALID_TIME_ZONE:
+      return TIME_ZONE_COPY.invalid;
+    case PROFILE_ERROR.NOT_FOUND:
+      return TIME_ZONE_COPY.failed;
+    default:
+      return TIME_ZONE_COPY.failed;
+  }
+}
+
 // Configuración › Zona horaria form: `timeZone` is the selected IANA name.
 // Never throws: unexpected failures go to Sentry and back as copy.
 export async function updateTimeZoneAction(
@@ -197,10 +210,7 @@ export async function updateTimeZoneAction(
     if (!result.ok) {
       return {
         status: "error",
-        message:
-          result.error.code === PROFILE_ERROR.INVALID_TIME_ZONE
-            ? TIME_ZONE_COPY.invalid
-            : TIME_ZONE_COPY.failed,
+        message: timeZoneErrorMessage(result.error.code),
       };
     }
     return {
