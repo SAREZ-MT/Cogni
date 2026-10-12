@@ -84,15 +84,9 @@ describe("Sidebar", () => {
       "page",
     );
 
-    // Exams design preview (2026-09-24): "Exámenes" is no longer disabled —
-    // moved to its own "links the Exámenes nav item" test below, same
-    // treatment Flashcards/Active recall already got. The remaining
-    // "pronto" items in Menú principal stay disabled.
-    for (const label of ["Horarios"]) {
-      expect(
-        screen.getByText(label).closest("[aria-disabled]"),
-      ).toHaveAttribute("aria-disabled", "true");
-    }
+    // Phase 7 T1: the old disabled "Horarios" row is now the live
+    // "Calendario" entry (tests below), so no "Horarios" row remains.
+    expect(screen.queryByText("Horarios")).not.toBeInTheDocument();
   });
 
   // Flashcards runs on real data (Phase 3): a plain link to /flashcards
@@ -247,16 +241,28 @@ describe("Sidebar", () => {
     ).toBeInTheDocument();
   });
 
-  // Every design preview (Dashboard) has its route now and Flashcards,
-  // Exámenes and Active recall run on real data; "Horarios" is the only row without one, so it stays a
-  // disabled "pronto" row whatever the server-computed flag says.
+  // Calendario runs on real data (Phase 7 T1, documento-maestro §3.5): a
+  // plain link to /calendario whatever the design-preview flag says, active
+  // on its own routes.
+  it("marks Calendario active on its own routes", () => {
+    pathname.current = "/calendario";
+    render(<Sidebar initialCollapsed={false} user={USER} previewsEnabled />);
+
+    expect(screen.getByRole("link", { name: "Calendario" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+  });
+
+  // Every design preview (Dashboard) has its route now, and Flashcards,
+  // Exámenes, Active recall and Calendario run on real data.
   describe.each([
     ["enabled", true],
     ["disabled", false],
   ])("with design previews %s", (_state, previewsEnabled) => {
     // The preview rows' enabled/disabled states are covered by the dedicated
     // tests above.
-    it.each(["Horarios"])("renders %s as a disabled 'pronto' row", (label) => {
+    it("links Calendario to /calendario as a live entry", () => {
       render(
         <Sidebar
           initialCollapsed={false}
@@ -265,12 +271,13 @@ describe("Sidebar", () => {
         />,
       );
 
-      const row = screen.getByText(label).closest("[aria-disabled]");
-      expect(row).toHaveAttribute("aria-disabled", "true");
-      expect(row).toHaveTextContent("pronto");
+      expect(screen.getByRole("link", { name: "Calendario" })).toHaveAttribute(
+        "href",
+        "/calendario",
+      );
       expect(
-        screen.queryByRole("link", { name: new RegExp(label) }),
-      ).not.toBeInTheDocument();
+        screen.getByText("Calendario").closest("[aria-disabled]"),
+      ).toBeNull();
     });
 
     it("keeps the real routes (Inicio, Cuadernos) as links", () => {

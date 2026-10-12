@@ -26,6 +26,29 @@ vi.mock("@/modules/notebooks", () => ({
   ),
 }));
 
+const { listDueTodayAction } = vi.hoisted(() => ({
+  listDueTodayAction: vi.fn(),
+}));
+vi.mock("@/modules/scheduling", async () => ({
+  ...(await import("@/modules/scheduling/domain")),
+  listDueTodayAction,
+}));
+
+function duePage(
+  pageId: string,
+  due: { flashcard: number; exam_question: number; recall_question: number },
+) {
+  return {
+    pageId,
+    pageTitle: `Página ${pageId}`,
+    notebookId: "n1",
+    notebookTitle: "Biología Celular",
+    notebookColor: "purple",
+    due,
+    earliestDueAt: new Date("2026-10-12T08:00:00.000Z"),
+  };
+}
+
 function emptyOverview() {
   return {
     notebookCount: 0,
@@ -94,6 +117,8 @@ describe("HomePage", () => {
     });
     getHomeOverview.mockReset();
     redirect.mockReset();
+    listDueTodayAction.mockReset();
+    listDueTodayAction.mockResolvedValue({ ok: true, value: [] });
   });
 
   describe("without a session", () => {
@@ -208,10 +233,47 @@ describe("HomePage", () => {
       ).not.toBeInTheDocument();
     });
 
-    it("keeps the flashcards card as an explicit muted placeholder until they ship", async () => {
+    it("counts every technique's reviews due today and links to the calendar", async () => {
+      listDueTodayAction.mockResolvedValue({
+        ok: true,
+        value: [
+          duePage("a", { flashcard: 2, exam_question: 1, recall_question: 0 }),
+          duePage("b", { flashcard: 0, exam_question: 0, recall_question: 3 }),
+        ],
+      });
+
       await renderHome();
 
-      expect(screen.getByText("Flashcards llegan pronto")).toBeInTheDocument();
+      const card = screen.getByTestId("due-today-stat");
+      expect(card).toHaveTextContent("6 repasos");
+      expect(card).toHaveTextContent("en 2 páginas");
+      expect(card).not.toHaveTextContent("Flashcards llegan pronto");
+      expect(card).not.toHaveTextContent("pronto");
+      expect(
+        screen.getByRole("link", { name: "Ver calendario →" }),
+      ).toHaveAttribute("href", "/calendario");
+    });
+
+    it("says nothing is due today when the list is empty", async () => {
+      await renderHome();
+
+      const card = screen.getByTestId("due-today-stat");
+      expect(card).toHaveTextContent("0 repasos");
+      expect(card).toHaveTextContent("Estás al día");
+    });
+
+    it("does not claim zero reviews when the due list cannot load", async () => {
+      listDueTodayAction.mockResolvedValue({
+        ok: false,
+        error: { code: "UNEXPECTED", message: "x" },
+      });
+
+      await renderHome();
+
+      const card = screen.getByTestId("due-today-stat");
+      expect(card).toHaveTextContent("—");
+      expect(card).toHaveTextContent("No pudimos cargar tus repasos");
+      expect(card).not.toHaveTextContent("0 repasos");
     });
 
     it("renders the notebook grid and the recent pages list from real data", async () => {

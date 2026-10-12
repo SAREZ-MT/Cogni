@@ -5,6 +5,7 @@ export {
   type DueKind,
   type DueTodayPage,
   emptyDueCounts,
+  totalDueCount,
 } from "./due-today";
 export type { DueTodayReader } from "./due-today-reader";
 export { SCHEDULING_ERROR } from "./errors";

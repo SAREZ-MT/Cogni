@@ -47,8 +47,8 @@ function SectionLabel({ children }: { children: ReactNode }) {
 // threaded in as a prop. Entries for areas that are sample-data design
 // previews (Dashboard) get a `preview` route once that route ships; until
 // then, and whenever design previews are disabled, they render as disabled
-// "pronto" rows (nav-entries.ts). Flashcards, Exámenes and Active recall run
-// on real data, so they are plain links.
+// "pronto" rows (nav-entries.ts). Calendario, Flashcards, Exámenes and
+// Active recall run on real data, so they are plain links.
 const MAIN_SECTION: { label: string; items: NavEntry[] } = {
   label: "Menú principal",
   items: [
@@ -75,7 +75,12 @@ const MAIN_SECTION: { label: string; items: NavEntry[] } = {
         isActive: (path) => path.startsWith("/dashboard"),
       },
     },
-    { icon: Calendar, label: "Horarios", disabled: true, hint: "pronto" },
+    {
+      href: "/calendario",
+      icon: Calendar,
+      label: "Calendario",
+      isActive: (path) => path.startsWith("/calendario"),
+    },
   ],
 };
 
