@@ -23,10 +23,18 @@ const TONE_TILE: Record<TechniqueTone, "yellow" | "mint" | "pink"> = {
 // label on its pastel: pastel-yellow-fg 6.4:1, pastel-mint-fg 6.8:1 (chosen
 // over pastel-green-fg, 4.6:1), pastel-pink-fg 5.9:1. Hover darkens the
 // same pair slightly (brightness-95) instead of switching colour.
+// The pastel pair itself is exported so every technique-coloured surface
+// (TechniqueChip on the calendar) reuses exactly this mapping.
+export const TECHNIQUE_PAIR_CLASS: Record<TechniqueTone, string> = {
+  yellow: "bg-pastel-yellow text-pastel-yellow-fg",
+  green: "bg-pastel-mint text-pastel-mint-fg",
+  rose: "bg-pastel-pink text-pastel-pink-fg",
+};
+
 const TONE_BUTTON_CLASS: Record<TechniqueTone, string> = {
-  yellow: "bg-pastel-yellow text-pastel-yellow-fg hover:bg-pastel-yellow",
-  green: "bg-pastel-mint text-pastel-mint-fg hover:bg-pastel-mint",
-  rose: "bg-pastel-pink text-pastel-pink-fg hover:bg-pastel-pink",
+  yellow: `${TECHNIQUE_PAIR_CLASS.yellow} hover:bg-pastel-yellow`,
+  green: `${TECHNIQUE_PAIR_CLASS.green} hover:bg-pastel-mint`,
+  rose: `${TECHNIQUE_PAIR_CLASS.rose} hover:bg-pastel-pink`,
 };
 
 const GENERATE_BUTTON_CLASS =
