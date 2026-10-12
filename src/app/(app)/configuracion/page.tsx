@@ -6,20 +6,20 @@ import {
 } from "@/modules/identity/ui";
 import { Card } from "@/shared/ui/card";
 import { SectionHeader } from "@/shared/ui/section-header";
+import { StatusBanner } from "@/shared/ui/status-banner";
 import { SetBreadcrumb } from "../_components/breadcrumb";
 
 // Configuración (Phase 7 T2a, user decision 2026-10-12): a minimal settings
 // page in the Profile Settings style (ui_kits/app/Profile Settings.html:
 // panel with title/subtitle header, form row, save row) holding only the
 // time zone for now. Auth comes from the (app) layout, like its siblings.
+// A failed profile read shows an error instead of the form: an editable
+// select would preselect the browser zone and a save would overwrite the
+// stored one without the user ever seeing it.
 export default async function SettingsPage() {
   const setting = await getCurrentTimeZoneSetting();
+  const failed = setting.status === "failed";
   const current = setting.chosen ? setting.timeZone : null;
-  const groups = timeZoneGroups(
-    Intl.supportedValuesOf("timeZone"),
-    new Date(),
-    current ?? undefined,
-  );
 
   return (
     <section className="flex flex-1 flex-col gap-6">
@@ -42,7 +42,25 @@ export default async function SettingsPage() {
             {TIME_ZONE_COPY.sectionDescription}
           </p>
         </div>
-        <TimeZoneForm groups={groups} initialTimeZone={current} />
+        {failed ? (
+          <div className="px-[22px] py-4">
+            <StatusBanner
+              role="alert"
+              tone="error"
+              title={TIME_ZONE_COPY.loadFailedTitle}
+              description={TIME_ZONE_COPY.loadFailedDescription}
+            />
+          </div>
+        ) : (
+          <TimeZoneForm
+            groups={timeZoneGroups(
+              Intl.supportedValuesOf("timeZone"),
+              new Date(),
+              current ?? undefined,
+            )}
+            initialTimeZone={current}
+          />
+        )}
       </Card>
     </section>
   );

@@ -1,5 +1,6 @@
 import "server-only";
 import * as Sentry from "@sentry/nextjs";
+import { unstable_rethrow } from "next/navigation";
 import { getDb } from "@/shared/db/client";
 import { systemClock } from "@/shared/kernel/clock";
 import {
@@ -27,6 +28,14 @@ export {
   termsRedirectFor,
 } from "./domain";
 export type { Profile, SessionUser, TimeZoneSetting };
+
+// The shell's time-zone read with an explicit failure state: a failed read
+// still carries the UTC display fallback (the calendar keeps working), but
+// Configuración must not mistake it for "never chosen" and offer to
+// overwrite the stored zone.
+export type CurrentTimeZoneSetting =
+  | ({ status: "ok" } & TimeZoneSetting)
+  | { status: "failed"; timeZone: string; chosen: false };
 
 export async function getCurrentUser(): Promise<SessionUser | null> {
   const supabase = await createSupabaseServerClient();
@@ -57,21 +66,24 @@ export async function ensureProfileForUser(
 }
 
 // The signed-in user's time zone for presentation (calendar "Hoy", the
-// settings page). Never throws: without a session or on a read failure
-// (reported to Sentry) it degrades to the unchosen default, which formats
-// dates exactly as the shell did before the setting existed.
-export async function getCurrentTimeZoneSetting(): Promise<TimeZoneSetting> {
-  const fallback = { timeZone: DEFAULT_TIMEZONE, chosen: false };
+// settings page). Without a session it is the unchosen default. A read
+// failure is reported to Sentry and returned as `failed` (with the UTC
+// display fallback); Next.js control-flow errors (redirect, dynamic usage)
+// are rethrown to the framework first.
+export async function getCurrentTimeZoneSetting(): Promise<CurrentTimeZoneSetting> {
   try {
     const user = await getCurrentUser();
-    if (!user) return fallback;
-    return await getTimeZoneSetting(
+    if (!user)
+      return { status: "ok", timeZone: DEFAULT_TIMEZONE, chosen: false };
+    const setting = await getTimeZoneSetting(
       { ownerId: user.id },
       { profiles: new DrizzleProfileRepository(getDb()) },
     );
+    return { status: "ok", ...setting };
   } catch (error) {
+    unstable_rethrow(error);
     Sentry.captureException(error);
-    return fallback;
+    return { status: "failed", timeZone: DEFAULT_TIMEZONE, chosen: false };
   }
 }
 

@@ -1,6 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import type { ReactElement } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Breadcrumb, BreadcrumbProvider } from "../_components/breadcrumb";
 
 const { getCurrentTimeZoneSetting } = vi.hoisted(() => ({
@@ -28,9 +28,14 @@ describe("SettingsPage", () => {
   beforeEach(() => {
     getCurrentTimeZoneSetting.mockReset();
     getCurrentTimeZoneSetting.mockResolvedValue({
+      status: "ok",
       timeZone: "America/Bogota",
       chosen: true,
     });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it("titles the page Configuración and publishes it as the breadcrumb", async () => {
@@ -73,6 +78,7 @@ describe("SettingsPage", () => {
 
   it("leaves the choice to the browser detection when no zone was chosen", async () => {
     getCurrentTimeZoneSetting.mockResolvedValue({
+      status: "ok",
       timeZone: "UTC",
       chosen: false,
     });
@@ -83,6 +89,25 @@ describe("SettingsPage", () => {
     await renderPage();
 
     expect(screen.getByLabelText("Zona horaria")).toHaveValue("");
-    vi.restoreAllMocks();
+  });
+
+  it("shows an error and offers no save when the profile read failed", async () => {
+    getCurrentTimeZoneSetting.mockResolvedValue({
+      status: "failed",
+      timeZone: "UTC",
+      chosen: false,
+    });
+    vi.spyOn(Intl.DateTimeFormat.prototype, "resolvedOptions").mockReturnValue({
+      timeZone: "America/Mexico_City",
+    } as Intl.ResolvedDateTimeFormatOptions);
+
+    await renderPage();
+
+    const card = screen.getByTestId("time-zone-card");
+    expect(within(card).getByRole("alert")).toHaveTextContent(
+      "No pudimos cargar tu zona horaria",
+    );
+    expect(within(card).queryByLabelText("Zona horaria")).toBeNull();
+    expect(within(card).queryByRole("button")).toBeNull();
   });
 });

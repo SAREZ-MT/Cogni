@@ -13,4 +13,7 @@ export const TIME_ZONE_COPY = {
   invalid: "Elige una zona horaria válida de la lista.",
   sessionRequired: "Debes iniciar sesión para continuar.",
   failed: "No pudimos guardar tu zona horaria. Inténtalo de nuevo.",
+  loadFailedTitle: "No pudimos cargar tu zona horaria",
+  loadFailedDescription:
+    "Recarga la página para verla y cambiarla. Mientras tanto, conservamos la que tienes guardada.",
 } as const;
