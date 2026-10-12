@@ -300,7 +300,10 @@ lists (Phase 6 T5b, "Crear examen" notebook and page pickers). Native on
 purpose: keyboard, screen readers and mobile pickers work without a custom
 listbox. Forwards every `<select>` prop; `className` merges.
 
-Used by: `exams/_components/create-exam-dialog.tsx`.
+Used by: `exams/_components/create-exam-dialog.tsx`; the Configuración
+time-zone select (`identity/ui/time-zone-form.tsx`, Phase 7 T2a), which
+passes `<optgroup>` children per region and widens it with `className`
+(`h-10 sm:w-[280px]`, the Profile Settings form-input size). No atom change.
 
 ## ChoiceGroup (`choice-group.tsx`)
 

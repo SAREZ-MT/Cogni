@@ -1,12 +1,17 @@
 import { render, screen, within } from "@testing-library/react";
 import type { ReactElement } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Breadcrumb, BreadcrumbProvider } from "../_components/breadcrumb";
 
 const { listDueTodayAction } = vi.hoisted(() => ({
   listDueTodayAction: vi.fn(),
 }));
 vi.mock("@/modules/scheduling", () => ({ listDueTodayAction }));
+
+const { getCurrentTimeZoneSetting } = vi.hoisted(() => ({
+  getCurrentTimeZoneSetting: vi.fn(),
+}));
+vi.mock("@/modules/identity", () => ({ getCurrentTimeZoneSetting }));
 vi.mock("@/modules/notebooks", () => ({
   COLOR_PALETTE: [
     "pink",
@@ -47,6 +52,35 @@ describe("CalendarPage", () => {
   beforeEach(() => {
     listDueTodayAction.mockReset();
     listDueTodayAction.mockResolvedValue({ ok: true, value: [] });
+    getCurrentTimeZoneSetting.mockReset();
+    getCurrentTimeZoneSetting.mockResolvedValue({
+      timeZone: "UTC",
+      chosen: false,
+    });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  // Phase 7 T2a: the date in the card header is read in the profile time
+  // zone. 12:00 UTC on 12 Oct is already 13 Oct in Kiritimati (UTC+14) and
+  // still 12 Oct in Pago Pago (UTC-11).
+  it.each([
+    ["Pacific/Kiritimati", "13", "Martes, 13 de octubre"],
+    ["Pacific/Pago_Pago", "12", "Lunes, 12 de octubre"],
+  ])("formats today's badge and subtitle in the profile zone %s", async (timeZone, day, subtitle) => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-12T12:00:00.000Z"));
+    getCurrentTimeZoneSetting.mockResolvedValue({ timeZone, chosen: true });
+
+    await renderPage();
+
+    const card = screen.getByTestId("calendar-card");
+    expect(
+      card.querySelector('[data-slot="date-badge"] [data-part="day"]'),
+    ).toHaveTextContent(day);
+    expect(card).toHaveTextContent(subtitle);
   });
 
   it("titles the page Calendario and publishes it as the breadcrumb", async () => {
