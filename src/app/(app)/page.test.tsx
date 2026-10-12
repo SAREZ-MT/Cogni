@@ -10,8 +10,11 @@ vi.mock("@/modules/identity", () => ({ getCurrentUser }));
 // session that disappeared mid-request (e.g. sign-out) made
 // getHomeOverview's requireOwnerId() throw instead of a clean redirect —
 // the same guard layout.tsx already has.
-const { redirect } = vi.hoisted(() => ({ redirect: vi.fn() }));
-vi.mock("next/navigation", () => ({ redirect }));
+const { redirect, unstable_rethrow } = vi.hoisted(() => ({
+  redirect: vi.fn(),
+  unstable_rethrow: vi.fn(),
+}));
+vi.mock("next/navigation", () => ({ redirect, unstable_rethrow }));
 
 const { getHomeOverview } = vi.hoisted(() => ({ getHomeOverview: vi.fn() }));
 vi.mock("@/modules/notebooks", () => ({
@@ -117,6 +120,7 @@ describe("HomePage", () => {
     });
     getHomeOverview.mockReset();
     redirect.mockReset();
+    unstable_rethrow.mockReset();
     listDueTodayAction.mockReset();
     listDueTodayAction.mockResolvedValue({ ok: true, value: [] });
   });
@@ -274,6 +278,29 @@ describe("HomePage", () => {
       expect(card).toHaveTextContent("—");
       expect(card).toHaveTextContent("No pudimos cargar tus repasos");
       expect(card).not.toHaveTextContent("0 repasos");
+    });
+
+    // R3-home-due-promise-all: a thrown due read must degrade only the
+    // "Repasos pendientes hoy" card, exactly like the typed failure.
+    it("degrades only the due card when the due read throws", async () => {
+      const failure = new Error("due read exploded");
+      listDueTodayAction.mockRejectedValue(failure);
+
+      await renderHome();
+
+      const card = screen.getByTestId("due-today-stat");
+      expect(card).toHaveTextContent("—");
+      expect(card).toHaveTextContent("No pudimos cargar tus repasos");
+      expect(screen.getByText("Mis cuadernos")).toBeInTheDocument();
+      // Next.js control-flow errors (redirect/notFound) are handed back to
+      // the framework instead of being swallowed.
+      expect(unstable_rethrow).toHaveBeenCalledWith(failure);
+    });
+
+    it("still fails Home when the overview read throws", async () => {
+      getHomeOverview.mockRejectedValue(new Error("overview exploded"));
+
+      await expect(renderHome()).rejects.toThrow("overview exploded");
     });
 
     it("renders the notebook grid and the recent pages list from real data", async () => {

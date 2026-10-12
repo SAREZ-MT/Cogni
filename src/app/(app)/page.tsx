@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/nextjs";
 import {
   BookOpenCheck,
   Flame,
@@ -6,7 +7,7 @@ import {
   Target,
 } from "lucide-react";
 import Link from "next/link";
-import { redirect } from "next/navigation";
+import { redirect, unstable_rethrow } from "next/navigation";
 import { getCurrentUser } from "@/modules/identity";
 import { CreateNotebookTrigger, getHomeOverview } from "@/modules/notebooks";
 import { listDueTodayAction, totalDueCount } from "@/modules/scheduling";
@@ -23,13 +24,27 @@ import { StatCard } from "./_components/home/stat-card";
 import { StreakDots } from "./_components/home/streak-dots";
 import { WeakTopics } from "./_components/home/weak-topics";
 
+type DueTodayResult = Awaited<ReturnType<typeof listDueTodayAction>>;
+
+// The due read feeds a single card, so a thrown rejection (not only the
+// typed { ok: false }) degrades just that card instead of failing Home.
+// Next.js control-flow errors (redirect, notFound) are rethrown to the
+// framework first.
+async function readDueToday(): Promise<DueTodayResult | null> {
+  try {
+    return await listDueTodayAction();
+  } catch (error) {
+    unstable_rethrow(error);
+    Sentry.captureException(error);
+    return null;
+  }
+}
+
 // "Repasos pendientes hoy" card copy: the real total due now across the
 // three techniques (scheduling's listDueToday, Phase 7 T1), or an explicit
 // failure instead of a false zero.
-function dueTodayStat(
-  dueResult: Awaited<ReturnType<typeof listDueTodayAction>>,
-) {
-  if (!dueResult.ok) {
+function dueTodayStat(dueResult: DueTodayResult | null) {
+  if (!dueResult?.ok) {
     return { value: "—", unit: null, hint: "No pudimos cargar tus repasos" };
   }
   const total = totalDueCount(dueResult.value);
@@ -61,7 +76,7 @@ export default async function HomePage() {
   }
   const [overview, dueResult] = await Promise.all([
     getHomeOverview(),
-    listDueTodayAction(),
+    readDueToday(),
   ]);
   const displayName = displayNameFromEmail(user.email);
   const now = new Date();
