@@ -47,23 +47,3 @@ export async function clearStudyItems(pageId: string): Promise<void> {
     await sql.end();
   }
 }
-
-// Total items due now for the page's owner, with the same filters as
-// scheduling's listDueToday (not suspended, page and notebook not archived).
-export async function dueCountForOwnerOf(pageId: string): Promise<number> {
-  const sql = connect();
-  try {
-    const [row] = await sql<{ count: number }[]>`
-      select count(*)::int as count
-      from study_items s
-      join pages p on p.id = s.page_id
-      join notebooks n on n.id = p.notebook_id
-      where s.owner_id = (select owner_id from pages where id = ${pageId})
-        and s.suspended_at is null and s.due_at <= now()
-        and p.archived_at is null and n.archived_at is null
-    `;
-    return row?.count ?? 0;
-  } finally {
-    await sql.end();
-  }
-}
