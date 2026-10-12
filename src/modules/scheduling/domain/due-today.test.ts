@@ -4,6 +4,7 @@ import {
   DUE_KINDS,
   type DueTodayPage,
   emptyDueCounts,
+  totalDueCount,
 } from "./due-today";
 
 const page = (pageId: string, earliestDueAt: string): DueTodayPage => ({
@@ -39,5 +40,21 @@ describe("due today", () => {
     ]);
     const [first] = pages as [DueTodayPage];
     expect(compareDueTodayPages(first, first)).toBe(0);
+  });
+
+  it("totals every technique's due items across pages", () => {
+    const pages = [
+      {
+        ...page("a", "2026-10-12T08:00:00.000Z"),
+        due: { flashcard: 2, exam_question: 1, recall_question: 0 },
+      },
+      {
+        ...page("b", "2026-10-12T09:00:00.000Z"),
+        due: { flashcard: 0, exam_question: 0, recall_question: 4 },
+      },
+    ];
+
+    expect(totalDueCount(pages)).toBe(7);
+    expect(totalDueCount([])).toBe(0);
   });
 });

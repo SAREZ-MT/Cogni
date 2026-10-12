@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/nextjs";
 import {
   BookOpenCheck,
   Flame,
@@ -6,12 +7,12 @@ import {
   Target,
 } from "lucide-react";
 import Link from "next/link";
-import { redirect } from "next/navigation";
+import { redirect, unstable_rethrow } from "next/navigation";
 import { getCurrentUser } from "@/modules/identity";
 import { CreateNotebookTrigger, getHomeOverview } from "@/modules/notebooks";
+import { listDueTodayAction, totalDueCount } from "@/modules/scheduling";
 import { EmptyState } from "@/shared/ui/empty-state";
 import { IconTile } from "@/shared/ui/icon-tile";
-import { Pill } from "@/shared/ui/pill";
 import { SectionTitle } from "@/shared/ui/section-header";
 import { displayNameFromEmail } from "./_components/account-name";
 import { SetBreadcrumb } from "./_components/breadcrumb";
@@ -23,12 +24,45 @@ import { StatCard } from "./_components/home/stat-card";
 import { StreakDots } from "./_components/home/streak-dots";
 import { WeakTopics } from "./_components/home/weak-topics";
 
-// Design pass 2 (odd/tasks, Home study-metrics decisions): Home now shows
-// real study-progress metrics derived from page activity (readyToReview,
-// streak, weeklyGoal — all from getHomeOverview) plus one explicit
-// placeholder ("Repasos pendientes hoy") the user asked for ahead of
-// Flashcards shipping. This supersedes the earlier "no invented metrics"
-// decision only for that one card, per the design-pass-2 spec.
+type DueTodayResult = Awaited<ReturnType<typeof listDueTodayAction>>;
+
+// The due read feeds a single card, so a thrown rejection (not only the
+// typed { ok: false }) degrades just that card instead of failing Home.
+// Next.js control-flow errors (redirect, notFound) are rethrown to the
+// framework first.
+async function readDueToday(): Promise<DueTodayResult | null> {
+  try {
+    return await listDueTodayAction();
+  } catch (error) {
+    unstable_rethrow(error);
+    Sentry.captureException(error);
+    return null;
+  }
+}
+
+// "Repasos pendientes hoy" card copy: the real total due now across the
+// three techniques (scheduling's listDueToday, Phase 7 T1), or an explicit
+// failure instead of a false zero.
+function dueTodayStat(dueResult: DueTodayResult | null) {
+  if (!dueResult?.ok) {
+    return { value: "—", unit: null, hint: "No pudimos cargar tus repasos" };
+  }
+  const total = totalDueCount(dueResult.value);
+  const pages = dueResult.value.length;
+  return {
+    value: String(total),
+    unit: total === 1 ? "repaso" : "repasos",
+    hint:
+      total === 0
+        ? "Estás al día"
+        : `en ${pages} ${pages === 1 ? "página" : "páginas"}`,
+  };
+}
+
+// Design pass 2 (odd/tasks, Home study-metrics decisions): Home shows real
+// study-progress metrics derived from page activity (readyToReview, streak,
+// weeklyGoal — all from getHomeOverview) and, since Phase 7 T1, the real
+// count of reviews due today, linking to the calendar's "Hoy" tab.
 export default async function HomePage() {
   // The user is read first (and redirected on, same as layout.tsx) before
   // touching getHomeOverview: running both in Promise.all let a session
@@ -40,7 +74,10 @@ export default async function HomePage() {
     redirect("/login");
     return;
   }
-  const overview = await getHomeOverview();
+  const [overview, dueResult] = await Promise.all([
+    getHomeOverview(),
+    readDueToday(),
+  ]);
   const displayName = displayNameFromEmail(user.email);
   const now = new Date();
 
@@ -75,6 +112,7 @@ export default async function HomePage() {
         100
       : undefined;
   const streakProgress = (overview.streak.activeDays / 14) * 100;
+  const dueStat = dueTodayStat(dueResult);
   const weeklyProgress =
     (overview.weeklyGoal.activeDays / overview.weeklyGoal.goal) * 100;
 
@@ -143,26 +181,35 @@ export default async function HomePage() {
             </button>
           }
         />
-        <StatCard
-          label="Repasos pendientes hoy"
-          icon={<Layers aria-hidden="true" size={14} strokeWidth={2} />}
-          iconBgClass="bg-error-100 text-error-500"
-          value={
-            <>
-              0{" "}
-              <span className="font-normal text-[13px] text-fg-muted">
-                tarjetas
-              </span>
-            </>
-          }
-          hint="Flashcards llegan pronto"
-          action={
-            <Pill size="sm" tone="neutral" className="text-[10px]">
-              pronto
-            </Pill>
-          }
-          muted
-        />
+        <div data-testid="due-today-stat" className="flex flex-1">
+          <StatCard
+            label="Repasos pendientes hoy"
+            icon={<Layers aria-hidden="true" size={14} strokeWidth={2} />}
+            iconBgClass="bg-error-100 text-error-500"
+            value={
+              <>
+                {dueStat.value}
+                {dueStat.unit && (
+                  <>
+                    {" "}
+                    <span className="font-normal text-[13px] text-fg-muted">
+                      {dueStat.unit}
+                    </span>
+                  </>
+                )}
+              </>
+            }
+            hint={dueStat.hint}
+            action={
+              <Link
+                href="/calendario"
+                className="font-medium text-[11.5px] text-primary-600 hover:underline"
+              >
+                Ver calendario →
+              </Link>
+            }
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3.5">

@@ -10,8 +10,11 @@ vi.mock("@/modules/identity", () => ({ getCurrentUser }));
 // session that disappeared mid-request (e.g. sign-out) made
 // getHomeOverview's requireOwnerId() throw instead of a clean redirect —
 // the same guard layout.tsx already has.
-const { redirect } = vi.hoisted(() => ({ redirect: vi.fn() }));
-vi.mock("next/navigation", () => ({ redirect }));
+const { redirect, unstable_rethrow } = vi.hoisted(() => ({
+  redirect: vi.fn(),
+  unstable_rethrow: vi.fn(),
+}));
+vi.mock("next/navigation", () => ({ redirect, unstable_rethrow }));
 
 const { getHomeOverview } = vi.hoisted(() => ({ getHomeOverview: vi.fn() }));
 vi.mock("@/modules/notebooks", () => ({
@@ -25,6 +28,29 @@ vi.mock("@/modules/notebooks", () => ({
     </button>
   ),
 }));
+
+const { listDueTodayAction } = vi.hoisted(() => ({
+  listDueTodayAction: vi.fn(),
+}));
+vi.mock("@/modules/scheduling", async () => ({
+  ...(await import("@/modules/scheduling/domain")),
+  listDueTodayAction,
+}));
+
+function duePage(
+  pageId: string,
+  due: { flashcard: number; exam_question: number; recall_question: number },
+) {
+  return {
+    pageId,
+    pageTitle: `Página ${pageId}`,
+    notebookId: "n1",
+    notebookTitle: "Biología Celular",
+    notebookColor: "purple",
+    due,
+    earliestDueAt: new Date("2026-10-12T08:00:00.000Z"),
+  };
+}
 
 function emptyOverview() {
   return {
@@ -94,6 +120,9 @@ describe("HomePage", () => {
     });
     getHomeOverview.mockReset();
     redirect.mockReset();
+    unstable_rethrow.mockReset();
+    listDueTodayAction.mockReset();
+    listDueTodayAction.mockResolvedValue({ ok: true, value: [] });
   });
 
   describe("without a session", () => {
@@ -208,10 +237,70 @@ describe("HomePage", () => {
       ).not.toBeInTheDocument();
     });
 
-    it("keeps the flashcards card as an explicit muted placeholder until they ship", async () => {
+    it("counts every technique's reviews due today and links to the calendar", async () => {
+      listDueTodayAction.mockResolvedValue({
+        ok: true,
+        value: [
+          duePage("a", { flashcard: 2, exam_question: 1, recall_question: 0 }),
+          duePage("b", { flashcard: 0, exam_question: 0, recall_question: 3 }),
+        ],
+      });
+
       await renderHome();
 
-      expect(screen.getByText("Flashcards llegan pronto")).toBeInTheDocument();
+      const card = screen.getByTestId("due-today-stat");
+      expect(card).toHaveTextContent("6 repasos");
+      expect(card).toHaveTextContent("en 2 páginas");
+      expect(card).not.toHaveTextContent("Flashcards llegan pronto");
+      expect(card).not.toHaveTextContent("pronto");
+      expect(
+        screen.getByRole("link", { name: "Ver calendario →" }),
+      ).toHaveAttribute("href", "/calendario");
+    });
+
+    it("says nothing is due today when the list is empty", async () => {
+      await renderHome();
+
+      const card = screen.getByTestId("due-today-stat");
+      expect(card).toHaveTextContent("0 repasos");
+      expect(card).toHaveTextContent("Estás al día");
+    });
+
+    it("does not claim zero reviews when the due list cannot load", async () => {
+      listDueTodayAction.mockResolvedValue({
+        ok: false,
+        error: { code: "UNEXPECTED", message: "x" },
+      });
+
+      await renderHome();
+
+      const card = screen.getByTestId("due-today-stat");
+      expect(card).toHaveTextContent("—");
+      expect(card).toHaveTextContent("No pudimos cargar tus repasos");
+      expect(card).not.toHaveTextContent("0 repasos");
+    });
+
+    // R3-home-due-promise-all: a thrown due read must degrade only the
+    // "Repasos pendientes hoy" card, exactly like the typed failure.
+    it("degrades only the due card when the due read throws", async () => {
+      const failure = new Error("due read exploded");
+      listDueTodayAction.mockRejectedValue(failure);
+
+      await renderHome();
+
+      const card = screen.getByTestId("due-today-stat");
+      expect(card).toHaveTextContent("—");
+      expect(card).toHaveTextContent("No pudimos cargar tus repasos");
+      expect(screen.getByText("Mis cuadernos")).toBeInTheDocument();
+      // Next.js control-flow errors (redirect/notFound) are handed back to
+      // the framework instead of being swallowed.
+      expect(unstable_rethrow).toHaveBeenCalledWith(failure);
+    });
+
+    it("still fails Home when the overview read throws", async () => {
+      getHomeOverview.mockRejectedValue(new Error("overview exploded"));
+
+      await expect(renderHome()).rejects.toThrow("overview exploded");
     });
 
     it("renders the notebook grid and the recent pages list from real data", async () => {

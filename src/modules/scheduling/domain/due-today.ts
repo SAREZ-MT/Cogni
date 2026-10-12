@@ -39,3 +39,13 @@ export function compareDueTodayPages(a: DueTodayPage, b: DueTodayPage): number {
   if (byDue !== 0) return byDue;
   return a.pageId < b.pageId ? -1 : a.pageId > b.pageId ? 1 : 0;
 }
+
+// Total study items due now across pages and techniques (Home's "Repasos
+// pendientes hoy").
+export function totalDueCount(pages: readonly DueTodayPage[]): number {
+  let total = 0;
+  for (const page of pages) {
+    for (const kind of DUE_KINDS) total += page.due[kind];
+  }
+  return total;
+}

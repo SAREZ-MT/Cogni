@@ -230,6 +230,11 @@ anatomy; simplified per user decision 2026-09-24 — a card has **only** a
   activa / Examen) — mapped onto the **existing** pastel `IconTile` tones
   `yellow` / `mint` / `pink`, the same pairs as the button, for the icon tile
   (tagged `data-part="technique-icon"`). No new token was needed.
+- `TECHNIQUE_PAIR_CLASS` (Phase 7 T1): the pastel pair per `TechniqueTone`
+  (`bg-pastel-yellow text-pastel-yellow-fg`, `bg-pastel-mint
+  text-pastel-mint-fg`, `bg-pastel-pink text-pastel-pink-fg`), exported so
+  `TechniqueChip` reuses exactly the panel's mapping; the button classes are
+  derived from it (no visual change).
 
 - `controls?` (Phase 5 T5): options of the action rendered between the
   description and the button. No card passes it since Phase 6 T5b v2:
@@ -1334,3 +1339,54 @@ for T6's exam length selector (same range).
   bound or when `disabled`.
 
 Used by: `techniques-panel.tsx` (Examen card `controls`).
+
+## TechniqueChip (`technique-chip.tsx`)
+
+Calendar event chip (Phase 7 T1, calendar look decision 2026-10-12; the
+Untitled UI month calendar's event chips): one study technique of one page,
+coloured with the techniques panel's pastel pair — Flashcards yellow,
+Recordación activa green, Examen rose (`TECHNIQUE_PAIR_CLASS`).
+
+- Props: `tone` (`TechniqueTone`), `label`, `meta?` (trailing lighter detail,
+  tagged `data-part="meta"`: the due count on "Hoy"; a count or time on the
+  month/week grid in T2), `href?` (renders a `next/link` that opens the
+  technique's session; without it a `span`), plus any HTML attribute
+  (`aria-label`, `data-testid`, `className` merged via `cn()`).
+- Anatomy: `rounded-md border border-current/15 px-2 py-1 text-xs
+  font-semibold`, label truncates, meta `font-medium tabular-nums
+  opacity-80`. Linked chips add `hover:brightness-95` and the focus ring.
+- `data-slot="technique-chip"`, `data-tone={tone}`.
+
+Used by: `calendario/_components/today-list.tsx`.
+
+## DateBadge (`date-badge.tsx`)
+
+Calendar card date badge (Phase 7 T1, the reference's "JAN / 10" tile): a
+56px-wide bordered tile with the abbreviated Spanish month in capitals
+(`OCT`, neutral-50 band, 10.5px semibold muted) over the day number (18px
+bold).
+
+- Props: `date`, `timeZone?` (IANA zone the day is read in; omitted, the
+  runtime zone, like the rest of the shell), `className?` and span attributes.
+- The visible parts are `aria-hidden`; an `sr-only <time datetime="YYYY-MM-DD">`
+  carries the long date ("lunes, 12 de octubre").
+- `data-slot="date-badge"`, parts `data-part="month"` / `"day"`.
+
+Used by: `calendario/page.tsx`.
+
+## SegmentedTabs (`segmented-tabs.tsx`)
+
+Page-level segmented tabs (Phase 7 T1, the reference's "All events / Shared
+/ …" row): same container as `ViewToggle`/`PeriodFilter` (`rounded-input
+border bg-neutral-100 p-1`), text items `px-3 py-1.5 text-[13px]
+font-semibold`, the active one `bg-card text-fg shadow-xs`.
+
+- Props: `aria-label` (names the `<nav>`), `items` (`{ value, label, href }`
+  or `{ value, label, disabled: true, hint }`), `value`, `className?`.
+- Linked items are server-rendered `next/link`s (the view lives in the URL);
+  the active one gets `aria-current="page"`. A disabled item is a `span`
+  with `aria-disabled="true"`, `title={hint}` and `opacity-60`.
+- `data-slot="segmented-tabs"`.
+
+Used by: `calendario/page.tsx` ("Hoy" / "Semana" / "Mes"; Semana and Mes are
+disabled "Próximamente" items until T2).
