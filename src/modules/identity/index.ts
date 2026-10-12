@@ -2,8 +2,13 @@ import "server-only";
 import * as Sentry from "@sentry/nextjs";
 import { getDb } from "@/shared/db/client";
 import { systemClock } from "@/shared/kernel/clock";
-import { ensureProfileResilient } from "./application";
+import {
+  ensureProfileResilient,
+  getTimeZoneSetting,
+  type TimeZoneSetting,
+} from "./application";
 import type { Profile } from "./domain";
+import { DEFAULT_TIMEZONE } from "./domain";
 import {
   createSupabaseServerClient,
   DrizzleProfileRepository,
@@ -16,11 +21,12 @@ import {
 export { safeNext } from "./application";
 export {
   hasAcceptedCurrentTerms,
+  hasChosenTimeZone,
   TERMS_PATH,
   TERMS_VERSION,
   termsRedirectFor,
 } from "./domain";
-export type { Profile, SessionUser };
+export type { Profile, SessionUser, TimeZoneSetting };
 
 export async function getCurrentUser(): Promise<SessionUser | null> {
   const supabase = await createSupabaseServerClient();
@@ -48,6 +54,25 @@ export async function ensureProfileForUser(
       onTransientFailure: (error) => Sentry.captureException(error),
     },
   );
+}
+
+// The signed-in user's time zone for presentation (calendar "Hoy", the
+// settings page). Never throws: without a session or on a read failure
+// (reported to Sentry) it degrades to the unchosen default, which formats
+// dates exactly as the shell did before the setting existed.
+export async function getCurrentTimeZoneSetting(): Promise<TimeZoneSetting> {
+  const fallback = { timeZone: DEFAULT_TIMEZONE, chosen: false };
+  try {
+    const user = await getCurrentUser();
+    if (!user) return fallback;
+    return await getTimeZoneSetting(
+      { ownerId: user.id },
+      { profiles: new DrizzleProfileRepository(getDb()) },
+    );
+  } catch (error) {
+    Sentry.captureException(error);
+    return fallback;
+  }
 }
 
 // OAuth and email-link callback: trades the PKCE code for session cookies.

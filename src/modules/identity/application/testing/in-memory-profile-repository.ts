@@ -1,4 +1,4 @@
-import type { Profile } from "../../domain/profile";
+import { DEFAULT_TIMEZONE, type Profile } from "../../domain/profile";
 import type { ProfileRepository } from "../../domain/profile-repository";
 
 // Test double for the ProfileRepository port. Upsert semantics mirror the
@@ -30,6 +30,22 @@ export class InMemoryProfileRepository implements ProfileRepository {
       termsAcceptedAt: at,
       updatedAt: at,
     };
+    this.rows.set(id, updated);
+    return updated;
+  }
+
+  async updateTimeZone(
+    id: string,
+    timeZone: string,
+    at: Date,
+    options: { onlyIfUnset?: boolean } = {},
+  ): Promise<Profile | null> {
+    const existing = this.rows.get(id);
+    if (!existing) return null;
+    if (options.onlyIfUnset && existing.timezone !== DEFAULT_TIMEZONE) {
+      return null;
+    }
+    const updated: Profile = { ...existing, timezone: timeZone, updatedAt: at };
     this.rows.set(id, updated);
     return updated;
   }

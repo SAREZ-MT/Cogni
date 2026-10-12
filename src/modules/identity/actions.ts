@@ -1,5 +1,6 @@
 "use server";
 
+import * as Sentry from "@sentry/nextjs";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { clientEnv } from "@/shared/config/env.client";
@@ -8,12 +9,15 @@ import { createServerAnalytics } from "@/shared/observability/analytics";
 import {
   AUTH_CALLBACK_PATH,
   acceptTerms,
+  adoptBrowserTimeZone,
   requestPasswordReset,
   safeNext,
   signIn,
   signUp,
   updatePassword,
+  updateProfileTimeZone,
 } from "./application";
+import { PROFILE_ERROR } from "./domain/time-zone";
 import {
   createSupabaseServerClient,
   DrizzleProfileRepository,
@@ -21,6 +25,8 @@ import {
 } from "./infrastructure";
 import { AUTH_COPY, messageForCode } from "./ui/auth-copy";
 import type { AuthFormState } from "./ui/auth-form-state";
+import { TIME_ZONE_COPY } from "./ui/time-zone-copy";
+import type { TimeZoneFormState } from "./ui/time-zone-form-state";
 
 // Server Actions are the only entry point for the public auth forms. Each
 // one validates through the application layer and maps the result to a
@@ -153,4 +159,79 @@ export async function acceptTermsAction(
   after(() => analytics().track("terms_accepted", user.id, { version }));
   const next = formData.get("next");
   return redirect(safeNext(typeof next === "string" ? next : null));
+}
+
+async function sessionUserId(): Promise<string | null> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  return user?.id ?? null;
+}
+
+async function profileDeps() {
+  // Lazy for the same reason as acceptTermsAction: the db client is
+  // server-only and client components import this file's references.
+  const { getDb } = await import("@/shared/db/client");
+  return {
+    profiles: new DrizzleProfileRepository(getDb()),
+    clock: systemClock,
+  };
+}
+
+// Configuración › Zona horaria form: `timeZone` is the selected IANA name.
+// Never throws: unexpected failures go to Sentry and back as copy.
+export async function updateTimeZoneAction(
+  _previous: TimeZoneFormState,
+  formData: FormData,
+): Promise<TimeZoneFormState> {
+  try {
+    const ownerId = await sessionUserId();
+    if (!ownerId) {
+      return { status: "error", message: TIME_ZONE_COPY.sessionRequired };
+    }
+    const result = await updateProfileTimeZone(
+      { ownerId, timeZone: formData.get("timeZone") },
+      await profileDeps(),
+    );
+    if (!result.ok) {
+      return {
+        status: "error",
+        message:
+          result.error.code === PROFILE_ERROR.INVALID_TIME_ZONE
+            ? TIME_ZONE_COPY.invalid
+            : TIME_ZONE_COPY.failed,
+      };
+    }
+    return {
+      status: "success",
+      message: TIME_ZONE_COPY.saved,
+      timeZone: result.value.timezone,
+    };
+  } catch (error) {
+    Sentry.captureException(error);
+    return { status: "error", message: TIME_ZONE_COPY.failed };
+  }
+}
+
+// First-use browser detection (TimeZoneAutoDetect): saves the browser's
+// zone only while the profile has none. Silent by design — the shell never
+// shows feedback for it — so it only answers whether it went through.
+export async function adoptBrowserTimeZoneAction(
+  timeZone: string,
+): Promise<{ ok: true; adopted: boolean } | { ok: false }> {
+  try {
+    const ownerId = await sessionUserId();
+    if (!ownerId) return { ok: false };
+    const result = await adoptBrowserTimeZone(
+      { ownerId, timeZone },
+      await profileDeps(),
+    );
+    return result.ok
+      ? { ok: true, adopted: result.value.adopted }
+      : { ok: false };
+  } catch (error) {
+    Sentry.captureException(error);
+    return { ok: false };
+  }
 }
