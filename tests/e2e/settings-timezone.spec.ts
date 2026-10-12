@@ -17,19 +17,33 @@ async function shot(page: Page, name: string) {
   });
 }
 
-// Kiritimati is UTC+14: its calendar day differs from Bogota's (UTC-5)
-// for 19 hours of every day, and the assertion computes the expected text
-// in the same zone, so it holds at any time of day.
-const CHOSEN_ZONE = "Pacific/Kiritimati";
-
-function longDayIn(timeZone: string): string {
+function longDayIn(timeZone: string, at: Date = new Date()): string {
   const text = new Intl.DateTimeFormat("es", {
     weekday: "long",
     day: "numeric",
     month: "long",
     timeZone,
-  }).format(new Date());
+  }).format(at);
   return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+// The calendar falls back to UTC when the zone cannot be read, so the saved
+// zone must put "today" on a different calendar day than UTC or the header
+// check cannot tell them apart. Kiritimati (UTC+14) is a day ahead of UTC
+// from 10:00 to 24:00 UTC and Pago Pago (UTC-11) a day behind from 00:00 to
+// 11:00 UTC; pick the one that differs now and for the next ten minutes
+// (the test's run time). Only in the last minutes before 00:00 UTC does
+// neither qualify; Kiritimati is then the best effort.
+const DIFFERS_FOR_MS = 10 * 60 * 1000;
+function zoneOffUtcDay(): string {
+  const now = new Date();
+  const later = new Date(now.getTime() + DIFFERS_FOR_MS);
+  const differs = (zone: string) =>
+    [now, later].every((at) => longDayIn(zone, at) !== longDayIn("UTC", at));
+  return (
+    ["Pacific/Kiritimati", "Pacific/Pago_Pago"].find(differs) ??
+    "Pacific/Kiritimati"
+  );
 }
 
 test.describe("Configuración — zona horaria", () => {
@@ -59,27 +73,28 @@ test.describe("Configuración — zona horaria", () => {
     await expect(select).toHaveValue("America/Bogota");
     await shot(page, "settings-time-zone");
 
-    await select.selectOption(CHOSEN_ZONE);
-    await page.waitForTimeout(50);
+    const chosenZone = zoneOffUtcDay();
+    await select.selectOption(chosenZone);
+    await expect(select).toHaveValue(chosenZone);
     await card.getByRole("button", { name: "Guardar cambios" }).click();
     await expect(card.getByRole("status")).toHaveText("Zona horaria guardada.");
 
     await page.reload();
     await expect(
       page.getByTestId("time-zone-card").getByLabel("Zona horaria"),
-    ).toHaveValue(CHOSEN_ZONE);
-    expect(await profileTimeZoneOf(freshUser.id)).toBe(CHOSEN_ZONE);
+    ).toHaveValue(chosenZone);
+    expect(await profileTimeZoneOf(freshUser.id)).toBe(chosenZone);
 
     await sidebar.getByRole("link", { name: "Calendario" }).click();
     await expect(page).toHaveURL(/\/calendario$/);
     const calendar = page.getByTestId("calendar-card");
-    await expect(calendar).toContainText(longDayIn(CHOSEN_ZONE));
+    await expect(calendar).toContainText(longDayIn(chosenZone));
     await expect(
       calendar.locator('[data-slot="date-badge"] [data-part="day"]'),
     ).toHaveText(
       new Intl.DateTimeFormat("es", {
         day: "numeric",
-        timeZone: CHOSEN_ZONE,
+        timeZone: chosenZone,
       }).format(new Date()),
     );
     await shot(page, "calendar-today-time-zone");
