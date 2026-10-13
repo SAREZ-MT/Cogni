@@ -1,4 +1,4 @@
-import type { CalendarItem } from "../../domain/calendar";
+import type { CalendarItem, OverdueCount } from "../../domain/calendar";
 import type { DueInRangeReader } from "../../domain/due-in-range-reader";
 import {
   compareDueTodayPages,
@@ -102,11 +102,9 @@ export class InMemoryDueTodayReader
     return [...byPage.values()].sort(compareDueTodayPages);
   }
 
-  async listDueInRange(
-    ownerId: string,
-    from: Date,
-    to: Date,
-  ): Promise<CalendarItem[]> {
+  // The owner's live items (not suspended, page and notebook active) with
+  // `from <= due_at < to`, as calendar items.
+  private calendarItems(ownerId: string, from: Date, to: Date): CalendarItem[] {
     const rows: CalendarItem[] = [];
     for (const item of this.items) {
       const due = item.dueAt.getTime();
@@ -125,10 +123,55 @@ export class InMemoryDueTodayReader
         dueAt: item.dueAt,
       });
     }
-    return rows.sort(
+    return rows;
+  }
+
+  async listDueInRange(
+    ownerId: string,
+    from: Date,
+    to: Date,
+  ): Promise<CalendarItem[]> {
+    return this.calendarItems(ownerId, from, to).sort(
       (a, b) =>
         a.dueAt.getTime() - b.dueAt.getTime() ||
-        (a.pageId < b.pageId ? -1 : a.pageId > b.pageId ? 1 : 0),
+        compareText(a.pageId, b.pageId),
     );
   }
+
+  async listOverdueCounts(
+    ownerId: string,
+    before: Date,
+  ): Promise<OverdueCount[]> {
+    const byPageKind = new Map<string, OverdueCount>();
+    for (const item of this.calendarItems(
+      ownerId,
+      new Date(-8.64e15),
+      before,
+    )) {
+      const key = `${item.pageId}|${item.kind}`;
+      const row = byPageKind.get(key) ?? {
+        pageId: item.pageId,
+        pageTitle: item.pageTitle,
+        notebookId: item.notebookId,
+        kind: item.kind,
+        count: 0,
+        earliestDueAt: item.dueAt,
+      };
+      row.count += 1;
+      if (item.dueAt.getTime() < row.earliestDueAt.getTime()) {
+        row.earliestDueAt = item.dueAt;
+      }
+      byPageKind.set(key, row);
+    }
+    return [...byPageKind.values()].sort(
+      (a, b) =>
+        a.earliestDueAt.getTime() - b.earliestDueAt.getTime() ||
+        compareText(a.pageId, b.pageId) ||
+        compareText(a.kind, b.kind),
+    );
+  }
+}
+
+function compareText(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
 }

@@ -10,6 +10,7 @@ export {
   LAST_CALENDAR_DAY,
   monthGridDays,
   monthOf,
+  type OverdueCount,
   weekDays,
   weekdayIndex,
 } from "./calendar";

@@ -153,6 +153,17 @@ export interface CalendarItem {
   dueAt: Date;
 }
 
+// The overdue items of one page and technique, counted in the read: they
+// all show on today, so the calendar never reads them one by one.
+export interface OverdueCount {
+  pageId: string;
+  pageTitle: string;
+  notebookId: string;
+  kind: DueKind;
+  count: number;
+  earliestDueAt: Date;
+}
+
 // One page on one local day, with its items due that day per technique.
 export interface CalendarDayPage {
   day: DayKey;
@@ -163,31 +174,46 @@ export interface CalendarDayPage {
 }
 
 // Groups items by local day (in `timeZone`) and page. Items due before
-// `today` are overdue and still pending, so they count on `today`. Ordered
-// by day, then by each page's earliest item that day, then page id.
+// `today` are overdue and still pending, so they count on `today`, as do
+// the already aggregated `overdue` counts. Ordered by day, then by each
+// page's earliest item that day, then page id.
 export function groupCalendarDays(
   items: readonly CalendarItem[],
-  options: { timeZone: string; today: DayKey },
+  options: {
+    timeZone: string;
+    today: DayKey;
+    overdue?: readonly OverdueCount[];
+  },
 ): CalendarDayPage[] {
   const dayOf = dayKeyFormatter(options.timeZone);
   const groups = new Map<string, { row: CalendarDayPage; earliest: number }>();
-  for (const item of items) {
-    const local = dayOf(item.dueAt);
-    const day = local < options.today ? options.today : local;
-    const key = `${day}|${item.pageId}`;
+  const add = (
+    day: DayKey,
+    entry: Omit<CalendarItem, "dueAt">,
+    count: number,
+    dueAt: Date,
+  ) => {
+    const key = `${day}|${entry.pageId}`;
     const group = groups.get(key) ?? {
       row: {
         day,
-        pageId: item.pageId,
-        pageTitle: item.pageTitle,
-        notebookId: item.notebookId,
+        pageId: entry.pageId,
+        pageTitle: entry.pageTitle,
+        notebookId: entry.notebookId,
         due: emptyDueCounts(),
       },
-      earliest: item.dueAt.getTime(),
+      earliest: dueAt.getTime(),
     };
-    group.row.due[item.kind] += 1;
-    group.earliest = Math.min(group.earliest, item.dueAt.getTime());
+    group.row.due[entry.kind] += count;
+    group.earliest = Math.min(group.earliest, dueAt.getTime());
     groups.set(key, group);
+  };
+  for (const overdue of options.overdue ?? []) {
+    add(options.today, overdue, overdue.count, overdue.earliestDueAt);
+  }
+  for (const item of items) {
+    const local = dayOf(item.dueAt);
+    add(local < options.today ? options.today : local, item, 1, item.dueAt);
   }
   return [...groups.values()]
     .sort(

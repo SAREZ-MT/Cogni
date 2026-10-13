@@ -24,7 +24,7 @@ flashcards.
 | `due-today.ts` | `DueTodayPage` (página, cuaderno, ítems vencidos por técnica y `earliestDueAt`), `DUE_KINDS`/`DueCounts` (espejo de `StudyItemKind`, verificado en compilación por `application/list-due-today.ts`), `emptyDueCounts()` y `compareDueTodayPages` (el vencimiento más antiguo primero; desempata el id de página). |
 | `due-today-reader.ts` | Puerto `DueTodayReader.listDueToday(ownerId, now)`: páginas del dueño con ítems no suspendidos y `due_at <= now`, sin páginas ni cuadernos archivados. |
 | `calendar.ts` | Calendario (Fase 7): `DayKey` ("YYYY-MM-DD"), aritmética de días en medianoches UTC (`addDays`, `weekdayIndex`, `weekDays`, `monthOf`, `monthGridDays` con semanas de lunes a domingo), `dayKeyIn` (día local en una zona), `paddedRange` (ventana ±14 h) y `groupCalendarDays` (agrupa por día local y página; lo vencido cuenta en hoy). |
-| `due-in-range-reader.ts` | Puerto `DueInRangeReader.listDueInRange(ownerId, from, to)`: ítems no suspendidos con `from <= due_at < to`, sin páginas ni cuadernos archivados, sin agrupar. |
+| `due-in-range-reader.ts` | Puerto `DueInRangeReader.listDueInRange(ownerId, from, to)`: ítems no suspendidos con `from <= due_at < to`, sin páginas ni cuadernos archivados, sin agrupar; y `listOverdueCounts(ownerId, before)`: los ítems con `due_at < before` contados por página y técnica (todos van a hoy, así la lectura está acotada por páginas × técnicas y no crece con el atraso). |
 | `errors.ts` | Códigos `SCHEDULING_ERROR`. |
 
 ## Aplicación (`application/`)

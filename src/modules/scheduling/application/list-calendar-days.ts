@@ -21,10 +21,6 @@ export interface ListCalendarDaysInput {
   timeZone: string;
 }
 
-// Overdue items have no lower bound: a range that holds today reads them
-// all, and groupCalendarDays shows them on today.
-const OVERDUE_FLOOR = new Date(0);
-
 // "Mes" / "Semana" (documento-maestro §3.5): the owner's pages per local
 // day with the items whose next due date falls that day. Past days stay
 // empty — their items were either reviewed (history lives in review_logs)
@@ -36,14 +32,19 @@ export async function listCalendarDays(
   const today = dayKeyIn(deps.clock.now(), input.timeZone);
   if (input.toDay <= today) return [];
 
+  // A range that holds today also shows every overdue item on today. The
+  // ones inside the padded range come with the range read (they may belong
+  // to an earlier day of the range); the ones before it are only counted,
+  // per page and technique, so the read never grows with the backlog.
   const holdsToday = input.fromDay <= today;
   const { from, to } = paddedRange(input.fromDay, input.toDay);
-  const items = await deps.reader.listDueInRange(
-    input.ownerId,
-    holdsToday ? OVERDUE_FLOOR : from,
-    to,
-  );
-  return groupCalendarDays(items, { timeZone: input.timeZone, today }).filter(
-    (row) => row.day >= input.fromDay && row.day < input.toDay,
-  );
+  const [items, overdue] = await Promise.all([
+    deps.reader.listDueInRange(input.ownerId, from, to),
+    holdsToday ? deps.reader.listOverdueCounts(input.ownerId, from) : [],
+  ]);
+  return groupCalendarDays(items, {
+    timeZone: input.timeZone,
+    today,
+    overdue,
+  }).filter((row) => row.day >= input.fromDay && row.day < input.toDay);
 }

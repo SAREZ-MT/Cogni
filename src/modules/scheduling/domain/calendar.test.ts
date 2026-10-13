@@ -244,6 +244,54 @@ describe("groupCalendarDays", () => {
     ]);
   });
 
+  it("adds the aggregated overdue counts to today", () => {
+    const days = groupCalendarDays(
+      [
+        item("p1", "2026-10-12T20:00:00.000Z"),
+        item("p2", "2026-10-11T10:00:00.000Z"),
+      ],
+      {
+        timeZone: "UTC",
+        today: "2026-10-12",
+        overdue: [
+          {
+            pageId: "p1",
+            pageTitle: "Página p1",
+            notebookId: "nb-p1",
+            kind: "exam_question",
+            count: 4,
+            earliestDueAt: new Date("2026-09-01T10:00:00.000Z"),
+          },
+          {
+            pageId: "p3",
+            pageTitle: "Página p3",
+            notebookId: "nb-p3",
+            kind: "flashcard",
+            count: 7,
+            earliestDueAt: new Date("2026-10-10T10:00:00.000Z"),
+          },
+        ],
+      },
+    );
+    expect(days.map((day) => [day.day, day.pageId, day.due])).toEqual([
+      [
+        "2026-10-12",
+        "p1",
+        { flashcard: 1, exam_question: 4, recall_question: 0 },
+      ],
+      [
+        "2026-10-12",
+        "p3",
+        { flashcard: 7, exam_question: 0, recall_question: 0 },
+      ],
+      [
+        "2026-10-12",
+        "p2",
+        { flashcard: 1, exam_question: 0, recall_question: 0 },
+      ],
+    ]);
+  });
+
   it("orders pages within a day by their earliest item, then page id", () => {
     const days = groupCalendarDays(
       [

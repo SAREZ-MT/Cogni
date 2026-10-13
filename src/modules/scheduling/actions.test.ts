@@ -21,6 +21,9 @@ vi.mock("./infrastructure", () => ({
     listDueInRange(ownerId: string, from: Date, to: Date) {
       return reader.listDueInRange(ownerId, from, to);
     }
+    listOverdueCounts(ownerId: string, before: Date) {
+      return reader.listOverdueCounts(ownerId, before);
+    }
   },
 }));
 

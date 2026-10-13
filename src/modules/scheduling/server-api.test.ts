@@ -17,6 +17,7 @@ const ROW: DueTodayPage = {
 };
 const calls: Array<{ ownerId: string; now: Date }> = [];
 const rangeCalls: Array<{ ownerId: string; from: Date; to: Date }> = [];
+const overdueCalls: Array<{ ownerId: string; before: Date }> = [];
 vi.mock("./infrastructure", () => ({
   DrizzleDueInRangeReader: vi.fn(function DrizzleDueInRangeReader() {
     return {
@@ -31,6 +32,10 @@ vi.mock("./infrastructure", () => ({
             dueAt: new Date("2026-10-08T15:00:00.000Z"),
           },
         ];
+      },
+      async listOverdueCounts(ownerId: string, before: Date) {
+        overdueCalls.push({ ownerId, before });
+        return [];
       },
     };
   }),
@@ -78,13 +83,16 @@ describe("createSchedulingServerApi", () => {
         due: { flashcard: 0, exam_question: 0, recall_question: 1 },
       },
     ]);
-    // The range holds today (NOW), so overdue items are read too.
+    // The range holds today (NOW), so overdue items are counted too.
     expect(rangeCalls).toEqual([
       {
         ownerId: "owner-1",
-        from: new Date(0),
+        from: new Date("2026-10-04T10:00:00.000Z"),
         to: new Date("2026-10-12T14:00:00.000Z"),
       },
+    ]);
+    expect(overdueCalls).toEqual([
+      { ownerId: "owner-1", before: new Date("2026-10-04T10:00:00.000Z") },
     ]);
   });
 });
