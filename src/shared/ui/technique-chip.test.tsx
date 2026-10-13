@@ -59,4 +59,36 @@ describe("TechniqueChip", () => {
       screen.getByTestId("chip").querySelector('[data-part="meta"]'),
     ).toBeNull();
   });
+
+  // Narrow month grid (Phase 7 T2): inside a narrow container the chip
+  // collapses to a coloured dot in the technique's strong hue; its text
+  // stays readable for assistive tech.
+  it("collapses to a dot in a narrow container when asked, keeping its text for screen readers", () => {
+    render(
+      <TechniqueChip
+        data-testid="chip"
+        tone="green"
+        label="Mitosis"
+        meta="3"
+        collapse="dot-when-narrow"
+      />,
+    );
+
+    const chip = screen.getByTestId("chip");
+    expect(chip).toHaveAttribute("data-collapse", "dot-when-narrow");
+    expect(chip).toHaveClass("@max-2xl:size-2.5", "@max-2xl:bg-current");
+    expect(chip.querySelector("[data-part='label']")).toHaveClass(
+      "@max-2xl:sr-only",
+    );
+    expect(chip.querySelector("[data-part='meta']")).toHaveClass(
+      "@max-2xl:sr-only",
+    );
+    expect(chip).toHaveTextContent("Mitosis3");
+  });
+
+  it("never collapses by default", () => {
+    render(<TechniqueChip data-testid="chip" tone="green" label="x" />);
+    expect(screen.getByTestId("chip")).not.toHaveAttribute("data-collapse");
+    expect(screen.getByTestId("chip")).not.toHaveClass("@max-2xl:bg-current");
+  });
 });

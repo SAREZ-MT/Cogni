@@ -179,17 +179,15 @@ async function profileDeps() {
   };
 }
 
-// Form copy per time-zone use-case error. A missing profile (lazy creation
-// raced or failed) is a save failure for the user, like any other.
+// Form copy per time-zone use-case error. Only an invalid zone has its own
+// copy; a missing profile (lazy creation raced or failed) or a profile
+// creation error from ensureProfile is a save failure for the user, like any
+// other. `code` stays a plain DomainError code: the use case can also return
+// createProfile's codes, so the PROFILE_ERROR union would not cover it.
 function timeZoneErrorMessage(code: string): string {
-  switch (code) {
-    case PROFILE_ERROR.INVALID_TIME_ZONE:
-      return TIME_ZONE_COPY.invalid;
-    case PROFILE_ERROR.NOT_FOUND:
-      return TIME_ZONE_COPY.failed;
-    default:
-      return TIME_ZONE_COPY.failed;
-  }
+  return code === PROFILE_ERROR.INVALID_TIME_ZONE
+    ? TIME_ZONE_COPY.invalid
+    : TIME_ZONE_COPY.failed;
 }
 
 // Configuración › Zona horaria form: `timeZone` is the selected IANA name.

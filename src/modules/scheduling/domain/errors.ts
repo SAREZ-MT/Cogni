@@ -1,5 +1,6 @@
 // DomainError codes for the scheduling module.
 export const SCHEDULING_ERROR = {
   SESSION_REQUIRED: "SCHEDULING_SESSION_REQUIRED",
+  INVALID_RANGE: "SCHEDULING_INVALID_RANGE",
   UNEXPECTED: "SCHEDULING_UNEXPECTED",
 } as const;

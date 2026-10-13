@@ -44,14 +44,26 @@ describe("getCurrentTimeZoneSetting", () => {
     });
   });
 
+  it("returns the unchosen default without a session and reads no profile", async () => {
+    getUser.mockResolvedValue({ data: { user: null } });
+
+    expect(await getCurrentTimeZoneSetting()).toEqual({
+      status: "ok",
+      timeZone: "UTC",
+      chosen: false,
+    });
+    expect(findById).not.toHaveBeenCalled();
+  });
+
   it("reports a read failure explicitly, with the UTC display fallback", async () => {
     const boom = new Error("db down");
     findById.mockRejectedValue(boom);
 
-    expect(await getCurrentTimeZoneSetting()).toEqual({
+    // No `chosen` on a failure: the read cannot tell whether a zone was
+    // chosen, so the result must not claim "unchosen".
+    expect(await getCurrentTimeZoneSetting()).toStrictEqual({
       status: "failed",
       timeZone: "UTC",
-      chosen: false,
     });
     expect(captureException).toHaveBeenCalledWith(boom);
   });
