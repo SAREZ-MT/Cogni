@@ -95,7 +95,6 @@ describe("SettingsPage", () => {
     getCurrentTimeZoneSetting.mockResolvedValue({
       status: "failed",
       timeZone: "UTC",
-      chosen: false,
     });
     vi.spyOn(Intl.DateTimeFormat.prototype, "resolvedOptions").mockReturnValue({
       timeZone: "America/Mexico_City",

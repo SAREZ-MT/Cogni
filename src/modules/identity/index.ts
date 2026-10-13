@@ -31,11 +31,12 @@ export type { Profile, SessionUser, TimeZoneSetting };
 
 // The shell's time-zone read with an explicit failure state: a failed read
 // still carries the UTC display fallback (the calendar keeps working), but
-// Configuración must not mistake it for "never chosen" and offer to
+// carries no `chosen` flag — the read cannot tell whether a zone was chosen,
+// so Configuración must not mistake it for "never chosen" and offer to
 // overwrite the stored zone.
 export type CurrentTimeZoneSetting =
   | ({ status: "ok" } & TimeZoneSetting)
-  | { status: "failed"; timeZone: string; chosen: false };
+  | { status: "failed"; timeZone: string };
 
 export async function getCurrentUser(): Promise<SessionUser | null> {
   const supabase = await createSupabaseServerClient();
@@ -83,7 +84,7 @@ export async function getCurrentTimeZoneSetting(): Promise<CurrentTimeZoneSettin
   } catch (error) {
     unstable_rethrow(error);
     Sentry.captureException(error);
-    return { status: "failed", timeZone: DEFAULT_TIMEZONE, chosen: false };
+    return { status: "failed", timeZone: DEFAULT_TIMEZONE };
   }
 }
 

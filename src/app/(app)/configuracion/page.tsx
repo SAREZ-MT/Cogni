@@ -19,7 +19,8 @@ import { SetBreadcrumb } from "../_components/breadcrumb";
 export default async function SettingsPage() {
   const setting = await getCurrentTimeZoneSetting();
   const failed = setting.status === "failed";
-  const current = setting.chosen ? setting.timeZone : null;
+  const current =
+    setting.status === "ok" && setting.chosen ? setting.timeZone : null;
 
   return (
     <section className="flex flex-1 flex-col gap-6">
