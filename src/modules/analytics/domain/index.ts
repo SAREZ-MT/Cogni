@@ -15,6 +15,7 @@ export {
   type PageCalibration,
   rollupCalibration,
 } from "./calibration";
+export { ANALYTICS_ERROR } from "./errors";
 export {
   addDays,
   type DayKey,
@@ -28,6 +29,7 @@ export {
   paddedWindow,
   weekStartOf,
 } from "./local-day";
+export { type PeriodSplit, previousRange, splitPeriods } from "./periods";
 export {
   buildProgress,
   type MasteryLevelName,
@@ -36,6 +38,13 @@ export {
   type PageProgressRow,
   type Progress,
 } from "./progress";
+export type {
+  AnswerOutcomeReader,
+  ExamAnswerFact,
+  PageProgressReader,
+  RecallAnswerFact,
+  ReviewHistoryReader,
+} from "./readers";
 export {
   countReviews,
   type DailyReviews,
