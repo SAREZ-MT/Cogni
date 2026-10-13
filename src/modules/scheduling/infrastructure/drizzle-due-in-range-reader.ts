@@ -67,7 +67,13 @@ export class DrizzleDueInRangeReader implements DueInRangeReader {
       .innerJoin(notebooks, eq(notebooks.id, pages.notebookId))
       .where(and(...this.live(ownerId), lt(studyItems.dueAt, before)))
       .groupBy(pages.id, pages.title, notebooks.id, studyItems.kind)
-      .orderBy(asc(earliest), asc(pages.id), asc(sql`${studyItems.kind}`));
+      // Kind in byte order (collate "C"), the code-unit order of the
+      // in-memory reader, whatever the database's default collation.
+      .orderBy(
+        asc(earliest),
+        asc(pages.id),
+        asc(sql`${studyItems.kind} collate "C"`),
+      );
     // min() over a non-empty group is never null.
     return rows.map((row) => ({
       ...row,

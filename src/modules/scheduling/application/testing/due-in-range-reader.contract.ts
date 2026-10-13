@@ -245,6 +245,27 @@ export function runDueInRangeReaderContract(
       ).toEqual([mine.pageId]);
     });
 
+    it("breaks overdue ties on the same page and due date by kind in code-unit order", async () => {
+      const ctx = options.context();
+      const reader = options.createReader();
+      const page = await ctx.newPage();
+      const dueAt = daysFromStart(-3);
+      for (const kind of [
+        "recall_question",
+        "flashcard",
+        "exam_question",
+      ] as const) {
+        await ctx.addItem(page, { kind, dueAt });
+      }
+
+      const rows = await overdueFor(reader, ctx.ownerId, [page]);
+      expect(rows.map((row) => row.kind)).toEqual([
+        "exam_question",
+        "flashcard",
+        "recall_question",
+      ]);
+    });
+
     it("orders rows by earliest due date, then page id, then technique", async () => {
       const ctx = options.context();
       const reader = options.createReader();
