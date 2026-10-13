@@ -55,6 +55,35 @@ describe("parseCalendarQuery", () => {
       parseCalendarQuery({ view: ["mes", "semana"], date: ["x"] }, TODAY),
     ).toEqual({ view: "mes", anchor: TODAY });
   });
+
+  // The grid math reads up to six weeks around the anchor; a far-future
+  // date would overflow into expanded years (+010000-…), so only days of
+  // the calendar window (1970-01-01 … 9998-12-31) are accepted.
+  it("falls back to today for a date outside the calendar window", () => {
+    for (const date of ["9999-12-31", "9999-01-01", "1969-12-31"]) {
+      expect(parseCalendarQuery({ view: "mes", date }, TODAY).anchor).toBe(
+        TODAY,
+      );
+    }
+    for (const date of ["9998-12-31", "1970-01-01"]) {
+      expect(parseCalendarQuery({ view: "mes", date }, TODAY).anchor).toBe(
+        date,
+      );
+    }
+  });
+
+  it("builds well-formed views at the window's edges", () => {
+    const month = monthView({ anchor: "9998-12-31", today: TODAY, days: [] });
+    expect(month.title).toBe("Diciembre 9998");
+    expect(month.nav.next.href).toBe("/calendario?view=mes&date=9999-01-01");
+    expect(month.cells.at(-1)?.day).toBe("9999-01-03");
+    const week = weekView({ anchor: "1970-01-01", today: TODAY, days: [] });
+    expect(week.cells[0]?.day).toBe("1969-12-29");
+    expect(weekRange("9998-12-31")).toEqual({
+      fromDay: "9998-12-28",
+      toDay: "9999-01-04",
+    });
+  });
 });
 
 describe("calendarHref", () => {

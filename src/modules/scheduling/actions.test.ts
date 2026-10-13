@@ -146,6 +146,14 @@ describe("listCalendarDaysAction", () => {
     ["an empty range", { ...WEEK, toDay: WEEK.fromDay }],
     ["a range over 6 weeks", { ...WEEK, toDay: "2026-11-17" }],
     ["an unknown zone", { ...WEEK, timeZone: "Mars/Olympus" }],
+    [
+      "a range past the calendar window",
+      { ...WEEK, fromDay: "9999-01-04", toDay: "9999-01-11" },
+    ],
+    [
+      "a range before the calendar window",
+      { ...WEEK, fromDay: "1969-12-22", toDay: "1969-12-29" },
+    ],
   ])("rejects %s without reading", async (_label, input) => {
     getCurrentUser.mockResolvedValue({ id: "owner-1" });
     const spy = vi.spyOn(reader, "listDueInRange");
@@ -155,6 +163,26 @@ describe("listCalendarDaysAction", () => {
       error: expect.objectContaining({ code: "SCHEDULING_INVALID_RANGE" }),
     });
     expect(spy).not.toHaveBeenCalled();
+  });
+
+  // The month grids of the calendar window's edge months reach past it
+  // (1969-12-29, 9999-01-03); a range is valid while it holds a window day.
+  it.each([
+    [
+      "the first window month",
+      { ...WEEK, fromDay: "1969-12-29", toDay: "1970-02-02" },
+    ],
+    [
+      "the last window month",
+      { ...WEEK, fromDay: "9998-11-30", toDay: "9999-01-04" },
+    ],
+  ])("accepts the grid of %s", async (_label, input) => {
+    getCurrentUser.mockResolvedValue({ id: "owner-1" });
+
+    expect(await listCalendarDaysAction(input)).toEqual({
+      ok: true,
+      value: [],
+    });
   });
 
   it("never throws: an infrastructure failure becomes an ActionError", async () => {

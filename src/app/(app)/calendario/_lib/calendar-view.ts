@@ -2,7 +2,7 @@ import {
   addDays,
   type CalendarDayPageView,
   type DayKey,
-  isDayKey,
+  isCalendarDay,
   monthGridDays,
   monthOf,
   weekDays,
@@ -67,7 +67,11 @@ function first(value: string | string[] | undefined): string | undefined {
 }
 
 // `?view=semana|mes` picks the tab (Hoy by default) and `?date=YYYY-MM-DD`
-// the shown period (today by default); anything else falls back.
+// the shown period (today by default); anything else falls back, including
+// days outside the calendar window (1970-01-01 … 9998-12-31), whose grids
+// would overflow four-digit years. The window's edge months still render;
+// their outward navigation link lands on an out-of-window date and so
+// falls back to today.
 export function parseCalendarQuery(
   params: { view?: string | string[]; date?: string | string[] },
   today: DayKey,
@@ -76,7 +80,7 @@ export function parseCalendarQuery(
   const date = first(params.date);
   return {
     view: VIEWS.find((candidate) => candidate === view) ?? "hoy",
-    anchor: isDayKey(date) ? date : today,
+    anchor: isCalendarDay(date) ? date : today,
   };
 }
 

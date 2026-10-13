@@ -3,9 +3,12 @@ import {
   addDays,
   type CalendarItem,
   dayKeyIn,
+  FIRST_CALENDAR_DAY,
   groupCalendarDays,
+  isCalendarDay,
   isDayKey,
   isTimeZone,
+  LAST_CALENDAR_DAY,
   monthGridDays,
   monthOf,
   paddedRange,
@@ -26,6 +29,32 @@ describe("isDayKey", () => {
   });
 });
 
+describe("isCalendarDay", () => {
+  it("accepts real days inside the calendar's window only", () => {
+    expect([FIRST_CALENDAR_DAY, LAST_CALENDAR_DAY]).toEqual([
+      "1970-01-01",
+      "9998-12-31",
+    ]);
+    expect(isCalendarDay("2026-10-12")).toBe(true);
+    expect(isCalendarDay("1970-01-01")).toBe(true);
+    expect(isCalendarDay("9998-12-31")).toBe(true);
+    expect(isCalendarDay("1969-12-31")).toBe(false);
+    expect(isCalendarDay("9999-01-01")).toBe(false);
+    expect(isCalendarDay("9999-12-31")).toBe(false);
+    expect(isCalendarDay("2026-02-30")).toBe(false);
+    expect(isCalendarDay(undefined)).toBe(false);
+  });
+
+  it("keeps every grid and padded range of a window day four-digit", () => {
+    for (const day of [FIRST_CALENDAR_DAY, LAST_CALENDAR_DAY]) {
+      const grid = monthGridDays(day);
+      expect(grid.every(isDayKey)).toBe(true);
+      expect(isDayKey(addDays(grid.at(-1) as string, 42))).toBe(true);
+      expect(weekDays(day).every(isDayKey)).toBe(true);
+    }
+  });
+});
+
 describe("isTimeZone", () => {
   it("accepts names Intl can format in and rejects the rest", () => {
     expect(isTimeZone("America/Bogota")).toBe(true);
@@ -43,6 +72,11 @@ describe("addDays", () => {
     expect(addDays("2028-03-01", -1)).toBe("2028-02-29");
     expect(addDays("2026-10-12", -42)).toBe("2026-08-31");
     expect(addDays("2026-10-12", 0)).toBe("2026-10-12");
+  });
+
+  it("throws instead of returning a key outside four-digit years", () => {
+    expect(() => addDays("9999-12-31", 1)).toThrow(RangeError);
+    expect(() => monthGridDays("9999-12-31")).toThrow(RangeError);
   });
 });
 

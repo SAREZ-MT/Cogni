@@ -15,8 +15,10 @@ import { listCalendarDays, listDueToday } from "./application";
 import {
   addDays,
   type CalendarDayPage,
+  FIRST_CALENDAR_DAY,
   isDayKey,
   isTimeZone,
+  LAST_CALENDAR_DAY,
 } from "./domain/calendar";
 import type { DueTodayPage } from "./domain/due-today";
 import { SCHEDULING_ERROR } from "./domain/errors";
@@ -69,6 +71,9 @@ export async function listDueTodayAction(): Promise<
   }
 }
 
+// A range must hold at least one day of the calendar window: the grids of
+// its edge months reach a week past it, and with the 42-day cap every
+// bound stays within four-digit years (no expanded-year keys downstream).
 function isValidRange(input: {
   fromDay: unknown;
   toDay: unknown;
@@ -77,6 +82,8 @@ function isValidRange(input: {
   return (
     isDayKey(input.fromDay) &&
     isDayKey(input.toDay) &&
+    input.fromDay <= LAST_CALENDAR_DAY &&
+    input.toDay > FIRST_CALENDAR_DAY &&
     input.fromDay < input.toDay &&
     input.toDay <= addDays(input.fromDay, MAX_RANGE_DAYS) &&
     isTimeZone(input.timeZone)

@@ -22,14 +22,38 @@ function utcMidnight(key: DayKey): number {
   return Date.UTC(year, month - 1, day);
 }
 
+// Throws rather than return a malformed key: past year 9999 (or before
+// 0000) toISOString switches to expanded years ("+010000-01-01"), which
+// would leak into labels, hrefs and range checks.
 function keyOfUtc(ms: number): DayKey {
-  return new Date(ms).toISOString().slice(0, 10);
+  const date = new Date(ms);
+  const key = Number.isNaN(date.getTime())
+    ? ""
+    : date.toISOString().slice(0, 10);
+  if (!DAY_KEY.test(key)) {
+    throw new RangeError(`day outside four-digit years: ${ms}`);
+  }
+  return key;
 }
 
 export function isDayKey(value: unknown): value is DayKey {
   if (typeof value !== "string" || !DAY_KEY.test(value)) return false;
   // Round-trip rejects impossible dates such as 2026-02-30.
   return keyOfUtc(utcMidnight(value)) === value;
+}
+
+// The days the calendar accepts as an anchor or a range bound. Every grid
+// and range around them (six weeks at most, padded by a day) stays within
+// four-digit years: the last full year before 9999 leaves room for the
+// month grid's trailing week and the action's 42-day range. The epoch is
+// the floor; no study item can be due before it.
+export const FIRST_CALENDAR_DAY: DayKey = "1970-01-01";
+export const LAST_CALENDAR_DAY: DayKey = "9998-12-31";
+
+export function isCalendarDay(value: unknown): value is DayKey {
+  return (
+    isDayKey(value) && value >= FIRST_CALENDAR_DAY && value <= LAST_CALENDAR_DAY
+  );
 }
 
 // True for a zone Intl can format in (the profile stores ICU's canonical
