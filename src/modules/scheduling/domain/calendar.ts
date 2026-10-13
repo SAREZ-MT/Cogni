@@ -38,8 +38,14 @@ function keyOfUtc(ms: number): DayKey {
 
 export function isDayKey(value: unknown): value is DayKey {
   if (typeof value !== "string" || !DAY_KEY.test(value)) return false;
-  // Round-trip rejects impossible dates such as 2026-02-30.
-  return keyOfUtc(utcMidnight(value)) === value;
+  // Round-trip rejects impossible dates such as 2026-02-30. A shape-valid
+  // key that rolls over past year 9999 (9999-12-32) makes keyOfUtc throw;
+  // it is not a day either.
+  try {
+    return keyOfUtc(utcMidnight(value)) === value;
+  } catch {
+    return false;
+  }
 }
 
 // The days the calendar accepts as an anchor or a range bound. Every grid

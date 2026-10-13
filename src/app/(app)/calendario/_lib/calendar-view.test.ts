@@ -49,6 +49,9 @@ describe("parseCalendarQuery", () => {
   it("falls back on unknown views, malformed dates and repeated params", () => {
     expect(parseCalendarQuery({ view: "año" }, TODAY).view).toBe("hoy");
     expect(
+      parseCalendarQuery({ view: "mes", date: "9999-12-32" }, TODAY).anchor,
+    ).toBe(TODAY);
+    expect(
       parseCalendarQuery({ view: "mes", date: "2026-02-30" }, TODAY).anchor,
     ).toBe(TODAY);
     expect(

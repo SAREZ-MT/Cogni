@@ -27,6 +27,12 @@ describe("isDayKey", () => {
     expect(isDayKey(20261012)).toBe(false);
     expect(isDayKey(null)).toBe(false);
   });
+
+  it("rejects shape-valid keys that roll over past year 9999 instead of throwing", () => {
+    expect(isDayKey("9999-12-32")).toBe(false);
+    expect(isDayKey("9999-99-01")).toBe(false);
+    expect(isDayKey("9999-12-31")).toBe(true);
+  });
 });
 
 describe("isCalendarDay", () => {
