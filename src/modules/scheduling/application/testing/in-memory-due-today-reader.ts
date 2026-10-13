@@ -1,3 +1,5 @@
+import type { CalendarItem } from "../../domain/calendar";
+import type { DueInRangeReader } from "../../domain/due-in-range-reader";
 import {
   compareDueTodayPages,
   type DueKind,
@@ -29,11 +31,14 @@ interface ItemRow {
   suspended: boolean;
 }
 
-// In-memory DueTodayReader for unit tests; satisfies the shared contract
-// (due-today-reader.contract.ts). It stands in for the notebooks, pages and
+// In-memory DueTodayReader and DueInRangeReader for unit tests; satisfies
+// both shared contracts (due-today-reader.contract.ts,
+// due-in-range-reader.contract.ts). It stands in for the notebooks, pages and
 // study_items tables, so tests seed it directly. An item belongs to its
 // page's owner, as in the database.
-export class InMemoryDueTodayReader implements DueTodayReader {
+export class InMemoryDueTodayReader
+  implements DueTodayReader, DueInRangeReader
+{
   private readonly notebooks = new Map<string, NotebookRow>();
   private readonly pages = new Map<string, PageRow>();
   private readonly items: ItemRow[] = [];
@@ -95,5 +100,35 @@ export class InMemoryDueTodayReader implements DueTodayReader {
       byPage.set(page.id, row);
     }
     return [...byPage.values()].sort(compareDueTodayPages);
+  }
+
+  async listDueInRange(
+    ownerId: string,
+    from: Date,
+    to: Date,
+  ): Promise<CalendarItem[]> {
+    const rows: CalendarItem[] = [];
+    for (const item of this.items) {
+      const due = item.dueAt.getTime();
+      if (item.suspended || due < from.getTime() || due >= to.getTime()) {
+        continue;
+      }
+      const page = this.pages.get(item.pageId);
+      if (!page || page.archived || page.ownerId !== ownerId) continue;
+      const notebook = this.notebooks.get(page.notebookId);
+      if (!notebook || notebook.archived) continue;
+      rows.push({
+        pageId: page.id,
+        pageTitle: page.title,
+        notebookId: notebook.id,
+        kind: item.kind,
+        dueAt: item.dueAt,
+      });
+    }
+    return rows.sort(
+      (a, b) =>
+        a.dueAt.getTime() - b.dueAt.getTime() ||
+        (a.pageId < b.pageId ? -1 : a.pageId > b.pageId ? 1 : 0),
+    );
   }
 }

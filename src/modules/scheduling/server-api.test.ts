@@ -16,7 +16,24 @@ const ROW: DueTodayPage = {
   earliestDueAt: NOW,
 };
 const calls: Array<{ ownerId: string; now: Date }> = [];
+const rangeCalls: Array<{ ownerId: string; from: Date; to: Date }> = [];
 vi.mock("./infrastructure", () => ({
+  DrizzleDueInRangeReader: vi.fn(function DrizzleDueInRangeReader() {
+    return {
+      async listDueInRange(ownerId: string, from: Date, to: Date) {
+        rangeCalls.push({ ownerId, from, to });
+        return [
+          {
+            pageId: "page-1",
+            pageTitle: "Mitocondria",
+            notebookId: "nb-1",
+            kind: "recall_question",
+            dueAt: new Date("2026-10-08T15:00:00.000Z"),
+          },
+        ];
+      },
+    };
+  }),
   DrizzleDueTodayReader: vi.fn(function DrizzleDueTodayReader() {
     return {
       async listDueToday(ownerId: string, now: Date) {
@@ -38,5 +55,36 @@ describe("createSchedulingServerApi", () => {
 
     await expect(api.listDueToday("owner-1")).resolves.toEqual([ROW]);
     expect(calls).toEqual([{ ownerId: "owner-1", now: NOW }]);
+  });
+
+  it("lists the owner's calendar days at the clock's now", async () => {
+    const api = createSchedulingServerApi({
+      db: {} as never,
+      clock: createFixedClock(NOW),
+    });
+
+    await expect(
+      api.listCalendarDays("owner-1", {
+        fromDay: "2026-10-05",
+        toDay: "2026-10-12",
+        timeZone: "UTC",
+      }),
+    ).resolves.toEqual([
+      {
+        day: "2026-10-08",
+        pageId: "page-1",
+        pageTitle: "Mitocondria",
+        notebookId: "nb-1",
+        due: { flashcard: 0, exam_question: 0, recall_question: 1 },
+      },
+    ]);
+    // The range holds today (NOW), so overdue items are read too.
+    expect(rangeCalls).toEqual([
+      {
+        ownerId: "owner-1",
+        from: new Date(0),
+        to: new Date("2026-10-12T14:00:00.000Z"),
+      },
+    ]);
   });
 });

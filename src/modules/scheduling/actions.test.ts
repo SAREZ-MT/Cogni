@@ -17,9 +17,14 @@ vi.mock("./infrastructure", () => ({
       return reader.listDueToday(ownerId, now);
     }
   },
+  DrizzleDueInRangeReader: class {
+    listDueInRange(ownerId: string, from: Date, to: Date) {
+      return reader.listDueInRange(ownerId, from, to);
+    }
+  },
 }));
 
-import { listDueTodayAction } from "./actions";
+import { listCalendarDaysAction, listDueTodayAction } from "./actions";
 
 const NOW = new Date("2026-10-04T12:00:00.000Z");
 
@@ -81,6 +86,82 @@ describe("listDueTodayAction", () => {
     const result = await listDueTodayAction();
 
     expect(result).toEqual({
+      ok: false,
+      error: expect.objectContaining({ code: "SCHEDULING_UNEXPECTED" }),
+    });
+    expect(captureException).toHaveBeenCalled();
+  });
+});
+
+describe("listCalendarDaysAction", () => {
+  const WEEK = {
+    fromDay: "2026-10-05",
+    toDay: "2026-10-12",
+    timeZone: "UTC",
+  };
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    // Thursday 2026-10-01: the week above lies in the future.
+    vi.setSystemTime(new Date("2026-10-01T12:00:00.000Z"));
+    reader = new InMemoryDueTodayReader();
+    getCurrentUser.mockReset();
+    captureException.mockReset();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("requires a session", async () => {
+    getCurrentUser.mockResolvedValue(null);
+    expect(await listCalendarDaysAction(WEEK)).toEqual({
+      ok: false,
+      error: expect.objectContaining({ code: "SCHEDULING_SESSION_REQUIRED" }),
+    });
+  });
+
+  it("lists the caller's pages per local day in the range", async () => {
+    getCurrentUser.mockResolvedValue({ id: "owner-1" });
+    seedPage("p-in", "owner-1", new Date("2026-10-07T09:00:00.000Z"));
+    seedPage("p-out", "owner-1", new Date("2026-10-12T09:00:00.000Z"));
+    seedPage("p-other", "owner-2", new Date("2026-10-07T09:00:00.000Z"));
+
+    expect(await listCalendarDaysAction(WEEK)).toEqual({
+      ok: true,
+      value: [
+        {
+          day: "2026-10-07",
+          pageId: "p-in",
+          pageTitle: "Mitosis",
+          notebookId: "nb-p-in",
+          due: { flashcard: 1, exam_question: 0, recall_question: 0 },
+        },
+      ],
+    });
+  });
+
+  it.each([
+    ["a malformed day", { ...WEEK, fromDay: "2026-10-5" }],
+    ["an impossible day", { ...WEEK, toDay: "2026-02-30" }],
+    ["an empty range", { ...WEEK, toDay: WEEK.fromDay }],
+    ["a range over 6 weeks", { ...WEEK, toDay: "2026-11-17" }],
+    ["an unknown zone", { ...WEEK, timeZone: "Mars/Olympus" }],
+  ])("rejects %s without reading", async (_label, input) => {
+    getCurrentUser.mockResolvedValue({ id: "owner-1" });
+    const spy = vi.spyOn(reader, "listDueInRange");
+
+    expect(await listCalendarDaysAction(input)).toEqual({
+      ok: false,
+      error: expect.objectContaining({ code: "SCHEDULING_INVALID_RANGE" }),
+    });
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it("never throws: an infrastructure failure becomes an ActionError", async () => {
+    getCurrentUser.mockResolvedValue({ id: "owner-1" });
+    vi.spyOn(reader, "listDueInRange").mockRejectedValue(new Error("db down"));
+
+    expect(await listCalendarDaysAction(WEEK)).toEqual({
       ok: false,
       error: expect.objectContaining({ code: "SCHEDULING_UNEXPECTED" }),
     });
