@@ -227,6 +227,29 @@ export function runAnalyticsReadersContract(
       ]);
     });
 
+    it("breaks bucket ties by technique name in code-unit order", async () => {
+      const ctx = options.context();
+      const { reviews } = options.createReaders();
+      const page = await ctx.newPage();
+      const day = "2001-04-05";
+      const startsAt = new Date(`${day}T09:00:00Z`);
+      for (const technique of ["recall", "flashcards", "exam"] as const) {
+        await ctx.addReview(page, {
+          technique,
+          quality: 3,
+          reviewedAt: new Date(`${day}T09:07:00Z`),
+        });
+      }
+
+      expect(
+        bucketsOn(await reviews.listReviewBuckets(ctx.ownerId), day),
+      ).toEqual([
+        { technique: "exam", startsAt },
+        { technique: "flashcards", startsAt },
+        { technique: "recall", startsAt },
+      ]);
+    });
+
     it("keeps buckets owner-scoped and skips archived pages and notebooks", async () => {
       const ctx = options.context();
       const { reviews } = options.createReaders();

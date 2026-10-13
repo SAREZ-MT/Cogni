@@ -42,12 +42,19 @@ export class DrizzleReviewHistoryReader implements ReviewHistoryReader {
   }
 
   async listReviewBuckets(ownerId: string): Promise<ReviewBucket[]> {
+    // Ties break on the technique name in byte order (collate "C"), the
+    // code-unit order the in-memory store uses, whatever the database's
+    // default collation; SELECT DISTINCT needs the collated expression in
+    // the select list to order by it.
+    const technique = sql<
+      ReviewBucket["technique"]
+    >`${reviewLogs.sessionKind} collate "C"`;
     // 15-minute UTC buckets: every zone offset in use is a multiple of 15
     // minutes, so a bucket never spans two local days.
     const startsAt = sql`date_bin('15 minutes', ${reviewLogs.reviewedAt}, timestamptz '2000-01-01 00:00:00+00')`;
     return this.db
       .selectDistinct({
-        technique: reviewLogs.sessionKind,
+        technique,
         startsAt: startsAt.mapWith(reviewLogs.reviewedAt),
       })
       .from(reviewLogs)
@@ -55,6 +62,6 @@ export class DrizzleReviewHistoryReader implements ReviewHistoryReader {
       .innerJoin(pages, eq(pages.id, studyItems.pageId))
       .innerJoin(notebooks, eq(notebooks.id, pages.notebookId))
       .where(and(eq(reviewLogs.ownerId, ownerId), ...livePage))
-      .orderBy(asc(startsAt), asc(reviewLogs.sessionKind));
+      .orderBy(asc(startsAt), asc(technique));
   }
 }

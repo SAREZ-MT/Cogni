@@ -12,7 +12,8 @@ export interface ReviewHistoryReader {
   // reviewed_at.
   listReviews(ownerId: string, from: Date, to: Date): Promise<ReviewFact[]>;
   // The whole history reduced to distinct (technique, 15-minute UTC
-  // bucket) pairs, ordered by bucket then technique: enough to find every
+  // bucket) pairs, ordered by bucket then technique name in code-unit
+  // (byte) order, independent of the database collation: enough to find every
   // local day with a review in any zone, bounded by the time spent
   // reviewing instead of by the number of reviews.
   listReviewBuckets(ownerId: string): Promise<ReviewBucket[]>;
