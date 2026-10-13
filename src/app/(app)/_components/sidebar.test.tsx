@@ -70,8 +70,8 @@ describe("Sidebar", () => {
 
     expect(screen.getByText("Menú principal")).toBeInTheDocument();
     expect(screen.getByText("Técnicas")).toBeInTheDocument();
-    // "Configuración" is both the section label and its one (disabled) nav
-    // item's label; scope to the label element specifically.
+    // "Configuración" is both the section label and its one nav item's
+    // label; scope to the label element specifically.
     expect(
       screen.getByText("Configuración", { selector: "p" }),
     ).toBeInTheDocument();
@@ -254,6 +254,17 @@ describe("Sidebar", () => {
     );
   });
 
+  // Configuración is live since Phase 7 T2a (the time-zone setting).
+  it("marks Configuración active on its own routes", () => {
+    pathname.current = "/configuracion";
+    render(<Sidebar initialCollapsed={false} user={USER} previewsEnabled />);
+
+    expect(screen.getByRole("link", { name: "Configuración" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+  });
+
   // Every design preview (Dashboard) has its route now, and Flashcards,
   // Exámenes, Active recall and Calendario run on real data.
   describe.each([
@@ -277,6 +288,25 @@ describe("Sidebar", () => {
       );
       expect(
         screen.getByText("Calendario").closest("[aria-disabled]"),
+      ).toBeNull();
+    });
+
+    it("links Configuración to /configuracion as a live entry", () => {
+      render(
+        <Sidebar
+          initialCollapsed={false}
+          user={USER}
+          previewsEnabled={previewsEnabled}
+        />,
+      );
+
+      expect(
+        screen.getByRole("link", { name: "Configuración" }),
+      ).toHaveAttribute("href", "/configuracion");
+      expect(
+        screen
+          .getByRole("link", { name: "Configuración" })
+          .closest("[aria-disabled]"),
       ).toBeNull();
     });
 

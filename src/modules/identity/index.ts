@@ -1,9 +1,15 @@
 import "server-only";
 import * as Sentry from "@sentry/nextjs";
+import { unstable_rethrow } from "next/navigation";
 import { getDb } from "@/shared/db/client";
 import { systemClock } from "@/shared/kernel/clock";
-import { ensureProfileResilient } from "./application";
+import {
+  ensureProfileResilient,
+  getTimeZoneSetting,
+  type TimeZoneSetting,
+} from "./application";
 import type { Profile } from "./domain";
+import { DEFAULT_TIMEZONE } from "./domain";
 import {
   createSupabaseServerClient,
   DrizzleProfileRepository,
@@ -16,11 +22,20 @@ import {
 export { safeNext } from "./application";
 export {
   hasAcceptedCurrentTerms,
+  hasChosenTimeZone,
   TERMS_PATH,
   TERMS_VERSION,
   termsRedirectFor,
 } from "./domain";
-export type { Profile, SessionUser };
+export type { Profile, SessionUser, TimeZoneSetting };
+
+// The shell's time-zone read with an explicit failure state: a failed read
+// still carries the UTC display fallback (the calendar keeps working), but
+// Configuración must not mistake it for "never chosen" and offer to
+// overwrite the stored zone.
+export type CurrentTimeZoneSetting =
+  | ({ status: "ok" } & TimeZoneSetting)
+  | { status: "failed"; timeZone: string; chosen: false };
 
 export async function getCurrentUser(): Promise<SessionUser | null> {
   const supabase = await createSupabaseServerClient();
@@ -48,6 +63,28 @@ export async function ensureProfileForUser(
       onTransientFailure: (error) => Sentry.captureException(error),
     },
   );
+}
+
+// The signed-in user's time zone for presentation (calendar "Hoy", the
+// settings page). Without a session it is the unchosen default. A read
+// failure is reported to Sentry and returned as `failed` (with the UTC
+// display fallback); Next.js control-flow errors (redirect, dynamic usage)
+// are rethrown to the framework first.
+export async function getCurrentTimeZoneSetting(): Promise<CurrentTimeZoneSetting> {
+  try {
+    const user = await getCurrentUser();
+    if (!user)
+      return { status: "ok", timeZone: DEFAULT_TIMEZONE, chosen: false };
+    const setting = await getTimeZoneSetting(
+      { ownerId: user.id },
+      { profiles: new DrizzleProfileRepository(getDb()) },
+    );
+    return { status: "ok", ...setting };
+  } catch (error) {
+    unstable_rethrow(error);
+    Sentry.captureException(error);
+    return { status: "failed", timeZone: DEFAULT_TIMEZONE, chosen: false };
+  }
 }
 
 // OAuth and email-link callback: trades the PKCE code for session cookies.

@@ -17,6 +17,7 @@ import {
   SIDEBAR_COOKIE,
 } from "./_components/sidebar-cookie";
 import { TechniquesPanelSlot } from "./_components/techniques-panel-slot";
+import { TimeZoneDetection } from "./_components/time-zone-detection";
 import { Topbar } from "./_components/topbar";
 
 // Authenticated shell. The proxy already redirects anonymous visitors; the
@@ -91,6 +92,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
               server-detecting the active route here. */}
           <TechniquesPanelSlot />
         </div>
+        <TimeZoneDetection profile={profile} />
       </BreadcrumbProvider>
     </QueryProvider>
   );

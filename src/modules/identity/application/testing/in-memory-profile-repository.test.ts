@@ -91,3 +91,81 @@ describe("InMemoryProfileRepository.acceptTerms", () => {
     expect(repository.count()).toBe(0);
   });
 });
+
+// Same behaviours as tests/db/drizzle-profile-repository.time-zone.test.ts
+// against the real table.
+describe("InMemoryProfileRepository.updateTimeZone", () => {
+  const AT = new Date("2026-10-12T12:00:00.000Z");
+
+  it("sets the zone and updatedAt on the existing row", async () => {
+    const repository = new InMemoryProfileRepository();
+    await repository.upsert(profile({ displayName: "Ana" }));
+
+    const updated = await repository.updateTimeZone(
+      OWNER_ID,
+      "America/Bogota",
+      AT,
+    );
+
+    expect(updated).toMatchObject({
+      displayName: "Ana",
+      timezone: "America/Bogota",
+      updatedAt: AT,
+    });
+    expect(await repository.findById(OWNER_ID)).toEqual(updated);
+  });
+
+  it("overwrites a previous choice by default", async () => {
+    const repository = new InMemoryProfileRepository();
+    await repository.upsert(profile({}));
+    await repository.updateTimeZone(OWNER_ID, "America/Bogota", AT);
+
+    await repository.updateTimeZone(OWNER_ID, "Europe/Madrid", AT);
+
+    expect((await repository.findById(OWNER_ID))?.timezone).toBe(
+      "Europe/Madrid",
+    );
+  });
+
+  it("with onlyIfUnset writes over the default zone", async () => {
+    const repository = new InMemoryProfileRepository();
+    await repository.upsert(profile({}));
+
+    const updated = await repository.updateTimeZone(
+      OWNER_ID,
+      "America/Bogota",
+      AT,
+      { onlyIfUnset: true },
+    );
+
+    expect(updated?.timezone).toBe("America/Bogota");
+  });
+
+  it("with onlyIfUnset leaves a chosen zone untouched and returns null", async () => {
+    const repository = new InMemoryProfileRepository();
+    await repository.upsert(profile({}));
+    await repository.updateTimeZone(OWNER_ID, "Etc/UTC", AT);
+
+    const updated = await repository.updateTimeZone(
+      OWNER_ID,
+      "America/Bogota",
+      new Date("2026-10-13T00:00:00.000Z"),
+      { onlyIfUnset: true },
+    );
+
+    expect(updated).toBeNull();
+    expect(await repository.findById(OWNER_ID)).toMatchObject({
+      timezone: "Etc/UTC",
+      updatedAt: AT,
+    });
+  });
+
+  it("returns null for an unknown id", async () => {
+    const repository = new InMemoryProfileRepository();
+
+    expect(
+      await repository.updateTimeZone(OWNER_ID, "America/Bogota", AT),
+    ).toBeNull();
+    expect(repository.count()).toBe(0);
+  });
+});

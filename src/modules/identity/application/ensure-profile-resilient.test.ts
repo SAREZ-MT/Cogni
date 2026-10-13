@@ -37,6 +37,15 @@ class FlakyProfileRepository implements ProfileRepository {
   ): Promise<Profile | null> {
     return this.inner.acceptTerms(id, version, at);
   }
+
+  async updateTimeZone(
+    id: string,
+    timeZone: string,
+    at: Date,
+    options?: { onlyIfUnset?: boolean },
+  ): Promise<Profile | null> {
+    return this.inner.updateTimeZone(id, timeZone, at, options);
+  }
 }
 
 describe("ensureProfileResilient", () => {

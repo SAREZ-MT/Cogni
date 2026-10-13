@@ -66,8 +66,8 @@ test.describe("app shell", () => {
   // Design previews (Dashboard) are hidden in production builds, which is
   // what this suite runs against (`next build && next start`): they render
   // as disabled "pronto" rows instead of links. Flashcards (Phase 3),
-  // Exámenes (Phase 5 T9), Active recall (Phase 6 T7) and Calendario
-  // (Phase 7 T1) run on real data, so they are always live links.
+  // Exámenes (Phase 5 T9), Active recall (Phase 6 T7), Calendario
+  // (Phase 7 T1) and Configuración (Phase 7 T2a) are always live links.
   test("sidebar lists the preview areas as disabled 'pronto' entries", async ({
     page,
   }) => {
@@ -87,6 +87,10 @@ test.describe("app shell", () => {
     await expect(
       sidebar.getByRole("link", { name: "Calendario" }),
     ).toHaveAttribute("href", "/calendario");
+    // Phase 7 T2a: "Configuración" is a live entry (time-zone setting).
+    await expect(
+      sidebar.getByRole("link", { name: /Configuración/ }),
+    ).toHaveAttribute("href", "/configuracion");
     for (const label of ["Dashboard"]) {
       await expect(sidebar.getByRole("link", { name: label })).toHaveCount(0);
       await expect(

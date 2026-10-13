@@ -111,7 +111,13 @@ const TECNICAS_SECTION: { label: string; items: NavEntry[] } = {
 const CONFIGURACION_SECTION: { label: string; items: NavEntry[] } = {
   label: "Configuración",
   items: [
-    { icon: Settings, label: "Configuración", disabled: true, hint: "pronto" },
+    // Live since Phase 7 T2a: the time-zone setting.
+    {
+      href: "/configuracion",
+      icon: Settings,
+      label: "Configuración",
+      isActive: (path) => path.startsWith("/configuracion"),
+    },
   ],
 };
 

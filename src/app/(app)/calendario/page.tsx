@@ -1,3 +1,4 @@
+import { getCurrentTimeZoneSetting } from "@/modules/identity";
 import { listDueTodayAction } from "@/modules/scheduling";
 import { Card } from "@/shared/ui/card";
 import { DateBadge } from "@/shared/ui/date-badge";
@@ -15,13 +16,16 @@ const VIEWS = [
   { value: "mes", label: "Mes", disabled: true, hint: "Próximamente" },
 ] as const;
 
-// Same convention as the rest of the shell (format.ts): the server's own
-// time zone until the profile time zone is wired into presentation.
-const LONG_DAY = new Intl.DateTimeFormat("es", {
-  weekday: "long",
-  day: "numeric",
-  month: "long",
-});
+// "Lunes, 12 de octubre" in the profile time zone (Phase 7 T2a). The due
+// query itself (`due_at <= now`) does not depend on the zone.
+function longDayOf(date: Date, timeZone: string): string {
+  return new Intl.DateTimeFormat("es", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    timeZone,
+  }).format(date);
+}
 
 function capitalize(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
@@ -43,7 +47,10 @@ function summaryOf(rows: readonly TodayRow[] | null): string | null {
 // event" action. "Hoy" lists the pages with items due now (scheduling's
 // listDueToday), each technique opening its session.
 export default async function CalendarPage() {
-  const result = await listDueTodayAction();
+  const [result, { timeZone }] = await Promise.all([
+    listDueTodayAction(),
+    getCurrentTimeZoneSetting(),
+  ]);
   const rows = result.ok ? toTodayRows(result.value) : null;
   const now = new Date();
   const summary = summaryOf(rows);
@@ -63,11 +70,11 @@ export default async function CalendarPage() {
 
       <Card padding="none" data-testid="calendar-card">
         <div className="flex items-center gap-4 border-border-subtle border-b px-6 py-5">
-          <DateBadge date={now} />
+          <DateBadge date={now} timeZone={timeZone} />
           <div className="min-w-0">
             <h2 className="font-semibold text-fg text-lg leading-tight">Hoy</h2>
             <p className="mt-0.5 text-fg-muted text-sm">
-              {capitalize(LONG_DAY.format(now))}
+              {capitalize(longDayOf(now, timeZone))}
               {summary && (
                 <>
                   {" · "}

@@ -1,7 +1,7 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { Db } from "@/shared/db/client";
 import { type ProfileRow, profiles } from "@/shared/db/schema";
-import type { Profile } from "../domain/profile";
+import { DEFAULT_TIMEZONE, type Profile } from "../domain/profile";
 import type { ProfileRepository } from "../domain/profile-repository";
 
 function toProfile(row: ProfileRow): Profile {
@@ -71,6 +71,27 @@ export class DrizzleProfileRepository implements ProfileRepository {
         updatedAt: at,
       })
       .where(eq(profiles.id, id))
+      .returning();
+    return row ? toProfile(row) : null;
+  }
+
+  // `onlyIfUnset` is a conditional UPDATE (WHERE timezone = default), so a
+  // concurrent explicit choice always wins over the browser detection.
+  async updateTimeZone(
+    id: string,
+    timeZone: string,
+    at: Date,
+    options: { onlyIfUnset?: boolean } = {},
+  ): Promise<Profile | null> {
+    const byId = eq(profiles.id, id);
+    const [row] = await this.db
+      .update(profiles)
+      .set({ timezone: timeZone, updatedAt: at })
+      .where(
+        options.onlyIfUnset
+          ? and(byId, eq(profiles.timezone, DEFAULT_TIMEZONE))
+          : byId,
+      )
       .returning();
     return row ? toProfile(row) : null;
   }
