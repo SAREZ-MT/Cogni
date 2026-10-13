@@ -37,6 +37,30 @@ export async function seedDueItems(
   }
 }
 
+// Inserts `count` items of each kind on the page, due at `dueAt` (future
+// dates for the calendar's "Mes" / "Semana" views).
+export async function seedItemsDueAt(
+  pageId: string,
+  counts: Partial<Record<DueKind, number>>,
+  dueAt: Date,
+): Promise<void> {
+  const sql = connect();
+  try {
+    for (const [kind, count] of Object.entries(counts)) {
+      if (!count) continue;
+      await sql`
+        insert into study_items (id, owner_id, page_id, kind, source_id, due_at)
+        select gen_random_uuid(), p.owner_id, p.id, ${kind}, gen_random_uuid(),
+               ${dueAt}
+        from pages p, generate_series(1, ${count}::int)
+        where p.id = ${pageId}
+      `;
+    }
+  } finally {
+    await sql.end();
+  }
+}
+
 // Removes every study item of the page (the e2e user is shared per worker,
 // so seeded rows must not leak into other specs' due lists).
 export async function clearStudyItems(pageId: string): Promise<void> {

@@ -25,7 +25,7 @@ export interface TodayRow {
 // T5b: Flashcards yellow, Recordación activa green, Examen rose); each
 // opens that technique's session for the page — flashcards straight into
 // the graded review of its due cards (`?repasar=1`).
-const TECHNIQUES: readonly {
+export const TECHNIQUES: readonly {
   kind: DueKind;
   tone: TechniqueTone;
   label: string;

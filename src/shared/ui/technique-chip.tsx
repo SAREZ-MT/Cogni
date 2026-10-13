@@ -16,7 +16,14 @@ export interface TechniqueChipProps
   meta?: ReactNode;
   // Renders the chip as a link (opens that technique's session).
   href?: string;
+  // "dot-when-narrow": inside a container narrower than 42rem (the
+  // CalendarGrid frame) the chip shrinks to a dot in the technique's strong
+  // hue; its label and meta stay in the DOM as screen-reader text.
+  collapse?: "dot-when-narrow";
 }
+
+const COLLAPSE_CLASS =
+  "@max-2xl:size-2.5 @max-2xl:shrink-0 @max-2xl:gap-0 @max-2xl:rounded-full @max-2xl:border-0 @max-2xl:bg-current @max-2xl:p-0";
 
 const CHIP_CLASS =
   "inline-flex min-w-0 items-center justify-between gap-2 rounded-md border border-current/15 px-2 py-1 font-semibold text-xs";
@@ -31,23 +38,34 @@ export function TechniqueChip({
   label,
   meta,
   href,
+  collapse,
   className,
   ...props
 }: TechniqueChipProps) {
+  const collapsed = collapse === "dot-when-narrow";
   const classes = cn(
     CHIP_CLASS,
     TECHNIQUE_PAIR_CLASS[tone],
+    collapsed && COLLAPSE_CLASS,
     href &&
       "transition-[filter] hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
     className,
   );
   const content = (
     <>
-      <span className="truncate">{label}</span>
+      <span
+        data-part="label"
+        className={cn("truncate", collapsed && "@max-2xl:sr-only")}
+      >
+        {label}
+      </span>
       {meta !== undefined && (
         <span
           data-part="meta"
-          className="shrink-0 font-medium tabular-nums opacity-80"
+          className={cn(
+            "shrink-0 font-medium tabular-nums opacity-80",
+            collapsed && "@max-2xl:sr-only",
+          )}
         >
           {meta}
         </span>
@@ -61,6 +79,7 @@ export function TechniqueChip({
         href={href}
         data-slot="technique-chip"
         data-tone={tone}
+        data-collapse={collapse}
         className={classes}
         {...props}
       >
@@ -72,6 +91,7 @@ export function TechniqueChip({
     <span
       data-slot="technique-chip"
       data-tone={tone}
+      data-collapse={collapse}
       className={classes}
       {...props}
     >

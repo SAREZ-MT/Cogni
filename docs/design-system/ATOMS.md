@@ -1358,9 +1358,17 @@ Recordación activa green, Examen rose (`TECHNIQUE_PAIR_CLASS`).
 - Anatomy: `rounded-md border border-current/15 px-2 py-1 text-xs
   font-semibold`, label truncates, meta `font-medium tabular-nums
   opacity-80`. Linked chips add `hover:brightness-95` and the focus ring.
+- `collapse?: "dot-when-narrow"` (Phase 7 T2, narrow month grid): inside a
+  container narrower than 42rem (`@max-2xl`, the `CalendarGrid` frame) the
+  chip shrinks to a 10px round dot filled with the technique's strong hue
+  (`bg-current`); label (`data-part="label"`) and meta become `sr-only`
+  there, so the link keeps its text for assistive tech. Sets
+  `data-collapse`.
 - `data-slot="technique-chip"`, `data-tone={tone}`.
 
-Used by: `calendario/_components/today-list.tsx`.
+Used by: `calendario/_components/today-list.tsx`,
+`calendario/_components/calendar-period.tsx` (month/week events: page title,
+item count, link to the page).
 
 ## DateBadge (`date-badge.tsx`)
 
@@ -1375,7 +1383,7 @@ bold).
   carries the long date ("lunes, 12 de octubre").
 - `data-slot="date-badge"`, parts `data-part="month"` / `"day"`.
 
-Used by: `calendario/page.tsx`.
+Used by: `calendario/_components/calendar-card-header.tsx`.
 
 ## SegmentedTabs (`segmented-tabs.tsx`)
 
@@ -1391,5 +1399,46 @@ font-semibold`, the active one `bg-card text-fg shadow-xs`.
   with `aria-disabled="true"`, `title={hint}` and `opacity-60`.
 - `data-slot="segmented-tabs"`.
 
-Used by: `calendario/page.tsx` ("Hoy" / "Semana" / "Mes"; Semana and Mes are
-disabled "Próximamente" items until T2).
+Used by: `calendario/page.tsx` ("Hoy" / "Semana" / "Mes", all linked since
+T2).
+
+## CalendarNav (`calendar-nav.tsx`)
+
+Calendar period navigation (Phase 7 T2, the reference's "← | Today | →"
+group): one bordered button group (`rounded-input border-border-default
+bg-card shadow-xs`, `divide-x`) of three server-rendered links, 36px high —
+arrow links 40px wide with Lucide `ArrowLeft`/`ArrowRight` (16px, 1.75
+stroke) and their label as accessible name, the middle link shows its label
+(13px semibold).
+
+- Props: `aria-label` (names the `<nav>`), `prev`, `today`, `next` (each
+  `{ href, label }`), `className?`.
+- `data-slot="calendar-nav"`.
+
+Used by: `calendario/_components/calendar-card-header.tsx`.
+
+## CalendarGrid / CalendarDayCell (`calendar-grid.tsx`)
+
+Calendar day grid (Phase 7 T2, the reference's month body). `CalendarGrid`
+renders an `aria-hidden` weekday header row (`bg-neutral-50`, 12px semibold
+muted, centred) over a `<ul>` of seven `minmax(0,1fr)` columns, so phones get
+narrow cells instead of a horizontal scroll. `CalendarDayCell` is one `<li>`:
+hairline `border-r border-b border-border-subtle`, `p-1.5` (`md:p-2`),
+min-height 72px (`md:` 128px); day number top-left in a 24px slot (12px
+semibold), today's in a dark circle (`rounded-full bg-fg text-card`), days
+outside the shown month on `bg-neutral-50` with a muted number; children
+stack (`gap-1`) and wrap in a row when narrow; an optional "N más…" link
+(12px semibold muted, `+N` when narrow).
+
+- `CalendarGrid` props: `aria-label` (names the list), `weekdays` (seven
+  short names, Monday first), `stackWhenNarrow?` (week layout: one column and no
+  header when narrow), `className?`.
+- `CalendarDayCell` props: `day` (ISO, also `data-day` and the `<time
+  dateTime>`), `dayNumber`, `label` (sr-only long name, "(hoy)" appended for
+  today), `weekday?` (shown next to the number only below `md`), `isToday?`,
+  `outside?`, `more?` (`{ count, href }`, accessible name "N más el …"),
+  `className?`, children (event chips).
+- `data-slot="calendar-grid"` / `"calendar-day"`, `data-today`,
+  `data-outside`.
+
+Used by: `calendario/_components/calendar-period.tsx` ("Mes", "Semana").

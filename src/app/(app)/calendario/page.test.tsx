@@ -3,10 +3,17 @@ import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Breadcrumb, BreadcrumbProvider } from "../_components/breadcrumb";
 
-const { listDueTodayAction } = vi.hoisted(() => ({
+vi.mock("server-only", () => ({}));
+const { listDueTodayAction, listCalendarDaysAction } = vi.hoisted(() => ({
   listDueTodayAction: vi.fn(),
+  listCalendarDaysAction: vi.fn(),
 }));
-vi.mock("@/modules/scheduling", () => ({ listDueTodayAction }));
+// The pure calendar helpers stay real; only the Server Actions are faked.
+vi.mock("@/modules/scheduling", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/modules/scheduling")>()),
+  listDueTodayAction,
+  listCalendarDaysAction,
+}));
 
 const { getCurrentTimeZoneSetting } = vi.hoisted(() => ({
   getCurrentTimeZoneSetting: vi.fn(),
@@ -38,8 +45,10 @@ function due(pageId: string, flashcard: number, recall = 0) {
   };
 }
 
-async function renderPage() {
-  const element = (await CalendarPage()) as ReactElement;
+async function renderPage(params: { view?: string; date?: string } = {}) {
+  const element = (await CalendarPage({
+    searchParams: Promise.resolve(params),
+  })) as ReactElement;
   return render(
     <BreadcrumbProvider>
       {element}
@@ -52,6 +61,8 @@ describe("CalendarPage", () => {
   beforeEach(() => {
     listDueTodayAction.mockReset();
     listDueTodayAction.mockResolvedValue({ ok: true, value: [] });
+    listCalendarDaysAction.mockReset();
+    listCalendarDaysAction.mockResolvedValue({ ok: true, value: [] });
     getCurrentTimeZoneSetting.mockReset();
     getCurrentTimeZoneSetting.mockResolvedValue({
       timeZone: "UTC",
@@ -92,22 +103,32 @@ describe("CalendarPage", () => {
     expect(screen.getAllByText("Calendario").length).toBeGreaterThanOrEqual(2);
   });
 
-  it("offers Hoy as the current view and Semana / Mes as upcoming ones", async () => {
-    await renderPage();
+  it.each([
+    [{}, "Hoy"],
+    [{ view: "semana" }, "Semana"],
+    [{ view: "mes" }, "Mes"],
+  ])("links the three views and marks the current one (%o)", async (params, current) => {
+    await renderPage(params);
 
     const tabs = screen.getByRole("navigation", {
       name: "Vistas del calendario",
     });
     expect(within(tabs).getByRole("link", { name: "Hoy" })).toHaveAttribute(
+      "href",
+      "/calendario",
+    );
+    expect(within(tabs).getByRole("link", { name: "Semana" })).toHaveAttribute(
+      "href",
+      "/calendario?view=semana",
+    );
+    expect(within(tabs).getByRole("link", { name: "Mes" })).toHaveAttribute(
+      "href",
+      "/calendario?view=mes",
+    );
+    expect(within(tabs).getByRole("link", { name: current })).toHaveAttribute(
       "aria-current",
       "page",
     );
-    for (const label of ["Semana", "Mes"]) {
-      expect(within(tabs).queryByRole("link", { name: label })).toBeNull();
-      expect(
-        within(tabs).getByText(label).closest("[aria-disabled]"),
-      ).toHaveAttribute("title", "Próximamente");
-    }
   });
 
   it("heads the card with today's date badge and the Hoy title, with no add-event action", async () => {
@@ -163,5 +184,102 @@ describe("CalendarPage", () => {
       ),
     ).toBeInTheDocument();
     expect(screen.queryByText("Estás al día")).toBeNull();
+  });
+
+  describe("Mes and Semana", () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      // 12:00 UTC on Monday 12 Oct: already Tuesday 13 Oct in Kiritimati.
+      vi.setSystemTime(new Date("2026-10-12T12:00:00.000Z"));
+    });
+
+    it("reads the month grid's days in the profile zone and shows its events", async () => {
+      getCurrentTimeZoneSetting.mockResolvedValue({
+        status: "ok",
+        timeZone: "Pacific/Kiritimati",
+        chosen: true,
+      });
+      listCalendarDaysAction.mockResolvedValue({
+        ok: true,
+        value: [
+          {
+            day: "2026-10-20",
+            pageId: "p1",
+            pageTitle: "Mitosis",
+            notebookId: "nb1",
+            due: { flashcard: 0, exam_question: 0, recall_question: 4 },
+          },
+        ],
+      });
+
+      await renderPage({ view: "mes" });
+
+      expect(listCalendarDaysAction).toHaveBeenCalledWith({
+        fromDay: "2026-09-28",
+        toDay: "2026-11-02",
+        timeZone: "Pacific/Kiritimati",
+      });
+      expect(listDueTodayAction).not.toHaveBeenCalled();
+      const card = screen.getByTestId("calendar-card");
+      expect(
+        within(card).getByRole("heading", { level: 2, name: "Octubre 2026" }),
+      ).toBeInTheDocument();
+      expect(card).toHaveTextContent("1 oct 2026 – 31 oct 2026");
+      expect(
+        card.querySelector('[data-slot="calendar-day"][data-today]'),
+      ).toHaveAttribute("data-day", "2026-10-13");
+      const chip = within(card).getByRole("link", {
+        name: "Recordación activa de Mitosis: 4 ítems",
+      });
+      expect(chip).toHaveAttribute("href", "/notebooks/nb1/pages/p1");
+      expect(chip.closest('[data-slot="calendar-day"]')).toHaveAttribute(
+        "data-day",
+        "2026-10-20",
+      );
+      expect(
+        within(card).getByRole("navigation", { name: "Navegar meses" }),
+      ).toBeInTheDocument();
+      expect(within(card).queryByRole("button")).toBeNull();
+    });
+
+    it("shows the week of the dated day with its navigation", async () => {
+      await renderPage({ view: "semana", date: "2026-11-04" });
+
+      expect(listCalendarDaysAction).toHaveBeenCalledWith({
+        fromDay: "2026-11-02",
+        toDay: "2026-11-09",
+        timeZone: "UTC",
+      });
+      const card = screen.getByTestId("calendar-card");
+      expect(
+        within(card).getByRole("heading", {
+          level: 2,
+          name: "Semana del 2 de noviembre",
+        }),
+      ).toBeInTheDocument();
+      expect(card.querySelectorAll('[data-slot="calendar-day"]')).toHaveLength(
+        7,
+      );
+      expect(
+        within(card).getByRole("link", { name: "Semana anterior" }),
+      ).toHaveAttribute("href", "/calendario?view=semana&date=2026-10-26");
+    });
+
+    it("keeps the empty grid and reports a load failure", async () => {
+      listCalendarDaysAction.mockResolvedValue({
+        ok: false,
+        error: { code: "SCHEDULING_UNEXPECTED", message: "x" },
+      });
+
+      await renderPage({ view: "mes" });
+
+      const card = screen.getByTestId("calendar-card");
+      expect(within(card).getByRole("alert")).toHaveTextContent(
+        "No pudimos cargar tus repasos",
+      );
+      expect(card.querySelectorAll('[data-slot="calendar-day"]')).toHaveLength(
+        35,
+      );
+    });
   });
 });
