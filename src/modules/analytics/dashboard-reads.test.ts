@@ -242,5 +242,34 @@ describe("dashboard reads", () => {
 
       expect(await getCalibrationAction(WEEK)).toEqual(SESSION_REQUIRED);
     });
+
+    const actions = [
+      ["getProgressAction", getProgressAction],
+      ["getTechniqueMetricsAction", getTechniqueMetricsAction],
+      ["getCalibrationAction", getCalibrationAction],
+    ] as const;
+    const malformed = [
+      ["null", null],
+      ["undefined", undefined],
+      ["a string", "2026-10-06"],
+      ["a number", 7],
+    ] as const;
+
+    describe.each(actions)("%s", (_name, action) => {
+      it.each(
+        malformed,
+      )("returns the invalid-input error for %s", async (_label, input) => {
+        expect(await action(input as never)).toEqual(INVALID_INPUT);
+        expect(captureException).not.toHaveBeenCalled();
+      });
+
+      it.each(
+        malformed,
+      )("checks the session before the shape of %s", async (_label, input) => {
+        getCurrentUser.mockResolvedValue(null);
+
+        expect(await action(input as never)).toEqual(SESSION_REQUIRED);
+      });
+    });
   });
 });

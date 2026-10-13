@@ -61,10 +61,13 @@ function actionError(code: string, message: string): ActionError {
 
 // Session first, then the input check, then the read. Every failure leaves
 // as the plain ActionError shape, never throws; Next.js control-flow
-// errors go back to the framework.
-async function forCurrentOwner<T>(
-  valid: boolean,
-  read: (ownerId: string) => Promise<T>,
+// errors go back to the framework. The input is untrusted (Server Actions
+// receive whatever the client posts, null included), so it is parsed
+// inside the guarded path and reduced to its known fields.
+async function forCurrentOwner<I, T>(
+  input: unknown,
+  parse: (input: unknown) => I | null,
+  read: (ownerId: string, input: I) => Promise<T>,
 ): Promise<Result<T, ActionError>> {
   try {
     const user = await getCurrentUser();
@@ -73,12 +76,13 @@ async function forCurrentOwner<T>(
         actionError(ANALYTICS_ERROR.SESSION_REQUIRED, SESSION_REQUIRED_MESSAGE),
       );
     }
-    if (!valid) {
+    const parsed = parse(input);
+    if (parsed === null) {
       return err(
         actionError(ANALYTICS_ERROR.INVALID_INPUT, INVALID_INPUT_MESSAGE),
       );
     }
-    return ok(await read(user.id));
+    return ok(await read(user.id, parsed));
   } catch (error) {
     unstable_rethrow(error);
     Sentry.captureException(error);
@@ -86,30 +90,47 @@ async function forCurrentOwner<T>(
   }
 }
 
-function isValidProgressInput(input: ProgressInput): boolean {
-  return (
-    isTimeZone(input.timeZone) &&
-    Number.isInteger(input.weeks) &&
-    input.weeks >= 1 &&
-    input.weeks <= MAX_TREND_WEEKS
-  );
+function fieldsOf(input: unknown): Record<string, unknown> | null {
+  return typeof input === "object" && input !== null
+    ? (input as Record<string, unknown>)
+    : null;
 }
 
-function isValidRangeInput(input: DashboardRangeInput): boolean {
-  return (
-    isAnalyticsRange(input.fromDay, input.toDay, MAX_RANGE_DAYS) &&
-    isTimeZone(input.timeZone)
-  );
+function parseProgressInput(input: unknown): ProgressInput | null {
+  const fields = fieldsOf(input);
+  if (!fields) return null;
+  const { timeZone, weeks } = fields;
+  return typeof timeZone === "string" &&
+    isTimeZone(timeZone) &&
+    typeof weeks === "number" &&
+    Number.isInteger(weeks) &&
+    weeks >= 1 &&
+    weeks <= MAX_TREND_WEEKS
+    ? { timeZone, weeks }
+    : null;
+}
+
+function parseRangeInput(input: unknown): DashboardRangeInput | null {
+  const fields = fieldsOf(input);
+  if (!fields) return null;
+  const { fromDay, toDay, timeZone } = fields;
+  return typeof fromDay === "string" &&
+    typeof toDay === "string" &&
+    typeof timeZone === "string" &&
+    isAnalyticsRange(fromDay, toDay, MAX_RANGE_DAYS) &&
+    isTimeZone(timeZone)
+    ? { fromDay, toDay, timeZone }
+    : null;
 }
 
 export function readProgress(
   input: ProgressInput,
   clock: Clock,
 ): Promise<Result<Progress, ActionError>> {
-  return forCurrentOwner(isValidProgressInput(input), (ownerId) => {
+  return forCurrentOwner(input, parseProgressInput, (ownerId, valid) => {
     const db = getDb();
     return getProgress(
-      { ownerId, timeZone: input.timeZone, weeks: input.weeks },
+      { ownerId, timeZone: valid.timeZone, weeks: valid.weeks },
       {
         pages: new DrizzlePageProgressReader(db),
         reviews: new DrizzleReviewHistoryReader(db),
@@ -123,15 +144,10 @@ export function readTechniqueMetrics(
   input: DashboardRangeInput,
   clock: Clock,
 ): Promise<Result<TechniqueMetricsReport, ActionError>> {
-  return forCurrentOwner(isValidRangeInput(input), (ownerId) => {
+  return forCurrentOwner(input, parseRangeInput, (ownerId, valid) => {
     const db = getDb();
     return getTechniqueMetrics(
-      {
-        ownerId,
-        fromDay: input.fromDay,
-        toDay: input.toDay,
-        timeZone: input.timeZone,
-      },
+      { ownerId, ...valid },
       {
         reviews: new DrizzleReviewHistoryReader(db),
         answers: new DrizzleAnswerOutcomeReader(db),
@@ -144,14 +160,9 @@ export function readTechniqueMetrics(
 export function readCalibration(
   input: DashboardRangeInput,
 ): Promise<Result<CalibrationRollup, ActionError>> {
-  return forCurrentOwner(isValidRangeInput(input), (ownerId) =>
+  return forCurrentOwner(input, parseRangeInput, (ownerId, valid) =>
     getCalibration(
-      {
-        ownerId,
-        fromDay: input.fromDay,
-        toDay: input.toDay,
-        timeZone: input.timeZone,
-      },
+      { ownerId, ...valid },
       { answers: new DrizzleAnswerOutcomeReader(getDb()) },
     ),
   );
