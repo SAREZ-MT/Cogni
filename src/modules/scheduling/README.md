@@ -43,7 +43,8 @@ flashcards.
 
 | Exportación | Para quién | Contrato |
 |---|---|---|
-| `listCalendarDaysAction({ fromDay, toDay, timeZone })` | Interfaz (Server Action) | Sesión primero, nunca lanza. Valida días ISO, rango no vacío de hasta 42 días y zona horaria (`SCHEDULING_INVALID_RANGE`). Vistas "Mes" y "Semana" de `/calendario`. |
+| `listCalendarDaysAction({ fromDay, toDay, timeZone })` | Interfaz (Server Action) | Sesión primero, nunca lanza. Valida días ISO, rango no vacío de hasta 42 días que contenga algún día de la ventana del calendario (1970-01-01 … 9998-12-31) y zona horaria (`SCHEDULING_INVALID_RANGE`). Usa siempre el reloj del sistema: nunca acepta un reloj del cliente. |
+| `getCalendarDays({ fromDay, toDay, timeZone, now })` | Servidor (no es Server Action) | La misma lectura con el instante con que la página `/calendario` pinta su día de hoy, para que la celda de hoy y los vencidos acumulados en hoy coincidan. Vistas "Mes" y "Semana". |
 | `listDueTodayAction()` | Interfaz (Server Action) | Sesión primero, nunca lanza. La ruta `/flashcards` muestra "Repasos de hoy" y los conteos de vencidas de cada mazo. |
 | `createSchedulingServerApi({ db, clock? })` | Otros módulos en el servidor | Devuelve `SchedulingServerApi.listDueToday(ownerId)`: la misma lectura que la acción (páginas del dueño con ítems vencidos ahora, la que más esperó primero), con el reloj del sistema por defecto. No es una Server Action: el llamador ya autenticó al dueño. `db` puede ser una transacción abierta. La usa `exams` (`hub-actions.ts`) para `due.exam_question`. |
 | Dominio | Todos | `DueTodayPage`, `DueCounts`, `DUE_KINDS`, `emptyDueCounts`, `compareDueTodayPages`. |

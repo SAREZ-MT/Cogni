@@ -11,30 +11,18 @@ import {
   toActionError,
 } from "@/shared/kernel/domain-error";
 import { err, ok, type Result } from "@/shared/kernel/result";
-import { listCalendarDays, listDueToday } from "./application";
-import {
-  addDays,
-  type CalendarDayPage,
-  FIRST_CALENDAR_DAY,
-  isDayKey,
-  isTimeZone,
-  LAST_CALENDAR_DAY,
-} from "./domain/calendar";
+import { listDueToday } from "./application";
+import { readCalendarDays } from "./calendar-days";
+import type { CalendarDayPage } from "./domain/calendar";
 import type { DueTodayPage } from "./domain/due-today";
 import { SCHEDULING_ERROR } from "./domain/errors";
-import {
-  DrizzleDueInRangeReader,
-  DrizzleDueTodayReader,
-} from "./infrastructure";
+import { DrizzleDueTodayReader } from "./infrastructure";
 
 // Server Actions of the scheduling module (documento-maestro §3.5): session
 // first, every failure leaves as the plain ActionError shape, never throws.
 
 export type DueTodayPageView = DueTodayPage;
 export type CalendarDayPageView = CalendarDayPage;
-
-// "Mes" spans at most six Monday-first weeks.
-const MAX_RANGE_DAYS = 42;
 
 function actionError(code: string, message: string): ActionError {
   return toActionError(new DomainError(code, message));
@@ -61,64 +49,6 @@ export async function listDueTodayAction(): Promise<
     });
     return ok(pages);
   } catch (error) {
-    Sentry.captureException(error);
-    return err(
-      actionError(
-        SCHEDULING_ERROR.UNEXPECTED,
-        "unexpected scheduling action failure",
-      ),
-    );
-  }
-}
-
-// A range must hold at least one day of the calendar window: the grids of
-// its edge months reach a week past it, and with the 42-day cap every
-// bound stays within four-digit years (no expanded-year keys downstream).
-function isValidRange(input: {
-  fromDay: unknown;
-  toDay: unknown;
-  timeZone: unknown;
-}): input is { fromDay: string; toDay: string; timeZone: string } {
-  return (
-    isDayKey(input.fromDay) &&
-    isDayKey(input.toDay) &&
-    input.fromDay <= LAST_CALENDAR_DAY &&
-    input.toDay > FIRST_CALENDAR_DAY &&
-    input.fromDay < input.toDay &&
-    input.toDay <= addDays(input.fromDay, MAX_RANGE_DAYS) &&
-    isTimeZone(input.timeZone)
-  );
-}
-
-// "Mes" / "Semana": the caller's pages per local day of [fromDay, toDay)
-// (ISO days in `timeZone`, the profile's zone), each with the items whose
-// next due date falls that day; overdue items show on today.
-export async function listCalendarDaysAction(input: {
-  fromDay: string;
-  toDay: string;
-  timeZone: string;
-}): Promise<Result<CalendarDayPageView[], ActionError>> {
-  try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return err(
-        actionError(
-          SCHEDULING_ERROR.SESSION_REQUIRED,
-          "Debes iniciar sesión para continuar.",
-        ),
-      );
-    }
-    if (!isValidRange(input)) {
-      return err(
-        actionError(SCHEDULING_ERROR.INVALID_RANGE, "invalid calendar range"),
-      );
-    }
-    const days = await listCalendarDays(
-      { ownerId: user.id, ...input },
-      { reader: new DrizzleDueInRangeReader(getDb()), clock: systemClock },
-    );
-    return ok(days);
-  } catch (error) {
     unstable_rethrow(error);
     Sentry.captureException(error);
     return err(
@@ -128,4 +58,20 @@ export async function listCalendarDaysAction(input: {
       ),
     );
   }
+}
+
+// "Mes" / "Semana": the caller's pages per local day of [fromDay, toDay)
+// (ISO days in `timeZone`, the profile's zone), each with the items whose
+// next due date falls that day; overdue items show on today. Client-
+// reachable, so "today" always comes from the system clock: the input is
+// reduced to the range and never carries a clock.
+export async function listCalendarDaysAction(input: {
+  fromDay: string;
+  toDay: string;
+  timeZone: string;
+}): Promise<Result<CalendarDayPageView[], ActionError>> {
+  return readCalendarDays(
+    { fromDay: input.fromDay, toDay: input.toDay, timeZone: input.timeZone },
+    systemClock,
+  );
 }

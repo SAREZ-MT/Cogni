@@ -1,7 +1,7 @@
 import { getCurrentTimeZoneSetting } from "@/modules/identity";
 import {
   dayKeyIn,
-  listCalendarDaysAction,
+  getCalendarDays,
   listDueTodayAction,
 } from "@/modules/scheduling";
 import { Card } from "@/shared/ui/card";
@@ -62,12 +62,6 @@ function summaryOf(rows: readonly TodayRow[] | null): string | null {
 // Calendar (documento-maestro §3.5, Phase 7) in the Untitled UI month
 // calendar style the user chose (2026-10-12): page title + view tabs, then a
 // card whose header carries today's date badge, the view title and a short
-// summary. Events are only system-generated reviews, so there is no "add
-// event" action. "Hoy" lists the pages with items due now (scheduling's
-// listDueToday), each technique opening its session.
-// Calendar (documento-maestro §3.5, Phase 7) in the Untitled UI month
-// calendar style the user chose (2026-10-12): page title + view tabs, then a
-// card whose header carries today's date badge, the view title and a short
 // summary or range. Events are only system-generated reviews, so there is
 // no "add event" action. "Hoy" lists the pages with items due now; "Mes"
 // and "Semana" show, per day in the profile time zone, each page's next
@@ -80,6 +74,8 @@ export default async function CalendarPage({
     getCurrentTimeZoneSetting(),
   ]);
   const { timeZone } = setting;
+  // One instant for the whole render: the today cell, the date badge and
+  // the read that folds overdue items into today all agree on the day.
   const now = new Date();
   const { view, anchor } = parseCalendarQuery(params, dayKeyIn(now, timeZone));
   // Plain awaited helpers rather than async child components: the card body
@@ -153,7 +149,7 @@ async function periodCard({
 }) {
   const month = view === "mes";
   const range = month ? monthRange(anchor) : weekRange(anchor);
-  const result = await listCalendarDaysAction({ ...range, timeZone });
+  const result = await getCalendarDays({ ...range, timeZone, now });
   const input = {
     anchor,
     today: dayKeyIn(now, timeZone),

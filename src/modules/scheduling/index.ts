@@ -7,6 +7,7 @@ export {
   listCalendarDaysAction,
   listDueTodayAction,
 } from "./actions";
+export { getCalendarDays } from "./calendar-days";
 export * from "./domain";
 export {
   createSchedulingServerApi,

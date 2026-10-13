@@ -4,15 +4,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Breadcrumb, BreadcrumbProvider } from "../_components/breadcrumb";
 
 vi.mock("server-only", () => ({}));
-const { listDueTodayAction, listCalendarDaysAction } = vi.hoisted(() => ({
-  listDueTodayAction: vi.fn(),
-  listCalendarDaysAction: vi.fn(),
-}));
-// The pure calendar helpers stay real; only the Server Actions are faked.
+const { listDueTodayAction, listCalendarDaysAction, getCalendarDays } =
+  vi.hoisted(() => ({
+    listDueTodayAction: vi.fn(),
+    listCalendarDaysAction: vi.fn(),
+    getCalendarDays: vi.fn(),
+  }));
+// The pure calendar helpers stay real; only the reads are faked.
 vi.mock("@/modules/scheduling", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/modules/scheduling")>()),
   listDueTodayAction,
   listCalendarDaysAction,
+  getCalendarDays,
 }));
 
 const { getCurrentTimeZoneSetting } = vi.hoisted(() => ({
@@ -62,7 +65,8 @@ describe("CalendarPage", () => {
     listDueTodayAction.mockReset();
     listDueTodayAction.mockResolvedValue({ ok: true, value: [] });
     listCalendarDaysAction.mockReset();
-    listCalendarDaysAction.mockResolvedValue({ ok: true, value: [] });
+    getCalendarDays.mockReset();
+    getCalendarDays.mockResolvedValue({ ok: true, value: [] });
     getCurrentTimeZoneSetting.mockReset();
     getCurrentTimeZoneSetting.mockResolvedValue({
       timeZone: "UTC",
@@ -199,7 +203,7 @@ describe("CalendarPage", () => {
         timeZone: "Pacific/Kiritimati",
         chosen: true,
       });
-      listCalendarDaysAction.mockResolvedValue({
+      getCalendarDays.mockResolvedValue({
         ok: true,
         value: [
           {
@@ -214,11 +218,15 @@ describe("CalendarPage", () => {
 
       await renderPage({ view: "mes" });
 
-      expect(listCalendarDaysAction).toHaveBeenCalledWith({
+      // One clock for the whole render: the read folds overdue items into
+      // the same today the grid marks (no client-reachable clock involved).
+      expect(getCalendarDays).toHaveBeenCalledWith({
         fromDay: "2026-09-28",
         toDay: "2026-11-02",
         timeZone: "Pacific/Kiritimati",
+        now: new Date("2026-10-12T12:00:00.000Z"),
       });
+      expect(listCalendarDaysAction).not.toHaveBeenCalled();
       expect(listDueTodayAction).not.toHaveBeenCalled();
       const card = screen.getByTestId("calendar-card");
       expect(
@@ -245,10 +253,11 @@ describe("CalendarPage", () => {
     it("shows the week of the dated day with its navigation", async () => {
       await renderPage({ view: "semana", date: "2026-11-04" });
 
-      expect(listCalendarDaysAction).toHaveBeenCalledWith({
+      expect(getCalendarDays).toHaveBeenCalledWith({
         fromDay: "2026-11-02",
         toDay: "2026-11-09",
         timeZone: "UTC",
+        now: new Date("2026-10-12T12:00:00.000Z"),
       });
       const card = screen.getByTestId("calendar-card");
       expect(
@@ -266,7 +275,7 @@ describe("CalendarPage", () => {
     });
 
     it("keeps the empty grid and reports a load failure", async () => {
-      listCalendarDaysAction.mockResolvedValue({
+      getCalendarDays.mockResolvedValue({
         ok: false,
         error: { code: "SCHEDULING_UNEXPECTED", message: "x" },
       });
