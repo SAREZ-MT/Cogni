@@ -1,0 +1,6 @@
+// DomainError codes for the analytics module.
+export const ANALYTICS_ERROR = {
+  SESSION_REQUIRED: "ANALYTICS_SESSION_REQUIRED",
+  INVALID_INPUT: "ANALYTICS_INVALID_INPUT",
+  UNEXPECTED: "ANALYTICS_UNEXPECTED",
+} as const;
