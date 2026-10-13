@@ -20,7 +20,7 @@ vi.mock("react", async (importOriginal) => {
 });
 
 const GROUPS: TimeZoneGroup[] = [
-  { label: "Universal", options: [{ value: "Etc/UTC", label: "UTC (GMT)" }] },
+  { label: "Universal", options: [{ value: "Etc/UTC", label: "UTC (GMT+0)" }] },
   {
     label: "América",
     options: [

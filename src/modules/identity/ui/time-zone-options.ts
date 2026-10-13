@@ -27,8 +27,10 @@ const REGION_LABELS: Record<string, string> = {
   Pacific: "Pacífico",
 };
 
-// "GMT-5", "GMT+5:30", "GMT" — the offset in force at `now` (it changes
-// with daylight saving, so the label says the current one).
+// "GMT-5", "GMT+5:30", "GMT+0" — the offset in force at `now` (it changes
+// with daylight saving, so the label says the current one). ICU versions
+// disagree on the zero offset ("GMT" locally, "GMT+0" on CI runners), so it
+// is normalized to "GMT+0".
 function offsetOf(timeZone: string, now: Date): string {
   const part = new Intl.DateTimeFormat("en", {
     timeZone,
@@ -36,7 +38,8 @@ function offsetOf(timeZone: string, now: Date): string {
   })
     .formatToParts(now)
     .find((item) => item.type === "timeZoneName");
-  return part?.value ?? "GMT";
+  const offset = part?.value ?? "GMT";
+  return offset === "GMT" ? "GMT+0" : offset;
 }
 
 function cityOf(path: readonly string[]): string {

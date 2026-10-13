@@ -71,7 +71,7 @@ describe("SettingsPage", () => {
     expect(
       screen.getByRole("option", { name: /^Madrid \(GMT\+\d\)$/ }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "UTC (GMT)" })).toHaveValue(
+    expect(screen.getByRole("option", { name: "UTC (GMT+0)" })).toHaveValue(
       "Etc/UTC",
     );
   });

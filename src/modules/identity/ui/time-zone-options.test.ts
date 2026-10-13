@@ -31,7 +31,7 @@ describe("timeZoneGroups", () => {
     const [universal] = timeZoneGroups(ZONES, NOW);
 
     expect(universal?.options).toEqual([
-      { value: "Etc/UTC", label: "UTC (GMT)" },
+      { value: "Etc/UTC", label: "UTC (GMT+0)" },
     ]);
   });
 

@@ -112,7 +112,7 @@ test.describe("Configuración — zona horaria", () => {
       .getByLabel("Zona horaria");
     await expect(select.locator("optgroup")).not.toHaveCount(0);
     await expect(select.locator('option[value="Etc/UTC"]')).toHaveText(
-      "UTC (GMT)",
+      "UTC (GMT+0)",
     );
   });
 });
