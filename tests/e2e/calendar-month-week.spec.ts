@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import { expect, hasSupabaseEnv, signIn, test } from "./fixtures/auth";
 import { createNotebookWithOpenPage } from "./helpers/notebooks";
 import { setProfileTimeZone } from "./helpers/profiles";
@@ -47,6 +47,21 @@ function noonInZone(day: string): Date {
   return new Date(
     Date.parse(`${day}T12:00:00.000Z`) + ZONE_OFFSET_HOURS * 3_600_000,
   );
+}
+
+// How a month chip actually renders: its box and whether its label is the
+// visually hidden screen-reader text (sr-only = absolutely positioned and
+// clipped to 1 px) or laid out as visible text.
+async function chipRendering(chip: Locator) {
+  const box = await chip.boundingBox();
+  const labelPosition = await chip
+    .locator('[data-part="label"]')
+    .evaluate((label) => getComputedStyle(label).position);
+  return {
+    width: box?.width ?? 0,
+    height: box?.height ?? 0,
+    labelHidden: labelPosition === "absolute",
+  };
 }
 
 function dayCell(page: Page, day: string) {
@@ -151,6 +166,10 @@ test.describe("Calendario — Mes y Semana", () => {
       });
       await expect(exam).toHaveAttribute("data-tone", "rose");
       await expect(exam).toHaveClass(/bg-pastel-pink/);
+      // A wide grid shows whole chips: the label is visible text.
+      const wide = await chipRendering(flashcards);
+      expect(wide.labelHidden).toBe(false);
+      expect(wide.width).toBeGreaterThan(40);
       // Only the next due date shows: the neighbouring days stay empty.
       await expect(
         dayCell(page, addDays(target, 1)).locator(
@@ -173,12 +192,28 @@ test.describe("Calendario — Mes y Semana", () => {
       ).toBeVisible();
       await shot(page, "calendar-week-events");
 
-      // A narrow grid (sidebar open on a small laptop): chips become dots.
+      // A narrow grid (sidebar open on a small laptop): chips become dots
+      // (size-2.5 = 10 px) whose label is screen-reader text only. At the
+      // wide viewport above these checks fail.
       await page.setViewportSize({ width: 900, height: 900 });
       await page.goto(`/calendario?view=mes&date=${target}`);
+      const narrowChips = dayCell(page, target).locator(
+        '[data-slot="technique-chip"]',
+      );
+      await expect(narrowChips).toHaveCount(2);
+      await expect(async () => {
+        for (const chip of await narrowChips.all()) {
+          const narrow = await chipRendering(chip);
+          expect(narrow.labelHidden).toBe(true);
+          expect(narrow.width).toBeLessThanOrEqual(12);
+          expect(narrow.height).toBeLessThanOrEqual(12);
+        }
+      }).toPass({ timeout: 5_000 });
       await expect(
-        dayCell(page, target).locator('[data-collapse="dot-when-narrow"]'),
-      ).toHaveCount(2);
+        dayCell(page, target).getByRole("link", {
+          name: "Flashcards de Sin título: 2 ítems",
+        }),
+      ).toBeAttached();
       await shot(page, "calendar-month-narrow");
 
       // Phone width: no horizontal page scroll.
