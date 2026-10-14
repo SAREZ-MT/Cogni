@@ -112,7 +112,11 @@ export function sampleMetrics(range = 7): TechniqueMetricsReport {
   return {
     today: "2026-10-13",
     range: { fromDay: days[0] as string, toDay: "2026-10-14" },
-    previousRange: { fromDay: "2026-09-30", toDay: days[0] as string },
+    // The same length right before the range.
+    previousRange: {
+      fromDay: dayKeys("2026-10-13", 2 * range)[0] as string,
+      toDay: days[0] as string,
+    },
     daily,
     overall: {
       reviewsCompleted: 10,

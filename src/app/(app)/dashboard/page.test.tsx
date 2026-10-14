@@ -136,8 +136,12 @@ describe("DashboardPage", () => {
     expect(screen.queryByTestId("kpi-row")).toBeNull();
   });
 
-  it("reports a failed read instead of showing made-up numbers", async () => {
-    reads.metrics.mockResolvedValue({
+  it.each([
+    "progress",
+    "metrics",
+    "calibration",
+  ] as const)("reports a failed %s read instead of showing made-up numbers", async (read) => {
+    reads[read].mockResolvedValue({
       ok: false,
       error: { code: "ANALYTICS_UNEXPECTED", message: "x" },
     });
