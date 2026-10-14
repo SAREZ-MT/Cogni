@@ -8,6 +8,7 @@ import {
   recallAccuracy,
 } from "../domain/accuracy";
 import {
+  addDays,
   type DayKey,
   dayKeyFormatter,
   daysBetween,
@@ -74,6 +75,9 @@ export interface TechniqueMetricsReport {
     reviewsCompleted: number;
     previousReviewsCompleted: number;
     streakDays: number;
+    // The overall streak as it stood seven local days before today: only
+    // review days up to that day count (the dashboard's "Racha" delta).
+    streakDaysWeekAgo: number;
   };
   // In the techniques panel order: flashcards, recall, exam.
   techniques: TechniqueMetrics[];
@@ -146,6 +150,7 @@ export async function getTechniqueMetrics(
       reviewsCompleted: reviewPeriods.current.length,
       previousReviewsCompleted: reviewPeriods.previous.length,
       streakDays: currentStreak(days.overall, today),
+      streakDaysWeekAgo: currentStreak(days.overall, addDays(today, -7)),
     },
     techniques: ANALYTICS_TECHNIQUES.map((technique) => ({
       technique,

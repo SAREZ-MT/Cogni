@@ -80,6 +80,8 @@ describe("getTechniqueMetrics", () => {
       reviewsCompleted: 4,
       previousReviewsCompleted: 2,
       streakDays: 3,
+      // As of 6 Oct only the 6 Oct review counts toward a run.
+      streakDaysWeekAgo: 1,
     });
     expect(report.techniques).toEqual([
       {
@@ -149,6 +151,34 @@ describe("getTechniqueMetrics", () => {
     expect(report.overall.streakDays).toBe(2);
   });
 
+  it("measures the overall streak as of seven days ago, ignoring later days", async () => {
+    const store = seededStore();
+    for (const iso of [
+      "2026-10-04T10:00:00Z",
+      "2026-10-05T10:00:00Z",
+      "2026-10-06T10:00:00Z",
+      "2026-10-10T10:00:00Z",
+      "2026-10-11T10:00:00Z",
+      "2026-10-12T10:00:00Z",
+      "2026-10-13T10:00:00Z",
+    ]) {
+      store.addReview({
+        pageId: "p-1",
+        technique: "flashcards",
+        quality: 4,
+        reviewedAt: at(iso),
+      });
+    }
+
+    const report = await getTechniqueMetrics(
+      { ownerId: "owner-1", ...RANGE, timeZone: "UTC" },
+      { reviews: store, answers: store, clock: createFixedClock(NOW) },
+    );
+
+    expect(report.overall.streakDays).toBe(4);
+    expect(report.overall.streakDaysWeekAgo).toBe(3);
+  });
+
   it("reports empty tallies without activity", async () => {
     const report = await getTechniqueMetrics(
       { ownerId: "owner-1", ...RANGE, timeZone: "UTC" },
@@ -163,6 +193,7 @@ describe("getTechniqueMetrics", () => {
       reviewsCompleted: 0,
       previousReviewsCompleted: 0,
       streakDays: 0,
+      streakDaysWeekAgo: 0,
     });
     expect(report.techniques[0]?.accuracy).toEqual({
       correct: 0,

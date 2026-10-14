@@ -9,9 +9,8 @@ derivan en cada lectura).
 
 ## Estado
 
-Fase 7, T3: dominio, lectores, casos de uso, API de servidor y acciones. La
-ruta `/dashboard` todavía muestra datos de ejemplo; la T4 la conecta a este
-módulo.
+Fase 7, T3: dominio, lectores, casos de uso, API de servidor y acciones.
+Desde la T4 la ruta `/dashboard` lee sus datos de este módulo.
 
 ## Decisiones (feature `phase-7-calendar-dashboard`, 2026-10-12)
 
@@ -23,6 +22,9 @@ módulo.
 - **Racha:** días locales consecutivos (zona del perfil) con al menos una
   fila de `review_logs`, en total y por técnica. Hoy cuenta como abierto: una
   racha que llegó hasta ayer sigue viva mientras hoy no termine sin repasos.
+  Las métricas traen también la racha general tal como estaba 7 días antes
+  de hoy (`overall.streakDaysWeekAgo`, solo cuentan los días hasta ese día),
+  para el delta de "Racha de repasos" del dashboard.
 - **Tasa de acierto (en el período):** flashcards = repasos con calidad ≥ 3
   (no "Otra vez"); exámenes = respuestas con `is_correct` de exámenes
   terminados; recordación activa = respuestas evaluadas (`done`) con
@@ -57,7 +59,7 @@ módulo.
 ## Aplicación (`application/`)
 
 - `getProgress({ ownerId, timeZone, weeks }, { pages, reviews, clock })`: progreso por cuaderno y página con tendencias de `weeks` semanas que terminan en la semana de hoy.
-- `getTechniqueMetrics({ ownerId, fromDay, toDay, timeZone }, { reviews, answers, clock })`: por técnica, repasos completados, tasa de acierto (del período y del anterior) y racha; además repasos por día del período y totales.
+- `getTechniqueMetrics({ ownerId, fromDay, toDay, timeZone }, { reviews, answers, clock })`: por técnica, repasos completados, tasa de acierto (del período y del anterior) y racha; además repasos por día del período y totales (con la racha general de hoy y la de hace 7 días).
 - `getCalibration({ ownerId, fromDay, toDay, timeZone }, { answers })`: calibración por página de las respuestas evaluadas del período.
 - `testing/`: contrato compartido de los tres lectores, fake en memoria (`InMemoryAnalyticsStore`, exportado en `testing.ts`) y `seededStore` para las pruebas.
 
