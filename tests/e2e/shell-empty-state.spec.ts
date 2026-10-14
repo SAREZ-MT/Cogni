@@ -63,14 +63,11 @@ test.describe("app shell", () => {
     ).toHaveCount(0);
   });
 
-  // Design previews (Dashboard) are hidden in production builds, which is
-  // what this suite runs against (`next build && next start`): they render
-  // as disabled "pronto" rows instead of links. Flashcards (Phase 3),
-  // Exámenes (Phase 5 T9), Active recall (Phase 6 T7), Calendario
-  // (Phase 7 T1) and Configuración (Phase 7 T2a) are always live links.
-  test("sidebar lists the preview areas as disabled 'pronto' entries", async ({
-    page,
-  }) => {
+  // Every sidebar area runs on real data, so each one is a live link:
+  // Flashcards (Phase 3), Exámenes (Phase 5 T9), Active recall (Phase 6 T7),
+  // Calendario (Phase 7 T1), Configuración (Phase 7 T2a) and Dashboard
+  // (Phase 7 T4). No disabled "pronto" row is left.
+  test("sidebar lists every area as a live link", async ({ page }) => {
     await page.goto("/");
 
     const sidebar = page.getByRole("navigation", { name: "Barra lateral" });
@@ -91,12 +88,11 @@ test.describe("app shell", () => {
     await expect(
       sidebar.getByRole("link", { name: /Configuración/ }),
     ).toHaveAttribute("href", "/configuracion");
-    for (const label of ["Dashboard"]) {
-      await expect(sidebar.getByRole("link", { name: label })).toHaveCount(0);
-      await expect(
-        sidebar.locator('[aria-disabled="true"]').filter({ hasText: label }),
-      ).toContainText("pronto");
-    }
+    // Phase 7 T4: "Dashboard" runs on analytics data.
+    await expect(
+      sidebar.getByRole("link", { name: "Dashboard", exact: true }),
+    ).toHaveAttribute("href", "/dashboard");
+    await expect(sidebar.locator('[aria-disabled="true"]')).toHaveCount(0);
     await expect(
       sidebar.getByRole("link", { name: "Cuadernos" }),
     ).toHaveAttribute("href", "/notebooks");
@@ -191,17 +187,17 @@ test.describe("app shell", () => {
     }
   });
 
-  test("hides the dashboard preview route: /dashboard answers not-found", async ({
+  // Phase 7 T4: /dashboard is no longer a hidden design preview; it serves
+  // the user's analytics (content is covered by dashboard.spec.ts).
+  test("serves /dashboard instead of hiding it as a preview", async ({
     page,
   }) => {
-    for (const path of ["/dashboard", "/dashboard?range=30"]) {
-      const response = await page.goto(path);
+    const response = await page.goto("/dashboard");
 
-      expect(response?.status(), path).toBe(404);
-      await expect(page.getByText("Actividad de repaso")).toHaveCount(0);
-      await expect(page.getByText("Tasa de acierto")).toHaveCount(0);
-      await expect(page.getByText("Dominio global")).toHaveCount(0);
-    }
+    expect(response?.status()).toBe(200);
+    await expect(
+      page.getByRole("heading", { name: "Dashboard", level: 1 }),
+    ).toBeVisible();
   });
 
   test("collapses the sidebar to 64px and keeps the choice after navigating", async ({
