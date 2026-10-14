@@ -6,14 +6,7 @@ import { ChartCard } from "@/shared/ui/chart-card";
 import { DotStreak } from "@/shared/ui/dot-streak";
 import { IconTile, type IconTileProps } from "@/shared/ui/icon-tile";
 import { Pill, type PillProps } from "@/shared/ui/pill";
-import {
-  TECHNIQUE_METRICS,
-  type TechniqueKey,
-  type TechniqueMetric,
-  techniqueRepasosCompletados,
-} from "../_data/sample";
-
-const DAY_LABELS = ["l", "m", "x", "j", "v", "s", "d"];
+import type { TechniqueCardView, TechniqueKey } from "../_lib/dashboard-view";
 
 const TECHNIQUE_ICON: Record<TechniqueKey, LucideIcon> = {
   flashcards: Layers,
@@ -39,14 +32,24 @@ const TECHNIQUE_PILL_TONE: Record<
   exams: "rose",
 };
 
-function TechniqueCard({ metric }: { metric: TechniqueMetric }) {
+function figureLabel(metric: TechniqueCardView): string {
+  const reviews =
+    metric.reviewsCompleted === 1
+      ? "1 repaso completado"
+      : `${metric.reviewsCompleted} repasos completados`;
+  const streak = `${metric.streakDays} día${metric.streakDays === 1 ? "" : "s"}`;
+  const accuracy =
+    metric.accuracyPct === null
+      ? "sin resultados de acierto"
+      : `${metric.accuracyPct}% de acierto`;
+  return `Actividad de ${metric.label}: ${reviews} en el período, racha de ${streak}, ${accuracy}`;
+}
+
+function TechniqueCard({ metric }: { metric: TechniqueCardView }) {
   const Icon = TECHNIQUE_ICON[metric.key];
-  const repasos = techniqueRepasosCompletados(metric);
-  const isUp = metric.repasosDeltaPct >= 0;
-  const activity = metric.weeklyActivity.map((count, i) => ({
-    day: DAY_LABELS[i],
-    count,
-  }));
+  const repasos = metric.reviewsCompleted;
+  const isUp = metric.deltaPct !== null && metric.deltaPct >= 0;
+  const accuracy = metric.accuracyPct === null ? "—" : `${metric.accuracyPct}%`;
 
   return (
     <ChartCard
@@ -60,7 +63,7 @@ function TechniqueCard({ metric }: { metric: TechniqueMetric }) {
         </IconTile>
       }
       title={metric.label}
-      ariaLabel={`Actividad de ${metric.label}: ${repasos} repasos completados esta semana, racha de ${metric.streakDays} días, ${metric.accuracyPct}% de acierto`}
+      ariaLabel={figureLabel(metric)}
     >
       <div>
         <p className="text-[12px] text-fg-muted">Repasos completados</p>
@@ -68,16 +71,18 @@ function TechniqueCard({ metric }: { metric: TechniqueMetric }) {
           <span className="font-bold text-[22px] text-fg leading-none">
             {repasos}
           </span>
-          <span
-            className={
-              isUp
-                ? "text-[11.5px] text-success-600"
-                : "text-[11.5px] text-error-600"
-            }
-          >
-            {isUp ? "+" : ""}
-            {metric.repasosDeltaPct}% vs la semana pasada
-          </span>
+          {metric.deltaPct !== null && (
+            <span
+              className={
+                isUp
+                  ? "text-[11.5px] text-success-600"
+                  : "text-[11.5px] text-error-600"
+              }
+            >
+              {isUp ? "+" : ""}
+              {metric.deltaPct}% vs {metric.periodLabel}
+            </span>
+          )}
         </div>
       </div>
 
@@ -90,7 +95,7 @@ function TechniqueCard({ metric }: { metric: TechniqueMetric }) {
       <div className="h-12 w-full">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
-            data={activity}
+            data={metric.recentActivity}
             margin={{ top: 4, right: 0, bottom: 0, left: 0 }}
           >
             <Bar
@@ -103,8 +108,8 @@ function TechniqueCard({ metric }: { metric: TechniqueMetric }) {
         </ResponsiveContainer>
       </div>
       <div className="flex justify-between text-[10px] text-fg-muted">
-        {DAY_LABELS.map((label, i) => (
-          <span key={`${metric.key}-${label}-${i}`}>{label}</span>
+        {metric.recentActivity.map((day) => (
+          <span key={day.day}>{day.label}</span>
         ))}
       </div>
 
@@ -113,22 +118,28 @@ function TechniqueCard({ metric }: { metric: TechniqueMetric }) {
         tone={TECHNIQUE_PILL_TONE[metric.key]}
         className="self-start"
       >
-        Acierto {metric.accuracyPct}%
+        Acierto {accuracy}
       </Pill>
     </ChartCard>
   );
 }
 
-// Row 8 — "Actividad por técnica": one card per technique, kept from v1 but
+// Row 8 — "Actividad por técnica": one card per technique (reviews in the
+// period vs. the previous one, streak with the last days of the period,
+// the last 7 days' reviews and the period's accuracy), kept from v1 but
 // simplified — no ring (that moved to the global `AccuracyRing` widget) and
-// no "tiempo de estudio" (it can't be measured honestly yet).
-export function TechniqueActivity() {
+// no "tiempo de estudio" (it can't be measured honestly).
+export function TechniqueActivity({
+  techniques,
+}: {
+  techniques: readonly TechniqueCardView[];
+}) {
   return (
     <div
       data-testid="technique-activity"
       className="grid grid-cols-1 gap-3.5 md:grid-cols-2 xl:grid-cols-3"
     >
-      {TECHNIQUE_METRICS.map((metric) => (
+      {techniques.map((metric) => (
         <TechniqueCard key={metric.key} metric={metric} />
       ))}
     </div>

@@ -1,28 +1,29 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+import { sampleView } from "../_lib/dashboard-view.fixtures";
 import { DashboardHero } from "./hero";
 
 describe("DashboardHero", () => {
   it("greets the user by name", () => {
-    render(<DashboardHero />);
+    render(<DashboardHero hero={sampleView().hero} />);
 
     expect(
-      screen.getByRole("heading", { level: 1, name: "Buenos días, Valentina" }),
+      screen.getByRole("heading", { level: 1, name: "Buenos días, Ana" }),
     ).toBeInTheDocument();
   });
 
-  it("states the week's mastery gain and the weakest notebook, from the same numbers as the page", () => {
-    render(<DashboardHero />);
+  it("points at the weakest notebook, from the same numbers as the page", () => {
+    render(<DashboardHero hero={sampleView().hero} />);
 
     expect(
       screen.getByText(
-        "Subiste 2 puntos de dominio esta semana. Historia del Arte sigue en Aprendiendo: dedícale dos repasos.",
+        "Historia sigue en Aprendiendo: dedícale dos repasos para retomar impulso.",
       ),
     ).toBeInTheDocument();
   });
 
   it("links the call to action to today's reviews", () => {
-    render(<DashboardHero />);
+    render(<DashboardHero hero={sampleView().hero} />);
 
     expect(
       screen.getByRole("link", { name: /Ver repasos de hoy/ }),
@@ -30,7 +31,7 @@ describe("DashboardHero", () => {
   });
 
   it("keeps the illustration decorative", () => {
-    const { container } = render(<DashboardHero />);
+    const { container } = render(<DashboardHero hero={sampleView().hero} />);
 
     const illustration = Array.from(container.querySelectorAll("svg")).find(
       (svg) => svg.getAttribute("viewBox") === "0 0 160 140",

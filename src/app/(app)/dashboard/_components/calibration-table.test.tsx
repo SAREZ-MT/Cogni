@@ -1,7 +1,44 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
+import type { CalibrationRow, CalibrationZone } from "../_lib/dashboard-view";
+import { sampleView } from "../_lib/dashboard-view.fixtures";
 import { CalibrationTable } from "./calibration-table";
+
+function calRow(
+  id: string,
+  pageTitle: string,
+  selfAvg: number,
+  aiAvg: number,
+  zone: CalibrationZone,
+): CalibrationRow {
+  return {
+    id,
+    pageTitle,
+    notebookTitle: "Biología",
+    selfAvg,
+    aiAvg,
+    gap: Math.round((selfAvg - aiAvg) * 10) / 10,
+    zone,
+    href: `/active-recall/nb-1/${id}`,
+  };
+}
+
+// Seven pages (two table pages). The zone is each page's most frequent
+// per-answer signal, so it may disagree with the averages (Ribosomas).
+const ROWS: CalibrationRow[] = [
+  calRow("p-clo", "Cloroplasto", 5, 1, "exceso"),
+  calRow("p-nuc", "Núcleo", 1, 5, "falta"),
+  calRow("p-mit", "Mitocondria", 4, 4, "calibrado"),
+  calRow("p-rib", "Ribosomas", 3.5, 3, "exceso"),
+  calRow("p-mem", "Membrana", 3, 3.5, "calibrado"),
+  calRow("p-ser", "Series de Taylor", 2, 2, "calibrado"),
+  calRow("p-apo", "Apoptosis", 2.5, 1.5, "calibrado"),
+];
+
+function renderTable(rows: readonly CalibrationRow[] = ROWS) {
+  return render(<CalibrationTable rows={rows} />);
+}
 
 // Row page titles in display order (first column), header row excluded.
 function pageTitles(): string[] {
@@ -21,7 +58,7 @@ function header(name: RegExp | string) {
 
 describe("CalibrationTable", () => {
   it("explains what is compared and names the table for screen readers", () => {
-    render(<CalibrationTable />);
+    renderTable();
 
     expect(
       screen.getByRole("heading", { name: "Calibración metacognitiva" }),
@@ -32,7 +69,7 @@ describe("CalibrationTable", () => {
   });
 
   it("starts sorted by the gap, largest first", () => {
-    render(<CalibrationTable />);
+    renderTable();
 
     const gaps = screen
       .getAllByRole("row")
@@ -53,7 +90,7 @@ describe("CalibrationTable", () => {
   });
 
   it("shows averages, signed gap and the calibration signal of a row", () => {
-    render(<CalibrationTable />);
+    renderTable();
 
     const row = screen.getByRole("row", { name: /Cloroplasto/ });
     const cells = within(row).getAllByRole("cell");
@@ -63,13 +100,13 @@ describe("CalibrationTable", () => {
     expect(within(row).getByText("Exceso de confianza")).toBeInTheDocument();
     expect(within(row).getByRole("link", { name: "Repasar" })).toHaveAttribute(
       "href",
-      "/active-recall/biologia-celular/cloroplasto",
+      "/active-recall/nb-1/p-clo",
     );
   });
 
   it("tones the signal pill by calibration zone", async () => {
     const user = userEvent.setup();
-    render(<CalibrationTable />);
+    renderTable();
 
     for (const pill of screen.getAllByText("Exceso de confianza", {
       selector: "span",
@@ -90,7 +127,7 @@ describe("CalibrationTable", () => {
 
   it("toggles the same column between descending and ascending", async () => {
     const user = userEvent.setup();
-    render(<CalibrationTable />);
+    renderTable();
 
     await user.click(screen.getByRole("button", { name: "Brecha" }));
 
@@ -103,7 +140,7 @@ describe("CalibrationTable", () => {
 
   it("sorts a new column descending, and the title column alphabetically", async () => {
     const user = userEvent.setup();
-    render(<CalibrationTable />);
+    renderTable();
 
     await user.click(screen.getByRole("button", { name: "Página" }));
     expect(header("Página")).toHaveAttribute("aria-sort", "descending");
@@ -117,7 +154,7 @@ describe("CalibrationTable", () => {
 
   it("sorts by self-assessment and by real result", async () => {
     const user = userEvent.setup();
-    render(<CalibrationTable />);
+    renderTable();
 
     await user.click(screen.getByRole("button", { name: "Autoevaluación" }));
     expect(header("Autoevaluación")).toHaveAttribute("aria-sort", "descending");
@@ -133,43 +170,67 @@ describe("CalibrationTable", () => {
 
   it("paginates five rows at a time and reports the visible range", async () => {
     const user = userEvent.setup();
-    render(<CalibrationTable />);
+    renderTable();
 
-    expect(screen.getByText("1–5 de 19")).toBeInTheDocument();
+    expect(screen.getByText("1–5 de 7")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Página anterior" }),
     ).toBeDisabled();
 
     await user.click(screen.getByRole("button", { name: "Página siguiente" }));
-    expect(screen.getByText("6–10 de 19")).toBeInTheDocument();
-    expect(pageTitles()).toHaveLength(5);
+    expect(screen.getByText("6–7 de 7")).toBeInTheDocument();
+    expect(pageTitles()).toHaveLength(2);
     expect(pageTitles()).not.toContain("Cloroplasto");
 
     await user.click(screen.getByRole("button", { name: "Página anterior" }));
-    expect(screen.getByText("1–5 de 19")).toBeInTheDocument();
+    expect(screen.getByText("1–5 de 7")).toBeInTheDocument();
   });
 
   it("stops at the last page, which holds the remainder", async () => {
     const user = userEvent.setup();
-    render(<CalibrationTable />);
+    renderTable();
 
     const next = screen.getByRole("button", { name: "Página siguiente" });
     await user.click(next);
-    await user.click(next);
-    await user.click(next);
 
-    expect(screen.getByText("16–19 de 19")).toBeInTheDocument();
-    expect(pageTitles()).toHaveLength(4);
+    expect(screen.getByText("6–7 de 7")).toBeInTheDocument();
+    expect(pageTitles()).toHaveLength(2);
     expect(next).toBeDisabled();
   });
 
   it("returns to the first page when the sort changes", async () => {
     const user = userEvent.setup();
-    render(<CalibrationTable />);
+    renderTable();
 
     await user.click(screen.getByRole("button", { name: "Página siguiente" }));
     await user.click(screen.getByRole("button", { name: "Página" }));
 
-    expect(screen.getByText("1–5 de 19")).toBeInTheDocument();
+    expect(screen.getByText("1–5 de 7")).toBeInTheDocument();
+  });
+
+  it("takes the signal from the answers, not from the averages", () => {
+    renderTable();
+
+    const row = screen.getByRole("row", { name: /Ribosomas/ });
+    expect(within(row).getByText("Exceso de confianza")).toBeInTheDocument();
+  });
+
+  it("maps the analytics rows with rounded averages", () => {
+    renderTable(sampleView().calibration);
+
+    const row = screen.getByRole("row", { name: /Renacimiento/ });
+    const cells = within(row).getAllByRole("cell");
+    expect(cells[1]).toHaveTextContent("3,7");
+    expect(cells[2]).toHaveTextContent("2,3");
+    expect(cells[3]).toHaveTextContent("+1,4");
+  });
+
+  it("shows an empty state without evaluated answers in the period", () => {
+    renderTable([]);
+
+    expect(
+      screen.getByText("Sin autoevaluaciones en este período"),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("table")).toBeNull();
   });
 });

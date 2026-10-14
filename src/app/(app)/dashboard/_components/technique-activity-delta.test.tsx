@@ -1,6 +1,9 @@
 import { render, screen } from "@testing-library/react";
 import { cloneElement, type ReactElement } from "react";
 import { describe, expect, it, vi } from "vitest";
+import type { TechniqueCardView } from "../_lib/dashboard-view";
+import { sampleView } from "../_lib/dashboard-view.fixtures";
+import { TechniqueActivity } from "./technique-activity";
 
 vi.mock("recharts", async (importOriginal) => {
   const actual = await importOriginal<typeof import("recharts")>();
@@ -14,26 +17,12 @@ vi.mock("recharts", async (importOriginal) => {
   };
 });
 
-// Sample deltas are +12, +9 and -4: no technique sits at the 0 boundary, so
-// a flat technique is exercised with a substituted metric.
-vi.mock("../_data/sample", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../_data/sample")>();
-  return {
-    ...actual,
-    TECHNIQUE_METRICS: actual.TECHNIQUE_METRICS.slice(0, 1).map((metric) => ({
-      ...metric,
-      repasosDeltaPct: 0,
-    })),
-  };
-});
-
-import { TechniqueActivity } from "./technique-activity";
-
 describe("TechniqueActivity flat week", () => {
   it("treats 0% as non-negative: success tone with a plus sign", () => {
-    render(<TechniqueActivity />);
+    const first = sampleView().techniques[0] as TechniqueCardView;
+    render(<TechniqueActivity techniques={[{ ...first, deltaPct: 0 }]} />);
 
-    expect(screen.getByText("+0% vs la semana pasada")).toHaveClass(
+    expect(screen.getByText("+0% vs la semana anterior")).toHaveClass(
       "text-success-600",
     );
   });

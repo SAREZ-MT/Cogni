@@ -2,7 +2,7 @@ import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
-import { heroFeedback, SAMPLE_USER_NAME } from "../_data/sample";
+import type { HeroView } from "../_lib/dashboard-view";
 
 // Purely decorative abstract composition (violet pastel shapes, no emoji) —
 // a soft nod to "progreso"/growth instead of a literal illustration.
@@ -36,16 +36,11 @@ function HeroIllustration() {
   );
 }
 
-// Row 1 (wide) — hero: greeting + a feedback sentence derived from the same
-// numbers the rest of the page shows, a primary CTA to today's reviews and
-// a decorative illustration.
-export function DashboardHero() {
-  const { deltaPts, weakestNotebookTitle, weakestLevelLabel } = heroFeedback();
-  const subtitle =
-    deltaPts > 0
-      ? `Subiste ${deltaPts} puntos de dominio esta semana. ${weakestNotebookTitle} sigue en ${weakestLevelLabel}: dedícale dos repasos.`
-      : `${weakestNotebookTitle} sigue en ${weakestLevelLabel}: dedícale dos repasos para retomar impulso.`;
-
+// Row 1 (wide) — hero: greeting (profile-zone hour + account name) and a
+// feedback sentence about the weakest notebook, both built from the same
+// analytics reads as the rest of the page, a primary CTA to today's reviews
+// and a decorative illustration.
+export function DashboardHero({ hero }: { hero: HeroView }) {
   return (
     <Card
       data-testid="hero"
@@ -54,11 +49,9 @@ export function DashboardHero() {
     >
       <div className="flex flex-col items-start gap-4">
         <div>
-          <h1 className="font-bold text-[22px] text-fg">
-            Buenos días, {SAMPLE_USER_NAME}
-          </h1>
+          <h1 className="font-bold text-[22px] text-fg">{hero.greeting}</h1>
           <p className="mt-1.5 max-w-md text-[13px] text-fg-muted">
-            {subtitle}
+            {hero.subtitle}
           </p>
         </div>
         <Button asChild>

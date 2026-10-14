@@ -8,6 +8,7 @@ import {
   recallAccuracy,
 } from "../domain/accuracy";
 import {
+  addDays,
   type DayKey,
   dayKeyFormatter,
   daysBetween,
@@ -74,6 +75,13 @@ export interface TechniqueMetricsReport {
     reviewsCompleted: number;
     previousReviewsCompleted: number;
     streakDays: number;
+    // The overall streak as it stood seven local days before today: only
+    // review days up to that day count (the dashboard's "Racha" delta).
+    // That anchor day is treated as still open, exactly like today: a run
+    // that ended the day before it still counts. The delta compares "now"
+    // with "the same moment a week ago", when that day was also unfinished,
+    // so the grace is symmetric with `streakDays`.
+    streakDaysWeekAgo: number;
   };
   // In the techniques panel order: flashcards, recall, exam.
   techniques: TechniqueMetrics[];
@@ -146,6 +154,7 @@ export async function getTechniqueMetrics(
       reviewsCompleted: reviewPeriods.current.length,
       previousReviewsCompleted: reviewPeriods.previous.length,
       streakDays: currentStreak(days.overall, today),
+      streakDaysWeekAgo: currentStreak(days.overall, addDays(today, -7)),
     },
     techniques: ANALYTICS_TECHNIQUES.map((technique) => ({
       technique,
