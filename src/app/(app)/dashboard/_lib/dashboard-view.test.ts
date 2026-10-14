@@ -40,6 +40,12 @@ describe("hourIn", () => {
     expect(hourIn(instant, "America/Bogota")).toBe(22);
     expect(hourIn(new Date("2026-10-13T05:00:00Z"), "America/Bogota")).toBe(0);
   });
+
+  it("falls back to UTC for an invalid or empty zone instead of throwing", () => {
+    const instant = new Date("2026-10-13T15:30:00Z");
+    expect(hourIn(instant, "")).toBe(15);
+    expect(hourIn(instant, "Not/AZone")).toBe(15);
+  });
 });
 
 describe("dayLabels", () => {
@@ -81,6 +87,10 @@ describe("calibrationZoneOf", () => {
     expect(calibrationZoneOf(counts(0, 2, 2))).toBe("falta");
     expect(calibrationZoneOf(counts(2, 2, 2))).toBe("exceso");
   });
+
+  it("reads a page without answers as calibrated, never as overconfident", () => {
+    expect(calibrationZoneOf(counts(0, 0, 0))).toBe("calibrado");
+  });
 });
 
 describe("buildDashboardView", () => {
@@ -98,6 +108,31 @@ describe("buildDashboardView", () => {
   it("points the hero at the weakest notebook with items, without a weekly change", () => {
     expect(view().hero.subtitle).toBe(
       "Historia sigue en Aprendiendo: dedícale dos repasos para retomar impulso.",
+    );
+  });
+
+  it("invites to generate study items when no notebook has a score", () => {
+    const progress = sampleProgress();
+    progress.notebooks = progress.notebooks.map((notebook) => ({
+      ...notebook,
+      averageScore: null,
+    }));
+    expect(view({ progress }).hero.subtitle).toBe(
+      "Genera flashcards, preguntas o exámenes en tus páginas para ver aquí cómo avanzas.",
+    );
+    expect(buildDashboardView(emptySources()).hero.subtitle).toBe(
+      "Genera flashcards, preguntas o exámenes en tus páginas para ver aquí cómo avanzas.",
+    );
+  });
+
+  it("celebrates when even the weakest notebook is Dominado", () => {
+    const progress = sampleProgress();
+    progress.notebooks = progress.notebooks.map((notebook) => ({
+      ...notebook,
+      averageScore: 0.9,
+    }));
+    expect(view({ progress }).hero.subtitle).toBe(
+      "Todos tus cuadernos están en Dominado: mantén tus repasos al día.",
     );
   });
 
@@ -277,6 +312,26 @@ describe("buildDashboardView", () => {
     const [flashcards] = view({ metrics, range: 30 }).techniques;
     expect(flashcards?.studiedDays).toHaveLength(14);
     expect(flashcards?.recentActivity).toHaveLength(7);
+  });
+
+  it("leaves pages without evaluated answers out of the calibration rows", () => {
+    const calibration = sampleCalibration();
+    calibration.pages.push({
+      pageId: "p-none",
+      pageTitle: "Sin respuestas",
+      notebookId: "nb-cel",
+      notebookTitle: "Biología",
+      answers: 0,
+      overconfident: 0,
+      underconfident: 0,
+      calibrated: 0,
+      selfAverage: 0,
+      aiAverage: 0,
+    });
+    expect(view({ calibration }).calibration.map((row) => row.id)).toEqual([
+      "p-hist",
+      "p-cel1",
+    ]);
   });
 
   it("keeps the calibration source order when every page is unique", () => {

@@ -215,13 +215,24 @@ export function dashboardRangeDays(
   return { fromDay: addDays(toDay, -range), toDay };
 }
 
-// The local hour (0–23) of `instant` in `timeZone`, for the greeting.
-export function hourIn(instant: Date, timeZone: string): number {
-  const hour = new Intl.DateTimeFormat("en-US", {
-    timeZone,
+function hourFormatter(timeZone: string): Intl.DateTimeFormat {
+  const options: Intl.DateTimeFormatOptions = {
     hour: "numeric",
     hourCycle: "h23",
-  })
+  };
+  try {
+    return new Intl.DateTimeFormat("en-US", { ...options, timeZone });
+  } catch {
+    // An empty or unknown zone throws RangeError; the greeting never
+    // breaks the page, so it falls back to UTC.
+    return new Intl.DateTimeFormat("en-US", { ...options, timeZone: "UTC" });
+  }
+}
+
+// The local hour (0–23) of `instant` in `timeZone`, for the greeting
+// (UTC when the zone is invalid).
+export function hourIn(instant: Date, timeZone: string): number {
+  const hour = hourFormatter(timeZone)
     .formatToParts(instant)
     .find((part) => part.type === "hour")?.value;
   return Number(hour ?? 0) % 24;
@@ -266,8 +277,10 @@ function plural(count: number, one: string, many: string): string {
 
 // §7.4 zone of a page: its most frequent per-answer signal. Ties favour
 // the miscalibrated signal, overconfidence before underconfidence
-// (decision 2026-10-13).
+// (decision 2026-10-13). A page without answers has no signal and reads as
+// "calibrado"; the calibration rows leave such pages out anyway.
 export function calibrationZoneOf(counts: CalibrationCounts): CalibrationZone {
+  if (counts.answers === 0) return "calibrado";
   const ranked: [CalibrationZone, number][] = [
     ["exceso", counts.overconfident],
     ["falta", counts.underconfident],
@@ -429,22 +442,26 @@ function notebookRows(progress: Progress): NotebookProgressRow[] {
   }));
 }
 
+// Only pages with evaluated answers: without them there are no averages
+// or signal to show.
 function calibrationRows(calibration: CalibrationRollup): CalibrationRow[] {
-  return calibration.pages.map((page) => {
-    const selfAvg = round1(page.selfAverage);
-    const aiAvg = round1(page.aiAverage);
-    return {
-      id: page.pageId,
-      pageTitle: page.pageTitle,
-      notebookTitle: page.notebookTitle,
-      selfAvg,
-      aiAvg,
-      // From the shown averages, so the three columns always add up.
-      gap: round1(selfAvg - aiAvg),
-      zone: calibrationZoneOf(page),
-      href: `/active-recall/${page.notebookId}/${page.pageId}`,
-    };
-  });
+  return calibration.pages
+    .filter((page) => page.answers > 0)
+    .map((page) => {
+      const selfAvg = round1(page.selfAverage);
+      const aiAvg = round1(page.aiAverage);
+      return {
+        id: page.pageId,
+        pageTitle: page.pageTitle,
+        notebookTitle: page.notebookTitle,
+        selfAvg,
+        aiAvg,
+        // From the shown averages, so the three columns always add up.
+        gap: round1(selfAvg - aiAvg),
+        zone: calibrationZoneOf(page),
+        href: `/active-recall/${page.notebookId}/${page.pageId}`,
+      };
+    });
 }
 
 function techniqueCards(sources: DashboardSources): TechniqueCardView[] {
