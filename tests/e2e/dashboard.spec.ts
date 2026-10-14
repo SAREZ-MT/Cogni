@@ -78,8 +78,11 @@ test.describe("Dashboard", () => {
     // become "yesterday" before the page renders, so wait the day out.
     const untilMidnight = await msToUtcMidnight();
     if (untilMidnight < MIDNIGHT_MARGIN_MS) {
-      test.slow();
-      await page.waitForTimeout(untilMidnight + 5_000);
+      // Extend this test's budget by exactly the wait, so the scenario keeps
+      // its full configured timeout after midnight.
+      const wait = untilMidnight + 5_000;
+      test.setTimeout(test.info().timeout + wait);
+      await page.waitForTimeout(wait);
     }
     await seedReviews(pageId, [
       { sessionKind: "flashcards", quality: 5, daysAgo: 0 },
