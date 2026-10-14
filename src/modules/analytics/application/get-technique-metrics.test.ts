@@ -179,6 +179,27 @@ describe("getTechniqueMetrics", () => {
     expect(report.overall.streakDaysWeekAgo).toBe(3);
   });
 
+  it("keeps the week-ago anchor day open, like today: a run ending the day before still counts", async () => {
+    const store = seededStore();
+    // No review on 6 Oct (the anchor, today − 7); reviews on 4 and 5 Oct.
+    for (const iso of ["2026-10-04T10:00:00Z", "2026-10-05T10:00:00Z"]) {
+      store.addReview({
+        pageId: "p-1",
+        technique: "flashcards",
+        quality: 4,
+        reviewedAt: at(iso),
+      });
+    }
+
+    const report = await getTechniqueMetrics(
+      { ownerId: "owner-1", ...RANGE, timeZone: "UTC" },
+      { reviews: store, answers: store, clock: createFixedClock(NOW) },
+    );
+
+    expect(report.overall.streakDays).toBe(0);
+    expect(report.overall.streakDaysWeekAgo).toBe(2);
+  });
+
   it("reports empty tallies without activity", async () => {
     const report = await getTechniqueMetrics(
       { ownerId: "owner-1", ...RANGE, timeZone: "UTC" },

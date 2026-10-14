@@ -24,7 +24,11 @@ Desde la T4 la ruta `/dashboard` lee sus datos de este módulo.
   racha que llegó hasta ayer sigue viva mientras hoy no termine sin repasos.
   Las métricas traen también la racha general tal como estaba 7 días antes
   de hoy (`overall.streakDaysWeekAgo`, solo cuentan los días hasta ese día),
-  para el delta de "Racha de repasos" del dashboard.
+  para el delta de "Racha de repasos" del dashboard. Ese día ancla también
+  cuenta como abierto, igual que hoy: una racha que llegó hasta el día
+  anterior al ancla sigue contando. El delta compara "ahora" con "el mismo
+  momento hace una semana", cuando ese día tampoco había terminado, así la
+  gracia es simétrica con la racha de hoy.
 - **Tasa de acierto (en el período):** flashcards = repasos con calidad ≥ 3
   (no "Otra vez"); exámenes = respuestas con `is_correct` de exámenes
   terminados; recordación activa = respuestas evaluadas (`done`) con
