@@ -2,7 +2,11 @@ import { randomUUID } from "node:crypto";
 import type { Page } from "@playwright/test";
 import { expect, hasSupabaseEnv, signIn, test } from "./fixtures/auth";
 import { createNotebookWithOpenPage } from "./helpers/notebooks";
-import { seedDueItems, seedReviews } from "./helpers/study-items";
+import {
+  msToUtcMidnight,
+  seedDueItems,
+  seedReviews,
+} from "./helpers/study-items";
 
 // Phase 7 T4 (documento-maestro §3.6): /dashboard reads the analytics
 // module instead of sample data. A user who has studied sees their real
@@ -12,7 +16,8 @@ import { seedDueItems, seedReviews } from "./helpers/study-items";
 // profile's default UTC zone.
 
 const SCREENSHOT_DIR = process.env.E2E_SCREENSHOT_DIR;
-const DAY_MS = 86_400_000;
+// A run of this scenario fits well within two minutes.
+const MIDNIGHT_MARGIN_MS = 120_000;
 
 // The shell scrolls inside its content area, so a tall desktop viewport
 // captures the whole dashboard.
@@ -67,17 +72,19 @@ test.describe("Dashboard", () => {
     const [, , , , pageId] = new URL(page.url()).pathname.split("/");
     if (!pageId) throw new Error("page id missing from the editor URL");
 
-    // Two reviews today and one yesterday (UTC days): a 2-day streak, 3
-    // reviews in the last 7 days, and one flashcard due now.
-    const now = Date.now();
+    // Two reviews today and one yesterday (UTC days, on the database
+    // clock): a 2-day streak, 3 reviews in the last 7 days, and one
+    // flashcard due now. Close to UTC midnight the seeded "today" could
+    // become "yesterday" before the page renders, so wait the day out.
+    const untilMidnight = await msToUtcMidnight();
+    if (untilMidnight < MIDNIGHT_MARGIN_MS) {
+      test.slow();
+      await page.waitForTimeout(untilMidnight + 5_000);
+    }
     await seedReviews(pageId, [
-      { sessionKind: "flashcards", quality: 5, reviewedAt: new Date(now) },
-      { sessionKind: "flashcards", quality: 2, reviewedAt: new Date(now) },
-      {
-        sessionKind: "flashcards",
-        quality: 4,
-        reviewedAt: new Date(now - DAY_MS),
-      },
+      { sessionKind: "flashcards", quality: 5, daysAgo: 0 },
+      { sessionKind: "flashcards", quality: 2, daysAgo: 0 },
+      { sessionKind: "flashcards", quality: 4, daysAgo: 1 },
     ]);
     await seedDueItems(pageId, { flashcard: 1 });
 
@@ -96,6 +103,7 @@ test.describe("Dashboard", () => {
     const due = kpis
       .locator("[data-slot=card]")
       .filter({ hasText: "Ítems vencidos" });
+    await expect(due.getByText("1", { exact: true })).toBeVisible();
     await expect(due.getByText("en 1 página")).toBeVisible();
 
     const activity = page.getByTestId("activity-chart");
