@@ -10,19 +10,22 @@ import { describe, expect, it } from "vitest";
 // `designPreviewsEnabled()` (covered by that route's own test). `exams` left
 // the list in Phase 5 T9: every exams route runs on real data. Active
 // recall left it in Phase 6: its session route in T5, its hub, notebook
-// view and past-session results in T7.
-const PREVIEW_TREES: [tree: string, routes: number][] = [["dashboard", 1]];
+// view and past-session results in T7. `dashboard` left it in Phase 7 T4:
+// it runs on the analytics reads. No preview tree is left; the structural
+// check stays for the next one.
+const PREVIEW_TREES: [tree: string, routes: number][] = [];
 
 // Real-data routes that leave the gate (Phase 5 T4: an exam page's
 // questions; T6: its exam player and results; T9: the exams hub and
 // notebook view; Phase 6 T5: the active recall session; T7: its hub,
-// notebook view and past-session results). Every listed route must exist
-// and must not be guarded.
+// notebook view and past-session results; Phase 7 T4: the dashboard).
+// Every listed route must exist and must not be guarded.
 const REAL_DATA_PAGES = new Set([
   "active-recall/page.tsx",
   "active-recall/[notebookId]/page.tsx",
   "active-recall/[notebookId]/[pageId]/page.tsx",
   "active-recall/[notebookId]/[pageId]/resultados/page.tsx",
+  "dashboard/page.tsx",
   "exams/page.tsx",
   "exams/[notebookId]/page.tsx",
   "exams/[notebookId]/[pageId]/page.tsx",

@@ -1,14 +1,46 @@
 import { render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { cloneElement, type ReactElement } from "react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  emptySources,
+  sampleCalibration,
+  sampleMetrics,
+  sampleProgress,
+} from "./_lib/dashboard-view.fixtures";
 
 vi.mock("server-only", () => ({}));
 
-const { notFound } = vi.hoisted(() => ({
-  notFound: vi.fn(() => {
-    throw new Error("NEXT_NOT_FOUND");
-  }),
+vi.mock("recharts", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("recharts")>();
+  return {
+    ...actual,
+    ResponsiveContainer: ({ children }: { children: ReactElement }) =>
+      cloneElement(
+        children as ReactElement<{ width: number; height: number }>,
+        { width: 800, height: 220 },
+      ),
+  };
+});
+
+const reads = vi.hoisted(() => ({
+  progress: vi.fn(),
+  metrics: vi.fn(),
+  calibration: vi.fn(),
+  zone: vi.fn(),
+  user: vi.fn(),
 }));
-vi.mock("next/navigation", () => ({ notFound }));
+
+vi.mock("@/modules/analytics", () => ({
+  // 13 Oct 2026 in any zone (the reads are faked).
+  dayKeyFormatter: () => () => "2026-10-13",
+  getDashboardProgress: reads.progress,
+  getDashboardTechniqueMetrics: reads.metrics,
+  getDashboardCalibration: reads.calibration,
+}));
+vi.mock("@/modules/identity", () => ({
+  getCurrentTimeZoneSetting: reads.zone,
+  getCurrentUser: reads.user,
+}));
 
 import DashboardPage from "./page";
 
@@ -18,22 +50,34 @@ function props(range?: string | string[]) {
   };
 }
 
+const ok = <T,>(value: T) => ({ ok: true as const, value });
+
+function withData() {
+  reads.progress.mockResolvedValue(ok(sampleProgress()));
+  reads.metrics.mockResolvedValue(ok(sampleMetrics()));
+  reads.calibration.mockResolvedValue(ok(sampleCalibration()));
+}
+
 describe("DashboardPage", () => {
-  afterEach(() => {
-    vi.unstubAllEnvs();
-    notFound.mockClear();
+  beforeEach(() => {
+    vi.clearAllMocks();
+    reads.zone.mockResolvedValue({
+      status: "ok",
+      timeZone: "America/Bogota",
+      chosen: true,
+    });
+    reads.user.mockResolvedValue({ id: "u-1", email: "ana@example.com" });
+    withData();
   });
 
-  it("renders every §3.6 section while design previews are enabled", async () => {
-    vi.stubEnv("NODE_ENV", "development");
-
+  it("renders every §3.6 section from the analytics reads", async () => {
     render(await DashboardPage(props()));
 
     expect(screen.getByTestId("dashboard")).toBeInTheDocument();
     expect(
       screen.getByRole("heading", { name: "Dashboard" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("Vista previa")).toBeInTheDocument();
+    expect(screen.queryByText("Vista previa")).toBeNull();
     for (const id of [
       "hero",
       "mastery-insight",
@@ -43,33 +87,70 @@ describe("DashboardPage", () => {
       "notebook-progress",
       "calibration-table",
       "technique-activity",
-      "concepts",
     ]) {
       expect(screen.getByTestId(id), id).toBeInTheDocument();
     }
-    expect(notFound).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("concepts")).toBeNull();
+    expect(screen.getByText("4 días")).toBeInTheDocument();
+    expect(screen.getByTestId("hero")).toHaveTextContent(/, Ana/);
   });
 
-  it("answers 404 in production before touching any sample data", async () => {
-    vi.stubEnv("NODE_ENV", "production");
-    vi.stubEnv("COGNI_DESIGN_PREVIEWS", "");
+  it("reads the selected range in the profile zone with one instant", async () => {
+    render(await DashboardPage(props("15")));
 
-    await expect(DashboardPage(props())).rejects.toThrow("NEXT_NOT_FOUND");
-    expect(notFound).toHaveBeenCalledTimes(1);
+    const range = {
+      fromDay: "2026-09-29",
+      toDay: "2026-10-14",
+      timeZone: "America/Bogota",
+    };
+    expect(reads.metrics).toHaveBeenCalledWith({
+      ...range,
+      now: expect.any(Date),
+    });
+    expect(reads.calibration).toHaveBeenCalledWith(range);
+    expect(reads.progress).toHaveBeenCalledWith({
+      timeZone: "America/Bogota",
+      weeks: 1,
+      now: expect.any(Date),
+    });
+    expect(reads.progress.mock.calls[0]?.[0].now).toBe(
+      reads.metrics.mock.calls[0]?.[0].now,
+    );
   });
 
-  it("renders in production when the preview opt-in is set", async () => {
-    vi.stubEnv("NODE_ENV", "production");
-    vi.stubEnv("COGNI_DESIGN_PREVIEWS", "1");
+  it("shows one empty state to a user with no items and no reviews", async () => {
+    const empty = emptySources();
+    reads.progress.mockResolvedValue(ok(empty.progress));
+    reads.metrics.mockResolvedValue(ok(empty.metrics));
+    reads.calibration.mockResolvedValue(ok(empty.calibration));
 
     render(await DashboardPage(props()));
 
-    expect(screen.getByTestId("dashboard")).toBeInTheDocument();
+    expect(screen.getByTestId("dashboard-empty")).toBeInTheDocument();
+    expect(
+      screen.getByText("Aún no hay progreso que mostrar"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /Ir a mis cuadernos/ }),
+    ).toHaveAttribute("href", "/notebooks");
+    expect(screen.queryByTestId("kpi-row")).toBeNull();
+  });
+
+  it("reports a failed read instead of showing made-up numbers", async () => {
+    reads.metrics.mockResolvedValue({
+      ok: false,
+      error: { code: "ANALYTICS_UNEXPECTED", message: "x" },
+    });
+
+    render(await DashboardPage(props()));
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "No pudimos cargar tus métricas",
+    );
+    expect(screen.queryByTestId("kpi-row")).toBeNull();
   });
 
   it("never shows a study-time metric", async () => {
-    vi.stubEnv("NODE_ENV", "development");
-
     const { container } = render(await DashboardPage(props("30")));
 
     expect(container.textContent).not.toMatch(/tiempo de estudio/i);
@@ -87,8 +168,6 @@ describe("DashboardPage", () => {
     ["abc", "los últimos 7 días", "7 días"],
     [["15", "30"], "los últimos 15 días", "15 días"],
   ])("range %j selects %s", async (range, description, current) => {
-    vi.stubEnv("NODE_ENV", "development");
-
     render(await DashboardPage(props(range)));
 
     expect(screen.getByText(`Cómo vas en ${description}`)).toBeInTheDocument();

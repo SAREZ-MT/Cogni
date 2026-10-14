@@ -1,7 +1,8 @@
 import { cn } from "@/shared/ui/utils";
 
 export interface DotStreakProps {
-  // One entry per day in the window (chart spec §Widgets E: 14 dots),
+  // One entry per day in the window (chart spec §Widgets E: 14 dots; the
+  // dashboard passes the last days of the selected period, at most 14),
   // oldest first — `true` means "studied that day".
   days: readonly boolean[];
   streakDays: number;
@@ -28,7 +29,7 @@ export function DotStreak({
       >
         {days.map((studied, index) => (
           <span
-            // Fixed-length sample window, index is stable across renders.
+            // Positional window of days, index is stable across renders.
             key={`${index}-${studied}`}
             aria-hidden="true"
             className={cn(

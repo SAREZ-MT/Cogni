@@ -194,29 +194,17 @@ describe("Sidebar", () => {
     expect(screen.getByText("Exámenes").closest("[aria-disabled]")).toBeNull();
   });
 
-  // Dashboard is a design preview too: a link to /dashboard while previews
-  // are enabled, a disabled "pronto" row otherwise (its route 404s in
-  // production).
-  it("links the Dashboard nav item to /dashboard while previews are enabled", () => {
+  // Dashboard runs on real data since Phase 7 T4 (documento-maestro §3.6):
+  // a plain link to /dashboard whatever the design-preview flag says,
+  // active on its own routes.
+  it("marks Dashboard active on its own routes", () => {
+    pathname.current = "/dashboard";
     render(<Sidebar initialCollapsed={false} user={USER} previewsEnabled />);
 
     expect(screen.getByRole("link", { name: "Dashboard" })).toHaveAttribute(
-      "href",
-      "/dashboard",
+      "aria-current",
+      "page",
     );
-  });
-
-  it("keeps Dashboard as a disabled 'pronto' row when previews are disabled", () => {
-    render(
-      <Sidebar initialCollapsed={false} user={USER} previewsEnabled={false} />,
-    );
-
-    const row = screen.getByText("Dashboard").closest("[aria-disabled]");
-    expect(row).toHaveAttribute("aria-disabled", "true");
-    expect(row).toHaveTextContent("pronto");
-    expect(
-      screen.queryByRole("link", { name: "Dashboard" }),
-    ).not.toBeInTheDocument();
   });
 
   it("links the Cuadernos nav item to /notebooks", () => {
@@ -265,14 +253,30 @@ describe("Sidebar", () => {
     );
   });
 
-  // Every design preview (Dashboard) has its route now, and Flashcards,
-  // Exámenes, Active recall and Calendario run on real data.
+  // Dashboard, Flashcards, Exámenes, Active recall and Calendario run on
+  // real data.
   describe.each([
     ["enabled", true],
     ["disabled", false],
   ])("with design previews %s", (_state, previewsEnabled) => {
-    // The preview rows' enabled/disabled states are covered by the dedicated
-    // tests above.
+    it("links Dashboard to /dashboard as a live entry", () => {
+      render(
+        <Sidebar
+          initialCollapsed={false}
+          user={USER}
+          previewsEnabled={previewsEnabled}
+        />,
+      );
+
+      expect(screen.getByRole("link", { name: "Dashboard" })).toHaveAttribute(
+        "href",
+        "/dashboard",
+      );
+      expect(
+        screen.getByText("Dashboard").closest("[aria-disabled]"),
+      ).toBeNull();
+    });
+
     it("links Calendario to /calendario as a live entry", () => {
       render(
         <Sidebar

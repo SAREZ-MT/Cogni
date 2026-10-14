@@ -16,10 +16,11 @@ import {
   ChartTooltip,
 } from "@/shared/ui/chart";
 import { ChartCard } from "@/shared/ui/chart-card";
+import { EmptyState } from "@/shared/ui/empty-state";
 import { IconTile } from "@/shared/ui/icon-tile";
 import { type DashboardRange, PeriodFilter } from "@/shared/ui/period-filter";
 import { Pill } from "@/shared/ui/pill";
-import { activityChartInsight, type DailyActivity } from "../_data/sample";
+import type { ActivityView, DailyActivity } from "../_lib/dashboard-view";
 
 const CONFIG: ChartConfig = {
   flashcards: { label: "Flashcards", color: "var(--color-neutral-900)" },
@@ -48,9 +49,11 @@ function buildRangeHref(range: DashboardRange): string {
 interface ActivityTickProps {
   x?: number;
   y?: number;
-  payload?: { value?: string };
   index?: number;
   showEvery: number;
+  // Display label per bar: the axis keys on the unique day ("2026-10-12"),
+  // since a short label like "dom 1" can repeat within 30 days.
+  labels: readonly string[];
 }
 
 // Custom XAxis tick (chart spec: 7 días shows every tick; 15/30 días shows
@@ -58,9 +61,9 @@ interface ActivityTickProps {
 function ActivityTick({
   x = 0,
   y = 0,
-  payload,
   index = 0,
   showEvery,
+  labels,
 }: ActivityTickProps) {
   if (index % showEvery !== 0) return null;
   return (
@@ -71,7 +74,7 @@ function ActivityTick({
       fontSize={11}
       fill="var(--color-neutral-400)"
     >
-      {payload?.value}
+      {labels[index]}
     </text>
   );
 }
@@ -112,13 +115,21 @@ function ActivityTooltip({ active, payload }: TooltipContentProps) {
 
 // Row 3 (wide) — "Actividad de repaso": the main chart. A stacked, MONOCHROME
 // bar chart (neutral-900/500/300 — never distinguishing series by hue
-// alone), one bar per day for the selected 7/15/30-day range, with a
-// dashed weekly `ReferenceLine` so the chart reads day-by-day AND
-// week-by-week at once.
-export function ActivityChart({ range }: { range: DashboardRange }) {
-  const { days, total, deltaPct, periodLabel } = activityChartInsight(range);
-  const isUp = deltaPct >= 0;
+// alone), one bar per local day of the selected 7/15/30-day range (the
+// analytics daily reviews), with a dashed weekly `ReferenceLine` so the
+// chart reads day-by-day AND week-by-week at once. The comparison with the
+// previous period only shows when that period had reviews; a period
+// without reviews shows an empty state instead of empty bars.
+export function ActivityChart({
+  range,
+  activity: { days, total, deltaPct, periodLabel },
+}: {
+  range: DashboardRange;
+  activity: ActivityView;
+}) {
+  const isUp = deltaPct !== null && deltaPct >= 0;
   const weekBoundaries = range === 7 ? [] : days.filter((d) => d.isMonday);
+  const labels = days.map((d) => d.label);
 
   return (
     <div data-testid="activity-chart">
@@ -132,10 +143,12 @@ export function ActivityChart({ range }: { range: DashboardRange }) {
         divider
         ariaLabel="Repasos completados por día, desglosados por técnica"
         actions={
-          <Pill size="sm" tone={isUp ? "success" : "error"}>
-            {isUp ? "+" : ""}
-            {deltaPct}%
-          </Pill>
+          deltaPct !== null && (
+            <Pill size="sm" tone={isUp ? "success" : "error"}>
+              {isUp ? "+" : ""}
+              {deltaPct}%
+            </Pill>
+          )
         }
       >
         <div className="flex flex-col gap-1">
@@ -144,16 +157,18 @@ export function ActivityChart({ range }: { range: DashboardRange }) {
             <span className="font-bold text-[26px] text-fg leading-none">
               {total}
             </span>
-            <span
-              className={
-                isUp
-                  ? "text-[12px] text-success-600"
-                  : "text-[12px] text-error-600"
-              }
-            >
-              {isUp ? "+" : ""}
-              {deltaPct}% vs {periodLabel}
-            </span>
+            {deltaPct !== null && (
+              <span
+                className={
+                  isUp
+                    ? "text-[12px] text-success-600"
+                    : "text-[12px] text-error-600"
+                }
+              >
+                {isUp ? "+" : ""}
+                {deltaPct}% vs {periodLabel}
+              </span>
+            )}
           </div>
         </div>
 
@@ -173,68 +188,90 @@ export function ActivityChart({ range }: { range: DashboardRange }) {
           <PeriodFilter value={range} hrefFor={buildRangeHref} />
         </div>
 
-        <ChartContainer config={CONFIG} className="h-[220px]">
-          <BarChart
-            data={[...days]}
-            margin={{ top: 8, right: 12, left: 12, bottom: 4 }}
-          >
-            <CartesianGrid
-              vertical={false}
-              stroke="var(--color-border-subtle)"
-              strokeDasharray="3 3"
-            />
-            {weekBoundaries.map((day) => (
-              <ReferenceLine
-                key={day.label}
-                x={day.label}
-                stroke="var(--color-border-default)"
-                strokeDasharray="2 4"
-                label={{
-                  value: day.weekLabel,
-                  position: "insideTopLeft",
-                  fill: "var(--color-fg-muted)",
-                  fontSize: 10,
-                  fontWeight: 600,
-                }}
+        {total === 0 ? (
+          <EmptyState
+            variant="tinted"
+            className="h-[220px]"
+            icon={
+              <IconTile size="36" radius="input" tone="neutral">
+                <Activity aria-hidden="true" size={16} strokeWidth={1.75} />
+              </IconTile>
+            }
+            title="Sin repasos en este período"
+            titleAs="p"
+            titleClassName="text-[13px]"
+            description="Cuando repases, verás aquí tu actividad de cada día."
+            descriptionClassName="text-[12px]"
+          />
+        ) : (
+          <ChartContainer config={CONFIG} className="h-[220px]">
+            <BarChart
+              data={[...days]}
+              margin={{ top: 8, right: 12, left: 12, bottom: 4 }}
+            >
+              <CartesianGrid
+                vertical={false}
+                stroke="var(--color-border-subtle)"
+                strokeDasharray="3 3"
               />
-            ))}
-            <XAxis
-              dataKey="label"
-              tickLine={false}
-              axisLine={false}
-              tickMargin={8}
-              interval={0}
-              tick={<ActivityTick showEvery={range === 7 ? 1 : 5} />}
-            />
-            <YAxis hide />
-            <ChartTooltip
-              content={ActivityTooltip}
-              cursor={{ fill: "var(--color-neutral-100)" }}
-            />
-            <Bar
-              dataKey="flashcards"
-              name="Flashcards"
-              stackId="activity"
-              fill="var(--color-neutral-900)"
-              isAnimationActive={false}
-            />
-            <Bar
-              dataKey="activeRecall"
-              name="Active recall"
-              stackId="activity"
-              fill="var(--color-neutral-500)"
-              isAnimationActive={false}
-            />
-            <Bar
-              dataKey="exams"
-              name="Exámenes"
-              stackId="activity"
-              radius={[4, 4, 0, 0]}
-              fill="var(--color-neutral-300)"
-              isAnimationActive={false}
-            />
-          </BarChart>
-        </ChartContainer>
+              {weekBoundaries.map((day) => (
+                <ReferenceLine
+                  key={day.day}
+                  x={day.day}
+                  stroke="var(--color-border-default)"
+                  strokeDasharray="2 4"
+                  label={{
+                    value: day.weekLabel,
+                    position: "insideTopLeft",
+                    fill: "var(--color-fg-muted)",
+                    fontSize: 10,
+                    fontWeight: 600,
+                  }}
+                />
+              ))}
+              <XAxis
+                dataKey="day"
+                tickLine={false}
+                axisLine={false}
+                tickMargin={8}
+                interval={0}
+                tick={
+                  <ActivityTick
+                    showEvery={range === 7 ? 1 : 5}
+                    labels={labels}
+                  />
+                }
+              />
+              <YAxis hide />
+              <ChartTooltip
+                content={ActivityTooltip}
+                cursor={{ fill: "var(--color-neutral-100)" }}
+              />
+              <Bar
+                dataKey="flashcards"
+                name="Flashcards"
+                stackId="activity"
+                fill="var(--color-neutral-900)"
+                isAnimationActive={false}
+              />
+              <Bar
+                dataKey="activeRecall"
+                name="Active recall"
+                stackId="activity"
+                fill="var(--color-neutral-500)"
+                isAnimationActive={false}
+              />
+              <Bar
+                dataKey="exams"
+                name="Exámenes"
+                stackId="activity"
+                radius={[4, 4, 0, 0]}
+                fill="var(--color-neutral-300)"
+                isAnimationActive={false}
+              />
+            </BarChart>
+          </ChartContainer>
+        )}
       </ChartCard>
     </div>
   );
