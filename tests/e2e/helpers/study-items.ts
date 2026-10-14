@@ -71,3 +71,49 @@ export async function clearStudyItems(pageId: string): Promise<void> {
     await sql.end();
   }
 }
+
+export type ReviewSessionKind = "flashcards" | "recall" | "exam";
+
+const ITEM_KIND_OF: Record<ReviewSessionKind, DueKind> = {
+  flashcards: "flashcard",
+  recall: "recall_question",
+  exam: "exam_question",
+};
+
+// Inserts one review_logs row per entry (the dashboard's "Repasos
+// completados" and "racha" source), each on its own study item of the page
+// that is due in a week, so the reviews never count as due items.
+export async function seedReviews(
+  pageId: string,
+  reviews: readonly {
+    sessionKind: ReviewSessionKind;
+    quality: number;
+    reviewedAt: Date;
+  }[],
+): Promise<void> {
+  const sql = connect();
+  try {
+    for (const review of reviews) {
+      await sql`
+        with item as (
+          insert into study_items (id, owner_id, page_id, kind, source_id, due_at)
+          select gen_random_uuid(), p.owner_id, p.id,
+                 ${ITEM_KIND_OF[review.sessionKind]}, gen_random_uuid(),
+                 now() + interval '7 days'
+          from pages p
+          where p.id = ${pageId}
+          returning id, owner_id
+        )
+        insert into review_logs (id, owner_id, item_id, quality, reviewed_at,
+                                 interval_before, interval_after,
+                                 easiness_after, session_kind, session_id)
+        select gen_random_uuid(), item.owner_id, item.id, ${review.quality},
+               ${review.reviewedAt}, 0, 1, 2.5, ${review.sessionKind},
+               gen_random_uuid()
+        from item
+      `;
+    }
+  } finally {
+    await sql.end();
+  }
+}
