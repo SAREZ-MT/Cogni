@@ -123,10 +123,15 @@ export async function updatePasswordAction(
   redirect("/");
 }
 
+// `flow=google` marks the callback as the Google flow, so a failed exchange
+// there shows the Google copy instead of the invalid-link one
+// (app/auth/callback/route.ts). Supabase keeps our own query string on a
+// same-host redirectTo and appends `code` to it, as the password-reset
+// link's `?next=` already relies on.
 export async function signInWithGoogleAction(): Promise<void> {
   const auth = await gateway();
   const result = await auth.startGoogleSignIn({
-    redirectTo: `${siteUrl()}${AUTH_CALLBACK_PATH}`,
+    redirectTo: `${siteUrl()}${AUTH_CALLBACK_PATH}?flow=google`,
   });
   if (!result.ok) redirect("/login?error=google");
   redirect(result.value.url);

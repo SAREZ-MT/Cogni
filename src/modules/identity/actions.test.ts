@@ -36,11 +36,13 @@ vi.mock("./application", async (importOriginal) => {
 
 vi.mock("@/shared/db/client", () => ({ getDb: () => ({}) }));
 
-const { getUser, signInWithPasswordMock, signOutMock } = vi.hoisted(() => ({
-  getUser: vi.fn(),
-  signInWithPasswordMock: vi.fn(),
-  signOutMock: vi.fn(),
-}));
+const { getUser, signInWithPasswordMock, signOutMock, signInWithOAuthMock } =
+  vi.hoisted(() => ({
+    getUser: vi.fn(),
+    signInWithPasswordMock: vi.fn(),
+    signOutMock: vi.fn(),
+    signInWithOAuthMock: vi.fn(),
+  }));
 vi.mock("./infrastructure", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./infrastructure")>();
   return {
@@ -50,6 +52,7 @@ vi.mock("./infrastructure", async (importOriginal) => {
         getUser,
         signInWithPassword: signInWithPasswordMock,
         signOut: signOutMock,
+        signInWithOAuth: signInWithOAuthMock,
       },
     })),
   };
@@ -85,6 +88,34 @@ describe("signInAction", () => {
     expect(getUser).not.toHaveBeenCalled();
     expect(track).toHaveBeenCalledWith("user_signed_in", "u-42");
     expect(redirect).toHaveBeenCalledWith("/");
+  });
+});
+
+describe("signInWithGoogleAction", () => {
+  beforeEach(() => {
+    redirect.mockClear();
+    signInWithOAuthMock.mockReset();
+  });
+
+  it("marks the callback URL with flow=google so a failed exchange shows the Google copy", async () => {
+    signInWithOAuthMock.mockResolvedValue({
+      data: { url: "https://accounts.google.test/o/oauth2" },
+      error: null,
+    });
+    const { signInWithGoogleAction } = await import("./actions");
+
+    await signInWithGoogleAction();
+
+    expect(signInWithOAuthMock).toHaveBeenCalledWith({
+      provider: "google",
+      options: {
+        redirectTo: "https://cogni.test/auth/callback?flow=google",
+        skipBrowserRedirect: true,
+      },
+    });
+    expect(redirect).toHaveBeenCalledWith(
+      "https://accounts.google.test/o/oauth2",
+    );
   });
 });
 

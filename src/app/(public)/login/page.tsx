@@ -21,6 +21,11 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
           {AUTH_COPY.googleCancelled}
         </output>
       )}
+      {error === "link" && (
+        <output className="rounded-input bg-warning-50 px-3 py-2 text-sm text-warning-600">
+          {AUTH_COPY.linkInvalid}
+        </output>
+      )}
       <SignInForm />
       <GoogleButton />
       <TermsNotice />
