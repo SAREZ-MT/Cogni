@@ -197,7 +197,7 @@ Esta vista se limita a dos módulos, ambos con código suficientemente cargado d
 5. `getImportJobStatus` usa `ImportJob.isAbandoned` (función de solo lectura) para reportar como fallido por tiempo agotado un job que el runtime ya interrumpió, sin escribir ese estado.
 6. `SupabasePdfStorageGateway` implementa `PdfStorageGateway`; `UnpdfTextExtractor` implementa `PdfTextExtractor`; `NotebooksPagesAdapter` implementa `NotebookPagesPort`; `DrizzleImportJobRepository` implementa `ImportJobRepository`.
 7. `DrizzleImportJobRepository` persiste sobre la tabla `import_jobs` (Postgres) mediante una sentencia `UPDATE ... RETURNING` atómica por cada transición.
-8. `UnpdfTextExtractor` es el único archivo del repositorio que puede importar `unpdf` (regla `unpdf-only-in-ingestion-infra` de `.dependency-cruiser.cjs`).
+8. Solo `src/modules/ingestion/infrastructure/` puede importar `unpdf` (regla `unpdf-only-in-ingestion-infra` de `.dependency-cruiser.cjs`); hoy el único archivo que lo importa es `unpdf-text-extractor.ts` (`UnpdfTextExtractor`).
 
 ### 5.2 `study-engine` — implementado
 
@@ -219,7 +219,7 @@ Esta vista se limita a dos módulos, ambos con código suficientemente cargado d
 | `startFlashcardSession`, `gradeFlashcard`, `finishFlashcardSession` | Casos de uso (`application/`) | Sesión de repaso de flashcards; `gradeFlashcard` escribe en una sola unidad de trabajo el nuevo estado del `StudyItem`, su `ReviewLog`, los contadores de la sesión y el `PageMastery` de la página. |
 | `recordExamReviews`, `recordRecallReviews` | Casos de uso (`application/`) | Registran los repasos de un examen terminado y de las respuestas de recordación evaluadas (SM-2, `ReviewLog`, `PageMastery`). |
 | `recomputeAllPageMastery` | Caso de uso (`application/`) | Recalcula el dominio de las páginas más desactualizadas primero, dentro de un presupuesto de tiempo, para el cron diario. |
-| `DrizzleStudyUnitOfWork` y repositorios Drizzle | Adaptadores (`infrastructure/`) | Persisten `study_items`, `review_logs`, `page_mastery`, `flashcard_sessions` y `session_feedback` dentro de una transacción. |
+| `DrizzleStudyUnitOfWork` y repositorios Drizzle | Adaptadores (`infrastructure/`) | Persisten `study_items`, `review_logs`, `page_mastery` y `flashcard_sessions` dentro de una transacción (`StudyRepositories`); `session_feedback` se escribe fuera de ella con `DrizzleSessionFeedbackRepository` (`createSessionFeedbackSources`, `server-api.ts`). |
 | `server-api.ts` | API de servidor (exportada por `index.ts`) | `createStudyItemRepository`, `createPageMasteryReader`, `createFlashcardSessionsServerApi`, `createExamReviewRecorder`, `createRecallReviewRecorder`, `createSessionFeedbackSources` y `createMasteryRecomputeJob`. |
 
 #### 5.2.2 Relaciones
@@ -396,7 +396,7 @@ export function looksLikePdf(bytes: Uint8Array): boolean {
 Estos mecanismos son reales y acotados; no existe un mecanismo de reintento genérico en la plataforma: cada uno vive en el módulo que lo necesita.
 
 1. **Reintento único con degradación** (`ensureProfileResilient`, `src/modules/identity/application/`): si crear el perfil falla, reintenta una vez tras 150 ms; si vuelve a fallar, invoca un `onTransientFailure` de degradación en vez de lanzar una excepción, para que el layout autenticado siga renderizando (RNF-F-02 lo generaliza para `getActiveImports`).
-2. **Degradación a lista vacía** (`getActiveImports()`, `src/app/(app)/layout.tsx`): si la consulta de importaciones activas falla, el sidebar se renderiza sin la insignia de importación, en vez de fallar la página completa.
+2. **Degradación a lista vacía** (`getActiveImports()`, `src/app/(app)/layout.tsx`): si la consulta de importaciones activas falla, devuelve `[]` y el shell se renderiza con normalidad, en vez de fallar la página completa (hoy ningún componente consume esos identificadores).
 3. **Descarte silencioso de fallos de analítica** (`createServerAnalytics`, `src/shared/observability/analytics.ts`): un fallo al enviar un evento a PostHog se captura y se descarta; nunca propaga la excepción a la petición del estudiante (RNF-F-03).
 4. **Abandono por edad, no por *lease*** (`isAbandoned`, `src/modules/ingestion/domain/import-job.ts`): un `ImportJob` no terminal sin escritura reciente se reporta como fallido por tiempo agotado sin que ningún proceso deba liberar un candado explícito.
 5. ***Circuit breaker* por proveedor de IA** (`src/modules/ai/domain/circuit-breaker.ts`): 3 fallos consecutivos (`BREAKER_FAILURE_THRESHOLD`) marcan al proveedor como no sano durante 10 minutos (`BREAKER_OPEN_MS`); su estado se comparte entre invocaciones en Upstash Redis (`UpstashBreakerStore`).
@@ -417,9 +417,9 @@ Los 11 módulos tienen capas reales; la forma de cada uno depende de lo que nece
 - **Sin `infrastructure/`**: `editor` tiene `domain/`, `application/` y `ui/`; no tiene ningún adaptador externo que aislar y declara sus propios puertos (`SavePagePort`, `ImageUploadPort`, `MentionPort`), que la ruta de página compone con las Server Actions de `notebooks`.
 - **Sin `ui/`**: `ai`, `study-engine`, `flashcards`, `exams`, `active-recall`, `scheduling` y `analytics` tienen `domain/`, `application/` e `infrastructure/`; sus pantallas viven en `src/app/(app)/…` (`flashcards`, `exams`, `active-recall`, `calendario`, `dashboard`) y componen los átomos de `src/shared/ui`.
 
-Además de las capas, la raíz de cada módulo contiene sus Server Actions (`actions.ts` y, según el módulo, `session-actions.ts`, `hub-actions.ts`, `retake-actions.ts`, `feedback-actions.ts`, `evaluation-actions.ts`) y, en cinco módulos (`ai`, `notebooks`, `study-engine`, `scheduling`, `analytics`), un `server-api.ts`: la raíz de composición sin `"use server"` que el `index.ts` reexporta para que otros módulos o Route Handlers usen el módulo desde el servidor. `ai`, `flashcards`, `notebooks`, `scheduling`, `analytics` y `study-engine` exponen también un `testing.ts` con dobles de prueba.
+Además de las capas, la raíz de los módulos con Server Actions (todos salvo `ai`, `editor` y `study-engine`) contiene esas acciones (`actions.ts` y, según el módulo, `session-actions.ts`, `hub-actions.ts`, `retake-actions.ts`, `feedback-actions.ts`, `evaluation-actions.ts`) y, en cinco módulos (`ai`, `notebooks`, `study-engine`, `scheduling`, `analytics`), un `server-api.ts`: la raíz de composición sin `"use server"` que el `index.ts` reexporta para que otros módulos o Route Handlers usen el módulo desde el servidor. `ai`, `flashcards`, `notebooks`, `scheduling`, `analytics` y `study-engine` exponen también un `testing.ts` con dobles de prueba.
 
-**Entradas públicas.** Cada módulo se importa desde fuera por su `index.ts`. Hay dos entradas públicas adicionales, cada una protegida por su propia regla (§7.3):
+**Entradas públicas.** Entre módulos, cada módulo se importa por su `index.ts` (regla `cross-module-via-index`, que solo se aplica a importaciones con origen en `src/modules/`). La capa de aplicación (`src/app`) importa además, de forma directa, la `ui/` y el `actions.ts` de algunos módulos (por ejemplo `@/modules/identity/ui`, `@/modules/ingestion/ui/pdf-import-provider`, `@/modules/notebooks/actions`, `@/modules/notebooks/ui/notebook-actions-slot` y `@/modules/notebooks/ui/page-title-editor`). Hay dos entradas públicas adicionales, cada una protegida por su propia regla (§7.3):
 
 - `src/modules/identity/proxy.ts` — entrada liviana que solo reexporta `updateSession`, para que `src/proxy.ts` (que corre en cada petición) no cargue el grafo `server-only` del `index.ts` de `identity` (regla `proxy-via-public-entry`).
 - `src/modules/active-recall/calibration.ts` — entrada solo de dominio que expone `calibrationOf`, para que `analytics` la use sin cargar las Server Actions de `active-recall` (regla `domain-entry-is-pure`).
@@ -678,8 +678,8 @@ Las escrituras que deben quedar juntas se agrupan en una unidad de trabajo sobre
    - Con Google, `signInWithGoogleAction` obtiene la URL de OAuth (con `redirectTo` hacia `/auth/callback`, igual a la entrada de la lista de redirecciones de Supabase) y marca el flujo con la cookie `cogni_auth_flow` (httpOnly, `path=/auth/callback`, 600 s; contrato en `src/modules/identity/domain/auth-flow.ts`). Las acciones de correo (registro, recuperación de contraseña) borran esa marca.
    - `/auth/callback` (`src/app/auth/callback/route.ts`) intercambia el código PKCE. Si el intercambio tiene éxito, registra `user_signed_in` (cada intercambio exitoso, sea Google, verificación de correo o recuperación) y redirige a `next`. Si falla o no hay código, redirige a `/login?error=google` cuando la cookie marca el flujo de Google, o a `/login?error=link` (enlace inválido o vencido) en cualquier otro caso. Toda respuesta borra la cookie.
 4. En el shell autenticado (`src/app/(app)/layout.tsx`), `ensureProfileForUser` asegura la fila `profiles` del estudiante; si su cuenta no aceptó la versión vigente de los términos de uso, `termsRedirectFor` la envía a `/terminos?next=…` antes de mostrar el shell.
-5. El estudiante crea un cuaderno desde el panel lateral; el componente invoca la Server Action `createNotebook` (`src/modules/notebooks/actions.ts`), que ejecuta el caso de uso `createNotebook` (`application/create-notebook.ts`) y lo persiste con `DrizzleNotebookRepository`.
-6. El estudiante crea una página dentro del cuaderno; la Server Action `createPage` ejecuta el caso de uso homónimo, que rechaza la operación si el cuaderno está archivado (`NOTEBOOK_ARCHIVED`).
+5. El estudiante crea un cuaderno desde el inicio (`/`) o desde `/notebooks` con `CreateNotebookTrigger`; el componente invoca la Server Action `createNotebook` (`src/modules/notebooks/actions.ts`), que ejecuta el caso de uso `createNotebook` (`application/create-notebook.ts`) y lo persiste con `DrizzleNotebookRepository`.
+6. El estudiante crea una página desde la vista de detalle del cuaderno (`/notebooks/[notebookId]`); la Server Action `createPage` ejecuta el caso de uso homónimo, que rechaza la operación si el cuaderno está archivado (`NOTEBOOK_ARCHIVED`).
 7. El estudiante escribe en el editor Tiptap; `useAutosave` (`src/modules/editor/application/use-autosave.ts`) detecta el cambio y, tras un *debounce* de 800 a 1500 ms, invoca `port.save`, que la página conecta a la Server Action `saveContent`.
 8. `saveContent` ejecuta el caso de uso `savePage` (`src/modules/notebooks/application/save-page.ts`), que aplica una comparación-e-intercambio atómica sobre `content_version` (`DrizzlePageRepository.updateIfVersion`) y recalcula `plain_text` con `extractPlainText`.
 9. Si otro cliente ya guardó una versión más nueva, `savePage` devuelve `PAGE_VERSION_CONFLICT`; `useAutosave` llama a `port.getCurrent`, guarda el borrador descartado en `conflictDraft` y pasa a estado `conflict`.
@@ -692,13 +692,13 @@ Las escrituras que deben quedar juntas se agrupan en una unidad de trabajo sobre
 
 Generación:
 
-1. En el panel de técnicas de la página, "Generar" de flashcards llama a `generateFlashcardsAction`. `requestGeneration` (`flashcards/application/request-generation.ts`) lee y comprueba la página (`notebooks`) antes de tocar el límite, y selecciona los párrafos que flashcards aún no usó (huellas en `generation_fingerprints`); sin párrafos nuevos responde `NO_NEW_CONTENT` sin llamar a la IA ni consumir el límite.
+1. En el panel de técnicas de la página, "Generar" de flashcards llama a `generateFlashcardsAction`. `requestGeneration` (`flashcards/application/request-generation.ts`) lee y comprueba la página (`notebooks`) antes de tocar el límite, y selecciona los párrafos que flashcards aún no usó (huellas en `generation_fingerprints`); sin párrafos nuevos responde `FLASHCARDS_NO_NEW_CONTENT` sin llamar a la IA ni consumir el límite.
 2. Consume una unidad del límite diario de generaciones (`check`, Upstash) y llama a `ai.generateStructured` con `generate_flashcards/v1`, recortado a `AI_PAGE_TOKEN_CAP`. `generateStructured` elige un proveedor sano y con cuota, valida la salida contra `{cards:[{front,back}]}` y, si falla, reintenta una vez con otro proveedor; cada intento queda auditado en `ai_generations`.
 3. En una sola transacción (`DrizzleDeckUnitOfWork`) guarda las tarjetas válidas al final del mazo de la página, un `StudyItem(kind = "flashcard")` por tarjeta (`createStudyItemRepository` de `study-engine`) y las huellas de los párrafos enviados. Si ninguna tarjeta es válida no se guarda nada: un mazo nunca queda vacío. La acción registra el evento `generation_requested` en PostHog.
 
 Repaso:
 
-4. `startFlashcardSessionAction` abre una sesión con `createFlashcardSessionsServerApi` de `study-engine`; sin ítems vencidos responde `NOTHING_DUE` y no crea fila.
+4. `startFlashcardSessionAction` abre una sesión con `createFlashcardSessionsServerApi` de `study-engine`; sin ítems vencidos responde `STUDY_ENGINE_NOTHING_DUE` y no crea fila.
 5. Cada calificación (Otra vez q=1, Difícil q=3, Bien q=4, Fácil q=5) llama a `gradeFlashcardAction` → `gradeFlashcard`: en una transacción aplica `applySm2`, escribe el `ReviewLog(session_kind = flashcards)`, actualiza los contadores de la `FlashcardSession` y recalcula el `PageMastery` de la página.
 6. `finishFlashcardSessionAction` cierra la sesión. `requestSessionFeedbackAction` → `requestSessionFeedback` (`flashcards`) consulta el límite sin consumirlo (`peek`), lee la sesión y las tarjetas difíciles con `createSessionFeedbackSources` y pide `session_feedback` a la IA; la fila única de `session_feedback` pasa a `done` o `failed`, y un fallo nunca impide cerrar la sesión.
 
@@ -719,7 +719,7 @@ Repaso:
 
 > Diagrama a construir con archify a partir de esta descripción.
 
-**Implementado (Fase 6, 2026-10-08)** — `src/modules/active-recall`, con `ai` y `study-engine` como dependencias a través de sus `index.ts`; decisiones en `docs/adr/0007-recordacion-activa-y-generacion-incremental.md`; trazabilidad con CU-09, RF-AR-01 a RF-AR-06 y RF-AI-03.
+**Implementado (Fase 6, 2026-10-10)** — `src/modules/active-recall`, con `ai`, `notebooks` y `study-engine` (más `identity` para la sesión) como dependencias a través de sus `index.ts`; decisiones en `docs/adr/0007-recordacion-activa-y-generacion-incremental.md`; trazabilidad con CU-09, RF-AR-01 a RF-AR-06 y RF-AI-03.
 
 Generación (previa a la sesión):
 
@@ -764,7 +764,7 @@ Dashboard:
 6. `getProgress` combina `DrizzlePageProgressReader` (páginas vivas con su fila de `page_mastery` y los conteos vivos de `study_items`, total y vencidos con `due_at <= now`) con la calidad semanal de `review_logs` (`DrizzleReviewHistoryReader`); `buildProgress` arma el progreso por página y cuaderno.
 7. `getTechniqueMetrics` lee `review_logs` del período y del anterior, los pares distintos (técnica, tramo UTC de 15 minutos) de todo el historial para la racha, y las respuestas de exámenes terminados y de recordación evaluadas (`DrizzleAnswerOutcomeReader`); el dominio calcula repasos por día, tasa de acierto, racha actual y la de hace 7 días.
 8. `getCalibration` clasifica cada respuesta de recordación evaluada del período con `calibrationOf` de `active-recall` y la agrega por página (`rollupCalibration`).
-9. La ruta mapea los tres resultados con la función pura `buildDashboardView` (zona de calibración por la señal más frecuente, variación solo en la racha) y pinta los componentes con los gráficos de `src/shared/ui/chart.tsx` (Recharts). Si alguna lectura falla muestra un aviso de error; sin datos, un estado vacío.
+9. La ruta mapea los tres resultados con la función pura `buildDashboardView` (zona de calibración por la señal más frecuente, variación respecto del periodo anterior en repasos completados, precisión y repasos por técnica, y en la racha; sin variación para el dominio global, los ítems pendientes ni las páginas dominadas) y pinta los componentes con los gráficos de `src/shared/ui/chart.tsx` (Recharts). Si alguna lectura falla muestra un aviso de error; sin datos, un estado vacío.
 
 ---
 
@@ -872,6 +872,7 @@ Solo nombres; ningún valor real fue leído ni se reproduce aquí.
 | `SENTRY_AUTH_TOKEN` | Habilita la subida de *source maps* en el build de producción. | Sentry (CI/Vercel) |
 | `VERCEL_ENV` | Entorno de Vercel, leído por `sentry.*.config.ts` y `scripts/migrate-in-build.mjs`. | Vercel |
 | `VERCEL_GIT_COMMIT_SHA` | SHA del commit, leído por `sentry.*.config.ts`. | Vercel |
+| `COGNI_DESIGN_PREVIEWS` | Con `1` reactiva las vistas previas de diseño en un build de producción (`designPreviewsEnabled()`, `src/shared/config/design-previews.ts`). | Aplicación |
 | `RUN_DB_MIGRATIONS` | Escape hatch para migrar localmente contra `cogni-dev` sin desplegar. | Aplicación |
 | `SENTRY_ORG` / `SENTRY_PROJECT` | Referenciadas solo en un comentario de `next.config.ts`; Vercel las inyecta en el build a través de su integración con Sentry. | Sentry (Vercel) |
 
@@ -893,11 +894,11 @@ Los buckets de Storage sí tienen políticas RLS reales por `owner_id`, sobre `s
 
 ### 12.3 Content Security Policy con nonce por petición
 
-`src/shared/config/security-headers.ts` construye la CSP; `src/proxy.ts` genera un nonce único por petición (`crypto.randomUUID()`) y lo propaga vía la cabecera `x-nonce` (RNF-S-05).
+`src/shared/config/security-headers.ts` construye la CSP; `src/proxy.ts` genera un nonce único por petición (`crypto.randomUUID()` codificado en base64) y lo propaga vía la cabecera `x-nonce` (RNF-S-05).
 
 - `script-src` usa `'self' 'nonce-{value}' 'strict-dynamic'` una vez que existe un nonce, y `'self' 'unsafe-inline'` sin él (el `headers()` estático de `next.config.ts`, red de seguridad solo para rutas fuera del `matcher` del proxy). Además permite `https://*.posthog.com`, porque `posthog-js` carga su configuración remota y módulos diferidos como scripts, y agrega `'unsafe-eval'` solo en desarrollo.
 - `style-src` es `'self' 'unsafe-inline'` y nunca lleva nonce: un nonce no cubre los atributos `style=""`, y una `style-src` con nonce bloqueaba los estilos en línea generados en servidor en cargas completas del navegador (decisión del 2026-09-24, `04-ADR.md`, ADR-011).
-- El resto de directivas: `default-src 'self'`, `img-src` (Supabase y `googleusercontent.com`), `connect-src` (Supabase, Sentry, PostHog), `form-action 'self' https://*.supabase.co https://accounts.google.com`, `frame-ancestors 'none'`, `object-src 'none'`, `base-uri 'self'` y `upgrade-insecure-requests`, junto con `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy` y `Permissions-Policy`.
+- El resto de directivas: `default-src 'self'`, `img-src` (Supabase y `googleusercontent.com`), `font-src 'self'`, `connect-src` (Supabase, Sentry, PostHog), `worker-src 'self' blob: data:`, `form-action 'self' https://*.supabase.co https://accounts.google.com`, `frame-ancestors 'none'`, `object-src 'none'`, `base-uri 'self'` y `upgrade-insecure-requests`, junto con `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy` y `Permissions-Policy`.
 
 ### 12.4 Validación de variables de entorno
 
@@ -949,7 +950,7 @@ Esta tabla documenta alineación, no cumplimiento ni certificación: describe qu
 
 **Lo que no existe:**
 
-- La lista de eventos de `docs/documento-maestro.md` §10.3 (`page_created`, `generation_requested`, `session_started`, `session_finished`, `item_rated`) es aspiracional en lo que no coincide con la lista anterior: `generation_requested` está implementado; `page_created`, `session_started`, `session_finished` e `item_rated` no.
+- La lista de eventos de `docs/documento-maestro.md` §10.3 (`page_created`, `pdf_imported`, `generation_requested`, `session_started`, `session_finished`, `item_rated`) es aspiracional en lo que no coincide con la lista anterior: `pdf_imported` y `generation_requested` están implementados; `page_created`, `session_started`, `session_finished` e `item_rated` no.
 - No hay trazas de rendimiento (`tracesSampleRate: 0`), ni *dashboards* de métricas de infraestructura propios.
 - No hay un `error.tsx` por ruta bajo `src/app` (solo `global-error.tsx` en la raíz) ni `loading.tsx` en ninguna ruta.
 - Better Stack (registro de logs externo, entregable de la Fase 9) no está integrado.
