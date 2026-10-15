@@ -1441,3 +1441,79 @@ stack (`gap-1`) and wrap in a row when narrow; an optional "N más…" link
   `data-outside`.
 
 Used by: `calendario/_components/calendar-period.tsx` ("Mes", "Semana").
+
+## Auth screens redesign (Phase 8 L1, 2026-10-15)
+
+Atoms added for the login/register/forgot/reset screens. They are generic
+and safe to reuse elsewhere.
+
+### TextDivider (`text-divider.tsx`)
+
+Horizontal rule with a short centred label: the "o" between "Iniciar sesión"
+and "Continuar con Google". Two `aria-hidden` 1px rules
+(`h-px flex-1 bg-border-default`) around a `text-xs text-fg-secondary`
+label, `flex items-center gap-3`.
+
+- Props: `children` (the label), any `div` prop, `className?`.
+- `data-slot="text-divider"`.
+
+Used by: `(public)/login/page.tsx`, `(public)/register/page.tsx`.
+
+### GoogleIcon (`google-icon.tsx`)
+
+Google's four-colour "G" as inline SVG (no external request), 18px by
+default, `aria-hidden` — the button carries the accessible name.
+
+- Props: any `svg` prop, `className?` (size override).
+- `data-slot="google-icon"`.
+
+Used by: `modules/identity/ui/google-button.tsx`.
+
+### TextLink (`text-link.tsx`)
+
+Inline `next/link` for links inside running copy ("¿No tienes cuenta? Crea
+una"): `font-medium text-fg-active` (violet, AA on the warm panels),
+`hover:underline hover:text-primary-800` with `underline-offset-4`, and a
+`focus-visible:ring-3 ring-ring/50` focus ring.
+
+- Props: every `next/link` prop, `className?`.
+- `data-slot="text-link"`.
+
+Used by: the four `(public)` auth pages and
+`modules/identity/ui/terms-notice.tsx`.
+
+### BrandMark / BrandGlyph (`brand-mark.tsx`)
+
+Single source of truth for the Cogni brand. `BrandGlyph` is the mark: a "C"
+arc (stroke 2.4, round caps) whose two ends are white knowledge nodes, with
+a violet (`--color-primary-400`) node at its centre — the memory the arc
+keeps reinforcing. `BrandMark` puts the glyph (22px) in a 36px tile
+(`rounded-[10px]`) next to the bold "Cogni" wordmark. Static copy of the
+light variant: `docs/design-system/assets/logo.svg`.
+
+- `tone`: `light` (default; `bg-neutral-900` tile, `text-fg` wordmark) ·
+  `dark` (glass tile `bg-white/10 border-white/15`, white wordmark) for the
+  near-black brand panel.
+- `size`: `md` (default, 16px wordmark) · `sm` (14px, app sidebar).
+- `wordmark`: `false` renders the tile alone (collapsed sidebar); the caller
+  then owns the accessible name.
+- Not a link; `data-slot="brand-mark"` / `"brand-glyph"`, `data-tone`.
+
+Used by: `(public)/layout.tsx` (dark tone on the brand panel; light tone
+above the form below `md`), `(app)/_components/logo.tsx` (wrapped in the home
+link).
+
+### SubmitButton (`submit-button.tsx`)
+
+`Button` (via `motion.create`) with `type="submit"`, a pressed scale of 0.98
+(spring, no bounce, 150ms) and a loading state: while pending it is
+disabled, sets `aria-busy` and shows a spinning `Loader2`
+(`data-slot="spinner"`, static under reduced motion). The label never
+changes, so its accessible name stays stable for tests and screen readers.
+
+- Props: every `Button` prop except `type`, plus `pending?` (e.g. from
+  `useActionState`). The enclosing form's `useFormStatus().pending` also
+  counts, so plain server-action forms get the loading state for free.
+
+Used by: `modules/identity/ui/auth-forms.tsx` (all four auth forms),
+`modules/identity/ui/google-button.tsx`.

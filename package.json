@@ -72,6 +72,7 @@
     "lowlight": "3.3.0",
     "lucide-react": "^1.46.0",
     "mammoth": "1.13.0",
+    "motion": "^14.2.0",
     "next": "16.4.1",
     "officeparser": "8.2.0",
     "postgres": "^3.4.9",
@@ -83,6 +84,7 @@
     "recharts": "3.10.1",
     "server-only": "^0.0.1",
     "tailwind-merge": "^3.7.0",
+    "three": "^0.186.1",
     "zod": "^4.6.7"
   },
   "devDependencies": {
@@ -96,6 +98,7 @@
     "@types/node": "^22.20.3",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/three": "^0.186.0",
     "@vitejs/plugin-react": "^6.1.1",
     "@vitest/coverage-v8": "^5.0.5",
     "dependency-cruiser": "^18.3.1",
