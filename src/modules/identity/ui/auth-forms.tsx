@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { Button } from "@/shared/ui/button";
+import { SubmitButton } from "@/shared/ui/submit-button";
 import {
   requestPasswordResetAction,
   signInAction,
@@ -34,9 +34,9 @@ export function SignInForm() {
         autoComplete="current-password"
         required
       />
-      <Button type="submit" size="lg" className="w-full" disabled={pending}>
+      <SubmitButton size="lg" className="w-full" pending={pending}>
         Iniciar sesión
-      </Button>
+      </SubmitButton>
     </form>
   );
 }
@@ -65,9 +65,9 @@ export function SignUpForm() {
         minLength={8}
         required
       />
-      <Button type="submit" size="lg" className="w-full" disabled={pending}>
+      <SubmitButton size="lg" className="w-full" pending={pending}>
         Crear cuenta
-      </Button>
+      </SubmitButton>
     </form>
   );
 }
@@ -87,9 +87,9 @@ export function ForgotPasswordForm() {
         autoComplete="email"
         required
       />
-      <Button type="submit" size="lg" className="w-full" disabled={pending}>
+      <SubmitButton size="lg" className="w-full" pending={pending}>
         Enviar enlace
-      </Button>
+      </SubmitButton>
     </form>
   );
 }
@@ -110,9 +110,9 @@ export function ResetPasswordForm() {
         minLength={8}
         required
       />
-      <Button type="submit" size="lg" className="w-full" disabled={pending}>
+      <SubmitButton size="lg" className="w-full" pending={pending}>
         Guardar contraseña
-      </Button>
+      </SubmitButton>
     </form>
   );
 }
