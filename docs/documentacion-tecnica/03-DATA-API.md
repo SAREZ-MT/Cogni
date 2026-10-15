@@ -560,7 +560,7 @@ CREATE INDEX "pages_notebook_id_idx" ON "pages" USING btree ("notebook_id");
 ```
 
 ```sql
--- drizzle/0004_page_assets_storage.sql
+-- drizzle/0004_page_assets_storage.sql (encabezado de comentarios abreviado; sentencias SQL textuales)
 -- Bucket configuration and RLS policies for Supabase Storage's
 -- `storage.objects`/`storage.buckets` tables. Drizzle does not introspect
 -- the `storage` schema, so this is hand-written raw SQL applied by
@@ -626,7 +626,7 @@ CREATE INDEX "import_jobs_owner_status_idx" ON "import_jobs" USING btree ("owner
 ```
 
 ```sql
--- drizzle/0006_page_pdfs_storage.sql
+-- drizzle/0006_page_pdfs_storage.sql (encabezado de comentarios abreviado; sentencias SQL textuales)
 -- Bucket configuration and RLS policies for imported PDFs. Same pattern as
 -- 0004_page_assets_storage.sql: raw SQL, because Drizzle does not
 -- introspect the `storage` schema. page-assets is not touched.
@@ -1332,7 +1332,7 @@ Corresponden a CU-05 (Importar PDF) y a los requisitos RF-IN-01 a RF-IN-08 (comp
 | Acción | Parámetros | Retorno | Auth | Errores |
 |---|---|---|---|---|
 | `requestPdfUpload` | `{ notebookId: string; fileName: string; mime: string; sizeBytes: number }` | `Result<PdfUploadGrant, ActionError>` | Requiere sesión (Result) | `INGESTION_SESSION_REQUIRED`, `INGESTION_INVALID_INPUT`, `PDF_FILE_NAME_INVALID`, `PDF_MIME_NOT_ALLOWED`, `PDF_TOO_LARGE`, `INGESTION_NOTEBOOK_NOT_FOUND`, `INGESTION_STORAGE_UNAVAILABLE`, `INGESTION_UNEXPECTED` |
-| `startPdfImport` | `{ notebookId: string; storagePath: string; fileName: string; mime: string; sizeBytes: number }` | `Result<StartPdfImportResult, ActionError>` | Requiere sesión (Result) | `INGESTION_SESSION_REQUIRED`, `INGESTION_INVALID_INPUT`, `PDF_PATH_OUT_OF_SCOPE`, `PDF_UPLOAD_EXPIRED`, `PDF_OBJECT_MISSING`, `INGESTION_NOTEBOOK_NOT_FOUND`, `INGESTION_NOTEBOOK_MISMATCH`, `INGESTION_PAGE_NOT_FOUND`, `INGESTION_STORAGE_UNAVAILABLE`, `INGESTION_UNEXPECTED` |
+| `startPdfImport` | `{ notebookId: string; storagePath: string; fileName: string; mime: string; sizeBytes: number }` | `Result<StartPdfImportResult, ActionError>` | Requiere sesión (Result) | `INGESTION_SESSION_REQUIRED`, `INGESTION_INVALID_INPUT`, `PDF_PATH_OUT_OF_SCOPE`, `PDF_UPLOAD_EXPIRED`, `PDF_OBJECT_MISSING`, `PDF_MIME_NOT_ALLOWED`, `PDF_TOO_LARGE` (revalidación de los metadatos reales del objeto con `validatePdfInput`), `INGESTION_NOTEBOOK_NOT_FOUND`, `INGESTION_NOTEBOOK_MISMATCH`, `NOTEBOOK_NOT_FOUND`, `NOTEBOOK_ARCHIVED` (de `notebooks` al crear la página, si el cuaderno se archivó entre la comprobación y la creación), `INGESTION_PAGE_NOT_FOUND`, `INGESTION_STORAGE_UNAVAILABLE`, `INGESTION_UNEXPECTED` |
 | `processPdfImport` | `{ importJobId: string }` | `Result<ImportJobStatusView, ActionError>` | Requiere sesión (Result) | `INGESTION_SESSION_REQUIRED`, `INGESTION_INVALID_INPUT`, `IMPORT_JOB_NOT_FOUND`, `INGESTION_UNEXPECTED` |
 | `getImportJobStatus` | `{ pageId: string }` | `Result<ImportJobStatusView o null, ActionError>` | Requiere sesión (Result) | `INGESTION_SESSION_REQUIRED`, `INGESTION_INVALID_INPUT`, `IMPORT_JOB_NOT_FOUND`, `INGESTION_UNEXPECTED` |
 | `getActiveImports` | — | `Result<string[], ActionError>` | Requiere sesión (Result) | `INGESTION_SESSION_REQUIRED`, `INGESTION_UNEXPECTED` |
@@ -1366,11 +1366,11 @@ Ejemplo de retorno no trivial (`ImportJobStatusView`):
 
 ### 4.4 `flashcards`
 
-Corresponden a CU-06 (Generar material de estudio con IA) y CU-07 (Repasar flashcards), y a RF-FC-01 a RF-FC-05 (Fases 3 y 4; `docs/adr/0004`, `docs/adr/0005`). Server Actions (`"use server"`) en `src/modules/flashcards/actions.ts` y `session-actions.ts`, sobre el borde compartido de `action-support.ts`: sesión primero (`FLASHCARDS_SESSION_REQUIRED`, "Debes iniciar sesión para continuar."), entrada validada con Zod (ids `z.uuid()`; `FLASHCARDS_INVALID_INPUT`) y envoltura `withBoundary()` (una excepción no prevista se reporta a Sentry y se convierte en `FLASHCARDS_UNEXPECTED`); nunca lanzan y cada `DomainError` sale como `ActionError`. La tabla lista solo los demás errores. Las acciones que cambian un mazo revalidan `/flashcards` (`revalidatePath("/flashcards", "layout")`).
+Corresponden a CU-06 (Generar material de estudio con IA) y CU-07 (Repasar flashcards), y a RF-FC-01 a RF-FC-05 (Fases 3 y 4; `docs/adr/0004`, `docs/adr/0005`). Server Actions (`"use server"`) en `src/modules/flashcards/actions.ts` y `session-actions.ts`, sobre el borde compartido de `action-support.ts`: sesión primero (`FLASHCARDS_SESSION_REQUIRED`, "Debes iniciar sesión para continuar."), entrada validada con Zod (ids `z.uuid()`; `FLASHCARDS_INVALID_INPUT`) y envoltura `withBoundary()` (una excepción no prevista se reporta a Sentry y se convierte en `FLASHCARDS_UNEXPECTED`); nunca lanzan y cada `DomainError` sale como `ActionError`. La tabla lista solo los demás errores. `createFlashcardAction` y `archiveFlashcardAction` revalidan `/flashcards` (`revalidatePath("/flashcards", "layout")`); `generateFlashcardsAction` no revalida.
 
 | Acción | Parámetros | Retorno | Errores propios |
 |---|---|---|---|
-| `generateFlashcardsAction` | `{ pageId, count? }` (`count` entero de 3 a 20; 10 por defecto) | `Result<GenerationView, GenerationActionError>` (`cards`, `remainingToday`, `truncated`, `wordsUsed`, `wordsTotal`) | `PAGE_NOT_FOUND`, `AI_PAGE_EMPTY`, `FLASHCARDS_NO_NEW_CONTENT`, `AI_DAILY_LIMIT_REACHED` (con `resetAt` ISO), `AI_GENERATION_FAILED` |
+| `generateFlashcardsAction` | `{ pageId, count? }` (`count` entero de 3 a 20; 10 por defecto) | `Result<GenerationView, GenerationActionError>` (`cards`, `remainingToday`, `truncated`, `wordsUsed`, `wordsTotal`) | `PAGE_NOT_FOUND`, `AI_PAGE_EMPTY`, `FLASHCARDS_NO_NEW_CONTENT`, `AI_DAILY_LIMIT_REACHED` (con `resetAt` ISO), `AI_GENERATION_FAILED`, `AI_NO_PROVIDER_AVAILABLE` |
 | `listFlashcardsAction` | `{ pageId }` | `Result<FlashcardView[], ActionError>` (`id`, `pageId`, `front`, `back`, `position`) | — |
 | `getGenerationStatusAction` | — | `Result<GenerationStatusView, ActionError>` (`remainingToday`, `resetAt` ISO); solo consulta el límite, no lo consume | — |
 | `listDecksAction` | — | `Result<DeckView[], ActionError>` (`pageId`, `notebookId`, `pageTitle`, `notebookTitle`, `notebookColor`, `count`) | — |
@@ -1385,7 +1385,7 @@ Corresponden a CU-06 (Generar material de estudio con IA) y CU-07 (Repasar flash
 
 ### 4.5 `exams`
 
-Corresponden a CU-06 y CU-08 (Presentar un examen) y a RF-EX-01 a RF-EX-07 (Fase 5, `docs/adr/0006`). Server Actions (`"use server"`) en `src/modules/exams/actions.ts`, `session-actions.ts`, `feedback-actions.ts`, `hub-actions.ts` y `retake-actions.ts`, con el mismo borde que flashcards (`action-support.ts`): `EXAMS_SESSION_REQUIRED`, `EXAMS_INVALID_INPUT` y `EXAMS_UNEXPECTED`; nunca lanzan. Las acciones que cambian preguntas o sesiones revalidan `/exams`. La tabla lista solo los demás errores.
+Corresponden a CU-06 y CU-08 (Presentar un examen) y a RF-EX-01 a RF-EX-07 (Fase 5, `docs/adr/0006`). Server Actions (`"use server"`) en `src/modules/exams/actions.ts`, `session-actions.ts`, `feedback-actions.ts`, `hub-actions.ts` y `retake-actions.ts`, con el mismo borde que flashcards (`action-support.ts`): `EXAMS_SESSION_REQUIRED`, `EXAMS_INVALID_INPUT` y `EXAMS_UNEXPECTED`; nunca lanzan. Las acciones que cambian preguntas (crear, editar, retirar y generar), además de iniciar, terminar y repetir un examen, revalidan `/exams`; `answerExamQuestionAction` no revalida. La tabla lista solo los demás errores.
 
 | Acción | Parámetros | Retorno | Errores propios |
 |---|---|---|---|
@@ -1393,7 +1393,7 @@ Corresponden a CU-06 y CU-08 (Presentar un examen) y a RF-EX-01 a RF-EX-07 (Fase
 | `createExamQuestionAction` | `{ pageId, stem, options (4), correctIndex (0–3), explanation, concept }` (límites tras recortar: enunciado 1000, opción 300, explicación 2000, concepto 120 caracteres) | `Result<ExamQuestionView, ActionError>` | `PAGE_NOT_FOUND`, `EXAMS_INVALID_QUESTION` |
 | `editExamQuestionAction` | `{ questionId, stem, options, correctIndex, explanation, concept }` | `Result<ExamQuestionView, ActionError>` | `EXAMS_QUESTION_NOT_FOUND`, `EXAMS_QUESTION_RETIRED`, `EXAMS_INVALID_QUESTION` |
 | `retireExamQuestionAction` | `{ questionId }` | `Result<{ id }, ActionError>` (idempotente: una pregunta ya retirada conserva su `retired_at`) | `EXAMS_QUESTION_NOT_FOUND` |
-| `generateExamQuestionsAction` | `{ pageId, count? }` (`count` de 10 a 30; 10 por defecto) | `Result<ExamGenerationView, ExamGenerationActionError>` (`questions`, `created`, `skipped`, `remainingToday`, `truncated`, `wordsUsed`, `wordsTotal`) | `PAGE_NOT_FOUND`, `AI_PAGE_EMPTY`, `EXAMS_NO_NEW_CONTENT`, `EXAMS_INVALID_QUESTION_COUNT`, `AI_DAILY_LIMIT_REACHED` (con `resetAt`), `AI_GENERATION_FAILED` |
+| `generateExamQuestionsAction` | `{ pageId, count? }` (`count` de 10 a 30; 10 por defecto) | `Result<ExamGenerationView, ExamGenerationActionError>` (`questions`, `created`, `skipped`, `remainingToday`, `truncated`, `wordsUsed`, `wordsTotal`) | `PAGE_NOT_FOUND`, `AI_PAGE_EMPTY`, `EXAMS_NO_NEW_CONTENT`, `EXAMS_INVALID_QUESTION_COUNT`, `AI_DAILY_LIMIT_REACHED` (con `resetAt`), `AI_GENERATION_FAILED`, `AI_NO_PROVIDER_AVAILABLE` |
 | `getExamStartAction` | `{ pageId }` | `Result<ExamStartView, ActionError>` (`activeQuestionCount`, `retakePending`, `failedRootCount`, `openSessionId`, `openRetakeSessionId`, `lastFinishedSessionId`) | — |
 | `startExamSessionAction` | `{ pageId, count? }` (N de 10 a 30; 10 por defecto) | `Result<{ sessionId, resumed }, ActionError>` (reanuda la sesión abierta de la página si existe) | `PAGE_NOT_FOUND`, `EXAMS_RETAKE_PENDING`, `EXAMS_NOT_ENOUGH_QUESTIONS`, `EXAMS_INVALID_QUESTION_COUNT` |
 | `getExamSessionAction` | `{ sessionId }` | `Result<ExamSessionView, ActionError>` (`sessionId`, `pageId`, `startedAt`, `finished`, `isRetake`, `questions[]` con su `answer` revelada solo si ya se respondió) | `EXAMS_SESSION_NOT_FOUND` |
@@ -1413,7 +1413,7 @@ Corresponden a CU-09 y a RF-AR-01 a RF-AR-06 y RF-AI-03 (Fase 6, `docs/adr/0007`
 
 | Acción | Parámetros | Retorno | Errores propios |
 |---|---|---|---|
-| `generateRecallQuestionsAction` | `{ pageId }` | `Result<RecallGenerationView, RecallGenerationActionError>` (`questions`, `created`, `skipped`, `remainingToday`, `truncated`, `wordsUsed`, `wordsTotal`) | `PAGE_NOT_FOUND`, `AI_PAGE_EMPTY`, `RECALL_NO_NEW_CONTENT`, `AI_DAILY_LIMIT_REACHED` (con `resetAt` ISO), `AI_GENERATION_FAILED` |
+| `generateRecallQuestionsAction` | `{ pageId }` | `Result<RecallGenerationView, RecallGenerationActionError>` (`questions`, `created`, `skipped`, `remainingToday`, `truncated`, `wordsUsed`, `wordsTotal`) | `PAGE_NOT_FOUND`, `AI_PAGE_EMPTY`, `RECALL_NO_NEW_CONTENT`, `AI_DAILY_LIMIT_REACHED` (con `resetAt` ISO), `AI_GENERATION_FAILED`, `AI_NO_PROVIDER_AVAILABLE` |
 | `getRecallSessionPlanAction` | `{ pageId }` | `Result<RecallSessionPlanView, ActionError>` | — (solo lectura; no crea sesión) |
 | `getRecallPageSummaryAction` | `{ pageId }` | `Result<{ questionCount }, ActionError>` | — |
 | `startRecallSessionAction` | `{ pageId }` | `Result<StartedRecallSessionView, ActionError>` (`sessionId`, `questions`) | `PAGE_NOT_FOUND`, `RECALL_NO_QUESTIONS` |
@@ -1425,7 +1425,7 @@ Corresponden a CU-09 y a RF-AR-01 a RF-AR-06 y RF-AI-03 (Fase 6, `docs/adr/0007`
 | `listRecallHubAction` | — | `Result<RecallHubView, ActionError>` | — |
 | `getRecallSessionReviewAction` | `{ pageId, sessionId }` | `Result<RecallSessionReviewView, ActionError>` | `RECALL_SESSION_NOT_FOUND` |
 
-`finishRecallSessionAction` responde sin esperar a la IA: si la sesión queda `pending`, programa `evaluateRecallSession` con `after()` dentro de `maxDuration = 300` de la ruta de la sesión (`docs/adr/0003`). La evaluación no devuelve errores al cliente: cada respuesta queda `done` o `failed` con su registro crudo (§1, RecallAnswer); dentro de ese registro, `code` es `AI_GENERATION_FAILED`, `AI_DAILY_LIMIT_REACHED` o `RECALL_UNEXPECTED`. `getRecallSessionResultsAction` vuelve a programar una evaluación cuando la sesión terminada sigue `pending` y ninguna respuesta pendiente se guardó o reclamó dentro del plazo de 6 minutos. Los demás códigos de `RECALL_ERROR` (`RECALL_INVALID_QUESTION`, `RECALL_INVALID_SCORE`) son internos: una pregunta generada inválida se descarta y cuenta en `skipped`.
+`finishRecallSessionAction` responde sin esperar a la IA: si la sesión queda `pending`, programa `evaluateRecallSession` con `after()` dentro de `maxDuration = 300` de la ruta de la sesión (`docs/adr/0003`). La evaluación no devuelve errores al cliente: cada respuesta queda `done` o `failed` con su registro crudo (§1, RecallAnswer); dentro de ese registro, `code` puede ser `AI_GENERATION_FAILED`, `AI_DAILY_LIMIT_REACHED`, `AI_NO_PROVIDER_AVAILABLE` (u otro código devuelto por `generateStructured`), `RECALL_QUESTION_NOT_IN_SESSION`, `RECALL_INVALID_SCORE` (puntuación combinada inválida) o `RECALL_UNEXPECTED`. `getRecallSessionResultsAction` vuelve a programar una evaluación cuando la sesión terminada sigue `pending` y ninguna respuesta pendiente se guardó o reclamó dentro del plazo de 6 minutos. `RECALL_INVALID_QUESTION` es interno: una pregunta generada inválida se descarta y cuenta en `skipped`.
 
 ### 4.7 `scheduling`
 
@@ -1585,7 +1585,7 @@ CONSTRAINT "recall_questions_id_owner_key" UNIQUE("id","owner_id")
 CONSTRAINT "recall_sessions_id_owner_key" UNIQUE("id","owner_id")
 -- Fase 6 — una respuesta por pregunta y sesión
 CONSTRAINT "recall_answers_session_question_key" UNIQUE("session_id","question_id")
--- Fase 6 — una huella por página, dueño y técnica
+-- Fase 6 — una fila por párrafo (huella) por página, dueño y técnica
 CONSTRAINT "generation_fingerprints_pkey" PRIMARY KEY("page_id","owner_id","technique","fingerprint")
 ```
 
