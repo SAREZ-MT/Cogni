@@ -1,28 +1,31 @@
 # Modelo de datos y contrato de API — Cogni
 
 **Proyecto:** Cogni — plataforma web de estudio a partir de apuntes propios
-**Versión:** 1.0
-**Fecha:** 2026-09-25
+**Versión:** 1.1
+**Fecha:** 2026-10-15
 **Estado:** Borrador
 **Autor:** Javier Sarez
-**Documentos relacionados:** ./01-SRS.md, ./02-SAD.md
+**Documentos relacionados:** ./01-SRS.md, ./02-SAD.md, ./04-ADR.md
 
 ---
 
-## 0. Nota de estado actual (2026-09-25, actualizada el 2026-10-10 para la Fase 6 y el 2026-10-14 para la Fase 7)
+## 0. Nota de estado actual (revisada el 2026-10-15 contra el código)
 
-- Fase 0 (Cimientos) y Fase 1 (Cuadernos y editor) están desplegadas en producción; sus tablas (`profiles`, `notebooks`, `pages`, `page_assets`) existen en el esquema real.
-- Fase 2 (Importación de PDF) fue implementada bajo Organic Driven Development (ODD) el 2026-09-23; la tabla `import_jobs` y el bucket `page-pdfs` son reales.
-- Fase 3 (Capa de IA) no ha iniciado: no existe la tabla `AiGeneration` ni ninguna dependencia `ai`/`@ai-sdk/*` en `package.json`.
-- Las Fases 4 a 7 (motor de repetición espaciada, flashcards, exámenes, recordación activa, calendario y dashboard) no tienen esquema ni migración en este código base; existen únicamente como especificación en `docs/documento-maestro.md` §6.1 y, para su interfaz visual, como diseño con datos de muestra en la rama `design/shell-look` no integrada a `main`.
-- Fase 6 (Recordación activa) está implementada (2026-10-08; decisiones en `docs/adr/0007-recordacion-activa-y-generacion-incremental.md`): las tablas `recall_questions`, `recall_sessions` y `recall_answers` (migración `0012_active_recall`) y la nueva tabla `generation_fingerprints` (migración `0013_generation_fingerprints`, generación incremental de las tres técnicas) se documentan contra su migración y su `schema.ts` (§1, §2.4, §2.5, §2.6 y §5), junto con las Server Actions de `active-recall` (§4.4) y los límites de tasa reales (§4). Con `GenerationFingerprint`, el modelo de dominio pasa de 19 a 20 entidades.
-- Fase 7 (Calendario y dashboard) está implementada (2026-10-14; decisiones en `docs/adr/0008-calendario-y-dashboard.md`) sin tablas ni migraciones nuevas: `scheduling` y `analytics` solo leen tablas existentes, y `profiles.timezone` pasa a usarse (§2.1). Se documentan las Server Actions de zona horaria de `identity` (§4.1), las de `scheduling` (§4.5) y las de `analytics` (§4.6), y los índices que usan sus lecturas (§5).
-- Las Fases 3 a 5 (IA, motor de repetición y flashcards, exámenes) también están implementadas, con migraciones `0007` a `0011`, pero sus entidades siguen descritas aquí como especificación Roadmap: su actualización contra el código queda pendiente.
-- En este documento: 5 tablas reales (`profiles`, `notebooks`, `pages`, `page_assets`, `import_jobs`) están completamente documentadas contra su migración y su `schema.ts`; las 14 entidades restantes del modelo de dominio (§6.1 del documento maestro) se documentan como especificación de datos, marcadas Roadmap, sin migración asociada. El contrato de API (§4) cubre únicamente Server Actions y Route Handlers que existen hoy en el código; no se documenta ningún endpoint de las fases roadmap.
+- Las Fases 0 a 7 están implementadas y los 11 módulos de `src/modules/` son reales; ninguno es un esqueleto.
+  - Fase 0 (Cimientos) y Fase 1 (Cuadernos y editor): desplegadas en producción; tablas `profiles`, `notebooks`, `pages` y `page_assets` (migraciones `0000`–`0004`).
+  - Fase 2 (Importación de PDF): implementada bajo Organic Driven Development (ODD) el 2026-09-23; tabla `import_jobs` y bucket `page-pdfs` (migraciones `0005`–`0006`).
+  - Fase 3 (Capa de IA, PR #63–#69) y aceptación de términos de uso (PR #70): tablas `ai_generations` y `flashcards` (migración `0007`) y columnas de términos en `profiles` (migración `0008`); decisiones en `docs/adr/0004-capa-de-ia-con-proveedores-gratuitos.md`.
+  - Fase 4 (Motor de repetición y flashcards, PR #71–#77): tablas `study_items`, `review_logs`, `page_mastery`, `flashcard_sessions` y `session_feedback`, y `flashcards.archived_at` (migración `0009`); decisiones en `docs/adr/0005-motor-de-repeticion-y-flashcards.md`.
+  - Fase 5 (Exámenes, PR #78–#86): tablas `exam_questions`, `exam_page_state`, `exam_sessions` y `exam_answers` (migraciones `0010`–`0011`); decisiones en `docs/adr/0006-examenes-y-repeticion-con-variantes.md`.
+  - Fase 6 (Recordación activa, PR #87–#94): tablas `recall_questions`, `recall_sessions` y `recall_answers` (migración `0012`) y `generation_fingerprints` (migración `0013`, generación incremental de las tres técnicas); decisiones en `docs/adr/0007-recordacion-activa-y-generacion-incremental.md`.
+  - Fase 7 (Calendario y dashboard, PR #95–#100): sin tablas ni migraciones nuevas; `scheduling` y `analytics` solo leen tablas existentes y `profiles.timezone` pasa a usarse; decisiones en `docs/adr/0008-calendario-y-dashboard.md`.
+- El esquema real tiene 20 tablas, una por entidad del modelo de dominio (documento-maestro §6.1), creadas por 14 migraciones (`0000_profiles` a `0013_generation_fingerprints`). Todas se documentan en este documento contra su migración y `src/shared/db/schema.ts` (§1 y §2).
+- El contrato de API (§4) cubre las Server Actions de los 16 archivos `"use server"` y los 3 Route Handlers que existen hoy en el código; no documenta ningún punto de entrada inexistente.
+- Referencias a decisiones: "`04-ADR.md`, ADR-0NN" designa una entrada del registro de decisiones de esta suite (`./04-ADR.md`); "`docs/adr/00NN`" designa un ADR numerado del repositorio. Son dos numeraciones distintas.
 
 ### Documento vivo
 
-Este documento se actualiza a medida que avanza la construcción de Cogni. Por ejemplo, cuando la Fase 4 implemente `study-engine`, la sección 3 (Motor de repetición espaciada) dejará de decir "pendiente de implementación" y ganará una referencia a `drizzle/000N_study_items.sql` y al wrapper real de `applySm2`; y cuando la Fase 3 implemente la capa de IA, la sección "Límites de tasa" de §4 dejará de decir `N/A` y documentará el limitador real (Upstash Ratelimit u otro mecanismo elegido) con sus ventanas exactas.
+Este documento se actualiza a medida que avanza la construcción de Cogni; la nota de estado de esta sección es el punto de anclaje de esas actualizaciones. Cuando una fase posterior (por ejemplo, la Fase 9) agregue migraciones, Server Actions o Route Handlers, esta nota y las secciones afectadas se revisarán contra el código en la misma entrega.
 
 ### Correspondencia con las fases RAD
 
@@ -30,7 +33,7 @@ Este documento se actualiza a medida que avanza la construcción de Cogni. Por e
 |---|---|---|
 | 1. Modelo entidad-relación | Diseño de usuario / Construcción | Sustenta el modelo de datos como evidencia de diseño previo a la implementación. |
 | 2. Esquema por módulo | Construcción | Evidencia directa y verificable (SQL real) del trabajo de construcción de la base de datos. |
-| 3. Motor de repetición espaciada (SM-2) | Diseño de usuario | Especificación de un algoritmo aún no construido, útil como diseño detallado pendiente de Implementación. |
+| 3. Motor de repetición espaciada (SM-2) | Diseño de usuario / Construcción | Especificación del algoritmo (documento-maestro §7) y referencia a su implementación en `study-engine`. |
 | 4. Contrato de API | Construcción | Documenta el contrato real entre interfaz y servidor, insumo de pruebas de Implementación. |
 | 5. Índices y restricciones | Construcción | Evidencia de las decisiones de integridad y desempeño tomadas durante la construcción. |
 
@@ -39,16 +42,17 @@ Este documento se actualiza a medida que avanza la construcción de Cogni. Por e
 ## 1. Modelo entidad-relación
 
 > **Decisiones de modelado (documento-maestro §6.2 y código real):**
-> - **Autorización por propiedad, no por RLS de negocio:** el servidor se conecta con el pooler de Supabase y omite Row Level Security; cada caso de uso de `application` recibe `ownerId` de la sesión y filtra explícitamente por él (`src/shared/db/client.ts`, `prepare: false, max: 1`). RLS está **activa** en las 5 tablas (`.enableRLS()`) pero sin políticas: solo la conexión de servidor las alcanza.
+> - **Autorización por propiedad, no por RLS de negocio:** el servidor se conecta con el pooler de Supabase y omite Row Level Security; cada caso de uso de `application` recibe `ownerId` de la sesión y filtra explícitamente por él (`src/shared/db/client.ts`, `prepare: false, max: 1`). RLS está **activa** en las 20 tablas (`.enableRLS()` en `schema.ts`, `ENABLE ROW LEVEL SECURITY` en cada migración) pero ninguna tiene políticas propias: solo la conexión de servidor las alcanza. Las únicas políticas RLS del proyecto son las de Storage (siguiente punto).
 > - **RLS real en Supabase Storage:** a diferencia de las tablas de negocio, los buckets `page-assets` y `page-pdfs` sí tienen políticas RLS por `owner_id`, porque el navegador sube archivos directamente a Storage con la clave pública.
-> - **Borrado lógico (`archived_at`):** `notebooks` y `pages` no se eliminan físicamente; el archivado de un cuaderno propaga `archived_at` a sus páginas activas en la capa de aplicación, no mediante un trigger de base de datos.
+> - **Borrado lógico (`archived_at`):** `notebooks`, `pages`, `flashcards` y `recall_questions` no se eliminan físicamente (las preguntas de examen se retiran con `retired_at`); el archivado de un cuaderno propaga `archived_at` a sus páginas activas en la capa de aplicación, no mediante un trigger de base de datos.
 > - **`content` jsonb + `plain_text` materializado:** `pages.content` guarda el documento Tiptap tal cual; `plain_text` se recalcula en el servidor en cada guardado mediante un recorrido puro del árbol (`extractPlainText`), nunca se acepta el `plain_text` que envíe el cliente.
 > - **`content_version` como concurrencia optimista:** cada guardado de página es un `UPDATE ... WHERE content_version = expected` atómico (comparar-e-intercambiar), no un patrón leer-luego-escribir.
-> - **`ImportJob` como máquina de estados:** `import_jobs.status` (`queued → processing → done/failed`) es el único registro de progreso de una importación; no existe columna `trigger_run_id` (ver ADR-009: la importación corre de forma síncrona dentro de la propia Server Action, bajo `maxDuration`, sobre Vercel Fluid Compute).
-> - **`StudyItem.root_id` y referencias polimórficas (especificación, no implementadas):** el documento maestro especifica que cada `StudyItem` de examen apunta a la pregunta raíz de su linaje, y que `ReviewLog.session_id` es una referencia polimórfica según `session_kind` (sin FK física), para que el motor siga el concepto evaluado y no la redacción de una variante.
-> - **Identificadores UUID v7:** todo `id` se genera en la aplicación con `createId()` (48 bits de marca de tiempo en milisegundos + bits aleatorios, RFC 9562), nunca con un valor por defecto de Postgres.
+> - **`ImportJob` como máquina de estados:** `import_jobs.status` (`queued → processing → done/failed`) es el único registro de progreso de una importación; no existe columna `trigger_run_id` (ver `04-ADR.md`, ADR-009, y `docs/adr/0003`: la importación corre de forma síncrona dentro de la propia Server Action, bajo `maxDuration`, sobre Vercel Fluid Compute).
+> - **Ítem de examen por raíz y referencias polimórficas:** el `StudyItem` de un examen tiene `kind = 'exam_question'` y `source_id` = `root_id` del linaje, así que las variantes de una repetición alimentan el mismo ítem que su pregunta original; `study_items.source_id`, `review_logs.session_id` y `session_feedback.session_id` son referencias polimórficas (según `kind` o `session_kind`) sin FK física, para que el motor siga el concepto evaluado y no conozca la técnica de origen.
+> - **Identificadores UUID v7:** todo `id` se genera en la aplicación con `createId()` (48 bits de marca de tiempo en milisegundos + bits aleatorios, RFC 9562), nunca con un valor por defecto de Postgres. La única excepción es el relleno de `study_items` de `0009`, que usa `gen_random_uuid()` (v4) porque Postgres no genera v7 antes de la versión 18.
 > - **Recordación activa (Fase 6):** las respuestas se atan al dueño de su sesión y de su pregunta con claves foráneas compuestas `(session_id, owner_id)` y `(question_id, owner_id)`, de modo que una respuesta nunca mezcla dueños; restricciones `CHECK` atan el estado de evaluación a sus datos. `generation_fingerprints` no tiene `id`: su clave natural es `(page_id, owner_id, technique, fingerprint)`.
-> - **Columnas comunes:** `id`, `owner_id`, `created_at`, `updated_at` son comunes a toda entidad de usuario (documento-maestro §6.1); se listan completas en cada tabla de esta sección aunque el documento maestro las omita por brevedad.
+> - **Columnas comunes:** `id`, `owner_id`, `created_at`, `updated_at` son comunes a casi toda entidad de usuario (documento-maestro §6.1) y se listan completas en cada tabla de esta sección. Excepciones reales: `profiles` no tiene `owner_id` (su `id` es el de `auth.users`); `review_logs` no tiene `updated_at` (registro inmutable); `exam_page_state` no tiene `id` (su clave primaria es `page_id`); `exam_answers` no tiene `id` ni `updated_at` (clave primaria `(session_id, question_id)`); `generation_fingerprints` no tiene `id` ni `updated_at` (clave primaria `(page_id, owner_id, technique, fingerprint)`).
+> - **Exámenes por linaje:** `exam_questions` ata cada pregunta a su raíz con claves foráneas compuestas sobre la misma tabla (`(root_id, owner_id, page_id)` y `(variant_of, root_id)`), de modo que una variante nunca cambia de dueño, de página ni de linaje; `exam_answers` referencia `(question_id, root_id)` y es única por `(session_id, root_id)`: un examen nunca evalúa dos veces el mismo concepto.
 
 > Diagrama a construir con archify a partir de esta descripción.
 
@@ -63,10 +67,12 @@ Este documento se actualiza a medida que avanza la construcción de Cogni. Por e
 | locale | text |
 | timezone | text |
 | onboarding_completed_at | timestamptz |
+| terms_accepted_version | text |
+| terms_accepted_at | timestamptz |
 | created_at | timestamptz |
 | updated_at | timestamptz |
 
-Se relaciona con `auth.users` de Supabase: comparte el mismo `id` y depende de él (`ON DELETE CASCADE`, `drizzle/0002_profiles_auth_fk.sql`). Se relaciona con Notebook, Page, PageAsset e ImportJob: un Profile tiene muchos de cada uno; cada tabla dependiente se elimina en cascada cuando se elimina el Profile.
+Se relaciona con `auth.users` de Supabase: comparte el mismo `id` y depende de él (`ON DELETE CASCADE`, `drizzle/0002_profiles_auth_fk.sql`). Es el dueño (`owner_id`, `ON DELETE CASCADE`) de las otras 19 tablas: eliminar un Profile elimina en cadena todos sus datos. `terms_accepted_version` y `terms_accepted_at` (ambas nulas, `drizzle/0008_profiles_terms.sql`) registran la versión de los términos de uso aceptada (`TERMS_VERSION = "2026-10-04"`, `src/modules/identity/domain/terms.ts`) y cuándo; mientras la versión guardada no sea la vigente, el layout de `(app)` redirige a la puerta de términos (`termsRedirectFor`). `timezone` (texto `NOT NULL`, por defecto `UTC`) se describe en §2.1.
 
 #### Notebook — Estado: Implementado (Fase 1)
 
@@ -100,7 +106,7 @@ Se relaciona con Profile: pertenece a uno (`owner_id`, `ON DELETE CASCADE`). Se 
 | created_at | timestamptz |
 | updated_at | timestamptz |
 
-Se relaciona con Notebook: pertenece a uno (`notebook_id`, `ON DELETE CASCADE`). Se relaciona con Profile: pertenece a uno (`owner_id`, `ON DELETE CASCADE`). Se relaciona con PageAsset e ImportJob: una Page tiene muchos de cada uno; ambos se eliminan en cascada.
+Se relaciona con Notebook: pertenece a uno (`notebook_id`, `ON DELETE CASCADE`). Se relaciona con Profile: pertenece a uno (`owner_id`, `ON DELETE CASCADE`). Es la unidad de estudio: PageAsset, ImportJob, Flashcard, StudyItem, PageMastery, FlashcardSession, ExamQuestion, ExamPageState, ExamSession, RecallQuestion, RecallSession y GenerationFingerprint dependen de ella y se eliminan en cascada; AiGeneration conserva su registro con `page_id` nulo (§2.6).
 
 #### PageAsset — Estado: Implementado (Fase 1)
 
@@ -136,111 +142,142 @@ Se relaciona con Page: pertenece a una (`page_id`, `ON DELETE CASCADE`). Se rela
 | created_at | timestamptz |
 | updated_at | timestamptz |
 
-Se relaciona con Page: pertenece a una (`page_id`, `ON DELETE CASCADE`). Se relaciona con Profile: pertenece a uno (`owner_id`, `ON DELETE CASCADE`). `storage_path` es único. A diferencia de la especificación original del documento maestro (§6.1), esta tabla **no** tiene columna `trigger_run_id`: el ADR-009 fija el procesamiento síncrono dentro de la propia Server Action (`maxDuration = 120`, Vercel Fluid Compute) como mecanismo de trabajo en segundo plano.
+Se relaciona con Page: pertenece a una (`page_id`, `ON DELETE CASCADE`). Se relaciona con Profile: pertenece a uno (`owner_id`, `ON DELETE CASCADE`). `storage_path` es único. A diferencia de la especificación original del documento maestro (§6.1), esta tabla **no** tiene columna `trigger_run_id`: `04-ADR.md`, ADR-009 (y `docs/adr/0003`), fija el procesamiento síncrono dentro de la propia Server Action (`maxDuration = 120`, Vercel Fluid Compute) como mecanismo de trabajo en segundo plano.
 
-### Entidades roadmap (especificación, sin migración)
-
-> Desde la Fase 6, RecallQuestion, RecallSession y RecallAnswer ya tienen migración y se documentan como implementadas en esta misma lista; GenerationFingerprint se agrega a continuación de ellas. Las entidades de las Fases 3 a 5 también tienen migración (`0007`–`0011`), pendiente de documentar.
-
-#### StudyItem — Estado: Roadmap (Fase 4)
+#### AiGeneration — Estado: Implementado (Fase 3)
 
 | Atributo | Tipo |
 |---|---|
 | id | uuid |
 | owner_id | uuid |
+| page_id | uuid |
+| purpose | text |
+| provider | text |
+| model | text |
+| prompt_version | text |
+| input_tokens | integer |
+| output_tokens | integer |
+| latency_ms | integer |
+| status | text |
+| error | text |
 | created_at | timestamptz |
 | updated_at | timestamptz |
+
+Registro de auditoría de cada llamada a la IA (`drizzle/0007_ai_generations_flashcards.sql`, módulo `ai`). Se relaciona con Profile (`owner_id`, `ON DELETE CASCADE`) y con Page cuando el propósito la tiene (`page_id` nulo; `ON DELETE SET NULL`, para que el registro sobreviva a la página). `purpose` es uno de seis valores (`CHECK ai_generations_purpose_check`, §2.5) y `status` sigue `queued → running → done/failed` (`CHECK ai_generations_status_check`). `input_tokens`, `output_tokens` y `latency_ms` son `NOT NULL` con valor por defecto 0; `provider`, `model` y `prompt_version` son `NOT NULL`. Alimenta Flashcard, ExamQuestion, RecallQuestion, RecallAnswer y SessionFeedback mediante `generation_id` (`ON DELETE SET NULL` en todas). El documento maestro también lista `trigger_run_id` para esta entidad; no existe, por la misma razón que en ImportJob (`04-ADR.md`, ADR-009, y `docs/adr/0003`: el trabajo largo corre dentro de la propia función de Vercel, sin colas externas).
+
+#### Flashcard — Estado: Implementado (Fase 3; `archived_at` desde la Fase 4)
+
+| Atributo | Tipo |
+|---|---|
+| id | uuid |
+| owner_id | uuid |
+| page_id | uuid |
+| generation_id | uuid |
+| front | text |
+| back | text |
+| origin | text |
+| position | integer |
+| archived_at | timestamptz |
+| created_at | timestamptz |
+| updated_at | timestamptz |
+
+Se relaciona con Page (`page_id`, `ON DELETE CASCADE`) y con Profile (`owner_id`, `ON DELETE CASCADE`): las tarjetas activas de una página forman su único mazo, ordenado por `position` (`integer NOT NULL`). `front` y `back` no pueden estar vacíos (`CHECK flashcards_front_not_blank`, `flashcards_back_not_blank`; la aplicación limita cada lado a 1000 caracteres); `origin` es `ai` o `manual` (`CHECK flashcards_origin_check`). `generation_id` apunta a AiGeneration cuando la tarjeta se generó (`ON DELETE SET NULL`). `archived_at` (nula, agregada por `0009_study_engine`) archiva una tarjeta sin borrarla; archivar la última tarjeta activa de un mazo se rechaza (`FLASHCARD_LAST_CARD`: un mazo nunca queda vacío). Su `StudyItem` es de tipo `flashcard` con `source_id` = id de la tarjeta.
+
+#### StudyItem — Estado: Implementado (Fase 4)
+
+| Atributo | Tipo |
+|---|---|
+| id | uuid |
+| owner_id | uuid |
 | page_id | uuid |
 | kind | text |
 | source_id | uuid |
-| easiness | real |
+| easiness | double precision |
 | interval_days | integer |
 | repetitions | integer |
+| lapses | integer |
 | due_at | timestamptz |
 | last_quality | integer |
 | last_reviewed_at | timestamptz |
-| lapses | integer |
 | suspended_at | timestamptz |
+| created_at | timestamptz |
+| updated_at | timestamptz |
 
-Se relacionará con Page: muchos StudyItem por página (`page_id`). `kind` distingue si `source_id` apunta a una Flashcard, a la `ExamQuestion` raíz de su linaje o a una RecallQuestion, de forma que las variantes de examen (§7.5) alimentan el mismo ítem que su pregunta original.
+Estado SM-2 de una unidad repasable (`drizzle/0009_study_engine.sql`, módulo `study-engine`). Se relaciona con Page (`page_id`, `ON DELETE CASCADE`) y con Profile (`owner_id`, `ON DELETE CASCADE`). `kind` es `flashcard`, `exam_question` o `recall_question` (`CHECK study_items_kind_check`) y `source_id` apunta, sin FK física, a la tarjeta, a la pregunta raíz del linaje de examen o a la pregunta de recordación; el par es único (`UNIQUE study_items_kind_source_key (kind, source_id)`). `easiness` empieza en 2.5 y nunca baja de 1.3 (`CHECK study_items_easiness_min`); `interval_days`, `repetitions` y `lapses` empiezan en 0 y no son negativos (`CHECK study_items_counters_non_negative`); `last_quality`, cuando existe, va de 0 a 5 (`CHECK study_items_last_quality_range`). `due_at` es `NOT NULL` sin valor por defecto (la aplicación lo fija al crear el ítem). La migración rellena un ítem por cada tarjeta no archivada previa a la Fase 4 (vencido desde la creación de la tarjeta).
 
-#### ReviewLog — Estado: Roadmap (Fase 4)
+#### ReviewLog — Estado: Implementado (Fase 4)
 
 | Atributo | Tipo |
 |---|---|
 | id | uuid |
 | owner_id | uuid |
-| created_at | timestamptz |
-| updated_at | timestamptz |
 | item_id | uuid |
 | quality | integer |
 | reviewed_at | timestamptz |
 | interval_before | integer |
 | interval_after | integer |
-| easiness_after | real |
+| easiness_after | double precision |
 | session_kind | text |
 | session_id | uuid |
+| created_at | timestamptz |
 
-Se relacionará con StudyItem: muchos ReviewLog por ítem (`item_id`). `session_id` es una referencia polimórfica sin FK física: apunta a FlashcardSession, ExamSession o RecallSession según `session_kind` (documento-maestro §6.1).
+Registro inmutable de cada repaso: no tiene `updated_at`. Se relaciona con StudyItem (`item_id`, `ON DELETE CASCADE`) y con Profile (`owner_id`, `ON DELETE CASCADE`): muchos ReviewLog por ítem. `quality` va de 0 a 5 (`CHECK review_logs_quality_range`); `session_kind` es `flashcards`, `exam` o `recall` (`CHECK review_logs_session_kind_check`) y `session_id` es una referencia polimórfica sin FK física a FlashcardSession, ExamSession o RecallSession según `session_kind` (documento-maestro §6.1). Es la fuente del historial de repasos y de la racha del dashboard (Fase 7).
 
-#### PageMastery — Estado: Roadmap (Fase 4)
+#### PageMastery — Estado: Implementado (Fase 4)
 
 | Atributo | Tipo |
 |---|---|
 | id | uuid |
 | owner_id | uuid |
-| created_at | timestamptz |
-| updated_at | timestamptz |
 | page_id | uuid |
 | level | text |
-| score | real |
+| score | double precision |
 | items_total | integer |
 | items_due | integer |
 | computed_at | timestamptz |
+| created_at | timestamptz |
+| updated_at | timestamptz |
 
-Se relacionará con Page: una PageMastery por página (`page_id`), recalculada por el motor de repetición espaciada según la fórmula de §3 de este documento (documento-maestro §7.3).
+Se relaciona con Page: una PageMastery por página (`UNIQUE page_mastery_page_id_key (page_id)`, `ON DELETE CASCADE`) y con Profile (`ON DELETE CASCADE`). `level` es `Nuevo`, `Aprendiendo`, `Consolidando` o `Dominado` (`CHECK page_mastery_level_check`) y `score` está entre 0 y 1 (`CHECK page_mastery_score_range`), calculados con la fórmula de §3.4. La recalculan los repasos de las tres técnicas y el cron diario `/api/recompute-mastery` (§4, Route Handlers).
 
-#### Flashcard — Estado: Roadmap (Fase 4)
+#### FlashcardSession — Estado: Implementado (Fase 4)
 
 | Atributo | Tipo |
 |---|---|
 | id | uuid |
 | owner_id | uuid |
-| created_at | timestamptz |
-| updated_at | timestamptz |
-| page_id | uuid |
-| front | text |
-| back | text |
-| origin | text |
-| generation_id | uuid |
-| archived_at | timestamptz |
-
-Se relacionará con Page: muchas Flashcard por página. Se relacionará con AiGeneration cuando `origin` sea `ai` (`generation_id`).
-
-#### FlashcardSession — Estado: Roadmap (Fase 4)
-
-| Atributo | Tipo |
-|---|---|
-| id | uuid |
-| owner_id | uuid |
-| created_at | timestamptz |
-| updated_at | timestamptz |
 | page_id | uuid |
 | started_at | timestamptz |
 | finished_at | timestamptz |
 | reviewed_count | integer |
 | again_count | integer |
+| created_at | timestamptz |
+| updated_at | timestamptz |
 
-Se relacionará con Page cuando la sesión sea de una sola página; `page_id` queda nulo en la vista "Hoy" multipágina (documento-maestro §6.1). Se relacionará con ReviewLog y SessionFeedback a través de `session_id`/`session_kind`.
+Se relaciona con Profile (`ON DELETE CASCADE`) y con Page cuando la sesión es de una sola página (`page_id`, `ON DELETE CASCADE`); `page_id` queda nulo en la sesión multipágina de "Hoy" (documento-maestro §6.1). `reviewed_count` y `again_count` empiezan en 0. Se relaciona con ReviewLog y SessionFeedback a través de `session_id`/`session_kind = flashcards`.
 
-#### ExamQuestion — Estado: Roadmap (Fase 5)
+#### SessionFeedback — Estado: Implementado (Fase 4)
 
 | Atributo | Tipo |
 |---|---|
 | id | uuid |
 | owner_id | uuid |
+| session_kind | text |
+| session_id | uuid |
+| content | jsonb |
+| generation_id | uuid |
+| status | text |
 | created_at | timestamptz |
 | updated_at | timestamptz |
+
+Retroalimentación de IA de una sesión terminada, una por sesión (`UNIQUE session_feedback_session_key (session_kind, session_id)`). Se relaciona con Profile (`ON DELETE CASCADE`) y con AiGeneration (`generation_id`, `ON DELETE SET NULL`); `session_id` es polimórfico sin FK física. `status` es `pending`, `done` o `failed` (`CHECK session_feedback_status_check`, por defecto `pending`); `content` (nulo salvo en `done`) guarda `summary`, `strengths[]`, `toReinforce[]` y `nextStepSuggestion`. `session_kind` admite `flashcards`, `exam` y `recall` (`CHECK session_feedback_session_kind_check`), pero solo flashcards (Fase 4) y exámenes (Fase 5) la crean. Desviación deliberada de la Fase 6 (`docs/adr/0007`): la recordación activa no crea SessionFeedback; su retroalimentación es la justificación por pregunta guardada en `RecallAnswer.ai_evaluation`.
+
+#### ExamQuestion — Estado: Implementado (Fase 5)
+
+| Atributo | Tipo |
+|---|---|
+| id | uuid |
+| owner_id | uuid |
 | page_id | uuid |
 | stem | text |
 | options | jsonb |
@@ -252,60 +289,61 @@ Se relacionará con Page cuando la sesión sea de una sola página; `page_id` qu
 | origin | text |
 | generation_id | uuid |
 | retired_at | timestamptz |
+| created_at | timestamptz |
+| updated_at | timestamptz |
 
-Se relacionará con Page: muchas ExamQuestion por página. `root_id` apunta a la pregunta original de su linaje (a sí misma si es original); `variant_of` apunta a la pregunta que reemplaza en una repetición (documento-maestro §7.5).
+Se relaciona con Page y con Profile (`ON DELETE CASCADE`) y con AiGeneration (`generation_id`, `ON DELETE SET NULL`). `options` es un arreglo de exactamente 4 opciones (`CHECK exam_questions_options_count`) y `correct_index` va de 0 a 3 (`CHECK exam_questions_correct_index_range`); `stem` y `concept` no pueden estar vacíos. `origin` es `ai`, `manual` o `ai_variant` (`CHECK exam_questions_origin_check`). `root_id` apunta a la pregunta original de su linaje (a sí misma si es original) y `variant_of` a la pregunta que reemplaza en una repetición; `CHECK exam_questions_lineage_check` exige que `variant_of` sea nulo exactamente cuando `root_id = id`. Dos claves foráneas sobre la misma tabla (`ON DELETE NO ACTION`) atan una variante a su raíz con el mismo dueño y página (`(root_id, owner_id, page_id)`) y a una pregunta del mismo linaje (`(variant_of, root_id)`). Una pregunta se retira (`retired_at`), no se borra.
 
-#### ExamPageState — Estado: Roadmap (Fase 5)
+#### ExamPageState — Estado: Implementado (Fase 5)
 
 | Atributo | Tipo |
 |---|---|
-| id | uuid |
-| owner_id | uuid |
-| created_at | timestamptz |
-| updated_at | timestamptz |
 | page_id | uuid |
+| owner_id | uuid |
 | retake_pending | boolean |
 | failed_root_ids | jsonb |
 | last_passed_session_id | uuid |
+| created_at | timestamptz |
+| updated_at | timestamptz |
 
-Se relacionará con Page: un ExamPageState por página. `last_passed_session_id` apunta a la ExamSession aprobada más reciente; `failed_root_ids` guarda los `root_id` fallados en el último examen (documento-maestro §7.5).
+Estado de examen de una página: su clave primaria es `page_id` (no tiene `id`). Se relaciona con Page y con Profile (`ON DELETE CASCADE`). `retake_pending` (por defecto falso) marca una repetición pendiente; `failed_root_ids` (por defecto `[]`, `CHECK exam_page_state_failed_root_ids_array`) guarda los `root_id` fallados en el último examen; `last_passed_session_id` apunta a la ExamSession aprobada más reciente (`ON DELETE SET NULL`), cuya retroalimentación se reutiliza tras otro aprobado (documento-maestro §7.5).
 
-#### ExamSession — Estado: Roadmap (Fase 5)
+#### ExamSession — Estado: Implementado (Fase 5)
 
 | Atributo | Tipo |
 |---|---|
 | id | uuid |
 | owner_id | uuid |
-| created_at | timestamptz |
-| updated_at | timestamptz |
 | page_id | uuid |
+| requested_count | integer |
+| question_ids | jsonb |
 | is_retake | boolean |
 | retake_of_session_id | uuid |
 | started_at | timestamptz |
 | finished_at | timestamptz |
 | total | integer |
 | correct | integer |
-| score | real |
+| score | double precision |
 | passed | boolean |
+| created_at | timestamptz |
+| updated_at | timestamptz |
 
-Se relacionará con Page: muchas ExamSession por página. `retake_of_session_id` apunta a la sesión original cuando `is_retake` es verdadero.
+Se relaciona con Page y con Profile (`ON DELETE CASCADE`). `requested_count` (N) va de 10 a 30 (`CHECK exam_sessions_requested_count_range`). `question_ids` (`jsonb NOT NULL`, agregada por `0011_exam_session_questions`) fija al iniciar la lista ordenada de preguntas que muestra la sesión: de 1 a `requested_count` elementos (`CHECK exam_sessions_question_ids_check`). `retake_of_session_id` apunta a la sesión original (`ON DELETE SET NULL`) y solo puede existir si `is_retake` es verdadero (`CHECK exam_sessions_retake_check`). `CHECK exam_sessions_result_check` ata el resultado al cierre: con `finished_at` nulo, `total`, `correct`, `score` y `passed` son nulos; con `finished_at`, `total` va de 1 a `requested_count`, `correct` de 0 a `total` y `score` (`double precision`) de 0 a 1.
 
-#### ExamAnswer — Estado: Roadmap (Fase 5)
+#### ExamAnswer — Estado: Implementado (Fase 5)
 
 | Atributo | Tipo |
 |---|---|
-| id | uuid |
 | owner_id | uuid |
-| created_at | timestamptz |
-| updated_at | timestamptz |
 | session_id | uuid |
 | question_id | uuid |
 | root_id | uuid |
 | selected_index | integer |
 | is_correct | boolean |
 | answered_at | timestamptz |
+| created_at | timestamptz |
 
-Se relacionará con ExamSession: muchas ExamAnswer por sesión (`session_id`). `question_id` referencia la variante realmente mostrada al estudiante; `root_id` preserva el concepto evaluado independientemente de la redacción.
+Sin `id` ni `updated_at`: su clave primaria es `(session_id, question_id)` y cada respuesta queda fija al darla. Se relaciona con ExamSession (`session_id`, `ON DELETE CASCADE`), con Profile (`ON DELETE CASCADE`) y con ExamQuestion por `(question_id, root_id)` (`ON DELETE CASCADE`): `question_id` es la variante realmente mostrada y `root_id` preserva el concepto evaluado; `UNIQUE exam_answers_session_root_key (session_id, root_id)` impide evaluar dos veces el mismo concepto en una sesión. `selected_index` va de 0 a 3 (`CHECK exam_answers_selected_index_range`).
 
 #### RecallQuestion — Estado: Implementado (Fase 6)
 
@@ -359,7 +397,7 @@ Se relaciona con Page (`page_id`, `ON DELETE CASCADE`) y con Profile (`owner_id`
 | disagreed | boolean |
 | evaluation_claimed_at | timestamptz |
 
-Se relaciona con RecallSession (`(session_id, owner_id)`, `ON DELETE CASCADE`) y con RecallQuestion (`(question_id, owner_id)`, `ON DELETE CASCADE`): muchas RecallAnswer por sesión, una por pregunta (único `(session_id, question_id)`). `combined_quality` es la calidad SM-2 calculada según la fórmula de §3.3 de este documento (documento-maestro §7.4). `self_rating`, `ai_score` y `combined_quality` van de 0 a 5. `evaluation_claimed_at` no figura en el documento maestro original: guarda cuándo una corrida de evaluación reclamó la respuesta (un reclamo de más de 6 minutos se retoma; ADR 0007). `CHECK recall_answers_evaluation_check` ata el estado a sus datos: `pending` sin `ai_score` ni `combined_quality` (puede conservar el intento fallido anterior tras "Reintentar"); `done` con `ai_evaluation`, `ai_score` y `combined_quality`; `failed` con `ai_evaluation` y sin puntajes. Contenido de `ai_evaluation`: la salida del modelo (`score`, `presentConcepts`, `missingConcepts`, `misconceptions`, `justification`), el registro `{ "source": "skipped", "score": 0, "justification": "Pregunta sin responder." }` de una pregunta saltada (texto `(sin respuesta)`), o el intento fallido `{ "source": "failed", "code", "generationId", "resetAt"? }`. `disagreed` registra "No estoy de acuerdo" y nunca cambia el puntaje.
+Se relaciona con RecallSession (`(session_id, owner_id)`, `ON DELETE CASCADE`) y con RecallQuestion (`(question_id, owner_id)`, `ON DELETE CASCADE`): muchas RecallAnswer por sesión, una por pregunta (único `(session_id, question_id)`). `combined_quality` es la calidad SM-2 calculada según la fórmula de §3.3 de este documento (documento-maestro §7.4). `self_rating`, `ai_score` y `combined_quality` van de 0 a 5. `evaluation_claimed_at` no figura en el documento maestro original: guarda cuándo una corrida de evaluación reclamó la respuesta (un reclamo de más de 6 minutos se retoma; `docs/adr/0007`). `CHECK recall_answers_evaluation_check` ata el estado a sus datos: `pending` sin `ai_score` ni `combined_quality` (puede conservar el intento fallido anterior tras "Reintentar"); `done` con `ai_evaluation`, `ai_score` y `combined_quality`; `failed` con `ai_evaluation` y sin puntajes. Contenido de `ai_evaluation`: la salida del modelo (`score`, `presentConcepts`, `missingConcepts`, `misconceptions`, `justification`), el registro `{ "source": "skipped", "score": 0, "justification": "Pregunta sin responder." }` de una pregunta saltada (texto `(sin respuesta)`), o el intento fallido `{ "source": "failed", "code", "generationId", "resetAt"? }`. `disagreed` registra "No estoy de acuerdo" y nunca cambia el puntaje.
 
 #### GenerationFingerprint — Estado: Implementado (Fase 6)
 
@@ -371,75 +409,38 @@ Se relaciona con RecallSession (`(session_id, owner_id)`, `ON DELETE CASCADE`) y
 | fingerprint | text |
 | created_at | timestamptz |
 
-Memoria de la generación incremental (documento-maestro §3.1, ADR 0007): una fila por párrafo de una página que una técnica ya envió a la IA. Clave primaria `(page_id, owner_id, technique, fingerprint)`; sin `id` ni `updated_at`. `technique` es `flashcards`, `exam` o `recall` (`CHECK generation_fingerprints_technique_check`); `fingerprint` es el sha256 hexadecimal del párrafo normalizado (forma NFC, espacios colapsados, minúsculas), validado con `CHECK generation_fingerprints_fingerprint_format` (`^[0-9a-f]{64}$`). Se relaciona con Page y con Profile (`ON DELETE CASCADE`). La escribe el módulo de cada técnica, solo para su técnica y en la misma transacción que sus ítems; el puerto compartido es `GenerationFingerprintRepository` (`src/shared/kernel/generation-fingerprints.ts`).
-
-#### SessionFeedback — Estado: Roadmap (Fase 4-6)
-
-| Atributo | Tipo |
-|---|---|
-| id | uuid |
-| owner_id | uuid |
-| created_at | timestamptz |
-| updated_at | timestamptz |
-| session_kind | text |
-| session_id | uuid |
-| content | jsonb |
-| generation_id | uuid |
-| status | text |
-
-Se relacionará, de forma polimórfica según `session_kind`, con FlashcardSession o ExamSession (igual que ReviewLog). Desviación deliberada de la Fase 6 (ADR 0007): la recordación activa no crea SessionFeedback; su retroalimentación es la justificación por pregunta guardada en `RecallAnswer.ai_evaluation`.
-
-#### AiGeneration — Estado: Roadmap (Fase 3)
-
-| Atributo | Tipo |
-|---|---|
-| id | uuid |
-| owner_id | uuid |
-| created_at | timestamptz |
-| updated_at | timestamptz |
-| page_id | uuid |
-| purpose | text |
-| provider | text |
-| model | text |
-| prompt_version | text |
-| input_tokens | integer |
-| output_tokens | integer |
-| latency_ms | integer |
-| status | text |
-| error | text |
-
-Se relacionará con Page cuando el propósito lo requiera (`page_id` nulo si no aplica). Alimentará Flashcard, ExamQuestion, RecallQuestion y SessionFeedback mediante `generation_id`. El documento maestro también lista `trigger_run_id` para esta entidad; se omite aquí por la misma razón que en ImportJob (ADR-009: el trabajo en segundo plano corre de forma síncrona dentro de una función de Vercel, sin un mecanismo externo de colas).
+Memoria de la generación incremental (documento-maestro §3.1, `docs/adr/0007`): una fila por párrafo de una página que una técnica ya envió a la IA. Clave primaria `(page_id, owner_id, technique, fingerprint)`; sin `id` ni `updated_at`. `technique` es `flashcards`, `exam` o `recall` (`CHECK generation_fingerprints_technique_check`); `fingerprint` es el sha256 hexadecimal del párrafo normalizado (forma NFC, espacios colapsados, minúsculas), validado con `CHECK generation_fingerprints_fingerprint_format` (`^[0-9a-f]{64}$`). Se relaciona con Page y con Profile (`ON DELETE CASCADE`). La escribe el módulo de cada técnica, solo para su técnica y en la misma transacción que sus ítems; el puerto compartido es `GenerationFingerprintRepository` (`src/shared/kernel/generation-fingerprints.ts`).
 
 ### Resumen de entidades
 
-| Entidad | Tabla | Módulo | Estado | Fase |
+| Entidad | Tabla | Módulo | Estado | Fase (migración) |
 |---|---|---|---|---|
-| Profile | profiles | identity | Implementado | Fase 0 |
-| Notebook | notebooks | notebooks | Implementado | Fase 1 |
-| Page | pages | notebooks | Implementado | Fase 1 |
-| PageAsset | page_assets | notebooks | Implementado | Fase 1 |
-| ImportJob | import_jobs | ingestion | Implementado | Fase 2 |
-| StudyItem | — | study-engine | Roadmap | Fase 4 |
-| ReviewLog | — | study-engine | Roadmap | Fase 4 |
-| PageMastery | — | study-engine | Roadmap | Fase 4 |
-| Flashcard | — | flashcards | Roadmap | Fase 4 |
-| FlashcardSession | — | flashcards | Roadmap | Fase 4 |
-| ExamQuestion | — | exams | Roadmap | Fase 5 |
-| ExamPageState | — | exams | Roadmap | Fase 5 |
-| ExamSession | — | exams | Roadmap | Fase 5 |
-| ExamAnswer | — | exams | Roadmap | Fase 5 |
-| RecallQuestion | recall_questions | active-recall | Implementado | Fase 6 |
-| RecallSession | recall_sessions | active-recall | Implementado | Fase 6 |
-| RecallAnswer | recall_answers | active-recall | Implementado | Fase 6 |
-| GenerationFingerprint | generation_fingerprints | flashcards / exams / active-recall | Implementado | Fase 6 |
-| SessionFeedback | — | flashcards / exams | Roadmap | Fase 4-5 |
-| AiGeneration | — | ai | Roadmap | Fase 3 |
+| Profile | profiles | identity | Implementado | Fase 0 (`0000`–`0002`; términos `0008`) |
+| Notebook | notebooks | notebooks | Implementado | Fase 1 (`0003`) |
+| Page | pages | notebooks | Implementado | Fase 1 (`0003`) |
+| PageAsset | page_assets | notebooks | Implementado | Fase 1 (`0003`, bucket `0004`) |
+| ImportJob | import_jobs | ingestion | Implementado | Fase 2 (`0005`, bucket `0006`) |
+| AiGeneration | ai_generations | ai | Implementado | Fase 3 (`0007`) |
+| Flashcard | flashcards | flashcards | Implementado | Fase 3 (`0007`; `archived_at` en `0009`) |
+| StudyItem | study_items | study-engine | Implementado | Fase 4 (`0009`) |
+| ReviewLog | review_logs | study-engine | Implementado | Fase 4 (`0009`) |
+| PageMastery | page_mastery | study-engine | Implementado | Fase 4 (`0009`) |
+| FlashcardSession | flashcard_sessions | study-engine | Implementado | Fase 4 (`0009`) |
+| SessionFeedback | session_feedback | study-engine (escrita por flashcards y exams) | Implementado | Fase 4 (`0009`) |
+| ExamQuestion | exam_questions | exams | Implementado | Fase 5 (`0010`) |
+| ExamPageState | exam_page_state | exams | Implementado | Fase 5 (`0010`) |
+| ExamSession | exam_sessions | exams | Implementado | Fase 5 (`0010`; `question_ids` en `0011`) |
+| ExamAnswer | exam_answers | exams | Implementado | Fase 5 (`0010`) |
+| RecallQuestion | recall_questions | active-recall | Implementado | Fase 6 (`0012`) |
+| RecallSession | recall_sessions | active-recall | Implementado | Fase 6 (`0012`) |
+| RecallAnswer | recall_answers | active-recall | Implementado | Fase 6 (`0012`) |
+| GenerationFingerprint | generation_fingerprints | flashcards / exams / active-recall | Implementado | Fase 6 (`0013`) |
 
 ---
 
 ## 2. Esquema por módulo
 
-Las migraciones reales viven en `drizzle/*.sql` (14 desde la Fase 6; este documento detalla `0000`–`0006`, `0012` y `0013`), generadas por `drizzle-kit generate` a partir de `src/shared/db/schema.ts` (`drizzle.config.ts`: `dialect: "postgresql"`, `schema: "./src/shared/db/schema.ts"`, `out: "./drizzle"`) y aplicadas con `drizzle-kit migrate`. Las migraciones de Storage (buckets y políticas RLS) son SQL escrito a mano, porque Drizzle no introspecta el esquema `storage` de Supabase.
+Las migraciones reales viven en `drizzle/*.sql` (14, de `0000` a `0013`; esta sección cita el SQL de todas), generadas por `drizzle-kit generate` a partir de `src/shared/db/schema.ts` (`drizzle.config.ts`: `dialect: "postgresql"`, `schema: "./src/shared/db/schema.ts"`, `out: "./drizzle"`) y aplicadas con `drizzle-kit migrate`. Las migraciones de Storage (buckets y políticas RLS) son SQL escrito a mano, porque Drizzle no introspecta el esquema `storage` de Supabase.
 
 ### 2.1 `identity` — `profiles`
 
@@ -495,7 +496,13 @@ alter table profiles
   foreign key (id) references auth.users(id) on delete cascade;
 ```
 
-Nota de la Fase 7 (ADR 0008): `timezone` guarda un nombre de zona IANA en su forma canónica. Sin migración, el valor por defecto `UTC` significa "nunca elegida" (`hasChosenTimeZone`) y una elección explícita de UTC se guarda como `Etc/UTC`. La detección del navegador escribe con `UPDATE … WHERE timezone = 'UTC'`, así nunca pisa una elección explícita.
+```sql
+-- drizzle/0008_profiles_terms.sql
+ALTER TABLE "profiles" ADD COLUMN "terms_accepted_version" text;--> statement-breakpoint
+ALTER TABLE "profiles" ADD COLUMN "terms_accepted_at" timestamp with time zone;
+```
+
+Nota de la Fase 7 (`docs/adr/0008`): `timezone` guarda un nombre de zona IANA en su forma canónica. Sin migración, el valor por defecto `UTC` significa "nunca elegida" (`hasChosenTimeZone`) y una elección explícita de UTC se guarda como `Etc/UTC`. La detección del navegador escribe con `UPDATE … WHERE timezone = 'UTC'`, así nunca pisa una elección explícita.
 
 ### 2.2 `notebooks` — `notebooks`, `pages`, `page_assets` + bucket `page-assets`
 
@@ -650,11 +657,313 @@ create policy "page-pdfs delete own"
   using (bucket_id = 'page-pdfs' and (storage.foldername(name))[1] = auth.uid()::text);
 ```
 
-### 2.4 Módulos de las fases siguientes
+### 2.4 Módulos de las Fases 3 a 6
 
-`ai`, `study-engine`, `flashcards` y `exams` tienen tablas desde las Fases 3 a 5 (migraciones `0007`–`0011`), pendientes de documentar aquí; `scheduling` y `analytics` no tienen tablas. Ver §1 para la especificación de sus entidades.
+`ai`, `flashcards`, `study-engine`, `exams` y `active-recall` tienen tablas (migraciones `0007` y `0009`–`0013`); `scheduling` y `analytics` (Fase 7) no tienen tablas: solo leen las de `study-engine`, `notebooks` y `active-recall`. Todas las tablas de esta sección tienen RLS activa sin políticas, como el resto.
 
-#### 2.4.1 `active-recall` — `recall_questions`, `recall_sessions`, `recall_answers` (Fase 6)
+#### 2.4.1 `ai` y `flashcards` — `ai_generations`, `flashcards` (Fase 3)
+
+```sql
+-- drizzle/0007_ai_generations_flashcards.sql
+CREATE TABLE "ai_generations" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"owner_id" uuid NOT NULL,
+	"page_id" uuid,
+	"purpose" text NOT NULL,
+	"provider" text NOT NULL,
+	"model" text NOT NULL,
+	"prompt_version" text NOT NULL,
+	"input_tokens" integer DEFAULT 0 NOT NULL,
+	"output_tokens" integer DEFAULT 0 NOT NULL,
+	"latency_ms" integer DEFAULT 0 NOT NULL,
+	"status" text NOT NULL,
+	"error" text,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "ai_generations_status_check" CHECK ("ai_generations"."status" in ('queued', 'running', 'done', 'failed')),
+	CONSTRAINT "ai_generations_purpose_check" CHECK ("ai_generations"."purpose" in ('generate_flashcards', 'generate_exam_questions', 'generate_exam_variants', 'generate_recall_questions', 'evaluate_recall_answer', 'session_feedback'))
+);
+--> statement-breakpoint
+ALTER TABLE "ai_generations" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
+CREATE TABLE "flashcards" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"owner_id" uuid NOT NULL,
+	"page_id" uuid NOT NULL,
+	"generation_id" uuid,
+	"front" text NOT NULL,
+	"back" text NOT NULL,
+	"origin" text NOT NULL,
+	"position" integer NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "flashcards_origin_check" CHECK ("flashcards"."origin" in ('ai', 'manual')),
+	CONSTRAINT "flashcards_front_not_blank" CHECK (length(btrim("flashcards"."front")) > 0),
+	CONSTRAINT "flashcards_back_not_blank" CHECK (length(btrim("flashcards"."back")) > 0)
+);
+--> statement-breakpoint
+ALTER TABLE "flashcards" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
+ALTER TABLE "ai_generations" ADD CONSTRAINT "ai_generations_owner_id_profiles_id_fk" FOREIGN KEY ("owner_id") REFERENCES "public"."profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "ai_generations" ADD CONSTRAINT "ai_generations_page_id_pages_id_fk" FOREIGN KEY ("page_id") REFERENCES "public"."pages"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "flashcards" ADD CONSTRAINT "flashcards_owner_id_profiles_id_fk" FOREIGN KEY ("owner_id") REFERENCES "public"."profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "flashcards" ADD CONSTRAINT "flashcards_page_id_pages_id_fk" FOREIGN KEY ("page_id") REFERENCES "public"."pages"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "flashcards" ADD CONSTRAINT "flashcards_generation_id_ai_generations_id_fk" FOREIGN KEY ("generation_id") REFERENCES "public"."ai_generations"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "ai_generations_owner_created_idx" ON "ai_generations" USING btree ("owner_id","created_at");--> statement-breakpoint
+CREATE INDEX "ai_generations_page_id_idx" ON "ai_generations" USING btree ("page_id");--> statement-breakpoint
+CREATE INDEX "flashcards_page_position_idx" ON "flashcards" USING btree ("page_id","position");--> statement-breakpoint
+CREATE INDEX "flashcards_owner_id_idx" ON "flashcards" USING btree ("owner_id");
+```
+
+`drizzle/0007_ai_generations_flashcards.down.sql` revierte la migración. `flashcards.archived_at` se agrega en `0009` (§2.4.2).
+
+#### 2.4.2 `study-engine` — `study_items`, `review_logs`, `page_mastery`, `flashcard_sessions`, `session_feedback` (Fase 4)
+
+```sql
+-- drizzle/0009_study_engine.sql
+CREATE TABLE "flashcard_sessions" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"owner_id" uuid NOT NULL,
+	"page_id" uuid,
+	"started_at" timestamp with time zone NOT NULL,
+	"finished_at" timestamp with time zone,
+	"reviewed_count" integer DEFAULT 0 NOT NULL,
+	"again_count" integer DEFAULT 0 NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+ALTER TABLE "flashcard_sessions" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
+CREATE TABLE "page_mastery" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"owner_id" uuid NOT NULL,
+	"page_id" uuid NOT NULL,
+	"level" text NOT NULL,
+	"score" double precision NOT NULL,
+	"items_total" integer NOT NULL,
+	"items_due" integer NOT NULL,
+	"computed_at" timestamp with time zone NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "page_mastery_page_id_key" UNIQUE("page_id"),
+	CONSTRAINT "page_mastery_level_check" CHECK ("page_mastery"."level" in ('Nuevo', 'Aprendiendo', 'Consolidando', 'Dominado')),
+	CONSTRAINT "page_mastery_score_range" CHECK ("page_mastery"."score" >= 0 and "page_mastery"."score" <= 1)
+);
+--> statement-breakpoint
+ALTER TABLE "page_mastery" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
+CREATE TABLE "review_logs" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"owner_id" uuid NOT NULL,
+	"item_id" uuid NOT NULL,
+	"quality" integer NOT NULL,
+	"reviewed_at" timestamp with time zone NOT NULL,
+	"interval_before" integer NOT NULL,
+	"interval_after" integer NOT NULL,
+	"easiness_after" double precision NOT NULL,
+	"session_kind" text NOT NULL,
+	"session_id" uuid NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "review_logs_quality_range" CHECK ("review_logs"."quality" between 0 and 5),
+	CONSTRAINT "review_logs_session_kind_check" CHECK ("review_logs"."session_kind" in ('flashcards', 'exam', 'recall'))
+);
+--> statement-breakpoint
+ALTER TABLE "review_logs" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
+CREATE TABLE "session_feedback" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"owner_id" uuid NOT NULL,
+	"session_kind" text NOT NULL,
+	"session_id" uuid NOT NULL,
+	"content" jsonb,
+	"generation_id" uuid,
+	"status" text DEFAULT 'pending' NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "session_feedback_session_key" UNIQUE("session_kind","session_id"),
+	CONSTRAINT "session_feedback_session_kind_check" CHECK ("session_feedback"."session_kind" in ('flashcards', 'exam', 'recall')),
+	CONSTRAINT "session_feedback_status_check" CHECK ("session_feedback"."status" in ('pending', 'done', 'failed'))
+);
+--> statement-breakpoint
+ALTER TABLE "session_feedback" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
+CREATE TABLE "study_items" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"owner_id" uuid NOT NULL,
+	"page_id" uuid NOT NULL,
+	"kind" text NOT NULL,
+	"source_id" uuid NOT NULL,
+	"easiness" double precision DEFAULT 2.5 NOT NULL,
+	"interval_days" integer DEFAULT 0 NOT NULL,
+	"repetitions" integer DEFAULT 0 NOT NULL,
+	"lapses" integer DEFAULT 0 NOT NULL,
+	"due_at" timestamp with time zone NOT NULL,
+	"last_quality" integer,
+	"last_reviewed_at" timestamp with time zone,
+	"suspended_at" timestamp with time zone,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "study_items_kind_source_key" UNIQUE("kind","source_id"),
+	CONSTRAINT "study_items_kind_check" CHECK ("study_items"."kind" in ('flashcard', 'exam_question', 'recall_question')),
+	CONSTRAINT "study_items_easiness_min" CHECK ("study_items"."easiness" >= 1.3),
+	CONSTRAINT "study_items_counters_non_negative" CHECK ("study_items"."interval_days" >= 0 and "study_items"."repetitions" >= 0 and "study_items"."lapses" >= 0),
+	CONSTRAINT "study_items_last_quality_range" CHECK ("study_items"."last_quality" between 0 and 5)
+);
+--> statement-breakpoint
+ALTER TABLE "study_items" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
+ALTER TABLE "flashcards" ADD COLUMN "archived_at" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "flashcard_sessions" ADD CONSTRAINT "flashcard_sessions_owner_id_profiles_id_fk" FOREIGN KEY ("owner_id") REFERENCES "public"."profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "flashcard_sessions" ADD CONSTRAINT "flashcard_sessions_page_id_pages_id_fk" FOREIGN KEY ("page_id") REFERENCES "public"."pages"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "page_mastery" ADD CONSTRAINT "page_mastery_owner_id_profiles_id_fk" FOREIGN KEY ("owner_id") REFERENCES "public"."profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "page_mastery" ADD CONSTRAINT "page_mastery_page_id_pages_id_fk" FOREIGN KEY ("page_id") REFERENCES "public"."pages"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "review_logs" ADD CONSTRAINT "review_logs_owner_id_profiles_id_fk" FOREIGN KEY ("owner_id") REFERENCES "public"."profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "review_logs" ADD CONSTRAINT "review_logs_item_id_study_items_id_fk" FOREIGN KEY ("item_id") REFERENCES "public"."study_items"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "session_feedback" ADD CONSTRAINT "session_feedback_owner_id_profiles_id_fk" FOREIGN KEY ("owner_id") REFERENCES "public"."profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "session_feedback" ADD CONSTRAINT "session_feedback_generation_id_ai_generations_id_fk" FOREIGN KEY ("generation_id") REFERENCES "public"."ai_generations"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "study_items" ADD CONSTRAINT "study_items_owner_id_profiles_id_fk" FOREIGN KEY ("owner_id") REFERENCES "public"."profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "study_items" ADD CONSTRAINT "study_items_page_id_pages_id_fk" FOREIGN KEY ("page_id") REFERENCES "public"."pages"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "flashcard_sessions_owner_started_idx" ON "flashcard_sessions" USING btree ("owner_id","started_at");--> statement-breakpoint
+CREATE INDEX "flashcard_sessions_page_id_idx" ON "flashcard_sessions" USING btree ("page_id");--> statement-breakpoint
+CREATE INDEX "page_mastery_owner_id_idx" ON "page_mastery" USING btree ("owner_id");--> statement-breakpoint
+CREATE INDEX "review_logs_item_reviewed_idx" ON "review_logs" USING btree ("item_id","reviewed_at");--> statement-breakpoint
+CREATE INDEX "review_logs_owner_reviewed_idx" ON "review_logs" USING btree ("owner_id","reviewed_at");--> statement-breakpoint
+CREATE INDEX "session_feedback_owner_id_idx" ON "session_feedback" USING btree ("owner_id");--> statement-breakpoint
+CREATE INDEX "study_items_owner_due_idx" ON "study_items" USING btree ("owner_id","due_at");--> statement-breakpoint
+CREATE INDEX "study_items_page_id_idx" ON "study_items" USING btree ("page_id");--> statement-breakpoint
+-- Hand-written backfill (T2): every existing, non-archived flashcard gets the
+-- study item it would have had from the start (documento-maestro §3.4):
+-- easiness 2.5, interval 0, repetitions 0, lapses 0, due at the card's
+-- creation, so pre-Phase-4 decks are due immediately. ids are v4 here
+-- (gen_random_uuid) because Postgres has no v7 generator before 18; the
+-- application keeps creating v7 ids. ON CONFLICT keeps it re-runnable.
+-- tests/db/study-engine-schema.smoke.test.ts runs the statement between
+-- the two markers below.
+-- backfill:study_items:start
+INSERT INTO "study_items" ("id", "owner_id", "page_id", "kind", "source_id", "easiness", "interval_days", "repetitions", "lapses", "due_at", "created_at", "updated_at")
+SELECT gen_random_uuid(), "f"."owner_id", "f"."page_id", 'flashcard', "f"."id", 2.5, 0, 0, 0, "f"."created_at", "f"."created_at", now()
+FROM "flashcards" "f"
+WHERE "f"."archived_at" IS NULL
+ON CONFLICT ("kind", "source_id") DO NOTHING;
+-- backfill:study_items:end
+```
+
+`drizzle/0009_study_engine.down.sql` revierte la migración. El relleno de `study_items` entre los marcadores `backfill:study_items` lo ejecuta también `tests/db/study-engine-schema.smoke.test.ts`; sus `id` son v4 (`gen_random_uuid()`), mientras la aplicación sigue creando UUID v7.
+
+#### 2.4.3 `exams` — `exam_questions`, `exam_page_state`, `exam_sessions`, `exam_answers` (Fase 5)
+
+```sql
+-- drizzle/0010_exams.sql
+CREATE TABLE "exam_answers" (
+	"owner_id" uuid NOT NULL,
+	"session_id" uuid NOT NULL,
+	"question_id" uuid NOT NULL,
+	"root_id" uuid NOT NULL,
+	"selected_index" integer NOT NULL,
+	"is_correct" boolean NOT NULL,
+	"answered_at" timestamp with time zone NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "exam_answers_pkey" PRIMARY KEY("session_id","question_id"),
+	CONSTRAINT "exam_answers_session_root_key" UNIQUE("session_id","root_id"),
+	CONSTRAINT "exam_answers_selected_index_range" CHECK ("exam_answers"."selected_index" between 0 and 3)
+);
+--> statement-breakpoint
+ALTER TABLE "exam_answers" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
+CREATE TABLE "exam_page_state" (
+	"page_id" uuid PRIMARY KEY NOT NULL,
+	"owner_id" uuid NOT NULL,
+	"retake_pending" boolean DEFAULT false NOT NULL,
+	"failed_root_ids" jsonb DEFAULT '[]'::jsonb NOT NULL,
+	"last_passed_session_id" uuid,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "exam_page_state_failed_root_ids_array" CHECK (jsonb_typeof("exam_page_state"."failed_root_ids") = 'array')
+);
+--> statement-breakpoint
+ALTER TABLE "exam_page_state" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
+CREATE TABLE "exam_questions" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"owner_id" uuid NOT NULL,
+	"page_id" uuid NOT NULL,
+	"stem" text NOT NULL,
+	"options" jsonb NOT NULL,
+	"correct_index" integer NOT NULL,
+	"explanation" text NOT NULL,
+	"concept" text NOT NULL,
+	"root_id" uuid NOT NULL,
+	"variant_of" uuid,
+	"origin" text NOT NULL,
+	"generation_id" uuid,
+	"retired_at" timestamp with time zone,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "exam_questions_id_owner_page_key" UNIQUE("id","owner_id","page_id"),
+	CONSTRAINT "exam_questions_id_root_key" UNIQUE("id","root_id"),
+	CONSTRAINT "exam_questions_origin_check" CHECK ("exam_questions"."origin" in ('ai', 'manual', 'ai_variant')),
+	CONSTRAINT "exam_questions_options_count" CHECK (jsonb_typeof("exam_questions"."options") = 'array' and jsonb_array_length("exam_questions"."options") = 4),
+	CONSTRAINT "exam_questions_correct_index_range" CHECK ("exam_questions"."correct_index" between 0 and 3),
+	CONSTRAINT "exam_questions_stem_not_blank" CHECK (length(btrim("exam_questions"."stem")) > 0),
+	CONSTRAINT "exam_questions_concept_not_blank" CHECK (length(btrim("exam_questions"."concept")) > 0),
+	CONSTRAINT "exam_questions_lineage_check" CHECK (("exam_questions"."variant_of" is null) = ("exam_questions"."root_id" = "exam_questions"."id"))
+);
+--> statement-breakpoint
+ALTER TABLE "exam_questions" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
+CREATE TABLE "exam_sessions" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"owner_id" uuid NOT NULL,
+	"page_id" uuid NOT NULL,
+	"requested_count" integer NOT NULL,
+	"is_retake" boolean DEFAULT false NOT NULL,
+	"retake_of_session_id" uuid,
+	"started_at" timestamp with time zone NOT NULL,
+	"finished_at" timestamp with time zone,
+	"total" integer,
+	"correct" integer,
+	"score" double precision,
+	"passed" boolean,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "exam_sessions_requested_count_range" CHECK ("exam_sessions"."requested_count" between 10 and 30),
+	CONSTRAINT "exam_sessions_retake_check" CHECK ("exam_sessions"."retake_of_session_id" is null or "exam_sessions"."is_retake"),
+	CONSTRAINT "exam_sessions_result_check" CHECK (("exam_sessions"."finished_at" is null and "exam_sessions"."total" is null and "exam_sessions"."correct" is null and "exam_sessions"."score" is null and "exam_sessions"."passed" is null)
+        or ("exam_sessions"."finished_at" is not null and "exam_sessions"."total" between 1 and "exam_sessions"."requested_count"
+          and "exam_sessions"."correct" between 0 and "exam_sessions"."total"
+          and "exam_sessions"."score" between 0 and 1 and "exam_sessions"."passed" is not null))
+);
+--> statement-breakpoint
+ALTER TABLE "exam_sessions" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
+ALTER TABLE "exam_answers" ADD CONSTRAINT "exam_answers_owner_id_profiles_id_fk" FOREIGN KEY ("owner_id") REFERENCES "public"."profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "exam_answers" ADD CONSTRAINT "exam_answers_session_id_exam_sessions_id_fk" FOREIGN KEY ("session_id") REFERENCES "public"."exam_sessions"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "exam_answers" ADD CONSTRAINT "exam_answers_question_root_fk" FOREIGN KEY ("question_id","root_id") REFERENCES "public"."exam_questions"("id","root_id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "exam_page_state" ADD CONSTRAINT "exam_page_state_page_id_pages_id_fk" FOREIGN KEY ("page_id") REFERENCES "public"."pages"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "exam_page_state" ADD CONSTRAINT "exam_page_state_owner_id_profiles_id_fk" FOREIGN KEY ("owner_id") REFERENCES "public"."profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "exam_page_state" ADD CONSTRAINT "exam_page_state_last_passed_session_id_exam_sessions_id_fk" FOREIGN KEY ("last_passed_session_id") REFERENCES "public"."exam_sessions"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "exam_questions" ADD CONSTRAINT "exam_questions_owner_id_profiles_id_fk" FOREIGN KEY ("owner_id") REFERENCES "public"."profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "exam_questions" ADD CONSTRAINT "exam_questions_page_id_pages_id_fk" FOREIGN KEY ("page_id") REFERENCES "public"."pages"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "exam_questions" ADD CONSTRAINT "exam_questions_generation_id_ai_generations_id_fk" FOREIGN KEY ("generation_id") REFERENCES "public"."ai_generations"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "exam_questions" ADD CONSTRAINT "exam_questions_root_fk" FOREIGN KEY ("root_id","owner_id","page_id") REFERENCES "public"."exam_questions"("id","owner_id","page_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "exam_questions" ADD CONSTRAINT "exam_questions_variant_of_fk" FOREIGN KEY ("variant_of","root_id") REFERENCES "public"."exam_questions"("id","root_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "exam_sessions" ADD CONSTRAINT "exam_sessions_owner_id_profiles_id_fk" FOREIGN KEY ("owner_id") REFERENCES "public"."profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "exam_sessions" ADD CONSTRAINT "exam_sessions_page_id_pages_id_fk" FOREIGN KEY ("page_id") REFERENCES "public"."pages"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "exam_sessions" ADD CONSTRAINT "exam_sessions_retake_of_session_id_exam_sessions_id_fk" FOREIGN KEY ("retake_of_session_id") REFERENCES "public"."exam_sessions"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "exam_answers_question_id_idx" ON "exam_answers" USING btree ("question_id");--> statement-breakpoint
+CREATE INDEX "exam_answers_owner_id_idx" ON "exam_answers" USING btree ("owner_id");--> statement-breakpoint
+CREATE INDEX "exam_page_state_owner_id_idx" ON "exam_page_state" USING btree ("owner_id");--> statement-breakpoint
+CREATE INDEX "exam_questions_page_active_idx" ON "exam_questions" USING btree ("page_id","created_at") WHERE "exam_questions"."retired_at" is null;--> statement-breakpoint
+CREATE INDEX "exam_questions_root_id_idx" ON "exam_questions" USING btree ("root_id");--> statement-breakpoint
+CREATE INDEX "exam_questions_owner_id_idx" ON "exam_questions" USING btree ("owner_id");--> statement-breakpoint
+CREATE INDEX "exam_sessions_page_finished_idx" ON "exam_sessions" USING btree ("page_id","finished_at");--> statement-breakpoint
+CREATE INDEX "exam_sessions_owner_started_idx" ON "exam_sessions" USING btree ("owner_id","started_at");
+```
+
+```sql
+-- drizzle/0011_exam_session_questions.sql
+-- Each exam session stores the ordered ids of the questions it shows,
+-- fixed at its start, instead of composing them again on every answer,
+-- finish and read. No default and no backfill: exam_sessions is empty
+-- wherever this runs (sessions ship together with this migration), and a
+-- non-empty table makes the NOT NULL fail loudly instead of inventing lists.
+ALTER TABLE "exam_sessions" ADD COLUMN "question_ids" jsonb NOT NULL;--> statement-breakpoint
+ALTER TABLE "exam_sessions" ADD CONSTRAINT "exam_sessions_question_ids_check" CHECK (jsonb_typeof("exam_sessions"."question_ids") = 'array' and jsonb_array_length("exam_sessions"."question_ids") between 1 and "exam_sessions"."requested_count");
+```
+
+`drizzle/0010_exams.down.sql` y `drizzle/0011_exam_session_questions.down.sql` revierten cada migración. Las restricciones `UNIQUE exam_questions_id_owner_page_key (id, owner_id, page_id)` y `exam_questions_id_root_key (id, root_id)` existen para ser destino de las claves foráneas compuestas del linaje y de `exam_answers`.
+
+#### 2.4.4 `active-recall` — `recall_questions`, `recall_sessions`, `recall_answers` (Fase 6)
 
 ```sql
 -- drizzle/0012_active_recall.sql
@@ -745,7 +1054,7 @@ CREATE INDEX "recall_sessions_owner_started_idx" ON "recall_sessions" USING btre
 
 `drizzle/0012_active_recall.down.sql` revierte la migración. RLS activa sin políticas, como el resto de tablas de negocio: solo la conexión de servidor las alcanza.
 
-#### 2.4.2 Generación incremental — `generation_fingerprints` (Fase 6)
+#### 2.4.5 Generación incremental — `generation_fingerprints` (Fase 6)
 
 ```sql
 -- drizzle/0013_generation_fingerprints.sql
@@ -770,7 +1079,7 @@ CREATE INDEX "generation_fingerprints_owner_id_idx" ON "generation_fingerprints"
 
 ### 2.5 Enumeraciones
 
-No existe ningún `pgEnum` de Drizzle en `src/shared/db/schema.ts`. El único conjunto cerrado de valores hoy en el esquema real es `import_jobs.status`, declarado como `text` con un `$type<ImportJobStatusValue>()` de TypeScript en el lado de la aplicación y reforzado en la base de datos con la restricción `CHECK import_jobs_status_check`, no con un tipo enumerado nativo de Postgres.
+No existe ningún `pgEnum` de Drizzle en `src/shared/db/schema.ts`. Todo conjunto cerrado de valores se declara como `text` con un `$type<...>()` de TypeScript en el lado de la aplicación y se refuerza en la base de datos con una restricción `CHECK`, no con un tipo enumerado nativo de Postgres. El primero fue `import_jobs.status` (`CHECK import_jobs_status_check`):
 
 | Valor | Significado |
 |---|---|
@@ -779,10 +1088,19 @@ No existe ningún `pgEnum` de Drizzle en `src/shared/db/schema.ts`. El único co
 | `done` | Importación terminada con éxito; el contenido ya está escrito en `pages.content`. |
 | `failed` | Importación terminada sin éxito; `error` contiene el mensaje en español correspondiente (ver §4.3). |
 
-Desde la Fase 6, otros conjuntos cerrados siguen el mismo patrón (`text` + `CHECK`):
+Los demás conjuntos cerrados siguen el mismo patrón (`text` + `CHECK`):
 
 | Columna | Valores | Significado |
 |---|---|---|
+| `ai_generations.purpose` | `generate_flashcards`, `generate_exam_questions`, `generate_exam_variants`, `generate_recall_questions`, `evaluate_recall_answer`, `session_feedback` | Propósito de la llamada a la IA auditada. |
+| `ai_generations.status` | `queued`, `running`, `done`, `failed` | Ciclo de vida de la llamada: creada, en curso, con salida válida, fallida en todos los proveedores. |
+| `flashcards.origin` | `ai`, `manual` | Tarjeta generada por la IA o escrita por el estudiante. |
+| `study_items.kind` | `flashcard`, `exam_question`, `recall_question` | Técnica a la que apunta `source_id` (tarjeta, raíz del linaje de examen o pregunta de recordación). |
+| `review_logs.session_kind` | `flashcards`, `exam`, `recall` | Tipo de sesión a la que apunta `session_id`. |
+| `page_mastery.level` | `Nuevo`, `Aprendiendo`, `Consolidando`, `Dominado` | Nivel de dominio de la página (§3.4). |
+| `session_feedback.session_kind` | `flashcards`, `exam`, `recall` | Tipo de sesión retroalimentada (`recall` está admitido pero no se usa; ver §1, SessionFeedback). |
+| `session_feedback.status` | `pending`, `done`, `failed` | Retroalimentación reclamada en curso; con contenido; fallida (sin contenido). |
+| `exam_questions.origin` | `ai`, `manual`, `ai_variant` | Pregunta generada, escrita por el estudiante o variante generada para una repetición. |
 | `recall_questions.origin` | `ai`, `manual` | Origen de la pregunta (en la Fase 6 solo `ai`). |
 | `recall_sessions.evaluation_status` | `pending`, `done`, `partial` | Evaluación en curso; todas las respuestas evaluadas; alguna respuesta `failed`. |
 | `recall_answers.evaluation_status` | `pending`, `done`, `failed` | Sin evaluar o reclamada; evaluada (modelo o saltada); falló en todos los proveedores o por el límite diario. |
@@ -800,6 +1118,35 @@ Desde la Fase 6, otros conjuntos cerrados siguen el mismo patrón (`text` + `CHE
 | `page_assets` | `page_id` | `pages.id` | cascade |
 | `import_jobs` | `owner_id` | `profiles.id` | cascade |
 | `import_jobs` | `page_id` | `pages.id` | cascade |
+| `ai_generations` | `owner_id` | `profiles.id` | cascade |
+| `ai_generations` | `page_id` | `pages.id` | set null |
+| `flashcards` | `owner_id` | `profiles.id` | cascade |
+| `flashcards` | `page_id` | `pages.id` | cascade |
+| `flashcards` | `generation_id` | `ai_generations.id` | set null |
+| `study_items` | `owner_id` | `profiles.id` | cascade |
+| `study_items` | `page_id` | `pages.id` | cascade |
+| `review_logs` | `owner_id` | `profiles.id` | cascade |
+| `review_logs` | `item_id` | `study_items.id` | cascade |
+| `page_mastery` | `owner_id` | `profiles.id` | cascade |
+| `page_mastery` | `page_id` | `pages.id` | cascade |
+| `flashcard_sessions` | `owner_id` | `profiles.id` | cascade |
+| `flashcard_sessions` | `page_id` | `pages.id` | cascade |
+| `session_feedback` | `owner_id` | `profiles.id` | cascade |
+| `session_feedback` | `generation_id` | `ai_generations.id` | set null |
+| `exam_questions` | `owner_id` | `profiles.id` | cascade |
+| `exam_questions` | `page_id` | `pages.id` | cascade |
+| `exam_questions` | `generation_id` | `ai_generations.id` | set null |
+| `exam_questions` | `(root_id, owner_id, page_id)` | `exam_questions(id, owner_id, page_id)` | no action |
+| `exam_questions` | `(variant_of, root_id)` | `exam_questions(id, root_id)` | no action |
+| `exam_page_state` | `page_id` | `pages.id` | cascade |
+| `exam_page_state` | `owner_id` | `profiles.id` | cascade |
+| `exam_page_state` | `last_passed_session_id` | `exam_sessions.id` | set null |
+| `exam_sessions` | `owner_id` | `profiles.id` | cascade |
+| `exam_sessions` | `page_id` | `pages.id` | cascade |
+| `exam_sessions` | `retake_of_session_id` | `exam_sessions.id` | set null |
+| `exam_answers` | `owner_id` | `profiles.id` | cascade |
+| `exam_answers` | `session_id` | `exam_sessions.id` | cascade |
+| `exam_answers` | `(question_id, root_id)` | `exam_questions(id, root_id)` | cascade |
 | `recall_questions` | `owner_id` | `profiles.id` | cascade |
 | `recall_questions` | `page_id` | `pages.id` | cascade |
 | `recall_questions` | `generation_id` | `ai_generations.id` | set null |
@@ -812,11 +1159,11 @@ Desde la Fase 6, otros conjuntos cerrados siguen el mismo patrón (`text` + `CHE
 | `generation_fingerprints` | `owner_id` | `profiles.id` | cascade |
 | `generation_fingerprints` | `page_id` | `pages.id` | cascade |
 
-Las claves foráneas de las tablas de las Fases 0 a 2 usan `ON DELETE cascade` y `ON UPDATE no action`; eliminar un `Profile` elimina en cadena sus cuadernos, páginas, adjuntos e importaciones. En las tablas de la Fase 6 también es así, salvo `generation_id`, que queda nulo si se borra la generación auditada.
+Todas las claves foráneas usan `ON UPDATE no action`. Eliminar un `Profile` elimina en cadena todos sus datos, y eliminar una `Page` elimina sus adjuntos, importaciones, tarjetas, ítems, dominio, sesiones, preguntas y huellas. Hay tres excepciones a `cascade`: `generation_id` (y `ai_generations.page_id`) queda nulo si se borra la generación o la página auditada; `exam_page_state.last_passed_session_id` y `exam_sessions.retake_of_session_id` quedan nulos si se borra la sesión referida; y las dos claves de linaje de `exam_questions` son `no action`, de modo que una raíz o una pregunta reemplazada no se puede borrar sola mientras existan sus variantes (el borrado de la página o del dueño las elimina juntas). Las referencias polimórficas (`study_items.source_id`, `review_logs.session_id`, `session_feedback.session_id`) no tienen FK física.
 
 ### 2.7 Estrategia de migraciones
 
-Incremental-aditiva: cada cambio de esquema es un nuevo archivo `NNNN_nombre.sql` generado por `drizzle-kit generate` (nunca se edita una migración ya aplicada), registrado en `drizzle/meta/_journal.json` (14 entradas desde la Fase 6, `0000_profiles` a `0013_generation_fingerprints`; este párrafo describe las 7 primeras). `drizzle-kit` no tiene comando `down`: 5 de las 7 migraciones (`0002`, `0003`, `0004`, `0005`, `0006`) traen un `.down.sql` hermano con la reversión manual documentada en comentarios, pensado para aplicarse a mano con `psql` o el editor SQL de Supabase; las dos primeras (`0000` crea la tabla, `0001` activa RLS) no lo necesitan. Las migraciones de Storage (`0004`, `0006`) son idempotentes por diseño (`on conflict (id) do update`), para que la misma migración sea la fuente de verdad de los límites del bucket tanto en `cogni-dev` como en `cogni-prod`.
+Incremental-aditiva: cada cambio de esquema es un nuevo archivo `NNNN_nombre.sql` generado por `drizzle-kit generate` (nunca se edita una migración ya aplicada), registrado en `drizzle/meta/_journal.json` (14 entradas, de `0000_profiles` a `0013_generation_fingerprints`): `0000` crea `profiles`, `0001` activa su RLS, `0002` la ata a `auth.users`, `0003` crea `notebooks`, `pages` y `page_assets`, `0004` el bucket `page-assets`, `0005` `import_jobs`, `0006` el bucket `page-pdfs`, `0007` `ai_generations` y `flashcards`, `0008` las columnas de términos de `profiles`, `0009` las cinco tablas de `study-engine` y `flashcards.archived_at` (con relleno de ítems), `0010` las cuatro tablas de `exams`, `0011` `exam_sessions.question_ids`, `0012` las tres tablas de `active-recall` y `0013` `generation_fingerprints`. `drizzle-kit` no tiene comando `down`: 12 de las 14 migraciones (`0002` a `0013`) traen un `.down.sql` hermano con la reversión manual, pensado para aplicarse a mano con `psql` o el editor SQL de Supabase; las dos primeras (`0000` crea la tabla, `0001` activa RLS) no lo tienen. Las migraciones de Storage (`0004`, `0006`) son idempotentes por diseño (`on conflict (id) do update`), para que la misma migración sea la fuente de verdad de los límites del bucket tanto en `cogni-dev` como en `cogni-prod`; las de tablas son SQL generado, salvo los bloques escritos a mano de `0002` (guarda y limpieza de huérfanos), `0009` (relleno de `study_items`) y el comentario de `0011`.
 
 Las migraciones se aplican exclusivamente durante la construcción de producción en Vercel, nunca en previsualizaciones (`package.json`: `"build": "node scripts/migrate-in-build.mjs && next build"`). `scripts/migrate-in-build.mjs` expone el predicado puro `shouldRunMigrations(env)`, verdadero solo si `env.VERCEL_ENV === "production"` o `env.RUN_DB_MIGRATIONS === "1"` (esta última, una escotilla para migrar manualmente contra `cogni-dev` sin desplegar). Cuando el predicado es verdadero ejecuta `pnpm exec drizzle-kit migrate`; en cualquier otro caso lo omite con un mensaje en consola. `drizzle.config.ts` fija `dialect: "postgresql"`, `schema: "./src/shared/db/schema.ts"` y `out: "./drizzle"`.
 
@@ -824,9 +1171,9 @@ Las migraciones se aplican exclusivamente durante la construcción de producció
 
 ## 3. Motor de repetición espaciada (SM-2)
 
-**Fase 4 — pendiente de implementación.** El módulo `src/modules/study-engine/index.ts` es `export {};`; ninguna de las fórmulas de esta sección tiene código en este repositorio. La especificación completa proviene de `docs/documento-maestro.md` §7.1–§7.5, y corresponde a los requisitos RF-SE-01 a RF-SE-04 (motor), RF-FC-03 (calidad por técnica en flashcards), RF-EX-03 a RF-EX-06 (corrección y repetición de exámenes) y RF-AR-04 a RF-AR-05 (calidad combinada y señales metacognitivas de recordación activa), todos marcados Roadmap / Diseño visual en `01-SRS.md` §4.
+**Implementado en la Fase 4** (`docs/adr/0005-motor-de-repeticion-y-flashcards.md`). La especificación proviene de `docs/documento-maestro.md` §7.1–§7.5 y corresponde a los requisitos RF-SE-01 a RF-SE-04 (motor), RF-FC-03 (calidad por técnica en flashcards), RF-EX-03 a RF-EX-06 (corrección y repetición de exámenes) y RF-AR-04 a RF-AR-05 (calidad combinada y señales metacognitivas de recordación activa), todos Implementados en `01-SRS.md` §4. La entrada pública `src/modules/study-engine/index.ts` exporta el dominio puro (`applySm2`, `computeMastery`, `MASTERY_LEVELS`, `CONSOLIDATING_THRESHOLD`/`MASTERED_THRESHOLD` desde `src/shared/kernel/mastery-thresholds.ts`, `STABILITY_HORIZON_DAYS`, `FLASHCARD_QUALITY`, `EXAM_REVIEW_QUALITY`, `examReviewQualityFor`, `recallReviewQualityFor`, `INITIAL_EASINESS`, `MIN_EASINESS`, `newStudyItem`, `newFlashcardSession`, las funciones de `SessionFeedback` y `STUDY_ENGINE_ERROR`) y las fábricas de servidor de `server-api.ts`: `createFlashcardSessionsServerApi`, `createExamReviewRecorder`, `createRecallReviewRecorder`, `createMasteryRecomputeJob`, `createPageMasteryReader`, `createSessionFeedbackSources` y `createStudyItemRepository`.
 
-El motor decide, de forma transversal a las tres técnicas de estudio (flashcards, exámenes, recordación activa), cuándo debe repasarse cada `StudyItem` y qué nivel de dominio tiene cada `Page`. Es el único módulo autorizado a calcular fechas de vencimiento (documento-maestro §3.4); ningún otro módulo calculará vencimientos fuera de él.
+El motor decide, de forma transversal a las tres técnicas de estudio (flashcards, exámenes, recordación activa), cuándo debe repasarse cada `StudyItem` y qué nivel de dominio tiene cada `Page`. Es el único módulo autorizado a calcular fechas de vencimiento (documento-maestro §3.4); ningún otro módulo calcula vencimientos fuera de él.
 
 ### 3.1 Algoritmo SM-2 por ítem (documento-maestro §7.1)
 
@@ -842,7 +1189,7 @@ Entrada: una calidad de respuesta `q` entera entre 0 y 5. Reglas (verbatim):
 - `due_at = ahora + interval_days` días.
 - `lapses += 1` cuando `q < 3`.
 
-Se especifica como una función pura `applySm2(state, quality, now) → newState`, con objetivo de cobertura de pruebas del 100 % (primer, segundo y tercer repaso, fallo después de un éxito, `easiness` mínimo, y los extremos `q = 0` y `q = 5`).
+Implementado como la función pura `applySm2(state, quality, now): Result<Sm2State, DomainError>` (`src/modules/study-engine/domain/sm2.ts`): una calidad fuera de 0–5 responde `STUDY_ENGINE_INVALID_QUALITY`; el intervalo usa el `easiness` previo a la actualización de este repaso, y "`interval_days` días" son `interval_days × 24 h` en UTC. Sus pruebas cubren el primer, segundo y tercer repaso, el fallo después de un éxito, el `easiness` mínimo y los extremos `q = 0` y `q = 5`.
 
 ### 3.2 Mapeo de calidad por técnica (documento-maestro §7.2)
 
@@ -856,11 +1203,13 @@ Se especifica como una función pura `applySm2(state, quality, now) → newState
 | Exámenes | Respuesta correcta | 4 |
 | Recordación activa | Calidad combinada (ver §3.3) | 0–5 (redondeada) |
 
+Compuerta de vencimiento: una tarjeta solo se califica si su ítem está vencido (`STUDY_ENGINE_ITEM_NOT_DUE` en otro caso). En exámenes y recordación activa, una calidad < 3 siempre se registra y una ≥ 3 solo si el ítem estaba vencido (`examReviewQualityFor`, `recallReviewQualityFor`); un ítem suspendido no se registra.
+
 ### 3.3 Calidad combinada en recordación activa (documento-maestro §7.4)
 
 `combined = round(0.6 * ai_score + 0.4 * self_rating)`, donde `ai_score` y `self_rating` son enteros de 0 a 5. Señales metacognitivas: `self_rating >= 4 and ai_score <= 2` marca exceso de confianza; `self_rating <= 1 and ai_score >= 4` marca falta de confianza. Se registran las tres señales (puntaje crudo de IA, autoevaluación y calidad combinada) en `RecallAnswer`.
 
-Implementado en la Fase 6 (ADR 0007): `combinedQuality` y `calibrationOf` (`src/modules/active-recall/domain/recall-answer.ts`). La señal metacognitiva se deriva al leer los resultados y no se guarda. Solo una respuesta `done` alimenta SM-2 (`recordRecallReviews` de `study-engine`, `ReviewLog.session_kind = recall`): calidad < 3 siempre; ≥ 3 solo si el ítem está vencido.
+Implementado en la Fase 6 (`docs/adr/0007`): `combinedQuality` y `calibrationOf` (`src/modules/active-recall/domain/recall-answer.ts`). La señal metacognitiva se deriva al leer los resultados y no se guarda. Solo una respuesta `done` alimenta SM-2 (`recordRecallReviews` de `study-engine`, `ReviewLog.session_kind = recall`): calidad < 3 siempre; ≥ 3 solo si el ítem está vencido.
 
 ### 3.4 Nivel de dominio por página (documento-maestro §7.3)
 
@@ -873,24 +1222,24 @@ Para cada ítem `i` de una página: `estabilidad_i = min(1, interval_days_i / 21
 | `0.35 <= score < 0.70` | Consolidando |
 | `score >= 0.70` | Dominado |
 
-El calendario ordena las páginas por `due_at` mínimo entre sus ítems; el dashboard muestra `level` y `score` por página.
+Implementado como `computeMastery` (`src/modules/study-engine/domain/mastery.ts`, horizonte `STABILITY_HORIZON_DAYS = 21`), que omite los ítems suspendidos; los umbrales 0.35 y 0.70 son `CONSOLIDATING_THRESHOLD` y `MASTERED_THRESHOLD` de `src/shared/kernel/mastery-thresholds.ts`, compartidos con `src/shared/ui/mastery-level.ts`. El resultado se guarda en `page_mastery`. "Hoy" ordena las páginas por `due_at` mínimo entre sus ítems vencidos (la que más esperó primero); el dashboard muestra `level` y `score` por página.
 
 ### 3.5 Repetición de exámenes (documento-maestro §7.5)
 
-Al terminar una `ExamSession`: `score = correct / total`. Cada respuesta alimenta `RecordReview` con `q = 4` si fue correcta o `q = 1` si fue incorrecta. Si `score < 0.70`, el `ExamPageState` de la página pasa a `retake_pending = true` con `failed_root_ids` poblado; si `score >= 0.70`, ese estado se limpia. En la repetición, nunca se repite la misma pregunta con la misma redacción: se genera por IA una variante distinta por cada `root_id` fallado (`variant_of` apunta a la pregunta reemplazada, `root_id` se preserva), la pregunta original queda `retired_at`, y la sesión de repetición se completa con preguntas nuevas hasta un máximo de 5 si hubo menos de 5 falladas. Las respuestas de la repetición alimentan el `StudyItem` de la pregunta raíz. Si la generación de variantes falla en todos los proveedores de IA, la repetición se bloquea con un mensaje claro al estudiante.
+Al terminar una `ExamSession` (solo con todas sus preguntas respondidas; `EXAMS_SESSION_INCOMPLETE` en otro caso): `score = correct / total` y `passed = score >= 0.70` (`EXAM_PASS_THRESHOLD`). Las respuestas alimentan el `StudyItem` de su raíz con `q = 1` si fue incorrecta y `q = 4` si fue correcta y el ítem estaba vencido (§3.2). Si no aprueba, el `ExamPageState` de la página pasa a `retake_pending = true` con `failed_root_ids` poblado; si aprueba, ese estado se limpia y `last_passed_session_id` apunta a la sesión. Mientras haya una repetición pendiente no se puede iniciar un examen normal (`EXAMS_RETAKE_PENDING`). En la repetición (N de 10 a 30 y nunca menor que el número de raíces falladas), cada raíz fallada vuelve primero como una variante generada por IA con una redacción nunca usada en su linaje (`origin = ai_variant`, `variant_of` = la pregunta mostrada en el examen fallado, mismo `root_id`); la redacción reemplazada queda `retired_at`, y la sesión se completa con el resto de las preguntas de la página hasta N (decisión de usuario del 2026-10-05, `docs/adr/0006`). Si la generación de variantes falla (también tras el reintento en otro proveedor) o repite una redacción, la repetición se bloquea con `EXAMS_RETAKE_VARIANT_MISSING` sin guardar nada ni consumir el límite diario. Si el estudiante retiró todas las preguntas de los conceptos fallados, la repetición pendiente se limpia y la página vuelve a admitir un examen normal.
 
 ### 3.6 Columnas de estado por `StudyItem`
 
 | Columna | Tipo | Valor inicial | Descripción |
 |---|---|---|---|
-| `easiness` | real | 2.5 | Factor de facilidad (EF); nunca baja de 1.3. |
+| `easiness` | double precision | 2.5 | Factor de facilidad (EF); nunca baja de 1.3 (`CHECK study_items_easiness_min`). |
 | `interval_days` | integer | 0 | Intervalo en días hasta el próximo repaso. |
 | `repetitions` | integer | 0 | Repasos consecutivos exitosos (`n` en la fórmula SM-2). |
-| `due_at` | timestamptz | fecha de creación | Fecha de vencimiento del ítem. |
+| `due_at` | timestamptz | fijado por la aplicación al crear el ítem (sin valor por defecto en la base de datos) | Fecha de vencimiento del ítem. |
 | `last_quality` | integer | nulo | Última calidad (`q`, 0–5) registrada. |
 | `last_reviewed_at` | timestamptz | nulo | Fecha del último repaso. |
 | `lapses` | integer | 0 | Número de veces que `q < 3`. |
-| `suspended_at` | timestamptz | nulo | Fecha de suspensión manual del ítem, si el estudiante la solicita. |
+| `suspended_at` | timestamptz | nulo | Fecha de suspensión del ítem: se fija al archivar su tarjeta o al retirar la última pregunta activa de su linaje de examen; un ítem suspendido no vence ni cuenta para el dominio. |
 
 ---
 
@@ -898,24 +1247,27 @@ Al terminar una `ExamSession`: `score = correct / total`. Cada respuesta aliment
 
 ### 4.1 `identity`
 
-Corresponden a CU-01 (Registro e inicio de sesión) y CU-02 (Recuperar contraseña), y a los requisitos RF-ID-01 a RF-ID-07 del componente `identity` (tabla de componentes, `02-SAD.md` §4.1). Todas las funciones siguientes son Server Actions (`"use server"`, `src/modules/identity/actions.ts`); ninguna declara `maxDuration`. Cada una valida la entrada con `credentialsSchema` (`email`, `password` de al menos 8 caracteres) a través de la capa de aplicación antes de llamar al `AuthGateway`.
+Corresponden a CU-01 (Registro e inicio de sesión) y CU-02 (Recuperar contraseña), y a los requisitos RF-ID-01 a RF-ID-09 del componente `identity` (tabla de componentes, `02-SAD.md` §4.1). Todas las funciones siguientes son Server Actions (`"use server"`, `src/modules/identity/actions.ts`); ninguna declara `maxDuration`. Las acciones de formulario reciben `(_previous: AuthFormState, formData: FormData)` (firma de `useActionState`) y devuelven `AuthFormState { status, message }` o redirigen. La validación depende de la acción: `signUpAction` y `signInAction` validan `credentialsSchema` (`email` válido, `password` de al menos 8 caracteres); `requestPasswordResetAction` valida solo `email`; `updatePasswordAction` solo `password`; `signOutAction` y `signInWithGoogleAction` no reciben entrada. Los mensajes en español salen de `messageForCode` (`src/modules/identity/ui/auth-copy.ts`).
 
 | Acción | Parámetros | Retorno | Auth | Errores |
 |---|---|---|---|---|
-| `signUpAction` | `formData: FormData` (`email`, `password`) | `AuthFormState { status, message }` | No requiere sesión | `AUTH_INVALID_INPUT`, `AUTH_PROVIDER_UNAVAILABLE` |
-| `signInAction` | `formData: FormData` (`email`, `password`) | `AuthFormState` o redirección a `/` | No requiere sesión | `AUTH_INVALID_INPUT`, `AUTH_INVALID_CREDENTIALS`, `AUTH_EMAIL_NOT_VERIFIED`, `AUTH_PROVIDER_UNAVAILABLE` |
+| `signUpAction` | `_previous`, `formData` (`email`, `password`) | `AuthFormState` | No requiere sesión | `AUTH_INVALID_INPUT`, `AUTH_PROVIDER_UNAVAILABLE` |
+| `signInAction` | `_previous`, `formData` (`email`, `password`) | `AuthFormState` o redirección a `/` | No requiere sesión | `AUTH_INVALID_INPUT`, `AUTH_INVALID_CREDENTIALS`, `AUTH_EMAIL_NOT_VERIFIED`, `AUTH_PROVIDER_UNAVAILABLE` |
 | `signOutAction` | — | `{ status: "error"; message }` o redirección a `/login` | Requiere sesión | `AUTH_PROVIDER_UNAVAILABLE` |
-| `requestPasswordResetAction` | `formData: FormData` (`email`) | `AuthFormState` | No requiere sesión | `AUTH_INVALID_INPUT`, `AUTH_PROVIDER_UNAVAILABLE` |
-| `updatePasswordAction` | `formData: FormData` (`password`) | `AuthFormState` o redirección a `/` | Requiere sesión de recuperación | `AUTH_INVALID_INPUT`, `AUTH_PROVIDER_UNAVAILABLE` |
+| `requestPasswordResetAction` | `_previous`, `formData` (`email`) | `AuthFormState` | No requiere sesión | `AUTH_INVALID_INPUT`, `AUTH_PROVIDER_UNAVAILABLE` |
+| `updatePasswordAction` | `_previous`, `formData` (`password`) | `AuthFormState` o redirección a `/` | Requiere sesión de recuperación | `AUTH_INVALID_INPUT`, `AUTH_PROVIDER_UNAVAILABLE` |
 | `signInWithGoogleAction` | — | Redirección a Google OAuth o a `/login?error=google` | No requiere sesión | `AUTH_PROVIDER_UNAVAILABLE` (no se devuelve como valor; solo redirige) |
-| `updateTimeZoneAction` (Fase 7) | `_previous: TimeZoneFormState`, `formData: FormData` (`timeZone`, nombre IANA) | `TimeZoneFormState { status, message?, timeZone? }` (zona canónica guardada) | Requiere sesión | `PROFILE_INVALID_TIME_ZONE` (texto propio); cualquier otro fallo, texto genérico. No usa `credentialsSchema`; nunca lanza |
+| `acceptTermsAction` (puerta de términos) | `_previous`, `formData` (`accept` = `"on"` si se marcó la casilla, `next`) | `AuthFormState` o redirección a `next` (sanitizado con `safeNext`) | Requiere sesión (sin ella, redirección a `/login`) | `TERMS_NOT_ACCEPTED`, `PROFILE_NOT_FOUND`. Guarda `terms_accepted_version = TERMS_VERSION` y `terms_accepted_at`; registra `terms_accepted` de forma diferida (`after()`) |
+| `updateTimeZoneAction` (Fase 7) | `_previous: TimeZoneFormState`, `formData: FormData` (`timeZone`, nombre IANA) | `TimeZoneFormState { status, message?, timeZone? }` (zona canónica guardada) | Requiere sesión | `PROFILE_INVALID_TIME_ZONE` (texto propio); cualquier otro fallo, texto genérico. Nunca lanza |
 | `adoptBrowserTimeZoneAction` (Fase 7) | `timeZone: string` | `{ ok: true; adopted: boolean }` o `{ ok: false }` | Requiere sesión | Silenciosa: solo guarda mientras el perfil sigue en `UTC`; nunca lanza |
 
-`signUpAction` trata la respuesta `outcome === "already_registered"` de Supabase (correo ya existente) como un caso de éxito con mensaje de error de dominio (`AUTH_COPY.alreadyRegistered`), no como un `DomainError`.
+`signUpAction` trata la respuesta `outcome === "already_registered"` de Supabase (correo ya existente) como un caso de éxito con mensaje de error de dominio (`AUTH_COPY.alreadyRegistered`), no como un `DomainError`; con un `userId`, registra `user_signed_up` de forma diferida. `signInAction` registra `user_signed_in` de forma diferida.
+
+Marca del flujo de Google (`src/modules/identity/domain/auth-flow.ts`): `signInWithGoogleAction` pide la URL de OAuth con `redirectTo` exactamente igual a `${siteUrl()}/auth/callback` (Supabase lo compara con su lista de Redirect URLs) y, solo si la obtiene, fija la cookie `cogni_auth_flow=google` (`httpOnly`, `secure` en producción, `sameSite=lax`, `path=/auth/callback`, `maxAge` 600 s). `signUpAction` y `requestPasswordResetAction` borran una marca vieja de un intento de Google abandonado (misma ruta, `maxAge` 0), para que un enlace de correo fallido posterior no se informe como un inicio con Google cancelado. El uso de la marca se describe en Route Handlers (`/auth/callback`).
 
 ### 4.2 `notebooks`
 
-Corresponden a CU-03 (Crear y organizar cuadernos y páginas) y CU-04 (Escribir apuntes en el editor), y a los requisitos RF-NB-01 a RF-NB-08 y RF-ED-01, RF-ED-05 y RF-ED-07 (componentes `notebooks` y `editor`, `02-SAD.md` §4.1). Server Actions (`"use server"`, `src/modules/notebooks/actions.ts`). Las seis primeras filas usan `requireOwnerId()` (lanza una excepción si no hay sesión, capturada por el manejador de errores de Next.js) y `unwrap()` (convierte un `DomainError` en una excepción con el mensaje en español de `notebooks-copy.ts`). Las marcadas "Result-returning" usan `requireOwnerIdResult()` y nunca lanzan: devuelven `Result<T, ActionError>` para que `editor`'s `useAutosave` pueda reconciliar un conflicto sin que el Server Action arroje una excepción.
+Corresponden a CU-03 (Crear y organizar cuadernos y páginas) y CU-04 (Escribir apuntes en el editor), y a los requisitos RF-NB-01 a RF-NB-08 y RF-ED-01, RF-ED-05 y RF-ED-07 (componentes `notebooks` y `editor`, `02-SAD.md` §4.1). Server Actions (`"use server"`, `src/modules/notebooks/actions.ts`). Las siete primeras filas (las mutaciones de cuadernos y páginas) usan `requireOwnerId()` (lanza una excepción si no hay sesión, capturada por el manejador de errores de Next.js) y `unwrap()` (convierte un `DomainError` en una excepción con el mensaje en español de `notebooks-copy.ts`); las lecturas `getSidebarTree`, `listPagesForMention`, `getHomeOverview`, `getNotebookForRoute` y `getPageForRoute` también usan `requireOwnerId()`. Las marcadas "Result-returning" usan `requireOwnerIdResult()` y nunca lanzan: devuelven `Result<T, ActionError>` para que `editor`'s `useAutosave` pueda reconciliar un conflicto sin que el Server Action arroje una excepción.
 
 | Acción | Parámetros | Retorno | Auth | Errores |
 |---|---|---|---|---|
@@ -927,6 +1279,7 @@ Corresponden a CU-03 (Crear y organizar cuadernos y páginas) y CU-04 (Escribir 
 | `renamePage` | `{ pageId: string; title: string }` | `Page` | Requiere sesión (lanza) | `NOTEBOOKS_INVALID_INPUT`, `PAGE_NOT_FOUND` |
 | `archivePage` | `{ pageId: string }` | `Page` | Requiere sesión (lanza) | `NOTEBOOKS_INVALID_INPUT`, `PAGE_NOT_FOUND` |
 | `getSidebarTree` | — | `SidebarNotebook[]` | Requiere sesión (lanza) | — (sin canal de `DomainError`) |
+| `listPagesForMention` | — | `MentionPageCandidate[]` (`id`, `title`, `notebookId`, `notebookTitle`, `notebookColor`): las páginas activas del árbol del sidebar, para el menú de menciones del editor | Requiere sesión (lanza) | — (sin canal de `DomainError`) |
 | `getHomeOverview` | — | `HomeOverview` (ver ejemplo abajo) | Requiere sesión (lanza) | — (sin canal de `DomainError`) |
 | `saveContent` | `{ pageId: string; expectedVersion: number; content: TiptapDoc }` (Result-returning) | `Result<{ version: number }, ActionError>` | Requiere sesión (Result) | `NOTEBOOKS_SESSION_REQUIRED`, `NOTEBOOKS_INVALID_INPUT`, `PAGE_NOT_FOUND`, `PAGE_VERSION_CONFLICT` |
 | `getCurrentContent` | `pageId: string` (Result-returning) | `Result<{ content: TiptapDoc; version: number }, ActionError>` | Requiere sesión (Result) | `NOTEBOOKS_SESSION_REQUIRED`, `NOTEBOOKS_INVALID_INPUT`, `PAGE_NOT_FOUND` |
@@ -958,14 +1311,17 @@ Ejemplo de retorno no trivial (`getHomeOverview`):
 
 #### `notebooks/server-api.ts` (composición interna, sin `"use server"`)
 
-`createNotebooksServerApi({ db, clock? }): NotebooksServerApi` no es un punto de entrada alcanzable por el cliente: lo consume únicamente `ingestion/infrastructure/notebooks-pages-adapter.ts` en el mismo proceso del servidor.
+`createNotebooksServerApi({ db, clock? }): NotebooksServerApi` no es un punto de entrada alcanzable por el cliente: lo consumen en el mismo proceso del servidor `ingestion` (`ingestion/infrastructure/notebooks-pages-adapter.ts`), `flashcards` (`actions.ts`, `session-actions.ts`), `exams` (`actions.ts`, `session-actions.ts`, `feedback-actions.ts`, `retake-actions.ts`) y `active-recall` (`actions.ts`, `session-actions.ts`, `evaluation-runner.ts`). `NotebooksServerApi` extiende `PageTextReader` (`notebooks/domain/page-text-reader.ts`), de donde hereda `getPageText`; tiene cinco métodos.
 
 | Método | Parámetros | Retorno | Auth | Errores |
 |---|---|---|---|---|
 | `findActiveNotebook` | `ownerId: string, notebookId: string` | `{ id: string } o null` | N/A — invocado en proceso, no expuesto a cliente | — |
 | `createPage` | `ownerId: string, { notebookId: string; title?: string }` | `Result<{ id: string; notebookId: string }, DomainError>` | N/A | `NOTEBOOK_NOT_FOUND`, `NOTEBOOK_ARCHIVED` |
 | `writeImportedContent` | `ownerId: string, { pageId: string; content: TiptapDoc; expectedVersion: number }` | `Result<{ version: number }, DomainError>` | N/A | `PAGE_NOT_FOUND`, `PAGE_VERSION_CONFLICT`, `PAGE_INVALID_CONTENT` |
+| `getPageText` (de `PageTextReader`) | `pageId: string, ownerId: string` | `Result<{ title: string; plainText: string }, DomainError>` | N/A | `PAGE_NOT_FOUND` (página inexistente, de otro dueño o archivada) |
 | `findPageNotebookId` | `ownerId: string, pageId: string` | `string o null` | N/A | — |
+
+`getPageText` es la única lectura del texto de una página que usan las técnicas de estudio (generación, retroalimentación y evaluación de IA) y su comprobación de propiedad de la página. Nótese el orden de parámetros: `getPageText` recibe `(pageId, ownerId)`, al revés que los otros cuatro métodos.
 
 `writeImportedContent` usa un esquema Zod `.strict()`: un campo extra (por ejemplo `plainText`) invalida toda la entrada, a diferencia de `saveContent`, que descarta silenciosamente un `plain_text` enviado por el cliente.
 
@@ -1008,9 +1364,52 @@ Ejemplo de retorno no trivial (`ImportJobStatusView`):
 }
 ```
 
-### 4.4 `active-recall`
+### 4.4 `flashcards`
 
-Corresponden a CU-09 y a RF-AR-01 a RF-AR-06 y RF-AI-03 (Fase 6, ADR 0007). Server Actions (`"use server"`) en `src/modules/active-recall/actions.ts`, `session-actions.ts`, `evaluation-actions.ts` y `hub-actions.ts`. Todas validan la entrada con Zod (ids `z.uuid()`), están envueltas en `withBoundary()` (una excepción no prevista se reporta a Sentry y se convierte en `RECALL_UNEXPECTED`) y nunca lanzan. Todas requieren sesión: sin ella responden `RECALL_SESSION_REQUIRED`; una entrada inválida, `RECALL_INVALID_INPUT`. La tabla lista solo los demás errores.
+Corresponden a CU-06 (Generar material de estudio con IA) y CU-07 (Repasar flashcards), y a RF-FC-01 a RF-FC-05 (Fases 3 y 4; `docs/adr/0004`, `docs/adr/0005`). Server Actions (`"use server"`) en `src/modules/flashcards/actions.ts` y `session-actions.ts`, sobre el borde compartido de `action-support.ts`: sesión primero (`FLASHCARDS_SESSION_REQUIRED`, "Debes iniciar sesión para continuar."), entrada validada con Zod (ids `z.uuid()`; `FLASHCARDS_INVALID_INPUT`) y envoltura `withBoundary()` (una excepción no prevista se reporta a Sentry y se convierte en `FLASHCARDS_UNEXPECTED`); nunca lanzan y cada `DomainError` sale como `ActionError`. La tabla lista solo los demás errores. Las acciones que cambian un mazo revalidan `/flashcards` (`revalidatePath("/flashcards", "layout")`).
+
+| Acción | Parámetros | Retorno | Errores propios |
+|---|---|---|---|
+| `generateFlashcardsAction` | `{ pageId, count? }` (`count` entero de 3 a 20; 10 por defecto) | `Result<GenerationView, GenerationActionError>` (`cards`, `remainingToday`, `truncated`, `wordsUsed`, `wordsTotal`) | `PAGE_NOT_FOUND`, `AI_PAGE_EMPTY`, `FLASHCARDS_NO_NEW_CONTENT`, `AI_DAILY_LIMIT_REACHED` (con `resetAt` ISO), `AI_GENERATION_FAILED` |
+| `listFlashcardsAction` | `{ pageId }` | `Result<FlashcardView[], ActionError>` (`id`, `pageId`, `front`, `back`, `position`) | — |
+| `getGenerationStatusAction` | — | `Result<GenerationStatusView, ActionError>` (`remainingToday`, `resetAt` ISO); solo consulta el límite, no lo consume | — |
+| `listDecksAction` | — | `Result<DeckView[], ActionError>` (`pageId`, `notebookId`, `pageTitle`, `notebookTitle`, `notebookColor`, `count`) | — |
+| `createFlashcardAction` | `{ pageId, front, back }` (cada lado hasta 1000 caracteres tras recortar espacios) | `Result<FlashcardView, ActionError>` | `PAGE_NOT_FOUND`, `FLASHCARD_EMPTY`, `FLASHCARD_TOO_LONG` |
+| `archiveFlashcardAction` | `{ flashcardId }` | `Result<ArchiveView, ActionError>` (`remaining`, tarjetas activas que quedan, siempre ≥ 1) | `FLASHCARD_NOT_FOUND`, `FLASHCARD_LAST_CARD` |
+| `startFlashcardSessionAction` | `{ pageId? }` (sin `pageId`: sesión multipágina de "Hoy") | `Result<ReviewSessionView, ActionError>` (`sessionId`, `cards[]` con `itemId`, `flashcardId`, `front`, `back`, `nextIntervalDays` por botón) | `PAGE_NOT_FOUND`, `STUDY_ENGINE_NOTHING_DUE` |
+| `gradeFlashcardAction` | `{ sessionId, itemId, rating }` (`rating`: `again`, `hard`, `good` o `easy`, claves de `FLASHCARD_QUALITY`) | `Result<GradeView, ActionError>` (`reviewedCount`, `againCount`, `masteryLevel`) | `STUDY_ENGINE_SESSION_NOT_FOUND`, `STUDY_ENGINE_SESSION_FINISHED`, `STUDY_ENGINE_ITEM_NOT_FOUND`, `STUDY_ENGINE_ITEM_SUSPENDED`, `STUDY_ENGINE_ITEM_NOT_DUE` |
+| `finishFlashcardSessionAction` | `{ sessionId }` | `Result<ReviewSummaryView, ActionError>` (`reviewedCount`, `againCount`; nunca tiempo de estudio) | `STUDY_ENGINE_SESSION_NOT_FOUND` |
+| `requestSessionFeedbackAction` | `{ sessionId }` | `Result<SessionFeedbackView, ActionError>` (`status` `pending`/`done`/`failed`, `content` nulo salvo en `done`) | `STUDY_ENGINE_SESSION_NOT_FOUND`, `FLASHCARDS_FEEDBACK_SESSION_OPEN`, `FLASHCARDS_FEEDBACK_NOTHING_REVIEWED` |
+
+`generateFlashcardsAction` es incremental (`docs/adr/0007`): solo envía los párrafos que flashcards aún no usó en la página, truncados a `AI_PAGE_TOKEN_CAP`; sin párrafos nuevos responde `FLASHCARDS_NO_NEW_CONTENT` sin llamar a la IA ni consumir el límite. Consume una unidad del límite diario de generaciones (`limiter.check`) antes de llamar al modelo y registra `generation_requested` en PostHog (con el desenlace `done`, `limit`, `empty`, `no_new_content` o `failed`). Corre bajo `maxDuration = 120` de la ruta del editor que la aloja (`src/app/(app)/notebooks/[notebookId]/pages/[pageId]/page.tsx`). `requestSessionFeedbackAction` solo consulta el límite (`limiter.peek`) y nunca lo consume; si el límite está agotado o el proveedor falla, responde con éxito y `status: "failed"`, y la sesión queda cerrada igualmente.
+
+### 4.5 `exams`
+
+Corresponden a CU-06 y CU-08 (Presentar un examen) y a RF-EX-01 a RF-EX-07 (Fase 5, `docs/adr/0006`). Server Actions (`"use server"`) en `src/modules/exams/actions.ts`, `session-actions.ts`, `feedback-actions.ts`, `hub-actions.ts` y `retake-actions.ts`, con el mismo borde que flashcards (`action-support.ts`): `EXAMS_SESSION_REQUIRED`, `EXAMS_INVALID_INPUT` y `EXAMS_UNEXPECTED`; nunca lanzan. Las acciones que cambian preguntas o sesiones revalidan `/exams`. La tabla lista solo los demás errores.
+
+| Acción | Parámetros | Retorno | Errores propios |
+|---|---|---|---|
+| `listExamQuestionsAction` | `{ pageId }` | `Result<ExamQuestionView[], ActionError>` (`id`, `pageId`, `stem`, `options[4]`, `correctIndex`, `explanation`, `concept`, `origin`) | — |
+| `createExamQuestionAction` | `{ pageId, stem, options (4), correctIndex (0–3), explanation, concept }` (límites tras recortar: enunciado 1000, opción 300, explicación 2000, concepto 120 caracteres) | `Result<ExamQuestionView, ActionError>` | `PAGE_NOT_FOUND`, `EXAMS_INVALID_QUESTION` |
+| `editExamQuestionAction` | `{ questionId, stem, options, correctIndex, explanation, concept }` | `Result<ExamQuestionView, ActionError>` | `EXAMS_QUESTION_NOT_FOUND`, `EXAMS_QUESTION_RETIRED`, `EXAMS_INVALID_QUESTION` |
+| `retireExamQuestionAction` | `{ questionId }` | `Result<{ id }, ActionError>` (idempotente: una pregunta ya retirada conserva su `retired_at`) | `EXAMS_QUESTION_NOT_FOUND` |
+| `generateExamQuestionsAction` | `{ pageId, count? }` (`count` de 10 a 30; 10 por defecto) | `Result<ExamGenerationView, ExamGenerationActionError>` (`questions`, `created`, `skipped`, `remainingToday`, `truncated`, `wordsUsed`, `wordsTotal`) | `PAGE_NOT_FOUND`, `AI_PAGE_EMPTY`, `EXAMS_NO_NEW_CONTENT`, `EXAMS_INVALID_QUESTION_COUNT`, `AI_DAILY_LIMIT_REACHED` (con `resetAt`), `AI_GENERATION_FAILED` |
+| `getExamStartAction` | `{ pageId }` | `Result<ExamStartView, ActionError>` (`activeQuestionCount`, `retakePending`, `failedRootCount`, `openSessionId`, `openRetakeSessionId`, `lastFinishedSessionId`) | — |
+| `startExamSessionAction` | `{ pageId, count? }` (N de 10 a 30; 10 por defecto) | `Result<{ sessionId, resumed }, ActionError>` (reanuda la sesión abierta de la página si existe) | `PAGE_NOT_FOUND`, `EXAMS_RETAKE_PENDING`, `EXAMS_NOT_ENOUGH_QUESTIONS`, `EXAMS_INVALID_QUESTION_COUNT` |
+| `getExamSessionAction` | `{ sessionId }` | `Result<ExamSessionView, ActionError>` (`sessionId`, `pageId`, `startedAt`, `finished`, `isRetake`, `questions[]` con su `answer` revelada solo si ya se respondió) | `EXAMS_SESSION_NOT_FOUND` |
+| `answerExamQuestionAction` | `{ sessionId, questionId, selectedIndex (0–3) }` | `Result<ExamAnswerView, ActionError>` (`questionId`, `selectedIndex`, `isCorrect`, `correctIndex`, `explanation`, `concept`) | `EXAMS_SESSION_NOT_FOUND`, `EXAMS_SESSION_FINISHED`, `EXAMS_QUESTION_NOT_IN_SESSION`, `EXAMS_DUPLICATE_ANSWER` |
+| `finishExamSessionAction` | `{ sessionId }` | `Result<{ sessionId, passed }, ActionError>` | `EXAMS_SESSION_NOT_FOUND`, `EXAMS_SESSION_FINISHED`, `EXAMS_SESSION_INCOMPLETE` |
+| `getExamResultsAction` | `{ pageId, sessionId? }` (sin `sessionId`: el último examen terminado de la página) | `Result<ExamResultsView, ActionError>` (`total`, `correct`, `scorePercent`, `passed`, `durationSeconds`, `questions[]`, `failedConcepts[]`, `feedback` o nulo) | `EXAMS_SESSION_NOT_FOUND` (sin examen terminado, sesión abierta o de otra página) |
+| `requestExamFeedbackAction` | `{ sessionId }` | `Result<ExamFeedbackView, ActionError>` (`status`, `reused`, `content`) | `EXAMS_SESSION_NOT_FOUND`, `EXAMS_FEEDBACK_SESSION_OPEN` |
+| `getExamReviewNoticeAction` | `{ pageId }` | `Result<ExamReviewNotice o null, ActionError>`: conceptos fallados de la repetición pendiente, para el aviso "Repasa antes de repetir el examen" | — |
+| `listExamHubAction` | — | `Result<ExamHubPageView[], ActionError>`: páginas con preguntas (sin páginas ni cuadernos archivados), ordenadas por cuaderno y página, con `lastFinishedAt` ISO y conteos de vencidas (nulos si su lectura falla) | — |
+| `startExamRetakeAction` | `{ pageId, count }` (N de 10 a 30, obligatorio) | `Result<StartedExamRetakeView, ExamGenerationActionError>`: `{ kind: "started", sessionId, resumed, remainingToday (nulo sin llamada a la IA) }` o `{ kind: "cleared" }` | `PAGE_NOT_FOUND`, `EXAMS_NO_RETAKE_PENDING`, `EXAMS_INVALID_QUESTION_COUNT`, `EXAMS_NOT_ENOUGH_QUESTIONS`, `AI_DAILY_LIMIT_REACHED` (con `resetAt`), `EXAMS_RETAKE_VARIANT_MISSING` |
+
+`generateExamQuestionsAction` es incremental como la de flashcards (sin párrafos nuevos, `EXAMS_NO_NEW_CONTENT` sin llamada ni consumo) y consume una unidad del límite diario de generaciones; una pregunta generada inválida se descarta y cuenta en `skipped`. `startExamRetakeAction` aplica las reglas de §3.5: consulta el límite antes de llamar a la IA y consume una unidad solo cuando la repetición se creó y hubo llamada; revalida también `/notebooks`. `requestExamFeedbackAction` solo consulta el límite y nunca lo consume; un fallo del proveedor responde con éxito y `status: "failed"`, y la retroalimentación de un aprobado se reutiliza tras otro aprobado (`reused`). Las acciones de generación y repetición corren bajo `maxDuration = 120` de la ruta que las aloja: la página del editor y `src/app/(app)/exams/[notebookId]/[pageId]/page.tsx`; las demás rutas de exámenes no declaran `maxDuration`.
+
+### 4.6 `active-recall`
+
+Corresponden a CU-09 y a RF-AR-01 a RF-AR-06 y RF-AI-03 (Fase 6, `docs/adr/0007`). Server Actions (`"use server"`) en `src/modules/active-recall/actions.ts`, `session-actions.ts`, `evaluation-actions.ts` y `hub-actions.ts`. Todas validan la entrada con Zod (ids `z.uuid()`), están envueltas en `withBoundary()` (una excepción no prevista se reporta a Sentry y se convierte en `RECALL_UNEXPECTED`) y nunca lanzan. Todas requieren sesión: sin ella responden `RECALL_SESSION_REQUIRED`; una entrada inválida, `RECALL_INVALID_INPUT`. La tabla lista solo los demás errores.
 
 | Acción | Parámetros | Retorno | Errores propios |
 |---|---|---|---|
@@ -1026,37 +1425,38 @@ Corresponden a CU-09 y a RF-AR-01 a RF-AR-06 y RF-AI-03 (Fase 6, ADR 0007). Serv
 | `listRecallHubAction` | — | `Result<RecallHubView, ActionError>` | — |
 | `getRecallSessionReviewAction` | `{ pageId, sessionId }` | `Result<RecallSessionReviewView, ActionError>` | `RECALL_SESSION_NOT_FOUND` |
 
-`finishRecallSessionAction` responde sin esperar a la IA: si la sesión queda `pending`, programa `evaluateRecallSession` con `after()` dentro de `maxDuration = 300` de la ruta de la sesión (ADR 0003). La evaluación no devuelve errores al cliente: cada respuesta queda `done` o `failed` con su registro crudo (§1, RecallAnswer); dentro de ese registro, `code` es `AI_GENERATION_FAILED`, `AI_DAILY_LIMIT_REACHED` o `RECALL_UNEXPECTED`. `getRecallSessionResultsAction` vuelve a programar una evaluación cuando la sesión terminada sigue `pending` y ninguna respuesta pendiente se guardó o reclamó dentro del plazo de 6 minutos. Los demás códigos de `RECALL_ERROR` (`RECALL_INVALID_QUESTION`, `RECALL_INVALID_SCORE`) son internos: una pregunta generada inválida se descarta y cuenta en `skipped`.
+`finishRecallSessionAction` responde sin esperar a la IA: si la sesión queda `pending`, programa `evaluateRecallSession` con `after()` dentro de `maxDuration = 300` de la ruta de la sesión (`docs/adr/0003`). La evaluación no devuelve errores al cliente: cada respuesta queda `done` o `failed` con su registro crudo (§1, RecallAnswer); dentro de ese registro, `code` es `AI_GENERATION_FAILED`, `AI_DAILY_LIMIT_REACHED` o `RECALL_UNEXPECTED`. `getRecallSessionResultsAction` vuelve a programar una evaluación cuando la sesión terminada sigue `pending` y ninguna respuesta pendiente se guardó o reclamó dentro del plazo de 6 minutos. Los demás códigos de `RECALL_ERROR` (`RECALL_INVALID_QUESTION`, `RECALL_INVALID_SCORE`) son internos: una pregunta generada inválida se descarta y cuenta en `skipped`.
 
-### 4.5 `scheduling`
+### 4.7 `scheduling`
 
-Corresponden a CU-10 y a RF-SC-01 a RF-SC-04 (Fase 7, ADR 0008). Server Actions (`"use server"`) en `src/modules/scheduling/actions.ts`; sesión primero, nunca lanzan (un error inesperado va a Sentry como `SCHEDULING_UNEXPECTED`; los errores de control de Next.js se relanzan). Sin sesión responden `SCHEDULING_SESSION_REQUIRED`. Solo leen; no tienen límite de tasa.
+Corresponden a CU-10 y a RF-SC-01 a RF-SC-04 (Fase 7, `docs/adr/0008`). Server Actions (`"use server"`) en `src/modules/scheduling/actions.ts`; sesión primero, nunca lanzan (un error inesperado va a Sentry como `SCHEDULING_UNEXPECTED`; los errores de control de Next.js se relanzan). Sin sesión responden `SCHEDULING_SESSION_REQUIRED`. Solo leen; no tienen límite de tasa.
 
 | Acción | Parámetros | Retorno | Errores propios |
 |---|---|---|---|
 | `listDueTodayAction` | — | `Result<DueTodayPageView[], ActionError>`: páginas con ítems no suspendidos y `due_at <= now` (sin páginas ni cuadernos archivados), con `due` por técnica y `earliestDueAt`, la que más esperó primero | — |
-| `listCalendarDaysAction` | `{ fromDay, toDay, timeZone }` (días ISO locales, `[fromDay, toDay)`) | `Result<CalendarDayPageView[], ActionError>`: por día local y página, los ítems cuyo próximo `due_at` cae ese día; lo vencido, en hoy | `SCHEDULING_INVALID_RANGE` (días no ISO, rango vacío o de más de 42 días, fuera de 1970-01-01 … 9998-12-31, o zona inválida) |
+| `listCalendarDaysAction` | `{ fromDay, toDay, timeZone }` (días ISO locales, `[fromDay, toDay)`) | `Result<CalendarDayPageView[], ActionError>`: por día local y página, los ítems cuyo próximo `due_at` cae ese día; lo vencido, en hoy | `SCHEDULING_INVALID_RANGE` (días no ISO, rango vacío o de más de 42 días, rango que no se solapa con la ventana del calendario —se exige `fromDay <= 9998-12-31` y `toDay > 1970-01-01` (`isValidRange`, `scheduling/calendar-days.ts`)—, o zona inválida) |
 
 Lecturas de servidor sin `"use server"`: `getCalendarDays({ fromDay, toDay, timeZone, now })` (`calendar-days.ts`), la misma lectura con el instante con que pinta `/calendario`; la acción usa siempre el reloj del sistema y nunca acepta uno del cliente. `createSchedulingServerApi({ db, clock? })` (`server-api.ts`) expone `listDueToday(ownerId)` y `listCalendarDays(ownerId, range)` para un dueño ya autenticado (lo usa el hub de exámenes).
 
-### 4.6 `analytics`
+### 4.8 `analytics`
 
-Corresponden a CU-11 y a RF-AN-01 a RF-AN-05 (Fase 7, ADR 0008). Server Actions (`"use server"`) en `src/modules/analytics/actions.ts`, sobre las lecturas compartidas de `dashboard-reads.ts`: sesión primero ("Debes iniciar sesión para continuar.", `ANALYTICS_SESSION_REQUIRED`), luego la entrada, que no es de confianza (se lee dentro del camino protegido y se reduce a sus campos conocidos; nunca trae un reloj), y nunca lanzan (un error inesperado va a Sentry como `ANALYTICS_UNEXPECTED`, "No pudimos cargar tus métricas. Inténtalo de nuevo."). Solo leen; ninguna métrica se guarda.
+Corresponden a CU-11 y a RF-AN-01 a RF-AN-05 (Fase 7, `docs/adr/0008`). Server Actions (`"use server"`) en `src/modules/analytics/actions.ts`, sobre las lecturas compartidas de `dashboard-reads.ts`: sesión primero ("Debes iniciar sesión para continuar.", `ANALYTICS_SESSION_REQUIRED`), luego la entrada, que no es de confianza (se lee dentro del camino protegido y se reduce a sus campos conocidos; nunca trae un reloj), y nunca lanzan (un error inesperado va a Sentry como `ANALYTICS_UNEXPECTED`, "No pudimos cargar tus métricas. Inténtalo de nuevo."). Solo leen; ninguna métrica se guarda.
 
 | Acción | Parámetros | Retorno | Errores propios |
 |---|---|---|---|
 | `getProgressAction` | `{ timeZone, weeks }` (`weeks` entero de 1 a 26) | `Result<ProgressView, ActionError>`: progreso por página (nivel, puntaje, ítems totales y vencidos, tendencia semanal de calidad) y por cuaderno | `ANALYTICS_INVALID_INPUT` ("El período o la zona horaria no son válidos.") |
 | `getTechniqueMetricsAction` | `{ fromDay, toDay, timeZone }` (rango no vacío de hasta 92 días) | `Result<TechniqueMetricsView, ActionError>`: por técnica, repasos completados, tasa de acierto del período y del anterior y racha; repasos por día; totales con `streakDays` y `streakDaysWeekAgo` | `ANALYTICS_INVALID_INPUT` |
-| `getCalibrationAction` | `{ fromDay, toDay, timeZone }` | `Result<CalibrationView, ActionError>`: por página, conteos de exceso, falta de confianza y calibradas, y promedios de autoevaluación y puntaje de IA | `ANALYTICS_INVALID_INPUT` |
+| `getCalibrationAction` | `{ fromDay, toDay, timeZone }` (mismo tope de 92 días que `getTechniqueMetricsAction`) | `Result<CalibrationView, ActionError>`: por página, conteos de exceso, falta de confianza y calibradas, y promedios de autoevaluación y puntaje de IA | `ANALYTICS_INVALID_INPUT` |
 
-Lecturas de servidor sin `"use server"` (`dashboard-reads.ts`): `getDashboardProgress`, `getDashboardTechniqueMetrics` (ambas con el `now` con que pinta `/dashboard`) y `getDashboardCalibration`. `createAnalyticsServerApi({ db, clock? })` (`server-api.ts`) expone `getProgress`, `getTechniqueMetrics` y `getCalibration` para un dueño ya autenticado y un rango ya validado. Las definiciones de cada métrica están en ADR 0008.
+Lecturas de servidor sin `"use server"` (`dashboard-reads.ts`): `getDashboardProgress`, `getDashboardTechniqueMetrics` (ambas con el `now` con que pinta `/dashboard`) y `getDashboardCalibration`. `createAnalyticsServerApi({ db, clock? })` (`server-api.ts`) expone `getProgress`, `getTechniqueMetrics` y `getCalibration` para un dueño ya autenticado y un rango ya validado. Las definiciones de cada métrica están en `docs/adr/0008`. Las acciones aceptan rangos de hasta 92 días (`MAX_RANGE_DAYS`) y 26 semanas (`MAX_TREND_WEEKS`), pero la interfaz de `/dashboard` solo ofrece 7, 15 y 30 días (`?range=`).
 
 ### Route Handlers
 
 | Método | Ruta | Cuerpo | Respuesta | Auth | Descripción |
 |---|---|---|---|---|---|
-| `GET` | `/api/keep-alive` | — | `{ ok: true }` (200) o vacío (401) | Cabecera `Authorization: Bearer <CRON_SECRET>`, comparada con `timingSafeEqual` | Ejecuta `select 1` para evitar que Supabase Free pause el proyecto por inactividad; llamado a diario por Vercel Cron. |
-| `GET` | `/auth/callback` | Query `code`, `next` | Redirección 302 a `next` (sanitizado con `safeNext`) o a `/login?error=google` | Ninguna (recibe el código PKCE de Supabase Auth) | Intercambia el código de OAuth de Google, verificación de correo o recuperación de contraseña por una sesión; registra `user_signed_in` de forma diferida (`after()`) cuando el intercambio corresponde a un inicio de sesión con `userId`. |
+| `GET` | `/api/keep-alive` | — | `{ ok: true }` (200) o vacío (401) | Cabecera `Authorization: Bearer <CRON_SECRET>`, comparada con `timingSafeEqual` | Ejecuta `select 1` para evitar que Supabase Free pause el proyecto por inactividad; Vercel Cron la llama a diario (`0 6 * * *`, `vercel.json`). |
+| `GET` | `/api/recompute-mastery` | — | `{ ok: true, pagesRecomputed, pagesFailed, complete }` (200); `{ ok: false }` (500) si falla el listado; vacío (401) con una cabecera incorrecta; vacío (500) si `CRON_SECRET` no está configurado | Cabecera `Authorization: Bearer <CRON_SECRET>`, comparada con `timingSafeEqual` tras comparar longitudes | Recalcula la `PageMastery` de cada página (`createMasteryRecomputeJob` de `study-engine`, documento-maestro §7.3) para que `items_due`, `level` y `score` sigan vigentes aunque nadie repase. `dynamic = "force-dynamic"`, `maxDuration = 300`; deja de empezar páginas 60 s antes del límite (`complete: false`) y las pendientes van primero en la corrida siguiente. Una página fallida se registra en el log con su id y el mensaje de error (sin contenido) y no detiene la corrida. Vercel Cron la llama a diario (`30 6 * * *`). |
+| `GET` | `/auth/callback` | Query `code`, `next` | Redirección 302 a `next` (sanitizado con `safeNext`), a `/login?error=google` o a `/login?error=link` | Ninguna (recibe el código PKCE de Supabase Auth) | Intercambia el código de OAuth de Google, verificación de correo o recuperación de contraseña por una sesión. Con éxito redirige a `next` y, si el intercambio trae `userId`, registra `user_signed_in` de forma diferida (`after()`). Si falta el código o el intercambio falla, redirige a `/login?error=google` solo cuando la petición trae la cookie `cogni_auth_flow=google` (fijada por `signInWithGoogleAction`, §4.1; la comparación exige el nombre exacto de la cookie, `isGoogleAuthFlow`), y a `/login?error=link` (enlace inválido o vencido) en cualquier otro caso. Toda respuesta borra la cookie (`path=/auth/callback`, `maxAge` 0) (`src/app/auth/callback/route.ts`). |
 
 ### Límites de tasa
 
@@ -1064,8 +1464,29 @@ Upstash Ratelimit con ventana fija de un día por usuario (`src/modules/ai/infra
 
 | Límite | Variable (por defecto) | Clave en Redis | Se consume | Al agotarse |
 |---|---|---|---|---|
-| Generaciones de IA | `AI_DAILY_GENERATIONS` (6) | `{REDIS_KEY_PREFIX}:ai:gen` | Una unidad por "Generar" (Fase 3); recordación activa la consume solo tras guardar las preguntas | `AI_DAILY_LIMIT_REACHED` con `resetAt` |
+| Generaciones de IA | `AI_DAILY_GENERATIONS` (6) | `{REDIS_KEY_PREFIX}:ai:gen` | Una unidad por "Generar" de flashcards o exámenes (antes de llamar al modelo y después de descartar páginas vacías o sin contenido nuevo); recordación activa la consume solo tras guardar las preguntas; la repetición de un examen, solo cuando se creó con llamada a la IA. La retroalimentación de sesión de flashcards y exámenes solo consulta el límite (`peek`) y nunca lo consume | `AI_DAILY_LIMIT_REACHED` con `resetAt`; la retroalimentación queda `failed` |
 | Evaluaciones de recordación activa | `AI_DAILY_EVALUATIONS` (60) | `{REDIS_KEY_PREFIX}:ai:eval` | Una unidad por respuesta evaluada por el modelo, solo si queda `done` (Fase 6); las respuestas saltadas no consumen | La respuesta queda `failed` con `code: "AI_DAILY_LIMIT_REACHED"` y `resetAt`; "Reintentar" la evalúa tras la renovación |
+
+
+### Variables de entorno del contrato
+
+Validadas con Zod al arrancar (`src/shared/config/env.schema.ts`); una cadena vacía cuenta como ausente. Solo se listan las que usan los puntos de entrada de esta sección.
+
+| Variable | Valor (por defecto) | Uso |
+|---|---|---|
+| `DATABASE_URL` | URL obligatoria | Conexión de servidor (pooler de Supabase) de todas las Server Actions y Route Handlers. |
+| `CRON_SECRET` | Texto obligatorio de al menos 32 caracteres | Portador de `/api/keep-alive` y `/api/recompute-mastery`. |
+| `SUPABASE_STORAGE_BUCKET`, `SUPABASE_PDF_BUCKET` | Texto obligatorio | Nombres de los buckets de imágenes (`page-assets`) y de PDF importados (`page-pdfs`). |
+| `SUPABASE_SERVICE_ROLE_KEY` | Texto obligatorio | Operaciones de Storage del servidor (URLs firmadas, metadatos). |
+| `AI_PROVIDER_MODE` | `live` o `fake` (`live`) | `fake` (CI y e2e) usa un proveedor simulado y límites en memoria. |
+| `GOOGLE_GENERATIVE_AI_API_KEY`, `GROQ_API_KEY`, `CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_API_TOKEN`, `OPENROUTER_API_KEY` | Opcionales | Claves de los cuatro proveedores de IA; en modo `live` se exige al menos una de Google, OpenRouter o el par de Cloudflare (que va completo o no va). |
+| `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | Opcionales; obligatorias en modo `live` | Límites de tasa diarios (Upstash Ratelimit). |
+| `REDIS_KEY_PREFIX` | Texto (`cogni:dev`) | Prefijo de las claves de los límites. |
+| `AI_DAILY_GENERATIONS` | Entero positivo (6) | Generaciones diarias por usuario. |
+| `AI_DAILY_EVALUATIONS` | Entero positivo (60) | Evaluaciones diarias de recordación activa por usuario. |
+| `AI_PAGE_TOKEN_CAP` | Entero positivo (12000) | Tope de tokens del texto de página enviado en una generación; lo excedente se trunca (`truncated`, `wordsUsed`, `wordsTotal`). |
+| `NEXT_PUBLIC_SITE_URL` | URL obligatoria | Base de `redirectTo` de los flujos de autenticación (`siteUrl()`). |
+| `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST` | Opcionales | Eventos de producto (`user_signed_up`, `user_signed_in`, `terms_accepted`, `generation_requested`, …). |
 
 ---
 
@@ -1085,6 +1506,40 @@ CREATE INDEX "page_assets_page_id_idx" ON "page_assets" USING btree ("page_id");
 CREATE INDEX "import_jobs_page_id_idx" ON "import_jobs" USING btree ("page_id");
 CREATE INDEX "import_jobs_owner_status_idx" ON "import_jobs" USING btree ("owner_id","status");
 
+-- Fase 3 — auditoría de IA por dueño y fecha, y por página
+CREATE INDEX "ai_generations_owner_created_idx" ON "ai_generations" USING btree ("owner_id","created_at");
+CREATE INDEX "ai_generations_page_id_idx" ON "ai_generations" USING btree ("page_id");
+
+-- Fase 3 — mazo de una página en orden, y tarjetas por dueño
+CREATE INDEX "flashcards_page_position_idx" ON "flashcards" USING btree ("page_id","position");
+CREATE INDEX "flashcards_owner_id_idx" ON "flashcards" USING btree ("owner_id");
+
+-- Fase 4 — ítems vencidos por dueño ("Hoy", calendario, conteos) e ítems de una página
+CREATE INDEX "study_items_owner_due_idx" ON "study_items" USING btree ("owner_id","due_at");
+CREATE INDEX "study_items_page_id_idx" ON "study_items" USING btree ("page_id");
+
+-- Fase 4 — historial de repasos por ítem y por dueño (dashboard, racha)
+CREATE INDEX "review_logs_item_reviewed_idx" ON "review_logs" USING btree ("item_id","reviewed_at");
+CREATE INDEX "review_logs_owner_reviewed_idx" ON "review_logs" USING btree ("owner_id","reviewed_at");
+
+-- Fase 4 — dominio, sesiones y retroalimentación por dueño
+CREATE INDEX "page_mastery_owner_id_idx" ON "page_mastery" USING btree ("owner_id");
+CREATE INDEX "flashcard_sessions_owner_started_idx" ON "flashcard_sessions" USING btree ("owner_id","started_at");
+CREATE INDEX "flashcard_sessions_page_id_idx" ON "flashcard_sessions" USING btree ("page_id");
+CREATE INDEX "session_feedback_owner_id_idx" ON "session_feedback" USING btree ("owner_id");
+
+-- Fase 5 — preguntas activas de una página y linajes
+CREATE INDEX "exam_questions_page_active_idx" ON "exam_questions" USING btree ("page_id","created_at") WHERE "exam_questions"."retired_at" is null;
+CREATE INDEX "exam_questions_root_id_idx" ON "exam_questions" USING btree ("root_id");
+CREATE INDEX "exam_questions_owner_id_idx" ON "exam_questions" USING btree ("owner_id");
+
+-- Fase 5 — sesiones de una página y del dueño, respuestas y estado de página
+CREATE INDEX "exam_sessions_page_finished_idx" ON "exam_sessions" USING btree ("page_id","finished_at");
+CREATE INDEX "exam_sessions_owner_started_idx" ON "exam_sessions" USING btree ("owner_id","started_at");
+CREATE INDEX "exam_answers_question_id_idx" ON "exam_answers" USING btree ("question_id");
+CREATE INDEX "exam_answers_owner_id_idx" ON "exam_answers" USING btree ("owner_id");
+CREATE INDEX "exam_page_state_owner_id_idx" ON "exam_page_state" USING btree ("owner_id");
+
 -- Fase 6 — preguntas activas de una página, en orden de creación
 CREATE INDEX "recall_questions_page_active_idx" ON "recall_questions" USING btree ("page_id","created_at") WHERE "recall_questions"."archived_at" is null;
 CREATE INDEX "recall_questions_owner_id_idx" ON "recall_questions" USING btree ("owner_id");
@@ -1102,7 +1557,7 @@ CREATE INDEX "recall_answers_owner_id_idx" ON "recall_answers" USING btree ("own
 CREATE INDEX "generation_fingerprints_owner_id_idx" ON "generation_fingerprints" USING btree ("owner_id");
 ```
 
-Fase 7 (sin índices nuevos): las lecturas de `scheduling` ("Hoy", calendario) y los conteos de ítems de `analytics` usan `study_items_owner_due_idx` (`owner_id`, `due_at`); el historial de repasos del dashboard y la racha usan `review_logs_owner_reviewed_idx` (`owner_id`, `reviewed_at`), ambos de `drizzle/0009_study_engine.sql`.
+Fase 7 (sin índices nuevos): las lecturas de `scheduling` ("Hoy", calendario) y los conteos de ítems de `analytics` usan `study_items_owner_due_idx` (`owner_id`, `due_at`); el historial de repasos del dashboard y la racha usan `review_logs_owner_reviewed_idx` (`owner_id`, `reviewed_at`), ambos de `drizzle/0009_study_engine.sql` (arriba).
 
 ```sql
 -- Idempotencia de subida: un mismo objeto de Storage se registra una sola vez
@@ -1111,6 +1566,19 @@ CONSTRAINT "import_jobs_storage_path_key" UNIQUE("storage_path")
 
 -- Estado cerrado de ImportJob sin pgEnum de Postgres
 CONSTRAINT "import_jobs_status_check" CHECK ("import_jobs"."status" in ('queued', 'processing', 'done', 'failed'))
+
+-- Fase 4 — un ítem por fuente, un dominio por página, una retroalimentación por sesión
+CONSTRAINT "study_items_kind_source_key" UNIQUE("kind","source_id")
+CONSTRAINT "page_mastery_page_id_key" UNIQUE("page_id")
+CONSTRAINT "session_feedback_session_key" UNIQUE("session_kind","session_id")
+
+-- Fase 5 — destino de las claves foráneas compuestas del linaje y de exam_answers
+CONSTRAINT "exam_questions_id_owner_page_key" UNIQUE("id","owner_id","page_id")
+CONSTRAINT "exam_questions_id_root_key" UNIQUE("id","root_id")
+-- Fase 5 — una respuesta por pregunta y un concepto por sesión; estado por página
+CONSTRAINT "exam_answers_pkey" PRIMARY KEY("session_id","question_id")
+CONSTRAINT "exam_answers_session_root_key" UNIQUE("session_id","root_id")
+"page_id" uuid PRIMARY KEY NOT NULL -- exam_page_state
 
 -- Fase 6 — destino de las claves foráneas compuestas de recall_answers
 CONSTRAINT "recall_questions_id_owner_key" UNIQUE("id","owner_id")
@@ -1121,6 +1589,8 @@ CONSTRAINT "recall_answers_session_question_key" UNIQUE("session_id","question_i
 CONSTRAINT "generation_fingerprints_pkey" PRIMARY KEY("page_id","owner_id","technique","fingerprint")
 ```
 
+Restricciones `CHECK` de las Fases 3 a 5 (texto completo en §2.4): `ai_generations_status_check`, `ai_generations_purpose_check`; `flashcards_origin_check`, `flashcards_front_not_blank`, `flashcards_back_not_blank`; `study_items_kind_check`, `study_items_easiness_min`, `study_items_counters_non_negative`, `study_items_last_quality_range`; `review_logs_quality_range`, `review_logs_session_kind_check`; `page_mastery_level_check`, `page_mastery_score_range`; `session_feedback_session_kind_check`, `session_feedback_status_check`; `exam_questions_origin_check`, `exam_questions_options_count`, `exam_questions_correct_index_range`, `exam_questions_stem_not_blank`, `exam_questions_concept_not_blank`, `exam_questions_lineage_check`; `exam_page_state_failed_root_ids_array`; `exam_sessions_requested_count_range`, `exam_sessions_retake_check`, `exam_sessions_result_check`, `exam_sessions_question_ids_check` (`0011`); `exam_answers_selected_index_range`.
+
 Restricciones `CHECK` de la Fase 6 (texto completo en §2.4): `recall_questions_origin_check`, `recall_questions_prompt_not_blank`, `recall_questions_rubric_shape`; `recall_sessions_evaluation_status_check`, `recall_sessions_finished_after_start`; `recall_answers_self_rating_range`, `recall_answers_ai_score_range`, `recall_answers_combined_quality_range`, `recall_answers_evaluation_check`; `generation_fingerprints_technique_check`, `generation_fingerprints_fingerprint_format`.
 
-Entre las 5 tablas de las Fases 0 a 2, ninguna declara una restricción `CHECK` adicional a `import_jobs_status_check`, y ninguna columna de esas 5 tablas es nula salvo las explícitamente marcadas como opcionales en el esquema (`profiles.display_name`, `profiles.onboarding_completed_at`, `notebooks.icon`/`color`/`archived_at`, `pages.archived_at`, `import_jobs.page_count`/`error`/`started_at`/`finished_at`). Las dos restricciones `UNIQUE` sobre `storage_path` son la base de la idempotencia de `registerPageAsset` (`onConflictDoUpdate`) y de `DrizzleImportJobRepository.create()` (que traduce su violación en `IMPORT_JOB_STORAGE_PATH_CONFLICT`).
+Entre las cinco tablas de las Fases 0 a 2, ninguna declara una restricción `CHECK` adicional a `import_jobs_status_check`, y ninguna columna de esas cinco tablas es nula salvo las explícitamente marcadas como opcionales en el esquema (`profiles.display_name`, `profiles.onboarding_completed_at`, `profiles.terms_accepted_version`/`terms_accepted_at` (migración `0008`), `notebooks.icon`/`color`/`archived_at`, `pages.archived_at`, `import_jobs.page_count`/`error`/`started_at`/`finished_at`). Las dos restricciones `UNIQUE` sobre `storage_path` son la base de la idempotencia de `registerPageAsset` (`onConflictDoUpdate`) y de `DrizzleImportJobRepository.create()` (que traduce su violación en `IMPORT_JOB_STORAGE_PATH_CONFLICT`).
