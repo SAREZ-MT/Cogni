@@ -1,21 +1,12 @@
 // Pure AST walk that materializes plain_text from a Tiptap document, with
 // no dependency on @tiptap/* or prosemirror-* (design.md, "plain_text como
-// recorrido puro de AST en notebooks/domain"). TiptapDoc/TiptapNode are the
-// only local shape this module needs; save-page-port.ts re-exports them so
-// the rest of the module shares one definition instead of duplicating it.
+// recorrido puro de AST en notebooks/domain"). TiptapDoc/TiptapNode are
+// defined once in shared/kernel/tiptap-doc.ts (editor/domain needs the same
+// shape for its SavePagePort) and re-exported here so every notebooks import
+// of them keeps working through this file.
+import type { TiptapDoc, TiptapNode } from "@/shared/kernel/tiptap-doc";
 
-export interface TiptapNode {
-  type: string;
-  content?: TiptapNode[];
-  text?: string;
-  attrs?: Record<string, unknown>;
-  marks?: Array<{ type: string; attrs?: Record<string, unknown> }>;
-}
-
-export interface TiptapDoc {
-  type: "doc";
-  content?: TiptapNode[];
-}
+export type { TiptapDoc, TiptapNode } from "@/shared/kernel/tiptap-doc";
 
 // Node types that never contribute text, regardless of their content
 // (design.md node table: "image, horizontalRule -> ninguna").

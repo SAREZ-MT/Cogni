@@ -79,7 +79,6 @@ export {
   type PageRepository,
   type PageText,
   type PageTextReader,
-  type SavePagePort,
   type StorageGateway,
   TITLE_MAX_LENGTH,
   type TiptapDoc,

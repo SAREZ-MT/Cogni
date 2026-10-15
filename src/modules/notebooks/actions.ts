@@ -217,10 +217,10 @@ export async function getHomeOverview(): Promise<HomeOverview> {
 
 // design.md, "notebooks como único puerto de persistencia hacia el
 // editor": saveContent/getCurrentContent below structurally satisfy
-// SavePagePort (Result-returning, never throwing on a domain error) so the
-// page route can pass them directly as the `Editor` component's `port`
-// prop, instead of the throw-on-error `unwrap()` pattern the other Server
-// Actions in this file use.
+// editor/domain's SavePagePort (Result-returning, never throwing on a
+// domain error) so the page route can pass them directly as the `Editor`
+// component's `port` prop, instead of the throw-on-error `unwrap()`
+// pattern the other Server Actions in this file use.
 
 // Saves a page's content through the atomic compare-and-swap of
 // SavePage/updateIfVersion (notebooks/application/save-page.ts). A stale

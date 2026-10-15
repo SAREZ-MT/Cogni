@@ -99,6 +99,10 @@ module.exports = {
     },
   ],
   options: {
+    // Type-only imports (`import type`) are erased by tsc, but they are still
+    // architectural dependencies: without this flag a domain file could
+    // import a type from another module and no rule would see it.
+    tsPreCompilationDeps: true,
     tsConfig: { fileName: "tsconfig.json" },
     doNotFollow: { path: "node_modules" },
   },
