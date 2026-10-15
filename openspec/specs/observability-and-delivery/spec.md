@@ -46,7 +46,7 @@ Sentry MUST estar configurado para cliente, servidor y un `global-error` raíz q
 
 ### Requirement: Analítica con eventos explícitos
 
-PostHog MUST inicializarse en cliente y servidor y MUST registrar únicamente eventos declarados. En la fase 0 los eventos son `user_signed_up` y `user_signed_in`. La autocaptura masiva MUST estar desactivada.
+PostHog MUST inicializarse en cliente y servidor y MUST registrar únicamente eventos declarados en el tipo `AnalyticsEvent` de `src/shared/observability/analytics.ts`. En la fase 0 los eventos eran `user_signed_up` y `user_signed_in`; a 2026-10-15 los eventos declarados son cinco: `user_signed_up`, `user_signed_in`, `pdf_imported` (Fase 2), `generation_requested` (generación con IA de flashcards, exámenes y recordación activa) y `terms_accepted` (aceptación de los términos de uso). Agregar un evento MUST ser una decisión de producto que actualice ese tipo y este requisito. La autocaptura masiva MUST estar desactivada.
 
 #### Scenario: Registro exitoso emite evento
 
@@ -222,13 +222,29 @@ El `matcher` del proxy (middleware) MUST anclar la exclusión de rutas de observ
 
 ### Requirement: Evento `user_signed_in` en el callback de OAuth
 
-El callback de Google OAuth MUST registrar el evento `user_signed_in` de PostHog tras establecer la sesión, con la misma disciplina de eventos declarados que `user_signed_up`.
+`/auth/callback` MUST registrar el evento `user_signed_in` de PostHog tras cualquier intercambio de código exitoso, sea del flujo de Google OAuth, de la verificación de correo o del restablecimiento de contraseña, con la misma disciplina de eventos declarados que `user_signed_up`. Un intercambio fallido o una petición sin código MUST NOT enviar ningún evento y MUST redirigir a `/login` con `error=google` solo si la petición trae la cookie de flujo de Google (`cogni_auth_flow`), y con `error=link` en cualquier otro caso. Toda respuesta del callback MUST borrar esa cookie. (Hasta 2026-10-14 el requisito solo cubría el callback de Google OAuth y todo fallo redirigía con `error=google`.)
 
 #### Scenario: Inicio de sesión con Google emite evento (unit)
 
 - GIVEN un callback de OAuth que establece sesión exitosamente
 - WHEN el flujo completa
 - THEN se envía exactamente un evento `user_signed_in`
+
+#### Scenario: Enlace de verificación o de restablecimiento emite evento (unit)
+
+- GIVEN un callback con el código de un enlace de verificación de correo o de restablecimiento de contraseña
+- WHEN el intercambio del código establece la sesión
+- THEN se envía exactamente un evento `user_signed_in`
+- AND el visitante se redirige al destino `next` saneado
+
+#### Scenario: Intercambio fallido enruta el error según el flujo (unit)
+
+- GIVEN un callback sin código o con un código que el intercambio rechaza
+- WHEN la petición trae la cookie `cogni_auth_flow` del flujo de Google
+- THEN el visitante se redirige a `/login?error=google`
+- AND sin esa cookie se redirige a `/login?error=link`
+- AND no se envía ningún evento `user_signed_in`
+- AND la respuesta borra la cookie `cogni_auth_flow`
 
 ### Requirement: Redirect del dominio apex
 

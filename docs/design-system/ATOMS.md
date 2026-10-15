@@ -1097,17 +1097,16 @@ banner (shown while taking a real retake) gained a small muted link "Ver
 estado de error (vista previa)" pointing at that same flag, so the blocked
 state is reachable from the UI instead of only by hand-typing the URL.
 
-### Submit confirmation — `SubmitConfirmDialog`
+### Submit confirmation — `SubmitConfirmDialog` (removed)
 
-`ExamPlayer`'s "Entregar"/"Enviar examen" no longer submit directly: if any
-question is unanswered, a confirm `Dialog` opens first ("¿Entregar el
-examen?" / "Tienes {N} preguntas sin responder…", outline "Seguir
-respondiendo" + rose "Entregar igual"); with everything answered, it
-submits immediately as before. Built inline in `exam-player.tsx` with
-Cogni's `Dialog` atom (not a separate `shared/ui` file — it's a single
-call site with no reuse elsewhere, same reasoning as the plain-element
-buttons documented under Button above). `data-testid=
-"submit-confirm-dialog"`.
+**Removed on 2026-10-05** (commit `673fa79`, "take an exam and see its
+results on real data"); kept here as history. The design-preview
+`ExamPlayer` asked for confirmation before submitting with unanswered
+questions. The real player (`src/app/(app)/exams/_components/
+exam-player.tsx`) has no submit dialog: each answer is graded and locked
+as it is given, and "Ver resultados" appears only on the last question
+once every question is answered, so finishing is immediate. Do not
+reintroduce the dialog without a product decision.
 
 ## Dashboard v2 (2026-09-25, design/shell-look)
 
