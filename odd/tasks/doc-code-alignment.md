@@ -37,8 +37,8 @@ The technical docs are part of the thesis deliverable and the architecture rules
 - [x] T6b — pre-existing flaky e2e: `tests/e2e/dashboard.spec.ts` streak scenario failed whenever the runner's local date differs from the UTC date (fresh account adopts the browser zone, reviews are seeded on UTC days). Pin the spec's browser to `timezoneId: "UTC"`. Route: inline (one mechanical test file).
 
 ### Docs
-- [ ] T7 — §0 of the four documents: one consistent status note (Phases 0–7 implemented).
-- [ ] T8 — 01-SRS: Phases 3–5 RF/CU to Implemented; RF-EX-02/03/07, CU-08, CU-01 (+ openspec spec + route comment), terms gate, `/terminos`, RNF counts, §2.3/§2.4, Phase 7 nits (N2–N8).
+- [ ] T7 — §0 of the four documents: one consistent status note (Phases 0–7 implemented). Progress: 01-SRS §0 done (T8 commit); 02-SAD, 03-DATA-API, 04-ADR pending.
+- [x] T8 — 01-SRS: Phases 3–5 RF/CU to Implemented; RF-EX-02/03/07, CU-08, CU-01 (+ openspec spec + route comment), terms gate, `/terminos`, RNF counts, §2.3/§2.4, Phase 7 nits (N2–N8).
 - [ ] T9 — 02-SAD: module statuses, AI stack + Upstash, 20 tables, 10 rules, CSP, 2 crons, env vars, study-engine view (doc 271/389), resilience, PostHog 5 events, deps map, test counts, ADR prefixes.
 - [ ] T10 — 03-DATA-API: Phase 3–5 entities/SQL/FKs/enums, profiles terms columns, flashcards/exams actions, `/api/recompute-mastery`, env vars, NotebooksServerApi, Phase 7 nits.
 - [ ] T11 — 04-ADR: index statuses, ADR-002/003/004/007/008/009/010/011 updates, new items, distinct prefix vs `docs/adr/`.
@@ -63,6 +63,8 @@ The technical docs are part of the thesis deliverable and the architecture rules
 
 - RDD: three reviews approved and acknowledged — T1–T6 + editor README (lineage review-912dfd121634512f), T4b (review-3063fe28b4b082ea), T4c (review-83322ed54613e1f0); advisory findings of T4b fixed in T4c.
 - Full Playwright suite on fe35d5e (2026-10-14 ~22:05 -05): 73 passed, 1 failed (`dashboard.spec.ts:63` streak). The same spec also failed on main 1156274 at 03:4x UTC → pre-existing, time-zone dependent. T6b: with `timezoneId: "UTC"` the dashboard spec passes 2/2; biome and typecheck exit 0.
+
+- T8 (route: delegated, docs only; branch `docs/doc-code-alignment`): 01-SRS v1.1 rewritten against the code. §0 one status (Phases 0–7, PR ranges from `git log main`); §1.2/§1.3/§2.2 statuses; §2.4 renumbered to §2.3 with the 4 real providers and 2 crons; CU-01 (callback tracks `user_signed_in` on every success + `signInAction`, profile in `(app)/layout.tsx`, terms gate, time zone, `cogni_auth_flow` error split); new RF-ID-09 (terms gate); CU-05 (startPdfImport creates the page); CU-06/07/08 and RF-AI/SE/FC/EX to Implemented (MAX_ATTEMPTS=2, breaker 3/10 min, prompts vN, N 10–30, q=4 only if due, no submit dialog, retake order/fill/clear/pre-AI refusals); RF-SC-01 oldest first; RF-AN-05 shared thresholds; CU-10/11 preconditions and delta wording; RNF-S-02 (20 tables RLS), S-04 (`/terminos` open path), S-06 (both crons), M-02 (12 rules + tsPreCompilationDeps), M-03 (12/14 down), M-05 (456 vitest files = 411 src + 5 tests/proxy|identity + 40 tests/db; 31 e2e specs), F-01 (two crons); matrix updated. Check: `rg -n -i "roadmap|esqueleto|vista previa|no implementad|pendiente"` → only legitimate hits (see commit). Note: `docs/design-system/ATOMS.md` §"Submit confirmation — SubmitConfirmDialog" (~L1100) still describes the removed dialog (removed in 673fa79); out of T8 surface.
 
 ## Next step
 Ask the user before push and PR; then the docs tasks T7–T11 on their own branch.
