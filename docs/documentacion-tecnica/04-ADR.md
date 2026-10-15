@@ -114,7 +114,7 @@ Cogni es un producto individual (no colaborativo: `docs/documento-maestro.md` §
 
 **Mitigación**
 
-Sin mitigación por ahora — `docs/documento-maestro.md` §1.2 marca este tipo de ajuste como fuera de alcance salvo por un ADR futuro.
+Sin mitigación por ahora — el documento maestro no planifica este tipo de ajuste, y cualquier cambio requeriría un ADR futuro.
 
 ---
 
@@ -283,11 +283,11 @@ function createDb() {
 
 ### Estado
 
-Aceptado.
+Aceptado — implementado.
 
 ### Contexto
 
-RF-ID-01 a RF-ID-07 exigen registro con correo y contraseña, Google OAuth, verificación de correo y recuperación de contraseña; RNF-S-04 exige redirigir a `/login` cualquier solicitud sin sesión activa. El documento maestro (§9) cierra Supabase Auth como mecanismo de identidad antes de escribir código, dentro del mismo proveedor gratuito ya elegido para Postgres y Storage (ADR-004). Comparación retrospectiva elaborada para este registro a partir del documento maestro y del código.
+RF-ID-01 a RF-ID-07 exigen registro con correo y contraseña, Google OAuth, verificación de correo y recuperación de contraseña; RNF-S-04 exige redirigir a `/login` cualquier solicitud sin sesión activa, salvo las rutas de autenticación, el callback de autenticación, las rutas abiertas y las que se autentican por su cuenta. El documento maestro (§9) cierra Supabase Auth como mecanismo de identidad antes de escribir código, dentro del mismo proveedor gratuito ya elegido para Postgres y Storage (ADR-004). Comparación retrospectiva elaborada para este registro a partir del documento maestro y del código.
 
 ### Opciones consideradas
 
@@ -304,7 +304,7 @@ RF-ID-01 a RF-ID-07 exigen registro con correo y contraseña, Google OAuth, veri
 ### Justificación
 
 - Supabase Auth expone `auth.uid()` de forma nativa a las políticas RLS de Storage (`drizzle/0004_page_assets_storage.sql`, `drizzle/0006_page_pdfs_storage.sql`), evitando sincronizar manualmente un identificador de sesión hacia Postgres.
-- `@supabase/ssr` resuelve la sesión por cookies en `src/proxy.ts` (`updateSession`), que redirige a `/login` a cualquier visitante sin sesión fuera de las rutas de autenticación (RNF-S-04), como defensa perimetral única.
+- `@supabase/ssr` resuelve la sesión por cookies en `src/proxy.ts` (`updateSession`), que redirige a `/login` a cualquier visitante sin sesión salvo en las rutas de autenticación, el callback de autenticación, las rutas abiertas (`/terminos`) y las que se autentican por su cuenta, como los pings de cron y los reportes de errores (RNF-S-04), como defensa perimetral única.
 - `src/app/(app)/layout.tsx` vuelve a llamar `getCurrentUser()` como "defensa en profundidad" (comentario del código), aceptando redundancia deliberada sobre un único punto de fallo.
 - **vs. NextAuth.js/Auth.js:** exigiría mantener un adaptador de base de datos propio y replicar el identificador de usuario hacia Postgres para que las políticas RLS de Storage lo reconocieran, trabajo que Supabase Auth resuelve de forma nativa.
 - **vs. identidad construida a mano:** implicaría implementar y mantener el flujo OAuth de Google, el *hashing* de contraseñas y la expiración de sesiones sin un proveedor gestionado, un costo no justificado para un equipo de una persona.
@@ -329,7 +329,7 @@ El puerto `AuthGateway` (`src/modules/identity/domain/auth-gateway.ts`) aísla e
 
 ### Estado
 
-Aceptado.
+Aceptado — implementado.
 
 ### Contexto
 
@@ -341,7 +341,7 @@ RF-ED-01 a RF-ED-07 exigen un editor de bloques con autoguardado, menú `/`, bar
 |---|---|---|---|---|
 | A. BlockNote | La plantilla con experiencia estilo Notion completa (menú `/`, manejador de arrastre) es de pago | Alta lista para usar, pero limitada a lo que la plantilla expone | Ninguna ganancia sobre Tiptap: BlockNote está construido sobre Tiptap/ProseMirror | Alta para el caso genérico, pero cerrada a la plantilla |
 | B. ProseMirror puro (sin Tiptap) | Gratuito | Ninguna: cada bloque (tablas, callouts, resaltado) se construiría desde cero | Total, a costa de reescribir el sistema de extensiones y esquema que Tiptap ya resuelve | Ninguna: ProseMirror es de bajo nivel, sin catálogo de extensiones oficiales |
-| C. Tiptap (headless sobre ProseMirror, elegida) | Extensiones oficiales de código abierto (`@tiptap/extension-*`), sin plantilla de pago | Alta: encabezados, listas, tablas, código con resaltado, callouts, imágenes, menú `/`, barra contextual y manejador de arrastre, todos en `package.json` | Confinable: regla `editor-tiptap-only-in-ui` de `.dependency-cruiser.cjs` | Alta: extensiones oficiales mantenidas activamente |
+| C. Tiptap (headless sobre ProseMirror, elegida) | Extensiones oficiales de código abierto (`@tiptap/extension-*`), sin plantilla de pago | Alta: encabezados, listas, tablas, código con resaltado, menú `/`, barra contextual y manejador de arrastre como extensiones oficiales en `package.json`; callouts e imágenes como nodos propios en `src/modules/editor/ui/tiptap/` | Confinable: regla `editor-tiptap-only-in-ui` de `.dependency-cruiser.cjs` | Alta: extensiones oficiales mantenidas activamente |
 
 ### Decisión
 
@@ -375,7 +375,7 @@ RF-ED-01 a RF-ED-07 exigen un editor de bloques con autoguardado, menú `/`, bar
 
 ### Estado
 
-Aceptado — implementado en la Fase 4 (PR #71–#77). Actualización (2026-10-15): `applySm2` (`src/modules/study-engine/domain/sm2.ts`) y `computeMastery` (`src/modules/study-engine/domain/mastery.ts`) son funciones puras con pruebas unitarias (`sm2.test.ts`, `mastery.test.ts`); el estado vive en las tablas `study_items`, `review_logs` y `page_mastery` (migración `drizzle/0009_study_engine.sql`), y el dominio de cada página se recalcula a diario en `/api/recompute-mastery`. Las decisiones de implementación están en `docs/adr/0005`; `docs/adr/0006` (exámenes), `docs/adr/0007` (calidad combinada de recordación activa) y `docs/adr/0008` (calendario con solo el próximo vencimiento) las precisan. Los umbrales de dominio (0,35 / 0,7) tienen una única fuente en `src/shared/kernel/mastery-thresholds.ts`.
+Aceptado — implementado en la Fase 4 (PR #71–#77). Actualización (2026-10-15): `applySm2` (`src/modules/study-engine/domain/sm2.ts`) y `computeMastery` (`src/modules/study-engine/domain/mastery.ts`) son funciones puras con pruebas unitarias (`sm2.test.ts`, `mastery.test.ts`); el estado vive en las tablas `study_items`, `review_logs` y `page_mastery` (migración `drizzle/0009_study_engine.sql`), y el dominio de cada página se recalcula en cada calificación y una vez al día en `/api/recompute-mastery`. Las decisiones de implementación están en `docs/adr/0005`; `docs/adr/0006` (exámenes), `docs/adr/0007` (calidad combinada de recordación activa) y `docs/adr/0008` (calendario con solo el próximo vencimiento) las precisan. Los umbrales de dominio (0,35 / 0,7) tienen una única fuente en `src/shared/kernel/mastery-thresholds.ts`.
 
 ### Contexto
 
@@ -386,7 +386,7 @@ Al registrar la decisión (2026-09-25), `src/modules/study-engine` era un esquel
 | Opción | Granularidad de repaso | Simplicidad para TDD 100 % (Fase 4, §4.4) | Evidencia citada (§2 documento maestro) | Compatible con 3 técnicas bajo un motor único |
 |---|---|---|---|---|
 | A. SM-2 por página completa (un único estado agregado) | Baja: toda la página se repasa junta aunque solo un ítem esté vencido | Alta simplicidad algorítmica, pero pierde la señal de qué ítem falló | Wozniak (1987) sigue aplicando, pero ignora la recuperación por ítem individual | Difícil: mezclar la calidad de flashcards, exámenes y recordación activa en un solo estado por página pierde la señal de qué técnica falló |
-| B. Motor FSRS en vez de SM-2 | Alta (por ítem, como C) | Menor: FSRS tiene más parámetros y mayor superficie de prueba que SM-2 | El documento maestro cita a Wozniak (1987) como base ya evaluada; FSRS se menciona solo como evaluación futura "a futuro por ADR" | Sí, pero no evaluado ni implementado en ningún código o especificación actual |
+| B. Motor FSRS en vez de SM-2 | Alta (por ítem, como C) | Menor: FSRS tiene más parámetros y mayor superficie de prueba que SM-2 | El documento maestro cita a Wozniak (1987) como base ya evaluada; FSRS se menciona solo como evolución futura ("FSRS se evalúa como evolución en un ADR posterior.", §2, tabla de fundamentos) | Sí, pero no evaluado ni implementado en ningún código o especificación actual |
 | C. SM-2 por ítem, dominio derivado por página (elegida) | Alta: cada flashcard/pregunta tiene su propio estado (`n`, `EF`, `due_at`) | Alta: fórmulas cerradas y deterministas (§7.1) | Wozniak (1987) citado explícitamente | Sí: `study-engine` es agnóstico de técnica por diseño (regla `study-engine-knows-no-technique`), cada técnica solo mapea su resultado a una calidad `q` 0–5 |
 
 ### Decisión
@@ -399,7 +399,7 @@ Al registrar la decisión (2026-09-25), `src/modules/study-engine` era un esquel
 - El nivel de dominio derivado (RF-SE-02) reutiliza la página como unidad de estudio (ADR-001) sin introducir una segunda jerarquía de agregación.
 - `study-engine` es agnóstico de técnica por diseño (RF-SE-04, regla `study-engine-knows-no-technique` de `.dependency-cruiser.cjs`, activa en CI desde antes de que el módulo tuviera código), lo que exige un modelo de ítem uniforme (calidad `q` 0–5) independiente de la técnica de origen.
 - **vs. SM-2 por página completa:** perdería la posibilidad de saber qué ítem concreto necesita repaso dentro de una página con muchos ítems, y complicaría mezclar la calidad de tres técnicas distintas en un único estado.
-- **vs. FSRS:** el documento maestro cita a Wozniak (1987, SM-2) como base científica ya evaluada y reserva FSRS como evaluación futura explícita ("FSRS evaluado a futuro por ADR", §2); adoptarlo ahora añadiría parámetros y superficie de prueba sin evidencia de que mejore el resultado para un producto todavía sin usuarios.
+- **vs. FSRS:** el documento maestro cita a Wozniak (1987, SM-2) como base científica ya evaluada y reserva FSRS como evaluación futura explícita ("FSRS se evalúa como evolución en un ADR posterior.", §2, tabla de fundamentos); adoptarlo ahora añadiría parámetros y superficie de prueba sin evidencia de que mejore el resultado para un producto todavía sin usuarios.
 
 ### Consecuencias
 
@@ -486,7 +486,7 @@ Aceptado — implementado. Actualización (2026-10-15), precisada por `docs/adr/
 
 ### Contexto
 
-Cogni opera con presupuesto de infraestructura cercano a cero (`docs/documento-maestro.md` §4.2) y una sola persona disponible para operar cualquier servicio adicional. Dos necesidades de trabajo en segundo plano son reales hoy: procesar una importación de PDF que puede tardar más que una petición HTTP típica (RF-IN-04, tope de 120 segundos) y mantener vivo el proyecto gratuito de Supabase, que se pausa tras aproximadamente 7 días de inactividad (RNF-F-01). `src/modules/ingestion/README.md` documenta explícitamente que no existe un *worker* separado para la primera necesidad. Comparación retrospectiva elaborada para este registro a partir del documento maestro y del código.
+Cogni opera con presupuesto de infraestructura cercano a cero (`docs/documento-maestro.md` §4.2) y una sola persona disponible para operar cualquier servicio adicional. Al decidir, dos necesidades de trabajo en segundo plano eran reales (hoy son cuatro, con el recálculo diario del dominio y la evaluación de recordación activa; ver el Estado): procesar una importación de PDF que puede tardar más que una petición HTTP típica (RF-IN-04, tope de 120 segundos) y mantener vivo el proyecto gratuito de Supabase, que se pausa tras aproximadamente 7 días de inactividad (RNF-F-01). `src/modules/ingestion/README.md` documenta explícitamente que no existe un *worker* separado para la primera necesidad. Comparación retrospectiva elaborada para este registro a partir del documento maestro y del código.
 
 ### Opciones consideradas
 
