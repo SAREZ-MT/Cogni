@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  CONSOLIDATING_THRESHOLD,
+  MASTERED_THRESHOLD,
+} from "@/shared/kernel/mastery-thresholds";
+import {
   MASTERY_LEVEL_LABEL,
   MASTERY_LEVEL_SOLID_CLASS,
   MASTERY_LEVELS,
@@ -21,6 +25,15 @@ describe("masteryLevelFromScore (documento-maestro §7.3)", () => {
     [1, "dominado"],
   ] as const)("maps score %s to %s", (score, level) => {
     expect(masteryLevelFromScore(score, 10)).toBe(level);
+  });
+});
+
+describe("masteryLevelFromScore thresholds", () => {
+  it("switches band exactly at the shared kernel thresholds", () => {
+    expect(masteryLevelFromScore(CONSOLIDATING_THRESHOLD, 10)).toBe(
+      "consolidando",
+    );
+    expect(masteryLevelFromScore(MASTERED_THRESHOLD, 10)).toBe("dominado");
   });
 });
 

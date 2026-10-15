@@ -30,7 +30,7 @@ The technical docs are part of the thesis deliverable and the architecture rules
 - [x] T2 — `src/modules/identity/proxy.ts` light public entry re-exporting `updateSession`; `src/proxy.ts` imports it; new depcruise rule `proxy-via-public-entry`. Route: delegated.
 - [x] T3 — remove `shared/redis` from `upstash-only-in-ai-infra` (`pathNot` + comment). Route: delegated (same writer, mechanical).
 - [ ] T4 — `/auth/callback`: a failed exchange no longer always lands on `/login?error=google`; pick the error by flow (Google vs email/reset link) and show matching copy. Test-first on the route + login page. Route: delegated.
-- [ ] T5 — single source for mastery thresholds (0.35 / 0.7): move to `src/shared/kernel`; `study-engine/domain/mastery.ts` and `src/shared/ui/mastery-level.ts` import them. Route: delegated.
+- [x] T5 — single source for mastery thresholds (0.35 / 0.7): move to `src/shared/kernel`; `study-engine/domain/mastery.ts` and `src/shared/ui/mastery-level.ts` import them. Route: delegated.
 - [ ] T6 — `analytics/application/get-calibration.ts` must not reach `active-recall` Server Actions through its index; expose `calibrationOf` from a domain-only path allowed by the rules. Route: delegated.
 
 ### Docs
@@ -51,6 +51,7 @@ The technical docs are part of the thesis deliverable and the architecture rules
 - T1 (route: delegated): RED — with `tsPreCompilationDeps: true` on the old code, `pnpm depcruise` → `error domain-is-pure: src/modules/editor/domain/save-page-port.ts → src/modules/notebooks/index.ts` (1 violation). GREEN — typecheck 0 errors; biome ci clean (1159 files); depcruise 0 violations (1142 modules); vitest 415 files / 3824 tests passed. Commit: see `git log` (T1 commit `build(depcruise)`).
 - T2 (route: delegated): RED — new rule with the old `src/proxy.ts` import → `error proxy-via-public-entry: src/proxy.ts → src/modules/identity/infrastructure/supabase-proxy-client.ts`. GREEN — typecheck 0 errors; biome ci clean (1160 files); depcruise 0 violations; vitest 415 files / 3824 tests passed (tests/proxy mocks of the infra path still apply through the re-export, left unchanged). Commit: `refactor(identity)` (see `git log`).
 - T3 (route: delegated): config-only, no meaningful RED (`src/shared/redis` does not exist; the only `@upstash` importers are in `src/modules/ai/infrastructure/`). GREEN — typecheck 0 errors; biome ci clean; depcruise 0 violations; vitest 415 files / 3824 tests passed. Commit: `build(depcruise)` upstash rule (see `git log`).
+- T5 (route: delegated): RED — new threshold tests in `mastery-level.test.ts` and `mastery.test.ts` failed with `Failed to resolve import "@/shared/kernel/mastery-thresholds"`. GREEN — both files 24/24; typecheck 0 errors; biome ci clean (1161 files); depcruise 0 violations (no rule restricts shared/ui → shared/kernel); vitest 415 files / 3826 tests passed. Commit: `refactor(mastery)` (see `git log`).
 
 ## Next step
 T1–T3 (verified viable in a scratch copy: depcruise 0 violations, tsc 0 errors, 1265 tests passing).
