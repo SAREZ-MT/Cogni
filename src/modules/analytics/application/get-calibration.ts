@@ -1,4 +1,7 @@
-import { type Calibration, calibrationOf } from "@/modules/active-recall";
+import {
+  type Calibration,
+  calibrationOf,
+} from "@/modules/active-recall/calibration";
 import {
   type CalibratedAnswer,
   type CalibrationRollup,

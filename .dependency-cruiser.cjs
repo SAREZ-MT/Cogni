@@ -40,12 +40,23 @@ module.exports = {
     {
       name: "cross-module-via-index",
       comment:
-        "a module may only be imported through its public index.ts, never through internal paths.",
+        "a module may only be imported through its public index.ts, never through internal paths. The one other public entry is a domain-only calibration.ts (active-recall), kept pure by domain-entry-is-pure.",
       severity: "error",
       from: { path: "^src/modules/([^/]+)/" },
       to: {
         path: "^src/modules/[^/]+/.+",
-        pathNot: "^(src/modules/$1/|src/modules/[^/]+/index\\.ts$)",
+        pathNot:
+          "^(src/modules/$1/|src/modules/[^/]+/(index|calibration)\\.ts$)",
+      },
+    },
+    {
+      name: "domain-entry-is-pure",
+      comment:
+        "a domain-only public entry (calibration.ts at a module root) may only re-export its own domain or shared/kernel, so importing it never loads Server Actions, infrastructure or ui.",
+      severity: "error",
+      from: { path: "^src/modules/([^/]+)/calibration\\.ts$" },
+      to: {
+        pathNot: "^(src/modules/$1/domain/|src/shared/kernel/)",
       },
     },
     {
