@@ -9,8 +9,17 @@ derivan en cada lectura).
 
 ## Estado
 
-Fase 7, T3: dominio, lectores, casos de uso, API de servidor y acciones.
-Desde la T4 la ruta `/dashboard` lee sus datos de este módulo.
+Fase 7 (cerrada, ADR 0008): dominio, lectores, casos de uso, API de servidor
+y acciones (T3); la ruta `/dashboard` lee sus datos de este módulo (T4), sin
+datos de muestra ni barrera de vista previa.
+
+Decisiones del usuario sobre el dashboard (2026-10-13 y 2026-10-14, ver ADR
+0008): sin sección de conceptos; solo "Racha de repasos" muestra variación
+(contra `overall.streakDaysWeekAgo`); "Ítems vencidos", "Páginas dominadas" y
+"Dominio global" muestran solo el valor actual; la tendencia semanal se
+calcula aquí pero el dashboard no la muestra (la ruta pide 1 semana); la zona
+de calibración de cada página es su señal más frecuente, con empates a favor
+de la descalibrada (`calibrationZoneOf` en `src/app/(app)/dashboard/_lib`).
 
 ## Decisiones (feature `phase-7-calendar-dashboard`, 2026-10-12)
 

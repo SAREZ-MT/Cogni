@@ -9,13 +9,14 @@
 
 ---
 
-## 0. Nota de estado actual (2026-09-25, actualizada el 2026-10-10 para la Fase 6)
+## 0. Nota de estado actual (2026-09-25, actualizada el 2026-10-10 para la Fase 6 y el 2026-10-14 para la Fase 7)
 
 - Fase 0 (Cimientos) y Fase 1 (Cuadernos y editor) están desplegadas en producción; sus módulos (`identity`, `notebooks`, `editor`) son los únicos, junto con `ingestion`, con capas hexagonales reales.
 - Fase 2 (Importación de PDF) se implementó bajo Organic Driven Development (ODD) el 2026-09-23; `src/modules/ingestion` es el módulo más completo del código base y respalda la única vista de código C4 Nivel 4 con implementación real de este documento.
 - Fase 3 (Capa de IA) está implementada (registro de proveedores, rotación por cuota, circuit breaker, límite por usuario y generación de flashcards; ADR 0004 en `docs/adr/`). Esta nota de estado y el resto del documento aún no se han revisado completo contra ese código: hasta entonces, el contenido de este documento sobre proveedores de IA, rotación por cuota y rate limiting es especificación de `docs/documento-maestro.md`, marcada explícitamente Roadmap.
 - Las Fases 4 a 7 (`study-engine`, `flashcards`, `exams`, `active-recall`, `scheduling`, `analytics`) son esqueletos vacíos (`index.ts` con `export {};` y un `README.md`) en este código base. Cuatro de ellas tienen una versión de diseño visual con datos de muestra en la rama `design/shell-look`, no integrada a `main`; este documento describe la arquitectura de `main`, no la de esa rama.
 - Fase 6 (Recordación activa) está implementada (2026-10-08; decisiones en `docs/adr/0007-recordacion-activa-y-generacion-incremental.md`): `src/modules/active-recall` tiene dominio, aplicación, infraestructura y Server Actions, y el flujo 4 de la sección 10 (§10.4) describe la secuencia implementada. Las Fases 3 a 5 también están implementadas (ADR 0004, 0005 y 0006), pero las secciones 2 a 7 y los flujos 2 y 3 de la sección 10 todavía no se han revisado contra ese código; esa actualización queda pendiente.
+- Fase 7 (Calendario y dashboard) está implementada (2026-10-14; decisiones en `docs/adr/0008-calendario-y-dashboard.md`): `src/modules/scheduling` y `src/modules/analytics` tienen dominio, aplicación, infraestructura (lectores Drizzle de solo lectura), API de servidor y Server Actions, sin tablas nuevas; el flujo 5 de la sección 10 (§10.5) describe la secuencia implementada y la sección 7 registra sus dependencias reales.
 - Fase 9 (Endurecimiento) está parcialmente cubierta: la Content Security Policy con nonce por petición, la redirección del dominio apex y la protección de sesión en `src/proxy.ts` existen; el resto (registro de logs externo, pruebas de carga, auditoría de accesibilidad) no se ha iniciado.
 - En este documento: las secciones 2 a 4 (vistas de contexto, contenedores y componentes), 5.1 y 5.3 (código de `ingestion`), 7, 9, el flujo 1 de la sección 10, 11, 12 y 13 describen arquitectura implementada y verificable contra el código. La parte de IA en las secciones 2 a 4, la sección 5.2 (código de `study-engine`), la subsección 8.10 y los flujos 2 a 4 de la sección 10 son especificación (Roadmap), tomada de `docs/documento-maestro.md`.
 
@@ -39,7 +40,7 @@ Este documento se actualiza a medida que avanza la construcción de Cogni; la no
 
 ### 1.1 Propósito
 
-Este documento describe la arquitectura de software de Cogni usando el modelo C4 (Contexto, Contenedores, Componentes y Código de Simon Brown), complementado con una vista de despliegue, una vista de módulos propia del monolito modular y cuatro flujos arquitectónicos clave. No se incluyen diagramas en formato Mermaid ni ningún otro código de diagrama: cada vista se describe como una tabla de elementos y una tabla o secuencia numerada de conexiones, con precisión suficiente para que un diagrama pueda construirse a partir de esa descripción con la herramienta `archify`. El documento cubre tanto la arquitectura implementada (identidad, cuadernos, editor, importación de PDF) como la especificada y pendiente de construir (capa de IA, motor de repetición espaciada, flashcards, exámenes, recordación activa, calendario y dashboard), marcando explícitamente el estado de cada elemento.
+Este documento describe la arquitectura de software de Cogni usando el modelo C4 (Contexto, Contenedores, Componentes y Código de Simon Brown), complementado con una vista de despliegue, una vista de módulos propia del monolito modular y cinco flujos arquitectónicos clave. No se incluyen diagramas en formato Mermaid ni ningún otro código de diagrama: cada vista se describe como una tabla de elementos y una tabla o secuencia numerada de conexiones, con precisión suficiente para que un diagrama pueda construirse a partir de esa descripción con la herramienta `archify`. El documento cubre tanto la arquitectura implementada (identidad, cuadernos, editor, importación de PDF) como la especificada y pendiente de construir (capa de IA, motor de repetición espaciada, flashcards, exámenes, recordación activa, calendario y dashboard), marcando explícitamente el estado de cada elemento.
 
 ### 1.2 Atributos de calidad priorizados
 
@@ -143,8 +144,8 @@ La aplicación web Cogni (el contenedor Next.js) se descompone en el proxy, el �
 | `flashcards` | Tarjetas de estudio, sesiones de repaso con SM-2, retroalimentación. | — | Roadmap (esqueleto; diseño visual en rama no integrada) |
 | `exams` | Preguntas de opción múltiple, sesiones de examen, corrección, repetición con variantes. | — | Roadmap (esqueleto; diseño visual en rama no integrada) |
 | `active-recall` | Preguntas abiertas, sesiones de respuesta, evaluación combinada IA + autoevaluación. | — | Implementado (Fase 6; ver §10.4) |
-| `scheduling` | Calendario y vista "Hoy" de repasos vencidos. | — | Roadmap (esqueleto) |
-| `analytics` | Dashboard de progreso, métricas por técnica, calibración metacognitiva. | — | Roadmap (esqueleto; diseño visual en rama no integrada) |
+| `scheduling` | Calendario y vista "Hoy" de repasos vencidos. | Drizzle (lectura) | Implementado (Fase 7; ver §10.5) |
+| `analytics` | Dashboard de progreso, métricas por técnica, calibración metacognitiva. | Drizzle (lectura), Recharts en la ruta | Implementado (Fase 7; ver §10.5) |
 | `shared/config` | Validación de variables de entorno (Zod), cabeceras de seguridad, patrones de imágenes remotas. | Zod | Implementado |
 | `shared/db` | Cliente único de Postgres (Drizzle + `postgres.js`) y el esquema de las 5 tablas reales. | Drizzle ORM | Implementado |
 | `shared/kernel` | Primitivas transversales: `Clock`, `DomainError`/`ActionError`, `createId` (UUID v7), tipo `Result`. | TypeScript puro | Implementado |
@@ -215,6 +216,8 @@ Esta vista se limita a dos módulos, ambos con especificación de código sufici
 2. `RecordReview` invoca `applySm2` sobre el `StudyItem` correspondiente y escribe un `ReviewLog`.
 3. `RecordReview` invoca `computeMastery` para recalcular el `PageMastery` de la página del ítem.
 4. `scheduling` y `analytics` invocan `GetDueItems` para leer vencimientos y niveles de dominio, sin calcular fechas por sí mismos (RF-SE-03, RF-SE-04, RF-AN-05).
+
+Nota de la Fase 7 (ADR 0008): `scheduling` y `analytics` no leen por un puerto de `study-engine`, que no ofrece lecturas por dueño y rango; cada uno tiene lectores Drizzle propios de solo lectura sobre `study_items`, `review_logs`, `page_mastery` y las tablas de respuestas de las técnicas (§10.5). La regla se mantiene: ninguno calcula vencimientos ni dominio ni escribe en esas tablas.
 
 ### 5.3 Detalle de interfaces y tipos clave
 
@@ -399,6 +402,8 @@ Los otros seis módulos (`ai`, `study-engine`, `flashcards`, `exams`, `active-re
 
 Actualización de la Fase 6: `active-recall` ya no es un esqueleto. Tiene `domain/`, `application/` e `infrastructure/`, y sus Server Actions viven en la raíz del módulo (`actions.ts`, `session-actions.ts`, `evaluation-actions.ts`, `hub-actions.ts`, más `evaluation-runner.ts`, que programa la evaluación con `after()`); no tiene `ui/`, porque sus pantallas viven en `src/app/(app)/active-recall`. La descripción de `ai`, `study-engine`, `flashcards`, `exams` y `scheduling`, implementados en las Fases 3 a 5, queda pendiente de actualizar.
 
+Actualización de la Fase 7: `scheduling` y `analytics` ya no son esqueletos. Cada uno tiene `domain/` (funciones puras de días locales, agrupación del calendario, racha, tasa de acierto, tendencia y calibración), `application/` (`listDueToday`, `listCalendarDays`; `getProgress`, `getTechniqueMetrics`, `getCalibration`) e `infrastructure/` (lectores Drizzle de solo lectura), y en la raíz `actions.ts` (Server Actions), `server-api.ts` y una lectura de servidor sin `"use server"` que recibe el instante con que pinta la página (`calendar-days.ts`, `dashboard-reads.ts`). No tienen `ui/`: sus pantallas viven en `src/app/(app)/calendario` y `src/app/(app)/dashboard`.
+
 ### 7.1 Estructura de directorios
 
 Recorte de `eza -T -L 2 src` (trimming: solo `page.tsx`/`layout.tsx`/`route.ts` significativos y los archivos de configuración de nivel raíz de `src`, sin repetir los `.test.ts` unitarios):
@@ -425,8 +430,8 @@ src
 │   ├── flashcards/                (index.ts, README.md — esqueleto)
 │   ├── exams/                    (index.ts, README.md — esqueleto)
 │   ├── active-recall/            (domain, application, infrastructure; Server Actions en la raíz)
-│   ├── scheduling/               (index.ts, README.md — esqueleto)
-│   └── analytics/                (index.ts, README.md — esqueleto)
+│   ├── scheduling/               (domain, application, infrastructure; Server Actions en la raíz)
+│   └── analytics/                (domain, application, infrastructure; Server Actions en la raíz)
 └── shared
     ├── config/       # env.schema.ts, env.server.ts, env.client.ts, security-headers.ts, image-remote-patterns.ts
     ├── db/           # client.ts, schema.ts
@@ -452,8 +457,8 @@ Especificado en `docs/documento-maestro.md` §5.2 (mapa de módulos completo, in
 | `flashcards` | `study-engine`, `ai`, `notebooks` | Roadmap |
 | `exams` | `study-engine`, `ai`, `notebooks` | Roadmap |
 | `active-recall` | `study-engine`, `ai`, `notebooks` | Implementada (Fase 6) |
-| `scheduling` | `study-engine`, `notebooks` | Roadmap |
-| `analytics` | `study-engine`, técnicas (solo lectura) | Roadmap |
+| `scheduling` | `study-engine`, `notebooks` | Implementada (Fase 7): `study-engine` (solo el tipo `StudyItemKind`) e `identity` (sesión); lee `pages` y `notebooks` con sus propios lectores, sin importar `notebooks` |
+| `analytics` | `study-engine`, técnicas (solo lectura) | Implementada (Fase 7): `study-engine` (tipos `MasteryLevel` y `SessionKind`), `active-recall` (`calibrationOf`) e `identity` (sesión); lee las tablas de las técnicas con sus propios lectores |
 
 Todos los módulos, reales o futuros, dependen además de `src/shared/kernel` (dominio puro compartido) y, fuera de la capa de dominio, de `src/shared/config`, `src/shared/db` y `src/shared/observability`. Ningún módulo importa a otro fuera de su `index.ts` público; la única excepción documentada a "un módulo no depende de otro módulo de técnica" es que `flashcards`, `exams` y `active-recall` dependerán de `study-engine`, nunca al revés (regla `study-engine-knows-no-technique`).
 
@@ -686,6 +691,30 @@ Resultados:
 10. La vista de resultados sondea `getRecallSessionResultsAction` con espera creciente (2,5 s × 1,5, tope de 20 s, 32 lecturas). Cuando todas las evaluaciones terminaron muestra la calidad combinada media, la calibración derivada (exceso o falta de confianza) y, por pregunta, el puntaje de la IA y su justificación. Si la sesión terminada sigue `pending` sin una corrida viva, el sondeo programa otra evaluación.
 11. "Reintentar" (`retryRecallEvaluationAction`) devuelve las respuestas `failed` a `pending` y vuelve a programar la evaluación; "No estoy de acuerdo" (`disagreeRecallAnswerAction`) guarda `disagreed = true` sin cambiar el puntaje.
 12. `/active-recall` y la vista por cuaderno leen `listRecallHubAction` (`DrizzleRecallHubReader`, dominio de página de `study-engine` con `createPageMasteryReader` y preguntas vencidas con `listDue`); la ruta `/resultados?sesion={id}` reabre una sesión terminada con `getRecallSessionReviewAction`.
+
+### 10.5 Calendario, "Hoy" y dashboard (lectura)
+
+> Diagrama a construir con archify a partir de esta descripción.
+
+**Implementado (Fase 7, 2026-10-14)** — `src/modules/scheduling` y `src/modules/analytics`, rutas `src/app/(app)/calendario`, `src/app/(app)/dashboard` y `src/app/(app)/configuracion`; decisiones en `docs/adr/0008-calendario-y-dashboard.md`; trazabilidad con CU-10, CU-11, RF-SC-01 a RF-SC-04, RF-AN-01 a RF-AN-05 y RF-ID-08.
+
+Zona horaria:
+
+1. El layout de `(app)` monta `TimeZoneDetection`, que muestra `TimeZoneAutoDetect` de `identity` solo mientras el perfil no tiene zona elegida (`profiles.timezone = 'UTC'`); envía la zona del navegador una vez con `adoptBrowserTimeZoneAction`, que solo escribe si el valor sigue en `UTC`. `/configuracion` guarda una elección explícita con `updateTimeZoneAction` (UTC se guarda como `Etc/UTC`).
+2. Cada página lee la zona con `getCurrentTimeZoneSetting()` de `identity` (ante un fallo de lectura, UTC) y toma un único instante `now` para todas sus lecturas, así "hoy" coincide en toda la página.
+
+Calendario:
+
+3. La pestaña "Hoy" llama a `listDueTodayAction`: `DrizzleDueTodayReader` agrupa `study_items` no suspendidos con `due_at <= now` por página (unida a `pages` y `notebooks`, sin archivados), con conteos por técnica y el vencimiento más antiguo; la ruta arma un chip por técnica con el enlace a su sesión. El inicio usa la misma lectura para la tarjeta "Repasos pendientes hoy" (`totalDueCount`).
+4. "Semana" y "Mes" (`?view=`, `?date=`) llaman a `getCalendarDays({ fromDay, toDay, timeZone, now })`: valida el rango (≤ 42 días) y `listCalendarDays` lee con `DrizzleDueInRangeReader` los ítems de una ventana UTC ampliada ±14 h (`listDueInRange`) y, si el rango contiene hoy, los vencidos anteriores contados por página y técnica en SQL (`listOverdueCounts`). `groupCalendarDays` los agrupa por día local y página en el dominio; lo vencido va a hoy y los días pasados quedan vacíos.
+
+Dashboard:
+
+5. `/dashboard?range=7|15|30` calcula `[fromDay, toDay)` en la zona del perfil y lanza en paralelo `getDashboardProgress`, `getDashboardTechniqueMetrics` y `getDashboardCalibration` (`dashboard-reads.ts`): sesión primero, entrada validada y errores como `ActionError` con códigos `ANALYTICS_*`, nunca excepciones.
+6. `getProgress` combina `DrizzlePageProgressReader` (páginas vivas con su fila de `page_mastery` y los conteos vivos de `study_items`, total y vencidos con `due_at <= now`) con la calidad semanal de `review_logs` (`DrizzleReviewHistoryReader`); `buildProgress` arma el progreso por página y cuaderno.
+7. `getTechniqueMetrics` lee `review_logs` del período y del anterior, los pares distintos (técnica, tramo UTC de 15 minutos) de todo el historial para la racha, y las respuestas de exámenes terminados y de recordación evaluadas (`DrizzleAnswerOutcomeReader`); el dominio calcula repasos por día, tasa de acierto, racha actual y la de hace 7 días.
+8. `getCalibration` clasifica cada respuesta de recordación evaluada del período con `calibrationOf` de `active-recall` y la agrega por página (`rollupCalibration`).
+9. La ruta mapea los tres resultados con la función pura `buildDashboardView` (zona de calibración por la señal más frecuente, variación solo en la racha) y pinta los componentes con los gráficos de `src/shared/ui/chart.tsx` (Recharts). Si alguna lectura falla muestra un aviso de error; sin datos, un estado vacío.
 
 ---
 

@@ -9,13 +9,14 @@
 
 ---
 
-## 0. Nota de estado actual (2026-09-25, actualizada el 2026-10-10 para la Fase 6)
+## 0. Nota de estado actual (2026-09-25, actualizada el 2026-10-10 para la Fase 6 y el 2026-10-14 para la Fase 7)
 
 - Fase 0 (Cimientos) y Fase 1 (Cuadernos y editor) están desplegadas en producción; sus tablas (`profiles`, `notebooks`, `pages`, `page_assets`) existen en el esquema real.
 - Fase 2 (Importación de PDF) fue implementada bajo Organic Driven Development (ODD) el 2026-09-23; la tabla `import_jobs` y el bucket `page-pdfs` son reales.
 - Fase 3 (Capa de IA) no ha iniciado: no existe la tabla `AiGeneration` ni ninguna dependencia `ai`/`@ai-sdk/*` en `package.json`.
 - Las Fases 4 a 7 (motor de repetición espaciada, flashcards, exámenes, recordación activa, calendario y dashboard) no tienen esquema ni migración en este código base; existen únicamente como especificación en `docs/documento-maestro.md` §6.1 y, para su interfaz visual, como diseño con datos de muestra en la rama `design/shell-look` no integrada a `main`.
 - Fase 6 (Recordación activa) está implementada (2026-10-08; decisiones en `docs/adr/0007-recordacion-activa-y-generacion-incremental.md`): las tablas `recall_questions`, `recall_sessions` y `recall_answers` (migración `0012_active_recall`) y la nueva tabla `generation_fingerprints` (migración `0013_generation_fingerprints`, generación incremental de las tres técnicas) se documentan contra su migración y su `schema.ts` (§1, §2.4, §2.5, §2.6 y §5), junto con las Server Actions de `active-recall` (§4.4) y los límites de tasa reales (§4). Con `GenerationFingerprint`, el modelo de dominio pasa de 19 a 20 entidades.
+- Fase 7 (Calendario y dashboard) está implementada (2026-10-14; decisiones en `docs/adr/0008-calendario-y-dashboard.md`) sin tablas ni migraciones nuevas: `scheduling` y `analytics` solo leen tablas existentes, y `profiles.timezone` pasa a usarse (§2.1). Se documentan las Server Actions de zona horaria de `identity` (§4.1), las de `scheduling` (§4.5) y las de `analytics` (§4.6), y los índices que usan sus lecturas (§5).
 - Las Fases 3 a 5 (IA, motor de repetición y flashcards, exámenes) también están implementadas, con migraciones `0007` a `0011`, pero sus entidades siguen descritas aquí como especificación Roadmap: su actualización contra el código queda pendiente.
 - En este documento: 5 tablas reales (`profiles`, `notebooks`, `pages`, `page_assets`, `import_jobs`) están completamente documentadas contra su migración y su `schema.ts`; las 14 entidades restantes del modelo de dominio (§6.1 del documento maestro) se documentan como especificación de datos, marcadas Roadmap, sin migración asociada. El contrato de API (§4) cubre únicamente Server Actions y Route Handlers que existen hoy en el código; no se documenta ningún endpoint de las fases roadmap.
 
@@ -494,6 +495,8 @@ alter table profiles
   foreign key (id) references auth.users(id) on delete cascade;
 ```
 
+Nota de la Fase 7 (ADR 0008): `timezone` guarda un nombre de zona IANA en su forma canónica. Sin migración, el valor por defecto `UTC` significa "nunca elegida" (`hasChosenTimeZone`) y una elección explícita de UTC se guarda como `Etc/UTC`. La detección del navegador escribe con `UPDATE … WHERE timezone = 'UTC'`, así nunca pisa una elección explícita.
+
 ### 2.2 `notebooks` — `notebooks`, `pages`, `page_assets` + bucket `page-assets`
 
 ```sql
@@ -905,6 +908,8 @@ Corresponden a CU-01 (Registro e inicio de sesión) y CU-02 (Recuperar contrase�
 | `requestPasswordResetAction` | `formData: FormData` (`email`) | `AuthFormState` | No requiere sesión | `AUTH_INVALID_INPUT`, `AUTH_PROVIDER_UNAVAILABLE` |
 | `updatePasswordAction` | `formData: FormData` (`password`) | `AuthFormState` o redirección a `/` | Requiere sesión de recuperación | `AUTH_INVALID_INPUT`, `AUTH_PROVIDER_UNAVAILABLE` |
 | `signInWithGoogleAction` | — | Redirección a Google OAuth o a `/login?error=google` | No requiere sesión | `AUTH_PROVIDER_UNAVAILABLE` (no se devuelve como valor; solo redirige) |
+| `updateTimeZoneAction` (Fase 7) | `_previous: TimeZoneFormState`, `formData: FormData` (`timeZone`, nombre IANA) | `TimeZoneFormState { status, message?, timeZone? }` (zona canónica guardada) | Requiere sesión | `PROFILE_INVALID_TIME_ZONE` (texto propio); cualquier otro fallo, texto genérico. No usa `credentialsSchema`; nunca lanza |
+| `adoptBrowserTimeZoneAction` (Fase 7) | `timeZone: string` | `{ ok: true; adopted: boolean }` o `{ ok: false }` | Requiere sesión | Silenciosa: solo guarda mientras el perfil sigue en `UTC`; nunca lanza |
 
 `signUpAction` trata la respuesta `outcome === "already_registered"` de Supabase (correo ya existente) como un caso de éxito con mensaje de error de dominio (`AUTH_COPY.alreadyRegistered`), no como un `DomainError`.
 
@@ -1023,6 +1028,29 @@ Corresponden a CU-09 y a RF-AR-01 a RF-AR-06 y RF-AI-03 (Fase 6, ADR 0007). Serv
 
 `finishRecallSessionAction` responde sin esperar a la IA: si la sesión queda `pending`, programa `evaluateRecallSession` con `after()` dentro de `maxDuration = 300` de la ruta de la sesión (ADR 0003). La evaluación no devuelve errores al cliente: cada respuesta queda `done` o `failed` con su registro crudo (§1, RecallAnswer); dentro de ese registro, `code` es `AI_GENERATION_FAILED`, `AI_DAILY_LIMIT_REACHED` o `RECALL_UNEXPECTED`. `getRecallSessionResultsAction` vuelve a programar una evaluación cuando la sesión terminada sigue `pending` y ninguna respuesta pendiente se guardó o reclamó dentro del plazo de 6 minutos. Los demás códigos de `RECALL_ERROR` (`RECALL_INVALID_QUESTION`, `RECALL_INVALID_SCORE`) son internos: una pregunta generada inválida se descarta y cuenta en `skipped`.
 
+### 4.5 `scheduling`
+
+Corresponden a CU-10 y a RF-SC-01 a RF-SC-04 (Fase 7, ADR 0008). Server Actions (`"use server"`) en `src/modules/scheduling/actions.ts`; sesión primero, nunca lanzan (un error inesperado va a Sentry como `SCHEDULING_UNEXPECTED`; los errores de control de Next.js se relanzan). Sin sesión responden `SCHEDULING_SESSION_REQUIRED`. Solo leen; no tienen límite de tasa.
+
+| Acción | Parámetros | Retorno | Errores propios |
+|---|---|---|---|
+| `listDueTodayAction` | — | `Result<DueTodayPageView[], ActionError>`: páginas con ítems no suspendidos y `due_at <= now` (sin páginas ni cuadernos archivados), con `due` por técnica y `earliestDueAt`, la que más esperó primero | — |
+| `listCalendarDaysAction` | `{ fromDay, toDay, timeZone }` (días ISO locales, `[fromDay, toDay)`) | `Result<CalendarDayPageView[], ActionError>`: por día local y página, los ítems cuyo próximo `due_at` cae ese día; lo vencido, en hoy | `SCHEDULING_INVALID_RANGE` (días no ISO, rango vacío o de más de 42 días, fuera de 1970-01-01 … 9998-12-31, o zona inválida) |
+
+Lecturas de servidor sin `"use server"`: `getCalendarDays({ fromDay, toDay, timeZone, now })` (`calendar-days.ts`), la misma lectura con el instante con que pinta `/calendario`; la acción usa siempre el reloj del sistema y nunca acepta uno del cliente. `createSchedulingServerApi({ db, clock? })` (`server-api.ts`) expone `listDueToday(ownerId)` y `listCalendarDays(ownerId, range)` para un dueño ya autenticado (lo usa el hub de exámenes).
+
+### 4.6 `analytics`
+
+Corresponden a CU-11 y a RF-AN-01 a RF-AN-05 (Fase 7, ADR 0008). Server Actions (`"use server"`) en `src/modules/analytics/actions.ts`, sobre las lecturas compartidas de `dashboard-reads.ts`: sesión primero ("Debes iniciar sesión para continuar.", `ANALYTICS_SESSION_REQUIRED`), luego la entrada, que no es de confianza (se lee dentro del camino protegido y se reduce a sus campos conocidos; nunca trae un reloj), y nunca lanzan (un error inesperado va a Sentry como `ANALYTICS_UNEXPECTED`, "No pudimos cargar tus métricas. Inténtalo de nuevo."). Solo leen; ninguna métrica se guarda.
+
+| Acción | Parámetros | Retorno | Errores propios |
+|---|---|---|---|
+| `getProgressAction` | `{ timeZone, weeks }` (`weeks` entero de 1 a 26) | `Result<ProgressView, ActionError>`: progreso por página (nivel, puntaje, ítems totales y vencidos, tendencia semanal de calidad) y por cuaderno | `ANALYTICS_INVALID_INPUT` ("El período o la zona horaria no son válidos.") |
+| `getTechniqueMetricsAction` | `{ fromDay, toDay, timeZone }` (rango no vacío de hasta 92 días) | `Result<TechniqueMetricsView, ActionError>`: por técnica, repasos completados, tasa de acierto del período y del anterior y racha; repasos por día; totales con `streakDays` y `streakDaysWeekAgo` | `ANALYTICS_INVALID_INPUT` |
+| `getCalibrationAction` | `{ fromDay, toDay, timeZone }` | `Result<CalibrationView, ActionError>`: por página, conteos de exceso, falta de confianza y calibradas, y promedios de autoevaluación y puntaje de IA | `ANALYTICS_INVALID_INPUT` |
+
+Lecturas de servidor sin `"use server"` (`dashboard-reads.ts`): `getDashboardProgress`, `getDashboardTechniqueMetrics` (ambas con el `now` con que pinta `/dashboard`) y `getDashboardCalibration`. `createAnalyticsServerApi({ db, clock? })` (`server-api.ts`) expone `getProgress`, `getTechniqueMetrics` y `getCalibration` para un dueño ya autenticado y un rango ya validado. Las definiciones de cada métrica están en ADR 0008.
+
 ### Route Handlers
 
 | Método | Ruta | Cuerpo | Respuesta | Auth | Descripción |
@@ -1073,6 +1101,8 @@ CREATE INDEX "recall_answers_owner_id_idx" ON "recall_answers" USING btree ("own
 -- Fase 6 — huellas por dueño (la clave primaria cubre la lectura por página y técnica)
 CREATE INDEX "generation_fingerprints_owner_id_idx" ON "generation_fingerprints" USING btree ("owner_id");
 ```
+
+Fase 7 (sin índices nuevos): las lecturas de `scheduling` ("Hoy", calendario) y los conteos de ítems de `analytics` usan `study_items_owner_due_idx` (`owner_id`, `due_at`); el historial de repasos del dashboard y la racha usan `review_logs_owner_reviewed_idx` (`owner_id`, `reviewed_at`), ambos de `drizzle/0009_study_engine.sql`.
 
 ```sql
 -- Idempotencia de subida: un mismo objeto de Storage se registra una sola vez

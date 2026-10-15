@@ -2,8 +2,9 @@
 
 | Campo | Valor |
 |---|---|
-| Versión del documento | 1.5.0 |
-| Fecha | 2026-09-14 (actualizado 2026-10-10) |
+| Versión del documento | 1.6.0 |
+| Fecha | 2026-09-14 (actualizado 2026-10-14) |
+| Cambios de la versión 1.6.0 | ADR 0008: decisiones de implementación de la Fase 7 ("Hoy" como pestaña de `/calendario`; el calendario muestra solo el próximo vencimiento de cada ítem y lo vencido en hoy; días en la zona horaria del perfil, elegida en `/configuracion` o detectada en el primer uso; tendencia desde `review_logs`; definiciones de tasa de acierto, racha y repasos completados; calibración solo con recordación activa; números del dashboard sin fuente resueltos por el usuario). Sin entidades ni migraciones nuevas. Notas en §3.5, §3.6, §5.2, §6.1 y §7.4; §13 (Fase 7 implementada). |
 | Cambios de la versión 1.5.0 | ADR 0007: decisiones de implementación de la Fase 6 (evaluación asíncrona con `after()`, reclamo y sondeo acotado, "Reintentar"; respuesta fallida sin SM-2 y respuesta saltada sin modelo; límite de 60 evaluaciones por usuario por día con clave propia; sin resumen de IA de la sesión; sesión fija de 10 preguntas; generación incremental por huellas de párrafo en las tres técnicas; panel de técnicas al estilo NotebookLM Studio, "Crear examen" y hub de recordación activa). Nueva entidad `GenerationFingerprint`. Notas en §3.1, §3.3, §6.1, §7.4, §8.2, §8.3, §8.4 y §8.5; §13 (Fase 6 implementada). |
 | Cambios de la versión 1.4.0 | ADR 0006: decisiones de implementación de la Fase 5 (exámenes de 10 a 30 preguntas, falladas primero; repetición con preguntas reformuladas y reglas para cuando no se puede armar; cronómetro solo dentro del examen; política de retroalimentación con reutilización; "Repasar contenido" antes de repetir). Notas en §3.3, §6.1, §7.2, §7.5 y §8.4; §13 (Fase 5 implementada). |
 | Cambios de la versión 1.3.1 | Nueva Fase 8 — Diseño y flujos de pantalla (solo interfaz y navegación, sin cambios de lógica de backend), justo después de la Fase 7. Endurecimiento pasa a ser la Fase 9. Actualizados §1, §4 y §13. |
@@ -160,12 +161,28 @@ Decisión cerrada (opción C):
 - Vista "Hoy": lista de páginas con ítems vencidos, con acceso directo a la sesión de cada técnica.
 - El usuario no crea eventos manualmente. El sistema los genera.
 
+Notas de implementación de la Fase 7 (ADR 0008):
+
+- **Una sola ruta.** `/calendario` (entrada "Calendario" de la barra lateral) tiene las pestañas "Hoy", "Semana" y "Mes". "Hoy" lista las páginas con ítems vencidos, la que más esperó primero, con un chip por técnica que abre su sesión (repaso del mazo, sesión de recordación o examen). La tarjeta "Repasos pendientes hoy" del inicio muestra el total real y enlaza al calendario.
+- **Solo el próximo vencimiento.** "Semana" y "Mes" muestran cada ítem en el día de su próximo `due_at`, agrupado por página, con chips coloreados por técnica; no se proyectan repeticiones posteriores. Lo vencido aparece en hoy y los días pasados quedan vacíos. Sin datos, el calendario se pinta vacío.
+- **Zona horaria.** Los días se cuentan en la zona del perfil (§6.1), que se elige en `/configuracion` o se detecta del navegador en el primer uso.
+
 ### 3.6 Dashboard
 
 - Progreso por cuaderno y por página: nivel de dominio, tendencia, ítems totales y vencidos.
 - Métricas por técnica: tasa de acierto, racha de días con repasos, repasos completados.
 - Calibración metacognitiva: comparación entre autoevaluación y resultado real. Detecta exceso y falta de confianza.
 - Gráficos con los componentes de gráficos de shadcn/ui (Recharts).
+
+Notas de implementación de la Fase 7 (ADR 0008):
+
+- **Datos reales.** `/dashboard` lee el módulo `analytics` en el período elegido (7, 15 o 30 días) y la zona del perfil; sin datos muestra un estado vacío y ante un fallo, un aviso de error. Ya no hay datos de muestra ni barrera de vista previa.
+- **Tendencia.** Promedio semanal de la calidad de los repasos de la página (`review_logs`), no del puntaje de dominio, que no tiene historial. El módulo la calcula, pero el dashboard no la muestra: el progreso por cuaderno no tiene flecha de variación semanal.
+- **Tasa de acierto.** Flashcards: repasos con calidad ≥ 3. Exámenes: respuestas correctas de exámenes terminados. Recordación activa: respuestas evaluadas con puntaje de IA ≥ 3. Se compara con el período anterior de la misma duración.
+- **Racha y repasos completados.** Días locales consecutivos con al menos un repaso (hoy cuenta como abierto), en total y por técnica; repasos completados = filas de `review_logs` del período. Nunca se muestra tiempo de estudio.
+- **Variaciones.** Solo "Racha de repasos" muestra variación (contra la racha de hace 7 días). "Ítems vencidos", "Páginas dominadas" y "Dominio global" muestran solo el valor actual.
+- **Calibración.** Solo recordación activa (§7.4). Cada página se clasifica por su señal más frecuente entre sus respuestas; un empate favorece la señal descalibrada (primero exceso, luego falta de confianza).
+- Sin sección de conceptos (no hay fuente por concepto) y con la etiqueta "Active recall", igual que la barra lateral.
 
 ### 3.7 Capa de IA como guía
 
@@ -269,6 +286,8 @@ Restricción conocida: los modelos Pro de Gemini no están en el tier gratuito. 
 | `analytics` | Dashboard, métricas, calibración | `study-engine`, técnicas (solo lectura) |
 
 Nota de implementación (Fase 4, ADR 0005): `study-engine` también persiste las sesiones de flashcards y la retroalimentación de sesión (`FlashcardSession`, `SessionFeedback`) y ofrece la sesión de repaso (iniciar, calificar, terminar) como API de servidor; las acciones que la usan y el caso de uso de retroalimentación viven en `flashcards`, porque `study-engine` no importa técnicas. Los puertos `RecordReview` y `GetDueItems` de §5.3 se materializan en esa API (`gradeFlashcard`, `startFlashcardSession`) y en `StudyItemRepository.listDue`.
+
+Nota de implementación (Fase 7, ADR 0008): `scheduling` y `analytics` leen con lectores Drizzle propios de solo lectura (`scheduling`: `study_items`, `pages`, `notebooks`; `analytics`: además `review_logs`, `page_mastery`, `exam_answers` y `recall_answers`), porque los casos de uso de `study-engine` y de las técnicas no ofrecen lecturas por dueño y rango. De otros módulos solo importan por su `index.ts`: tipos de `study-engine`, la sesión de `identity` y, en `analytics`, `calibrationOf` de `active-recall`. Ninguno escribe, guarda métricas ni calcula vencimientos o dominio.
 
 ### 5.3 Reglas de dependencia (obligatorias)
 
@@ -406,6 +425,8 @@ Notas de implementación de la Fase 6 (ADR 0007):
 - `RecallAnswer` tiene un único `(session_id, question_id)` y claves foráneas compuestas `(session_id, owner_id)` y `(question_id, owner_id)`. Agrega `evaluation_claimed_at` (no estaba en esta tabla): el instante en que una corrida de evaluación reclamó la respuesta; un reclamo de más de 6 minutos se retoma. Una restricción `CHECK` ata el estado a sus datos: `pending` sin puntajes; `done` con `ai_evaluation`, `ai_score` y `combined_quality`; `failed` con `ai_evaluation` (el intento crudo) y sin puntajes. Una respuesta saltada guarda el texto `(sin respuesta)`.
 - `GenerationFingerprint` (tabla `generation_fingerprints`) es la memoria de la generación incremental (§3.1): una fila por párrafo ya enviado a la IA por técnica y página. `technique` y el formato de la huella (64 caracteres hexadecimales) se validan con `CHECK`; borrar la página o el dueño borra sus huellas. Cada módulo escribe solo las de su técnica, en la misma transacción que sus ítems.
 
+Nota de implementación de la Fase 7 (ADR 0008): `Profile.timezone` ya se usa. Sin migración, el valor por defecto `UTC` significa "nunca elegida" y una elección explícita de UTC se guarda como `Etc/UTC`. La detección del navegador solo escribe mientras el valor sigue en `UTC`, así una elección explícita siempre gana. "Hoy", el calendario y el dashboard cuentan los días en esa zona.
+
 ### 6.2 Reglas de persistencia
 
 - Postgres en Supabase. Esquema y migraciones con Drizzle. Nunca cambios manuales en producción.
@@ -495,6 +516,8 @@ Notas de implementación de la Fase 6 (ADR 0007):
 - Se guardan la evaluación cruda (`ai_evaluation`), el puntaje de la IA, la autoevaluación y la calidad combinada. La señal metacognitiva no se guarda: se deriva al leer los resultados.
 - Solo una respuesta evaluada (`done`) alimenta SM-2, con la calidad combinada, mediante `recordRecallReviews` de `study-engine` (`ReviewLog` con `session_kind = recall`). Calidad < 3 se registra aunque el ítem no esté vencido; ≥ 3, solo si está vencido. Una respuesta `failed` no registra repaso: su pregunta sigue vencida y vuelve en la próxima sesión.
 - Una respuesta saltada recibe puntaje de IA 0 sin llamar al modelo, con el registro `{ source: "skipped", score: 0, justification: "Pregunta sin responder." }`.
+
+Nota de implementación de la Fase 7 (ADR 0008): la tabla de calibración del dashboard reutiliza la misma regla (`calibrationOf`) sobre las respuestas evaluadas del período, agregada por página; tampoco se guarda.
 
 ### 7.5 Reprogramación y repetición de exámenes
 
@@ -754,8 +777,15 @@ Estado (actualizado en la Fase 6):
 
 ### Fase 7 — Calendario y Dashboard
 
+> **Implementada el 2026-10-14 en cinco PR apiladas (#95–#99) más la de cierre, construida con ODD.** Decisiones en `docs/adr/0008-calendario-y-dashboard.md`.
+
 Entregables: calendario mensual y semanal, vista "Hoy" completa, dashboard con progreso por cuaderno y página, métricas por técnica, calibración metacognitiva, gráficos shadcn.
 Hecho cuando: el usuario puede responder "qué estudio hoy" y "cómo voy" sin abrir ninguna página.
+
+Estado (actualizado en la Fase 7):
+
+- Entregado: `/calendario` con las pestañas "Hoy", "Semana" y "Mes" sobre datos reales (próximo vencimiento de cada ítem, lo vencido en hoy, chips coloreados por técnica que abren su sesión o su página); la tarjeta "Repasos pendientes hoy" del inicio con el total real; `/configuracion` con la zona horaria del perfil y su detección en el primer uso; módulo `analytics` (dominio puro con cobertura del 100 %, lectores de solo lectura, `getProgress`, `getTechniqueMetrics`, `getCalibration`, API de servidor y acciones); `/dashboard` sobre datos reales con progreso por cuaderno y página, tasa de acierto, racha y repasos completados por técnica, calibración de recordación activa y gráficos shadcn, sin datos de muestra ni barrera de vista previa; "Calendario", "Configuración" y "Dashboard" habilitados en la barra lateral. Sin migraciones. Pruebas e2e del calendario, la zona horaria y el dashboard.
+- Pendiente: instantáneas semanales de dominio para mostrar variaciones de "Dominio global", "Páginas dominadas", "Ítems vencidos" y la tendencia por cuaderno; unificar "Active recall" / "Recordación activa" y plegar la barra lateral en teléfonos (Fase 8); pruebas de las acciones de `analytics` con campos de tipo incorrecto; varias pruebas de base de datos agotan su tiempo de 5 s con la base compartida bajo carga; la documentación técnica de las Fases 3 a 5 está sin actualizar. Detalle en ADR 0008.
 
 ### Fase 8 — Diseño y flujos de pantalla
 
