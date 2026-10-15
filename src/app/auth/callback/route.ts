@@ -17,10 +17,30 @@ function analytics() {
 // (specs/observability-and-delivery/spec.md, "Evento `user_signed_in` en
 // el callback de OAuth"), deferred past the response via `after()`.
 // A missing or rejected code sends the visitor back to login with the
-// message for its flow: Google's redirectTo carries `flow=google`
-// (identity/actions.ts, signInWithGoogleAction), so only that flow gets the
-// "Google cancelled" copy; a failed email-verification or password-reset
-// link (no marker) gets `error=link`, the invalid/expired link copy.
+// message for its flow. signInWithGoogleAction (identity/actions.ts) marks
+// the Google flow with a short-lived `cogni_auth_flow=google` cookie scoped
+// to this path, keeping the redirect URL byte-identical to the Supabase
+// allowlist entry; only that flow gets the "Google cancelled" copy, and a
+// failed email-verification or password-reset link (no cookie) gets
+// `error=link`, the invalid/expired link copy. Every response clears the
+// cookie so it never outlives this callback.
+const FLOW_COOKIE = "cogni_auth_flow";
+
+function isGoogleFlow(request: Request): boolean {
+  const header = request.headers.get("cookie") ?? "";
+  return header
+    .split(";")
+    .some((pair) => pair.trim() === `${FLOW_COOKIE}=google`);
+}
+
+function clearFlowCookie(response: NextResponse): NextResponse {
+  response.cookies.set(FLOW_COOKIE, "", {
+    path: "/auth/callback",
+    maxAge: 0,
+  });
+  return response;
+}
+
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
@@ -33,9 +53,11 @@ export async function GET(request: Request) {
         const userId = result.userId;
         after(() => analytics().track("user_signed_in", userId));
       }
-      return NextResponse.redirect(`${origin}${next}`);
+      return clearFlowCookie(NextResponse.redirect(`${origin}${next}`));
     }
   }
-  const error = searchParams.get("flow") === "google" ? "google" : "link";
-  return NextResponse.redirect(`${origin}/login?error=${error}`);
+  const error = isGoogleFlow(request) ? "google" : "link";
+  return clearFlowCookie(
+    NextResponse.redirect(`${origin}/login?error=${error}`),
+  );
 }

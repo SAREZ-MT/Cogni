@@ -131,8 +131,19 @@ test.describe("authentication", () => {
 
   test("sends a Google callback without code back to login with the Google message", async ({
     page,
+    context,
+    baseURL,
   }) => {
-    await page.goto("/auth/callback?flow=google");
+    // signInWithGoogleAction marks the Google flow with this cookie (the
+    // redirect URL itself carries no marker).
+    await context.addCookies([
+      {
+        name: "cogni_auth_flow",
+        value: "google",
+        url: new URL("/auth/callback", baseURL).toString(),
+      },
+    ]);
+    await page.goto("/auth/callback");
 
     await expect(page).toHaveURL(/\/login\?error=google$/);
     await expect(

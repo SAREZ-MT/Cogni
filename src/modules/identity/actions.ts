@@ -1,6 +1,7 @@
 "use server";
 
 import * as Sentry from "@sentry/nextjs";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { clientEnv } from "@/shared/config/env.client";
@@ -123,17 +124,26 @@ export async function updatePasswordAction(
   redirect("/");
 }
 
-// `flow=google` marks the callback as the Google flow, so a failed exchange
-// there shows the Google copy instead of the invalid-link one
-// (app/auth/callback/route.ts). Supabase keeps our own query string on a
-// same-host redirectTo and appends `code` to it, as the password-reset
-// link's `?next=` already relies on.
+// The callback URL stays exactly `${siteUrl()}/auth/callback`: Supabase
+// matches redirectTo against its Redirect URLs allowlist, and a query
+// marker would stop an exact entry from matching (Google sign-in would
+// silently fall back to the Site URL). The Google flow is marked instead
+// with a short-lived httpOnly cookie scoped to the callback path, which
+// app/auth/callback/route.ts reads to show the Google copy (not the
+// invalid-link one) on a failed exchange, and always clears.
 export async function signInWithGoogleAction(): Promise<void> {
   const auth = await gateway();
   const result = await auth.startGoogleSignIn({
-    redirectTo: `${siteUrl()}${AUTH_CALLBACK_PATH}?flow=google`,
+    redirectTo: `${siteUrl()}${AUTH_CALLBACK_PATH}`,
   });
   if (!result.ok) redirect("/login?error=google");
+  (await cookies()).set("cogni_auth_flow", "google", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: AUTH_CALLBACK_PATH,
+    maxAge: 600,
+  });
   redirect(result.value.url);
 }
 

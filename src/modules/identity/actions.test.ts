@@ -13,6 +13,11 @@ const { after } = vi.hoisted(() => ({
 }));
 vi.mock("next/server", () => ({ after }));
 
+const { setCookie } = vi.hoisted(() => ({ setCookie: vi.fn() }));
+vi.mock("next/headers", () => ({
+  cookies: vi.fn(async () => ({ set: setCookie })),
+}));
+
 const { track } = vi.hoisted(() => ({ track: vi.fn() }));
 vi.mock("@/shared/observability/analytics", () => ({
   createServerAnalytics: () => ({ track }),
@@ -97,7 +102,7 @@ describe("signInWithGoogleAction", () => {
     signInWithOAuthMock.mockReset();
   });
 
-  it("marks the callback URL with flow=google so a failed exchange shows the Google copy", async () => {
+  it("keeps the callback URL exactly as main had it and marks the flow with a short-lived cookie", async () => {
     signInWithOAuthMock.mockResolvedValue({
       data: { url: "https://accounts.google.test/o/oauth2" },
       error: null,
@@ -106,16 +111,46 @@ describe("signInWithGoogleAction", () => {
 
     await signInWithGoogleAction();
 
+    // Byte-identical to the URL registered in Supabase's Redirect URLs
+    // allowlist: a query marker would stop an exact entry from matching.
     expect(signInWithOAuthMock).toHaveBeenCalledWith({
       provider: "google",
       options: {
-        redirectTo: "https://cogni.test/auth/callback?flow=google",
+        redirectTo: "https://cogni.test/auth/callback",
         skipBrowserRedirect: true,
       },
     });
+    expect(setCookie).toHaveBeenCalledWith(
+      "cogni_auth_flow",
+      "google",
+      expect.objectContaining({
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/auth/callback",
+        maxAge: 600,
+      }),
+    );
     expect(redirect).toHaveBeenCalledWith(
       "https://accounts.google.test/o/oauth2",
     );
+  });
+
+  it("sets no flow cookie when Google sign-in cannot start", async () => {
+    setCookie.mockClear();
+    signInWithOAuthMock.mockResolvedValue({
+      data: { url: null },
+      error: { message: "provider down" },
+    });
+    // Like Next's real redirect(), stop execution at the error redirect.
+    redirect.mockImplementationOnce(() => {
+      throw new Error("NEXT_REDIRECT");
+    });
+    const { signInWithGoogleAction } = await import("./actions");
+
+    await expect(signInWithGoogleAction()).rejects.toThrow("NEXT_REDIRECT");
+
+    expect(setCookie).not.toHaveBeenCalled();
+    expect(redirect).toHaveBeenCalledWith("/login?error=google");
   });
 });
 
