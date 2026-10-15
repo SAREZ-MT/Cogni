@@ -42,6 +42,7 @@ The technical docs are part of the thesis deliverable and the architecture rules
 - [x] T9 — 02-SAD: module statuses, AI stack + Upstash, 20 tables, 10 rules, CSP, 2 crons, env vars, study-engine view (doc 271/389), resilience, PostHog 5 events, deps map, test counts, ADR prefixes.
 - [x] T10 — 03-DATA-API: Phase 3–5 entities/SQL/FKs/enums, profiles terms columns, flashcards/exams actions, `/api/recompute-mastery`, env vars, NotebooksServerApi, Phase 7 nits.
 - [x] T11 — 04-ADR: index statuses, ADR-002/003/004/007/008/009/010/011 updates, new items, distinct prefix vs `docs/adr/`.
+- [x] T12 — final re-audit corrections (independent re-audit of the four docs at d946a70): 01-SRS 7/7 fixed (44b6e2f), 02-SAD 14/14 fixed (71104cd), 03-DATA-API 7/7 fixed (6cb597f), 04-ADR 7/7 fixed (9cac6af); UNVERIFIED items (PR ranges, production status, Supabase ~7-day pause, plan facts, "69 violaciones", document date) left as is. Route: delegated (one writer, four docs).
 
 ## Acceptance criteria
 - `pnpm typecheck`, `pnpm exec biome ci`, `pnpm depcruise`, `pnpm test` and the full Playwright suite pass.
