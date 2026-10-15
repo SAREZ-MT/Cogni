@@ -9,13 +9,14 @@
 
 ---
 
-## 0. Nota de estado actual (2026-10-01, actualizada el 2026-10-10 para la Fase 6)
+## 0. Nota de estado actual (2026-10-01, actualizada el 2026-10-10 para la Fase 6 y el 2026-10-14 para la Fase 7)
 
 - Fase 0 (Cimientos) y Fase 1 (Cuadernos y editor) están desplegadas en producción.
 - Fase 2 (Importación de PDF) fue implementada bajo Organic Driven Development (ODD) el 2026-09-23; el módulo `src/modules/ingestion` es real, no un esqueleto.
 - Fase 3 (Capa de IA) no ha iniciado: el módulo `src/modules/ai` es un esqueleto vacío (`export {};`).
 - Las Fases 4 a 7 (flashcards, exámenes, recordación activa, calendario y dashboard) existen únicamente como vistas previas visuales con datos de muestra, integradas en `main` pero ocultas en producción tras `requireDesignPreviews()` (las rutas responden 404 y la barra lateral muestra "pronto"); los módulos `flashcards`, `study-engine`, `exams`, `active-recall`, `scheduling` y `analytics` siguen siendo esqueletos vacíos en el código base de este documento.
 - Fase 6 (Recordación activa) está implementada (2026-10-08, PR #87–#93; decisiones en `docs/adr/0007-recordacion-activa-y-generacion-incremental.md`): el módulo `src/modules/active-recall` es real y sus pantallas usan datos reales. Por eso CU-09, RF-AR-01 a RF-AR-06 y RF-AI-03 están marcados Implementado.
+- Fase 7 (Calendario y dashboard) está implementada (2026-10-14, PR #95–#99; decisiones en `docs/adr/0008-calendario-y-dashboard.md`): los módulos `src/modules/scheduling` y `src/modules/analytics` son reales, `/calendario` (pestañas "Hoy", "Semana" y "Mes"), `/dashboard` y `/configuracion` (zona horaria del perfil) usan datos reales y ninguna ruta usa ya `requireDesignPreviews()`. Por eso CU-10, CU-11, RF-SC-01 a RF-SC-04, RF-AN-01 a RF-AN-05 y el nuevo RF-ID-08 están marcados Implementado.
 - Las Fases 3 a 5 (IA, motor de repetición y flashcards, exámenes) también están implementadas (ADR 0004, 0005 y 0006), pero este documento todavía no se ha actualizado contra ese código: sus requisitos conservan el estado anterior hasta esa revisión, que queda pendiente.
 - Fase 9 (Endurecimiento) está parcialmente cubierta: la Content Security Policy con nonce por petición, la redirección del dominio apex y la protección de sesión ya existen en `src/proxy.ts` y `src/shared/config/security-headers.ts`; el resto de los entregables (registro de logs externo, pruebas de carga, auditoría de accesibilidad, manual de usuario) no se han iniciado.
 - En este documento: las secciones 1, 2, 4 y 5 describen tanto lo implementado como lo planeado, marcado explícitamente por su columna Estado; la sección 3 (casos de uso) sigue el mismo criterio caso por caso.
@@ -57,10 +58,10 @@ Cogni organiza su dominio en 11 módulos bajo `src/modules/`, cada uno con una �
 | `flashcards` | Tarjetas de estudio, sesiones de repaso con SM-2 y retroalimentación. | Vista previa integrada (oculta en producción) |
 | `exams` | Preguntas de opción múltiple, sesiones de examen, corrección y repetición. | Vista previa integrada (oculta en producción) |
 | `active-recall` | Preguntas abiertas, sesiones de respuesta y evaluación combinada IA + autoevaluación. | Implementado (Fase 6) |
-| `scheduling` | Calendario y vista "Hoy" de repasos vencidos. | Roadmap |
-| `analytics` | Dashboard de progreso, métricas por técnica y calibración metacognitiva. | Vista previa integrada (oculta en producción) |
+| `scheduling` | Calendario y vista "Hoy" de repasos vencidos. | Implementado (Fase 7) |
+| `analytics` | Dashboard de progreso, métricas por técnica y calibración metacognitiva. | Implementado (Fase 7) |
 
-Las cuatro filas marcadas "Vista previa integrada (oculta en producción)" tienen una versión visual con datos de muestra locales a cada ruta, ya integrada en `main` y protegida por `requireDesignPreviews()` (`src/shared/config/design-previews.ts`): en producción las rutas responden 404 y la barra lateral muestra "pronto"; se ven en desarrollo o con `COGNI_DESIGN_PREVIEWS=1`. Su dominio y aplicación siguen siendo esqueletos vacíos en este código base.
+Las filas que aún dicen "Vista previa integrada (oculta en producción)" conservan el estado anterior a la revisión pendiente de las Fases 3 a 5: esas pantallas nacieron como versiones visuales con datos de muestra protegidas por `requireDesignPreviews()` (`src/shared/config/design-previews.ts`), pero desde la Fase 7 ninguna ruta usa esa barrera y todas leen datos reales.
 
 ### 1.3 Definiciones y acrónimos
 
@@ -68,7 +69,7 @@ Las cuatro filas marcadas "Vista previa integrada (oculta en producción)" tiene
 |---|---|
 | SM-2 | Algoritmo de repetición espaciada (Wozniak, 1987): a partir de una calificación de calidad entera 0–5, calcula el nuevo intervalo y factor de facilidad de un ítem (`docs/documento-maestro.md` §7.1). Roadmap: el módulo `study-engine` es un esqueleto vacío. |
 | Recordación activa (Active Recall) | Técnica de estudio con preguntas abiertas evaluadas por IA contra una rúbrica (`docs/documento-maestro.md` §3.3, §7.4). Implementado (Fase 6). |
-| Calibración metacognitiva | Comparación entre la autoevaluación del estudiante y el resultado real de una evaluación, usada para detectar exceso o falta de confianza (`docs/documento-maestro.md` §7.4, §3.6). Implementada en los resultados de cada sesión de recordación activa (Fase 6); la tabla del dashboard es Roadmap (Fase 7). |
+| Calibración metacognitiva | Comparación entre la autoevaluación del estudiante y el resultado real de una evaluación, usada para detectar exceso o falta de confianza (`docs/documento-maestro.md` §7.4, §3.6). Implementada en los resultados de cada sesión de recordación activa (Fase 6) y en la tabla de calibración del dashboard, por página (Fase 7). |
 | Nivel de dominio | Estado derivado de una página (`Nuevo`, `Aprendiendo`, `Consolidando`, `Dominado`) calculado a partir del estado SM-2 de sus ítems (`docs/documento-maestro.md` §7.3). Roadmap. |
 | Página | Unidad de estudio de Cogni; contiene el documento Tiptap (`content`) y, en el futuro, sus ítems de estudio. Tabla `pages` (`src/shared/db/schema.ts`). |
 | Cuaderno | Agrupación de páginas de un estudiante, sin semántica de estudio propia. Tabla `notebooks` (`src/shared/db/schema.ts`). |
@@ -207,27 +208,27 @@ Además del Estudiante, Cogni se apoya en los siguientes servicios para funciona
 | Flujo alternativo | Un proveedor de IA falla a mitad de sesión → las respuestas ya están guardadas; cada evaluación se reintenta en otro proveedor. Si fallan todos, la respuesta queda `failed` con el intento crudo, sin calidad combinada ni repaso SM-2 (la pregunta sigue vencida), la sesión queda `partial` y el estudiante pulsa "Reintentar" en los resultados. Una pregunta saltada recibe puntaje de IA 0 sin llamar al modelo. Con el límite diario de evaluaciones agotado, la respuesta queda `failed` y "Reintentar" la evalúa cuando se renueve la ventana. |
 | Estado | Implementado (Fase 6) — `src/modules/active-recall`, rutas `src/app/(app)/active-recall/**`; decisiones en `docs/adr/0007-recordacion-activa-y-generacion-incremental.md`; prueba de extremo a extremo `tests/e2e/active-recall-evaluation.spec.ts`. |
 
-### CU-10 — Consultar "Hoy" / calendario (roadmap)
+### CU-10 — Consultar "Hoy" / calendario
 
 | Campo | Detalle |
 |---|---|
 | Actor principal | Estudiante |
 | Precondición | El estudiante tiene al menos un ítem de estudio con fecha de vencimiento asignada. |
-| Flujo principal | 1) El estudiante abre la vista "Hoy".<br>2) El sistema lista las páginas con ítems vencidos, ordenadas por la fecha de vencimiento más próxima.<br>3) El estudiante accede directamente a la sesión de repaso de una página desde esa vista.<br>3a) Alternativamente, el estudiante abre la vista de calendario mensual o semanal y ve los repasos agrupados por página. |
+| Flujo principal | 1) El estudiante abre `/calendario` desde la barra lateral ("Calendario") o desde la tarjeta "Repasos pendientes hoy" del inicio, que muestra el total de ítems vencidos; la pestaña "Hoy" es la predeterminada.<br>2) El sistema lista las páginas con ítems vencidos ahora (no suspendidos, sin páginas ni cuadernos archivados), primero la que tiene el vencimiento más antiguo, con un chip por técnica y su conteo.<br>3) El estudiante pulsa un chip y abre la sesión de esa técnica: flashcards `/flashcards/{cuaderno}/{página}?repasar=1`, recordación activa `/active-recall/{cuaderno}/{página}` o examen `/exams/{cuaderno}/{página}`.<br>3a) Alternativamente, abre la pestaña "Semana" o "Mes" y ve, por día y página, los ítems cuyo próximo vencimiento cae ese día; lo vencido aparece en hoy. Puede moverse al período anterior o siguiente y volver a hoy; cada chip abre la página y "N más…" abre la semana de ese día.<br>Los días se cuentan en la zona horaria del perfil. |
 | Postcondición | Ninguna (vista de solo lectura). |
-| Flujo alternativo | No hay ítems vencidos hoy → el sistema lo indica sin listar páginas. |
-| Estado | Roadmap — `scheduling` y `study-engine` son esqueletos vacíos en este código base (`docs/documento-maestro.md` §3.5). |
+| Flujo alternativo | No hay ítems vencidos hoy → el sistema muestra "Estás al día" sin listar páginas. Sin vencimientos en el período, la cuadrícula se pinta vacía. Si la lectura falla, se muestra un aviso de error. |
+| Estado | Implementado (Fase 7) — `src/modules/scheduling`, ruta `src/app/(app)/calendario`; decisiones en `docs/adr/0008-calendario-y-dashboard.md`; pruebas de extremo a extremo `tests/e2e/calendar-today.spec.ts` y `tests/e2e/calendar-month-week.spec.ts`. |
 
-### CU-11 — Consultar dashboard (roadmap)
+### CU-11 — Consultar dashboard
 
 | Campo | Detalle |
 |---|---|
 | Actor principal | Estudiante |
 | Precondición | El estudiante tiene al menos un cuaderno con contenido. |
-| Flujo principal | 1) El estudiante abre el dashboard.<br>2) El sistema muestra el progreso por cuaderno y por página (nivel de dominio, tendencia, ítems totales y vencidos).<br>3) El sistema muestra métricas por técnica (tasa de acierto, racha, repasos completados) y una tabla de calibración metacognitiva (autoevaluación frente a resultado real). |
+| Flujo principal | 1) El estudiante abre `/dashboard` y elige el período (7, 15 o 30 días; 7 por defecto).<br>2) El sistema muestra el dominio global actual con el nivel de cada página (una barra por página), los repasos por día del período, la tasa de acierto por técnica (con su variación frente al período anterior), la racha (con su variación frente a la racha de hace 7 días), los ítems vencidos y las páginas dominadas.<br>3) El sistema muestra el progreso por cuaderno (nivel de dominio, ítems totales y vencidos, puntaje medio).<br>4) El sistema muestra la tabla de calibración de recordación activa por página (autoevaluación media, puntaje de IA medio, diferencia y zona: exceso, falta de confianza o calibrado) y una tarjeta por técnica con sus repasos completados, tasa de acierto y racha. |
 | Postcondición | Ninguna (vista de solo lectura). |
-| Flujo alternativo | Sin datos suficientes, el sistema muestra un estado vacío orientador en lugar de gráficos sin datos. |
-| Estado | Roadmap — existe una vista previa visual (v2) con datos de muestra integrada en `main` y oculta en producción; `analytics` y `study-engine` son esqueletos vacíos en este código base (`docs/documento-maestro.md` §3.6). |
+| Flujo alternativo | Sin ítems, repasos, racha ni respuestas evaluadas → estado vacío que lleva a los cuadernos, en lugar de gráficos sin datos. Si alguna lectura falla → aviso de error, sin números. |
+| Estado | Implementado (Fase 7) — `src/modules/analytics`, ruta `src/app/(app)/dashboard`; la tendencia semanal se calcula pero no se muestra y solo la racha muestra variación (decisiones del usuario en `docs/adr/0008-calendario-y-dashboard.md`); prueba de extremo a extremo `tests/e2e/dashboard.spec.ts`. |
 
 ---
 
@@ -246,6 +247,7 @@ Prioridad: **Alta** (el producto queda incompleto sin él), **Media** (mejora re
 | RF-ID-05 | El sistema debe crear automáticamente el perfil (`profiles`) de un estudiante autenticado sin sobrescribir sus datos personalizados en accesos posteriores (`ensureProfileResilient`, `onConflictDoNothing`). | Alta | Implementado |
 | RF-ID-06 | El sistema debe rechazar cualquier redirección posterior al inicio de sesión que no sea una ruta relativa del propio sitio (`safeNext`, protección contra *open redirect*). | Alta | Implementado |
 | RF-ID-07 | El sistema debe permitir cerrar la sesión del estudiante mediante una acción explícita (`signOutAction`). | Media | Implementado |
+| RF-ID-08 | El sistema debe permitir elegir la zona horaria del perfil (nombre IANA validado) en `/configuracion` y, mientras no se haya elegido, adoptar la del navegador en el primer uso sin pisar una elección explícita (`updateTimeZoneAction`, `adoptBrowserTimeZoneAction`; `docs/documento-maestro.md` §6.1). | Media | Implementado (Fase 7) |
 
 ### 4.2 `notebooks` (NB)
 
@@ -341,20 +343,20 @@ Prioridad: **Alta** (el producto queda incompleto sin él), **Media** (mejora re
 
 | ID | Requisito | Prioridad | Estado |
 |---|---|---|---|
-| RF-SC-01 | El sistema debe mostrar una vista "Hoy" con las páginas que tienen ítems vencidos, ordenadas por la fecha de vencimiento más próxima (`docs/documento-maestro.md` §3.5, §7.3). | Alta | Roadmap |
-| RF-SC-02 | El sistema debe ofrecer una vista de calendario mensual y semanal con los repasos agrupados por página (`docs/documento-maestro.md` §3.5). | Media | Roadmap |
-| RF-SC-03 | El sistema no debe permitir crear eventos de calendario manuales; el calendario refleja únicamente los vencimientos calculados por `study-engine` (`docs/documento-maestro.md` §3.5). | Media | Roadmap |
-| RF-SC-04 | El sistema debe permitir acceder directamente a la sesión de repaso de una página desde la vista "Hoy" (`docs/documento-maestro.md` §3.5). | Media | Roadmap |
+| RF-SC-01 | El sistema debe mostrar una vista "Hoy" con las páginas que tienen ítems vencidos, ordenadas por la fecha de vencimiento más próxima (`docs/documento-maestro.md` §3.5, §7.3). | Alta | Implementado (Fase 7; pestaña "Hoy" de `/calendario`, `listDueTodayAction`) |
+| RF-SC-02 | El sistema debe ofrecer una vista de calendario mensual y semanal con los repasos agrupados por página (`docs/documento-maestro.md` §3.5). | Media | Implementado (Fase 7; pestañas "Semana" y "Mes", `getCalendarDays`; solo el próximo vencimiento de cada ítem, ADR 0008) |
+| RF-SC-03 | El sistema no debe permitir crear eventos de calendario manuales; el calendario refleja únicamente los vencimientos calculados por `study-engine` (`docs/documento-maestro.md` §3.5). | Media | Implementado (Fase 7) |
+| RF-SC-04 | El sistema debe permitir acceder directamente a la sesión de repaso de una página desde la vista "Hoy" (`docs/documento-maestro.md` §3.5). | Media | Implementado (Fase 7; un chip por técnica) |
 
 ### 4.11 `analytics` (AN)
 
 | ID | Requisito | Prioridad | Estado |
 |---|---|---|---|
-| RF-AN-01 | El sistema debe mostrar el progreso por cuaderno y por página, incluyendo nivel de dominio, tendencia y conteo de ítems totales y vencidos (`docs/documento-maestro.md` §3.6). | Alta | Vista previa integrada (oculta en producción) |
-| RF-AN-02 | El sistema debe mostrar métricas por técnica de estudio: tasa de acierto, racha y repasos completados (`docs/documento-maestro.md` §3.6). | Media | Vista previa integrada (oculta en producción) |
-| RF-AN-03 | El sistema debe mostrar una tabla de calibración metacognitiva que compare la autoevaluación del estudiante contra el resultado real de la evaluación de IA (`docs/documento-maestro.md` §3.6, §7.4). | Media | Vista previa integrada (oculta en producción) |
-| RF-AN-04 | El sistema debe presentar los gráficos del dashboard mediante componentes de gráficos de shadcn/ui (`docs/documento-maestro.md` §3.6, §4.1). | Baja | Vista previa integrada (oculta en producción) |
-| RF-AN-05 | El sistema debe limitar sus lecturas a los datos ya calculados por `study-engine` y las técnicas, sin realizar cálculos propios de vencimiento o dominio (`docs/documento-maestro.md` §5.2). | Alta | Vista previa integrada (oculta en producción) |
+| RF-AN-01 | El sistema debe mostrar el progreso por cuaderno y por página, incluyendo nivel de dominio, tendencia y conteo de ítems totales y vencidos (`docs/documento-maestro.md` §3.6). | Alta | Implementado (Fase 7): por cuaderno, nivel, ítems totales y vencidos; por página, el nivel ("Dominio global"). La tendencia (calidad semanal de los repasos) se calcula pero el dashboard no la muestra (ADR 0008) |
+| RF-AN-02 | El sistema debe mostrar métricas por técnica de estudio: tasa de acierto, racha y repasos completados (`docs/documento-maestro.md` §3.6). | Media | Implementado (Fase 7) |
+| RF-AN-03 | El sistema debe mostrar una tabla de calibración metacognitiva que compare la autoevaluación del estudiante contra el resultado real de la evaluación de IA (`docs/documento-maestro.md` §3.6, §7.4). | Media | Implementado (Fase 7; solo recordación activa) |
+| RF-AN-04 | El sistema debe presentar los gráficos del dashboard mediante componentes de gráficos de shadcn/ui (`docs/documento-maestro.md` §3.6, §4.1). | Baja | Implementado (Fase 7; `src/shared/ui/chart.tsx`, Recharts) |
+| RF-AN-05 | El sistema debe limitar sus lecturas a los datos ya calculados por `study-engine` y las técnicas, sin realizar cálculos propios de vencimiento o dominio (`docs/documento-maestro.md` §5.2). | Alta | Implementado (Fase 7) |
 
 ---
 
@@ -429,5 +431,5 @@ Agrupados por característica de calidad de ISO/IEC 25010. Solo se incluyen requ
 | CU-07 | RF-SE-01, RF-SE-02, RF-SE-03, RF-FC-03 | N/A — sin RNF verificable en el código actual |
 | CU-08 | RF-EX-01, RF-EX-02, RF-EX-03, RF-EX-04, RF-EX-05, RF-EX-06, RF-EX-07 | N/A — sin RNF verificable en el código actual |
 | CU-09 | RF-AR-01, RF-AR-02, RF-AR-03, RF-AR-04, RF-AR-05, RF-AR-06 | N/A — sin RNF verificable en el código actual |
-| CU-10 | RF-SC-01, RF-SC-02, RF-SC-03, RF-SC-04 | N/A — sin RNF verificable en el código actual |
-| CU-11 | RF-AN-01, RF-AN-02, RF-AN-03, RF-AN-04, RF-AN-05 | N/A — sin RNF verificable en el código actual |
+| CU-10 | RF-SC-01, RF-SC-02, RF-SC-03, RF-SC-04, RF-ID-08 | N/A — sin RNF verificable en el código actual |
+| CU-11 | RF-AN-01, RF-AN-02, RF-AN-03, RF-AN-04, RF-AN-05, RF-ID-08 | N/A — sin RNF verificable en el código actual |

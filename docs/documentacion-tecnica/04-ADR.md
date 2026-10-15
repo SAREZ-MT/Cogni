@@ -9,13 +9,14 @@
 
 ---
 
-## 0. Nota de estado actual (2026-09-25, actualizada el 2026-10-10 para la Fase 6)
+## 0. Nota de estado actual (2026-09-25, actualizada el 2026-10-10 para la Fase 6 y el 2026-10-14 para la Fase 7)
 
 - Fase 0 (Cimientos) y Fase 1 (Cuadernos y editor) están desplegadas en producción.
 - Fase 2 (Importación de PDF) se implementó bajo Organic Driven Development (ODD) el 2026-09-23.
 - Fase 3 (Capa de IA) no ha iniciado: `src/modules/ai` es un esqueleto (`export {};`).
 - Las Fases 4 a 7 (`study-engine`, `flashcards`, `exams`, `active-recall`, `scheduling`, `analytics`) son esqueletos vacíos en este código base; cuatro de ellas tienen una versión de diseño visual con datos de muestra en la rama `design/shell-look`, no integrada a `main`.
 - Fase 6 (Recordación activa) está implementada (2026-10-08). Sus decisiones de implementación están en `docs/adr/0007-recordacion-activa-y-generacion-incremental.md` (ver "Decisiones de implementación por fase", más abajo). Las Fases 3 a 5 también están implementadas (ADR 0004, 0005 y 0006); las notas de estado de este documento sobre esas fases (por ejemplo, ADR-007 "pendiente de implementación") todavía no se han revisado contra el código y su actualización queda pendiente.
+- Fase 7 (Calendario y dashboard) está implementada (2026-10-14). Sus decisiones de implementación están en `docs/adr/0008-calendario-y-dashboard.md` (ver "Decisiones de implementación por fase", más abajo).
 - Fase 9 (Endurecimiento) está parcialmente cubierta: Content Security Policy con nonce, redirección del dominio apex y protección de sesión existen; el resto (registro de logs externo, pruebas de carga, auditoría de accesibilidad) no se ha iniciado.
 - De las 11 decisiones registradas en este documento:
   - **Completamente implementadas y verificables en el código de `main`:** ADR-001, ADR-002, ADR-003, ADR-004, ADR-005, ADR-006, ADR-009, ADR-010.
@@ -64,6 +65,7 @@ Los ADR numerados de `docs/adr/` registran las decisiones tomadas al construir c
 | `docs/adr/0005-motor-de-repeticion-y-flashcards.md` | Fase 4 — Motor de repetición y flashcards | ADR-007 |
 | `docs/adr/0006-examenes-y-repeticion-con-variantes.md` | Fase 5 — Exámenes | ADR-007, ADR-008 |
 | `docs/adr/0007-recordacion-activa-y-generacion-incremental.md` | Fase 6 — Recordación activa y generación incremental | ADR-007 (calidad combinada en SM-2), ADR-008 (límite de evaluaciones, evaluación asíncrona sin cola), ADR-009 (`after()` dentro de `maxDuration`) |
+| `docs/adr/0008-calendario-y-dashboard.md` | Fase 7 — Calendario y dashboard | ADR-001 (calendario y métricas agrupados por página), ADR-002 (lectores de solo lectura propios de `scheduling` y `analytics`), ADR-007 (el calendario muestra solo el próximo vencimiento; tendencia desde `review_logs`, sin historial del dominio) |
 
 ---
 
