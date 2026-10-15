@@ -18,6 +18,11 @@ import {
   updatePassword,
   updateProfileTimeZone,
 } from "./application";
+import {
+  AUTH_FLOW_COOKIE,
+  AUTH_FLOW_COOKIE_MAX_AGE_SECONDS,
+  GOOGLE_AUTH_FLOW,
+} from "./domain/auth-flow";
 import { PROFILE_ERROR } from "./domain/time-zone";
 import {
   createSupabaseServerClient,
@@ -52,10 +57,23 @@ function analytics() {
   });
 }
 
+// An email flow (verification or password reset) clears any Google flow
+// marker left by an abandoned Google attempt, so a later failed email link
+// is not reported as a cancelled Google sign-in. Same name and path as the
+// setter in signInWithGoogleAction (cookies().delete() would use path "/"
+// and miss a cookie scoped to the callback path).
+async function clearGoogleFlowCookie(): Promise<void> {
+  (await cookies()).set(AUTH_FLOW_COOKIE, "", {
+    path: AUTH_CALLBACK_PATH,
+    maxAge: 0,
+  });
+}
+
 export async function signUpAction(
   _previous: AuthFormState,
   formData: FormData,
 ): Promise<AuthFormState> {
+  await clearGoogleFlowCookie();
   const result = await signUp(Object.fromEntries(formData), {
     auth: await gateway(),
     siteUrl: siteUrl(),
@@ -103,6 +121,7 @@ export async function requestPasswordResetAction(
   _previous: AuthFormState,
   formData: FormData,
 ): Promise<AuthFormState> {
+  await clearGoogleFlowCookie();
   const result = await requestPasswordReset(Object.fromEntries(formData), {
     auth: await gateway(),
     siteUrl: siteUrl(),
@@ -137,12 +156,12 @@ export async function signInWithGoogleAction(): Promise<void> {
     redirectTo: `${siteUrl()}${AUTH_CALLBACK_PATH}`,
   });
   if (!result.ok) redirect("/login?error=google");
-  (await cookies()).set("cogni_auth_flow", "google", {
+  (await cookies()).set(AUTH_FLOW_COOKIE, GOOGLE_AUTH_FLOW, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: AUTH_CALLBACK_PATH,
-    maxAge: 600,
+    maxAge: AUTH_FLOW_COOKIE_MAX_AGE_SECONDS,
   });
   redirect(result.value.url);
 }

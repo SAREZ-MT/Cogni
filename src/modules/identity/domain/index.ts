@@ -1,4 +1,10 @@
 export { AUTH_ERROR, type AuthErrorCode } from "./auth-errors";
+export {
+  AUTH_FLOW_COOKIE,
+  AUTH_FLOW_COOKIE_MAX_AGE_SECONDS,
+  GOOGLE_AUTH_FLOW,
+  isGoogleAuthFlow,
+} from "./auth-flow";
 export type {
   AuthGateway,
   SignUpOutcome,

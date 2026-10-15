@@ -154,6 +154,30 @@ describe("signInWithGoogleAction", () => {
   });
 });
 
+// An abandoned Google attempt leaves the flow cookie behind until it
+// expires; an email flow started afterwards clears it, so a later failed
+// email link is not reported as a cancelled Google sign-in.
+describe.each([
+  "signUpAction",
+  "requestPasswordResetAction",
+] as const)("%s after an abandoned Google attempt", (action) => {
+  beforeEach(() => {
+    setCookie.mockClear();
+  });
+
+  it("clears the Google flow cookie on the callback path", async () => {
+    const actions = await import("./actions");
+
+    await actions[action]({ status: "idle" } as never, formData({}));
+
+    expect(setCookie).toHaveBeenCalledWith(
+      "cogni_auth_flow",
+      "",
+      expect.objectContaining({ path: "/auth/callback", maxAge: 0 }),
+    );
+  });
+});
+
 describe("signOutAction", () => {
   beforeEach(() => {
     redirect.mockClear();

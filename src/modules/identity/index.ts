@@ -19,10 +19,14 @@ import {
 // Server-side public API of the identity module (layouts, route handlers).
 // Client code uses ./actions (Server Actions) and ./ui (components) instead:
 // this file pulls server-only modules and cannot enter a client bundle.
-export { safeNext } from "./application";
+export { AUTH_CALLBACK_PATH, safeNext } from "./application";
 export {
+  AUTH_FLOW_COOKIE,
+  AUTH_FLOW_COOKIE_MAX_AGE_SECONDS,
+  GOOGLE_AUTH_FLOW,
   hasAcceptedCurrentTerms,
   hasChosenTimeZone,
+  isGoogleAuthFlow,
   TERMS_PATH,
   TERMS_VERSION,
   termsRedirectFor,

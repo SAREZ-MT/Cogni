@@ -11,7 +11,16 @@ const { exchangeCodeForSession, safeNext } = vi.hoisted(() => ({
   exchangeCodeForSession: vi.fn(),
   safeNext: vi.fn((next: string | null) => next ?? "/"),
 }));
-vi.mock("@/modules/identity", () => ({ exchangeCodeForSession, safeNext }));
+// The flow-cookie contract is pure (identity/domain/auth-flow.ts and
+// application/sign-up.ts), so the mock spreads the real values instead of
+// loading the server-only identity index.
+vi.mock("@/modules/identity", async () => ({
+  exchangeCodeForSession,
+  safeNext,
+  ...(await import("@/modules/identity/domain/auth-flow")),
+  AUTH_CALLBACK_PATH: (await import("@/modules/identity/application/sign-up"))
+    .AUTH_CALLBACK_PATH,
+}));
 
 const { track } = vi.hoisted(() => ({ track: vi.fn() }));
 vi.mock("@/shared/observability/analytics", () => ({
@@ -112,6 +121,26 @@ describe("GET /auth/callback error selection", () => {
     ).toBe("https://cogni.test/cuadernos");
     expect(safeNext).toHaveBeenCalledWith("/cuadernos");
     expect(track).toHaveBeenCalledWith("user_signed_in", "u-1");
+  });
+
+  it("finds the flow cookie among several cookies, by exact name", async () => {
+    exchangeCodeForSession.mockResolvedValue({ ok: false, userId: null });
+
+    expect(
+      await callback(
+        "?code=bad",
+        "sb-access=x; xcogni_auth_flow=google; cogni_auth_flow=google; theme=dark",
+      ),
+    ).toBe("https://cogni.test/login?error=google");
+    expect(
+      await callback(
+        "?code=bad",
+        "xcogni_auth_flow=google; cogni_auth_flow_x=google; a=b",
+      ),
+    ).toBe("https://cogni.test/login?error=link");
+    expect(await callback("?code=bad", "cogni_auth_flow=googlex; a=b")).toBe(
+      "https://cogni.test/login?error=link",
+    );
   });
 
   it("clears the flow cookie on success, failure and no-code responses", async () => {
