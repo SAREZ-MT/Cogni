@@ -7,8 +7,11 @@ Extensiones Tiptap, bloques, menú `/`, resaltados y autoguardado.
 ## Estado
 
 PR3a completo: dominio y aplicación sin Tiptap. `domain/save-page-port.ts`
-reexporta el tipo `SavePagePort` de `notebooks` (nunca su implementación) y
-declara el código de conflicto de versión; `domain/autosave-state.ts` define
+declara el puerto `SavePagePort` (propiedad de `editor`; los Server Actions
+`saveContent`/`getCurrentContent` de `notebooks` lo cumplen de forma
+estructural, sin importarlo), toma `TiptapDoc`/`TiptapNode` de
+`src/shared/kernel/tiptap-doc.ts` y declara el código de conflicto de
+versión; `domain/autosave-state.ts` define
 el estado puro del autoguardado; `application/use-autosave.ts` implementa el
 debounce, el reintento y la reconciliación de conflicto contra un
 `SavePagePort` inyectado, sin importar Tiptap ni ProseMirror
