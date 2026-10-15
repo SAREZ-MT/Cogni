@@ -49,6 +49,17 @@ module.exports = {
       },
     },
     {
+      name: "proxy-via-public-entry",
+      comment:
+        "src/proxy.ts (the per-request Next.js proxy) may only import a module through a public entry: its index.ts or a light proxy.ts entry that avoids the index's server-only graph (identity/proxy.ts).",
+      severity: "error",
+      from: { path: "^src/proxy\\.ts$" },
+      to: {
+        path: "^src/modules/",
+        pathNot: "^src/modules/[^/]+/(index|proxy)\\.ts$",
+      },
+    },
+    {
       name: "editor-tiptap-only-in-ui",
       comment:
         "Tiptap and ProseMirror packages may only be imported from editor/ui; editor/domain and editor/application must stay framework-agnostic.",

@@ -27,7 +27,7 @@ The technical docs are part of the thesis deliverable and the architecture rules
 
 ### Code
 - [x] T1 — `tsPreCompilationDeps: true` in `.dependency-cruiser.cjs`; move `TiptapDoc`/`TiptapNode` to `src/shared/kernel/tiptap-doc.ts` (notebooks re-exports them); editor owns `SavePagePort`; delete `notebooks/domain/save-page-port.ts` and its exports; fix stale comments/README. Route: delegated (multi-file).
-- [ ] T2 — `src/modules/identity/proxy.ts` light public entry re-exporting `updateSession`; `src/proxy.ts` imports it; new depcruise rule `proxy-via-public-entry`. Route: delegated.
+- [x] T2 — `src/modules/identity/proxy.ts` light public entry re-exporting `updateSession`; `src/proxy.ts` imports it; new depcruise rule `proxy-via-public-entry`. Route: delegated.
 - [ ] T3 — remove `shared/redis` from `upstash-only-in-ai-infra` (`pathNot` + comment). Route: delegated (same writer, mechanical).
 - [ ] T4 — `/auth/callback`: a failed exchange no longer always lands on `/login?error=google`; pick the error by flow (Google vs email/reset link) and show matching copy. Test-first on the route + login page. Route: delegated.
 - [ ] T5 — single source for mastery thresholds (0.35 / 0.7): move to `src/shared/kernel`; `study-engine/domain/mastery.ts` and `src/shared/ui/mastery-level.ts` import them. Route: delegated.
@@ -49,6 +49,7 @@ The technical docs are part of the thesis deliverable and the architecture rules
 - 2026-10-14: branch `fix/doc-code-alignment` from main 1156274. RDD: on (global).
 
 - T1 (route: delegated): RED — with `tsPreCompilationDeps: true` on the old code, `pnpm depcruise` → `error domain-is-pure: src/modules/editor/domain/save-page-port.ts → src/modules/notebooks/index.ts` (1 violation). GREEN — typecheck 0 errors; biome ci clean (1159 files); depcruise 0 violations (1142 modules); vitest 415 files / 3824 tests passed. Commit: see `git log` (T1 commit `build(depcruise)`).
+- T2 (route: delegated): RED — new rule with the old `src/proxy.ts` import → `error proxy-via-public-entry: src/proxy.ts → src/modules/identity/infrastructure/supabase-proxy-client.ts`. GREEN — typecheck 0 errors; biome ci clean (1160 files); depcruise 0 violations; vitest 415 files / 3824 tests passed (tests/proxy mocks of the infra path still apply through the re-export, left unchanged). Commit: `refactor(identity)` (see `git log`).
 
 ## Next step
 T1–T3 (verified viable in a scratch copy: depcruise 0 violations, tsc 0 errors, 1265 tests passing).

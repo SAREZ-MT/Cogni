@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { updateSession } from "@/modules/identity/infrastructure/supabase-proxy-client";
+import { updateSession } from "@/modules/identity/proxy";
 import { clientEnv } from "@/shared/config/env.client";
 import { buildSecurityHeaders } from "@/shared/config/security-headers";
 
