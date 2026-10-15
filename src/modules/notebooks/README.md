@@ -17,8 +17,11 @@ Hexagonal shape enforced by `.dependency-cruiser.cjs` (`domain-is-pure`,
 - `domain/`: pure TypeScript — `Notebook`, `Page`, `PageAsset` entities,
   the `TiptapDoc`/`TiptapNode` document shape, `plain-text.ts` extraction
   and every port interface (`NotebookRepository`, `PageRepository`,
-  `PageAssetRepository`, `StorageGateway`, `SavePagePort`). No framework,
-  no npm dependency other than Zod.
+  `PageAssetRepository`, `StorageGateway`). No framework, no npm
+  dependency other than Zod. `TiptapDoc`/`TiptapNode` are defined in
+  `src/shared/kernel/tiptap-doc.ts` and re-exported from `plain-text.ts`.
+  The editor's `SavePagePort` belongs to `editor/domain`; this module's
+  `saveContent`/`getCurrentContent` Server Actions satisfy it structurally.
 - `application/`: use cases for creating/renaming/archiving notebooks and
   pages, saving and reading page content (`content-schema.ts` is the
   shared Zod schema `save-page.ts` and `write-imported-content.ts` both

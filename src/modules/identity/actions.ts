@@ -1,6 +1,7 @@
 "use server";
 
 import * as Sentry from "@sentry/nextjs";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { clientEnv } from "@/shared/config/env.client";
@@ -17,6 +18,11 @@ import {
   updatePassword,
   updateProfileTimeZone,
 } from "./application";
+import {
+  AUTH_FLOW_COOKIE,
+  AUTH_FLOW_COOKIE_MAX_AGE_SECONDS,
+  GOOGLE_AUTH_FLOW,
+} from "./domain/auth-flow";
 import { PROFILE_ERROR } from "./domain/time-zone";
 import {
   createSupabaseServerClient,
@@ -51,10 +57,23 @@ function analytics() {
   });
 }
 
+// An email flow (verification or password reset) clears any Google flow
+// marker left by an abandoned Google attempt, so a later failed email link
+// is not reported as a cancelled Google sign-in. Same name and path as the
+// setter in signInWithGoogleAction (cookies().delete() would use path "/"
+// and miss a cookie scoped to the callback path).
+async function clearGoogleFlowCookie(): Promise<void> {
+  (await cookies()).set(AUTH_FLOW_COOKIE, "", {
+    path: AUTH_CALLBACK_PATH,
+    maxAge: 0,
+  });
+}
+
 export async function signUpAction(
   _previous: AuthFormState,
   formData: FormData,
 ): Promise<AuthFormState> {
+  await clearGoogleFlowCookie();
   const result = await signUp(Object.fromEntries(formData), {
     auth: await gateway(),
     siteUrl: siteUrl(),
@@ -102,6 +121,7 @@ export async function requestPasswordResetAction(
   _previous: AuthFormState,
   formData: FormData,
 ): Promise<AuthFormState> {
+  await clearGoogleFlowCookie();
   const result = await requestPasswordReset(Object.fromEntries(formData), {
     auth: await gateway(),
     siteUrl: siteUrl(),
@@ -123,12 +143,26 @@ export async function updatePasswordAction(
   redirect("/");
 }
 
+// The callback URL stays exactly `${siteUrl()}/auth/callback`: Supabase
+// matches redirectTo against its Redirect URLs allowlist, and a query
+// marker would stop an exact entry from matching (Google sign-in would
+// silently fall back to the Site URL). The Google flow is marked instead
+// with a short-lived httpOnly cookie scoped to the callback path, which
+// app/auth/callback/route.ts reads to show the Google copy (not the
+// invalid-link one) on a failed exchange, and always clears.
 export async function signInWithGoogleAction(): Promise<void> {
   const auth = await gateway();
   const result = await auth.startGoogleSignIn({
     redirectTo: `${siteUrl()}${AUTH_CALLBACK_PATH}`,
   });
   if (!result.ok) redirect("/login?error=google");
+  (await cookies()).set(AUTH_FLOW_COOKIE, GOOGLE_AUTH_FLOW, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: AUTH_CALLBACK_PATH,
+    maxAge: AUTH_FLOW_COOKIE_MAX_AGE_SECONDS,
+  });
   redirect(result.value.url);
 }
 

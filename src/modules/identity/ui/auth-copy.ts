@@ -17,6 +17,7 @@ export const AUTH_COPY = {
   termsNotAccepted: "Debes aceptar los términos para continuar.",
   googleCancelled:
     "No se completó el acceso con Google. Puedes intentarlo de nuevo.",
+  linkInvalid: "El enlace no es válido o ya venció. Pide uno nuevo.",
 } as const;
 
 export function messageForCode(code: string): string {

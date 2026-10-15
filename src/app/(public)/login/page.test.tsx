@@ -40,4 +40,32 @@ describe("LoginPage", () => {
       screen.getByRole("link", { name: "términos de uso" }),
     ).toHaveAttribute("href", "/terminos");
   });
+
+  it("shows the Google copy only for error=google", async () => {
+    render(
+      await LoginPage({
+        searchParams: Promise.resolve({ error: "google" }),
+      } as never),
+    );
+
+    expect(
+      screen.getByText(
+        "No se completó el acceso con Google. Puedes intentarlo de nuevo.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/El enlace no es válido/)).toBeNull();
+  });
+
+  it("shows the invalid-link copy for error=link, not the Google one", async () => {
+    render(
+      await LoginPage({
+        searchParams: Promise.resolve({ error: "link" }),
+      } as never),
+    );
+
+    expect(
+      screen.getByText("El enlace no es válido o ya venció. Pide uno nuevo."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/acceso con Google/)).toBeNull();
+  });
 });

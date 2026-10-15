@@ -1,9 +1,8 @@
-import { describe, expect, it, vi } from "vitest";
-
-// get-calibration reuses calibrationOf from the active-recall index, which
-// also exports its Server Actions (server-only imports).
-vi.mock("server-only", () => ({}));
-
+import { describe, expect, it } from "vitest";
+// No `server-only` mock on purpose: get-calibration reaches active-recall's
+// calibrationOf through its domain-only entry (active-recall/calibration.ts),
+// never the index that also exports Server Actions, so loading it must not
+// pull in any server-only module.
 import { getCalibration } from "./get-calibration";
 import { seededStore } from "./testing/seeded-store";
 

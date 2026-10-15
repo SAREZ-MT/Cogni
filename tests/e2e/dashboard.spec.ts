@@ -33,6 +33,10 @@ async function shot(page: Page, name: string) {
 
 test.describe("Dashboard", () => {
   test.skip(!hasSupabaseEnv, "Supabase env (cogni-dev) is not configured");
+  // A fresh account adopts the browser's time zone, and the reviews are
+  // seeded on UTC days. Pin the browser to UTC so local days match the
+  // seeded ones whatever the runner's zone and time of day.
+  test.use({ timezoneId: "UTC" });
 
   test("a brand-new user sees the empty state, reached from the sidebar", async ({
     page,

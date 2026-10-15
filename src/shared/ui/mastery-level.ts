@@ -1,9 +1,16 @@
+import {
+  CONSOLIDATING_THRESHOLD,
+  MASTERED_THRESHOLD,
+} from "@/shared/kernel/mastery-thresholds";
+
 // Shared page-mastery vocabulary (documento-maestro §7.3: Nuevo "sin
 // ítems", Aprendiendo <0.35, Consolidando <0.70, Dominado ≥0.70) consumed by
 // every dashboard chart atom that renders a mastery level as a colour
 // (`StackedLevelBar`, `MasteryHeatmap`) or that needs to derive one from a
 // raw score (`_data/sample.ts`). Centralized here instead of duplicated in
-// each atom so the four-tone palette and thresholds can never drift apart.
+// each atom so the four-tone palette and thresholds can never drift apart;
+// the thresholds themselves come from shared/kernel/mastery-thresholds.ts,
+// the same source study-engine's computeMastery uses.
 export type MasteryLevel =
   | "nuevo"
   | "aprendiendo"
@@ -46,7 +53,7 @@ export function masteryLevelFromScore(
   itemsTotal: number,
 ): MasteryLevel {
   if (itemsTotal === 0) return "nuevo";
-  if (score < 0.35) return "aprendiendo";
-  if (score < 0.7) return "consolidando";
+  if (score < CONSOLIDATING_THRESHOLD) return "aprendiendo";
+  if (score < MASTERED_THRESHOLD) return "consolidando";
   return "dominado";
 }

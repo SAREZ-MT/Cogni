@@ -118,10 +118,32 @@ test.describe("authentication", () => {
     await expect(page.getByRole("status")).toContainText("Si el correo existe");
   });
 
-  test("sends a callback without code back to login with a neutral message", async ({
+  test("sends a callback without code back to login with the invalid-link message", async ({
     page,
   }) => {
     await page.goto("/auth/callback?next=//evil.tld");
+
+    await expect(page).toHaveURL(/\/login\?error=link$/);
+    await expect(
+      page.getByText("El enlace no es válido o ya venció. Pide uno nuevo."),
+    ).toBeVisible();
+  });
+
+  test("sends a Google callback without code back to login with the Google message", async ({
+    page,
+    context,
+    baseURL,
+  }) => {
+    // signInWithGoogleAction marks the Google flow with this cookie (the
+    // redirect URL itself carries no marker).
+    await context.addCookies([
+      {
+        name: "cogni_auth_flow",
+        value: "google",
+        url: new URL("/auth/callback", baseURL).toString(),
+      },
+    ]);
+    await page.goto("/auth/callback");
 
     await expect(page).toHaveURL(/\/login\?error=google$/);
     await expect(

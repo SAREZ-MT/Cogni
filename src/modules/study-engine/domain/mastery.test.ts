@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { computeMastery, MASTERY_LEVELS } from "./mastery";
+import * as kernelThresholds from "@/shared/kernel/mastery-thresholds";
+import {
+  CONSOLIDATING_THRESHOLD,
+  computeMastery,
+  MASTERED_THRESHOLD,
+  MASTERY_LEVELS,
+} from "./mastery";
 import type { Quality } from "./study-item";
 
 const NOW = new Date("2026-01-10T00:00:00.000Z");
@@ -156,5 +162,16 @@ describe("computeMastery (§7.3)", () => {
     );
     expect(result.itemsTotal).toBe(3);
     expect(result.itemsDue).toBe(2);
+  });
+});
+
+describe("mastery thresholds", () => {
+  it("are the shared kernel values (documento-maestro §7.3: 0.35 / 0.70)", () => {
+    expect(CONSOLIDATING_THRESHOLD).toBe(
+      kernelThresholds.CONSOLIDATING_THRESHOLD,
+    );
+    expect(MASTERED_THRESHOLD).toBe(kernelThresholds.MASTERED_THRESHOLD);
+    expect(kernelThresholds.CONSOLIDATING_THRESHOLD).toBe(0.35);
+    expect(kernelThresholds.MASTERED_THRESHOLD).toBe(0.7);
   });
 });

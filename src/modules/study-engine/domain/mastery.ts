@@ -1,3 +1,7 @@
+import {
+  CONSOLIDATING_THRESHOLD,
+  MASTERED_THRESHOLD,
+} from "@/shared/kernel/mastery-thresholds";
 import type { StudyItem } from "./study-item";
 
 // Page mastery v1 exactly as documento-maestro §7.3. Pure; adjusted only by
@@ -14,8 +18,9 @@ export type MasteryLevel = (typeof MASTERY_LEVELS)[number];
 
 // Days of interval at which an item counts as fully stable.
 export const STABILITY_HORIZON_DAYS = 21;
-export const CONSOLIDATING_THRESHOLD = 0.35;
-export const MASTERED_THRESHOLD = 0.7;
+// The band thresholds live in shared/kernel (also used by shared/ui's
+// masteryLevelFromScore); re-exported so study-engine's public names stay.
+export { CONSOLIDATING_THRESHOLD, MASTERED_THRESHOLD };
 
 export type MasteryInput = Pick<
   StudyItem,

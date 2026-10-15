@@ -34,5 +34,4 @@ export {
   type TiptapDoc,
   type TiptapNode,
 } from "./plain-text";
-export type { SavePagePort } from "./save-page-port";
 export type { StorageGateway } from "./storage-gateway";

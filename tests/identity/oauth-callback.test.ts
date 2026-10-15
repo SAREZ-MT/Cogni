@@ -6,7 +6,16 @@ const { exchangeCodeForSession, safeNext } = vi.hoisted(() => ({
   exchangeCodeForSession: vi.fn(),
   safeNext: vi.fn((next: string | null) => next ?? "/"),
 }));
-vi.mock("@/modules/identity", () => ({ exchangeCodeForSession, safeNext }));
+// The flow-cookie contract is pure (identity/domain/auth-flow.ts and
+// application/sign-up.ts), so the mock spreads the real values instead of
+// loading the server-only identity index.
+vi.mock("@/modules/identity", async () => ({
+  exchangeCodeForSession,
+  safeNext,
+  ...(await import("@/modules/identity/domain/auth-flow")),
+  AUTH_CALLBACK_PATH: (await import("@/modules/identity/application/sign-up"))
+    .AUTH_CALLBACK_PATH,
+}));
 
 const { track } = vi.hoisted(() => ({ track: vi.fn() }));
 vi.mock("@/shared/observability/analytics", () => ({
