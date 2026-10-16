@@ -30,7 +30,7 @@ async function webglSupported(page: Page) {
 
 async function expectUsableForm(page: Page) {
   const email = page.getByLabel("Correo electrónico");
-  const password = page.getByLabel("Contraseña");
+  const password = page.getByLabel("Contraseña", { exact: true });
   await expect(email).toBeVisible();
   await email.fill("nadie@cogni-e2e.test");
   await password.fill("Secreta-123");
@@ -75,8 +75,10 @@ test.describe("auth showcase", () => {
     test.skip(!(await webglSupported(page)), "WebGL unavailable here");
     await expect(showcase(page)).toHaveAttribute("data-canvas-state", "ready");
     const canvas = showcase(page).locator("canvas");
-    // A corner with no glass card: only the gradient plus the scene.
-    const corner = { x: 560, y: 40, width: 150, height: 150 };
+    // Top-right of the panel, above the "Repaso de hoy" card (top ≈ 175px at
+    // 1440×900) and its shadow: only the gradient plus the scene. The cards
+    // float, so the sample must not touch any of them.
+    const corner = { x: 560, y: 30, width: 150, height: 110 };
 
     await page.evaluate(() => {
       const element = document.querySelector<HTMLCanvasElement>(
