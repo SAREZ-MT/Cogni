@@ -271,7 +271,7 @@ export function SidebarTreeClient({
           <button
             type="button"
             aria-label="Crear cuaderno"
-            className="flex size-5 shrink-0 items-center justify-center rounded-md text-fg-muted transition-colors duration-200 ease-default hover:bg-neutral-100/90 hover:text-fg"
+            className="flex size-5 shrink-0 items-center justify-center rounded-md text-fg-muted transition-colors duration-200 ease-default hover:bg-hover hover:text-fg"
           >
             <Plus aria-hidden="true" size={14} strokeWidth={1.75} />
           </button>

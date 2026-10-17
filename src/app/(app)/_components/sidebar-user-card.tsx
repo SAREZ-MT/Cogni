@@ -99,7 +99,7 @@ export function SidebarUserCard({
         aria-expanded={open}
         aria-label="Opciones de la cuenta"
         onClick={() => setOpen((value) => !value)}
-        className="flex size-7 shrink-0 items-center justify-center rounded-md text-fg-muted hover:bg-neutral-100 hover:text-fg"
+        className="flex size-7 shrink-0 items-center justify-center rounded-md text-fg-muted hover:bg-hover hover:text-fg"
       >
         <MoreVertical aria-hidden="true" size={16} strokeWidth={1.75} />
       </button>

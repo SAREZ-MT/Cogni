@@ -23,13 +23,22 @@
   --color-neutral-0: #ffffff;
   --color-neutral-50: #fafaf8;
   --color-neutral-100: #f5f3ef;
-  --color-neutral-150: #edeae4;
+  /* Dry gray (no warm cast), user 2026-10-16: replaces the warm #edeae4 as
+     the app canvas, hovers, subtle borders and neutral tiles/pills. */
+  --color-neutral-150: #e8e8e8;
   --color-neutral-200: #e5e2dc;
   --color-neutral-300: #d4d0c8;
   --color-neutral-400: #a8a29e;
   --color-neutral-500: #78716c;
   --color-neutral-600: #57534e;
   --color-neutral-700: #44403c;
+  /* Soft blacks for secondary and muted text (user, 2026-10-16): the warm
+     greys #78716c / #a8a29e were hard to read on white (muted was ~2.5:1). */
+  --color-ink-soft: #404040;
+  --color-ink-muted: #575757;
+  /* Placeholders stay lighter than real text so an empty field never looks
+     filled in. */
+  --color-ink-placeholder: #8c8c8c;
   --color-neutral-800: #292524;
   --color-neutral-900: #1c1917;
   --color-neutral-950: #0c0a09;
@@ -162,7 +171,7 @@
   --bg-page: var(--color-neutral-0);
   --bg-card: var(--color-neutral-0);
   --bg-sidebar: var(--color-neutral-50);
-  --bg-hover: var(--color-neutral-50);
+  --bg-hover: var(--color-neutral-150);
   --bg-active: var(--color-primary-50);
   --bg-muted: var(--color-neutral-100);
   /* Topbar glass (design/shell-look, studyplatform obs 140): 0.92 opacity,
@@ -170,8 +179,9 @@
   --bg-glass: rgb(255 255 255 / 0.92);
 
   --fg-default: var(--color-neutral-900);
-  --fg-secondary: var(--color-neutral-500);
-  --fg-muted: var(--color-neutral-400);
+  --fg-secondary: var(--color-ink-soft);
+  --fg-muted: var(--color-ink-muted);
+  --fg-placeholder: var(--color-ink-placeholder);
   --fg-on-primary: var(--color-neutral-0);
   --fg-active: var(--color-primary-700);
 
@@ -214,6 +224,7 @@
   --color-fg: var(--fg-default);
   --color-fg-secondary: var(--fg-secondary);
   --color-fg-muted: var(--fg-muted);
+  --color-fg-placeholder: var(--fg-placeholder);
   --color-fg-active: var(--fg-active);
   --color-active-strong: var(--bg-active-strong);
   --color-border-default: var(--border-default);
@@ -448,7 +459,7 @@
     float: left;
     height: 0;
     pointer-events: none;
-    color: var(--color-fg-muted);
+    color: var(--color-fg-placeholder);
   }
 
   /* S6a defect fix: the global `:focus-visible` rule below draws a ring

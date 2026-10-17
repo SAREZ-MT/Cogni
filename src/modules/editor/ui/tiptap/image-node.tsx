@@ -389,7 +389,7 @@ function ImageNodeView({
                   placeholder="Añade un pie de imagen"
                   aria-label="Pie de imagen"
                   data-testid="image-node-caption"
-                  className="w-full border-none bg-transparent text-center text-fg-muted text-xs outline-none placeholder:text-fg-muted"
+                  className="w-full border-none bg-transparent text-center text-fg-muted text-xs outline-none placeholder:text-fg-placeholder"
                   onChange={(event) => setCaptionDraft(event.target.value)}
                   onBlur={commitCaption}
                   onKeyDown={(event) => {

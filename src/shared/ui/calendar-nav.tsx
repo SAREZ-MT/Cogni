@@ -16,7 +16,7 @@ export interface CalendarNavProps {
 }
 
 const ITEM_CLASS =
-  "inline-flex h-9 items-center justify-center text-fg-secondary transition-colors hover:bg-neutral-50 hover:text-fg focus-visible:relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+  "inline-flex h-9 items-center justify-center text-fg-secondary transition-colors hover:bg-hover hover:text-fg focus-visible:relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 // Calendar period navigation (Phase 7 T2, the Untitled UI month calendar's
 // "← | Today | →" button group): one bordered group of three

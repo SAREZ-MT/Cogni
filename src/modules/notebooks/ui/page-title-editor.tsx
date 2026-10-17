@@ -190,7 +190,7 @@ export function PageTitleEditor({
       onChange={handleChange}
       onKeyDown={handleKeyDown}
       onBlur={flush}
-      className="w-full resize-none overflow-hidden border-none bg-transparent font-bold text-[36px] text-fg leading-[1.1] outline-none placeholder:text-fg-muted"
+      className="w-full resize-none overflow-hidden border-none bg-transparent font-bold text-[36px] text-fg leading-[1.1] outline-none placeholder:text-fg-placeholder"
     />
   );
 }

@@ -10,7 +10,7 @@ export function GoogleButton() {
       <SubmitButton
         variant="outline"
         size="lg"
-        className="w-full border-border-default bg-card hover:bg-neutral-100"
+        className="w-full border-border-default bg-card hover:bg-hover"
       >
         <GoogleIcon />
         Continuar con Google

@@ -23,7 +23,7 @@
   --color-neutral-0:   #FFFFFF;
   --color-neutral-50:  #FAFAF8;
   --color-neutral-100: #F5F3EF;
-  --color-neutral-150: #EDEAE4;
+  --color-neutral-150: #E8E8E8;  /* dry gray, 2026-10-16 (was warm #EDEAE4) */
   --color-neutral-200: #E5E2DC;
   --color-neutral-300: #D4D0C8;
   --color-neutral-400: #A8A29E;
@@ -73,19 +73,20 @@
   --color-info-600:    #2563EB;
 
   /* ========== SEMANTIC TOKENS (Light) ========== */
-  --bg-app:       var(--color-neutral-100);  /* warm gray outer bg */
+  --bg-app:       var(--color-neutral-150);  /* dry gray outer bg (app canvas, 2026-10-16) */
   --bg-page:      var(--color-neutral-0);    /* white content area */
   --bg-card:      var(--color-neutral-0);
   --bg-sidebar:   var(--color-neutral-0);
-  --bg-hover:     var(--color-neutral-50);
+  --bg-hover:     var(--color-neutral-150);
   --bg-active:    var(--color-primary-50);
   --bg-muted:     var(--color-neutral-100);
   --bg-overlay:   rgba(28, 25, 23, 0.4);
   --bg-topbar:    var(--color-neutral-0);
 
   --fg-default:   var(--color-neutral-900);
-  --fg-secondary: var(--color-neutral-500);
-  --fg-muted:     var(--color-neutral-400);
+  --fg-secondary: #404040;  /* soft black, 2026-10-16 (was neutral-500) */
+  --fg-muted:     #575757;  /* soft black, 2026-10-16 (was neutral-400) */
+  --fg-placeholder: #8C8C8C; /* input/editor placeholders, lighter than text */
   --fg-on-primary:var(--color-neutral-0);
   --fg-link:      var(--color-primary-600);
   --fg-active:    var(--color-primary-600);
