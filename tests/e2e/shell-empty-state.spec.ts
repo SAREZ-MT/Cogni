@@ -16,7 +16,7 @@ test.describe("app shell", () => {
     await page.goto("/");
 
     const body = page.locator("body");
-    await expect(body).toHaveCSS("background-color", "rgb(237, 234, 228)");
+    await expect(body).toHaveCSS("background-color", "rgb(232, 232, 232)");
     await expect(body).toHaveCSS("font-family", /DM.?Sans/i);
 
     const sidebar = page.getByRole("navigation", { name: "Barra lateral" });
@@ -78,7 +78,7 @@ test.describe("app shell", () => {
       sidebar.getByRole("link", { name: "Exámenes" }),
     ).toHaveAttribute("href", "/exams");
     await expect(
-      sidebar.getByRole("link", { name: "Active recall" }),
+      sidebar.getByRole("link", { name: "Recordación activa" }),
     ).toHaveAttribute("href", "/active-recall");
     // Phase 7 T1: the old "Horarios" row is the live "Calendario" entry.
     await expect(
@@ -88,9 +88,9 @@ test.describe("app shell", () => {
     await expect(
       sidebar.getByRole("link", { name: /Configuración/ }),
     ).toHaveAttribute("href", "/configuracion");
-    // Phase 7 T4: "Dashboard" runs on analytics data.
+    // Phase 7 T4: "Progreso" runs on analytics data.
     await expect(
-      sidebar.getByRole("link", { name: "Dashboard", exact: true }),
+      sidebar.getByRole("link", { name: "Progreso", exact: true }),
     ).toHaveAttribute("href", "/dashboard");
     await expect(sidebar.locator('[aria-disabled="true"]')).toHaveCount(0);
     await expect(
@@ -134,7 +134,7 @@ test.describe("app shell", () => {
     const hub = await page.goto("/active-recall");
     expect(hub?.status()).toBe(200);
     await expect(
-      page.getByRole("heading", { level: 1, name: "Active recall" }),
+      page.getByRole("heading", { level: 1, name: "Recordación activa" }),
     ).toBeVisible();
     await expect(page.getByText("Biología Celular")).toHaveCount(0);
     await expect(page.getByText("Vista previa")).toHaveCount(0);
@@ -147,7 +147,9 @@ test.describe("app shell", () => {
       const response = await page.goto(path);
 
       expect(response?.status(), path).toBe(404);
-      await expect(page.getByText("Active recall — Biología")).toHaveCount(0);
+      await expect(page.getByText("Recordación activa — Biología")).toHaveCount(
+        0,
+      );
       await expect(page.getByText("Pregunta 1 de")).toHaveCount(0);
       await expect(page.getByText("Sesiones por página")).toHaveCount(0);
     }
@@ -196,7 +198,7 @@ test.describe("app shell", () => {
 
     expect(response?.status()).toBe(200);
     await expect(
-      page.getByRole("heading", { name: "Dashboard", level: 1 }),
+      page.getByRole("heading", { name: "Progreso", level: 1 }),
     ).toBeVisible();
   });
 
@@ -240,7 +242,7 @@ test.describe("public auth layout", () => {
     );
     await expect(page.getByTestId("public-panel-form")).toHaveCSS(
       "background-color",
-      "rgb(250, 250, 248)",
+      "rgb(245, 243, 239)",
     );
     await expect(
       page.getByRole("button", { name: "Iniciar sesión" }),
@@ -252,7 +254,7 @@ test.describe("public auth layout", () => {
   }) => {
     await page.goto("/login");
     await page.getByLabel("Correo electrónico").fill("ana@example.com");
-    await page.getByLabel("Contraseña").fill("secreta123");
+    await page.getByLabel("Contraseña", { exact: true }).fill("secreta123");
 
     const [request] = await Promise.all([
       page.waitForRequest((candidate) => candidate.url().includes("/login")),

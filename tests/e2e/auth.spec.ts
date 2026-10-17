@@ -27,7 +27,7 @@ test.describe("authentication", () => {
     try {
       await page.goto("/register");
       await page.getByLabel("Correo electrónico").fill(email);
-      await page.getByLabel("Contraseña").fill("Secreta-123");
+      await page.getByLabel("Contraseña", { exact: true }).fill("Secreta-123");
       await page.getByRole("button", { name: "Crear cuenta" }).click();
       await expect(page.getByRole("status")).toContainText(
         "Te enviamos un correo de verificación",
@@ -35,7 +35,7 @@ test.describe("authentication", () => {
 
       await page.goto("/login");
       await page.getByLabel("Correo electrónico").fill(email);
-      await page.getByLabel("Contraseña").fill("Secreta-123");
+      await page.getByLabel("Contraseña", { exact: true }).fill("Secreta-123");
       await page.getByRole("button", { name: "Iniciar sesión" }).click();
       await expect(formAlert(page)).toContainText(
         "Aún no has verificado tu correo",
@@ -51,7 +51,7 @@ test.describe("authentication", () => {
   }) => {
     await page.goto("/register");
     await page.getByLabel("Correo electrónico").fill(verifiedUser.email);
-    await page.getByLabel("Contraseña").fill("Otra-clave-123");
+    await page.getByLabel("Contraseña", { exact: true }).fill("Otra-clave-123");
     await page.getByRole("button", { name: "Crear cuenta" }).click();
 
     await expect(formAlert(page)).toContainText("El email ya está registrado");
@@ -62,7 +62,7 @@ test.describe("authentication", () => {
   }) => {
     await page.goto("/login");
     await page.getByLabel("Correo electrónico").fill("nadie@cogni-e2e.test");
-    await page.getByLabel("Contraseña").fill("Secreta-123");
+    await page.getByLabel("Contraseña", { exact: true }).fill("Secreta-123");
     await page.getByRole("button", { name: "Iniciar sesión" }).click();
 
     await expect(formAlert(page)).toContainText(

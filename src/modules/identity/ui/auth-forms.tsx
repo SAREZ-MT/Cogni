@@ -63,6 +63,7 @@ export function SignUpForm() {
         type="password"
         autoComplete="new-password"
         minLength={8}
+        hint="Mínimo 8 caracteres"
         required
       />
       <SubmitButton size="lg" className="w-full" pending={pending}>
@@ -108,6 +109,7 @@ export function ResetPasswordForm() {
         type="password"
         autoComplete="new-password"
         minLength={8}
+        hint="Mínimo 8 caracteres"
         required
       />
       <SubmitButton size="lg" className="w-full" pending={pending}>

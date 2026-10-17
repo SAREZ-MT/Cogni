@@ -74,7 +74,7 @@ export async function deleteUserByEmail(email: string): Promise<void> {
 export async function submitSignIn(page: Page, user: TestUser): Promise<void> {
   await page.goto("/login");
   await page.getByLabel("Correo electrónico").fill(user.email);
-  await page.getByLabel("Contraseña").fill(user.password);
+  await page.getByLabel("Contraseña", { exact: true }).fill(user.password);
   await page.getByRole("button", { name: "Iniciar sesión" }).click();
 }
 

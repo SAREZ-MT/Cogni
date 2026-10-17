@@ -11,14 +11,15 @@ export default function RegisterPage() {
           Crea tu cuenta
         </h1>
         <p className="text-fg-secondary text-sm">
-          Te enviaremos un correo para verificarla.
+          Empieza a estudiar con IA en minutos. Te enviaremos un correo para
+          verificarla.
         </p>
       </div>
       <SignUpForm />
       <div className="flex flex-col gap-4">
         <TextDivider>o</TextDivider>
         <GoogleButton />
-        <TermsNotice />
+        <TermsNotice variant="sign-up" />
       </div>
       <p className="border-border-default border-t pt-6 text-center text-fg-secondary text-sm">
         ¿Ya tienes cuenta? <TextLink href="/login">Inicia sesión</TextLink>
