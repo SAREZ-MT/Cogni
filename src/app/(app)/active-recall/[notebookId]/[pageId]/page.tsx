@@ -38,7 +38,7 @@ export default async function ActiveRecallSessionPage({
     <section className="flex flex-1 flex-col">
       <SetBreadcrumb
         items={[
-          { label: "Active recall", href: "/active-recall" },
+          { label: "Recordación activa", href: "/active-recall" },
           { label: notebookTitle, href: `/active-recall/${notebookId}` },
           { label: page.title },
         ]}

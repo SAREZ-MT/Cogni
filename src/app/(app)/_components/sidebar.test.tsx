@@ -100,6 +100,28 @@ describe("Sidebar", () => {
     );
   });
 
+  it.each([
+    ["/flashcards/biologia-celular", "Flashcards", "yellow"],
+    ["/active-recall/nb-1/pg-1", "Recordación activa", "green"],
+    ["/exams/nb-1/pg-1", "Exámenes", "rose"],
+  ])("highlights the active technique %s in its own colour", (path, label, tone) => {
+    pathname.current = path;
+    render(<Sidebar initialCollapsed={false} user={USER} previewsEnabled />);
+
+    expect(screen.getByRole("link", { name: label })).toHaveAttribute(
+      "data-tone",
+      tone,
+    );
+  });
+
+  it("keeps the neutral highlight for entries that are not techniques", () => {
+    render(<Sidebar initialCollapsed={false} user={USER} previewsEnabled />);
+
+    expect(screen.getByRole("link", { name: /Inicio/ })).not.toHaveAttribute(
+      "data-tone",
+    );
+  });
+
   it("marks Flashcards active on its own routes", () => {
     pathname.current = "/flashcards/biologia-celular";
     render(<Sidebar initialCollapsed={false} user={USER} previewsEnabled />);
@@ -129,20 +151,18 @@ describe("Sidebar", () => {
   it("links the Active recall nav item to /active-recall while previews are enabled", () => {
     render(<Sidebar initialCollapsed={false} user={USER} previewsEnabled />);
 
-    expect(screen.getByRole("link", { name: "Active recall" })).toHaveAttribute(
-      "href",
-      "/active-recall",
-    );
+    expect(
+      screen.getByRole("link", { name: "Recordación activa" }),
+    ).toHaveAttribute("href", "/active-recall");
   });
 
   it("marks Active recall active on its own routes", () => {
     pathname.current = "/active-recall/biologia-celular/mitocondria";
     render(<Sidebar initialCollapsed={false} user={USER} previewsEnabled />);
 
-    expect(screen.getByRole("link", { name: "Active recall" })).toHaveAttribute(
-      "aria-current",
-      "page",
-    );
+    expect(
+      screen.getByRole("link", { name: "Recordación activa" }),
+    ).toHaveAttribute("aria-current", "page");
   });
 
   it("keeps Active recall a live link when previews are disabled (production)", () => {
@@ -151,11 +171,11 @@ describe("Sidebar", () => {
       <Sidebar initialCollapsed={false} user={USER} previewsEnabled={false} />,
     );
 
-    const link = screen.getByRole("link", { name: "Active recall" });
+    const link = screen.getByRole("link", { name: "Recordación activa" });
     expect(link).toHaveAttribute("href", "/active-recall");
     expect(link).toHaveAttribute("aria-current", "page");
     expect(
-      screen.getByText("Active recall").closest("[aria-disabled]"),
+      screen.getByText("Recordación activa").closest("[aria-disabled]"),
     ).toBeNull();
   });
 
@@ -201,7 +221,7 @@ describe("Sidebar", () => {
     pathname.current = "/dashboard";
     render(<Sidebar initialCollapsed={false} user={USER} previewsEnabled />);
 
-    expect(screen.getByRole("link", { name: "Dashboard" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Progreso" })).toHaveAttribute(
       "aria-current",
       "page",
     );
@@ -268,12 +288,12 @@ describe("Sidebar", () => {
         />,
       );
 
-      expect(screen.getByRole("link", { name: "Dashboard" })).toHaveAttribute(
+      expect(screen.getByRole("link", { name: "Progreso" })).toHaveAttribute(
         "href",
         "/dashboard",
       );
       expect(
-        screen.getByText("Dashboard").closest("[aria-disabled]"),
+        screen.getByText("Progreso").closest("[aria-disabled]"),
       ).toBeNull();
     });
 

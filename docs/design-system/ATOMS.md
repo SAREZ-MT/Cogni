@@ -1216,7 +1216,7 @@ Página, Autoevaluación, Resultado real, Brecha).
   "Actividad de repaso" — title, big value + delta line, a 3-dot legend row
   + `PeriodFilter` (7/15/30), then a stacked `BarChart` — one bar per day,
   MONOCHROME series (`neutral-900`/`neutral-500`/`neutral-300` for
-  Flashcards/Active recall/Exámenes), `radius=[4,4,0,0]` on the top
+  Flashcards/Recordación activa/Exámenes), `radius=[4,4,0,0]` on the top
   (Exámenes) segment only, a dashed `CartesianGrid`, and (15/30 días only)
   a light dashed `ReferenceLine` + "Sem N" label at every Monday so the
   chart reads day-by-day AND week-by-week. X-axis ticks: every day at 7

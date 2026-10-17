@@ -118,7 +118,7 @@ test.describe("active recall hub", () => {
 
     // A new owner: the hub has no session yet.
     const sidebar = page.getByRole("navigation", { name: "Barra lateral" });
-    await sidebar.getByRole("link", { name: "Active recall" }).click();
+    await sidebar.getByRole("link", { name: "Recordación activa" }).click();
     await expect(page).toHaveURL(/\/active-recall$/);
     await expect(page.getByText("Sin sesiones todavía")).toBeVisible();
     await page.goBack();
@@ -150,10 +150,10 @@ test.describe("active recall hub", () => {
     // Hub: the notebook with its session, the study-engine mastery and a
     // quick start on the page, which has recall questions due today (the
     // seven it did not show yet are new, hence due).
-    await sidebar.getByRole("link", { name: "Active recall" }).click();
+    await sidebar.getByRole("link", { name: "Recordación activa" }).click();
     await expect(page).toHaveURL(/\/active-recall$/);
     await expect(
-      sidebar.getByRole("link", { name: "Active recall" }),
+      sidebar.getByRole("link", { name: "Recordación activa" }),
     ).toHaveAttribute("aria-current", "page");
     const db = await stored(pageId as string);
     expect(db.dueRecallQuestions).toBeGreaterThan(0);

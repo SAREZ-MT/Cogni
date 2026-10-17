@@ -17,7 +17,7 @@ export function WeakTopics() {
       }
       title="Temas débiles"
       titleClassName="text-[15px]"
-      description="Cuando actives Active recall y Exámenes verás aquí lo que más te cuesta."
+      description="Cuando practiques la recordación activa y los exámenes verás aquí lo que más te cuesta."
       descriptionClassName="max-w-xs text-[12.5px] leading-relaxed"
       action={
         <button

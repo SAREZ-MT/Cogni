@@ -83,7 +83,7 @@ describe("ActiveRecallHubPage", () => {
     render(await ActiveRecallHubPage());
 
     expect(
-      screen.getByRole("heading", { name: "Active recall" }),
+      screen.getByRole("heading", { name: "Recordación activa" }),
     ).toBeInTheDocument();
     expect(screen.queryByText("Vista previa")).toBeNull();
   });
@@ -247,7 +247,7 @@ describe("ActiveRecallHubPage", () => {
     expect(screen.getByText("Sin sesiones todavía")).toBeInTheDocument();
     expect(
       screen.getByText(
-        "Abre una página en el editor y usa Técnicas → Active recall → Generar.",
+        "Abre una página en el editor y usa Técnicas → Recordación activa → Generar.",
       ),
     ).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Nueva sesión/ })).toBeNull();

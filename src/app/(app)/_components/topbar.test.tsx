@@ -42,6 +42,14 @@ describe("Topbar", () => {
     expect(banner).toHaveTextContent("Mitocondria");
   });
 
+  it("renders the user menu as its only control (no inert share or notifications buttons)", () => {
+    render(<Topbar user={USER} />);
+
+    const buttons = screen.getAllByRole("button", { hidden: true });
+    expect(buttons).toHaveLength(1);
+    expect(buttons[0]).toHaveAccessibleName("Menú de usuario");
+  });
+
   it("renders the user menu trigger as a gradient avatar with initials", () => {
     render(<Topbar user={USER} />);
 

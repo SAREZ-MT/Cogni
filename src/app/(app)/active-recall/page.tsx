@@ -83,11 +83,11 @@ export default async function ActiveRecallHubPage() {
 
   return (
     <section className="flex flex-1 flex-col gap-6">
-      <SetBreadcrumb items={[{ label: "Active recall" }]} />
+      <SetBreadcrumb items={[{ label: "Recordación activa" }]} />
 
       <SectionHeader
         eyebrow="Técnicas de estudio"
-        title="Active recall"
+        title="Recordación activa"
         titleClassName="text-[26px]"
         description={`${plural(totalSessions, "sesión", "sesiones")} · ${plural(activeNotebookCount, "cuaderno", "cuadernos")}`}
         actions={
@@ -149,7 +149,7 @@ export default async function ActiveRecallHubPage() {
           titleClassName="text-base"
           description={
             result.ok
-              ? "Abre una página en el editor y usa Técnicas → Active recall → Generar."
+              ? "Abre una página en el editor y usa Técnicas → Recordación activa → Generar."
               : "No pudimos cargar tus sesiones. Intenta de nuevo."
           }
           descriptionClassName="max-w-[340px]"

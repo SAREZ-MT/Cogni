@@ -191,10 +191,14 @@ describe("TechniqueCard technique colours", () => {
 describe("TechniqueIconStrip", () => {
   it("exposes the technique name as a tooltip title", () => {
     render(
-      <TechniqueIconStrip icon={Layers} tone="green" title="Active recall" />,
+      <TechniqueIconStrip
+        icon={Layers}
+        tone="green"
+        title="Recordación activa"
+      />,
     );
 
-    expect(screen.getByTitle("Active recall")).toBeInTheDocument();
+    expect(screen.getByTitle("Recordación activa")).toBeInTheDocument();
   });
 
   it("uses the technique's pastel tile", () => {

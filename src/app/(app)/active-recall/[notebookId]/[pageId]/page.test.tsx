@@ -79,7 +79,7 @@ describe("ActiveRecallSessionPage", () => {
       screen.getByText("¿Qué produce la mitocondria?"),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("Active recall — Biología celular"),
+      screen.getByText("Recordación activa — Biología celular"),
     ).toBeInTheDocument();
     expect(screen.getByText("Mitocondria")).toBeInTheDocument();
   });
@@ -118,7 +118,9 @@ describe("ActiveRecallSessionPage", () => {
 
     render(await ActiveRecallSessionPage(props()));
 
-    expect(screen.getByText("Active recall — Cuaderno")).toBeInTheDocument();
+    expect(
+      screen.getByText("Recordación activa — Cuaderno"),
+    ).toBeInTheDocument();
   });
 
   // ADR 0003: the evaluation scheduled with after() by the finish action

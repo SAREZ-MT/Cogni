@@ -68,7 +68,7 @@ const MAIN_SECTION: { label: string; items: NavEntry[] } = {
     {
       href: "/dashboard",
       icon: BarChart3,
-      label: "Dashboard",
+      label: "Progreso",
       isActive: (path) => path.startsWith("/dashboard"),
     },
     {
@@ -87,18 +87,21 @@ const TECNICAS_SECTION: { label: string; items: NavEntry[] } = {
       href: "/flashcards",
       icon: Layers,
       label: "Flashcards",
+      tone: "yellow",
       isActive: (path) => path.startsWith("/flashcards"),
     },
     {
       href: "/active-recall",
       icon: Brain,
-      label: "Active recall",
+      label: "Recordación activa",
+      tone: "green",
       isActive: (path) => path.startsWith("/active-recall"),
     },
     {
       href: "/exams",
       icon: ClipboardList,
       label: "Exámenes",
+      tone: "rose",
       isActive: (path) => path.startsWith("/exams"),
     },
   ],
@@ -208,6 +211,7 @@ export function Sidebar({
                   label={item.label}
                   active={item.active}
                   shortcut={item.shortcut}
+                  tone={item.tone}
                   collapsed={collapsed}
                 />
               );

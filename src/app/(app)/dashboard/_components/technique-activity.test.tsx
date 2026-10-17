@@ -27,7 +27,7 @@ describe("TechniqueActivity", () => {
     render(<TechniqueActivity techniques={sampleView().techniques} />);
 
     expect(screen.getAllByRole("figure")).toHaveLength(3);
-    for (const name of ["Flashcards", "Active recall", "Exámenes"]) {
+    for (const name of ["Flashcards", "Recordación activa", "Exámenes"]) {
       expect(
         screen.getByRole("heading", { level: 3, name }),
       ).toBeInTheDocument();
@@ -82,7 +82,7 @@ describe("TechniqueActivity", () => {
       within(card("Flashcards")).getByText("Acierto 75%"),
     ).toBeInTheDocument();
     expect(
-      within(card("Active recall")).getByText("Acierto 50%"),
+      within(card("Recordación activa")).getByText("Acierto 50%"),
     ).toBeInTheDocument();
   });
 
@@ -108,7 +108,7 @@ describe("TechniqueActivity", () => {
     render(<TechniqueActivity techniques={sampleView().techniques} />);
 
     expect(
-      within(card("Active recall")).queryByText(/vs la semana anterior/),
+      within(card("Recordación activa")).queryByText(/vs la semana anterior/),
     ).toBeNull();
   });
 
