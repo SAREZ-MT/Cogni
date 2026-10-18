@@ -12,7 +12,7 @@ vi.mock("@/modules/notebooks", () => ({
   ],
 }));
 
-import { toTodayRows } from "./today-rows";
+import { toReviewRows, toTodayRows } from "./today-rows";
 
 function due(
   pageId: string,
@@ -100,5 +100,57 @@ describe("toTodayRows", () => {
       pageTitle: "Página a",
       notebookTitle: "Biología",
     });
+  });
+});
+
+describe("toReviewRows", () => {
+  it("splits each page into one row per technique due, keeping the page order", () => {
+    const rows = toReviewRows([
+      due("b", { flashcard: 2, exam: 1 }, "pink"),
+      due("a", { recall: 1 }, null),
+    ]);
+
+    expect(rows).toEqual([
+      {
+        key: "b:flashcard",
+        kind: "flashcard",
+        tone: "yellow",
+        techniqueLabel: "Flashcards",
+        count: 2,
+        pageTitle: "Página b",
+        notebookTitle: "Biología",
+        notebookTone: "pink",
+        href: "/flashcards/n1/b?repasar=1",
+        ariaLabel: "Repasar Flashcards de Página b: 2 pendientes",
+      },
+      {
+        key: "b:exam_question",
+        kind: "exam_question",
+        tone: "rose",
+        techniqueLabel: "Examen",
+        count: 1,
+        pageTitle: "Página b",
+        notebookTitle: "Biología",
+        notebookTone: "pink",
+        href: "/exams/n1/b",
+        ariaLabel: "Repasar Examen de Página b: 1 pendiente",
+      },
+      {
+        key: "a:recall_question",
+        kind: "recall_question",
+        tone: "green",
+        techniqueLabel: "Recordación activa",
+        count: 1,
+        pageTitle: "Página a",
+        notebookTitle: "Biología",
+        notebookTone: "purple",
+        href: "/active-recall/n1/a",
+        ariaLabel: "Repasar Recordación activa de Página a: 1 pendiente",
+      },
+    ]);
+  });
+
+  it("returns no rows when nothing is due", () => {
+    expect(toReviewRows([])).toEqual([]);
   });
 });

@@ -32,10 +32,10 @@ test.describe("app shell", () => {
 
   // Scenario "Reescritura de shell-empty-state.spec.ts"
   // (specs/design-tokens-and-shell/spec.md): a fresh owner without
-  // notebooks sees the empty-state message and a control to create the
-  // first one. Since design pass 2 the sidebar is navigation only, so both
-  // live in Home's content area (the "Nuevo cuaderno" pill, whose dialog
-  // confirms with "Crear cuaderno").
+  // notebooks sees the empty state and a control to create the first one.
+  // Since Phase 8 H2-T3 it is the "Tu inicio está vacío por ahora" screen:
+  // one primary "Crea tu primer cuaderno" (whose dialog confirms with
+  // "Crear cuaderno"), the "Ver tutorial" link and three static previews.
   test("home shows the empty state and a control to create the first notebook", async ({
     page,
     freshUser,
@@ -50,16 +50,34 @@ test.describe("app shell", () => {
 
     const content = page.getByTestId("content-area");
     await expect(
-      content.getByText("Aún no tienes cuadernos. Crea uno para empezar."),
+      content.getByRole("heading", {
+        level: 1,
+        name: "Tu inicio está vacío por ahora",
+      }),
+    ).toBeVisible();
+    const create = content.getByRole("button", {
+      name: "Crea tu primer cuaderno",
+    });
+    await expect(create).toBeVisible();
+    await expect(create).toHaveAttribute("data-tour", "crear-cuaderno");
+    await expect(
+      content.getByRole("button", { name: "Ver tutorial", exact: true }),
     ).toBeVisible();
     await expect(
-      content.getByRole("button", { name: "Nuevo cuaderno" }),
+      content
+        .getByRole("region", { name: "Lo que verás aquí" })
+        .getByRole("heading", { level: 3 }),
+    ).toHaveText(["Para hoy", "Continúa donde lo dejaste", "Temas débiles"]);
+
+    await create.click();
+    await expect(
+      page.getByRole("dialog").getByRole("button", { name: "Crear cuaderno" }),
     ).toBeVisible();
 
     // The sidebar no longer carries the notebook tree or its empty state.
     const sidebar = page.getByRole("navigation", { name: "Barra lateral" });
     await expect(
-      sidebar.getByText("Aún no tienes cuadernos. Crea uno para empezar."),
+      sidebar.getByText("Tu inicio está vacío por ahora"),
     ).toHaveCount(0);
   });
 

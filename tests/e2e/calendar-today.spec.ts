@@ -92,21 +92,33 @@ test.describe("Calendario — Hoy", () => {
       await expect(exam).toContainText("3");
       await shot(page, "calendar-today-due");
 
-      // Home: the real total across techniques, linking to the calendar.
-      // The e2e user is shared per worker and other items may become due at
-      // any moment, so the total is checked against this test's own 6 seeded
-      // items as a lower bound instead of an exact count read beforehand.
+      // Home (H2-T5f, H2-T5i): today's progress per technique in study
+      // units (one page × technique), linking to each technique, and a
+      // "Repasar" row in "Repasar hoy" that opens the scheduled
+      // session directly. The e2e user is shared per worker and other
+      // pages may become due at any moment, so the day's total (done +
+      // still due) is checked against this test's one seeded page as a
+      // lower bound.
       await page.goto("/");
-      const stat = page.getByTestId("due-today-stat");
-      await expect(stat).toContainText(/\d+ repasos/);
-      const shown = (await stat.textContent())?.match(/(\d+) repasos/)?.[1];
-      expect(Number(shown)).toBeGreaterThanOrEqual(6);
-      await expect(stat).not.toContainText("pronto");
-      await stat.getByRole("link", { name: "Ver calendario →" }).click();
-      await expect(page).toHaveURL("/calendario");
-      await expect(
-        page.getByTestId("today-row").filter({ hasText: notebookTitle }),
-      ).toHaveCount(1);
+      const flashcardsCard = page.getByRole("link", {
+        name: /^Flashcards: \d+ de \d+ repasos hechos hoy$/,
+      });
+      await expect(flashcardsCard).toHaveAttribute("href", "/flashcards");
+      const total = (await flashcardsCard.getAttribute("aria-label"))?.match(
+        /de (\d+) repasos/,
+      )?.[1];
+      expect(Number(total)).toBeGreaterThanOrEqual(1);
+      const reviewFlashcards = page
+        .getByRole("region", { name: /^Repasar hoy$/ })
+        .locator(`a[href="/flashcards/${notebookId}/${pageId}?repasar=1"]`);
+      await expect(reviewFlashcards).toHaveAttribute(
+        "aria-label",
+        /^Repasar Flashcards de /,
+      );
+      await reviewFlashcards.click();
+      await expect(page).toHaveURL(
+        `/flashcards/${notebookId}/${pageId}?repasar=1`,
+      );
     } finally {
       await clearStudyItems(pageId);
     }

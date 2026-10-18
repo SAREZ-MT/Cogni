@@ -12,6 +12,21 @@ export interface TodayChip {
   ariaLabel: string;
 }
 
+// One technique of one page with items due now: a "Para repasar hoy" row
+// on Home, whose button opens that technique's session directly.
+export interface ReviewRow {
+  key: string;
+  kind: DueKind;
+  tone: TechniqueTone;
+  techniqueLabel: string;
+  count: number;
+  pageTitle: string;
+  notebookTitle: string;
+  notebookTone: NotebookColor;
+  href: string;
+  ariaLabel: string;
+}
+
 export interface TodayRow {
   pageId: string;
   pageTitle: string;
@@ -54,7 +69,8 @@ export const TECHNIQUES: readonly {
 
 const DEFAULT_TONE: NotebookColor = "purple";
 
-function toTone(color: string | null): NotebookColor {
+// A stored notebook colour as a NotebookColor (violet when unknown).
+export function toTone(color: string | null): NotebookColor {
   return COLOR_PALETTE.find((candidate) => candidate === color) ?? DEFAULT_TONE;
 }
 
@@ -85,4 +101,26 @@ export function toTodayRows(pages: readonly DueTodayPageView[]): TodayRow[] {
       chips,
     };
   });
+}
+
+// Home's "Para repasar hoy" (Phase 8 H2-T5d): the same due pages, already
+// in "waited longest first" order, split into one row per technique due,
+// in the techniques panel order within a page.
+export function toReviewRows(pages: readonly DueTodayPageView[]): ReviewRow[] {
+  return pages.flatMap((page) =>
+    TECHNIQUES.filter(({ kind }) => page.due[kind] > 0).map(
+      ({ kind, tone, label, href }) => ({
+        key: `${page.pageId}:${kind}`,
+        kind,
+        tone,
+        techniqueLabel: label,
+        count: page.due[kind],
+        pageTitle: page.pageTitle,
+        notebookTitle: page.notebookTitle,
+        notebookTone: toTone(page.notebookColor),
+        href: href(page.notebookId, page.pageId),
+        ariaLabel: `Repasar ${label} de ${page.pageTitle}: ${pendientes(page.due[kind])}`,
+      }),
+    ),
+  );
 }

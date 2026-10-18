@@ -12,7 +12,7 @@ Surface box: `rounded-xl border`.
   · `success` · `error` · `achievement` (gradient) — only `default` is
   currently consumed; the rest exist as documented API surface.
 - `padding`: `none | sm(16px) | md(20px) | lg(24px)`. A non-standard padding
-  (StatCard's 18px) stays `padding="none"` + a `className` override.
+  (the former Home StatCard's 18px) stays `padding="none"` + a `className` override.
 - `interactive`: adds the hover lift (`-translate-y-0.5` + `shadow-card-hover`).
 - `asChild` (radix Slot, same pattern as `Button`): renders the styling onto
   the single child instead of a `div` — used to keep `<article>`/`<Link>`
@@ -34,7 +34,7 @@ The pastel/semantic square behind notebook, stat and empty-state icons.
   scale, so the key is the exact px value instead of an idealized
   sm/md/lg/xl/2xl. `"48"` was added for the Flashcards design preview's
   `DeckSummaryCard` header tile (studyplatform-flashcards-style.md §4).
-- `radius`: `md(8px) | input(10px) | tile(14px) | xl(16px)` — independent of
+- `radius`: `md(8px) | input(10px) | tile(14px) | xl(16px) | full` — independent of
   `size` (size 36 ships with both `md` and `input` radius on different screens).
 - `tone`: notebook pastel pairs (`purple | pink | green | yellow | orange |
   blue | mint`, matching `NotebookColor`) plus semantic tones (`primary |
@@ -88,8 +88,8 @@ Thin rounded-pill track + fill. `value` (0-100, clamped; non-finite counts as
 an inline `style`. The track exposes `role="progressbar"` with
 `aria-valuenow` (clamped) / `aria-valuemin=0` / `aria-valuemax=100`; a name
 is required whenever the bar is not decorative (axe `aria-progressbar-name`):
-pass `aria-label`, or `aria-labelledby` pointing at a visible label (StatCard
-uses `useId` + the stat's label). Only a purely decorative bar may opt out with
+pass `aria-label`, or `aria-labelledby` pointing at a visible label (the former
+Home StatCard used `useId` + the stat's label). Only a purely decorative bar may opt out with
 `role="presentation" aria-hidden`. `data-slot="progress-bar"`/`"progress-fill"`
 are unchanged so existing test queries still work.
 
@@ -104,15 +104,112 @@ caught up" panel). `icon` is a pre-built node (usually an `IconTile`) — this
 atom only lays it out. `fill` adds `flex-1`; `as`/`titleAs` pick the root/
 title element tag.
 
-Used by: `app/(app)/page.tsx` (zero-notebooks, `plain`), `notebooks/page.tsx`
+Used by: `home/home-empty-state.tsx` (zero-notebooks Home, `plain`, Phase 8
+H2-T3), `notebooks/page.tsx`
 (zero-notebooks, `dashed`), `notebooks/[notebookId]/page.tsx` (zero-pages,
 `dashed`), `home/ready-to-review.tsx` (`success`), `home/weak-topics.tsx`
 (`tinted`).
 
+## FeaturePreviewCard (`feature-preview-card.tsx`)
+
+Phase 8 H2-T3. A dashed, text-only box that previews a section the user
+will see once there is data (Home empty state, "Lo que verás aquí"). It is
+static on purpose: no link, no button, no skeleton shimmer, so it never
+reads as clickable or loading.
+
+- `icon` (pre-built node; Home passes a neutral `IconTile` 36 with an 18px
+  / 1.75 stroke lucide icon), optional `adornment` at the right of the icon
+  row (Home: the technique-colour dots `warning-500` / `success-500` /
+  `rose-500` of the techniques that feed the section), `title` (an `h3`,
+  15px medium), `description` (14px `text-fg-muted`), `className?`.
+- Style: `rounded-xl` (16px), 1px dashed `neutral-300` border, `bg-card`
+  (so a backdrop never shows through), `px-5 py-4`, `h-full` so the boxes
+  in a grid row share one height.
+
+Used by: `home/home-empty-state.tsx` (three boxes: Para hoy, Continúa donde
+lo dejaste, Temas débiles; dots on Para hoy (3) and Temas débiles (2)).
+
+`CreateNotebookTrigger` (notebooks module) also gained a `hero` variant for
+the same screen: the large `rounded-pill` primary `Button` with a custom
+`label` ("Crea tu primer cuaderno") and a `tourId` that becomes its
+`data-tour` anchor for the product tour.
+
+## TechniqueFan (`technique-fan.tsx`)
+
+Phase 8 Home empty state hero, client. The three study techniques as mini
+cards fanned like a hand of flashcards behind a mini notebook, so an empty
+screen still says what Cogni does. Decorative only: `aria-hidden`, no text,
+no data.
+
+- Props: `techniques` (`("flashcards" | "recall" | "exams")[]`, left to right —
+  keys, not icon components, because a server parent cannot pass
+  components to this client atom), `className?`. Footprint 300×150.
+- Each card: 92×112, `rounded-[14px]`, white, hairline `border-default`,
+  layered shadow (tight contact `0 1px 2px` + soft offset ambient
+  `0 8px 20px -8px`, no glow), a 20px pastel chip with the lucide icon
+  (12px / 1.75 stroke, pair from `TECHNIQUE_PAIR_CLASS`) and a miniature
+  of the technique's screen: Flashcards a card front (question lines +
+  `pastel-yellow` "Ver respuesta" pill), Recordación activa a prompt plus
+  an answer in a `pastel-mint` box, Exámenes three options with the middle
+  one chosen in `pastel-pink`. Cards carry `data-technique`.
+- Pose (`fanPose`): ±8deg outer tilt, ±80px spread, outer cards 10px lower,
+  middle lifted 4px; pivot at each card's bottom.
+- Front: a built-in mini notebook (`data-part="notebook"`, 72×76, rounded
+  8px at the spine and 14px at the fore edge, same white/border/shadow as
+  the cards) with a `primary-100` spine carrying three punched ring holes,
+  a `primary-200` title stroke and a soft "+" chip (`primary-50` fill,
+  `primary-200` border, `primary-600` `Plus`). Violet only in the spine and
+  the chip. Static and not interactive: the real action is the CTA under
+  the title. It replaced the former `center` slot (the violet
+  `IconTile` 56 with `BookPlus`).
+- Motion (`fanTransition`): once on mount the cards settle from a squared
+  stack into the fan — spring, no bounce, `visualDuration` 0.36s, 40ms
+  stagger, all done within 0.5s — and keep a stable transform. Under
+  `prefers-reduced-motion` the transition is zero-duration; `initial`
+  never changes, so server markup and hydration match.
+
+Used by: `home/home-empty-state.tsx`.
+
+## StudyBackdrop (`study-backdrop.tsx`)
+
+Phase 8. A static decorative background that gives a sparse screen body
+without competing with its content. Absolutely positioned, `aria-hidden`,
+`pointer-events-none`, no text, no animation or parallax. Grid only, no
+colour (user decision 2026-10-17):
+
+- `grid`: an SVG of 28px notebook graph paper, lines in
+  `stroke-ink-placeholder/55`, centred so a line crosses the middle of the
+  card. A radial mask keeps it strongest in the centre and fades it out
+  towards the edges.
+- `grid-cell`: 16 fixed cells filled with `neutral-150` (light dry gray),
+  aligned to the lines and kept clear of the hero text.
+
+Put it first inside a `relative` parent and give the content after it
+`relative`. `className?` overrides the inset: Home passes
+`inset-[calc(var(--content-padding)*-1)]` so it bleeds over `<main>`'s
+padding and fills the whole content card.
+
+Used by: `home/home-empty-state.tsx`.
+
+## RevealGroup / RevealItem (`reveal.tsx`)
+
+Phase 8, client. Staggered entrance with Motion (same feel as the auth
+pages' `AuthStack`): each `RevealItem` under a `RevealGroup` (any depth)
+rises 8px and fades in, 60ms apart, spring without bounce,
+`visualDuration` 0.34s. Opacity/translate only, and items end at
+`transform: none`, so the product tour measures the real position of an
+anchor inside one. Under `prefers-reduced-motion` the transitions become
+zero-duration (nothing animates); only transitions change, never
+`initial`, so server markup and hydration match. `revealVariants(reduce)`
+is exported for tests.
+
+Used by: `home/home-empty-state.tsx`.
+
 ## Keycap (`keycap.tsx`)
 
-The ⌘/H shortcut chip. Used by `nav-item.tsx` (once per key in a shortcut
-array).
+A keyboard shortcut chip. `nav-item.tsx` renders one per key of an entry's
+`shortcut` array. No sidebar entry sets one since 2026-10-17: the "⌘ H"
+chips on "Inicio" were removed because no shortcut was wired to them.
 
 ## BackLink (`back-link.tsx`)
 
@@ -591,7 +688,8 @@ Route component, not an atom: it composes `Card` (`padding="md"`),
 `Pill` (`sm`, `error`, `dot`: "{N} pendientes") and `Button`
 (`asChild`, `size="sm"`, `variant="outline"`) around a `next/link`
 "Repasar" that opens `/flashcards/{notebookId}/{pageId}?repasar=1`.
-Rows reuse the ReadyToReview divider pattern. Nothing due shows
+Rows reuse the divider pattern of the former Home ReadyToReview panel
+(removed in Phase 8 H2-T5). Nothing due shows
 `EmptyState variant="success"` ("Estás al día"); a failed load shows one
 muted line instead.
 
@@ -1517,3 +1615,265 @@ changes, so its accessible name stays stable for tests and screen readers.
 
 Used by: `modules/identity/ui/auth-forms.tsx` (all four auth forms),
 `modules/identity/ui/google-button.tsx`.
+
+## Populated Home atoms (Phase 8 H2-T5, 2026-10-18)
+
+The Home with notebooks: hero with the review streak full width, then a
+main column (three technique count cards, "Continúa donde lo dejaste",
+"Temas débiles") and a 320px "Para repasar hoy" column on the right that
+starts at the cards' top (H2-T5j, user decision 2026-10-18; it replaced
+the earlier weak-topics-on-the-right layout). It is one CSS grid
+(`lg:grid-cols-[minmax(0,1fr)_320px] lg:grid-rows-[auto_auto_auto_1fr]`,
+the right column spanning all four rows so the `1fr` row absorbs its extra
+height); below `lg` it stacks in DOM order, today's work first: cards,
+"Para repasar hoy", "Continúa donde lo dejaste", "Temas débiles". References:
+`docs/new_design_fase_8` (capture 10.37.53 hero + stat cards, Uxcel Web 22
+day streak, capture 12.28.40 row). They replace the old Home `StatCard`,
+`StreakDots`, `ReadyToReview`, `NotebookGrid`, `RecentPages` and
+`HomeHeader` route components, which were deleted.
+
+Personality pass (v2, impeccable "Operate" mode: restraint, one authored
+moment): the hero has soft radial glows (`home-hero-glow`: violet top-left, pink behind the illustration) and the illustration sits on it
+directly, with no graph paper (user 2026-10-18; `mix-blend-multiply` drops
+the image's white box); the focal moment is the week's streak chain filling in one
+day at a time, followed by the flame; everything else is a quiet `RevealGroup`
+entrance and a pop on the count numbers. All motion runs once, ≤0.5s, and
+only its transitions change under reduced motion (never `initial`).
+
+### PopNumber (`pop-number.tsx`)
+
+Client atom: a `motion.span` that settles in once (opacity 0→1, scale
+0.82→1, y 4→0, spring bounce 0.3, 0.4s, optional `delay`). It always
+renders the final value, so server markup, tests and screen readers never
+see an intermediate count (chosen over a count-up for that reason). Props:
+`value: number | string`, `delay?` (seconds), `className?`.
+
+Used by: `TechniqueCountCard`.
+
+### TechniqueCountCard (`technique-count-card.tsx`)
+
+v2 (H2-T5f, 2026-10-18): today's progress per technique instead of a "due
+today" count, so the cards no longer repeat the "Para repasar hoy" rows.
+User constraint: compact, never taller than v1 (~125px); v2 is ~118px at
+1440px. The label never shares a row with the ring, so "Recordación activa"
+is never truncated (user 2026-10-18).
+
+One `next/link` card per technique, two rows:
+
+- Top row: `IconTile` 30 (`radius="md"`, the technique's pastel tone:
+  yellow / mint / pink), the full 14px label and a muted `ChevronRight`
+  that nudges right on hover.
+- Bottom row, left: a 28px-high value line. `emphasis="tone"`: a 26px bold
+  tabular `PopNumber` in the technique's 600 shade (`warning-600`,
+  `success-600`, `rose-600`) plus an optional 14px `text-fg-secondary` `valueSuffix`
+  ("de 8"). `emphasis="muted"`: a 17px semibold `text-fg-secondary` phrase
+  ("Sin repasos hoy", "Aún no generas", "—"). Under it the 12.5px `text-fg-secondary`
+  sub line (truncates); secondary text uses `fg-secondary`, not
+  `fg-muted`, for legibility (user 2026-10-18).
+- Bottom row, right: `ProgressRing` 46px (stroke 4) in the technique
+  shade. Centre: the percentage (11px semibold `text-fg`), a lucide `Check` (day
+  done, full ring) or a muted dash.
+
+Surface unchanged: `technique-glow-{yellow,mint,pink}` from the top-left,
+`rounded-xl`, `border-border-subtle`, `shadow-xs`; hover lifts
+(`-translate-y-0.5`, `shadow-card-hover`, `border-border-default`); visible
+focus ring.
+
+- Props: `href`, `icon` (lucide component), `tone: "yellow" | "green" |
+  "rose"`, `label`, `value: string`, `valueSuffix?: string | null`,
+  `emphasis: "tone" | "muted"`, `sub`, `ring: { percent; center:
+  "percent" | "check" | "dash" }`, `ariaLabel` (full link name; the ring
+  is aria-hidden), `delay?`, `className?`.
+
+Used by: `home/technique-counts.tsx` (Flashcards → `/flashcards`,
+Recordación activa → `/active-recall`, Exámenes → `/exams`), which maps
+`home/technique-progress.ts` onto the props. The counts are study UNITS
+(H2-T5i, user decision 2026-10-18): one unit is one page × technique, the
+same unit as a "Para repasar hoy" row, so five exams due read "0 de 5",
+never "0 de 100" questions. Pending = pages with an item of the technique
+due today; done = pages with a review of the technique logged today (local
+day of the profile zone) and nothing of it still due — a partially
+reviewed page stays pending only. Both come from scheduling
+`getTechniqueOverview` (`pendingUnits`, `doneUnits`). States (total = done
++ pending):
+
+| State | Value | Sub | Ring | Link name |
+|---|---|---|---|---|
+| progress (pending > 0) | "{done}" + "de {total}" | "repasos hechos hoy" | done/total (floored), % inside | "{Label}: {done} de {total} repasos hechos hoy" |
+| done (pending 0, done > 0) | "Al día" | "{done} de {done} repasos hechos hoy" | full, check | "{Label}: al día, {done} repasos hechos hoy" (singular at 1) |
+| none (nothing today, items exist) | "Sin repasos hoy" (muted) | "Próximo repaso: mañana" / "el lunes 20" / "Nada agendado" | empty, dash | "{Label}: sin repasos hoy, próximo repaso {label}" |
+| never (no items) | "Aún no generas" (muted) | "Genera desde una página" | empty, dash | "{Label}: aún no generas contenido" |
+| unknown (the overview read failed) | "—" (muted) | "No pudimos cargar tu progreso" | empty, dash | "{Label}: progreso no disponible" |
+
+Home renders the three cards under a visible "Tu progreso de hoy" heading
+(17px semibold `text-fg`, `mb-3.5`, same as "Continúa donde lo dejaste"),
+so progress reads apart from "Repasar hoy" (user 2026-10-18).
+
+### ProgressRing (`progress-ring.tsx`)
+
+Small static SVG progress ring (server-renderable, no motion): a track
+circle (`trackClassName`, default `text-neutral-150`) and an arc
+(`indicatorClassName`, a text-* token class; both stroke `currentColor`)
+that starts at 12 o'clock and reads clockwise. The arc uses
+`pathLength={100}` so `stroke-dasharray` is the percentage itself; no arc
+is drawn at 0 (a round cap would leave a dot). `value` is clamped to
+0–100 and NaN reads 0. Children are centred inside. Always `aria-hidden`:
+the surrounding control carries the accessible name.
+
+- Props: `value`, `size?` (px, default 46), `strokeWidth?` (default 4),
+  `indicatorClassName?`, `trackClassName?`, `className?`, `children?`.
+
+Used by: `TechniqueCountCard`. (The dashboard's `DashedRing` stays the
+large labelled gauge with its own `role="img"`.)
+
+### StreakWeek (`streak-week.tsx`)
+
+Client atom, the day-streak block at the bottom-left of the Home hero
+(v3, 2026-10-18). References: Duolingo's lit flame + week bar, habit
+check-in pills with a "today" marker, GitHub-style streak chains.
+
+- Header: a 40px flame tile, dormant at 0 (`neutral-100` / `neutral-400`)
+  and lit with a streak (`warning-100` → `pastel-orange` vertical gradient,
+  `warning-600` stroke, `warning-500/45` fill). Next to it a 28px bold
+  tabular streak number with "días seguidos" / "día seguido" (14px
+  `text-fg-secondary`; the full `streakLabel` is `sr-only`), and the 13px
+  helper line under it.
+- Week: `<ol aria-label="Últimos 7 días">`, a 7-column grid of 28px day
+  circles over 12px initials. A reviewed day is a `warning-500` circle with
+  a white `Check` (`data-part="check"`). Consecutive reviewed days are
+  joined by a 4px `warning-500/40` bar (`data-part="link"`), so a run reads
+  as a chain. A past day without reviews is `neutral-150`. Today without a
+  review is a dashed `warning-500/70` target ring; reviewed, it adds a
+  `ring-warning-500/30` halo. Each item has `sr-only` text ("domingo (hoy):
+  sin repasos").
+- Milestone: `milestoneHint(streakDays)` → "N días más para tu primera
+  semana" / "para llegar a 30" / "para llegar a 100" (12px `warning-700`),
+  hidden at 0 and past 100.
+- Card: `data-state="dormant" | "lit"`. Dormant: plain bordered card. Lit:
+  `border-warning-500/25`, a faint `warning-50` wash from the top-left and a
+  warm glow (`shadow-lg shadow-warning-500/15`). `px-4 py-3.5`,
+  `max-w-[380px]`.
+- Motion, once: reviewed days pop in left to right (50ms apart, spring) and
+  their links draw after them. Then the flame flickers on once (0.6s scale +
+  rotate keyframes), and today's target ring pulses outward twice and stops.
+  Under prefers-reduced-motion only the transitions change (zero duration),
+  never `initial`. No new colour tokens: the warm tones are `warning-*` plus
+  `pastel-orange`.
+- Props (unchanged contract): `streakDays`, `days: { key, initial, name,
+  studied, isToday }[]` (oldest first), `helper`, `className?`.
+
+Used by: `home/home-hero.tsx`, fed by analytics `getDashboardTechniqueMetrics`
+over the last 7 local days (`overall.streakDays` + `daily`), via
+`home/streak-week-days.ts` (Spanish initials L M M J V S D). The helper copy
+depends on the streak (`home/home-copy.ts`): none → start one; today not
+reviewed yet → keep it; 1 → good start; 2–6 → keep going; 7+ → great
+consistency.
+
+### ReviewRow (`review-row.tsx`)
+
+An action row: leading `icon` node, a 15px semibold `text-fg` title over a
+13px `text-fg-secondary` meta line (flex, truncating), an optional `badge`,
+and a solid near-black `Button` (`asChild` → `next/link`, `h-9`,
+`rounded-input`, 13px) on the right. Row: `rounded-xl`, bordered,
+`bg-card`, `px-4 py-3`, `shadow-xs`; hover lifts 1px and firms the border
+(`shadow-card`, `border-border-default`).
+
+`layout="tile"` (H2-T5n, user 2026-10-18, reference: a course list with a
+round logo, bold name, muted provider line and a chevron; replaces the
+earlier stacked/list/outlined looks): the whole tile is one `next/link`
+named by `actionAriaLabel` (`data-layout="tile"`), `rounded-2xl`, `py-3 pr-4 pl-3.5`, white
+`bg-card`, neutral `border-border-subtle` (`border-border-default` on
+hover), `shadow-xs`, hover lifts a pixel with `shadow-card`, visible focus
+ring. The `icon` (Home: a round `IconTile` 40, `radius="full"`, technique
+pastel), the page title (13.5px semibold, `line-clamp-2`) over the `meta`
+(12px `text-fg-muted`, one line, truncates: the notebook name) and a
+`ChevronRight` that nudges right on hover. `actionLabel` and `badge` are
+not rendered.
+
+- `icon`, `title`, `meta?` (node; required visually by `inline`), `badge?` (node), `href`, `actionLabel`,
+  `actionAriaLabel` (full name, since every row says "Repasar"),
+  `layout?: "inline" | "tile"`, `className?`.
+
+Used by: `home/review-today.tsx` — one row per page × technique due
+(`toReviewRows` in `calendario/_lib/today-rows.ts`, same `TECHNIQUES` hrefs
+as the calendar "Hoy" chips: flashcards `?repasar=1`, recall, exam), in the
+tile layout, one link tile per page × technique: the technique's round
+icon, the page title and its notebook, and a chevron (user 2026-10-18).
+The section is a bordered card (`rounded-xl`, `border-border-subtle`,
+`bg-card`, `p-5`, `shadow-xs`) headed "Repasar hoy" in 22px bold
+`text-primary-600`, sentence case like the other Home headings (capitals
+tried and dropped, user 2026-10-18), with the 13px subtitle "Los repasos programados para hoy
+que aún tienes pendientes. Elige uno y empieza." The tiles sit directly on
+the card (no grey panel: user 2026-10-18). On `lg` the card is
+absolutely positioned inside its grid cell (`lg:absolute lg:inset-0`, the
+cell spans the three left rows), so it ends exactly where Temas débiles
+ends and never sets the grid's height; a long list scrolls inside it. No footer message and no item total (user
+2026-10-18); the empty state is a compact tinted `EmptyState` (`px-4
+py-5`, `IconTile` 36).
+
+### ForgettingCurve (`forgetting-curve.tsx`)
+
+Decorative backdrop for Home's "Continúa donde lo dejaste" cards (Phase 8
+H2-T5r, user 2026-10-18; picked over seven other background studies). It
+draws the Ebbinghaus forgetting curve, the science behind spaced
+repetition: retention `e^(-t/40h)` over 7 days, left (just edited) to
+right, in a band from 8% to 95% of the card's height: it starts near the
+card's top-left corner and the card nudges its title right (`pl-7`) to
+clear it (no visible notebook since H2-T5s, user 2026-10-18). A 2.25px `primary-500` line at 55% opacity
+(`vector-effect: non-scaling-stroke`) over a `primary-100` fill fading
+down, and a "now" marker (`size-2.5` `bg-primary-500`, `ring-4
+ring-primary-200/70`) placed by the hours since the page was edited, kept
+5% from the card's sides. Motion: the curve wipes in left to right once
+(clip-path, 0.6s, `cubic-bezier(0.23,1,0.32,1)`; `pathLength` dashes break
+with the non-scaling stroke) and the marker springs in at 0.5s; under
+reduced motion only the transition changes. `aria-hidden`. Client leaf
+(`motion/react`); the pure `forgettingCurve(elapsedHours)` gives the
+points and marker in a 100 x 100 box.
+
+- Props: `elapsedHours`, `className?`.
+
+### PageLinkCard (`page-link-card.tsx`)
+
+A link card restyled in H2-T5q after kokonutui's "Widget Grid" cards (user
+2026-10-18, no icons): the whole card is one `next/link` with an explicit
+`ariaLabel` (page and notebook, since the visible text is split across
+lines). `rounded-2xl`, bordered `bg-card`, `p-4 pt-3`, `min-h-[96px]`,
+flex column: an optional `h-7` meta header (12px `text-fg-secondary`,
+`data-part="meta"`; Home shows none since H2-T5s, user 2026-10-18), the
+page title below it (or at the top, `pt-1`, without meta) (15px semibold `text-fg`,
+`line-clamp-2`), and an optional 11px `text-fg-muted` trailing label
+pinned to the bottom-right corner (`data-part="trailing"`, `mt-auto
+self-end`, tabular numbers). Hover lifts 2px with a soft layered shadow
+(`0 18px 36px -16px` at 16% + `0 6px 12px -8px` at 8%) and
+`border-border-default`, easing `cubic-bezier(0.23,1,0.32,1)` over 300ms;
+focus shows the shared `ring-3 ring-ring/50`.
+
+- `href`, `title`, `titleClassName?`, `meta?` (node), `trailing?` (node), `backdrop?` (node:
+  a decorative layer rendered `aria-hidden` behind the content, the card
+  being `relative isolate overflow-hidden`), `ariaLabel`,
+  `className?`.
+
+Used by: `home/continue-reading.tsx` — Home's "Continúa donde lo dejaste"
+(Phase 8 H2-T5h), under the technique cards in the main column (H2-T5j): up to 4 of
+notebooks' `getHomeOverview().recentPages` (newest edit first), each linking
+to `/notebooks/{nb}/pages/{id}`, with the notebook name as a neutral
+chip as meta (`bg-neutral-100 text-fg-secondary`, `rounded-full px-2
+py-0.5`, 11.5px medium, truncates; no notebook colour and no icons, user
+2026-10-18) and "Editada {formatTimeAgo}" as the trailing
+label in the bottom-right corner (`self-end`, so it never crowds the
+title); an empty title reads "Sin título". A 2-column grid from `lg`,
+stacked below. Empty: one muted line, "Aún no abriste ninguna página."
+
+### "Temas débiles" column (`home/weak-topics.tsx`)
+
+Route component, not an atom: a bordered `bg-card` `rounded-xl` `p-5`
+card (h2 + one-line description), last in Home's wide main column since
+H2-T5j, listing up to 5 weak pages as links in a two-column grid from `sm`
+(`/notebooks/{nb}/pages/{id}`): semibold title with the accuracy %, notebook
+dot + name, and a `ProgressBar` with an `aria-label` (% and number of
+answers). Two severities (`accuracySeverity`): under 40% → `error-600` text
+/ `error-500` fill; 40–69% → `warning-700` / `warning-500`. Empty: a small
+`IconTile` composition (neutral `Target` tile flanked by tilted mint
+`Brain` and pink `FileCheck` tiles — the two techniques that feed it) next
+to "Aún no hay temas débiles" and its hint, one compact `neutral-50` row
+(`data-part="empty"`, no tall empty area). Data: analytics `getHomeWeakTopics`.

@@ -41,6 +41,8 @@ const iconTileVariants = cva("flex shrink-0 items-center justify-center", {
       input: "rounded-input",
       tile: "rounded-tile",
       xl: "rounded-xl",
+      // Round tile (Home review tiles, H2-T5m).
+      full: "rounded-full",
     },
     tone: {
       // Notebook pastel swatches (notebook-swatches.ts) — keys match

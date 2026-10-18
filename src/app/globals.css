@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./product-tour.css";
 
 /*
  * Cogni design tokens (docs/design-system/colors_and_type.css) exposed to
@@ -678,6 +679,39 @@
       color-mix(in oklch, var(--color-primary-500) 35%, transparent),
       transparent 70%
     );
+}
+
+/* Populated Home surfaces (Phase 8 H2-T5): soft radial glows instead of
+   flat diagonal washes. The hero has a violet glow behind the greeting and
+   a pink one behind the illustration, echoing its blobs; each technique
+   card glows from its icon corner in the technique's pastel. Glows fade to
+   transparent over the card background, so text always sits on white. */
+@utility home-hero-glow {
+  background-image:
+    radial-gradient(
+      55% 85% at 0% 0%,
+      color-mix(in oklch, var(--color-primary-100) 85%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      35% 70% at 82% 55%,
+      color-mix(in oklch, var(--color-pastel-pink) 55%, transparent),
+      transparent 75%
+    ),
+    radial-gradient(
+      30% 60% at 100% 100%,
+      color-mix(in oklch, var(--color-primary-50) 90%, transparent),
+      transparent 70%
+    );
+}
+
+@utility technique-glow-* {
+  background-image: radial-gradient(
+    130% 150% at 0% 0%,
+    color-mix(in oklch, --value(--color-pastel-*) 95%, transparent),
+    color-mix(in oklch, --value(--color-pastel-*) 35%, transparent) 38%,
+    transparent 72%
+  );
 }
 
 @layer base {

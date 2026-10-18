@@ -1,10 +1,26 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Breadcrumb, BreadcrumbProvider } from "./_components/breadcrumb";
 
-const { getCurrentUser } = vi.hoisted(() => ({ getCurrentUser: vi.fn() }));
-vi.mock("@/modules/identity", () => ({ getCurrentUser }));
+const { getCurrentUser, getCurrentTimeZoneSetting } = vi.hoisted(() => ({
+  getCurrentUser: vi.fn(),
+  getCurrentTimeZoneSetting: vi.fn(),
+}));
+vi.mock("@/modules/identity", () => ({
+  getCurrentUser,
+  getCurrentTimeZoneSetting,
+}));
+
+const { getDashboardTechniqueMetrics, getHomeWeakTopics } = vi.hoisted(() => ({
+  getDashboardTechniqueMetrics: vi.fn(),
+  getHomeWeakTopics: vi.fn(),
+}));
+vi.mock("@/modules/analytics", async () => ({
+  ...(await import("@/modules/analytics/domain")),
+  getDashboardTechniqueMetrics,
+  getHomeWeakTopics,
+}));
 
 // Defect: Home ran getCurrentUser and getHomeOverview in Promise.all, so a
 // session that disappeared mid-request (e.g. sign-out) made
@@ -19,23 +35,66 @@ vi.mock("next/navigation", () => ({ redirect, unstable_rethrow }));
 const { getHomeOverview } = vi.hoisted(() => ({ getHomeOverview: vi.fn() }));
 vi.mock("@/modules/notebooks", () => ({
   getHomeOverview,
+  COLOR_PALETTE: [
+    "pink",
+    "green",
+    "yellow",
+    "purple",
+    "orange",
+    "blue",
+    "mint",
+  ],
   // The per-card kebab menu needs server actions and the router; it is not
   // what this page-level test is about.
   NotebookCardActions: () => null,
-  CreateNotebookTrigger: ({ variant }: { variant?: string }) => (
-    <button type="button">
-      {variant === "tile" ? "Nuevo cuaderno (tile)" : "Nuevo cuaderno"}
+  CreateNotebookTrigger: ({
+    variant,
+    label = "Nuevo cuaderno",
+    tourId,
+  }: {
+    variant?: string;
+    label?: string;
+    tourId?: string;
+  }) => (
+    <button type="button" data-tour={tourId}>
+      {variant === "tile" ? `${label} (tile)` : label}
     </button>
   ),
 }));
 
-const { listDueTodayAction } = vi.hoisted(() => ({
-  listDueTodayAction: vi.fn(),
+const { getDueToday, getTechniqueOverview } = vi.hoisted(() => ({
+  getDueToday: vi.fn(),
+  getTechniqueOverview: vi.fn(),
 }));
 vi.mock("@/modules/scheduling", async () => ({
   ...(await import("@/modules/scheduling/domain")),
-  listDueTodayAction,
+  getDueToday,
+  getTechniqueOverview,
 }));
+
+type Kind = "flashcard" | "exam_question" | "recall_question";
+interface TotalsInput {
+  total: number;
+  nextDueAt?: Date | null;
+  pendingUnits?: number;
+  doneUnits?: number;
+}
+
+// Technique overview with study units (pages) per technique; omitted
+// fields read zero / null.
+function overviewWith(totals: Partial<Record<Kind, TotalsInput>> = {}) {
+  const totalsOf = (input: TotalsInput | undefined) => ({
+    total: input?.total ?? 0,
+    nextDueAt: input?.nextDueAt ?? null,
+    pendingUnits: input?.pendingUnits ?? 0,
+    doneUnits: input?.doneUnits ?? 0,
+  });
+  return {
+    flashcard: totalsOf(totals.flashcard),
+    exam_question: totalsOf(totals.exam_question),
+    recall_question: totalsOf(totals.recall_question),
+  };
+}
 
 function duePage(
   pageId: string,
@@ -121,8 +180,51 @@ describe("HomePage", () => {
     getHomeOverview.mockReset();
     redirect.mockReset();
     unstable_rethrow.mockReset();
-    listDueTodayAction.mockReset();
-    listDueTodayAction.mockResolvedValue({ ok: true, value: [] });
+    getDueToday.mockReset();
+    getDueToday.mockResolvedValue({ ok: true, value: [] });
+    getTechniqueOverview.mockReset();
+    // One flashcard page reviewed today, nothing left due.
+    getTechniqueOverview.mockResolvedValue({
+      ok: true,
+      value: overviewWith({ flashcard: { total: 5, doneUnits: 1 } }),
+    });
+    getCurrentTimeZoneSetting.mockReset();
+    getCurrentTimeZoneSetting.mockResolvedValue({
+      status: "ok",
+      timeZone: "America/Bogota",
+      chosen: true,
+    });
+    getDashboardTechniqueMetrics.mockReset();
+    getDashboardTechniqueMetrics.mockImplementation(
+      async (input: { fromDay: string; toDay: string }) => {
+        const days: string[] = [];
+        for (
+          let t = Date.parse(`${input.fromDay}T00:00:00Z`);
+          t < Date.parse(`${input.toDay}T00:00:00Z`);
+          t += 86_400_000
+        ) {
+          days.push(new Date(t).toISOString().slice(0, 10));
+        }
+        const today = days[days.length - 1];
+        return {
+          ok: true,
+          value: {
+            today,
+            overall: { streakDays: 3 },
+            daily: days.map((day) => ({
+              day,
+              reviews: {
+                flashcards: day === today ? 1 : 0,
+                recall: 0,
+                exam: 0,
+              },
+            })),
+          },
+        };
+      },
+    );
+    getHomeWeakTopics.mockReset();
+    getHomeWeakTopics.mockResolvedValue({ ok: true, value: [] });
   });
 
   describe("without a session", () => {
@@ -145,20 +247,26 @@ describe("HomePage", () => {
       getHomeOverview.mockResolvedValue(emptyOverview());
     });
 
-    it("shows the encouraging empty-state copy in Spanish", async () => {
+    it("shows the H2 empty state instead of the metric cards", async () => {
       await renderHome();
 
       expect(
-        screen.getByText("Aún no tienes cuadernos. Crea uno para empezar."),
+        screen.getByRole("heading", {
+          level: 1,
+          name: "Tu inicio está vacío por ahora",
+        }),
       ).toBeInTheDocument();
+      expect(
+        screen.queryByText("Notas listas para repasar"),
+      ).not.toBeInTheDocument();
     });
 
-    it("offers the create-notebook CTA", async () => {
+    it("offers the create-notebook CTA anchored for the tour", async () => {
       await renderHome();
 
       expect(
-        screen.getByRole("button", { name: "Nuevo cuaderno" }),
-      ).toBeInTheDocument();
+        screen.getByRole("button", { name: "Crea tu primer cuaderno" }),
+      ).toHaveAttribute("data-tour", "crear-cuaderno");
     });
 
     it("does not expose any product feature link", async () => {
@@ -191,107 +299,349 @@ describe("HomePage", () => {
       await renderHome();
 
       expect(
-        screen.getByText(/^Buen(os días|as tardes|as noches), Ana$/),
+        screen.getByRole("heading", { level: 1, name: "Hola de nuevo, Ana" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          /Cada repaso y sesión de estudio que haces hoy te ayudan a mejorar tu aprendizaje\./,
+        ),
+      ).toBeInTheDocument();
+      // Today's date in the profile zone, e.g. "Sábado 18 de octubre".
+      expect(
+        screen.getByText(/^[A-ZÁÉ][a-záéíóú]+ \d{1,2} de [a-z]+$/),
       ).toBeInTheDocument();
     });
 
-    it("shows the four study-metric cards with the values derived from the overview", async () => {
+    it("reads the review streak of the last 7 local days in the profile zone", async () => {
       await renderHome();
 
-      // The ready-to-review label is also the heading of the panel below.
-      expect(
-        screen.getAllByText("Notas listas para repasar").length,
-      ).toBeGreaterThanOrEqual(1);
-      expect(screen.getByText("Índice de constancia")).toBeInTheDocument();
-      expect(screen.getByText("3/14 días")).toBeInTheDocument();
-      expect(screen.getByText("Meta semanal de estudio")).toBeInTheDocument();
-      expect(screen.getByText("meta: 5 días por semana")).toBeInTheDocument();
-      expect(screen.getByText("Repasos pendientes hoy")).toBeInTheDocument();
-    });
-
-    it("points the ready-to-review card at the most urgent page", async () => {
-      await renderHome();
-
-      expect(
-        screen.getByText("la más urgente: Mitocondria"),
-      ).toBeInTheDocument();
-      expect(screen.getByRole("link", { name: "Repasar →" })).toHaveAttribute(
-        "href",
-        "/notebooks/n1/pages/p1",
+      const input = getDashboardTechniqueMetrics.mock.calls[0]?.[0];
+      expect(input).toMatchObject({ timeZone: "America/Bogota" });
+      expect(input.toDay).toBe(
+        // 7 days: [today - 6, today + 1).
+        new Date(Date.parse(`${input.fromDay}T00:00:00Z`) + 7 * 86_400_000)
+          .toISOString()
+          .slice(0, 10),
       );
-    });
-
-    it("says nothing is ready and offers no review link when no page qualifies", async () => {
-      getHomeOverview.mockResolvedValue({
-        ...populatedOverview(),
-        readyToReview: { items: [], totalReady: 0, totalRich: 0 },
-      });
-
-      await renderHome();
-
+      expect(screen.getByText("3 días seguidos")).toBeInTheDocument();
+      const week = screen.getByRole("list", { name: "Últimos 7 días" });
+      expect(within(week).getAllByRole("listitem")).toHaveLength(7);
+      expect(week).toHaveTextContent(/\(hoy\): con repasos/);
       expect(
-        screen.getByText("Ninguna nota lista todavía"),
+        screen.getByText("Ya repasaste hoy. ¡Sigue así!"),
       ).toBeInTheDocument();
-      expect(
-        screen.queryByRole("link", { name: "Repasar →" }),
-      ).not.toBeInTheDocument();
     });
 
-    it("counts every technique's reviews due today and links to the calendar", async () => {
-      listDueTodayAction.mockResolvedValue({
-        ok: true,
-        value: [
-          duePage("a", { flashcard: 2, exam_question: 1, recall_question: 0 }),
-          duePage("b", { flashcard: 0, exam_question: 0, recall_question: 3 }),
-        ],
-      });
-
-      await renderHome();
-
-      const card = screen.getByTestId("due-today-stat");
-      expect(card).toHaveTextContent("6 repasos");
-      expect(card).toHaveTextContent("en 2 páginas");
-      expect(card).not.toHaveTextContent("Flashcards llegan pronto");
-      expect(card).not.toHaveTextContent("pronto");
-      expect(
-        screen.getByRole("link", { name: "Ver calendario →" }),
-      ).toHaveAttribute("href", "/calendario");
-    });
-
-    it("says nothing is due today when the list is empty", async () => {
-      await renderHome();
-
-      const card = screen.getByTestId("due-today-stat");
-      expect(card).toHaveTextContent("0 repasos");
-      expect(card).toHaveTextContent("Estás al día");
-    });
-
-    it("does not claim zero reviews when the due list cannot load", async () => {
-      listDueTodayAction.mockResolvedValue({
+    it("still greets when the streak cannot load", async () => {
+      getDashboardTechniqueMetrics.mockResolvedValue({
         ok: false,
         error: { code: "UNEXPECTED", message: "x" },
       });
 
       await renderHome();
 
-      const card = screen.getByTestId("due-today-stat");
-      expect(card).toHaveTextContent("—");
-      expect(card).toHaveTextContent("No pudimos cargar tus repasos");
-      expect(card).not.toHaveTextContent("0 repasos");
+      expect(
+        screen.getByText("No pudimos cargar tu racha."),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("heading", { level: 1, name: "Hola de nuevo, Ana" }),
+      ).toBeInTheDocument();
     });
 
-    // R3-home-due-promise-all: a thrown due read must degrade only the
-    // "Repasos pendientes hoy" card, exactly like the typed failure.
-    it("degrades only the due card when the due read throws", async () => {
-      const failure = new Error("due read exploded");
-      listDueTodayAction.mockRejectedValue(failure);
+    it("links each technique card to its hub with today's progress in study units", async () => {
+      // H2-T5i: a unit is one page × technique, so three exams due read
+      // "0 de 3" however many questions each one holds.
+      getTechniqueOverview.mockResolvedValue({
+        ok: true,
+        value: overviewWith({
+          flashcard: { total: 40, pendingUnits: 2, doneUnits: 1 },
+          recall_question: { total: 9, pendingUnits: 1 },
+          exam_question: { total: 60, pendingUnits: 3 },
+        }),
+      });
 
       await renderHome();
 
-      const card = screen.getByTestId("due-today-stat");
-      expect(card).toHaveTextContent("—");
-      expect(card).toHaveTextContent("No pudimos cargar tus repasos");
-      expect(screen.getByText("Mis cuadernos")).toBeInTheDocument();
+      const flashcards = screen.getByRole("link", {
+        name: "Flashcards: 1 de 3 repasos hechos hoy",
+      });
+      expect(flashcards).toHaveAttribute("href", "/flashcards");
+      expect(flashcards).toHaveTextContent("33%");
+      expect(
+        screen.getByRole("link", {
+          name: "Recordación activa: 0 de 1 repasos hechos hoy",
+        }),
+      ).toHaveAttribute("href", "/active-recall");
+      expect(
+        screen.getByRole("link", {
+          name: "Exámenes: 0 de 3 repasos hechos hoy",
+        }),
+      ).toHaveAttribute("href", "/exams");
+    });
+
+    it("never counts individual reviews on the cards", async () => {
+      // The streak metrics log 1 flashcard review today; the card only
+      // reads the overview's units.
+      getTechniqueOverview.mockResolvedValue({
+        ok: true,
+        value: overviewWith({ flashcard: { total: 20, pendingUnits: 1 } }),
+      });
+
+      await renderHome();
+
+      expect(
+        screen.getByRole("link", {
+          name: "Flashcards: 0 de 1 repasos hechos hoy",
+        }),
+      ).toBeInTheDocument();
+    });
+
+    it("reads today's due items in the profile zone with the page's instant", async () => {
+      await renderHome();
+
+      // Reviews are due per local day: the read needs the zone and the
+      // instant the page renders with, like the technique totals.
+      expect(getDueToday).toHaveBeenCalledWith({
+        timeZone: "America/Bogota",
+        now: expect.any(Date),
+      });
+    });
+
+    it("reads the technique totals in the profile zone with the page's instant", async () => {
+      await renderHome();
+
+      expect(getTechniqueOverview).toHaveBeenCalledWith({
+        timeZone: "America/Bogota",
+        now: expect.any(Date),
+      });
+    });
+
+    it("tells done, idle and never-generated techniques apart", async () => {
+      getTechniqueOverview.mockResolvedValue({
+        ok: true,
+        value: overviewWith({
+          flashcard: { total: 5, doneUnits: 1 },
+          recall_question: {
+            total: 4,
+            nextDueAt: new Date(Date.now() + 3 * 86_400_000),
+          },
+        }),
+      });
+
+      await renderHome();
+
+      expect(
+        screen.getByRole("link", {
+          name: "Flashcards: al día, 1 repaso hecho hoy",
+        }),
+      ).toHaveTextContent("Al día");
+      expect(
+        screen.getByRole("link", {
+          name: /^Recordación activa: sin repasos hoy, próximo repaso el [a-záéíóú]+ \d{1,2}$/,
+        }),
+      ).toHaveTextContent("Sin repasos hoy");
+      expect(
+        screen.getByRole("link", {
+          name: "Exámenes: aún no generas contenido",
+        }),
+      ).toHaveTextContent("Genera desde una página");
+    });
+
+    it("shows every card as unavailable when the technique read fails, keeping the rows", async () => {
+      getTechniqueOverview.mockRejectedValue(new Error("overview exploded"));
+
+      await renderHome();
+
+      expect(
+        screen.getByRole("link", {
+          name: "Flashcards: progreso no disponible",
+        }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("link", { name: "Exámenes: progreso no disponible" }),
+      ).toHaveTextContent("No pudimos cargar tu progreso");
+      expect(
+        screen.getByRole("heading", { level: 2, name: "Repasar hoy" }),
+      ).toBeInTheDocument();
+    });
+
+    // User 2026-10-18: the cards get a visible heading, styled like
+    // "Continúa donde lo dejaste", so progress reads apart from "Repasar hoy".
+    it("titles the technique cards with a visible heading", async () => {
+      await renderHome();
+
+      const heading = screen.getByRole("heading", {
+        level: 2,
+        name: "Tu progreso de hoy",
+      });
+      expect(heading).not.toHaveClass("sr-only");
+      expect(
+        screen.getByRole("region", { name: "Tu progreso de hoy" }),
+      ).toContainElement(screen.getByRole("link", { name: /^Flashcards: / }));
+    });
+
+    it("orders today's work first: cards, reviews, recent pages, weak topics", async () => {
+      await renderHome();
+
+      // DOM order is the stacked (below lg) order; on wide screens the grid
+      // moves "Repasar hoy" into the right column.
+      const cards = screen.getByRole("region", {
+        name: "Tu progreso de hoy",
+      });
+      const review = screen.getByRole("region", { name: /^Repasar hoy$/ });
+      const recent = screen.getByRole("region", {
+        name: "Continúa donde lo dejaste",
+      });
+      const weak = screen.getByRole("region", { name: /Temas débiles/ });
+      const follows = (a: Element, b: Element) =>
+        Boolean(
+          a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING,
+        );
+      expect(follows(cards, review)).toBe(true);
+      expect(follows(review, recent)).toBe(true);
+      expect(follows(recent, weak)).toBe(true);
+    });
+
+    it("lists the review rows as borderless list items in their card", async () => {
+      getDueToday.mockResolvedValue({
+        ok: true,
+        value: [
+          duePage("a", { flashcard: 2, exam_question: 0, recall_question: 0 }),
+        ],
+      });
+
+      const { container } = await renderHome();
+
+      expect(
+        container.querySelector('[data-slot="review-row"]'),
+      ).toHaveAttribute("data-layout", "tile");
+    });
+
+    it("continues where the user left off, below the reviews of the day", async () => {
+      await renderHome();
+
+      const recent = screen.getByRole("region", {
+        name: "Continúa donde lo dejaste",
+      });
+      expect(
+        within(recent).getByRole("link", {
+          name: /^Abrir Mitocondria de Biología Celular, editada /,
+        }),
+      ).toHaveAttribute("href", "/notebooks/n1/pages/p1");
+      const review = screen.getByRole("region", { name: /^Repasar hoy$/ });
+      expect(
+        review.compareDocumentPosition(recent) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+
+    it("says no page was opened yet when there are no recent pages", async () => {
+      getHomeOverview.mockResolvedValue({
+        ...populatedOverview(),
+        recentPages: [],
+      });
+
+      await renderHome();
+
+      expect(
+        screen.getByText("Aún no abriste ninguna página."),
+      ).toBeInTheDocument();
+    });
+
+    it("lists one row per page and technique due, each opening its session", async () => {
+      getDueToday.mockResolvedValue({
+        ok: true,
+        value: [
+          duePage("a", { flashcard: 2, exam_question: 1, recall_question: 0 }),
+        ],
+      });
+
+      await renderHome();
+
+      expect(
+        screen.getByRole("heading", { level: 2, name: "Repasar hoy" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("link", {
+          name: "Repasar Flashcards de Página a: 2 pendientes",
+        }),
+      ).toHaveAttribute("href", "/flashcards/n1/a?repasar=1");
+      expect(
+        screen.getByRole("link", {
+          name: "Repasar Examen de Página a: 1 pendiente",
+        }),
+      ).toHaveAttribute("href", "/exams/n1/a");
+      // Each tile is one link (chevron, no button): page title over its
+      // notebook; technique and count live in the icon and the link's
+      // accessible name (user 2026-10-18).
+      const review = screen.getByRole("region", { name: "Repasar hoy" });
+      expect(
+        within(review).getAllByText("Biología Celular").length,
+      ).toBeGreaterThan(0);
+      expect(within(review).queryByText(/pendientes?$/)).toBeNull();
+      // No item total next to the heading; the line under it counts units
+      // (one per row). No message at the bottom (user 2026-10-18).
+      expect(
+        within(review).getByText(
+          "Los repasos programados para hoy que aún tienes pendientes. Elige uno y empieza.",
+        ),
+      ).toBeInTheDocument();
+      expect(within(review).queryByText(/tu racha suma un día/)).toBeNull();
+    });
+
+    it("says nothing is due today and keeps the cards at zero", async () => {
+      await renderHome();
+
+      expect(
+        screen.getByText("No tienes repasos pendientes hoy"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("link", {
+          name: "Flashcards: al día, 1 repaso hecho hoy",
+        }),
+      ).toBeInTheDocument();
+    });
+
+    it("does not claim zero reviews when the due list cannot load", async () => {
+      getDueToday.mockResolvedValue({
+        ok: false,
+        error: { code: "UNEXPECTED", message: "x" },
+      });
+
+      await renderHome();
+
+      expect(
+        screen.getByText(
+          "No pudimos cargar tus repasos. Inténtalo de nuevo en un momento.",
+        ),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText("No tienes repasos pendientes hoy"),
+      ).not.toBeInTheDocument();
+      // The cards read their own units, so they keep today's progress.
+      expect(
+        screen.getByRole("link", {
+          name: "Flashcards: al día, 1 repaso hecho hoy",
+        }),
+      ).toBeInTheDocument();
+    });
+
+    // R3-home-due-promise-all: a thrown due read must degrade only the
+    // due sections, exactly like the typed failure.
+    it("degrades only the due sections when the due read throws", async () => {
+      const failure = new Error("due read exploded");
+      getDueToday.mockRejectedValue(failure);
+
+      await renderHome();
+
+      expect(
+        screen.getByText(
+          "No pudimos cargar tus repasos. Inténtalo de nuevo en un momento.",
+        ),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("heading", { level: 2, name: "Temas débiles" }),
+      ).toBeInTheDocument();
       // Next.js control-flow errors (redirect/notFound) are handed back to
       // the framework instead of being swallowed.
       expect(unstable_rethrow).toHaveBeenCalledWith(failure);
@@ -303,30 +653,48 @@ describe("HomePage", () => {
       await expect(renderHome()).rejects.toThrow("overview exploded");
     });
 
-    it("renders the notebook grid and the recent pages list from real data", async () => {
+    it("lists the weak topics, each linking to its page", async () => {
+      getHomeWeakTopics.mockResolvedValue({
+        ok: true,
+        value: [
+          {
+            pageId: "p1",
+            pageTitle: "Mitocondria",
+            notebookId: "n1",
+            notebookTitle: "Biología Celular",
+            notebookColor: "purple",
+            accuracy: 0.42,
+            attempts: 7,
+          },
+        ],
+      });
+
       await renderHome();
 
-      expect(screen.getByText("Mis cuadernos")).toBeInTheDocument();
-      const links = screen.getAllByRole("link");
-      const notebookLink = links.find(
-        (link) => link.getAttribute("href") === "/notebooks/n1",
-      );
-      // The same page is linked from the review card and the review panel
-      // ("Repasar") as well as the recent-pages list (by title).
-      const pageLink = links.find(
-        (link) =>
-          link.getAttribute("href") === "/notebooks/n1/pages/p1" &&
-          link.textContent?.includes("Mitocondria"),
-      );
-      expect(notebookLink).toHaveTextContent("Biología Celular");
-      expect(pageLink).toBeDefined();
+      // Scoped: the page also shows under "Continúa donde lo dejaste".
+      const weak = screen.getByRole("region", { name: /Temas débiles/ });
+      const link = within(weak).getByRole("link", { name: /Mitocondria/ });
+      expect(link).toHaveAttribute("href", "/notebooks/n1/pages/p1");
+      expect(link).toHaveTextContent("42%");
+      expect(link).toHaveTextContent("Biología Celular");
+    });
+
+    it("explains when there are no weak topics yet", async () => {
+      await renderHome();
+
+      expect(screen.getByText("Aún no hay temas débiles")).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          "Aparecen cuando practiques recordación activa o exámenes.",
+        ),
+      ).toBeInTheDocument();
     });
 
     it("never shows the empty-state copy", async () => {
       await renderHome();
 
       expect(
-        screen.queryByText("Aún no tienes cuadernos. Crea uno para empezar."),
+        screen.queryByText("Tu inicio está vacío por ahora"),
       ).not.toBeInTheDocument();
     });
   });
