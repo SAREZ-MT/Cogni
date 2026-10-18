@@ -33,6 +33,8 @@ type NavItemProps = {
   // (Flashcards yellow, Recordación activa mint, Exámenes pink), the same
   // colours as the techniques panel and the calendar chips.
   tone?: TechniqueTone;
+  // Product tour anchor (`data-tour`), e.g. "cuadernos".
+  tourId?: string;
 };
 
 // Shared row styling for the link and the disabled-row variants (13.5px,
@@ -57,6 +59,7 @@ export function NavItem({
   collapsed = false,
   shortcut,
   tone,
+  tourId,
 }: NavItemProps) {
   const icon = (
     <Icon
@@ -96,6 +99,7 @@ export function NavItem({
       aria-current={active ? "page" : undefined}
       aria-label={collapsed ? label : undefined}
       data-tone={tone}
+      data-tour={tourId}
       className={cn(
         ROW_CLASS,
         "text-fg-secondary hover:bg-hover hover:text-fg",

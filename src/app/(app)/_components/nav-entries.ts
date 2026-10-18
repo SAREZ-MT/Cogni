@@ -10,10 +10,12 @@ type Route = { href: string; isActive: (path: string) => boolean };
 //   data, linked only while design previews are enabled (see
 //   shared/config/design-previews.ts) and a "pronto" row otherwise.
 // `tone` marks a study technique: its active row takes the technique colour.
+// `tourId` is the row's `data-tour` anchor for the product tour.
 export type NavEntry = {
   icon: LucideIcon;
   label: string;
   tone?: TechniqueTone;
+  tourId?: string;
 } & (
   | (Route & { shortcut?: string[] })
   | { disabled: true; hint: string; preview?: Route }
@@ -28,6 +30,7 @@ export type ResolvedNavEntry =
       active: boolean;
       shortcut: string[] | undefined;
       tone: TechniqueTone | undefined;
+      tourId: string | undefined;
     }
   | { disabled: true; icon: LucideIcon; label: string; hint: string };
 
@@ -36,7 +39,7 @@ export function resolveNavEntry(
   previewsEnabled: boolean,
   pathname: string,
 ): ResolvedNavEntry {
-  const { icon, label, tone } = entry;
+  const { icon, label, tone, tourId } = entry;
 
   if (!("disabled" in entry)) {
     return {
@@ -47,6 +50,7 @@ export function resolveNavEntry(
       active: entry.isActive(pathname),
       shortcut: entry.shortcut,
       tone,
+      tourId,
     };
   }
 
@@ -59,6 +63,7 @@ export function resolveNavEntry(
       active: entry.preview.isActive(pathname),
       shortcut: undefined,
       tone,
+      tourId,
     };
   }
 

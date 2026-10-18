@@ -80,9 +80,10 @@ test.describe("authentication", () => {
       // navigation only since design pass 2); scoping to it keeps the
       // assertion independent of any other surface that may repeat the copy.
       await expect(
-        page
-          .getByTestId("content-area")
-          .getByText("Aún no tienes cuadernos. Crea uno para empezar."),
+        page.getByTestId("content-area").getByRole("heading", {
+          level: 1,
+          name: "Tu inicio está vacío por ahora",
+        }),
       ).toBeVisible();
 
       await page.goto("/login");

@@ -8,8 +8,11 @@ import { CreateNotebookTrigger } from "./create-notebook-trigger";
 const { createNotebook } = vi.hoisted(() => ({ createNotebook: vi.fn() }));
 vi.mock("../actions", () => ({ createNotebook }));
 
-const { refresh } = vi.hoisted(() => ({ refresh: vi.fn() }));
-vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
+const { refresh, push } = vi.hoisted(() => ({
+  refresh: vi.fn(),
+  push: vi.fn(),
+}));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh, push }) }));
 
 function Wrapper({ children }: { children: ReactNode }) {
   const client = new QueryClient({
@@ -37,6 +40,31 @@ describe("CreateNotebookTrigger", () => {
     createNotebook.mockReset();
     createNotebook.mockResolvedValue({ id: "notebook-1" });
     refresh.mockReset();
+    push.mockReset();
+  });
+
+  // H2: the first notebook (Home empty state) opens the new notebook so the
+  // user can create its first page right away.
+  it("opens the new notebook after creating it when openAfterCreate is set", async () => {
+    const user = userEvent.setup();
+    render(
+      <CreateNotebookTrigger
+        variant="hero"
+        label="Crea tu primer cuaderno"
+        openAfterCreate
+      />,
+      { wrapper: Wrapper },
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: "Crea tu primer cuaderno" }),
+    );
+    await submitDialog(user);
+
+    await waitFor(() => {
+      expect(push).toHaveBeenCalledWith("/notebooks/notebook-1");
+    });
+    expect(refresh).not.toHaveBeenCalled();
   });
 
   it("renders the pill variant with the '+ Nuevo cuaderno' accessible name by default", () => {
@@ -53,6 +81,23 @@ describe("CreateNotebookTrigger", () => {
     expect(
       screen.getByRole("button", { name: "Nuevo cuaderno" }),
     ).toBeInTheDocument();
+  });
+
+  // H2-T3: Home's empty state reuses this trigger with its own label and the
+  // product tour's data-tour anchor.
+  it("renders the hero variant with a custom label and a tour anchor", () => {
+    render(
+      <CreateNotebookTrigger
+        variant="hero"
+        label="Crea tu primer cuaderno"
+        tourId="crear-cuaderno"
+      />,
+      { wrapper: Wrapper },
+    );
+
+    expect(
+      screen.getByRole("button", { name: "Crea tu primer cuaderno" }),
+    ).toHaveAttribute("data-tour", "crear-cuaderno");
   });
 
   it("submits the same createNotebook mutation both variants share", async () => {

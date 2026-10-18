@@ -12,6 +12,11 @@ vi.mock("@/modules/identity/actions", () => ({
   adoptBrowserTimeZoneAction: vi.fn(),
 }));
 
+const { startTour } = vi.hoisted(() => ({ startTour: vi.fn() }));
+vi.mock("../_components/product-tour/product-tour", () => ({
+  useProductTour: () => ({ start: startTour }),
+}));
+
 import SettingsPage from "./page";
 
 async function renderPage() {
@@ -36,6 +41,18 @@ describe("SettingsPage", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  // H2-T2: the guided tour can be replayed from settings at any time.
+  it("offers a row that replays the Cogni tour", async () => {
+    await renderPage();
+
+    const row = screen.getByTestId("product-tour-card");
+    expect(
+      within(row).getByRole("heading", { level: 2, name: "Ayuda" }),
+    ).toBeInTheDocument();
+    within(row).getByRole("button", { name: "Ver tutorial de Cogni" }).click();
+    expect(startTour).toHaveBeenCalledTimes(1);
   });
 
   it("titles the page Configuración and publishes it as the breadcrumb", async () => {
