@@ -29,6 +29,7 @@ import {
   OWNER,
   PAGE,
   seedSessionQuestions,
+  utcDayCutoff,
 } from "./testing/fixtures";
 import { InMemoryExamSessionUnitOfWork } from "./testing/in-memory-exam-session-unit-of-work";
 
@@ -138,6 +139,7 @@ function setup(
     ai,
     uow,
     clock: createFixedClock(options.now ?? RETAKE_AT),
+    dueCutoff: utcDayCutoff,
     ids: {
       // Valid-looking but deterministic ids, ordered by creation.
       next: () => `new-${String(++n).padStart(3, "0")}`,
@@ -520,7 +522,11 @@ describe("startExamRetake", () => {
       }
       const done = await completeExamSession(
         { sessionId: started.value.session.id },
-        { uow, clock: createFixedClock(new Date(at.getTime() + 60_000)) },
+        {
+          uow,
+          clock: createFixedClock(new Date(at.getTime() + 60_000)),
+          dueCutoff: utcDayCutoff,
+        },
         OWNER,
       );
       if (!done.ok) throw done.error;

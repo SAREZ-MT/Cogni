@@ -38,6 +38,8 @@ const PAGE_TEXT =
   "El núcleo guarda el ADN. La mitocondria produce ATP para la célula.";
 // Evaluation time: a day after the session started.
 const EVAL_AT = at(1);
+// The owner's "due" bound at EVAL_AT: the start of their next local day.
+const EVAL_DAY_END = new Date("2026-10-08T00:00:00.000Z");
 
 class StubLimiter implements GenerationRateLimiter {
   checks = 0;
@@ -181,6 +183,8 @@ async function setup(
     limiter,
     reviews,
     clock: createFixedClock(EVAL_AT),
+    dueCutoff: (now) =>
+      now.getTime() === EVAL_AT.getTime() ? EVAL_DAY_END : new Date(Number.NaN),
     tokenCap: 12_000,
     onError: (error) => errors.push(error),
   };
@@ -313,6 +317,8 @@ describe("evaluateRecallSession", () => {
           { questionId: "q-2", quality: 0 },
         ],
         now: EVAL_AT,
+        // Reviews are due per local day: the bound at the evaluation time.
+        dueBefore: EVAL_DAY_END,
       },
     ]);
   });

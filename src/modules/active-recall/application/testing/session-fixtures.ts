@@ -15,6 +15,13 @@ export const PAGE = "page-1";
 export const OTHER_PAGE = "page-2";
 export const NOW = new Date("2026-10-06T12:00:00.000Z");
 export const DAY = 86_400_000;
+// The owner's local day (UTC here) ends at midnight: reviews are due per
+// day, so a question due before it is due now.
+export const TOMORROW = new Date("2026-10-07T00:00:00.000Z");
+export const dueCutoff = (now: Date): Date => {
+  if (now.getTime() !== NOW.getTime()) throw new Error("unexpected instant");
+  return TOMORROW;
+};
 
 export function at(days: number): Date {
   return new Date(NOW.getTime() + days * DAY);

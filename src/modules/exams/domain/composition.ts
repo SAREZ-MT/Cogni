@@ -28,13 +28,16 @@ export interface ComposedQuestion {
 export interface ComposeExamInput {
   requestedCount: number;
   candidates: readonly ExamCandidate[];
-  now: Date;
+  // The owner's "due" bound: the start of their next local day (reviews
+  // are due per day, user decision 2026-10-18). A root due before it is
+  // due, also when it comes due later today.
+  dueBefore: Date;
 }
 
 // Picks the questions of an exam: one per root, min(N, available roots).
 // Order (user decision 2026-10-05):
 //   1. roots failed last time,
-//   2. due roots (dueAt <= now), oldest due first,
+//   2. due roots (dueAt < dueBefore), oldest due first,
 //   3. the rest, least recently seen first (never seen before anything).
 // Inside groups 1 and 2 the due date comes first, then last seen; the root id
 // (then the question id) breaks every remaining tie, so the result does not
@@ -51,7 +54,7 @@ export function composeExam(
   if (!isValidQuestionCount(input.requestedCount)) {
     return err(invalidCount(input.requestedCount));
   }
-  const ordered = orderByRoot(input.candidates, input.now);
+  const ordered = orderByRoot(input.candidates, input.dueBefore);
   if (ordered.length < EXAM_MIN_QUESTIONS) {
     return err(notEnough(ordered.length));
   }
@@ -67,7 +70,8 @@ export interface ComposeRetakeInput {
   shownQuestionIds: readonly string[];
   // The page's other active questions; failed roots among them are ignored.
   otherCandidates: readonly ExamCandidate[];
-  now: Date;
+  // Same "due" bound as composeExam's.
+  dueBefore: Date;
 }
 
 // Picks the questions of a retake (§7.5, user decision 2026-10-05): one
@@ -118,7 +122,7 @@ export function composeRetake(
   const failedSet = new Set(failed);
   const rest = orderByRoot(
     input.otherCandidates.filter((c) => !failedSet.has(c.rootId)),
-    input.now,
+    input.dueBefore,
   );
   const available = variants.length + rest.length;
   if (available < EXAM_MIN_QUESTIONS) return err(notEnough(available));
@@ -132,9 +136,9 @@ export function composeRetake(
 // Sorts by priority and keeps the first candidate of each root.
 function orderByRoot(
   candidates: readonly ExamCandidate[],
-  now: Date,
+  dueBefore: Date,
 ): ExamCandidate[] {
-  const sorted = [...candidates].sort(compareCandidates(now.getTime()));
+  const sorted = [...candidates].sort(compareCandidates(dueBefore.getTime()));
   const seen = new Set<string>();
   return sorted.filter((candidate) => {
     if (seen.has(candidate.rootId)) return false;
@@ -143,10 +147,10 @@ function orderByRoot(
   });
 }
 
-function compareCandidates(now: number) {
+function compareCandidates(dueBefore: number) {
   const group = (c: ExamCandidate) => {
     if (c.failedLastTime) return 0;
-    if (c.dueAt !== null && c.dueAt.getTime() <= now) return 1;
+    if (c.dueAt !== null && c.dueAt.getTime() < dueBefore) return 1;
     return 2;
   };
   return (a: ExamCandidate, b: ExamCandidate): number => {

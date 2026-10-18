@@ -1,4 +1,8 @@
-import type { StudyItem, StudyItemKind } from "../../domain/study-item";
+import {
+  isDueBefore,
+  type StudyItem,
+  type StudyItemKind,
+} from "../../domain/study-item";
 import type { StudyItemRepository } from "../../domain/study-item-repository";
 
 // In-memory StudyItemRepository for unit tests; satisfies the shared
@@ -63,14 +67,14 @@ export class InMemoryStudyItemRepository implements StudyItemRepository {
 
   async listDue(
     ownerId: string,
-    now: Date,
+    dueBefore: Date,
     pageId?: string,
   ): Promise<StudyItem[]> {
     return this.owned(ownerId)
       .filter(
         (item) =>
           item.suspendedAt === null &&
-          item.dueAt.getTime() <= now.getTime() &&
+          isDueBefore(item, dueBefore) &&
           this.isPageActive(item.pageId) &&
           (pageId === undefined || item.pageId === pageId),
       )

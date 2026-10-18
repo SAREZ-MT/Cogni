@@ -7,6 +7,14 @@ import {
   emptyDueCounts,
 } from "../../domain/due-today";
 import type { DueTodayReader } from "../../domain/due-today-reader";
+import {
+  emptyTechniqueSnapshot,
+  type TechniqueSnapshot,
+} from "../../domain/technique-overview";
+import type {
+  TechniqueOverviewReader,
+  TechniqueSnapshotBounds,
+} from "../../domain/technique-overview-reader";
 
 interface NotebookRow {
   id: string;
@@ -31,17 +39,28 @@ interface ItemRow {
   suspended: boolean;
 }
 
-// In-memory DueTodayReader and DueInRangeReader for unit tests; satisfies
-// both shared contracts (due-today-reader.contract.ts,
-// due-in-range-reader.contract.ts). It stands in for the notebooks, pages and
-// study_items tables, so tests seed it directly. An item belongs to its
+// One review_logs row reduced to what the overview reads: its item's page
+// and its technique (the session kind, as a DueKind).
+interface ReviewRow {
+  pageId: string;
+  kind: DueKind;
+  reviewedAt: Date;
+}
+
+// In-memory DueTodayReader, DueInRangeReader and TechniqueOverviewReader
+// for unit tests; satisfies the three shared contracts
+// (due-today-reader.contract.ts, due-in-range-reader.contract.ts,
+// technique-overview-reader.contract.ts). It stands in for the notebooks, pages and
+// study_items (and, for the overview, review_logs) tables, so tests seed
+// it directly. An item belongs to its
 // page's owner, as in the database.
 export class InMemoryDueTodayReader
-  implements DueTodayReader, DueInRangeReader
+  implements DueTodayReader, DueInRangeReader, TechniqueOverviewReader
 {
   private readonly notebooks = new Map<string, NotebookRow>();
   private readonly pages = new Map<string, PageRow>();
   private readonly items: ItemRow[] = [];
+  private readonly reviews: ReviewRow[] = [];
 
   addNotebook(notebook: {
     id: string;
@@ -65,6 +84,10 @@ export class InMemoryDueTodayReader
     this.items.push({ ...item });
   }
 
+  addReview(review: ReviewRow): void {
+    this.reviews.push({ ...review });
+  }
+
   archivePage(pageId: string): void {
     const page = this.pages.get(pageId);
     if (page) page.archived = true;
@@ -75,10 +98,15 @@ export class InMemoryDueTodayReader
     if (notebook) notebook.archived = true;
   }
 
-  async listDueToday(ownerId: string, now: Date): Promise<DueTodayPage[]> {
+  async listDueToday(
+    ownerId: string,
+    dueBefore: Date,
+  ): Promise<DueTodayPage[]> {
     const byPage = new Map<string, DueTodayPage>();
     for (const item of this.items) {
-      if (item.suspended || item.dueAt.getTime() > now.getTime()) continue;
+      if (item.suspended || item.dueAt.getTime() >= dueBefore.getTime()) {
+        continue;
+      }
       const page = this.pages.get(item.pageId);
       if (!page || page.archived || page.ownerId !== ownerId) continue;
       const notebook = this.notebooks.get(page.notebookId);
@@ -136,6 +164,66 @@ export class InMemoryDueTodayReader
         a.dueAt.getTime() - b.dueAt.getTime() ||
         compareText(a.pageId, b.pageId),
     );
+  }
+
+  async readTechniqueSnapshot(
+    ownerId: string,
+    bounds: TechniqueSnapshotBounds,
+  ): Promise<TechniqueSnapshot> {
+    const snapshot = emptyTechniqueSnapshot();
+    const due = new Map<DueKind, Set<string>>();
+    for (const item of this.calendarItems(
+      ownerId,
+      new Date(-8.64e15),
+      new Date(8.64e15),
+    )) {
+      const readout = snapshot[item.kind];
+      readout.total += 1;
+      const dueAt = item.dueAt.getTime();
+      if (dueAt < bounds.dueBefore.getTime()) {
+        const pages = due.get(item.kind) ?? new Set<string>();
+        pages.add(item.pageId);
+        due.set(item.kind, pages);
+      } else if (
+        readout.nextDueAt === null ||
+        dueAt < readout.nextDueAt.getTime()
+      ) {
+        readout.nextDueAt = item.dueAt;
+      }
+    }
+    const reviewed = new Map<DueKind, Set<string>>();
+    for (const review of this.reviews) {
+      const at = review.reviewedAt.getTime();
+      if (
+        at < bounds.reviewedFrom.getTime() ||
+        at >= bounds.dueBefore.getTime() ||
+        !this.isLivePage(review.pageId, ownerId)
+      ) {
+        continue;
+      }
+      const pages = reviewed.get(review.kind) ?? new Set<string>();
+      pages.add(review.pageId);
+      reviewed.set(review.kind, pages);
+    }
+    for (const [kind, readout] of Object.entries(snapshot) as [
+      DueKind,
+      (typeof snapshot)[DueKind],
+    ][]) {
+      readout.duePageIds = [...(due.get(kind) ?? [])].sort(compareText);
+      readout.reviewedPageIds = [...(reviewed.get(kind) ?? [])].sort(
+        compareText,
+      );
+    }
+    return snapshot;
+  }
+
+  // The page exists, belongs to the owner and neither it nor its notebook
+  // is archived.
+  private isLivePage(pageId: string, ownerId: string): boolean {
+    const page = this.pages.get(pageId);
+    if (!page || page.archived || page.ownerId !== ownerId) return false;
+    const notebook = this.notebooks.get(page.notebookId);
+    return Boolean(notebook && !notebook.archived);
   }
 
   async listOverdueCounts(

@@ -30,6 +30,8 @@ if (process.env.DATABASE_URL) {
   let nextPagePosition = 1;
   const CREATED = new Date("2026-10-05T08:00:00.000Z");
   const NOW = new Date("2026-10-06T09:00:00.000Z");
+  // Reviews are due per local day (UTC here): due before the next midnight.
+  const TOMORROW = new Date("2026-10-07T00:00:00.000Z");
   const DAY_MS = 86_400_000;
   const ids = { next: () => randomUUID() };
 
@@ -114,6 +116,7 @@ if (process.env.DATABASE_URL) {
         pageId,
         reviews: reviewsFor(questions),
         now: NOW,
+        dueBefore: TOMORROW,
       });
 
       expect(result.ok).toBe(true);
@@ -160,6 +163,7 @@ if (process.env.DATABASE_URL) {
             pageId,
             reviews: reviewsFor(questions),
             now: NOW,
+            dueBefore: TOMORROW,
           },
           { uow: failing, ids },
         ),
@@ -187,6 +191,7 @@ if (process.env.DATABASE_URL) {
             pageId,
             reviews: reviewsFor(questions),
             now: NOW,
+            dueBefore: TOMORROW,
           });
           expect(result.ok).toBe(true);
           throw new Error("saving the evaluations failed");
@@ -210,6 +215,7 @@ if (process.env.DATABASE_URL) {
         pageId,
         reviews: [{ questionId: questions[0] as string, quality: 1 }],
         now: NOW,
+        dueBefore: TOMORROW,
       });
       expect(first.ok).toBe(true);
 
@@ -222,6 +228,7 @@ if (process.env.DATABASE_URL) {
           { questionId: questions[1] as string, quality: 4 },
         ],
         now: new Date(NOW.getTime() + 60_000),
+        dueBefore: TOMORROW,
       });
 
       expect(retry.ok && retry.value).toMatchObject({
@@ -241,6 +248,7 @@ if (process.env.DATABASE_URL) {
           pageId,
           reviews: [{ questionId: questions[0] as string, quality: 1 }],
           now: NOW,
+          dueBefore: TOMORROW,
         });
 
       const results = await Promise.all([record(), record()]);

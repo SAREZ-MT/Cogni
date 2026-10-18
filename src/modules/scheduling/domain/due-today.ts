@@ -49,3 +49,13 @@ export function totalDueCount(pages: readonly DueTodayPage[]): number {
   }
   return total;
 }
+
+// Study items due now per technique across pages (Home's technique count
+// cards).
+export function sumDueByKind(pages: readonly DueTodayPage[]): DueCounts {
+  const counts = emptyDueCounts();
+  for (const page of pages) {
+    for (const kind of DUE_KINDS) counts[kind] += page.due[kind];
+  }
+  return counts;
+}

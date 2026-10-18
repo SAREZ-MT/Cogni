@@ -7,8 +7,10 @@ import { computeMastery } from "../domain/mastery";
 import type { PageMastery } from "../domain/page-mastery";
 import { applySm2 } from "../domain/sm2";
 import {
+  type DueCutoff,
   FLASHCARD_QUALITY,
   type FlashcardRating,
+  isDueBefore,
   type StudyItem,
 } from "../domain/study-item";
 import { runInUnitOfWork } from "./run-in-unit-of-work";
@@ -17,6 +19,9 @@ import type { StudyUnitOfWork } from "./study-unit-of-work";
 export interface GradeFlashcardDeps {
   uow: StudyUnitOfWork;
   clock: Clock;
+  // The owner's "due" bound (start of their next local day): a card due
+  // later today can be graded now, one due tomorrow cannot.
+  dueCutoff: DueCutoff;
   ids: { next(): string };
 }
 
@@ -60,7 +65,7 @@ export async function gradeFlashcard(
     if (item.suspendedAt !== null) {
       return fail(STUDY_ENGINE_ERROR.ITEM_SUSPENDED, input.itemId);
     }
-    if (item.dueAt.getTime() > now.getTime()) {
+    if (!isDueBefore(item, deps.dueCutoff(now))) {
       return fail(STUDY_ENGINE_ERROR.ITEM_NOT_DUE, input.itemId);
     }
 

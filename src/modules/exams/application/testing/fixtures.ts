@@ -9,6 +9,13 @@ export const PAGE = "page-1";
 export const NOW = new Date("2026-10-05T10:00:00.000Z");
 export const LATER = new Date("2026-10-06T10:00:00.000Z");
 
+// The owner's per-day "due" bound in UTC: the next midnight. Reviews are
+// due per local day, so anything due before it is due at `now`.
+export function utcDayCutoff(now: Date): Date {
+  const day = 86_400_000;
+  return new Date((Math.floor(now.getTime() / day) + 1) * day);
+}
+
 // The page exists and is active only for OWNER; any other page or owner is
 // PAGE_NOT_FOUND, like notebooks' getPageText.
 export const pages: PageTextReader = {

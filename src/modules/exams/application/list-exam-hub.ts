@@ -8,9 +8,10 @@ export interface ExamDueCounts {
   examQuestionsDueByPage(
     ownerId: string,
   ): Promise<ReadonlyMap<string, number> | null>;
-  // The roots whose exam study item is due now (same "due" as "Hoy":
-  // dueAt <= now, not suspended, page and notebook not archived); null
-  // when the due items could not be read.
+  // The roots whose exam study item is due today (same "due" as "Hoy":
+  // due before the start of the owner's next local day, not suspended,
+  // page and notebook not archived); null when the due items could not be
+  // read.
   examRootsDueNow(ownerId: string): Promise<ReadonlySet<string> | null>;
 }
 

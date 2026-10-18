@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull, lte, min, sql } from "drizzle-orm";
+import { and, asc, eq, isNull, lt, min, sql } from "drizzle-orm";
 import type { DbExecutor } from "@/shared/db/client";
 import { notebooks, pages, studyItems } from "@/shared/db/schema";
 import type { DueKind, DueTodayPage } from "../domain/due-today";
@@ -13,7 +13,10 @@ const countOf = (kind: DueKind) =>
 export class DrizzleDueTodayReader implements DueTodayReader {
   constructor(private readonly db: DbExecutor) {}
 
-  async listDueToday(ownerId: string, now: Date): Promise<DueTodayPage[]> {
+  async listDueToday(
+    ownerId: string,
+    dueBefore: Date,
+  ): Promise<DueTodayPage[]> {
     const earliestDueAt = min(studyItems.dueAt);
     const rows = await this.db
       .select({
@@ -34,7 +37,7 @@ export class DrizzleDueTodayReader implements DueTodayReader {
         and(
           eq(studyItems.ownerId, ownerId),
           isNull(studyItems.suspendedAt),
-          lte(studyItems.dueAt, now),
+          lt(studyItems.dueAt, dueBefore),
           isNull(pages.archivedAt),
           isNull(notebooks.archivedAt),
         ),

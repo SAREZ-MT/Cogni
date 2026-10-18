@@ -134,26 +134,36 @@ export function runStudyItemRepositoryContract(
     });
 
     describe("listDue", () => {
-      it("returns non-suspended items due at or before now, oldest first", async () => {
+      it("returns non-suspended items due before the bound, oldest first", async () => {
         const ctx = options.context();
         const repo = options.createRepository();
         const pageId = await ctx.newPageId();
         const late = makeItem(ctx, pageId, { dueAt: at(2) });
         const early = makeItem(ctx, pageId, { dueAt: at(1) });
-        const exactlyNow = makeItem(ctx, pageId, { dueAt: at(3) });
+        const lastInstant = makeItem(ctx, pageId, {
+          dueAt: new Date(at(3).getTime() - 1),
+        });
+        const atBound = makeItem(ctx, pageId, { dueAt: at(3) });
         const future = makeItem(ctx, pageId, { dueAt: at(4) });
         const suspended = makeItem(ctx, pageId, {
           dueAt: at(0),
           suspendedAt: at(0),
         });
-        for (const item of [late, early, exactlyNow, future, suspended]) {
+        for (const item of [
+          late,
+          early,
+          lastInstant,
+          atBound,
+          future,
+          suspended,
+        ]) {
           await repo.save(item);
         }
         const due = await repo.listDue(ctx.ownerId, at(3), pageId);
         expect(due.map((item) => item.id)).toEqual([
           early.id,
           late.id,
-          exactlyNow.id,
+          lastInstant.id,
         ]);
       });
 

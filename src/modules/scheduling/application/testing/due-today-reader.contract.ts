@@ -31,6 +31,8 @@ export interface DueTodayReaderContractOptions {
   context: () => DueTodayReaderContractContext;
 }
 
+// The reader's bound: the start of the owner's next local day (the use
+// case computes it). Items due before it are due today.
 const NOW = new Date("2026-10-04T12:00:00.000Z");
 const HOUR_MS = 3_600_000;
 const hoursFromNow = (hours: number) =>
@@ -46,10 +48,10 @@ export function runDueTodayReaderContract(
     reader: DueTodayReader,
     ownerId: string,
     pages: readonly DuePageFixture[],
-    now: Date = NOW,
+    dueBefore: Date = NOW,
   ): Promise<DueTodayPage[]> => {
     const ids = new Set(pages.map((page) => page.pageId));
-    return (await reader.listDueToday(ownerId, now)).filter((row) =>
+    return (await reader.listDueToday(ownerId, dueBefore)).filter((row) =>
       ids.has(row.pageId),
     );
   };
@@ -79,19 +81,20 @@ export function runDueTodayReaderContract(
       ]);
     });
 
-    it("counts an item due exactly now and never one due later", async () => {
+    it("counts an item due just before the bound and never one due at or after it", async () => {
       const ctx = options.context();
       const reader = options.createReader();
       const page = await ctx.newPage();
       const later = await ctx.newPage();
+      const lastInstant = new Date(NOW.getTime() - 1);
+      await ctx.addItem(page, { dueAt: lastInstant });
       await ctx.addItem(page, { dueAt: NOW });
-      await ctx.addItem(page, { dueAt: hoursFromNow(1) });
-      await ctx.addItem(later, { dueAt: new Date(NOW.getTime() + 1) });
+      await ctx.addItem(later, { dueAt: hoursFromNow(1) });
 
       const rows = await listFor(reader, ctx.ownerId, [page, later]);
       expect(rows.map((row) => row.pageId)).toEqual([page.pageId]);
       expect(rows[0]?.due.flashcard).toBe(1);
-      expect(rows[0]?.earliestDueAt).toEqual(NOW);
+      expect(rows[0]?.earliestDueAt).toEqual(lastInstant);
     });
 
     it("orders pages by their earliest due item, oldest first", async () => {
@@ -102,7 +105,7 @@ export function runDueTodayReaderContract(
       const middle = await ctx.newPage();
       await ctx.addItem(recent, { dueAt: hoursFromNow(-1) });
       await ctx.addItem(oldest, { dueAt: hoursFromNow(-30) });
-      await ctx.addItem(oldest, { dueAt: hoursFromNow(0) });
+      await ctx.addItem(oldest, { dueAt: hoursFromNow(-0.5) });
       await ctx.addItem(middle, { dueAt: hoursFromNow(-10) });
 
       const rows = await listFor(reader, ctx.ownerId, [recent, oldest, middle]);

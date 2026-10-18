@@ -24,6 +24,12 @@ import { err, ok } from "@/shared/kernel/result";
 import { createTestDb } from "./helpers/test-db";
 import { createTestOwner, deleteTestOwner } from "./helpers/test-owner";
 
+// Reviews are due per local day (UTC here): due before the next midnight.
+function utcDayCutoff(now: Date): Date {
+  const day = 86_400_000;
+  return new Date((Math.floor(now.getTime() / day) + 1) * day);
+}
+
 // A recall session against the real database (Phase 6 T5): composition
 // from the page's study items, one answer per (session, question), page
 // coherence, finish with the answered questions only, and the session row
@@ -132,7 +138,7 @@ if (process.env.DATABASE_URL) {
   async function start() {
     const started = await startRecallSession(
       { pageId },
-      { pages: pageReader, uow, clock, ids: newIds },
+      { pages: pageReader, uow, clock, dueCutoff: utcDayCutoff, ids: newIds },
       owner.id,
     );
     if (!started.ok) throw started.error;
@@ -157,7 +163,7 @@ if (process.env.DATABASE_URL) {
       const expected = [ids.due, ids.newA, ids.newB, ids.later];
       const plan = await planRecallSession(
         { pageId },
-        { questions, studyItems: items, clock },
+        { questions, studyItems: items, clock, dueCutoff: utcDayCutoff },
         owner.id,
       );
       expect(plan.questions.map((q) => q.id)).toEqual(expected);

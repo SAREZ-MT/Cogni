@@ -9,6 +9,7 @@ import {
 import type { FlashcardSessionRepository } from "../domain/flashcard-session-repository";
 import { applySm2 } from "../domain/sm2";
 import {
+  type DueCutoff,
   FLASHCARD_QUALITY,
   type FlashcardRating,
   type StudyItem,
@@ -30,6 +31,9 @@ export interface StartFlashcardSessionDeps {
   studyItems: Pick<StudyItemRepository, "listDue">;
   sessions: Pick<FlashcardSessionRepository, "insert">;
   clock: Clock;
+  // The owner's "due" bound (start of their next local day): a card due
+  // later today is already in the session.
+  dueCutoff: DueCutoff;
   ids: { next(): string };
 }
 
@@ -50,8 +54,9 @@ export interface StartedFlashcardSession {
 
 const RATINGS = Object.keys(FLASHCARD_QUALITY) as FlashcardRating[];
 
-// Opens a flashcard review session (§3.3): the due flashcards of one page,
-// or of every page of the owner when pageId is absent ("Repasos de hoy").
+// Opens a flashcard review session (§3.3): the flashcards due today (per
+// local day, deps.dueCutoff) of one page, or of every page of the owner
+// when pageId is absent ("Repasos de hoy").
 // Nothing due answers NOTHING_DUE and opens no session.
 export async function startFlashcardSession(
   input: { pageId?: string },
@@ -65,7 +70,7 @@ export async function startFlashcardSession(
 
   const now = deps.clock.now();
   const due = (
-    await deps.studyItems.listDue(ownerId, now, input.pageId)
+    await deps.studyItems.listDue(ownerId, deps.dueCutoff(now), input.pageId)
   ).filter((item) => item.kind === "flashcard");
   if (due.length === 0) {
     return err(

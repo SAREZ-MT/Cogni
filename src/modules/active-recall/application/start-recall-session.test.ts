@@ -4,6 +4,7 @@ import { RECALL_ERROR } from "../domain/errors";
 import { startRecallSession } from "./start-recall-session";
 import { InMemoryRecallSessionUnitOfWork } from "./testing/in-memory-recall-session-unit-of-work";
 import {
+  dueCutoff,
   NOW,
   OTHER_OWNER,
   OTHER_PAGE,
@@ -20,6 +21,7 @@ function setup() {
     pages,
     uow,
     clock: createFixedClock(NOW),
+    dueCutoff,
     ids: { next: () => `session-${++n}` },
   };
   return { uow, deps };
@@ -81,6 +83,25 @@ describe("startRecallSession", () => {
       "new-b",
       "later-old",
       "later-recent",
+    ]);
+  });
+
+  it("counts a question due later today as due: the whole local day is review time", async () => {
+    const { uow, deps } = setup();
+    await seedQuestions(uow, [
+      { id: "new", createdDay: -2 },
+      // 21:36 UTC, before the owner's day ends at midnight.
+      { id: "due-tonight", reviewedDay: -3, dueDay: 0.4 },
+      // 00:00 tomorrow: not due yet.
+      { id: "due-tomorrow", reviewedDay: -4, dueDay: 0.5 },
+    ]);
+
+    const result = await startRecallSession({ pageId: PAGE }, deps, OWNER);
+
+    expect(result.ok && result.value.questions.map((q) => q.id)).toEqual([
+      "due-tonight",
+      "new",
+      "due-tomorrow",
     ]);
   });
 

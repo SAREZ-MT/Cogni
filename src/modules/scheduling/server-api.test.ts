@@ -15,7 +15,7 @@ const ROW: DueTodayPage = {
   due: { flashcard: 0, exam_question: 3, recall_question: 0 },
   earliestDueAt: NOW,
 };
-const calls: Array<{ ownerId: string; now: Date }> = [];
+const calls: Array<{ ownerId: string; dueBefore: Date }> = [];
 const rangeCalls: Array<{ ownerId: string; from: Date; to: Date }> = [];
 const overdueCalls: Array<{ ownerId: string; before: Date }> = [];
 vi.mock("./infrastructure", () => ({
@@ -41,8 +41,8 @@ vi.mock("./infrastructure", () => ({
   }),
   DrizzleDueTodayReader: vi.fn(function DrizzleDueTodayReader() {
     return {
-      async listDueToday(ownerId: string, now: Date) {
-        calls.push({ ownerId, now });
+      async listDueToday(ownerId: string, dueBefore: Date) {
+        calls.push({ ownerId, dueBefore });
         return [ROW];
       },
     };
@@ -52,14 +52,19 @@ vi.mock("./infrastructure", () => ({
 import { createSchedulingServerApi } from "./server-api";
 
 describe("createSchedulingServerApi", () => {
-  it("lists the owner's pages with items due at the clock's now", async () => {
+  it("lists the owner's pages with items due during the clock's local day", async () => {
     const api = createSchedulingServerApi({
       db: {} as never,
       clock: createFixedClock(NOW),
     });
 
-    await expect(api.listDueToday("owner-1")).resolves.toEqual([ROW]);
-    expect(calls).toEqual([{ ownerId: "owner-1", now: NOW }]);
+    // 08:00Z is 03:00 in Bogotá (-05): the local day ends at 7 Oct 05:00Z.
+    await expect(
+      api.listDueToday("owner-1", { timeZone: "America/Bogota" }),
+    ).resolves.toEqual([ROW]);
+    expect(calls).toEqual([
+      { ownerId: "owner-1", dueBefore: new Date("2026-10-07T05:00:00.000Z") },
+    ]);
   });
 
   it("lists the owner's calendar days at the clock's now", async () => {

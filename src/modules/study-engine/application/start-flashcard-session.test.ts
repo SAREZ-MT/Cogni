@@ -11,6 +11,9 @@ import { InMemoryStudyItemRepository } from "./testing/in-memory-study-item-repo
 const OWNER = "owner-1";
 const NOW = new Date("2026-10-04T09:00:00.000Z");
 const HOUR_MS = 3_600_000;
+// The owner's local day (UTC here) ends at midnight: reviews are due per
+// day, so anything due before it is due now.
+const TOMORROW = new Date("2026-10-05T00:00:00.000Z");
 
 function sequentialIds(prefix = "id") {
   let n = 0;
@@ -50,6 +53,8 @@ function setup(pageExists = true) {
     studyItems,
     sessions,
     clock: createFixedClock(NOW),
+    dueCutoff: (now: Date) =>
+      now.getTime() === NOW.getTime() ? TOMORROW : new Date(Number.NaN),
     ids: sequentialIds("session"),
   };
   return { deps, studyItems, sessions, pagesRead };
@@ -64,10 +69,8 @@ describe("startFlashcardSession", () => {
     await studyItems.save(
       item("a", { dueAt: new Date(NOW.getTime() - 2 * HOUR_MS) }),
     );
-    // Not due yet, another page, suspended: all left out.
-    await studyItems.save(
-      item("later", { dueAt: new Date(NOW.getTime() + HOUR_MS) }),
-    );
+    // Due tomorrow, another page, suspended: all left out.
+    await studyItems.save(item("tomorrow", { dueAt: TOMORROW }));
     await studyItems.save(item("other-page", { pageId: "page-2" }));
     await studyItems.save(item("suspended", { suspendedAt: NOW }));
 
@@ -175,11 +178,25 @@ describe("startFlashcardSession", () => {
     expect(await sessions.findById("session-1", OWNER)).toBe(null);
   });
 
+  it("offers a card due later today: the whole local day is review time", async () => {
+    const { deps, studyItems } = setup();
+    await studyItems.save(
+      item("tonight", { dueAt: new Date(TOMORROW.getTime() - HOUR_MS) }),
+    );
+
+    const result = await startFlashcardSession(
+      { pageId: "page-1" },
+      deps,
+      OWNER,
+    );
+
+    if (!result.ok) throw result.error;
+    expect(result.value.items.map((due) => due.itemId)).toEqual(["tonight"]);
+  });
+
   it("answers NOTHING_DUE without opening a session when no card is due", async () => {
     const { deps, studyItems, sessions } = setup();
-    await studyItems.save(
-      item("later", { dueAt: new Date(NOW.getTime() + HOUR_MS) }),
-    );
+    await studyItems.save(item("tomorrow", { dueAt: TOMORROW }));
 
     const result = await startFlashcardSession(
       { pageId: "page-1" },

@@ -36,6 +36,12 @@ import { err, ok } from "@/shared/kernel/result";
 import { createTestDb } from "./helpers/test-db";
 import { createTestOwner, deleteTestOwner } from "./helpers/test-owner";
 
+// Reviews are due per local day (UTC here): due before the next midnight.
+function utcDayCutoff(now: Date): Date {
+  const day = 86_400_000;
+  return new Date((Math.floor(now.getTime() / day) + 1) * day);
+}
+
 // The asynchronous recall evaluation against the real database (Phase 6
 // T6): every answer keeps its raw evaluation (model output, failed attempt
 // or skipped record), review_logs are written for done answers only, a
@@ -178,6 +184,7 @@ if (process.env.DATABASE_URL) {
       limiter: createInMemoryGenerationLimiter({ limit: 60, clock }),
       reviews: createRecallReviewRecorder({ db, ids: { next: randomUUID } }),
       clock,
+      dueCutoff: utcDayCutoff,
       tokenCap: 12_000,
     };
   }

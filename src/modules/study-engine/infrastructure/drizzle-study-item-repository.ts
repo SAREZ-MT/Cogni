@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull, lte, sql } from "drizzle-orm";
+import { and, asc, eq, isNull, lt, sql } from "drizzle-orm";
 import type { DbExecutor } from "@/shared/db/client";
 import {
   notebooks,
@@ -94,7 +94,7 @@ export class DrizzleStudyItemRepository implements StudyItemRepository {
 
   async listDue(
     ownerId: string,
-    now: Date,
+    dueBefore: Date,
     pageId?: string,
   ): Promise<StudyItem[]> {
     // Items of an archived page, or of a page in an archived notebook, are
@@ -108,7 +108,7 @@ export class DrizzleStudyItemRepository implements StudyItemRepository {
         and(
           eq(studyItems.ownerId, ownerId),
           isNull(studyItems.suspendedAt),
-          lte(studyItems.dueAt, now),
+          lt(studyItems.dueAt, dueBefore),
           isNull(pages.archivedAt),
           isNull(notebooks.archivedAt),
           pageId === undefined ? undefined : eq(studyItems.pageId, pageId),

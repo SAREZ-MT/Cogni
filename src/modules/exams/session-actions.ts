@@ -4,6 +4,7 @@ import * as Sentry from "@sentry/nextjs";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createNotebooksServerApi } from "@/modules/notebooks";
+import { getCurrentDueCutoff } from "@/modules/scheduling";
 import { createSessionFeedbackSources } from "@/modules/study-engine";
 import { getDb } from "@/shared/db/client";
 import { systemClock } from "@/shared/kernel/clock";
@@ -278,7 +279,14 @@ export async function startExamSessionAction(
         pageId: parsed.value.pageId,
         requestedCount: parsed.value.count ?? EXAM_DEFAULT_QUESTIONS,
       },
-      { pages, uow, clock: systemClock, ids },
+      {
+        pages,
+        uow,
+        clock: systemClock,
+        // Reviews are due per local day of the profile zone (server-side).
+        dueCutoff: await getCurrentDueCutoff(),
+        ids,
+      },
       ownerId.value,
     );
     if (!result.ok) return err(toActionError(result.error));
@@ -338,7 +346,7 @@ export async function finishExamSessionAction(
     const { uow } = deps();
     const result = await completeExamSession(
       parsed.value,
-      { uow, clock: systemClock },
+      { uow, clock: systemClock, dueCutoff: await getCurrentDueCutoff() },
       ownerId.value,
     );
     if (!result.ok) return err(toActionError(result.error));

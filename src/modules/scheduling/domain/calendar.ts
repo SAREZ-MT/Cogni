@@ -132,6 +132,63 @@ export function dayKeyIn(instant: Date, timeZone: string): DayKey {
   return dayKeyFormatter(timeZone)(instant);
 }
 
+// Offset of `timeZone` from UTC at `instant`, in ms (east positive), read
+// from Intl's wall-clock parts at second precision.
+function zoneOffsetMs(instant: number, timeZone: string): number {
+  const format = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+  const parts: Record<string, number> = {};
+  for (const part of format.formatToParts(new Date(instant))) {
+    parts[part.type] = Number(part.value);
+  }
+  const wall = Date.UTC(
+    parts.year ?? 0,
+    (parts.month ?? 1) - 1,
+    parts.day ?? 1,
+    parts.hour ?? 0,
+    parts.minute ?? 0,
+    parts.second ?? 0,
+  );
+  return wall - Math.floor(instant / 1000) * 1000;
+}
+
+// The first instant of the local day `day` in `timeZone`: local midnight,
+// or the transition instant when a DST jump skips midnight. Two offset
+// probes cover any day with at most one transition near midnight; the
+// earliest candidate that already reads as `day` wins.
+export function startOfDayIn(day: DayKey, timeZone: string): Date {
+  const midnight = utcMidnight(day);
+  const first = midnight - zoneOffsetMs(midnight, timeZone);
+  const second = midnight - zoneOffsetMs(first, timeZone);
+  const dayOf = dayKeyFormatter(timeZone);
+  const candidates = [first, second]
+    .filter((instant) => dayOf(new Date(instant)) === day)
+    .sort((a, b) => a - b);
+  return new Date(candidates[0] ?? first);
+}
+
+// The first instant of the local day `now` falls on in `timeZone` (Home's
+// "reviewed today" bound, H2-T5i).
+export function startOfTodayIn(now: Date, timeZone: string): Date {
+  return startOfDayIn(dayKeyIn(now, timeZone), timeZone);
+}
+
+// The first instant of the local day after the one `now` falls on in
+// `timeZone`. Reviews are due per local day (user decision 2026-10-18,
+// SM-2 schedules days, not hours): an item is due today while its due_at
+// is before this bound, so the whole day is review time.
+export function startOfTomorrowIn(now: Date, timeZone: string): Date {
+  return startOfDayIn(addDays(dayKeyIn(now, timeZone), 1), timeZone);
+}
+
 // Every UTC offset in use lies within ±14 h, so local midnight of a day is
 // never further than this from the day's UTC midnight. Readers query a
 // window padded by it and the grouping keeps only the requested local days,

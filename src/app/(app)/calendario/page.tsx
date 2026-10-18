@@ -1,9 +1,5 @@
 import { getCurrentTimeZoneSetting } from "@/modules/identity";
-import {
-  dayKeyIn,
-  getCalendarDays,
-  listDueTodayAction,
-} from "@/modules/scheduling";
+import { dayKeyIn, getCalendarDays, getDueToday } from "@/modules/scheduling";
 import { Card } from "@/shared/ui/card";
 import { SectionHeader } from "@/shared/ui/section-header";
 import { SegmentedTabs } from "@/shared/ui/segmented-tabs";
@@ -63,9 +59,9 @@ function summaryOf(rows: readonly TodayRow[] | null): string | null {
 // calendar style the user chose (2026-10-12): page title + view tabs, then a
 // card whose header carries today's date badge, the view title and a short
 // summary or range. Events are only system-generated reviews, so there is
-// no "add event" action. "Hoy" lists the pages with items due now; "Mes"
-// and "Semana" show, per day in the profile time zone, each page's next
-// due items per technique.
+// no "add event" action. "Hoy" lists the pages with items due today (the
+// whole local day: reviews are due per day); "Mes" and "Semana" show, per
+// day in the profile time zone, each page's next due items per technique.
 export default async function CalendarPage({
   searchParams,
 }: CalendarPageProps) {
@@ -110,7 +106,8 @@ export default async function CalendarPage({
 }
 
 async function todayCard({ now, timeZone }: { now: Date; timeZone: string }) {
-  const result = await listDueTodayAction();
+  // Reviews are due per local day: the whole day of `now` in the zone.
+  const result = await getDueToday({ timeZone, now });
   const rows = result.ok ? toTodayRows(result.value) : null;
   const summary = summaryOf(rows);
   return (

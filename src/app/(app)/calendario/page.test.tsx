@@ -4,16 +4,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Breadcrumb, BreadcrumbProvider } from "../_components/breadcrumb";
 
 vi.mock("server-only", () => ({}));
-const { listDueTodayAction, listCalendarDaysAction, getCalendarDays } =
-  vi.hoisted(() => ({
-    listDueTodayAction: vi.fn(),
+const { getDueToday, listCalendarDaysAction, getCalendarDays } = vi.hoisted(
+  () => ({
+    getDueToday: vi.fn(),
     listCalendarDaysAction: vi.fn(),
     getCalendarDays: vi.fn(),
-  }));
+  }),
+);
 // The pure calendar helpers stay real; only the reads are faked.
 vi.mock("@/modules/scheduling", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/modules/scheduling")>()),
-  listDueTodayAction,
+  getDueToday,
   listCalendarDaysAction,
   getCalendarDays,
 }));
@@ -62,8 +63,8 @@ async function renderPage(params: { view?: string; date?: string } = {}) {
 
 describe("CalendarPage", () => {
   beforeEach(() => {
-    listDueTodayAction.mockReset();
-    listDueTodayAction.mockResolvedValue({ ok: true, value: [] });
+    getDueToday.mockReset();
+    getDueToday.mockResolvedValue({ ok: true, value: [] });
     listCalendarDaysAction.mockReset();
     getCalendarDays.mockReset();
     getCalendarDays.mockResolvedValue({ ok: true, value: [] });
@@ -147,7 +148,7 @@ describe("CalendarPage", () => {
   });
 
   it("lists the due pages with their technique chips and summarises the total", async () => {
-    listDueTodayAction.mockResolvedValue({
+    getDueToday.mockResolvedValue({
       ok: true,
       value: [due("a", 2, 1), due("b", 1)],
     });
@@ -165,6 +166,23 @@ describe("CalendarPage", () => {
     );
   });
 
+  it("reads the day's due items in the profile zone with the render's instant", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-12T12:00:00.000Z"));
+    getCurrentTimeZoneSetting.mockResolvedValue({
+      timeZone: "America/Bogota",
+      chosen: true,
+    });
+
+    await renderPage();
+
+    // Reviews are due per local day: "Hoy" counts the whole local day.
+    expect(getDueToday).toHaveBeenCalledWith({
+      timeZone: "America/Bogota",
+      now: new Date("2026-10-12T12:00:00.000Z"),
+    });
+  });
+
   it("shows the up-to-date empty state when nothing is due", async () => {
     await renderPage();
 
@@ -175,7 +193,7 @@ describe("CalendarPage", () => {
   });
 
   it("reports a load failure instead of an empty day", async () => {
-    listDueTodayAction.mockResolvedValue({
+    getDueToday.mockResolvedValue({
       ok: false,
       error: { code: "UNEXPECTED", message: "x" },
     });
@@ -227,7 +245,7 @@ describe("CalendarPage", () => {
         now: new Date("2026-10-12T12:00:00.000Z"),
       });
       expect(listCalendarDaysAction).not.toHaveBeenCalled();
-      expect(listDueTodayAction).not.toHaveBeenCalled();
+      expect(getDueToday).not.toHaveBeenCalled();
       const card = screen.getByTestId("calendar-card");
       expect(
         within(card).getByRole("heading", { level: 2, name: "Octubre 2026" }),

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createAiServerApi } from "@/modules/ai";
 import { createNotebooksServerApi } from "@/modules/notebooks";
+import { getCurrentDueCutoff } from "@/modules/scheduling";
 import { serverEnv } from "@/shared/config/env.server";
 import { getDb } from "@/shared/db/client";
 import { systemClock } from "@/shared/kernel/clock";
@@ -68,6 +69,7 @@ export async function startExamRetakeAction(
         ai,
         uow: new DrizzleExamSessionUnitOfWork(db, ids),
         clock: systemClock,
+        dueCutoff: await getCurrentDueCutoff(),
         ids,
         tokenCap: env.AI_PAGE_TOKEN_CAP,
       },
