@@ -1,4 +1,4 @@
-import { and, asc, eq, lte, sql } from "drizzle-orm";
+import { and, asc, eq, lt, sql } from "drizzle-orm";
 import type { DbExecutor } from "@/shared/db/client";
 import { notebooks, pageMastery, pages, studyItems } from "@/shared/db/schema";
 import type { PageProgressRow } from "../domain/progress";
@@ -15,7 +15,7 @@ export class DrizzlePageProgressReader implements PageProgressReader {
 
   async listPageProgress(
     ownerId: string,
-    now: Date,
+    dueBefore: Date,
   ): Promise<PageProgressRow[]> {
     const active = sql`${studyItems.suspendedAt} is null`;
     const rows = await this.db
@@ -32,7 +32,7 @@ export class DrizzlePageProgressReader implements PageProgressReader {
             Number,
           ),
         itemsDue:
-          sql<number>`count(${studyItems.id}) filter (where ${active} and ${lte(studyItems.dueAt, now)})`.mapWith(
+          sql<number>`count(${studyItems.id}) filter (where ${active} and ${lt(studyItems.dueAt, dueBefore)})`.mapWith(
             Number,
           ),
       })

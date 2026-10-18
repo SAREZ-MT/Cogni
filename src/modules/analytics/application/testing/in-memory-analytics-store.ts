@@ -180,7 +180,7 @@ export class InMemoryAnalyticsStore
 
   async listPageProgress(
     ownerId: string,
-    now: Date,
+    dueBefore: Date,
   ): Promise<PageProgressRow[]> {
     const rows: Array<PageProgressRow & { order: [number, number] }> = [];
     for (const pageId of this.pages.keys()) {
@@ -199,8 +199,9 @@ export class InMemoryAnalyticsStore
         level: mastery?.level ?? null,
         score: mastery?.score ?? null,
         itemsTotal: items.length,
-        itemsDue: items.filter((item) => item.dueAt.getTime() <= now.getTime())
-          .length,
+        itemsDue: items.filter(
+          (item) => item.dueAt.getTime() < dueBefore.getTime(),
+        ).length,
         order: [live.notebook.position, live.page.position],
       });
     }

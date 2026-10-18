@@ -16,3 +16,9 @@ export {
   type TechniqueMetrics,
   type TechniqueMetricsReport,
 } from "./get-technique-metrics";
+export {
+  type GetWeakTopicsDeps,
+  type GetWeakTopicsInput,
+  getWeakTopics,
+  WEAK_TOPICS_WINDOW_DAYS,
+} from "./get-weak-topics";

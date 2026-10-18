@@ -26,8 +26,8 @@ vi.mock("./infrastructure", () => ({
     }
   },
   DrizzlePageProgressReader: class {
-    listPageProgress(ownerId: string, now: Date) {
-      return store.listPageProgress(ownerId, now);
+    listPageProgress(ownerId: string, dueBefore: Date) {
+      return store.listPageProgress(ownerId, dueBefore);
     }
   },
   DrizzleAnswerOutcomeReader: class {
@@ -49,6 +49,7 @@ import {
   getDashboardCalibration,
   getDashboardProgress,
   getDashboardTechniqueMetrics,
+  getHomeWeakTopics,
 } from "./dashboard-reads";
 
 // The page rendered at 23:59:59.999 UTC on Monday 12 Oct; by the time the
@@ -197,6 +198,48 @@ describe("dashboard reads", () => {
       expect(
         await getDashboardCalibration({ ...WEEK, toDay: WEEK.fromDay }),
       ).toEqual(INVALID_INPUT);
+    });
+  });
+
+  describe("getHomeWeakTopics", () => {
+    it("ranks the caller's weak pages over the 30 days before the given instant", async () => {
+      for (const iso of [
+        "2026-10-12T10:00:00.000Z",
+        "2026-10-12T10:01:00.000Z",
+        "2026-10-12T10:02:00.000Z",
+      ]) {
+        store.addExamAnswer({
+          pageId: "p-2",
+          isCorrect: false,
+          answeredAt: new Date(iso),
+          finished: true,
+        });
+      }
+
+      const result = await getHomeWeakTopics({ now: RENDERED_AT });
+
+      expect(result).toEqual({
+        ok: true,
+        value: [
+          {
+            pageId: "p-2",
+            pageTitle: "Ribosomas",
+            notebookId: "nb-1",
+            notebookTitle: "Biología",
+            notebookColor: "green",
+            accuracy: 0,
+            attempts: 3,
+          },
+        ],
+      });
+    });
+
+    it("requires a session", async () => {
+      getCurrentUser.mockResolvedValue(null);
+
+      expect(await getHomeWeakTopics({ now: RENDERED_AT })).toEqual(
+        SESSION_REQUIRED,
+      );
     });
   });
 

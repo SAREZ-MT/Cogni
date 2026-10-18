@@ -1,6 +1,11 @@
 import type { MasteryLevel } from "@/modules/study-engine";
 import type { Clock } from "@/shared/kernel/clock";
-import { addDays, dayKeyFormatter, paddedWindow } from "../domain/local-day";
+import {
+  addDays,
+  dayKeyFormatter,
+  paddedWindow,
+  startOfTomorrowIn,
+} from "../domain/local-day";
 import {
   buildProgress,
   type MasteryLevelName,
@@ -33,7 +38,8 @@ export interface GetProgressInput {
 }
 
 // "Progreso por cuaderno y por página" (documento-maestro §3.6): mastery
-// level and score, total and due items now, and the weekly trend of the
+// level and score, total and due items today (the whole local day, like
+// Home and "Hoy": reviews are due per day), and the weekly trend of the
 // average review quality (decision 2026-10-12, option A).
 export async function getProgress(
   input: GetProgressInput,
@@ -44,7 +50,10 @@ export async function getProgress(
   const weekStarts = trendWeekStarts(today, input.weeks);
   const { from, to } = paddedWindow(weekStarts[0] as string, addDays(today, 1));
   const [rows, reviews] = await Promise.all([
-    deps.pages.listPageProgress(input.ownerId, now),
+    deps.pages.listPageProgress(
+      input.ownerId,
+      startOfTomorrowIn(now, input.timeZone),
+    ),
     deps.reviews.listReviews(input.ownerId, from, to),
   ]);
   return buildProgress(rows, reviews, {

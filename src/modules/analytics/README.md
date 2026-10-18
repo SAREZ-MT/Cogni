@@ -84,7 +84,7 @@ Lectores Drizzle propios del módulo, de solo lectura, como los de
 ofrecen lecturas por dueño y rango.
 
 - `DrizzleReviewHistoryReader`: `review_logs` por dueño y rango (índice `(owner_id, reviewed_at)`), unido por el ítem a su página y cuaderno; y los pares distintos (técnica, tramo UTC de 15 minutos) de todo el historial para la racha. Todas las zonas en uso tienen desfases múltiplos de 15 minutos, así un tramo nunca cruza dos días locales y la lectura crece con el tiempo de estudio, no con la cantidad de repasos. La zona horaria nunca llega a SQL.
-- `DrizzlePageProgressReader`: una consulta agrupada con cada página viva, su cuaderno, su fila de `page_mastery` (nivel y puntaje) y los conteos vivos de `study_items` (no suspendidos, y vencidos con `due_at <= now`), para que "vencidos" coincida con "Hoy" del calendario entre recálculos del dominio.
+- `DrizzlePageProgressReader`: una consulta agrupada con cada página viva, su cuaderno, su fila de `page_mastery` (nivel y puntaje) y los conteos vivos de `study_items` (no suspendidos, y vencidos con `due_at < dueBefore`, el inicio del día local siguiente que `getProgress` calcula con `startOfTomorrowIn` en la zona del perfil: los repasos vencen por día), para que "vencidos" coincida con "Hoy" del calendario y con el inicio entre recálculos del dominio.
 - `DrizzleAnswerOutcomeReader`: `exam_answers` de exámenes terminados (por `answered_at`) y `recall_answers` evaluadas (por `created_at`), cada una con la página de su sesión.
 
 El contrato corre contra Postgres en `tests/db/drizzle-analytics-readers.contract.test.ts`.
@@ -96,6 +96,7 @@ El contrato corre contra Postgres en `tests/db/drizzle-analytics-readers.contrac
 | `getDashboardProgress({ timeZone, weeks, now })` | Servidor (no es Server Action) | Progreso con el instante con que la página pinta, para que la semana actual coincida con la de la página. `weeks` entero de 1 a 26. |
 | `getDashboardTechniqueMetrics({ fromDay, toDay, timeZone, now })` | Servidor (no es Server Action) | Métricas por técnica con el instante de la página (hoy, rachas). Rango no vacío de hasta 92 días. |
 | `getDashboardCalibration({ fromDay, toDay, timeZone })` | Servidor (no es Server Action) | Calibración del rango. |
+| `getHomeWeakTopics({ now })` | Servidor (no es Server Action) | Temas débiles del Inicio: hasta 5 páginas vivas con menos del 70 % de acierto (≥ 3 respuestas de examen terminado o de recordación evaluada en los últimos 30 días), la peor primero. |
 | `getProgressAction`, `getTechniqueMetricsAction`, `getCalibrationAction` | Interfaz (Server Actions) | Las mismas lecturas con el reloj del sistema; nunca aceptan un reloj del cliente. |
 | `createAnalyticsServerApi({ db, clock? })` | Otros módulos en el servidor | `getProgress`, `getTechniqueMetrics` y `getCalibration` para un dueño ya autenticado y un rango ya validado. |
 | Dominio | Todos | Tipos y funciones puras de `domain/`. |
