@@ -16,7 +16,8 @@ export interface TechniqueTotals {
   // Pages with at least one item of the technique due today.
   pendingUnits: number;
   // Pages reviewed today in the technique with nothing of it still due
-  // today. A partially reviewed page is pending only.
+  // today. A partially reviewed page is pending only. Exams also count a
+  // page whose exam session was completed today, whatever is still due.
   doneUnits: number;
 }
 
@@ -33,6 +34,10 @@ export interface TechniqueReadout {
   // Live pages with a review log of the technique today (reviewed_at in
   // [start of today, start of tomorrow)).
   reviewedPageIds: string[];
+  // Live pages whose session of the technique was completed today
+  // (finished in [start of today, start of tomorrow)). Only exams have
+  // such a session (exam_sessions.finished_at); empty for the others.
+  completedPageIds: string[];
 }
 
 export type TechniqueSnapshot = Record<DueKind, TechniqueReadout>;
@@ -53,6 +58,7 @@ export function emptyTechniqueSnapshot(): TechniqueSnapshot {
     nextDueAt: null,
     duePageIds: [],
     reviewedPageIds: [],
+    completedPageIds: [],
   });
   return {
     flashcard: empty(),
@@ -65,9 +71,15 @@ export function emptyTechniqueOverview(): TechniqueOverview {
   return toTechniqueOverview(emptyTechniqueSnapshot());
 }
 
+// A completed session closes its page for the day (user decision
+// 2026-10-18, H2-T6): an exam serves 10–30 questions, so a page with more
+// due could otherwise never be done. Such a page is done, never pending.
 function toTotals(readout: TechniqueReadout): TechniqueTotals {
-  const due = new Set(readout.duePageIds);
-  const done = new Set(readout.reviewedPageIds.filter((id) => !due.has(id)));
+  const completed = new Set(readout.completedPageIds);
+  const due = new Set(readout.duePageIds.filter((id) => !completed.has(id)));
+  const done = new Set(
+    [...readout.reviewedPageIds, ...completed].filter((id) => !due.has(id)),
+  );
   return {
     total: readout.total,
     nextDueAt: readout.nextDueAt,

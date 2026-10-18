@@ -43,12 +43,12 @@ export async function listCalendarDaysAction(input: {
   );
 }
 
-// Home's technique cards: per technique, the caller's live item count and
-// the next due date from tomorrow on in `timeZone` (the profile's zone).
-// Client-reachable, so "tomorrow" always comes from the system clock: the
-// input is reduced to the zone and never carries a clock.
-export async function getTechniqueOverviewAction(input: {
-  timeZone: string;
-}): Promise<Result<TechniqueOverviewView, ActionError>> {
-  return readTechniqueOverview({ timeZone: input.timeZone }, systemClock);
+// Home's technique cards: per technique, the caller's study units for today
+// and the next due date from tomorrow on, in the profile's zone (read
+// server-side). Takes no input: the zone and the clock never come from the
+// client.
+export async function getTechniqueOverviewAction(): Promise<
+  Result<TechniqueOverviewView, ActionError>
+> {
+  return readTechniqueOverview({}, systemClock);
 }

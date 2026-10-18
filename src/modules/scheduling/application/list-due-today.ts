@@ -1,6 +1,6 @@
 import type { StudyItemKind } from "@/modules/study-engine";
 import type { Clock } from "@/shared/kernel/clock";
-import { startOfTomorrowIn } from "../domain/calendar";
+import { startOfTodayIn, startOfTomorrowIn } from "../domain/calendar";
 import type { DueKind, DueTodayPage } from "../domain/due-today";
 import type { DueTodayReader } from "../domain/due-today-reader";
 
@@ -19,6 +19,11 @@ export interface ListDueTodayInput {
   ownerId: string;
   // The profile's zone: "today" is the local day of the clock's now in it.
   timeZone: string;
+  // Home and the calendar's "Hoy" (H2-T6, user decision 2026-10-18): a
+  // page's exam is done for the day once an exam session of it was
+  // completed today, so its due exam questions are left out. The exams hub
+  // leaves this off and keeps listing them.
+  hideExamsCompletedToday?: boolean;
 }
 
 // "Repasos de hoy" (documento-maestro §3.5): the owner's pages with items
@@ -31,8 +36,12 @@ export async function listDueToday(
   input: ListDueTodayInput,
   deps: ListDueTodayDeps,
 ): Promise<DueTodayPage[]> {
-  return deps.reader.listDueToday(
-    input.ownerId,
-    startOfTomorrowIn(deps.clock.now(), input.timeZone),
-  );
+  const now = deps.clock.now();
+  const dueBefore = startOfTomorrowIn(now, input.timeZone);
+  if (!input.hideExamsCompletedToday) {
+    return deps.reader.listDueToday(input.ownerId, dueBefore);
+  }
+  return deps.reader.listDueToday(input.ownerId, dueBefore, {
+    examsCompletedFrom: startOfTodayIn(now, input.timeZone),
+  });
 }

@@ -7,10 +7,12 @@ import type {
 import type {
   DuePageFixture,
   DueTodayReaderContractContext,
+  ExamSessionFixtures,
 } from "./due-today-reader.contract";
 
 export interface TechniqueOverviewReaderContractContext
-  extends DueTodayReaderContractContext {
+  extends DueTodayReaderContractContext,
+    ExamSessionFixtures {
   // Adds one live item (owned by the page's owner) due at `dueAt` and one
   // review log of it at `reviewedAt`, with the technique's session kind.
   readonly addReviewedItem: (
@@ -42,6 +44,7 @@ const NOTHING = {
   nextDueAt: null,
   duePageIds: [],
   reviewedPageIds: [],
+  completedPageIds: [],
 };
 
 // Shared by the in-memory fake (unit suite) and the Drizzle adapter
@@ -67,12 +70,14 @@ export function runTechniqueOverviewReaderContract(
           nextDueAt: hoursFrom(30),
           duePageIds: [page.pageId],
           reviewedPageIds: [],
+          completedPageIds: [],
         },
         exam_question: {
           total: 1,
           nextDueAt: hoursFrom(5),
           duePageIds: [],
           reviewedPageIds: [],
+          completedPageIds: [],
         },
         recall_question: NOTHING,
       });
@@ -103,6 +108,7 @@ export function runTechniqueOverviewReaderContract(
         nextDueAt: UPCOMING_FROM,
         duePageIds: [page.pageId],
         reviewedPageIds: [],
+        completedPageIds: [],
       });
       // Only overdue items: counted, but nothing upcoming.
       expect(overview.flashcard).toMatchObject({ total: 1, nextDueAt: null });
@@ -128,6 +134,7 @@ export function runTechniqueOverviewReaderContract(
         nextDueAt: hoursFrom(10),
         duePageIds: [],
         reviewedPageIds: [],
+        completedPageIds: [],
       });
     });
 
@@ -252,6 +259,59 @@ export function runTechniqueOverviewReaderContract(
       expect(
         (await reader.readTechniqueSnapshot(ctx.otherOwnerId, BOUNDS)).flashcard
           .reviewedPageIds,
+      ).toEqual([theirs.pageId]);
+    });
+
+    it("lists the pages whose exam session was completed today, once each, never open or yesterday's", async () => {
+      const ctx = options.context();
+      const reader = options.createReader();
+      const twice = await ctx.newPage();
+      const lastInstant = await ctx.newPage();
+      const yesterday = await ctx.newPage();
+      const open = await ctx.newPage();
+      await ctx.addItem(twice, { kind: "exam_question", dueAt: hoursFrom(-2) });
+      await ctx.addExamSession(twice, REVIEWED_FROM);
+      await ctx.addExamSession(twice, hoursFrom(-3));
+      await ctx.addExamSession(
+        lastInstant,
+        new Date(UPCOMING_FROM.getTime() - 1),
+      );
+      await ctx.addExamSession(
+        yesterday,
+        new Date(REVIEWED_FROM.getTime() - 1),
+      );
+      await ctx.addExamSession(open, null);
+
+      const overview = await reader.readTechniqueSnapshot(ctx.ownerId, BOUNDS);
+
+      expect(overview.exam_question.completedPageIds).toEqual(
+        [twice.pageId, lastInstant.pageId].sort(),
+      );
+      // Completing an exam does not touch the items: still due.
+      expect(overview.exam_question.duePageIds).toEqual([twice.pageId]);
+      expect(overview.flashcard.completedPageIds).toEqual([]);
+      expect(overview.recall_question.completedPageIds).toEqual([]);
+    });
+
+    it("never lists completed exams on archived pages or notebooks, nor another owner's", async () => {
+      const ctx = options.context();
+      const reader = options.createReader();
+      const archivedPage = await ctx.newPage();
+      const archivedNotebook = await ctx.newPage();
+      const theirs = await ctx.newPage(ctx.otherOwnerId);
+      for (const page of [archivedPage, archivedNotebook, theirs]) {
+        await ctx.addExamSession(page, hoursFrom(-2));
+      }
+      await ctx.archivePage(archivedPage);
+      await ctx.archiveNotebook(archivedNotebook);
+
+      expect(
+        (await reader.readTechniqueSnapshot(ctx.ownerId, BOUNDS)).exam_question
+          .completedPageIds,
+      ).toEqual([]);
+      expect(
+        (await reader.readTechniqueSnapshot(ctx.otherOwnerId, BOUNDS))
+          .exam_question.completedPageIds,
       ).toEqual([theirs.pageId]);
     });
   });

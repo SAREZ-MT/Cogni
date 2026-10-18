@@ -101,4 +101,49 @@ describe("listDueToday", () => {
 
     expect(rows.map((row) => row.due.flashcard)).toEqual([1]);
   });
+
+  // H2-T6: Home and the calendar's "Hoy" treat a page's exam as done once
+  // an exam session of it was completed today (the owner's local day).
+  it("asks the reader to drop exams completed since the start of today when told", async () => {
+    const reader = { listDueToday: vi.fn().mockResolvedValue([]) };
+
+    await listDueToday(
+      { ownerId: "owner-1", timeZone: ZONE, hideExamsCompletedToday: true },
+      { reader, clock: createFixedClock(NOW) },
+    );
+
+    expect(reader.listDueToday).toHaveBeenCalledWith(
+      "owner-1",
+      new Date("2026-10-05T05:00:00.000Z"),
+      { examsCompletedFrom: new Date("2026-10-04T05:00:00.000Z") },
+    );
+  });
+
+  it("leaves out a page whose exam was completed today when told", async () => {
+    const reader = seededReader([]);
+    reader.addItem({
+      pageId: "p1",
+      kind: "exam_question",
+      dueAt: new Date("2026-10-04T09:00:00.000Z"),
+      suspended: false,
+    });
+    reader.addExamSession({
+      pageId: "p1",
+      finishedAt: new Date("2026-10-04T11:00:00.000Z"),
+    });
+    const deps = { reader, clock: createFixedClock(NOW) };
+
+    expect(
+      await listDueToday(
+        { ownerId: "owner-1", timeZone: ZONE, hideExamsCompletedToday: true },
+        deps,
+      ),
+    ).toEqual([]);
+    // The exams hub still lists the due questions.
+    expect(
+      (await listDueToday({ ownerId: "owner-1", timeZone: ZONE }, deps)).map(
+        (page) => page.due.exam_question,
+      ),
+    ).toEqual([1]);
+  });
 });

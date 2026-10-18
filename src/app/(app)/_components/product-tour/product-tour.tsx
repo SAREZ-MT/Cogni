@@ -59,18 +59,31 @@ function createTour(onEnd: () => void): Driver {
     tour.destroy();
   };
 
+  // A text button before "Atrás"/"Siguiente". Driver.js only intercepts
+  // clicks on its own prev/next/close buttons, so this one keeps its listener.
+  const addFooterButton = (
+    footerButtons: HTMLElement,
+    label: string,
+    onClick: () => void,
+  ) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "cogni-tour-skip";
+    button.textContent = label;
+    button.addEventListener("click", onClick);
+    footerButtons.prepend(button);
+  };
+
   const decorate = (
     popover: { wrapper: HTMLElement; footerButtons: HTMLElement },
     withSkip: boolean,
   ) => {
     popover.wrapper.setAttribute("aria-modal", "true");
-    if (!withSkip) return;
-    const skip = document.createElement("button");
-    skip.type = "button";
-    skip.className = "cogni-tour-skip";
-    skip.textContent = "Omitir";
-    skip.addEventListener("click", () => finish("dismissed"));
-    popover.footerButtons.prepend(skip);
+    if (withSkip) {
+      addFooterButton(popover.footerButtons, "Omitir", () =>
+        finish("dismissed"),
+      );
+    }
   };
 
   // Step 5: "Crear cuaderno" and a direct click on the highlighted button
@@ -129,17 +142,29 @@ function createTour(onEnd: () => void): Driver {
         },
         popover: {
           ...base,
+          // Three footer buttons (Terminar, Atrás, Crear cuaderno): wider.
+          popoverClass: "cogni-tour cogni-tour-create",
           side: "bottom",
           align: "center",
-          prevBtnText: "Terminar",
-          onPrevClick: () => finish("done"),
+          // No onPrevClick: "Atrás" and ArrowLeft (Driver.js routes the key to
+          // the same handler) go back to step 4. "Terminar" is an extra
+          // footer button that ends the tour as done.
           onDoneClick: () => openCreateNotebook(anchor),
-          onPopoverRender: (popover) => decorate(popover, false),
+          onPopoverRender: (popover) => {
+            // Not aria-modal: the highlighted "Crear cuaderno" button lives
+            // outside the popover and must stay reachable.
+            addFooterButton(popover.footerButtons, "Terminar", () =>
+              finish("done"),
+            );
+          },
         },
       };
     }
     return {
       element: step.anchor,
+      // Explanatory steps: a click on the highlighted sidebar link must not
+      // navigate away mid-tour.
+      disableActiveInteraction: true,
       popover: {
         ...base,
         side: "right",

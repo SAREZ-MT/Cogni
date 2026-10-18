@@ -1,6 +1,12 @@
 import { and, eq, gte, isNull, lt, sql } from "drizzle-orm";
 import type { DbExecutor } from "@/shared/db/client";
-import { notebooks, pages, reviewLogs, studyItems } from "@/shared/db/schema";
+import {
+  examSessions,
+  notebooks,
+  pages,
+  reviewLogs,
+  studyItems,
+} from "@/shared/db/schema";
 import { DUE_KINDS, type DueKind } from "../domain/due-today";
 import {
   emptyTechniqueSnapshot,
@@ -24,7 +30,7 @@ function sortedIds(ids: readonly string[] | null): string[] {
   return [...(ids ?? [])].sort();
 }
 
-// Drizzle implementation of TechniqueOverviewReader, in two reads:
+// Drizzle implementation of TechniqueOverviewReader, in three reads:
 // 1. Items grouped by kind over the owner's study_items
 //    (study_items_owner_due_idx serves the owner filter) joined to their
 //    page and notebook, with the same live-item filters as
@@ -33,6 +39,9 @@ function sortedIds(ids: readonly string[] | null): string[] {
 // 2. The distinct (session kind, page) pairs of the owner's review logs in
 //    [reviewedFrom, dueBefore) (review_logs_owner_reviewed_idx), on pages
 //    and notebooks that are not archived.
+// 3. The distinct pages of the owner's exam sessions finished in
+//    [reviewedFrom, dueBefore), on live pages and notebooks (H2-T6: a
+//    completed exam closes its page for the day).
 export class DrizzleTechniqueOverviewReader implements TechniqueOverviewReader {
   constructor(private readonly db: DbExecutor) {}
 
@@ -92,6 +101,21 @@ export class DrizzleTechniqueOverviewReader implements TechniqueOverviewReader {
         ),
       );
 
+    const completedRows = await this.db
+      .selectDistinct({ pageId: examSessions.pageId })
+      .from(examSessions)
+      .innerJoin(pages, eq(pages.id, examSessions.pageId))
+      .innerJoin(notebooks, eq(notebooks.id, pages.notebookId))
+      .where(
+        and(
+          eq(examSessions.ownerId, ownerId),
+          gte(examSessions.finishedAt, bounds.reviewedFrom),
+          lt(examSessions.finishedAt, bounds.dueBefore),
+          isNull(pages.archivedAt),
+          isNull(notebooks.archivedAt),
+        ),
+      );
+
     const snapshot = emptyTechniqueSnapshot();
     for (const row of itemRows) {
       // Kinds outside DUE_KINDS cannot exist (study_items has a check on
@@ -113,6 +137,9 @@ export class DrizzleTechniqueOverviewReader implements TechniqueOverviewReader {
     for (const [kind, ids] of reviewed) {
       snapshot[kind].reviewedPageIds = sortedIds(ids);
     }
+    snapshot.exam_question.completedPageIds = sortedIds(
+      completedRows.map((row) => row.pageId),
+    );
     return snapshot;
   }
 }

@@ -548,6 +548,35 @@ describe("HomePage", () => {
       ).toBeInTheDocument();
     });
 
+    // H2-T6 (user decision 2026-10-18): once an exam session of a page is
+    // completed today, scheduling reports that page's exam as done and no
+    // longer lists its exam questions, so card and rows agree.
+    it("shows a completed exam as done on the card and lists no exam row for it", async () => {
+      getTechniqueOverview.mockResolvedValue({
+        ok: true,
+        value: overviewWith({ exam_question: { total: 40, doneUnits: 1 } }),
+      });
+      getDueToday.mockResolvedValue({
+        ok: true,
+        value: [
+          duePage("a", { flashcard: 2, exam_question: 0, recall_question: 0 }),
+        ],
+      });
+
+      await renderHome();
+
+      expect(
+        screen.getByRole("link", {
+          name: "Exámenes: al día, 1 repaso hecho hoy",
+        }),
+      ).toBeInTheDocument();
+      const review = screen.getByRole("region", { name: /^Repasar hoy$/ });
+      // One tile only: the page's flashcards.
+      const links = within(review).getAllByRole("link");
+      expect(links).toHaveLength(1);
+      expect(links[0]).toHaveAccessibleName(/flashcards/i);
+    });
+
     it("lists one row per page and technique due, each opening its session", async () => {
       getDueToday.mockResolvedValue({
         ok: true,

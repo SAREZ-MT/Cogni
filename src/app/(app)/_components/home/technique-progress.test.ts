@@ -142,6 +142,54 @@ describe("techniqueProgress", () => {
     ).toBe("Próximo repaso: el martes 20");
   });
 
+  it("does not say tomorrow when only UTC's tomorrow matches", () => {
+    // Sunday 18 Oct 21:00 in Bogotá is already Monday 19 02:00 in UTC.
+    const now = new Date("2026-10-19T02:00:00.000Z");
+    // Tuesday 20 Oct 01:00 in Bogotá: the day after tomorrow there, but
+    // tomorrow in UTC.
+    const nextDueAt = new Date("2026-10-20T06:00:00.000Z");
+
+    expect(techniqueProgress(input({ itemTotal: 1, nextDueAt, now })).sub).toBe(
+      "Próximo repaso: el martes 20",
+    );
+    expect(
+      techniqueProgress(
+        input({ itemTotal: 1, nextDueAt, now, timeZone: "UTC" }),
+      ).sub,
+    ).toBe("Próximo repaso: mañana");
+  });
+
+  it("keeps the short form up to six days ahead", () => {
+    // Saturday 24 Oct in Bogotá, six days after Sunday 18.
+    const nextDueAt = new Date("2026-10-24T15:00:00.000Z");
+    expect(techniqueProgress(input({ itemTotal: 1, nextDueAt })).sub).toBe(
+      "Próximo repaso: el sábado 24",
+    );
+  });
+
+  it("adds the month seven or more days ahead", () => {
+    // Sunday 25 Oct in Bogotá, seven days after Sunday 18.
+    const nextWeek = new Date("2026-10-25T15:00:00.000Z");
+    expect(
+      techniqueProgress(input({ itemTotal: 1, nextDueAt: nextWeek })).sub,
+    ).toBe("Próximo repaso: el domingo 25 de octubre");
+    const later = new Date("2026-11-03T15:00:00.000Z");
+    const view = techniqueProgress(input({ itemTotal: 1, nextDueAt: later }));
+    expect(view.sub).toBe("Próximo repaso: el martes 3 de noviembre");
+    expect(view.ariaLabel).toBe(
+      "Flashcards: sin repasos hoy, próximo repaso el martes 3 de noviembre",
+    );
+  });
+
+  it("adds the month when the next review falls in another month", () => {
+    // Wednesday 28 Oct in Bogotá; Monday 2 Nov is five days later.
+    const now = new Date("2026-10-28T15:00:00.000Z");
+    const nextDueAt = new Date("2026-11-02T15:00:00.000Z");
+    expect(techniqueProgress(input({ itemTotal: 1, nextDueAt, now })).sub).toBe(
+      "Próximo repaso: el lunes 2 de noviembre",
+    );
+  });
+
   it("says nothing is scheduled when no review lies ahead", () => {
     const view = techniqueProgress(input({ itemTotal: 3, nextDueAt: null }));
     expect(view.state).toBe("none");

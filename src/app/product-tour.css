@@ -22,6 +22,13 @@
   width: 440px;
 }
 
+/* Step 5: three footer buttons (Terminar, Atrás, Crear cuaderno) need room
+   so the primary button never truncates. */
+.driver-popover.cogni-tour.cogni-tour-create {
+  max-width: 400px;
+  width: 400px;
+}
+
 /* Step 1 illustration above the title, injected by product-tour.tsx. */
 .driver-popover.cogni-tour .cogni-tour-art {
   display: block;
@@ -127,7 +134,8 @@
 /* Phones: the card takes the available width with a 16px margin (§1.8). */
 @media (max-width: 640px) {
   .driver-popover.cogni-tour,
-  .driver-popover.cogni-tour.cogni-tour-welcome {
+  .driver-popover.cogni-tour.cogni-tour-welcome,
+  .driver-popover.cogni-tour.cogni-tour-create {
     width: auto;
     min-width: 0;
     max-width: calc(100vw - 32px);

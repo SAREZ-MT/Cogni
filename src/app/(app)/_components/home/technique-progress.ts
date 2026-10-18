@@ -44,15 +44,34 @@ export interface TechniqueProgress {
 
 const NO_RING = { percent: 0, center: "dash" } as const;
 
-// "mañana" when the next review falls tomorrow in the user's zone,
-// otherwise "el lunes 20" (weekday and day of month, lowercase).
+const DAY_MS = 86_400_000;
+
+// Whole local days between two ISO day keys ("2026-10-18").
+function daysBetween(fromDay: string, toDay: string): number {
+  return Math.round(
+    (Date.parse(`${toDay}T00:00:00Z`) - Date.parse(`${fromDay}T00:00:00Z`)) /
+      DAY_MS,
+  );
+}
+
+// "mañana" when the next review falls tomorrow in the user's zone; "el
+// lunes 20" (weekday and day of month, lowercase) up to six days ahead in
+// the same month; "el lunes 3 de noviembre" seven or more days ahead or in
+// another month.
 function nextReviewLabel(next: Date, timeZone: string, now: Date): string {
+  const today = dayKeyIn(now, timeZone);
   const nextDay = dayKeyIn(next, timeZone);
-  if (nextDay === addDays(dayKeyIn(now, timeZone), 1)) return "mañana";
+  if (nextDay === addDays(today, 1)) return "mañana";
   const weekday = new Intl.DateTimeFormat("es", { timeZone, weekday: "long" })
     .format(next)
     .toLocaleLowerCase("es");
-  return `el ${weekday} ${Number(nextDay.slice(8))}`;
+  const label = `el ${weekday} ${Number(nextDay.slice(8))}`;
+  const sameMonth = nextDay.slice(0, 7) === today.slice(0, 7);
+  if (sameMonth && daysBetween(today, nextDay) < 7) return label;
+  const month = new Intl.DateTimeFormat("es", { timeZone, month: "long" })
+    .format(next)
+    .toLocaleLowerCase("es");
+  return `${label} de ${month}`;
 }
 
 export function techniqueProgress(

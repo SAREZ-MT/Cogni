@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { LOCAL_DAY_CUTOFFS } from "../../../../tests/unit/fixtures/local-day-cutoffs";
 import {
   addDays,
   type CalendarItem,
@@ -409,5 +410,19 @@ describe("startOfTodayIn", () => {
     expect(
       startOfTodayIn(new Date("2026-09-06T15:00:00.000Z"), "America/Santiago"),
     ).toEqual(new Date("2026-09-06T04:00:00.000Z"));
+  });
+});
+
+// Shared table with the analytics module's startOfTomorrowIn: both cut "today"
+// at the same instant, DST transitions included (H2-T6).
+describe("startOfTomorrowIn agrees with the shared cutoff table", () => {
+  it.each(LOCAL_DAY_CUTOFFS)("$timeZone at $now", ({
+    timeZone,
+    now,
+    startOfTomorrow,
+  }) => {
+    expect(startOfTomorrowIn(new Date(now), timeZone).toISOString()).toBe(
+      startOfTomorrow,
+    );
   });
 });

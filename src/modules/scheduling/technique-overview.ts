@@ -3,10 +3,10 @@
 // getTechniqueOverview with the instant it renders with, so "tomorrow"
 // agrees with the rest of the page; the Server Action
 // (getTechniqueOverviewAction) reuses the same read with the system clock
-// and never accepts a clock from its input.
+// and the profile's zone (read server-side); it takes no input.
 import * as Sentry from "@sentry/nextjs";
 import { unstable_rethrow } from "next/navigation";
-import { getCurrentUser } from "@/modules/identity";
+import { getCurrentTimeZoneSetting, getCurrentUser } from "@/modules/identity";
 import { getDb } from "@/shared/db/client";
 import { type Clock, createFixedClock } from "@/shared/kernel/clock";
 import {
@@ -26,11 +26,12 @@ function actionError(code: string, message: string): ActionError {
 }
 
 // The caller's live item count and next due date (from tomorrow on, in
-// `timeZone`) per technique. Session first; every failure leaves as the
+// `timeZone`; a missing `timeZone` reads the profile's zone) per technique.
+// Session first; every failure leaves as the
 // plain ActionError shape, never throws (Next.js control-flow errors are
 // rethrown to the framework).
 export async function readTechniqueOverview(
-  input: { timeZone: string },
+  input: { timeZone?: string },
   clock: Clock,
 ): Promise<Result<TechniqueOverview, ActionError>> {
   try {
@@ -43,13 +44,15 @@ export async function readTechniqueOverview(
         ),
       );
     }
-    if (!isTimeZone(input.timeZone)) {
+    const timeZone =
+      input.timeZone ?? (await getCurrentTimeZoneSetting()).timeZone;
+    if (!isTimeZone(timeZone)) {
       return err(
         actionError(SCHEDULING_ERROR.INVALID_RANGE, "invalid time zone"),
       );
     }
     const overview = await readOverview(
-      { ownerId: user.id, timeZone: input.timeZone },
+      { ownerId: user.id, timeZone },
       { reader: new DrizzleTechniqueOverviewReader(getDb()), clock },
     );
     return ok(overview);

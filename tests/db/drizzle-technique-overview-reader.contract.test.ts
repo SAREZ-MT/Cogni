@@ -10,7 +10,13 @@ import { REVIEW_SESSION_KIND } from "@/modules/scheduling/domain/technique-overv
 import { DrizzleTechniqueOverviewReader } from "@/modules/scheduling/infrastructure/drizzle-technique-overview-reader";
 import { newStudyItem } from "@/modules/study-engine/domain/study-item";
 import { DrizzleStudyItemRepository } from "@/modules/study-engine/infrastructure/drizzle-study-item-repository";
-import { notebooks, pages, profiles, reviewLogs } from "@/shared/db/schema";
+import {
+  examSessions,
+  notebooks,
+  pages,
+  profiles,
+  reviewLogs,
+} from "@/shared/db/schema";
 import { createTestDb } from "./helpers/test-db";
 import {
   createTestOwner,
@@ -24,7 +30,7 @@ import {
 // collection time) and each context() call takes the next pair. Deleting
 // the owners cascades to every notebook, page, study item and review log
 // created here.
-const CONTRACT_TESTS = 9;
+const CONTRACT_TESTS = 11;
 
 if (process.env.DATABASE_URL) {
   const db = createTestDb();
@@ -125,6 +131,23 @@ if (process.env.DATABASE_URL) {
           easinessAfter: 2.5,
           sessionKind: REVIEW_SESSION_KIND[kind],
           sessionId: randomUUID(),
+        });
+      },
+      addExamSession: async (page, finishedAt) => {
+        const ownerId = pageOwners.get(page.pageId) ?? owner.id;
+        const done = finishedAt !== null;
+        await db.insert(examSessions).values({
+          id: randomUUID(),
+          ownerId,
+          pageId: page.pageId,
+          requestedCount: 10,
+          questionIds: [randomUUID()],
+          startedAt: finishedAt ?? new Date(),
+          finishedAt,
+          total: done ? 1 : null,
+          correct: done ? 1 : null,
+          score: done ? 1 : null,
+          passed: done ? true : null,
         });
       },
       archivePage: async (page) => {

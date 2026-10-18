@@ -7,6 +7,20 @@ import type { DueTodayPage } from "./due-today";
 // due per day, user decision 2026-10-18); archived pages and pages of
 // archived notebooks are left out. Ordered by earliestDueAt ascending,
 // then page id.
+//
+// With `examsCompletedFrom` (Home and the calendar's "Hoy", H2-T6), the
+// exam questions of a page with an exam session finished in
+// [examsCompletedFrom, dueBefore) are left out (counts, earliestDueAt and
+// the page itself when nothing else is due): that page's exam is done for
+// the day. Without it every due exam question is listed (the exams hub).
+export interface DueTodayReadOptions {
+  examsCompletedFrom?: Date;
+}
+
 export interface DueTodayReader {
-  listDueToday(ownerId: string, dueBefore: Date): Promise<DueTodayPage[]>;
+  listDueToday(
+    ownerId: string,
+    dueBefore: Date,
+    options?: DueTodayReadOptions,
+  ): Promise<DueTodayPage[]>;
 }

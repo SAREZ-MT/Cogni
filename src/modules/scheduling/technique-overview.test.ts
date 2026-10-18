@@ -3,10 +3,17 @@ import { InMemoryDueTodayReader } from "./application/testing/in-memory-due-toda
 
 // getTechniqueOverview is Home's server-side read (the page passes the
 // instant it renders with); getTechniqueOverviewAction is the client-
-// reachable twin that only ever uses the system clock. Session, database
+// reachable twin that only ever uses the system clock and the profile's
+// zone, read server-side. Session, database
 // and Sentry are mocked.
-const { getCurrentUser } = vi.hoisted(() => ({ getCurrentUser: vi.fn() }));
-vi.mock("@/modules/identity", () => ({ getCurrentUser }));
+const { getCurrentUser, getCurrentTimeZoneSetting } = vi.hoisted(() => ({
+  getCurrentUser: vi.fn(),
+  getCurrentTimeZoneSetting: vi.fn(),
+}));
+vi.mock("@/modules/identity", () => ({
+  getCurrentUser,
+  getCurrentTimeZoneSetting,
+}));
 vi.mock("@/shared/db/client", () => ({ getDb: () => ({}) }));
 const { captureException } = vi.hoisted(() => ({ captureException: vi.fn() }));
 vi.mock("@sentry/nextjs", () => ({ captureException }));
@@ -151,20 +158,31 @@ describe("getTechniqueOverviewAction", () => {
     reader = new InMemoryDueTodayReader();
     failure = null;
     getCurrentUser.mockReset();
+    getCurrentTimeZoneSetting.mockReset();
   });
   afterEach(() => {
     vi.useRealTimers();
   });
 
+  function profileZone(timeZone: string) {
+    getCurrentTimeZoneSetting.mockResolvedValue({
+      status: "ok",
+      timeZone,
+      chosen: true,
+    });
+  }
+
   // Client-reachable: a forged `now` in the input cannot move "tomorrow".
   it("ignores a client-supplied now and uses the system clock", async () => {
     getCurrentUser.mockResolvedValue({ id: "owner-1" });
+    profileZone("UTC");
     seed();
 
-    const result = await getTechniqueOverviewAction({
-      timeZone: "UTC",
-      now: RENDERED_AT,
-    } as { timeZone: string });
+    const result = await (
+      getTechniqueOverviewAction as (
+        input: unknown,
+      ) => ReturnType<typeof getTechniqueOverviewAction>
+    )({ now: RENDERED_AT });
 
     // From Monday's point of view the item is due today (one pending page),
     // not upcoming.
@@ -175,6 +193,33 @@ describe("getTechniqueOverviewAction", () => {
           total: 1,
           nextDueAt: null,
           pendingUnits: 1,
+          doneUnits: 0,
+        },
+      }),
+    });
+  });
+
+  // Client-reachable: the zone comes from the profile, never from the input.
+  it("ignores a client-supplied zone and reads the profile's", async () => {
+    getCurrentUser.mockResolvedValue({ id: "owner-1" });
+    // Sunday 19:00 in Bogotá: the Monday 09:00 UTC item is due tomorrow.
+    profileZone("America/Bogota");
+    seed();
+
+    const result = await (
+      getTechniqueOverviewAction as (
+        input: unknown,
+      ) => ReturnType<typeof getTechniqueOverviewAction>
+    )({ timeZone: "UTC" });
+
+    expect(getCurrentTimeZoneSetting).toHaveBeenCalled();
+    expect(result).toEqual({
+      ok: true,
+      value: expect.objectContaining({
+        flashcard: {
+          total: 1,
+          nextDueAt: new Date("2026-10-19T09:00:00.000Z"),
+          pendingUnits: 0,
           doneUnits: 0,
         },
       }),

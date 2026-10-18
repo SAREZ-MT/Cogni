@@ -58,6 +58,9 @@ const context = (): TechniqueOverviewReaderContractContext => ({
       reviewedAt: input.reviewedAt,
     });
   },
+  addExamSession: async (page, finishedAt) => {
+    reader.addExamSession({ pageId: page.pageId, finishedAt });
+  },
   archivePage: async (page) => reader.archivePage(page.pageId),
   archiveNotebook: async (page) => reader.archiveNotebook(page.notebookId),
 });

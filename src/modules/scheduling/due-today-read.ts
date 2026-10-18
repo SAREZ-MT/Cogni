@@ -4,6 +4,8 @@
 // "due today" read needs that zone:
 //   - getDueToday: Home and the calendar's "Hoy" pass the zone and the
 //     instant they render with, so "today" agrees with the rest of the page;
+//     a page whose exam session was completed today lists no exam (H2-T6),
+//     matching Home's technique cards;
 //   - listDueTodayAction (actions.ts) reads the zone itself, server-side,
 //     with the system clock, and never accepts a clock from its caller;
 //   - getCurrentDueCutoff: the technique modules' Server Actions build
@@ -35,7 +37,7 @@ function actionError(code: string, message: string): ActionError {
 // zone. Session first; every failure leaves as the plain ActionError
 // shape, never throws (Next.js control-flow errors are rethrown).
 export async function readDueToday(
-  input: { timeZone?: string },
+  input: { timeZone?: string; hideExamsCompletedToday?: boolean },
   clock: Clock,
 ): Promise<Result<DueTodayPage[], ActionError>> {
   try {
@@ -56,7 +58,11 @@ export async function readDueToday(
       );
     }
     const pages = await listDueToday(
-      { ownerId: user.id, timeZone },
+      {
+        ownerId: user.id,
+        timeZone,
+        hideExamsCompletedToday: input.hideExamsCompletedToday,
+      },
       { reader: new DrizzleDueTodayReader(getDb()), clock },
     );
     return ok(pages);
@@ -79,7 +85,7 @@ export function getDueToday(input: {
   now: Date;
 }): Promise<Result<DueTodayPage[], ActionError>> {
   return readDueToday(
-    { timeZone: input.timeZone },
+    { timeZone: input.timeZone, hideExamsCompletedToday: true },
     createFixedClock(input.now),
   );
 }

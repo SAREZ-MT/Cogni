@@ -20,8 +20,12 @@ vi.mock("@sentry/nextjs", () => ({ captureException }));
 let reader: InMemoryDueTodayReader;
 vi.mock("./infrastructure", () => ({
   DrizzleDueTodayReader: class {
-    listDueToday(ownerId: string, dueBefore: Date) {
-      return reader.listDueToday(ownerId, dueBefore);
+    listDueToday(
+      ownerId: string,
+      dueBefore: Date,
+      options?: { examsCompletedFrom?: Date },
+    ) {
+      return reader.listDueToday(ownerId, dueBefore, options);
     }
   },
 }));
@@ -75,6 +79,33 @@ describe("getDueToday", () => {
       "p-tonight",
     ]);
     expect(getCurrentTimeZoneSetting).not.toHaveBeenCalled();
+  });
+
+  // H2-T6: Home and "Hoy" read a page's exam as done once an exam session
+  // of it was completed during the local day.
+  it("leaves out the exam of a page whose exam was completed today", async () => {
+    getCurrentUser.mockResolvedValue({ id: "owner-1" });
+    seed("p-recall", new Date("2026-10-18T12:00:00.000Z"));
+    reader.addItem({
+      pageId: "p-recall",
+      kind: "exam_question",
+      dueAt: new Date("2026-10-18T10:00:00.000Z"),
+      suspended: false,
+    });
+    // 13:00 local on Sunday 18 Oct.
+    reader.addExamSession({
+      pageId: "p-recall",
+      finishedAt: new Date("2026-10-18T18:00:00.000Z"),
+    });
+
+    const result = await getDueToday({
+      timeZone: "America/Bogota",
+      now: RENDERED_AT,
+    });
+
+    expect(result.ok && result.value.map((row) => row.due)).toEqual([
+      { flashcard: 0, exam_question: 0, recall_question: 1 },
+    ]);
   });
 
   it("requires a session", async () => {

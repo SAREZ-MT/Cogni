@@ -26,31 +26,33 @@ const ICON_TONE = {
 // sentence case like the other Home headings (user 2026-10-18). On wide
 // screens the card fills the right
 // column exactly down to the end of the left column (it never sets the
-// grid's height) and the list scrolls inside it when it is long.
+// grid's height) and the list scrolls inside it when it is long. There the
+// section clips (lg:overflow-hidden) and the list is the only scroller;
+// the list's -m-1 p-1 gives the tiles' focus ring and hover lift room.
 export function ReviewToday({ rows }: { rows: ReviewRowView[] | null }) {
   return (
     <section
       aria-labelledby="home-review-title"
-      className="flex flex-col rounded-xl border border-border-subtle bg-card p-5 shadow-xs lg:absolute lg:inset-0"
+      className="flex flex-col rounded-xl border border-border-subtle bg-card p-5 shadow-xs lg:absolute lg:inset-0 lg:overflow-hidden"
     >
       <h2
         id="home-review-title"
-        className="font-bold text-[22px] text-primary-600 leading-tight tracking-[-0.015em]"
+        className="shrink-0 font-bold text-[22px] text-primary-600 leading-tight tracking-[-0.015em]"
       >
         Repasar hoy
       </h2>
-      <p className="mt-1.5 mb-4 text-pretty text-[13px] text-fg-secondary">
+      <p className="mt-1.5 mb-4 shrink-0 text-pretty text-[13px] text-fg-secondary">
         Los repasos programados para hoy que aún tienes pendientes. Elige uno y
         empieza.
       </p>
       {rows === null ? (
-        <p role="alert" className="text-[13px] text-fg-secondary">
+        <p role="alert" className="shrink-0 text-[13px] text-fg-secondary">
           No pudimos cargar tus repasos. Inténtalo de nuevo en un momento.
         </p>
       ) : rows.length === 0 ? (
         <EmptyState
           variant="tinted"
-          className="px-4 py-5"
+          className="shrink-0 px-4 py-5"
           icon={
             <IconTile size="36" radius="input" tone="success">
               <CalendarCheck aria-hidden="true" size={18} strokeWidth={1.75} />
@@ -63,7 +65,7 @@ export function ReviewToday({ rows }: { rows: ReviewRowView[] | null }) {
           descriptionClassName="text-[13px] text-fg-secondary"
         />
       ) : (
-        <ul className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto">
+        <ul className="-m-1 flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto p-1">
           {rows.map((row) => {
             const Icon = ICON[row.kind];
             return (

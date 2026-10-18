@@ -54,6 +54,7 @@ describe("getTechniqueOverview", () => {
         nextDueAt: new Date("2026-10-20T12:00:00Z"),
         duePageIds: ["p-1"],
         reviewedPageIds: ["p-1", "p-2"],
+        completedPageIds: [],
       },
     });
 

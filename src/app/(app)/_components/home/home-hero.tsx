@@ -61,7 +61,10 @@ export function HomeHero({ displayName, dateLabel, streak }: HomeHeroProps) {
           width={720}
           height={736}
           sizes="280px"
-          priority
+          // Not `priority`/`preload` (deprecated / preloads on phones where
+          // it is hidden): high fetch priority and the default lazy loading,
+          // so a display:none copy below lg is never fetched (Next 16 docs).
+          fetchPriority="high"
           className="relative h-auto w-[240px] mix-blend-multiply xl:w-[280px]"
         />
       </div>

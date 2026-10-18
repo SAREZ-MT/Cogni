@@ -6,7 +6,10 @@ import {
   type DueTodayPage,
   emptyDueCounts,
 } from "../../domain/due-today";
-import type { DueTodayReader } from "../../domain/due-today-reader";
+import type {
+  DueTodayReader,
+  DueTodayReadOptions,
+} from "../../domain/due-today-reader";
 import {
   emptyTechniqueSnapshot,
   type TechniqueSnapshot,
@@ -47,6 +50,13 @@ interface ReviewRow {
   reviewedAt: Date;
 }
 
+// One exam_sessions row reduced to what the readers use: its page and when
+// it finished (null while open). It belongs to its page's owner.
+interface ExamSessionRow {
+  pageId: string;
+  finishedAt: Date | null;
+}
+
 // In-memory DueTodayReader, DueInRangeReader and TechniqueOverviewReader
 // for unit tests; satisfies the three shared contracts
 // (due-today-reader.contract.ts, due-in-range-reader.contract.ts,
@@ -61,6 +71,7 @@ export class InMemoryDueTodayReader
   private readonly pages = new Map<string, PageRow>();
   private readonly items: ItemRow[] = [];
   private readonly reviews: ReviewRow[] = [];
+  private readonly examSessions: ExamSessionRow[] = [];
 
   addNotebook(notebook: {
     id: string;
@@ -88,6 +99,28 @@ export class InMemoryDueTodayReader
     this.reviews.push({ ...review });
   }
 
+  addExamSession(session: ExamSessionRow): void {
+    this.examSessions.push({ ...session });
+  }
+
+  // Live pages of the owner with an exam session finished in [from, before).
+  private examsCompletedIn(ownerId: string, from: Date, before: Date) {
+    const pageIds = new Set<string>();
+    for (const session of this.examSessions) {
+      const at = session.finishedAt?.getTime();
+      if (
+        at === undefined ||
+        at < from.getTime() ||
+        at >= before.getTime() ||
+        !this.isLivePage(session.pageId, ownerId)
+      ) {
+        continue;
+      }
+      pageIds.add(session.pageId);
+    }
+    return pageIds;
+  }
+
   archivePage(pageId: string): void {
     const page = this.pages.get(pageId);
     if (page) page.archived = true;
@@ -101,10 +134,17 @@ export class InMemoryDueTodayReader
   async listDueToday(
     ownerId: string,
     dueBefore: Date,
+    options: DueTodayReadOptions = {},
   ): Promise<DueTodayPage[]> {
+    const examsDone = options.examsCompletedFrom
+      ? this.examsCompletedIn(ownerId, options.examsCompletedFrom, dueBefore)
+      : new Set<string>();
     const byPage = new Map<string, DueTodayPage>();
     for (const item of this.items) {
       if (item.suspended || item.dueAt.getTime() >= dueBefore.getTime()) {
+        continue;
+      }
+      if (item.kind === "exam_question" && examsDone.has(item.pageId)) {
         continue;
       }
       const page = this.pages.get(item.pageId);
@@ -214,6 +254,9 @@ export class InMemoryDueTodayReader
         compareText,
       );
     }
+    snapshot.exam_question.completedPageIds = [
+      ...this.examsCompletedIn(ownerId, bounds.reviewedFrom, bounds.dueBefore),
+    ].sort(compareText);
     return snapshot;
   }
 
