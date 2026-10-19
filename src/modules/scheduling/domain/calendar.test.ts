@@ -175,6 +175,7 @@ const item = (
   pageId,
   pageTitle: `Página ${pageId}`,
   notebookId: `nb-${pageId}`,
+  notebookTitle: `Cuaderno ${pageId}`,
   kind,
   dueAt: new Date(dueAt),
 });
@@ -197,6 +198,7 @@ describe("groupCalendarDays", () => {
         pageId: "p1",
         pageTitle: "Página p1",
         notebookId: "nb-p1",
+        notebookTitle: "Cuaderno p1",
         due: { flashcard: 2, exam_question: 1, recall_question: 0 },
       },
       {
@@ -204,6 +206,7 @@ describe("groupCalendarDays", () => {
         pageId: "p2",
         pageTitle: "Página p2",
         notebookId: "nb-p2",
+        notebookTitle: "Cuaderno p2",
         due: { flashcard: 0, exam_question: 0, recall_question: 1 },
       },
     ]);
@@ -268,6 +271,7 @@ describe("groupCalendarDays", () => {
             pageId: "p1",
             pageTitle: "Página p1",
             notebookId: "nb-p1",
+            notebookTitle: "Cuaderno p1",
             kind: "exam_question",
             count: 4,
             earliestDueAt: new Date("2026-09-01T10:00:00.000Z"),
@@ -276,6 +280,7 @@ describe("groupCalendarDays", () => {
             pageId: "p3",
             pageTitle: "Página p3",
             notebookId: "nb-p3",
+            notebookTitle: "Cuaderno p3",
             kind: "flashcard",
             count: 7,
             earliestDueAt: new Date("2026-10-10T10:00:00.000Z"),

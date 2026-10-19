@@ -212,6 +212,7 @@ export interface CalendarItem {
   pageId: string;
   pageTitle: string;
   notebookId: string;
+  notebookTitle: string;
   kind: DueKind;
   dueAt: Date;
 }
@@ -222,6 +223,7 @@ export interface OverdueCount {
   pageId: string;
   pageTitle: string;
   notebookId: string;
+  notebookTitle: string;
   kind: DueKind;
   count: number;
   earliestDueAt: Date;
@@ -233,6 +235,7 @@ export interface CalendarDayPage {
   pageId: string;
   pageTitle: string;
   notebookId: string;
+  notebookTitle: string;
   due: DueCounts;
 }
 
@@ -263,6 +266,7 @@ export function groupCalendarDays(
         pageId: entry.pageId,
         pageTitle: entry.pageTitle,
         notebookId: entry.notebookId,
+        notebookTitle: entry.notebookTitle,
         due: emptyDueCounts(),
       },
       earliest: dueAt.getTime(),

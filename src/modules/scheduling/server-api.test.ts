@@ -28,6 +28,7 @@ vi.mock("./infrastructure", () => ({
             pageId: "page-1",
             pageTitle: "Mitocondria",
             notebookId: "nb-1",
+            notebookTitle: "Biología",
             kind: "recall_question",
             dueAt: new Date("2026-10-08T15:00:00.000Z"),
           },
@@ -85,6 +86,7 @@ describe("createSchedulingServerApi", () => {
         pageId: "page-1",
         pageTitle: "Mitocondria",
         notebookId: "nb-1",
+        notebookTitle: "Biología",
         due: { flashcard: 0, exam_question: 0, recall_question: 1 },
       },
     ]);

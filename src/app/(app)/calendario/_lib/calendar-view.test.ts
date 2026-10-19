@@ -25,6 +25,7 @@ const row = (
   pageId,
   pageTitle: `Página ${pageId}`,
   notebookId: `nb-${pageId}`,
+  notebookTitle: `Cuaderno ${pageId}`,
   due: { flashcard: 0, exam_question: 0, recall_question: 0, ...due },
 });
 

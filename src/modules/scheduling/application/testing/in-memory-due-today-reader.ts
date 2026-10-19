@@ -187,6 +187,7 @@ export class InMemoryDueTodayReader
         pageId: page.id,
         pageTitle: page.title,
         notebookId: notebook.id,
+        notebookTitle: notebook.title,
         kind: item.kind,
         dueAt: item.dueAt,
       });
@@ -284,6 +285,7 @@ export class InMemoryDueTodayReader
         pageId: item.pageId,
         pageTitle: item.pageTitle,
         notebookId: item.notebookId,
+        notebookTitle: item.notebookTitle,
         kind: item.kind,
         count: 0,
         earliestDueAt: item.dueAt,

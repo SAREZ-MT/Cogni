@@ -229,6 +229,7 @@ describe("CalendarPage", () => {
             pageId: "p1",
             pageTitle: "Mitosis",
             notebookId: "nb1",
+            notebookTitle: "Biología",
             due: { flashcard: 0, exam_question: 0, recall_question: 4 },
           },
         ],

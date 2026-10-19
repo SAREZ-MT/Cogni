@@ -156,6 +156,7 @@ describe("listCalendarDaysAction", () => {
           pageId: "p-in",
           pageTitle: "Mitosis",
           notebookId: "nb-p-in",
+          notebookTitle: "Biología",
           due: { flashcard: 1, exam_question: 0, recall_question: 0 },
         },
       ],
