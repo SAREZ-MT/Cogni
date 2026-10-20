@@ -67,20 +67,22 @@ describe("CreateNotebookTrigger", () => {
     expect(refresh).not.toHaveBeenCalled();
   });
 
-  it("renders the pill variant with the '+ Nuevo cuaderno' accessible name by default", () => {
-    render(<CreateNotebookTrigger />, { wrapper: Wrapper });
-
-    expect(
-      screen.getByRole("button", { name: "Nuevo cuaderno" }),
-    ).toBeInTheDocument();
-  });
-
   it("renders the tile variant with a dashed 'Nuevo cuaderno' tile", () => {
     render(<CreateNotebookTrigger variant="tile" />, { wrapper: Wrapper });
 
     expect(
       screen.getByRole("button", { name: "Nuevo cuaderno" }),
     ).toBeInTheDocument();
+  });
+
+  // Phase 8 H4-T4: the tile fills its grid cell instead of shrinking to
+  // its content.
+  it("stretches the tile to its grid cell", () => {
+    render(<CreateNotebookTrigger variant="tile" />, { wrapper: Wrapper });
+
+    const tile = screen.getByRole("button", { name: "Nuevo cuaderno" });
+    expect(tile).toHaveClass("flex-1");
+    expect(tile.parentElement).toHaveClass("items-stretch");
   });
 
   // H2-T3: Home's empty state reuses this trigger with its own label and the
@@ -129,7 +131,7 @@ describe("CreateNotebookTrigger", () => {
 
   it("refreshes the router after a successful create, so Home's server data updates", async () => {
     const user = userEvent.setup();
-    render(<CreateNotebookTrigger />, { wrapper: Wrapper });
+    render(<CreateNotebookTrigger variant="tile" />, { wrapper: Wrapper });
 
     await user.click(screen.getByRole("button", { name: "Nuevo cuaderno" }));
     await submitDialog(user);
@@ -142,7 +144,7 @@ describe("CreateNotebookTrigger", () => {
   it("surfaces a mutation error instead of failing silently", async () => {
     const user = userEvent.setup();
     createNotebook.mockRejectedValue(new Error("network down"));
-    render(<CreateNotebookTrigger />, { wrapper: Wrapper });
+    render(<CreateNotebookTrigger variant="tile" />, { wrapper: Wrapper });
 
     await user.click(screen.getByRole("button", { name: "Nuevo cuaderno" }));
     await submitDialog(user);

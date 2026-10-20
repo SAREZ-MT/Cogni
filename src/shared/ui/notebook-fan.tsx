@@ -2,6 +2,7 @@
 
 import { Brain, Layers, type LucideIcon, Plus } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
+import { NotebookCover } from "@/shared/ui/notebook-cover";
 import {
   type FanShape,
   fanPose,
@@ -80,70 +81,35 @@ const NOTEBOOK_SHAPE: FanShape = {
   middleLiftPx: -2,
 };
 
-// Rounded like a bound book: tight at the spine, soft at the fore edge.
-const BOOK_RADIUS = "rounded-[8px_16px_16px_8px]";
-// Layered depth like `TechniqueFan`'s cards: a tight contact shadow plus a
-// soft, offset ambient one, never a glow.
-const BOOK_SHADOW =
-  "shadow-[0_1px_2px_rgb(0_0_0/0.05),0_12px_28px_-12px_rgb(0_0_0/0.2)]";
-
+// The book drawing itself is the shared `NotebookCover` atom (Phase 8
+// H4-T4); the fan only prints each sample's name, meta and icon tile on it.
 function Notebook({ look }: { look: NotebookLook }) {
   const Icon = look.icon;
   return (
-    <>
-      {/* Page-edge thickness: a striped block of pages, then the back
-          cover, offset behind the front cover. */}
-      <span
-        className={cn(
-          "absolute top-2 left-2 size-[calc(100%-8px)] border border-border-default bg-[repeating-linear-gradient(90deg,var(--color-neutral-0)_0_2px,var(--color-neutral-150)_2px_3px)]",
-          BOOK_RADIUS,
-        )}
-      />
-      <span
-        className={cn(
-          "absolute top-1 left-1 size-[calc(100%-8px)] border border-border-default bg-neutral-50",
-          BOOK_RADIUS,
-        )}
-      />
-      <span
-        className={cn(
-          "absolute top-0 left-0 size-[calc(100%-8px)] overflow-hidden border bg-linear-160",
-          BOOK_RADIUS,
-          BOOK_SHADOW,
-          look.cover,
-        )}
-      >
-        <span className="absolute inset-y-0 left-0 w-3.5 bg-black/7" />
+    <NotebookCover cover={look.cover} ribbon={look.ribbon}>
+      <span className="absolute top-16 right-5 left-7 flex flex-col text-left">
         <span
           className={cn(
-            "absolute -top-0.5 right-[26px] h-[46px] w-3.5 [clip-path:polygon(0_0,100%_0,100%_100%,50%_82%,0_100%)]",
-            look.ribbon,
-          )}
-        />
-        <span className="absolute top-16 right-5 left-7 flex flex-col text-left">
-          <span
-            className={cn(
-              "font-semibold leading-tight",
-              look.front ? "text-[15px]" : "text-[13px]",
-              look.title,
-            )}
-          >
-            {look.name}
-          </span>
-          <span className={cn("mt-1 font-medium text-[10.5px]", look.subtitle)}>
-            {look.meta}
-          </span>
-        </span>
-        <span
-          className={cn(
-            "absolute bottom-[18px] left-7 flex size-[26px] items-center justify-center rounded-lg border",
-            look.tile,
+            "font-semibold leading-tight",
+            look.front ? "text-[15px]" : "text-[13px]",
+            look.title,
           )}
         >
-          <Icon size={15} strokeWidth={1.75} />
+          {look.name}
+        </span>
+        <span className={cn("mt-1 font-medium text-[10.5px]", look.subtitle)}>
+          {look.meta}
         </span>
       </span>
-    </>
+      <span
+        className={cn(
+          "absolute bottom-[18px] left-7 flex size-[26px] items-center justify-center rounded-lg border",
+          look.tile,
+        )}
+      >
+        <Icon size={15} strokeWidth={1.75} />
+      </span>
+    </NotebookCover>
   );
 }
 

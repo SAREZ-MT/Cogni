@@ -1,5 +1,5 @@
 import type * as React from "react";
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import { cn } from "@/shared/ui/utils";
 
 export interface SectionHeaderProps {
@@ -7,7 +7,9 @@ export interface SectionHeaderProps {
   // "Overline"), e.g. "Biblioteca"/"Cuaderno".
   eyebrow?: ReactNode;
   title: ReactNode;
-  description?: ReactNode;
+  // A list renders as one line of phrases joined by small violet dots
+  // (Phase 8 H4-T4: "Tus materias, organizadas · 2 cuadernos").
+  description?: ReactNode | string[];
   // Right-aligned slot (a primary CTA, a "Nueva página" form, etc.).
   actions?: ReactNode;
   // Leading icon tile rendered before the eyebrow/title/description block
@@ -15,6 +17,8 @@ export interface SectionHeaderProps {
   // block in its own flex row when present, so screens without one keep
   // the exact same DOM the "no icon" screens already render.
   icon?: ReactNode;
+  // Overrides the icon + text row (e.g. `gap-4` for a larger badge).
+  leadingClassName?: string;
   titleClassName?: string;
   descriptionClassName?: string;
   className?: string;
@@ -33,6 +37,7 @@ export function SectionHeader({
   description,
   actions,
   icon,
+  leadingClassName,
   titleClassName,
   descriptionClassName,
   className,
@@ -53,10 +58,32 @@ export function SectionHeader({
       >
         {title}
       </h1>
-      {description && (
-        <p className={cn("mt-1 text-fg-muted text-sm", descriptionClassName)}>
-          {description}
+      {Array.isArray(description) ? (
+        <p
+          className={cn(
+            "mt-1 flex flex-wrap items-center gap-x-2 text-fg-muted text-sm",
+            descriptionClassName,
+          )}
+        >
+          {description.map((part, index) => (
+            <Fragment key={part}>
+              {index > 0 && (
+                <span
+                  aria-hidden="true"
+                  data-part="separator"
+                  className="size-1.5 shrink-0 rounded-full bg-primary-300"
+                />
+              )}
+              <span>{part}</span>
+            </Fragment>
+          ))}
         </p>
+      ) : (
+        description && (
+          <p className={cn("mt-1 text-fg-muted text-sm", descriptionClassName)}>
+            {description}
+          </p>
+        )
       )}
     </div>
   );
@@ -64,7 +91,7 @@ export function SectionHeader({
   return (
     <div className={cn("flex items-start justify-between gap-4", className)}>
       {icon ? (
-        <div className="flex items-center gap-3">
+        <div className={cn("flex items-center gap-3", leadingClassName)}>
           {icon}
           {textBlock}
         </div>

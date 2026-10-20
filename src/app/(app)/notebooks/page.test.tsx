@@ -12,10 +12,10 @@ vi.mock("@/modules/identity", () => ({ getCurrentUser }));
 const { getHomeOverview } = vi.hoisted(() => ({ getHomeOverview: vi.fn() }));
 vi.mock("@/modules/notebooks", () => ({
   CreateNotebookTrigger: ({
-    variant = "pill",
+    variant,
     label = "Nuevo cuaderno",
   }: {
-    variant?: string;
+    variant: string;
     label?: string;
   }) => (
     <button type="button" data-variant={variant}>
@@ -60,10 +60,64 @@ describe("notebooks hub route", () => {
       screen.getByRole("heading", { level: 1, name: "Cuadernos" }),
     ).toBeInTheDocument();
     expect(screen.queryByText("Biblioteca")).toBeNull();
+    expect(screen.getByText("Tus materias, organizadas")).toBeInTheDocument();
     expect(screen.getByText("Aún no tienes cuadernos")).toBeInTheDocument();
+  });
+
+  // Phase 8 H4-T4 (user decision 2026-10-20): no header create button in
+  // any state; the empty state's CTA and the grid's tile create notebooks.
+  it("renders no header create button when empty: only the empty state's CTA", async () => {
+    await renderRoute();
+
+    expect(screen.queryByRole("button", { name: "Nuevo cuaderno" })).toBeNull();
+    expect(screen.getAllByRole("button")).toHaveLength(1);
     expect(
-      screen.getByRole("button", { name: "Nuevo cuaderno" }),
-    ).toHaveAttribute("data-variant", "pill");
+      screen.getByRole("button", { name: "Crear mi primer cuaderno" }),
+    ).toHaveAttribute("data-variant", "cta");
+  });
+
+  it("gives the title personality: a gradient h1 beside a violet notebook badge", async () => {
+    await renderRoute();
+
+    const title = screen.getByRole("heading", { level: 1, name: "Cuadernos" });
+    expect(title).toHaveClass("text-gradient-brand", "text-[32px]");
+    const header = title.closest("div")?.parentElement as HTMLElement;
+    const badge = header.querySelector(
+      '[data-slot="notebook-cover"]',
+    ) as HTMLElement;
+    expect(badge).toHaveAttribute("aria-hidden", "true");
+    expect(badge).toHaveClass("h-[70px]", "w-[58px]");
+    // No "+" tile or icon on the badge (user correction 2026-10-20).
+    expect(badge.querySelector("svg")).toBeNull();
+    expect(badge.textContent).toBe("");
+    expect(
+      badge.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    // The dot separates the tagline from the count.
+    expect(header.querySelectorAll('[data-part="separator"]')).toHaveLength(1);
+  });
+
+  it.each([
+    [2, "2 cuadernos"],
+    [5, "5 cuadernos"],
+  ])("counts %i notebooks as '%s' and keeps only the grid's create tile", async (count, copy) => {
+    getHomeOverview.mockResolvedValue({
+      notebooks: Array.from({ length: count }, (_, index) => ({
+        id: `nb${index}`,
+        title: `Cuaderno ${index}`,
+        color: null,
+        icon: null,
+        pageCount: 0,
+        updatedAt: new Date("2026-10-01T00:00:00.000Z"),
+      })),
+    });
+    await renderRoute();
+
+    expect(screen.getByText(copy)).toBeInTheDocument();
+    expect(screen.getByText("Tus materias, organizadas")).toBeInTheDocument();
+    const creates = screen.getAllByRole("button", { name: "Nuevo cuaderno" });
+    expect(creates).toHaveLength(1);
+    expect(creates[0]).toHaveAttribute("data-variant", "tile");
   });
 
   it("shows the illustrated empty state with its steps and the create CTA", async () => {

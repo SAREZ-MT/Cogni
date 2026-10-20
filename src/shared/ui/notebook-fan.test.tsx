@@ -80,6 +80,26 @@ describe("NotebookFan", () => {
     expect(poses[2].y).toBeLessThan(poses[0].y);
   });
 
+  // Phase 8 H4-T4: every book is the shared `NotebookCover` atom; the front
+  // one keeps its default violet palette, the hub header's badge.
+  it("draws each book with the shared NotebookCover, the front one violet", () => {
+    const { container } = render(<NotebookFan />);
+
+    const all = books(container);
+    for (const book of all) {
+      expect(
+        book.querySelector(':scope > [data-slot="notebook-cover"]'),
+      ).toHaveClass("size-full");
+    }
+    expect(all[2]?.querySelector('[data-part="cover"]')).toHaveClass(
+      "from-primary-500",
+      "to-primary-700",
+    );
+    expect(all[0]?.querySelector('[data-part="cover"]')).toHaveClass(
+      "from-amber-200",
+    );
+  });
+
   it("is decorative: hidden from assistive technology and not interactive", () => {
     const { container } = render(<NotebookFan />);
 

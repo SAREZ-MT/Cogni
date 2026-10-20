@@ -69,6 +69,12 @@ Used by: `nav-item.tsx` (disabled row's "pronto" badge),
 - `SectionHeader`: page-level head — `eyebrow` (11px uppercase overline),
   `title` (24px/700 by default, override via `titleClassName`),
   `description`, `actions` (right-aligned), optional leading `icon`.
+  `description` may be a list of strings: one line of phrases joined by
+  6px `primary-300` dots (`data-part="separator"`, `aria-hidden`), wrapping
+  on narrow columns. `leadingClassName` overrides the icon + text row
+  (default `gap-3`). Phase 8 H4-T4: the notebooks hub passes a small
+  `NotebookCover` as `icon` with `gap-4`, a 32px tight-tracked
+  `text-gradient-brand` title and `["Tus materias, organizadas", count]`.
 - `SectionTitle`: in-card section heading — 14px/600 by default; passing
   `action` switches it to 16px/600 with a right-aligned link/action row.
 
@@ -189,14 +195,9 @@ no buttons, links or images.
 
 - Props: `className?`.
 - Each book (`data-part="fan-notebook"`, `data-notebook="left" | "right" |
-  "front"`): page-edge thickness from two layers offset 8px and 4px behind
-  the cover (a striped `neutral-0`/`neutral-150` page block and a
-  `neutral-50` back cover, both hairline `border-default`), a cover
-  rounded `8px 16px 16px 8px` with a 160deg gradient, a 14px `black/7`
-  spine strip, a notched bookmark ribbon (clip-path) near the top-right,
-  the name (13px semibold; 15px in front) over a 10.5px meta line, and a
-  26px icon tile bottom-left (lucide 15px / 1.75 stroke). Depth: tight
-  contact `0 1px 2px` + soft offset ambient `0 12px 28px -12px`, no glow.
+  "front"`) is a large `NotebookCover` (see below) carrying the name
+  (13px semibold; 15px in front) over a 10.5px meta line, and a 26px icon
+  tile bottom-left (lucide 15px / 1.75 stroke).
 - Palette: left `amber-200` → `amber-400`, `warning-500` border, white
   tile with a `warning-700` `Layers`, white ribbon; right `emerald-200` →
   `emerald-400`, `success-500` border, white tile with a `success-700`
@@ -213,6 +214,33 @@ no buttons, links or images.
   even when the sidebar takes the width.
 
 Used by: `notebooks/page.tsx` (through `IllustratedEmptyState`'s `art`).
+
+## NotebookCover (`notebook-cover.tsx`)
+
+Phase 8 H4-T4 (user decision 2026-10-20), extracted from `NotebookFan` so
+the fan's books and the notebooks hub header's badge are one drawing. A
+closed notebook seen from the front, decorative (`aria-hidden`,
+`data-slot="notebook-cover"`): page-edge thickness from two layers offset
+behind the cover (a striped `neutral-0`/`neutral-150` page block and a
+`neutral-50` back cover, hairline `border-default`, `data-part="pages"`),
+a 160deg gradient cover (`data-part="cover"`) with a `black/7` spine strip
+(`data-part="spine"`) and a notched bookmark ribbon (`data-part="ribbon"`,
+clip-path) near the top-right.
+
+- Props: `size?` (`"lg"` default | `"sm"`), `cover?` (border + gradient
+  stops, default `border-primary-700 from-primary-500 to-primary-700`),
+  `ribbon?` (default `bg-technique-flashcards-accent`), `className?`,
+  `children?` (printed on the cover).
+- `lg`: fills its parent (`size-full`); layers offset 8px / 4px, radius
+  `8px 16px 16px 8px`, 14px spine, 14×46 ribbon 26px from the edge;
+  depth `0 1px 2px` contact + `0 12px 28px -12px` ambient, no glow.
+- `sm`: a fixed 58×70 badge (52×64 cover); layers offset 6px / 3px,
+  radius `5px 11px 11px 5px`, 8px spine, 8×22 ribbon 9px from the edge;
+  depth `0 1px 2px` contact + a violet-tinted `0 10px 20px -10px` ambient.
+  No icon or "+" on it (user correction 2026-10-20).
+
+Used by: `notebook-fan.tsx` (all three books, `lg`), `notebooks/page.tsx`
+(the header badge, `sm`, through `SectionHeader`'s `icon`).
 
 ## StudyBackdrop (`study-backdrop.tsx`)
 
@@ -277,7 +305,7 @@ child of the centered `max-w-2xl` column, above `PageHeader`).
 
 Audited for hand-rolled duplication; the existing `default | outline |
 secondary | ghost | destructive | link` variants already cover every
-Button-composed call site (dialog actions, `CreateNotebookTrigger`'s pill,
+Button-composed call site (dialog actions, `CreateNotebookTrigger`'s hero and cta,
 `ArchivePageButton`, the kebab menu). The remaining hand-rolled buttons
 (`notebooks/[notebookId]/page.tsx`'s "Nueva página", `home/weak-topics.tsx`'s
 disabled "pronto", `app/(app)/page.tsx`'s disabled "Ajustar") are each used
