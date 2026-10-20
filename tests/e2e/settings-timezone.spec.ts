@@ -87,10 +87,12 @@ test.describe("Configuración — zona horaria", () => {
 
     await sidebar.getByRole("link", { name: "Calendario" }).click();
     await expect(page).toHaveURL(/\/calendario$/);
-    const calendar = page.getByTestId("calendar-card");
+    // The long day lives in the period block and the date badge beside the
+    // page title (Phase 8 H3); on the default Hoy view the badge is today.
+    const calendar = page.getByTestId("calendar-period");
     await expect(calendar).toContainText(longDayIn(chosenZone));
     await expect(
-      calendar.locator('[data-slot="date-badge"] [data-part="day"]'),
+      page.locator('[data-slot="date-badge"] [data-part="day"]'),
     ).toHaveText(
       new Intl.DateTimeFormat("es", {
         day: "numeric",
