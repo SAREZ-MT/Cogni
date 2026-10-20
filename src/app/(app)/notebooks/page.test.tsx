@@ -72,9 +72,8 @@ describe("notebooks hub route", () => {
     const empty = container.querySelector(
       '[data-slot="illustrated-empty-state"]',
     ) as HTMLElement;
-    expect(empty).toHaveAttribute("data-variant", "plain");
     expect(empty.querySelector("img")?.getAttribute("src")).toContain(
-      "notebooks-empty.webp",
+      "notebooks-empty-v2.webp",
     );
     expect(
       within(empty).getByRole("heading", {
@@ -98,6 +97,21 @@ describe("notebooks hub route", () => {
     expect(
       within(empty).getByRole("button", { name: "Crear mi primer cuaderno" }),
     ).toHaveAttribute("data-variant", "cta");
+  });
+
+  // Phase 8 H4-T2 (user decision 2026-10-20): the invitation keeps the
+  // calendar's glow around a smaller art, on the dotted paper, and cascades.
+  it("uses the small art, the cascade entrance and the dotted paper", async () => {
+    const { container } = await renderRoute();
+
+    const empty = container.querySelector(
+      '[data-slot="illustrated-empty-state"]',
+    ) as HTMLElement;
+    expect(empty).toHaveAttribute("data-entrance", "cascade");
+    expect(empty).toHaveAttribute("data-surface", "paper");
+    expect(empty.querySelector('[data-part="art"]')).toHaveClass(
+      "max-w-[400px]",
+    );
   });
 
   it("keeps the count description and no empty state when notebooks exist", async () => {

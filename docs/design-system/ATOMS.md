@@ -1539,28 +1539,47 @@ once; under prefers-reduced-motion only the transition becomes
 `duration: 0`, never `initial`, so hydration matches.
 
 - Props: `image` (`{ src, width, height }`), `title`, `description`,
-  `action?` (rendered in `data-part="action"`), `backdrop?` (default
-  `true`), `steps?` (`readonly string[]`), `className?`.
-- `data-slot="illustrated-empty-state"`, `data-variant="glow" | "plain"`.
-- Plain variant (`backdrop={false}`; Phase 8 H4, user decision
-  2026-10-20): for an illustration that keeps its own flat white
-  background on the white page — no `empty-state-glow`, no
-  `illustration-backdrop`, no mask or fade. The art grows to 560px
-  (`sizes="(min-width: 768px) 560px, 90vw"`), the title sits `mt-3` below
-  it (no overlap) and the message widens to 520px.
-- `steps`: an `<ol data-part="steps">` of centred, wrapping pills between
-  message and action — white, 1px `border-default`, `rounded-pill`, 13px
+  `action?` (rendered in `data-part="action"`), `steps?`
+  (`readonly string[]`), `artSize?` (`"md"` default | `"sm"`),
+  `entrance?` (`"block"` default | `"cascade"`), `paper?`, `className?`.
+- `data-slot="illustrated-empty-state"`, `data-entrance="block" |
+  "cascade"`, `data-surface="paper"` when `paper`.
+- `steps` (Phase 8 H4, user decision 2026-10-20): an
+  `<ol data-part="steps">` of centred, wrapping pills between message and
+  action — white, 1px `border-default`, `rounded-pill`, 13px
   `fg-secondary` text, the number in bold `primary-600`. With steps the
   action moves to `mt-7`.
+- `artSize="sm"` (Phase 8 H4-T2, user decision 2026-10-20): the art is
+  400px instead of 480px (`sizes="(min-width: 768px) 400px, 90vw"`), so a
+  longer message, the steps and the action stay above the fold.
+- `entrance="cascade"` (Phase 8 H4-T2): instead of the whole block, art,
+  title, message, each step (0.06s apart) and the action fade and rise
+  10px in turn with `cubic-bezier(0.16, 1, 0.3, 1)`, 0.32s each, finishing
+  under 0.7s. Under prefers-reduced-motion only the transitions become
+  `duration: 0`; `initial` never changes, so hydration matches.
+- `paper` (Phase 8 H4-T2): the `dotted-paper` utility on the block —
+  `primary-200` dots on a 22px grid in a `::before` layer (`z-index: -1`,
+  `isolation: isolate` on the block, so it sits over the glow and under
+  the content), radially masked so they are strongest around the centre
+  and dissolve before the edges.
+- History (2026-10-20): a `backdrop={false}` plain variant (opaque white
+  illustration, later framed as a card on a violet aura) and a Three.js
+  floating-sheets layer were tried for the notebooks hub and dropped by
+  the user (no visible rectangle; performance); the hub now uses the
+  calendar's glow and blob with a keyed-out illustration.
 
 Used by: `calendario/_components/today-list.tsx` ("¡Terminaste tus repasos
 de hoy!" / "Hoy estás al día", with "Próximo repaso: …" or "Ver la
 semana"), `calendario/_components/scheduled-list.tsx` ("Día libre de
-repasos", "Ver la semana"), with `/illustrations/calendar-empty.webp` (the source JPEG's flat grey
-background keyed out to transparency); `notebooks/page.tsx` (zero
-notebooks, plain variant: "Todas tus materias, en un solo lugar", three
-steps and `CreateNotebookTrigger variant="cta"`), with
-`/illustrations/notebooks-empty.webp` (1600×1067, white background kept).
+repasos", "Ver la semana"), with `/illustrations/calendar-empty.webp` (the
+source JPEG's flat grey background keyed out to transparency), both with
+the defaults; `notebooks/page.tsx` (zero notebooks: "Todas tus materias,
+en un solo lugar", three steps and `CreateNotebookTrigger variant="cta"`,
+`artSize="sm"`, `entrance="cascade"`, `paper`), with
+`/illustrations/notebooks-empty-v2.webp` (1600×1067; the white background
+flood-filled from the borders to transparency, so the white shirt and
+book pages stay, with a soft de-fringed matte and the outer 5% feathered
+where shelves and figure meet the frame).
 
 ## CalendarReviewCard (`calendar-review-card.tsx`)
 

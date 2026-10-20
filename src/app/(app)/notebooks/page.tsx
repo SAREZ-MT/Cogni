@@ -55,9 +55,14 @@ export default async function NotebooksPage({
       {notebooks.length === 0 ? (
         // Phase 8 H4-T1 (user-approved mockup 2026-10-20): an illustrated
         // invitation with three steps; its CTA opens the same create dialog
-        // as the header's "+ Nuevo cuaderno".
+        // as the header's "+ Nuevo cuaderno". H4-T2 (user decision
+        // 2026-10-20): the calendar's glow and blob around a smaller,
+        // keyed-out art (title and CTA above the fold), on the dotted
+        // paper, entering as a short cascade.
         <IllustratedEmptyState
-          backdrop={false}
+          artSize="sm"
+          entrance="cascade"
+          paper
           image={NOTEBOOKS_EMPTY_IMAGE}
           title="Todas tus materias, en un solo lugar"
           description="Crea un cuaderno para cada materia o tema que estudies. Ahí se juntan tus apuntes, los que escribes y los que importas desde PDF, para que todo quede ordenado y a mano cuando lo necesites."

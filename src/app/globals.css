@@ -766,6 +766,36 @@
   }
 }
 
+/* Dotted notebook paper (Phase 8 H4-T2, notebooks hub; user decision
+   2026-10-20): primary-200 dots
+   on a 22px grid that are strongest around the centre and dissolve before
+   the edges (radial mask on a ::before layer, so content is never masked).
+   Children that must sit above the dots need `position: relative`. */
+@utility dotted-paper {
+  position: relative;
+  isolation: isolate;
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background-image: radial-gradient(
+      circle at center,
+      color-mix(in oklch, var(--color-primary-200) 85%, transparent) 1.1px,
+      transparent 1.6px
+    );
+    background-size: 22px 22px;
+    background-position: center top;
+    mask-image: radial-gradient(
+      62% 58% at 50% 42%,
+      #000 0%,
+      rgb(0 0 0 / 0.55) 55%,
+      transparent 100%
+    );
+    pointer-events: none;
+  }
+}
+
 @utility technique-glow-* {
   background-image: radial-gradient(
     130% 150% at 0% 0%,
