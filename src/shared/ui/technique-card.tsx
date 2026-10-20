@@ -31,6 +31,25 @@ export const TECHNIQUE_PAIR_CLASS: Record<TechniqueTone, string> = {
   rose: "bg-pastel-pink text-pastel-pink-fg",
 };
 
+// Technique accent fill (Phase 8 H3, user decisions 2026-10-19): a soft
+// but visible pastel (yellow, mint, pink) for the bars, dots and progress
+// fills that mark a technique where the pastel background alone is too
+// faint — calendar chips, review rows, the week's split and progress bars,
+// status-pill dots. Never carries text.
+export const TECHNIQUE_ACCENT_CLASS: Record<TechniqueTone, string> = {
+  yellow: "bg-technique-flashcards-accent",
+  green: "bg-technique-recall-accent",
+  rose: "bg-technique-exam-accent",
+};
+
+// The same accents as a text colour, for SVG strokes drawn with
+// currentColor (TechniqueRing).
+export const TECHNIQUE_ACCENT_TEXT_CLASS: Record<TechniqueTone, string> = {
+  yellow: "text-technique-flashcards-accent",
+  green: "text-technique-recall-accent",
+  rose: "text-technique-exam-accent",
+};
+
 const TONE_BUTTON_CLASS: Record<TechniqueTone, string> = {
   yellow: `${TECHNIQUE_PAIR_CLASS.yellow} hover:bg-pastel-yellow`,
   green: `${TECHNIQUE_PAIR_CLASS.green} hover:bg-pastel-mint`,

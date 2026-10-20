@@ -332,6 +332,16 @@ anatomy; simplified per user decision 2026-09-24 — a card has **only** a
   text-pastel-mint-fg`, `bg-pastel-pink text-pastel-pink-fg`), exported so
   `TechniqueChip` reuses exactly the panel's mapping; the button classes are
   derived from it (no visual change).
+- `TECHNIQUE_ACCENT_CLASS` (Phase 8 H3, user decisions 2026-10-19): the
+  technique accent per tone — `bg-technique-flashcards-accent` #fcd34d
+  (pastel yellow, not amber), `bg-technique-recall-accent` #6ee7b7,
+  `bg-technique-exam-accent` #ef4444 (solid, vivid red), globals.css tokens
+  — for the calendar's technique bars and dots: `TechniqueChip`,
+  `CalendarReviewCard`, `TodayReviewRow`, `TechniqueStatusPill`'s dot and the
+  week card's dot counts. Accents never carry text; chip and pill
+  backgrounds keep the pastel pairs.
+- `TECHNIQUE_ACCENT_TEXT_CLASS`: the same accents as `text-*` classes, for
+  SVG strokes drawn with `currentColor` (`TechniqueRing`).
 
 - `controls?` (Phase 5 T5): options of the action rendered between the
   description and the button. No card passes it since Phase 6 T5b v2:
@@ -1442,30 +1452,166 @@ Used by: `techniques-panel.tsx` (Examen card `controls`).
 
 ## TechniqueChip (`technique-chip.tsx`)
 
-Calendar event chip (Phase 7 T1, calendar look decision 2026-10-12; the
-Untitled UI month calendar's event chips): one study technique of one page,
-coloured with the techniques panel's pastel pair — Flashcards yellow,
-Recordación activa green, Examen rose (`TECHNIQUE_PAIR_CLASS`).
+Calendar event chip (Phase 7 T1; Phase 8 H3, user reviews 2026-10-19): one
+study technique of one page on the month/week grid, drawn as an outlined
+card — `rounded-sm border border-border-default bg-card`, no tinted fill —
+with a 3px bar in the technique's accent on the left
+(`TECHNIQUE_ACCENT_CLASS`, `data-part="accent"`, `aria-hidden`), the page
+title in semibold black (`text-fg`) and an optional muted subline. The
+coloured side bar is a deliberate, approved exception to the "no coloured
+side borders" rule. No count on the chip: the caller's `aria-label` /
+`title` carries it.
 
-- Props: `tone` (`TechniqueTone`), `label`, `meta?` (trailing lighter detail,
-  tagged `data-part="meta"`: the due count on "Hoy"; a count or time on the
-  month/week grid in T2), `href?` (renders a `next/link` that opens the
-  technique's session; without it a `span`), plus any HTML attribute
-  (`aria-label`, `data-testid`, `className` merged via `cn()`).
-- Anatomy: `rounded-md border border-current/15 px-2 py-1 text-xs
-  font-semibold`, label truncates, meta `font-medium tabular-nums
-  opacity-80`. Linked chips add `hover:brightness-95` and the focus ring.
+- Props: `tone` (`TechniqueTone`), `label` (page title, 12px,
+  `data-part="label"`), `meta?` (11px `text-fg-muted` subline — the notebook
+  on the week grid, `data-part="meta"`), `compact?` (one truncated title
+  line for the month grid; default up to two lines, `line-clamp-2`),
+  `href?` (renders a `next/link`; without it a `span`), plus any HTML
+  attribute (`aria-label`, `title`, `className` merged via `cn()`).
+- Anatomy: `relative flex flex-col py-1.5 pr-2 pl-3.5`, bar `absolute
+  inset-y-1.5 left-1.5 w-[3px] rounded-full`. Linked chips firm the border
+  (`neutral-300`) and add a `neutral-50` wash on hover, plus the focus ring.
 - `collapse?: "dot-when-narrow"` (Phase 7 T2, narrow month grid): inside a
   container narrower than 42rem (`@max-2xl`, the `CalendarGrid` frame) the
-  chip shrinks to a 10px round dot filled with the technique's strong hue
-  (`bg-current`); label (`data-part="label"`) and meta become `sr-only`
-  there, so the link keeps its text for assistive tech. Sets
-  `data-collapse`.
+  chip shrinks to a 10px round dot in the technique's accent (borderless);
+  the bar hides and label / meta become `sr-only` there, so the link keeps
+  its text for assistive tech. Sets `data-collapse`.
 - `data-slot="technique-chip"`, `data-tone={tone}`.
 
+Used by: `calendario/_components/calendar-period.tsx` (week: title +
+notebook; month: compact title).
+
+## TechniqueStatusPill (`technique-status-pill.tsx`)
+
+Technique status pill (Phase 8 H3, reference "● Pendiente / ● Conectado /
+● Error"): `rounded-full px-2 py-0.5 text-xs font-medium` on the
+technique's pastel pair (`TECHNIQUE_PAIR_CLASS`: pale background, dark
+text in the same hue, ≥ 5.9:1) with a 6px dot in its accent
+(`TECHNIQUE_ACCENT_CLASS`, `aria-hidden`); the label truncates.
+
+- Props: `tone`, `size?` (`"md"` default; `"sm"`: 11px, `px-1.5 py-0`,
+  for height-capped rows), `children` (the technique name), `className?`.
+- `data-slot="technique-status-pill"`, `data-tone`, `data-size`; part `dot`.
+
+Used by: `technique-ring.tsx`, `calendar-review-card.tsx`.
+
+## TechniqueRing (`technique-ring.tsx`)
+
+One technique's week progress (Phase 8 H3-T2, Semana metric card option 1,
+user decision 2026-10-19). Client component (Motion). A 46px ring (5px
+stroke): `text-neutral-150` track and an arc in `TECHNIQUE_ACCENT_TEXT_CLASS`
+reading done / total clockwise from 12 o'clock (`pathLength={100}`, round
+cap), the share in the centre (11px bold tabular), and the technique's
+`TechniqueStatusPill size="sm"` below. A technique with nothing this week
+(total 0) shows the bare track and "—"; 0 of N shows the track and "0%"
+(no arc: a round cap would leave a dot). The arc draws in once
+(`strokeDasharray` "0 100" → percent, spring without bounce); under
+prefers-reduced-motion only the transition becomes `duration: 0`, never
+`initial`, so hydration matches. Accessibility: one sr-only sentence
+("Flashcards: 3 de 10 repasos (30%)" / "Examen: sin repasos esta semana");
+the drawing and digits are `aria-hidden`.
+
+- Props: `tone`, `label`, `done`, `total`, `className?`.
+- `data-slot="technique-ring"`, `data-tone`; parts `indicator`, `value`.
+- The static `ProgressRing` (Home's technique cards) stays as is: it is a
+  server component with no animation.
+
+Used by: `calendario/_components/week-summary.tsx`.
+
+## IllustratedEmptyState (`illustrated-empty-state.tsx`)
+
+Illustrated empty state (Phase 8 H3, the calendar's "Hoy"; user decision
+2026-10-19). Client component (Motion). A centred column on a calm glow
+(`empty-state-glow` utility: a violet radial — `primary-200` →
+`primary-100` → transparent — that stays around the illustration and
+fades out before the section's edges): a decorative `next/image`
+(`alt=""`, `sizes="(min-width: 768px) 480px, 90vw"`, up to 480px wide,
+scaling down on phones) with a transparent background, so every figure
+stays whole, inside `data-part="art"` on a blurred diagonal violet blob
+(`illustration-backdrop` utility: `primary-100` → `primary-300` in an
+ellipse, `blur(18px)`, 75% opacity), then a big title (`text-2xl md:text-3xl` semibold,
+`text-gradient-brand`, `h3`), a muted
+15px message and an optional quiet action. The block fades and rises 10px
+once; under prefers-reduced-motion only the transition becomes
+`duration: 0`, never `initial`, so hydration matches.
+
+- Props: `image` (`{ src, width, height }`), `title`, `description`,
+  `action?` (rendered in `data-part="action"`), `className?`.
+- `data-slot="illustrated-empty-state"`.
+
+Used by: `calendario/_components/today-list.tsx` ("¡Terminaste tus repasos
+de hoy!" / "Hoy estás al día", with "Próximo repaso: …" or "Ver la
+semana"), `calendario/_components/scheduled-list.tsx` ("Día libre de
+repasos", "Ver la semana"), with `/illustrations/calendar-empty.webp` (the source JPEG's flat grey
+background keyed out to transparency).
+
+## CalendarReviewCard (`calendar-review-card.tsx`)
+
+Review card of the month's right panel (Phase 8 H3, approved mockup
+2026-10-19): one fixed size whatever its text — a 60px-high hairline
+`rounded-xl` link with a 3px bar in the technique's accent on the left
+(`data-part="accent"`, `aria-hidden`), the page title (13px semibold) on
+its own line across the card's full width, and below it
+(`data-part="meta"`) the notebook (12px muted) with the technique's
+`TechniqueStatusPill size="sm"` pushed right (`shrink-0 whitespace-nowrap`,
+never wraps). Title and notebook truncate to one line each with the full
+text as `title` tooltip. Width follows the panel. Hover and
+`focus-visible` share one gentle lift (200ms ease-out): `primary-300`
+border, a `primary-100/60` wash, a soft violet-tinted
+shadow and — only under `motion-safe:` — a 2px rise (`-translate-y-0.5`);
+under reduced motion just the colours change. The size never changes (the
+rise is a transform; focus adds a `primary-200` ring). No chevron.
+
+- Props: `href` (the page), `tone`, `title`, `detail`, `techniqueLabel`,
+  `aria-label` (technique, page and amount: "Examen de …: 2 ítems"),
+  `className?`.
+- `data-slot="calendar-review-card"`; parts `accent`, `title`, `detail`.
+
+Used by: `calendario/_components/month-day-panel.tsx` (the selected day's
+reviews and "Próximos repasos").
+
+## DaySelectLink (`day-select-link.tsx`)
+
+The cover link that selects a calendar day (Phase 8 H3, the month grid).
+Client component. An `absolute inset-0` `next/link` with `scroll={false}`
+(the selection lives in the URL, the page does not jump) that also
+activates with Space, like a button; inset focus ring. `CalendarDayCell`
+renders it when given `selectHref`.
+
+- Props: `href`, `aria-label` ("Ver martes, 20 de octubre"),
+  `aria-current?` (`"date"` on the selected day), `className?`.
+- `data-part="select"`.
+
+Used by: `calendar-grid.tsx` (`CalendarDayCell`).
+
+## TodayReviewRow (`today-review-row.tsx`)
+
+Review-today row (Phase 8 H3-T4, the calendar's "Hoy"; user-approved
+mockup 2026-10-19): ONE `next/link` for the whole row, `rounded-2xl`
+hairline border, `p-4` (`md:px-5`), hover `border-border-default` +
+`shadow-card`, focus-visible ring. md+: a grid `[140px wait] [4px solid
+technique bar] [title + pills] [Repasar + chevron]`; below md the wait sits
+above the title; below sm the "Repasar" cue moves under the pills so the
+title keeps the width. The title is 15px semibold (two lines max); the pills
+are `Pill size="md"`: technique in its pastel tone (yellow / mint / pink),
+notebook and amount neutral. "Repasar" is a `span` styled with
+`buttonVariants()` (dark primary) because the row is already the link.
+
+- Props: `href`, `aria-label` (the link's name, e.g. "Flashcards de
+  Mitocondria: 8 pendientes"), `tone`, `title`, `waitingTitle` ("Desde
+  ayer"), `waitingDetail` ("1 día esperando"), `techniqueLabel`,
+  `notebookTitle`, `amountLabel` ("8 tarjetas"), `data-testid?`,
+  `className?`.
+- `scheduled?` (Phase 8 H3-T4, a later day on "Hoy"): no wait column and no
+  "Repasar" cue; a muted 12px "Programado" marker (`data-part="status"`)
+  with the chevron instead, in a `[4px 1fr auto]` grid. `waitingTitle` /
+  `waitingDetail` are then optional. Sets `data-mode="scheduled"` (else
+  `"due"`).
+- `data-slot="today-review-row"`; parts `waiting`, `accent`, `action`,
+  `status`.
+
 Used by: `calendario/_components/today-list.tsx`,
-`calendario/_components/calendar-period.tsx` (month/week events: page title,
-item count, link to the page).
+`calendario/_components/scheduled-list.tsx` (`scheduled`).
 
 ## DateBadge (`date-badge.tsx`)
 
@@ -1478,41 +1624,72 @@ bold).
   runtime zone, like the rest of the shell), `className?` and span attributes.
 - The visible parts are `aria-hidden`; an `sr-only <time datetime="YYYY-MM-DD">`
   carries the long date ("lunes, 12 de octubre").
+- `size?` (Phase 8 H3): `"md"` (default, 56px wide, 18px day) or `"xl"`
+  for the calendar page header — 88px wide and `h-full`, so it is as tall
+  as its slot (the title + tabs stack, ~96px), with a 12px month strip and
+  a 34px day centred in the rest; `data-size`.
+- `tone?` (Phase 8 H3): `"neutral"` (default, `bg-neutral-50` muted month
+  strip) or `"brand"` — a Cogni-violet month strip (`bg-primary-600
+  text-white`, 5.7:1) so the badge reads as a calendar icon.
 - `data-slot="date-badge"`, parts `data-part="month"` / `"day"`.
 
-Used by: `calendario/_components/calendar-card-header.tsx`.
+Used by: `calendario/page.tsx` (`tone="brand"`, `size="xl"`, left of the
+"Calendario" title and tabs; it shows the day being viewed: Hoy's day,
+today or the week's Monday, today or the month's 1st).
 
 ## SegmentedTabs (`segmented-tabs.tsx`)
 
 Page-level segmented tabs (Phase 7 T1, the reference's "All events / Shared
-/ …" row): same container as `ViewToggle`/`PeriodFilter` (`rounded-input
-border bg-neutral-100 p-1`), text items `px-3 py-1.5 text-[13px]
-font-semibold`, the active one `bg-card text-fg shadow-xs`.
+/ …" row; Phase 8 H3 violet glass pill, user review 2026-10-19). Client
+component (Motion). Same container as `ViewToggle`/`PeriodFilter`
+(`rounded-input border bg-neutral-100 p-1`), text items `px-3 py-1.5
+text-[13px] font-semibold text-fg-muted`. The active item is white text on
+a solid `primary-600` pill (`data-part="active-pill"`, `aria-hidden`) with a
+glass edge: an inset top highlight, a faint inner bottom shade, a thin
+`ring-white/25` inner ring, a soft diagonal white sheen and a small violet
+drop shadow — the fill stays solid. The pill slides between items with a
+Motion `layoutId` (scoped with `useId`); under prefers-reduced-motion the
+transition is `duration: 0`.
 
 - Props: `aria-label` (names the `<nav>`), `items` (`{ value, label, href }`
   or `{ value, label, disabled: true, hint }`), `value`, `className?`.
-- Linked items are server-rendered `next/link`s (the view lives in the URL);
-  the active one gets `aria-current="page"`. A disabled item is a `span`
-  with `aria-disabled="true"`, `title={hint}` and `opacity-60`.
+- Linked items are `next/link`s (the view lives in the URL); the active one
+  gets `aria-current="page"`. A disabled item is a `span` with
+  `aria-disabled="true"`, `title={hint}` and `opacity-60`.
 - `data-slot="segmented-tabs"`.
 
-Used by: `calendario/page.tsx` ("Hoy" / "Semana" / "Mes", all linked since
-T2).
+Used by: `calendario/page.tsx` ("Hoy" / "Semana" / "Mes").
+
+## `text-gradient-brand` (globals.css utility)
+
+Cogni violet gradient text (Phase 8 H3): `linear-gradient(120deg,
+primary-600, primary-800)` clipped to the glyphs (`background-clip: text`,
+transparent `-webkit-text-fill-color`, so a `text-*` colour class on the
+same element never paints over it). Both ends meet AA on white (5.7:1,
+8.9:1); the accessible name is the plain text.
+
+Used by: `calendario/page.tsx` (the "Calendario" h1, via `SectionHeader`'s
+`titleClassName`).
 
 ## CalendarNav (`calendar-nav.tsx`)
 
-Calendar period navigation (Phase 7 T2, the reference's "← | Today | →"
-group): one bordered button group (`rounded-input border-border-default
-bg-card shadow-xs`, `divide-x`) of three server-rendered links, 36px high —
-arrow links 40px wide with Lucide `ArrowLeft`/`ArrowRight` (16px, 1.75
-stroke) and their label as accessible name, the middle link shows its label
-(13px semibold).
+Calendar period navigation (Phase 7 T2; Phase 8 H3, user reference
+`ref-arrows.png`): two bare muted chevrons — no container and no middle
+button, since the view tabs return to the current period. Each is a 32px
+round hit area (`rounded-full text-fg-muted`) with a 20px `ChevronLeft` /
+`ChevronRight` that darkens over a faint `neutral-100` wash on hover, plus
+the focus ring. A `disabled` arrow ("Día anterior" on today) is an inert
+`span` (no href, not focusable) with `aria-disabled="true"` at
+`opacity-35`, its name kept as sr-only text.
 
-- Props: `aria-label` (names the `<nav>`), `prev`, `today`, `next` (each
-  `{ href, label }`), `className?`.
+- Props: `aria-label` (names the `<nav>`), `prev`, `next` (each `{ href,
+  label, disabled? }`; the label is the arrow's accessible name),
+  `className?`.
 - `data-slot="calendar-nav"`.
 
-Used by: `calendario/_components/calendar-card-header.tsx`.
+Used by: `calendario/_components/period-header.tsx` ("Día anterior / Día
+siguiente", "Semana anterior / Semana siguiente", "Mes anterior / Mes
+siguiente").
 
 ## CalendarGrid / CalendarDayCell (`calendar-grid.tsx`)
 
@@ -1522,19 +1699,35 @@ muted, centred) over a `<ul>` of seven `minmax(0,1fr)` columns, so phones get
 narrow cells instead of a horizontal scroll. `CalendarDayCell` is one `<li>`:
 hairline `border-r border-b border-border-subtle`, `p-1.5` (`md:p-2`),
 min-height 72px (`md:` 128px); day number top-left in a 24px slot (12px
-semibold), today's in a dark circle (`rounded-full bg-fg text-card`), days
-outside the shown month on `bg-neutral-50` with a muted number; children
+semibold); today's number in a violet rounded square (`rounded-md
+bg-primary-600 text-white`) on a faint violet cell (`bg-primary-50`), days
+outside the shown month on `bg-neutral-50` with a muted number. The
+`variant="week"` cell (Phase 8 H3) shows today as a soft violet wash down
+the whole column (`bg-linear-to-b from-primary-100/70 via-primary-50/40
+to-transparent`) and shows its number row (`data-part="number-row"`) only where the
+days stack (`@2xl:hidden`): the week's numbers live in the grid's header
+("Lun 19"). The sr-only long name and "(hoy)" are always present. Children
 stack (`gap-1`) and wrap in a row when narrow; an optional "N más…" link
 (12px semibold muted, `+N` when narrow).
 
 - `CalendarGrid` props: `aria-label` (names the list), `weekdays` (seven
-  short names, Monday first), `stackWhenNarrow?` (week layout: one column and no
-  header when narrow), `className?`.
+  short names, Monday first), `weekdayNumbers?` (Phase 8 H3, the week:
+  `{ dayNumber, isToday }` per weekday, shown next to its name in the
+  header — `data-part="weekday-number"`, 20px, today's in a violet
+  rounded square), `stackWhenNarrow?` (week layout: one column and no
+  header when narrow), `fill?` (Phase 8 H3, the week: the frame becomes
+  `flex flex-1 flex-col` and the list `flex-1`, so the days stretch to the
+  bottom of a flex-column card), `className?`.
 - `CalendarDayCell` props: `day` (ISO, also `data-day` and the `<time
   dateTime>`), `dayNumber`, `label` (sr-only long name, "(hoy)" appended for
   today), `weekday?` (shown next to the number only below `md`), `isToday?`,
   `outside?`, `more?` (`{ count, href }`, accessible name "N más el …"),
-  `className?`, children (event chips).
+  `variant?` (`"month"` default / `"week"`), `selectHref?` (Phase 8 H3,
+  the month grid: a `DaySelectLink` cover selects the day; the number row
+  and chips sit above it, only the chips catching the pointer), `isSelected?`
+  (2px inset `ring-primary-600` outline, `data-selected`, the cover's
+  `aria-current="date"`), `className?`,
+  children (event chips).
 - `data-slot="calendar-grid"` / `"calendar-day"`, `data-today`,
   `data-outside`.
 

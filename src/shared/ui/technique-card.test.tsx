@@ -2,7 +2,12 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Layers } from "lucide-react";
 import { describe, expect, it, vi } from "vitest";
-import { TechniqueCard, TechniqueIconStrip } from "./technique-card";
+import {
+  TECHNIQUE_ACCENT_CLASS,
+  TECHNIQUE_ACCENT_TEXT_CLASS,
+  TechniqueCard,
+  TechniqueIconStrip,
+} from "./technique-card";
 
 describe("TechniqueCard", () => {
   function renderCard(props: { disabled?: boolean } = {}) {
@@ -217,5 +222,22 @@ describe("TechniqueIconStrip", () => {
       <TechniqueIconStrip icon={Layers} tone="green" title="t" available />,
     );
     expect(screen.getByTitle("t")).not.toHaveClass("opacity-35");
+  });
+});
+
+describe("TECHNIQUE_ACCENT_CLASS / TECHNIQUE_ACCENT_TEXT_CLASS", () => {
+  // Accents for bars, dots, fills and ring strokes (user decisions
+  // 2026-10-19: pastel yellow and mint, a solid vivid red for Examen).
+  it("maps every technique tone to its accent as a fill and as a text colour", () => {
+    expect(TECHNIQUE_ACCENT_CLASS).toEqual({
+      yellow: "bg-technique-flashcards-accent",
+      green: "bg-technique-recall-accent",
+      rose: "bg-technique-exam-accent",
+    });
+    expect(TECHNIQUE_ACCENT_TEXT_CLASS).toEqual({
+      yellow: "text-technique-flashcards-accent",
+      green: "text-technique-recall-accent",
+      rose: "text-technique-exam-accent",
+    });
   });
 });
