@@ -14,9 +14,11 @@ interface CreateNotebookTriggerProps {
   // "pill" (default): Home's "+ Nuevo cuaderno" primary button
   // (ui_kits/app/Home Page.html .btn-primary). "tile": the dashed
   // "Nuevo cuaderno" grid tile (.workspace-card.new). "hero": the large
-  // rounded primary button of Home's empty state.
-  variant?: "pill" | "tile" | "hero";
-  // Button copy (and accessible name) for the pill/hero variants.
+  // rounded primary button of Home's empty state. "cta": the notebooks hub
+  // empty state's large violet pill with a soft violet shadow and no plus
+  // icon (Phase 8 H4-T1, user mockup 2026-10-20).
+  variant?: "pill" | "tile" | "hero" | "cta";
+  // Button copy (and accessible name) for the pill/hero/cta variants.
   label?: string;
   // Product tour anchor (`data-tour`), e.g. "crear-cuaderno".
   tourId?: string;
@@ -65,6 +67,15 @@ export function CreateNotebookTrigger({
         </IconTile>
         <span className="font-medium text-sm">Nuevo cuaderno</span>
       </button>
+    ) : variant === "cta" ? (
+      <Button
+        type="button"
+        size="lg"
+        data-tour={tourId}
+        className="rounded-pill bg-primary-600 px-6 font-semibold text-[15px] text-white shadow-[0_6px_18px_-6px_rgb(124_58_237/0.55)] hover:bg-primary-700"
+      >
+        {label}
+      </Button>
     ) : (
       <Button
         type="button"
@@ -81,7 +92,9 @@ export function CreateNotebookTrigger({
     <div
       className={cn(
         "flex flex-col gap-1",
-        variant === "hero" ? "items-center" : "items-start",
+        variant === "hero" || variant === "cta"
+          ? "items-center"
+          : "items-start",
       )}
     >
       <CreateNotebookDialog

@@ -53,5 +53,57 @@ describe("IllustratedEmptyState", () => {
       <IllustratedEmptyState image={IMAGE} title="t" description="d" />,
     );
     expect(container.querySelector('[data-part="action"]')).toBeNull();
+    expect(container.querySelector('[data-part="steps"]')).toBeNull();
+  });
+
+  // Phase 8 H4 (notebooks hub, user decision 2026-10-20): a plain variant
+  // whose illustration keeps its own white background on the white page.
+  it("renders the plain variant without the glow or the backdrop blob", () => {
+    const { container } = render(
+      <IllustratedEmptyState
+        backdrop={false}
+        image={IMAGE}
+        title="t"
+        description="d"
+      />,
+    );
+
+    const root = container.querySelector(
+      '[data-slot="illustrated-empty-state"]',
+    );
+    expect(root).not.toHaveClass("empty-state-glow");
+    expect(root).toHaveAttribute("data-variant", "plain");
+    const art = container.querySelector('[data-part="art"]');
+    expect(art).not.toHaveClass("illustration-backdrop");
+    expect(container.querySelector("img")).not.toHaveClass("mask-fade-edges");
+  });
+
+  it("keeps the glow variant by default", () => {
+    const { container } = render(
+      <IllustratedEmptyState image={IMAGE} title="t" description="d" />,
+    );
+    expect(
+      container.querySelector('[data-slot="illustrated-empty-state"]'),
+    ).toHaveAttribute("data-variant", "glow");
+  });
+
+  it("renders the steps as a numbered ordered list", () => {
+    render(
+      <IllustratedEmptyState
+        image={IMAGE}
+        title="t"
+        description="d"
+        steps={["Uno", "Dos", "Tres"]}
+      />,
+    );
+
+    const list = screen.getByRole("list");
+    expect(list.tagName).toBe("OL");
+    const items = screen.getAllByRole("listitem");
+    expect(items.map((item) => item.textContent)).toEqual([
+      "1Uno",
+      "2Dos",
+      "3Tres",
+    ]);
   });
 });

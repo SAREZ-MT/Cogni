@@ -100,6 +100,21 @@ describe("CreateNotebookTrigger", () => {
     ).toHaveAttribute("data-tour", "crear-cuaderno");
   });
 
+  // Phase 8 H4-T1: the notebooks hub's empty state CTA, a large violet pill
+  // with a soft violet shadow and no plus icon (user mockup 2026-10-20).
+  it("renders the cta variant as a violet pill without the plus icon", () => {
+    render(
+      <CreateNotebookTrigger variant="cta" label="Crear mi primer cuaderno" />,
+      { wrapper: Wrapper },
+    );
+
+    const button = screen.getByRole("button", {
+      name: "Crear mi primer cuaderno",
+    });
+    expect(button).toHaveClass("bg-primary-600", "rounded-pill");
+    expect(button.querySelector("svg")).toBeNull();
+  });
+
   it("submits the same createNotebook mutation both variants share", async () => {
     const user = userEvent.setup();
     render(<CreateNotebookTrigger variant="tile" />, { wrapper: Wrapper });

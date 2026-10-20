@@ -1,4 +1,16 @@
+import type { Page } from "@playwright/test";
 import { expect, hasSupabaseEnv, signIn, test } from "./fixtures/auth";
+
+const SCREENSHOT_DIR = process.env.E2E_SCREENSHOT_DIR;
+
+async function shot(page: Page, name: string) {
+  if (!SCREENSHOT_DIR) return;
+  await page.waitForTimeout(400);
+  await page.screenshot({
+    path: `${SCREENSHOT_DIR}/${name}.png`,
+    fullPage: true,
+  });
+}
 
 // Task 2.6: the authenticated shell renders an empty state, the sidebar
 // collapses and the choice survives navigation. Since PR3 the shell needs
@@ -79,6 +91,52 @@ test.describe("app shell", () => {
     await expect(
       sidebar.getByText("Tu inicio está vacío por ahora"),
     ).toHaveCount(0);
+  });
+
+  // Phase 8 H4-T1 (user-approved mockup 2026-10-20): a brand-new owner's
+  // /notebooks shows the illustrated invitation, without the old
+  // "Biblioteca" eyebrow, and its CTA opens the create-notebook dialog.
+  test("notebooks hub shows the illustrated empty state for a new owner", async ({
+    page,
+    freshUser,
+  }) => {
+    await page.context().clearCookies();
+    await signIn(page, freshUser);
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.goto("/notebooks");
+
+    const content = page.getByTestId("content-area");
+    await expect(
+      content.getByRole("heading", { level: 1, name: "Cuadernos" }),
+    ).toBeVisible();
+    await expect(content.getByText("Aún no tienes cuadernos")).toBeVisible();
+    await expect(content.getByText("Biblioteca")).toHaveCount(0);
+    await expect(
+      content.getByRole("heading", {
+        name: "Todas tus materias, en un solo lugar",
+      }),
+    ).toBeVisible();
+    // Scoped to the empty state: the breadcrumb is a list too.
+    const empty = content.locator('[data-slot="illustrated-empty-state"]');
+    await expect(empty.getByRole("listitem")).toHaveText([
+      "1Crea un cuaderno por materia",
+      "2Escribe o importa tus apuntes",
+      "3Repasa con las técnicas",
+    ]);
+    await shot(page, "real-1440");
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.reload();
+    await expect(
+      empty.getByRole("button", { name: "Crear mi primer cuaderno" }),
+    ).toBeVisible();
+    await shot(page, "real-390");
+
+    await empty
+      .getByRole("button", { name: "Crear mi primer cuaderno" })
+      .click();
+    await expect(
+      page.getByRole("dialog").getByRole("button", { name: "Crear cuaderno" }),
+    ).toBeVisible();
   });
 
   // Every sidebar area runs on real data, so each one is a live link:

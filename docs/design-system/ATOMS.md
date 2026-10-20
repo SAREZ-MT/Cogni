@@ -46,7 +46,7 @@ The pastel/semantic square behind notebook, stat and empty-state icons.
 
 Used by: `notebook-card.tsx`, `notebook-list-row.tsx`, `home/stat-card.tsx`,
 `home/ready-to-review.tsx`, `home/weak-topics.tsx`, `app/(app)/page.tsx`,
-`notebooks/page.tsx`, `notebooks/[notebookId]/page.tsx`,
+`notebooks/[notebookId]/page.tsx`,
 `modules/notebooks/ui/create-notebook-trigger.tsx`.
 
 ## Pill (`pill.tsx`)
@@ -105,8 +105,7 @@ atom only lays it out. `fill` adds `flex-1`; `as`/`titleAs` pick the root/
 title element tag.
 
 Used by: `home/home-empty-state.tsx` (zero-notebooks Home, `plain`, Phase 8
-H2-T3), `notebooks/page.tsx`
-(zero-notebooks, `dashed`), `notebooks/[notebookId]/page.tsx` (zero-pages,
+H2-T3), `notebooks/[notebookId]/page.tsx` (zero-pages,
 `dashed`), `home/ready-to-review.tsx` (`success`), `home/weak-topics.tsx`
 (`tinted`).
 
@@ -132,7 +131,11 @@ lo dejaste, Temas débiles; dots on Para hoy (3) and Temas débiles (2)).
 `CreateNotebookTrigger` (notebooks module) also gained a `hero` variant for
 the same screen: the large `rounded-pill` primary `Button` with a custom
 `label` ("Crea tu primer cuaderno") and a `tourId` that becomes its
-`data-tour` anchor for the product tour.
+`data-tour` anchor for the product tour. Phase 8 H4-T1 added a `cta`
+variant for the notebooks hub empty state: the same dialog behind a large
+`rounded-pill` violet `Button` (`primary-600`, hover `primary-700`, 15px
+semibold, soft violet shadow `0 6px 18px -6px rgb(124 58 237 / .55)`) with
+no plus icon and a custom `label` ("Crear mi primer cuaderno").
 
 ## TechniqueFan (`technique-fan.tsx`)
 
@@ -1536,14 +1539,28 @@ once; under prefers-reduced-motion only the transition becomes
 `duration: 0`, never `initial`, so hydration matches.
 
 - Props: `image` (`{ src, width, height }`), `title`, `description`,
-  `action?` (rendered in `data-part="action"`), `className?`.
-- `data-slot="illustrated-empty-state"`.
+  `action?` (rendered in `data-part="action"`), `backdrop?` (default
+  `true`), `steps?` (`readonly string[]`), `className?`.
+- `data-slot="illustrated-empty-state"`, `data-variant="glow" | "plain"`.
+- Plain variant (`backdrop={false}`; Phase 8 H4, user decision
+  2026-10-20): for an illustration that keeps its own flat white
+  background on the white page — no `empty-state-glow`, no
+  `illustration-backdrop`, no mask or fade. The art grows to 560px
+  (`sizes="(min-width: 768px) 560px, 90vw"`), the title sits `mt-3` below
+  it (no overlap) and the message widens to 520px.
+- `steps`: an `<ol data-part="steps">` of centred, wrapping pills between
+  message and action — white, 1px `border-default`, `rounded-pill`, 13px
+  `fg-secondary` text, the number in bold `primary-600`. With steps the
+  action moves to `mt-7`.
 
 Used by: `calendario/_components/today-list.tsx` ("¡Terminaste tus repasos
 de hoy!" / "Hoy estás al día", with "Próximo repaso: …" or "Ver la
 semana"), `calendario/_components/scheduled-list.tsx` ("Día libre de
 repasos", "Ver la semana"), with `/illustrations/calendar-empty.webp` (the source JPEG's flat grey
-background keyed out to transparency).
+background keyed out to transparency); `notebooks/page.tsx` (zero
+notebooks, plain variant: "Todas tus materias, en un solo lugar", three
+steps and `CreateNotebookTrigger variant="cta"`), with
+`/illustrations/notebooks-empty.webp` (1600×1067, white background kept).
 
 ## CalendarReviewCard (`calendar-review-card.tsx`)
 
