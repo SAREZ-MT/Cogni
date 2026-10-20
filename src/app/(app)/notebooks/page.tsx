@@ -3,12 +3,12 @@ import { getCurrentUser } from "@/modules/identity";
 import { CreateNotebookTrigger, getHomeOverview } from "@/modules/notebooks";
 import { Card } from "@/shared/ui/card";
 import { IllustratedEmptyState } from "@/shared/ui/illustrated-empty-state";
+import { NotebookFan } from "@/shared/ui/notebook-fan";
 import { SectionHeader } from "@/shared/ui/section-header";
 import { ViewToggle } from "@/shared/ui/view-toggle";
 import { SetBreadcrumb } from "../_components/breadcrumb";
 import { NotebookCard } from "../_components/notebook-card";
 import { NotebookListRow } from "../_components/notebook-list-row";
-import { NOTEBOOKS_EMPTY_IMAGE } from "./_components/empty-image";
 
 interface NotebooksPageProps {
   searchParams: Promise<{ view?: string }>;
@@ -56,14 +56,14 @@ export default async function NotebooksPage({
         // Phase 8 H4-T1 (user-approved mockup 2026-10-20): an illustrated
         // invitation with three steps; its CTA opens the same create dialog
         // as the header's "+ Nuevo cuaderno". H4-T2 (user decision
-        // 2026-10-20): the calendar's glow and blob around a smaller,
-        // keyed-out art (title and CTA above the fold), on the dotted
-        // paper, entering as a short cascade.
+        // 2026-10-20): the calendar's glow on the dotted paper, entering as
+        // a short cascade. H4-T3 (user decision 2026-10-20, option D
+        // palette 1): a CSS fan of three notebooks replaces the
+        // illustration.
         <IllustratedEmptyState
-          artSize="sm"
           entrance="cascade"
           paper
-          image={NOTEBOOKS_EMPTY_IMAGE}
+          art={<NotebookFan />}
           title="Todas tus materias, en un solo lugar"
           description="Crea un cuaderno para cada materia o tema que estudies. Ahí se juntan tus apuntes, los que escribes y los que importas desde PDF, para que todo quede ordenado y a mano cuando lo necesites."
           steps={[

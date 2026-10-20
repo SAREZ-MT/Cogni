@@ -123,8 +123,9 @@ describe("IllustratedEmptyState", () => {
   });
 
   // Phase 8 H4-T2 (user decision 2026-10-20): the notebooks hub keeps the
-  // calendar's glow and blob around a smaller art, on a dotted
-  // notebook-paper field, and enters as a short cascade.
+  // calendar's glow on a dotted notebook-paper field and enters as a short
+  // cascade. H4-T3 (user decision 2026-10-20): its art is a CSS-built
+  // hero passed through the `art` slot instead of an illustration.
   describe("hub options", () => {
     afterEach(() => {
       reduced.value = false;
@@ -133,10 +134,9 @@ describe("IllustratedEmptyState", () => {
     function renderHub() {
       return render(
         <IllustratedEmptyState
-          artSize="sm"
           entrance="cascade"
           paper
-          image={IMAGE}
+          art={<div data-testid="hero" />}
           title="t"
           description="d"
           steps={["Uno", "Dos"]}
@@ -145,8 +145,8 @@ describe("IllustratedEmptyState", () => {
       );
     }
 
-    it("keeps the glow and the blob around a 400px art on the dotted paper", () => {
-      const { container } = renderHub();
+    it("renders the given art instead of an illustration, on the glow and the dotted paper", () => {
+      const { container, getByTestId } = renderHub();
 
       const root = container.querySelector(
         '[data-slot="illustrated-empty-state"]',
@@ -154,12 +154,10 @@ describe("IllustratedEmptyState", () => {
       expect(root).toHaveClass("empty-state-glow", "dotted-paper");
       expect(root).toHaveAttribute("data-surface", "paper");
       const art = container.querySelector('[data-part="art"]');
-      expect(art).toHaveClass("illustration-backdrop", "max-w-[400px]");
-      expect(art).not.toHaveClass("rounded-3xl");
-      expect(container.querySelector("img")).toHaveAttribute(
-        "sizes",
-        "(min-width: 768px) 400px, 90vw",
-      );
+      expect(art).toContainElement(getByTestId("hero"));
+      expect(art).not.toHaveClass("illustration-backdrop");
+      expect(art).not.toHaveClass("max-w-[480px]");
+      expect(container.querySelector("img")).toBeNull();
     });
 
     it("cascades art, title, message, each step and the action in order", () => {

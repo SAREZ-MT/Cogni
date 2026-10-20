@@ -5,31 +5,27 @@ import Image from "next/image";
 import type { ReactNode } from "react";
 import { cn } from "@/shared/ui/utils";
 
-export interface IllustratedEmptyStateProps {
-  // A decorative illustration (rendered with alt="").
-  image: { src: string; width: number; height: number };
+// The art above the title: a decorative illustration (rendered with
+// alt="" on the violet blob) or, since Phase 8 H4-T3, any decorative node
+// such as `NotebookFan`. Exactly one of the two.
+type IllustratedEmptyStateArt =
+  | { image: { src: string; width: number; height: number }; art?: never }
+  | { art: ReactNode; image?: never };
+
+export type IllustratedEmptyStateProps = IllustratedEmptyStateArt & {
   title: string;
   description: string;
   // A quiet follow-up link under the message (e.g. the next review).
   action?: ReactNode;
   // Short numbered steps under the message, as an ordered list of pills.
   steps?: readonly string[];
-  // "sm" (Phase 8 H4-T2, user decision 2026-10-20): a 400px art instead of
-  // 480px, so title, steps and action stay above the fold.
-  artSize?: "md" | "sm";
   // "cascade" (Phase 8 H4-T2): art, title, message, each step and the
   // action rise in turn instead of the whole block at once.
   entrance?: "block" | "cascade";
   // Phase 8 H4-T2: a dotted notebook-paper field behind the block.
   paper?: boolean;
   className?: string;
-}
-
-const ART_CLASS = { md: "max-w-[480px]", sm: "max-w-[400px]" } as const;
-const ART_SIZES = {
-  md: "(min-width: 768px) 480px, 90vw",
-  sm: "(min-width: 768px) 400px, 90vw",
-} as const;
+};
 
 // Natural deceleration for the cascade (Phase 8 H4-T2).
 const CASCADE_EASE = [0.16, 1, 0.3, 1] as const;
@@ -46,16 +42,17 @@ const CASCADE_STEP_GAP = 0.06;
 // Motion; under prefers-reduced-motion only the transition changes
 // (duration 0), never `initial`, so the server markup and hydration match.
 // `steps` (Phase 8 H4, notebooks hub) adds the numbered pills of a short
-// "how it works" between message and action; `artSize`, `entrance` and
-// `paper` (H4-T2) give the hub a smaller art, a cascade entrance and the
-// dotted-paper field, while the calendar keeps the defaults.
+// "how it works" between message and action; `entrance` and `paper`
+// (H4-T2) give the hub a cascade entrance and the dotted-paper field, and
+// `art` (H4-T3) its CSS notebook fan, while the calendar keeps the
+// illustration and the defaults.
 export function IllustratedEmptyState({
   image,
+  art,
   title,
   description,
   action,
   steps,
-  artSize = "md",
   entrance = "block",
   paper = false,
   className,
@@ -100,25 +97,31 @@ export function IllustratedEmptyState({
       )}
       {...block}
     >
-      <motion.div
-        data-part="art"
-        className={cn(
-          "illustration-backdrop relative w-full",
-          ART_CLASS[artSize],
-        )}
-        {...enter(0)}
-      >
-        <Image
-          src={image.src}
-          alt=""
-          width={image.width}
-          height={image.height}
-          sizes={ART_SIZES[artSize]}
-          className="relative h-auto w-full"
-        />
-      </motion.div>
+      {image ? (
+        <motion.div
+          data-part="art"
+          className="illustration-backdrop relative w-full max-w-[480px]"
+          {...enter(0)}
+        >
+          <Image
+            src={image.src}
+            alt=""
+            width={image.width}
+            height={image.height}
+            sizes="(min-width: 768px) 480px, 90vw"
+            className="relative h-auto w-full"
+          />
+        </motion.div>
+      ) : (
+        <motion.div data-part="art" className="w-full" {...enter(0)}>
+          {art}
+        </motion.div>
+      )}
       <motion.h3
-        className="-mt-2 text-balance font-semibold text-2xl text-gradient-brand leading-tight md:text-3xl"
+        className={cn(
+          image ? "-mt-2" : "mt-4",
+          "text-balance font-semibold text-2xl text-gradient-brand leading-tight md:text-3xl",
+        )}
         {...enter(0.08)}
       >
         {title}

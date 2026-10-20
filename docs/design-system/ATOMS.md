@@ -156,7 +156,10 @@ no data.
   an answer in a `pastel-mint` box, Exámenes three options with the middle
   one chosen in `pastel-pink`. Cards carry `data-technique`.
 - Pose (`fanPose`): ±8deg outer tilt, ±80px spread, outer cards 10px lower,
-  middle lifted 4px; pivot at each card's bottom.
+  middle lifted 4px; pivot at each card's bottom. `fanPose(index, count,
+  shape?)` and `fanStack(shape?)` take an optional `FanShape` (`tiltDeg`,
+  `spreadPx`, `outerDropPx`, `middleLiftPx`; Phase 8 H4-T3) so
+  `NotebookFan` reuses the same geometry and `fanTransition`.
 - Front: a built-in mini notebook (`data-part="notebook"`, 72×76, rounded
   8px at the spine and 14px at the fore edge, same white/border/shadow as
   the cards) with a `primary-100` spine carrying three punched ring holes,
@@ -172,6 +175,44 @@ no data.
   never changes, so server markup and hydration match.
 
 Used by: `home/home-empty-state.tsx`.
+
+## NotebookFan (`notebook-fan.tsx`)
+
+Phase 8 H4-T3 hero of the notebooks hub's empty state, client (user
+decision 2026-10-20: option D, palette 1 "Técnicas vivas"). Three closed
+notebooks fanned on a 560×236 stage: "Historia" / "18 páginas" on the left
+(−9deg, 150px out), "Biología" / "9 páginas" on the right (+9deg), both
+166×208 and 10px lower, and an upright, larger (180×226) "Nueva materia" /
+"Tu primer cuaderno" in front, raised 2px, rendered last with `z-10`.
+Decorative only: `aria-hidden`, the names are sample decoration, not data;
+no buttons, links or images.
+
+- Props: `className?`.
+- Each book (`data-part="fan-notebook"`, `data-notebook="left" | "right" |
+  "front"`): page-edge thickness from two layers offset 8px and 4px behind
+  the cover (a striped `neutral-0`/`neutral-150` page block and a
+  `neutral-50` back cover, both hairline `border-default`), a cover
+  rounded `8px 16px 16px 8px` with a 160deg gradient, a 14px `black/7`
+  spine strip, a notched bookmark ribbon (clip-path) near the top-right,
+  the name (13px semibold; 15px in front) over a 10.5px meta line, and a
+  26px icon tile bottom-left (lucide 15px / 1.75 stroke). Depth: tight
+  contact `0 1px 2px` + soft offset ambient `0 12px 28px -12px`, no glow.
+- Palette: left `amber-200` → `amber-400`, `warning-500` border, white
+  tile with a `warning-700` `Layers`, white ribbon; right `emerald-200` →
+  `emerald-400`, `success-500` border, white tile with a `success-700`
+  `Brain`, white ribbon; front `primary-500` → `primary-700`, white text
+  (meta `white/75`), a translucent white tile with `Plus` and a
+  `technique-flashcards-accent` ribbon.
+- Motion: `TechniqueFan`'s helpers with the notebook `FanShape` — once on
+  mount the books settle from a squared stack into the fan (spring, no
+  bounce, staggered, done within 0.5s). Under `prefers-reduced-motion`
+  only the transition is zero-duration; `initial` never changes.
+- Responsive: the root is a size container; the stage scales in steps
+  with its own column (0.22 under 210px, 0.4, 0.56 from 300px, 0.75 from
+  420px, 1 from 560px) and the box height follows, so it never overflows
+  even when the sidebar takes the width.
+
+Used by: `notebooks/page.tsx` (through `IllustratedEmptyState`'s `art`).
 
 ## StudyBackdrop (`study-backdrop.tsx`)
 
@@ -1538,10 +1579,13 @@ ellipse, `blur(18px)`, 75% opacity), then a big title (`text-2xl md:text-3xl` se
 once; under prefers-reduced-motion only the transition becomes
 `duration: 0`, never `initial`, so hydration matches.
 
-- Props: `image` (`{ src, width, height }`), `title`, `description`,
+- Props: exactly one of `image` (`{ src, width, height }`) or `art`
+  (`ReactNode`, Phase 8 H4-T3: a decorative CSS hero such as
+  `NotebookFan`, rendered full width in `data-part="art"` with no blob,
+  no `<img>`, and the title at `mt-4`), then `title`, `description`,
   `action?` (rendered in `data-part="action"`), `steps?`
-  (`readonly string[]`), `artSize?` (`"md"` default | `"sm"`),
-  `entrance?` (`"block"` default | `"cascade"`), `paper?`, `className?`.
+  (`readonly string[]`), `entrance?` (`"block"` default | `"cascade"`),
+  `paper?`, `className?`.
 - `data-slot="illustrated-empty-state"`, `data-entrance="block" |
   "cascade"`, `data-surface="paper"` when `paper`.
 - `steps` (Phase 8 H4, user decision 2026-10-20): an
@@ -1549,9 +1593,6 @@ once; under prefers-reduced-motion only the transition becomes
   action — white, 1px `border-default`, `rounded-pill`, 13px
   `fg-secondary` text, the number in bold `primary-600`. With steps the
   action moves to `mt-7`.
-- `artSize="sm"` (Phase 8 H4-T2, user decision 2026-10-20): the art is
-  400px instead of 480px (`sizes="(min-width: 768px) 400px, 90vw"`), so a
-  longer message, the steps and the action stay above the fold.
 - `entrance="cascade"` (Phase 8 H4-T2): instead of the whole block, art,
   title, message, each step (0.06s apart) and the action fade and rise
   10px in turn with `cubic-bezier(0.16, 1, 0.3, 1)`, 0.32s each, finishing
@@ -1565,8 +1606,11 @@ once; under prefers-reduced-motion only the transition becomes
 - History (2026-10-20): a `backdrop={false}` plain variant (opaque white
   illustration, later framed as a card on a violet aura) and a Three.js
   floating-sheets layer were tried for the notebooks hub and dropped by
-  the user (no visible rectangle; performance); the hub now uses the
-  calendar's glow and blob with a keyed-out illustration.
+  the user (no visible rectangle; performance); H4-T2 then gave the hub
+  the calendar's glow and blob around a keyed-out illustration at a
+  400px `artSize="sm"`. H4-T3 (user decision 2026-10-20) replaced that
+  illustration with the CSS `NotebookFan` through `art`, and `artSize`
+  was removed with its last user.
 
 Used by: `calendario/_components/today-list.tsx` ("¡Terminaste tus repasos
 de hoy!" / "Hoy estás al día", with "Próximo repaso: …" or "Ver la
@@ -1575,11 +1619,8 @@ repasos", "Ver la semana"), with `/illustrations/calendar-empty.webp` (the
 source JPEG's flat grey background keyed out to transparency), both with
 the defaults; `notebooks/page.tsx` (zero notebooks: "Todas tus materias,
 en un solo lugar", three steps and `CreateNotebookTrigger variant="cta"`,
-`artSize="sm"`, `entrance="cascade"`, `paper`), with
-`/illustrations/notebooks-empty-v2.webp` (1600×1067; the white background
-flood-filled from the borders to transparency, so the white shirt and
-book pages stay, with a soft de-fringed matte and the outer 5% feathered
-where shelves and figure meet the frame).
+`entrance="cascade"`, `paper`), with `art={<NotebookFan />}`; the glow and
+the dotted paper stay behind the fan.
 
 ## CalendarReviewCard (`calendar-review-card.tsx`)
 

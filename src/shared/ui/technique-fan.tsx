@@ -27,27 +27,47 @@ const TECHNIQUE: Record<
   exams: { icon: FileCheck, tone: "rose" },
 };
 
-const MAX_TILT_DEG = 8;
-const SPREAD_PX = 80;
+// Geometry of a fan: outer tilt, horizontal spread, how far the outer
+// cards drop and how far the middle one lifts (negative is up). Phase 8
+// H4-T3: shared with `NotebookFan`, which passes its own shape.
+export interface FanShape {
+  tiltDeg: number;
+  spreadPx: number;
+  outerDropPx: number;
+  middleLiftPx: number;
+}
+
 // The outer cards sit lower than the middle one, like a hand of cards.
-const OUTER_DROP_PX = 10;
-const MIDDLE_LIFT_PX = -4;
+const TECHNIQUE_SHAPE: FanShape = {
+  tiltDeg: 8,
+  spreadPx: 80,
+  outerDropPx: 10,
+  middleLiftPx: -4,
+};
 
 // Resting pose of card `index` out of `count`: evenly spread from
-// -MAX_TILT to +MAX_TILT, the middle card upright and lifted.
-export function fanPose(index: number, count: number) {
-  if (count < 2) return { x: 0, y: MIDDLE_LIFT_PX, rotate: 0 };
+// -tilt to +tilt, the middle card upright and lifted.
+export function fanPose(
+  index: number,
+  count: number,
+  shape: FanShape = TECHNIQUE_SHAPE,
+) {
+  if (count < 2) return { x: 0, y: shape.middleLiftPx, rotate: 0 };
   const t = (index / (count - 1)) * 2 - 1; // -1 … 1
   const edge = Math.abs(t);
   return {
-    x: Math.round(t * SPREAD_PX),
-    y: Math.round(MIDDLE_LIFT_PX + edge * (OUTER_DROP_PX - MIDDLE_LIFT_PX)),
-    rotate: Math.round(t * MAX_TILT_DEG),
+    x: Math.round(t * shape.spreadPx),
+    y: Math.round(
+      shape.middleLiftPx + edge * (shape.outerDropPx - shape.middleLiftPx),
+    ),
+    rotate: Math.round(t * shape.tiltDeg),
   };
 }
 
 // Before the entrance every card sits squared up in one stack.
-const STACKED = { x: 0, y: OUTER_DROP_PX, rotate: 0 };
+export function fanStack(shape: FanShape = TECHNIQUE_SHAPE) {
+  return { x: 0, y: shape.outerDropPx, rotate: 0 };
+}
 
 // One settle from stack to fan on mount: a spring without overshoot,
 // staggered left to right, finished within 500 ms. Reduced motion jumps
@@ -188,7 +208,7 @@ export function TechniqueFan({ techniques, className }: TechniqueFanProps) {
             key={technique}
             data-part="fan-card"
             data-technique={technique}
-            initial={STACKED}
+            initial={fanStack()}
             animate={fanPose(index, techniques.length)}
             transition={fanTransition(reduce, index)}
             className={cn(

@@ -123,6 +123,9 @@ test.describe("app shell", () => {
       "2Escribe o importa tus apuntes",
       "3Repasa con las técnicas",
     ]);
+    // Phase 8 H4-T3: a CSS notebook fan instead of an illustration.
+    await expect(empty.locator('[data-slot="notebook-fan"]')).toBeVisible();
+    await expect(empty.locator("img")).toHaveCount(0);
     await shot(page, "real-1440");
     await page.setViewportSize({ width: 390, height: 844 });
     await page.reload();
