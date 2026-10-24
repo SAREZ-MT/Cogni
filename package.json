@@ -26,7 +26,7 @@
     "@ai-sdk/groq": "4.0.54",
     "@ai-sdk/openai-compatible": "3.0.62",
     "@openrouter/ai-sdk-provider": "3.1.0",
-    "@sentry/nextjs": "^10.75.0",
+    "@sentry/nextjs": "^10.76.2",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.116.0",
     "@tanstack/react-query": "^5.103.1",
@@ -68,7 +68,7 @@
     "katex": "^0.18.9",
     "lowlight": "3.3.0",
     "lucide-react": "^1.46.0",
-    "next": "16.3.8",
+    "next": "16.4.1",
     "postgres": "^3.4.9",
     "posthog-js": "^1.434.2",
     "posthog-node": "^5.52.4",
@@ -79,11 +79,11 @@
     "server-only": "^0.0.1",
     "tailwind-merge": "^3.7.0",
     "unpdf": "1.8.1",
-    "zod": "^4.6.5"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.2",
-    "@next/env": "^16.3.8",
+    "@next/env": "^16.4.1",
     "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^7.0.1",
