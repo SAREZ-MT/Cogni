@@ -20,6 +20,10 @@ export type ExtractedDocument = {
   totalPages: number;
   pagesWithoutText: number;
   images: ExtractedImage[];
+  // document-import T6: images found in the source but not kept, because
+  // their format is not one the page assets accept (EMF, WMF, TIFF, SVG
+  // without a PNG fallback, …). T9 reports the count in the job result.
+  skippedImages: number;
 };
 
 // document-import T5 (replaces `PdfTextExtractor`): the port

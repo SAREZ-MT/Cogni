@@ -12,6 +12,7 @@ const EXTRACTED: ExtractedDocument = {
   totalPages: 2,
   pagesWithoutText: 1,
   images: [],
+  skippedImages: 0,
 };
 
 describe("FakeDocumentExtractor", () => {
@@ -27,6 +28,7 @@ describe("FakeDocumentExtractor", () => {
         totalPages: 0,
         pagesWithoutText: 0,
         images: [],
+        skippedImages: 0,
       }),
     );
     expect(extractor.extractCalls).toEqual([{ bytes, format: "pdf" }]);

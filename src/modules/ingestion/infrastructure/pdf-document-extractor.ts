@@ -52,6 +52,7 @@ export class PdfDocumentExtractor implements DocumentExtractor {
       totalPages: converted.totalPages,
       pagesWithoutText: converted.pagesWithoutText,
       images: [],
+      skippedImages: 0,
     });
   }
 }

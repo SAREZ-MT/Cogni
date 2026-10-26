@@ -85,6 +85,7 @@ function extractedFromPages(pages: string[]) {
     totalPages: converted.totalPages,
     pagesWithoutText: converted.pagesWithoutText,
     images: [],
+    skippedImages: 0,
   };
 }
 
@@ -410,7 +411,13 @@ describe("processImportJob use case", () => {
       ],
     };
     deps.extractor.setResult(
-      ok({ content, totalPages: 3, pagesWithoutText: 0, images: [] }),
+      ok({
+        content,
+        totalPages: 3,
+        pagesWithoutText: 0,
+        images: [],
+        skippedImages: 0,
+      }),
     );
 
     const result = await processImportJob(
@@ -443,6 +450,7 @@ describe("processImportJob use case", () => {
         totalPages: 1,
         pagesWithoutText: 1,
         images: [],
+        skippedImages: 0,
       }),
     );
 

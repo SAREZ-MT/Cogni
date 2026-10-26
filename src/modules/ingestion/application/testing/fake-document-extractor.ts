@@ -36,6 +36,7 @@ export class FakeDocumentExtractor implements DocumentExtractor {
         totalPages: 0,
         pagesWithoutText: 0,
         images: [],
+        skippedImages: 0,
       })
     );
   }

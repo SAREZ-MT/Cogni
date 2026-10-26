@@ -98,6 +98,28 @@ module.exports = {
       to: { path: "node_modules/unpdf" },
     },
     {
+      name: "mammoth-only-in-ingestion-infra",
+      comment:
+        "mammoth (DOCX block structure, document-import T6) may only be imported from ingestion/infrastructure (docx-document-extractor.ts); every other layer and module stays decoupled from the parsing library. Unanchored for the same pnpm nested node_modules reason as unpdf.",
+      severity: "error",
+      from: {
+        path: "^src/",
+        pathNot: "^src/modules/ingestion/infrastructure/",
+      },
+      to: { path: "node_modules/mammoth/" },
+    },
+    {
+      name: "officeparser-only-in-ingestion-infra",
+      comment:
+        "officeparser (DOCX colours/lists/equations since document-import T6; PPTX/PDF in T7/T8) may only be imported from ingestion/infrastructure; every other layer and module stays decoupled from the parsing library. Unanchored for the same pnpm nested node_modules reason as unpdf.",
+      severity: "error",
+      from: {
+        path: "^src/",
+        pathNot: "^src/modules/ingestion/infrastructure/",
+      },
+      to: { path: "node_modules/officeparser/" },
+    },
+    {
       name: "ai-sdk-only-in-ai-infra",
       comment:
         "The AI SDK and its provider packages may only be imported from ai/infrastructure (documento-maestro §8.1); every other layer and module goes through ai.application. Unanchored for the same pnpm nested node_modules reason as unpdf.",

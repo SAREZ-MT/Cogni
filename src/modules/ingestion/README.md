@@ -6,9 +6,9 @@ Document import: a user picks a document from a notebook, it is uploaded
 directly to a private Supabase Storage bucket, its content is extracted on
 the server and converted into an editable page in the TipTap editor
 (`docs/documento-maestro.md` §13, Phase 2). Since document-import T5 the
-pipeline is format-aware (PDF, Word `.docx`, PowerPoint `.pptx`); today
-only the PDF adapter exists (DOCX/PPTX adapters land in T6/T7) and the UI
-still offers PDFs only (T11). The Server Actions keep their PDF names
+pipeline is format-aware (PDF, Word `.docx`, PowerPoint `.pptx`); the PDF
+and DOCX adapters exist (DOCX since T6, PPTX lands in T7) and the UI still
+offers PDFs only (T11). The Server Actions keep their PDF names
 (`requestPdfUpload`, `startPdfImport`, `processPdfImport`) until T11.
 
 ## Layers
@@ -17,7 +17,8 @@ Follows the same hexagonal shape as `notebooks`
 (`domain/application/infrastructure/ui`), enforced by
 `.dependency-cruiser.cjs` (`domain-is-pure`, `application-no-infra-or-ui`,
 `ui-never-touches-infra`, `cross-module-via-index`, plus this module's own
-`unpdf-only-in-ingestion-infra`).
+`unpdf-only-in-ingestion-infra`, `mammoth-only-in-ingestion-infra` and
+`officeparser-only-in-ingestion-infra`).
 
 - `domain/`: pure TypeScript — the `ImportJob` entity and its lifecycle
   transitions (`start`/`complete`/`fail`), the failure taxonomy and its
@@ -33,17 +34,22 @@ Follows the same hexagonal shape as `notebooks`
   TipTap-shaped blocks, the `ImportedDoc` type (`imported-doc.ts`, every block of the
   content catalogue in `src/shared/kernel/tiptap-catalogue.ts`; notebooks'
   `writeImportedContent` rejects anything outside it) with its recursive
-  `hasTextContent` predicate, the time budgets (`import-budget.ts`) and every port interface.
+  `hasTextContent` predicate, the time budgets (`import-budget.ts`), the
+  rules the format mappers share (`imported-marks.ts`: safe link schemes,
+  Word highlight → palette, hex colours, monospace fonts; `image-mime.ts`:
+  png/jpeg/gif/webp by magic bytes; `omml-latex.ts`: repair and validation
+  of officeparser's equation LaTeX) and every port interface.
   No framework, no npm dependency other than Zod.
 - `application/`: the five use cases (`requestPdfUpload`, `startPdfImport`,
   `processImportJob`, `getImportJobStatus`, `getActiveImports`), each
   `Result`-returning and testable with the in-memory fakes under
   `application/testing/`. Never imports `infrastructure` or `ui`.
-- `infrastructure/`: the only layer allowed to import `unpdf`, the Supabase
-  client and `@/modules/notebooks`. `SupabasePdfStorageGateway` wraps the
+- `infrastructure/`: the only layer allowed to import `unpdf`, `mammoth`,
+  `officeparser`, the Supabase client and `@/modules/notebooks`. `SupabasePdfStorageGateway` wraps the
   private `page-pdfs` bucket, `FormatRoutingDocumentExtractor`
   (`createDocumentExtractor()`) dispatches to one `DocumentExtractor` per
-  format — `PdfDocumentExtractor` wraps `unpdf` plus `textToBlocks` —
+  format — `PdfDocumentExtractor` wraps `unpdf` plus `textToBlocks`,
+  `DocxDocumentExtractor` merges mammoth and officeparser (see "DOCX") —
   `NotebooksPagesAdapter` wraps `createNotebooksServerApi` to implement
   `NotebookPagesPort`, `ImportTelemetryAdapter` reports to PostHog and
   Sentry, and `DrizzleImportJobRepository` persists `import_jobs`.
@@ -70,7 +76,7 @@ Follows the same hexagonal shape as `notebooks`
 | Port (`domain/`) | Adapter (`infrastructure/`) | Fake (`application/testing/`) |
 |---|---|---|
 | `PdfStorageGateway` | `SupabasePdfStorageGateway` | `FakePdfStorageGateway` |
-| `DocumentExtractor` | `FormatRoutingDocumentExtractor` → `PdfDocumentExtractor` | `FakeDocumentExtractor` |
+| `DocumentExtractor` | `FormatRoutingDocumentExtractor` → `PdfDocumentExtractor`, `DocxDocumentExtractor` | `FakeDocumentExtractor` |
 | `NotebookPagesPort` | `NotebooksPagesAdapter` | `FakeNotebookPagesPort` |
 | `ImportTelemetry` | `ImportTelemetryAdapter` | `FakeImportTelemetry` |
 | `ImportJobRepository` | `DrizzleImportJobRepository` | `InMemoryImportJobRepository` |
@@ -87,10 +93,12 @@ RETURNING`).
 `DocumentExtractor.extract(bytes, format)` returns
 `Result<ExtractedDocument, DomainError>`, where `ExtractedDocument` is
 `{ content: ImportedDoc; totalPages; pagesWithoutText; images:
-ExtractedImage[] }` and `ExtractedImage` is `{ key, bytes, mime, alt }`.
-An image node in `content` points at its image with `attrs.pendingId ===
-key`; T9 uploads the bytes and swaps `pendingId` for `assetId` before the
-write (no adapter emits images yet). Errors: `DOCUMENT_UNSUPPORTED_FORMAT`
+ExtractedImage[]; skippedImages }` and `ExtractedImage` is `{ key, bytes,
+mime, alt }`. An image node in `content` points at its image with
+`attrs.pendingId === key`; T9 uploads the bytes and swaps `pendingId` for
+`assetId` before the write (the DOCX adapter emits images since T6).
+`skippedImages` counts images found in the source but not kept because
+their format is not png/jpeg/gif/webp (T9 reports it in the job result). Errors: `DOCUMENT_UNSUPPORTED_FORMAT`
 when no adapter handles the format, `DOCUMENT_UNREADABLE` for a corrupt,
 encrypted or truncated file.
 
@@ -113,6 +121,68 @@ The `pdf_imported` event keeps its name until T10 and already carries the
 declared `format`. The `page-pdfs` bucket still allows only
 `application/pdf` (`drizzle/0006_page_pdfs_storage.sql`) until T10's
 migration, so a DOCX/PPTX upload is refused by Storage before then.
+
+## DOCX
+
+`DocxDocumentExtractor` (T6) runs two engines in parallel on the same
+bytes (T0 spike decision):
+
+- **mammoth 1.13** reads the block structure. Its document model is
+  captured with the `transformDocument` hook and mapped node by node
+  (`docx-model-mapper.ts`); the HTML mammoth renders afterwards is
+  discarded, so there is no HTML parsing.
+- **officeparser 8.2** reads what mammoth drops: run colour and shading,
+  the list counters (ordered `start`) and OMML equations as LaTeX. Its
+  AST is reduced to one enrichment per paragraph (`docx-enrichment.ts`)
+  and paired with mammoth's paragraphs in document order by equal text
+  with a short lookahead. A paragraph the engines read differently gets
+  no enrichment; if officeparser fails, the document imports from mammoth
+  alone.
+
+| DOCX construct | Block |
+|---|---|
+| `Title` style | `heading` 1 |
+| `Heading 1`–`Heading 9` (style name or id) | `heading` 1–6 (7–9 → 6) |
+| Bold, italic, underline, strike, sub/superscript | marks |
+| Monospace run font (Courier New, Consolas, … any "Mono") | `code` mark (alone: Tiptap's code excludes other marks) |
+| Run colour (officeparser) | `textStyle.color` `#rrggbb`, except on headings/quotes/code, character-styled runs (links), pure black/white and the document's dominant (Normal style) colour |
+| Highlight (mammoth) | `highlight` with the nearest palette name; greys dropped |
+| Shading (officeparser) | `textStyle.backgroundColor` (same exclusions) |
+| Hyperlink | `link` for http/https/mailto; other schemes and bookmarks keep the text, drop the mark |
+| Numbered/bulleted paragraphs | nested `bulletList`/`orderedList` by level; `start` from officeparser's counter |
+| Checkbox content control, or a `☐`/`☑`/`☒` prefix | `taskList`/`taskItem` (`checked`), glyph removed |
+| Table | `table`; header rows (`tblHeader`) → `tableHeader`; `colspan`/`rowspan`; `colwidth: null`; empty cell → empty paragraph |
+| `Code`-like style, or a paragraph whose text is all monospace | one `codeBlock` per run of consecutive paragraphs (newlines and indentation kept, `language: null`) |
+| `Quote`/`Intense Quote` style | `blockquote` (consecutive paragraphs grouped) |
+| Page break | `horizontalRule` (splits the paragraph) |
+| Line break | `hardBreak` |
+| Image (png/jpeg/gif/webp, by magic bytes) | `image` block (`pendingId`, `alt` from the DOCX description), splitting the paragraph; an SVG goes through the PNG fallback Word stores next to it |
+| Image in another format (EMF, WMF, TIFF, …) | skipped, counted in `skippedImages` |
+| Equation in a paragraph with text | `inlineMath` |
+| Paragraph holding only equations | one `blockMath` each |
+| Equation whose LaTeX does not validate | the LaTeX as plain text |
+| Empty or whitespace-only paragraph | dropped |
+
+Not mapped: footnotes/endnotes and comments (mammoth references are
+dropped), text boxes and SmartArt, headers/footers, section breaks (only
+explicit page breaks), column breaks, paragraph alignment, tracked-change
+deletions, `Subtitle` (a plain paragraph).
+
+Equations: officeparser writes a one-character argument without braces
+right after a command (`\fracab`, `\sqrty`). `omml-latex.ts` restores them
+deterministically (officeparser escapes all document text, so every
+`\name` is one of its own commands), then accepts the LaTeX only if braces
+balance and every command is one officeparser emits.
+
+`totalPages` is the number of explicit page breaks + 1 (a DOCX stores no
+reliable page count); `pagesWithoutText` is always 0. A file mammoth
+cannot open (truncated, not a ZIP) returns `DOCUMENT_UNREADABLE`, which
+`processImportJob` maps to `invalid_document`. `large-30p.docx` extracts
+in about 0.2 s locally.
+
+`officeparser` is listed in `serverExternalPackages` (`next.config.ts`):
+Turbopack breaks its ESM wrapper when bundled. Its optional
+`@napi-rs/canvas` (through pdfjs-dist) is not used on the DOCX path.
 
 ## Job lifecycle
 
@@ -169,7 +239,9 @@ Functions) — without it, the Hobby plan's ceiling is lower and
 
 - `pnpm test -- ingestion` — unit tests (Vitest): `domain`, `application`
   (against the in-memory fakes), `infrastructure` adapters (against mocked
-  clients) and `actions.ts` (against mocked adapters + session, matching
+  clients, or real parsers for the document extractors: the DOCX golden
+  test reads `tests/fixtures/documents/files/all-constructs.docx`) and
+  `actions.ts` (against mocked adapters + session, matching
   `notebooks/actions.test.ts`'s pattern). No `DATABASE_URL` or
   `SUPABASE_PDF_BUCKET` needed.
 - `pnpm test:db` — DB smoke tests against `cogni-dev`: the shared

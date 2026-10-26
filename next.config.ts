@@ -4,6 +4,11 @@ import { supabaseImageRemotePatterns } from "./src/shared/config/image-remote-pa
 import { securityHeaders } from "./src/shared/config/security-headers";
 
 const nextConfig: NextConfig = {
+  // document-import T6: officeparser (DOCX enrichment, later PPTX/PDF) is
+  // loaded with Node's own require instead of being bundled: Turbopack
+  // breaks its ESM wrapper (T0 spike). Its optional @napi-rs/canvas is
+  // never required on the DOCX path.
+  serverExternalPackages: ["officeparser"],
   images: {
     // Derived without clientEnv(): this file must stay loadable when the
     // app env is absent (see image-remote-patterns.ts).

@@ -256,6 +256,7 @@ describe("ingestion Server Actions", () => {
           totalPages: 1,
           pagesWithoutText: 0,
           images: [],
+          skippedImages: 0,
         },
       });
       const { startPdfImport, processPdfImport } = await import("./actions");

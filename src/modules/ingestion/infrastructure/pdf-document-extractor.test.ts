@@ -32,6 +32,7 @@ describe("PdfDocumentExtractor", () => {
       totalPages: 1,
       pagesWithoutText: 0,
       images: [],
+      skippedImages: 0,
     });
   });
 

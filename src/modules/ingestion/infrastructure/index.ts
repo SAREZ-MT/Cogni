@@ -1,3 +1,4 @@
+export { DocxDocumentExtractor } from "./docx-document-extractor";
 export { DrizzleImportJobRepository } from "./drizzle-import-job-repository";
 export {
   createDocumentExtractor,
