@@ -53,6 +53,13 @@ async function expectStructure(editable: Locator) {
   await expect(
     editable.locator("h1", { hasText: "Fixture Title" }),
   ).toBeVisible();
+  // Levels 4–6 get their own heading style, not body text (T11b).
+  for (const level of [4, 5, 6]) {
+    await expect(editable.locator(`h${level}`).first()).toHaveCSS(
+      "font-weight",
+      "600",
+    );
+  }
 
   // Nested lists, three levels deep; the ordered one starts at 3.
   await expect(
