@@ -410,7 +410,10 @@ describe("extractPlainText", () => {
       ).toBe("Hecho\nPendiente");
     });
 
-    it("recurses into an unknown node that sits among inline nodes", () => {
+    // document-import T5 (T4 review follow-up): an unknown node among
+    // inline siblings is treated as inline too, so a future inline node
+    // never splits its paragraph into several AI paragraphs.
+    it("keeps an unknown node that sits among inline nodes on the same line", () => {
       expect(
         extractPlainText(
           doc(
@@ -421,7 +424,62 @@ describe("extractPlainText", () => {
             ),
           ),
         ),
-      ).toBe("a\nb\nc");
+      ).toBe("abc");
+    });
+
+    it("still separates sibling blocks when an unknown node sits among known blocks", () => {
+      expect(
+        extractPlainText(
+          doc({
+            type: "blockquote",
+            content: [
+              p(text("uno")),
+              { type: "futureBlock", content: [p(text("dos"))] },
+            ],
+          }),
+        ),
+      ).toBe("uno\ndos");
+    });
+
+    // T4 review follow-up: atom text comes from attrs, so a newline inside
+    // it would split a line (and an AI paragraph) where the editor shows
+    // one; each run of line breaks becomes a single space instead.
+    it("replaces line breaks inside inline atom text with a single space", () => {
+      expect(
+        extractPlainText(
+          doc(
+            p(
+              text("Ver "),
+              { type: "inlineMath", attrs: { latex: "a\\\nb" } },
+              text(" y "),
+              {
+                type: "mention",
+                attrs: { id: "m1", label: "Tema\r\nlargo" },
+              },
+            ),
+          ),
+        ),
+      ).toBe("Ver a\\ b y @Tema largo");
+    });
+
+    it("keeps block math and an image caption or alt on a single line", () => {
+      expect(
+        extractPlainText(
+          doc(
+            {
+              type: "blockMath",
+              attrs: { latex: "\\begin{aligned}\na &= b\n\\end{aligned}" },
+            },
+            { type: "image", attrs: { caption: "Figura 1:\n\nderivada" } },
+            {
+              type: "image",
+              attrs: { caption: null, alt: "Gráfico\nde barras" },
+            },
+          ),
+        ),
+      ).toBe(
+        "\\begin{aligned} a &= b \\end{aligned}\nFigura 1: derivada\nGráfico de barras",
+      );
     });
 
     it("splits the catalogue sample into the expected AI paragraphs", () => {

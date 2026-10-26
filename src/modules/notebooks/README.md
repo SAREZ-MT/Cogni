@@ -23,10 +23,16 @@ Hexagonal shape enforced by `.dependency-cruiser.cjs` (`domain-is-pure`,
   `extractPlainText` covers every catalogue node (its comment table lists
   the rule per node): inline atoms stay on their line (`@label`, `:emoji:`,
   inline LaTeX), block math is its LaTeX line, an image is its caption or
-  alt, and youtube/divider/table-of-contents write nothing. `plain_text`
-  feeds the AI paragraph split (`src/shared/kernel/page-paragraphs.ts`), so
-  output for pre-catalogue nodes is pinned byte-identical to keep paragraph
-  fingerprints stable.
+  alt, and youtube/divider/table-of-contents write nothing. Text taken from
+  attrs (LaTeX, mention label, caption, alt) has its line breaks replaced by
+  one space, and an unknown node among inline content stays on that line,
+  so neither ever splits a line. `plain_text` feeds the AI paragraph split
+  (`src/shared/kernel/page-paragraphs.ts`), so output for pre-catalogue
+  nodes is pinned byte-identical to keep paragraph fingerprints stable —
+  except, deliberately, images (caption/alt is new text; the previous
+  implementation wrote nothing for them) and unknown inline nodes (no
+  longer split their line): such pages get new fingerprints once, on their
+  next save.
   The editor's `SavePagePort` belongs to `editor/domain`; this module's
   `saveContent`/`getCurrentContent` Server Actions satisfy it structurally.
 - `application/`: use cases for creating/renaming/archiving notebooks and

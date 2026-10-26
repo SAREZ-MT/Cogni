@@ -4,7 +4,10 @@
 // defined once in shared/kernel/tiptap-doc.ts (editor/domain needs the same
 // shape for its SavePagePort) and re-exported here so every notebooks import
 // of them keeps working through this file.
-import { INLINE_NODES } from "@/shared/kernel/tiptap-catalogue";
+import {
+  CATALOGUE_NODES,
+  INLINE_NODES,
+} from "@/shared/kernel/tiptap-catalogue";
 import type { TiptapDoc, TiptapNode } from "@/shared/kernel/tiptap-doc";
 
 export type { TiptapDoc, TiptapNode } from "@/shared/kernel/tiptap-doc";
@@ -13,7 +16,9 @@ export type { TiptapDoc, TiptapNode } from "@/shared/kernel/tiptap-doc";
 // plain_text feeds search and the AI paragraph split
 // (shared/kernel/page-paragraphs.ts: one non-blank line = one paragraph),
 // so every block is one or more lines and inline content never breaks a
-// line except at a hardBreak.
+// line except at a hardBreak. Text read from attrs (latex, mention label,
+// caption, alt) has each run of line breaks replaced by one space, so an
+// atom never splits its line.
 //
 // | Node                          | Plain text                                |
 // |-------------------------------|-------------------------------------------|
@@ -24,7 +29,7 @@ export type { TiptapDoc, TiptapNode } from "@/shared/kernel/tiptap-doc";
 // | emoji                         | ":name:" (the unicode table lives in      |
 // |                               | @tiptap/extension-emoji; domain-no-npm)   |
 // | inlineMath                    | its latex                                 |
-// | blockMath                     | its latex, on its own line                |
+// | blockMath                     | its latex, on its own (single) line       |
 // | paragraph, heading,           | its inline content, one line              |
 // | detailsSummary, codeBlock     | (codeBlock keeps its own "\n" lines)      |
 // | tableRow                      | its cells joined by "\t", one line        |
@@ -34,13 +39,20 @@ export type { TiptapDoc, TiptapNode } from "@/shared/kernel/tiptap-doc";
 // | image                         | caption, else alt, else nothing           |
 // | youtube, horizontalRule,      | nothing                                   |
 // | tocBlock                      |                                           |
-// | unknown type                  | recurse into its content (never throws)   |
+// | unknown type                  | recurse into its content (never throws);  |
+// |                               | among inline siblings it joins their line |
+// |                               | instead of starting a new one             |
 //
 // Documents made only of the pre-catalogue nodes (paragraph, heading,
 // lists, table, codeBlock, blockquote, hardBreak) produce byte-identical
 // output to the previous implementation, so their paragraph fingerprints
-// do not change (plain-text.test.ts pins it).
+// do not change (plain-text.test.ts pins it). Two changes are deliberate:
+// an image now writes its caption or alt (the previous implementation
+// wrote nothing for it), and an unknown node among inline content no
+// longer splits the line; pages with either get new paragraph
+// fingerprints once, on their next save.
 const INLINE_TYPES: ReadonlySet<string> = new Set(INLINE_NODES);
+const KNOWN_TYPES: ReadonlySet<string> = new Set(CATALOGUE_NODES);
 
 const NO_CONTRIBUTION: ReadonlySet<string> = new Set([
   "horizontalRule",
@@ -53,6 +65,15 @@ function attr(node: TiptapNode, name: string): string {
   return typeof value === "string" ? value : "";
 }
 
+// Attr text stays on one line: every run of CR/LF becomes a single space.
+function oneLine(value: string): string {
+  return value.replace(/[\r\n]+/g, " ");
+}
+
+function attrLine(node: TiptapNode, name: string): string {
+  return oneLine(attr(node, name));
+}
+
 function nodeText(node: TiptapNode): string {
   switch (node.type) {
     case "text":
@@ -60,7 +81,7 @@ function nodeText(node: TiptapNode): string {
     case "hardBreak":
       return "\n";
     case "mention": {
-      const label = attr(node, "label");
+      const label = attrLine(node, "label");
       return label ? (attr(node, "mentionSuggestionChar") || "@") + label : "";
     }
     case "emoji": {
@@ -69,9 +90,9 @@ function nodeText(node: TiptapNode): string {
     }
     case "inlineMath":
     case "blockMath":
-      return attr(node, "latex");
+      return attrLine(node, "latex");
     case "image":
-      return attr(node, "caption") || attr(node, "alt");
+      return attrLine(node, "caption") || attrLine(node, "alt");
   }
   if (NO_CONTRIBUTION.has(node.type)) return "";
 
@@ -85,9 +106,21 @@ function nodeText(node: TiptapNode): string {
 
   // A block whose children are all inline nodes (text, hardBreak and the
   // inline atoms of the catalogue) concatenates them directly: they are
-  // one line, not sibling blocks.
-  if (children.every((child) => INLINE_TYPES.has(child.type))) {
-    return childTexts.join("");
+  // one line, not sibling blocks. An unknown node among at least one
+  // inline sibling is taken as inline too (its own text kept on the line),
+  // so a future inline node never splits a paragraph.
+  const isInline = (child: TiptapNode) => INLINE_TYPES.has(child.type);
+  const isUnknown = (child: TiptapNode) =>
+    !isInline(child) && !KNOWN_TYPES.has(child.type);
+  if (
+    children.some(isInline) &&
+    children.every((child) => isInline(child) || isUnknown(child))
+  ) {
+    return children
+      .map((child, index) =>
+        isUnknown(child) ? oneLine(childTexts[index]) : childTexts[index],
+      )
+      .join("");
   }
 
   // Otherwise children are sibling blocks (headings, paragraphs, list
