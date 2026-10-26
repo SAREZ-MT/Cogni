@@ -31,6 +31,10 @@ export const IMPORT_JOB_ERROR = {
 // `UNSUPPORTED_FORMAT` (T5): the stored object's real mime does not match
 // the format its path declares (`startPdfImport`), or a `DocumentExtractor`
 // has no adapter for the format (`FormatRoutingDocumentExtractor`).
+// `LIMIT_EXCEEDED` (T9b): the document is readable but bigger or more
+// complex than the import accepts (OOXML part/total/ratio/entry caps, XML
+// element or nesting caps, PDF page or text caps). `processImportJob`
+// maps it to `invalid_document` with `DOCUMENT_LIMIT_EXCEEDED_MESSAGE`.
 export const DOCUMENT_FILE_ERROR = {
   MIME_NOT_ALLOWED: "DOCUMENT_MIME_NOT_ALLOWED",
   TOO_LARGE: "DOCUMENT_TOO_LARGE",
@@ -40,6 +44,7 @@ export const DOCUMENT_FILE_ERROR = {
   OBJECT_MISSING: "DOCUMENT_OBJECT_MISSING",
   UNREADABLE: "DOCUMENT_UNREADABLE",
   UNSUPPORTED_FORMAT: "DOCUMENT_UNSUPPORTED_FORMAT",
+  LIMIT_EXCEEDED: "DOCUMENT_LIMIT_EXCEEDED",
 } as const;
 
 // DomainError codes owned by `application` that are not specific to a PDF

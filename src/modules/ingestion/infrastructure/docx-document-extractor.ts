@@ -8,12 +8,19 @@ import type {
 } from "../domain/document-extractor";
 import type { DocumentFormat } from "../domain/document-format";
 import { DOCUMENT_FILE_ERROR } from "../domain/errors";
+import { OOXML_LIMITS } from "../domain/ooxml-guard";
 import {
   collectEnrichments,
   type OfficeParserNode,
   type ParagraphEnrichment,
 } from "./docx-enrichment";
 import { type MammothNode, mapDocxModel } from "./docx-model-mapper";
+import {
+  type MammothZipFile,
+  OoxmlLimitError,
+  type OoxmlPackage,
+  openOoxmlPackage,
+} from "./ooxml-package";
 
 // document-import T6: the DOCX adapter for the DocumentExtractor port.
 //
@@ -24,7 +31,8 @@ import { type MammothNode, mapDocxModel } from "./docx-model-mapper";
 // colour and shading, the numbering start of ordered lists and every OMML
 // equation. officeparser 8.2 reads exactly those.
 //
-// Merge strategy: both engines run in parallel on the same bytes.
+// Merge strategy: both engines read the same checked package, one after
+// the other (T9b: never in parallel, so their peak memory never adds up).
 // mammoth's document model is captured through its `transformDocument`
 // hook (the HTML it then renders is discarded; no HTML parsing) and mapped
 // node by node (docx-model-mapper.ts). officeparser's AST is reduced to one
@@ -41,11 +49,23 @@ import { type MammothNode, mapDocxModel } from "./docx-model-mapper";
 // figure is whatever the last writer computed), so it is the number of
 // explicit page breaks + 1; pagesWithoutText is always 0.
 //
+// Limits (T9b, see README "Límites y seguridad"): the bytes are opened as
+// an OoxmlPackage (ooxml-package.ts) — directory guard, then capped lazy
+// inflation — and neither engine ever inflates a part itself: mammoth
+// reads through `pkg.mammothFile()`, officeparser parses `pkg.xmlArchive()`
+// (stored, XML only) with its own decompression limits as a second fence.
+// A cap breach is err(LIMIT_EXCEEDED); a malformed package UNREADABLE.
+//
 // mammoth and officeparser may only be imported from
 // ingestion/infrastructure (.dependency-cruiser.cjs); officeparser is a
 // Next `serverExternalPackages` entry (next.config.ts) because Turbopack
 // breaks its ESM wrapper.
 const OFFICEPARSER_CONFIG = {
+  decompressionLimits: {
+    maxUncompressedBytes: OOXML_LIMITS.maxTotalBytes,
+    maxZipEntries: OOXML_LIMITS.maxEntries,
+    maxXmlElements: OOXML_LIMITS.maxXmlElements,
+  },
   extractAttachments: false,
   ignoreNotes: true,
   ignoreComments: true,
@@ -55,28 +75,32 @@ const OFFICEPARSER_CONFIG = {
   onWarning: () => {},
 };
 
-async function readMammothModel(buffer: Buffer): Promise<MammothNode> {
+// mammoth's `openZip` takes `{ file }` (a ready zip-file object) besides
+// `{ buffer }`; its published typings only declare the latter.
+type MammothInput = Parameters<typeof mammoth.convertToHtml>[0];
+
+async function readMammothModel(file: MammothZipFile): Promise<MammothNode> {
   let model: MammothNode | null = null;
-  await mammoth.convertToHtml(
-    { buffer },
-    {
-      transformDocument: (document: MammothNode) => {
-        model = document;
-        return document;
-      },
-      // The HTML is discarded: never read image bytes for it.
-      convertImage: mammoth.images.imgElement(async () => ({ src: "" })),
+  await mammoth.convertToHtml({ file } as unknown as MammothInput, {
+    transformDocument: (document: MammothNode) => {
+      model = document;
+      return document;
     },
-  );
+    // The HTML is discarded: never read image bytes for it.
+    convertImage: mammoth.images.imgElement(async () => ({ src: "" })),
+  });
   if (!model) throw new Error("mammoth returned no document");
   return model;
 }
 
 async function readEnrichments(
-  buffer: Buffer,
+  pkg: OoxmlPackage,
 ): Promise<ParagraphEnrichment[] | null> {
   try {
-    const ast = await OfficeParser.parseOffice(buffer, OFFICEPARSER_CONFIG);
+    const ast = await OfficeParser.parseOffice(
+      Buffer.from(pkg.xmlArchive()),
+      OFFICEPARSER_CONFIG,
+    );
     return collectEnrichments(ast.content as unknown as OfficeParserNode[]);
   } catch {
     return null;
@@ -96,27 +120,25 @@ export class DocxDocumentExtractor implements DocumentExtractor {
         ),
       );
     }
-    const buffer = Buffer.from(
-      bytes.buffer,
-      bytes.byteOffset,
-      bytes.byteLength,
-    );
+    const opened = openOoxmlPackage(bytes);
+    if (!opened.ok) return opened;
+    const pkg = opened.value;
     let mapped: Awaited<ReturnType<typeof mapDocxModel>>;
     try {
-      const [model, enrichments] = await Promise.all([
-        readMammothModel(buffer),
-        readEnrichments(buffer),
-      ]);
+      const model = await readMammothModel(pkg.mammothFile());
+      const enrichments = await readEnrichments(pkg);
       // Inside the try too (T6 review follow-up): a mapping bug on an
       // unexpected model shape becomes an error Result
       // (→ `invalid_document`) instead of escaping the port's contract.
       mapped = await mapDocxModel(model, enrichments);
-    } catch {
+    } catch (error) {
       return err(
-        new DomainError(
-          DOCUMENT_FILE_ERROR.UNREADABLE,
-          "the DOCX could not be read or mapped",
-        ),
+        error instanceof OoxmlLimitError
+          ? new DomainError(DOCUMENT_FILE_ERROR.LIMIT_EXCEEDED, error.message)
+          : new DomainError(
+              DOCUMENT_FILE_ERROR.UNREADABLE,
+              "the DOCX could not be read or mapped",
+            ),
       );
     }
     return ok({

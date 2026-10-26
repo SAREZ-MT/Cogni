@@ -36,6 +36,7 @@ export {
   PROCESSING_BUDGET_MS,
 } from "./import-budget";
 export {
+  DOCUMENT_LIMIT_EXCEEDED_MESSAGE,
   failureMessage,
   IMPORT_FAILURE_KIND,
   type ImportFailureKind,

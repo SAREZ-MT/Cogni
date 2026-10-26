@@ -54,6 +54,13 @@ const FAILURE_MESSAGE: Record<ImportFailureKind, string> = {
 export const PERSISTENCE_PAGE_UNAVAILABLE_MESSAGE =
   "La página de destino ya no está disponible. Vuelve a importar el documento.";
 
+// document-import T9b: the `invalid_document` text for a document that is
+// readable but over an import cap (DOCUMENT_FILE_ERROR.LIMIT_EXCEEDED:
+// OOXML size/ratio/entry caps, XML element or nesting caps, PDF page or
+// text caps), so the user splits it instead of looking for a password.
+export const DOCUMENT_LIMIT_EXCEEDED_MESSAGE =
+  "Este documento es demasiado grande o complejo para importarlo. Divídelo en partes más pequeñas e inténtalo de nuevo.";
+
 export function failureMessage(reason: ImportFailureKind): string {
   return FAILURE_MESSAGE[reason];
 }

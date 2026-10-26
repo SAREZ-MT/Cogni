@@ -141,8 +141,9 @@ migration, so a DOCX/PPTX upload is refused by Storage before then.
 
 ## DOCX
 
-`DocxDocumentExtractor` (T6) runs two engines in parallel on the same
-bytes (T0 spike decision):
+`DocxDocumentExtractor` (T6) runs two engines, one after the other
+(T9b; in parallel until then), on the same checked package (T0 spike
+decision; see "Límites y seguridad"):
 
 - **mammoth 1.13** reads the block structure. Its document model is
   captured with the `transformDocument` hook and mapped node by node
@@ -202,6 +203,47 @@ in about 0.2 s locally.
 `officeparser` is listed in `serverExternalPackages` (`next.config.ts`):
 Turbopack breaks its ESM wrapper when bundled. Its optional
 `@napi-rs/canvas` (through pdfjs-dist) is not used on the DOCX path.
+
+## Límites y seguridad
+
+Import hardening from the 2026-10-26 security audit (T9b). Every cap is a
+named constant; a document over one fails as `invalid_document`.
+
+### OOXML packages (zip bombs)
+
+`inspectOoxmlPackage` (`domain/ooxml-guard.ts`, pure, over the central
+directory parser in `domain/zip-directory.ts` that format detection
+shares) reads the directory before any parser runs and refuses the file
+when it cannot be trusted — no readable directory, encrypted or zip64
+entries, a method other than stored/deflate, duplicate names, data
+outside the archive (`DOCUMENT_UNREADABLE`) — or declares too much
+(`DOCUMENT_LIMIT_EXCEEDED`):
+
+| `OOXML_LIMITS` | Value |
+|---|---|
+| `maxEntries` | 2,000 entries |
+| `maxPartBytes` | 50 MiB declared per part (media included) |
+| `maxTotalBytes` | 150 MiB declared for all parts together |
+| `maxRatio` / `ratioMinBytes` | 200:1 for any entry of 1 MiB or more |
+| `maxImageBytes` | 10 MiB per image (larger ones are skipped, see Images) |
+| `maxXmlElements` | 1,000,000 XML elements across the parts read |
+| `maxXmlDepth` | 256 levels of XML nesting in one part |
+
+Declared sizes can lie, so neither engine inflates anything itself.
+`OoxmlPackage` (`infrastructure/ooxml-package.ts`) inflates each part
+lazily with `node:zlib`'s `inflateRawSync({ maxOutputLength })` at its
+declared size (a stream that holds more throws instead of allocating it)
+and counts the inflated total; XML parts are also counted (elements,
+nesting) before a parser gets them. mammoth reads through the package's
+zip-file object (`mammoth.convertToHtml({ file })`; mammoth 1.13's
+`openZip` accepts a ready zip file besides a buffer), so its JSZip never
+inflates; officeparser parses a rebuilt stored archive of the XML parts
+only, with `decompressionLimits` (`maxUncompressedBytes`,
+`maxZipEntries`, `maxXmlElements`) at the same caps as a second fence.
+No new dependency: `fflate` was not needed. The engines run sequentially
+so their peaks never add up. `processImportJob` reports a limit breach
+with `DOCUMENT_LIMIT_EXCEEDED_MESSAGE` ("Este documento es demasiado
+grande o complejo para importarlo. …").
 
 ## Job lifecycle
 

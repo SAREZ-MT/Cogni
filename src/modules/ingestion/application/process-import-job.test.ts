@@ -550,6 +550,38 @@ describe("processImportJob use case", () => {
     expect(result.value.error).toBe(INVALID_DOCUMENT_MESSAGE);
   });
 
+  // document-import T9b: a document over an import cap (zip bomb, page
+  // cap, XML element flood) fails as invalid_document with its own
+  // message, so the user knows to split it instead of checking a password.
+  it("fails(invalid_document) with the too-large message when the extractor reports a limit", async () => {
+    const deps = makeDeps();
+    const job = await seedQueuedJob(deps);
+    deps.storage.put(STORAGE_PATH, {
+      sizeBytes: PDF_BYTES.length,
+      mime: "application/pdf",
+      bytes: PDF_BYTES,
+    });
+    deps.extractor.setResult(
+      err(new DomainError("DOCUMENT_LIMIT_EXCEEDED", "301 pages")),
+    );
+
+    const result = await processImportJob(
+      { importJobId: job.id },
+      deps,
+      OWNER_ID,
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.status).toBe("failed");
+    expect(result.value.error).toBe(
+      "Este documento es demasiado grande o complejo para importarlo. Divídelo en partes más pequeñas e inténtalo de nuevo.",
+    );
+    expect(deps.telemetry.finishedCalls.at(-1)?.failure?.kind).toBe(
+      "invalid_document",
+    );
+  });
+
   // T7b review follow-up from T6 (R3-persist-and-extract-exceptions-
   // unhandled): the port promises a Result, but a thrown exception must
   // still leave the job terminal instead of propagating out of

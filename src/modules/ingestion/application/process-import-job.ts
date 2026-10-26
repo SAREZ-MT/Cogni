@@ -14,6 +14,7 @@ import {
   PROCESSING_BUDGET_MS,
 } from "../domain/import-budget";
 import {
+  DOCUMENT_LIMIT_EXCEEDED_MESSAGE,
   failureMessage,
   type ImportFailureKind,
   PERSISTENCE_PAGE_UNAVAILABLE_MESSAGE,
@@ -235,7 +236,10 @@ export async function processImportJob(
         : "invalid_document";
     return finishFailed({
       kind,
-      message: failureMessage(kind),
+      message:
+        extracted.error.code === DOCUMENT_FILE_ERROR.LIMIT_EXCEEDED
+          ? DOCUMENT_LIMIT_EXCEEDED_MESSAGE
+          : failureMessage(kind),
       cause: extractCause,
     });
   }
