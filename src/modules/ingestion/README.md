@@ -267,7 +267,13 @@ inflates; officeparser parses a rebuilt stored archive of the XML parts
 only, with `decompressionLimits` (`maxUncompressedBytes`,
 `maxZipEntries`, `maxXmlElements`) at the same caps as a second fence.
 No new dependency: `fflate` was not needed. The engines run sequentially
-so their peaks never add up. `processImportJob` reports a limit breach
+so their peaks never add up. officeparser's enrichment (colours, list
+starts, equations) is optional — any other officeparser failure imports
+from mammoth alone — but a limit breach on its path (a part only
+`xmlArchive()` reads, or officeparser's own `ZIP_*`/`XML_ELEMENT_*`/
+`MAX_NESTING_DEPTH_EXCEEDED`/`OUTPUT_TOO_LARGE` errors) fails the import as
+`DOCUMENT_LIMIT_EXCEEDED` (T10). A part refused by the element or nesting
+check is refused on every later read too. `processImportJob` reports a limit breach
 with `DOCUMENT_LIMIT_EXCEEDED_MESSAGE` ("Este documento es demasiado
 grande o complejo para importarlo. …").
 
@@ -342,7 +348,9 @@ Text the user never sees must not reach the AI (imported content feeds
 The DOCX mapper (`IMAGE_LIMITS`, `docx-model-mapper.ts`) reads embedded
 images one at a time, never more than 100 per document; an image over
 10 MiB (refused by `OoxmlPackage` from its declared size, before
-inflating, and checked again once read) is skipped, and once the images
+inflating, and checked again once read) is skipped and counted — the rest
+of the document still imports (regression test in
+`docx-document-extractor.limits.test.ts`) — and once the images
 read reach 40 MiB in total the rest are not read. Every image not kept
 counts in `skippedImages`.
 

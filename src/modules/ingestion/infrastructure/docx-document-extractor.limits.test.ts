@@ -1,13 +1,14 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { deflateRawSync } from "node:zlib";
+import { Document, ImageRun, Packer, Paragraph } from "docx";
 import mammoth from "mammoth";
 import { OfficeParser } from "officeparser";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { makeZip, type ZipTestEntry } from "../application/testing/make-zip";
 import { OOXML_LIMITS } from "../domain/ooxml-guard";
 import { DocxDocumentExtractor } from "./docx-document-extractor";
-import { openOoxmlPackage } from "./ooxml-package";
+import { OoxmlLimitError, openOoxmlPackage } from "./ooxml-package";
 
 // document-import T9b (security audit, zip bomb): the DOCX adapter refuses
 // a package that declares or inflates past the caps before mammoth or
@@ -129,6 +130,132 @@ describe("DocxDocumentExtractor limits", () => {
         maxXmlElements: OOXML_LIMITS.maxXmlElements,
       },
     });
+  });
+
+  // document-import T10 (T9b review): an image declaring more than the
+  // image cap drops that image (counted), never the whole document. The
+  // DOCX is built in the test with two distinct PNGs; the second one's
+  // media part is then replaced by one declared just over the cap.
+  it("skips and counts an embedded image declared over the image cap, importing the rest", async () => {
+    const opened = openOoxmlPackage(fixture);
+    if (!opened.ok) throw new Error("fixture");
+    const fixturePng = opened.value
+      .names()
+      .find((name) => /^word\/media\/.+\.png$/.test(name));
+    if (!fixturePng) throw new Error("fixture has no png");
+    const small = opened.value.readBytes(fixturePng);
+    const other = Uint8Array.from([...small, 0]);
+    const image = (data: Uint8Array) =>
+      new ImageRun({
+        type: "png",
+        data,
+        transformation: { width: 10, height: 10 },
+      });
+    const built = new Uint8Array(
+      await Packer.toBuffer(
+        new Document({
+          sections: [
+            {
+              children: [
+                new Paragraph({ children: [image(small)] }),
+                new Paragraph({ children: [image(other)] }),
+                new Paragraph("Texto después de las imágenes."),
+              ],
+            },
+          ],
+        }),
+      ),
+    );
+    const pkg = openOoxmlPackage(built);
+    if (!pkg.ok) throw new Error("built docx");
+    const otherPart = pkg.value
+      .names()
+      .find(
+        (name) =>
+          name.includes("/media/") &&
+          pkg.value.readBytes(name).length === other.length,
+      );
+    if (!otherPart) throw new Error("second image part");
+    const oversized = new Uint8Array(OOXML_LIMITS.maxImageBytes + 1);
+    oversized.set(other);
+    const bytes = makeZip(
+      pkg.value
+        .names()
+        .map((name) =>
+          name === otherPart
+            ? { name, data: oversized, method: 0 as const }
+            : { name, data: pkg.value.readBytes(name) },
+        ),
+    );
+
+    const result = await new DocxDocumentExtractor().extract(bytes, "docx");
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.images).toHaveLength(1);
+    expect(result.value.images[0]?.bytes).toEqual(small);
+    expect(result.value.skippedImages).toBe(1);
+    expect(JSON.stringify(result.value.content)).toContain(
+      "Texto después de las imágenes.",
+    );
+  });
+
+  // document-import T10 (T9b review: the enrichment catch-all swallowed
+  // limit breaches). The caps are security bounds: a breach found while
+  // building officeparser's archive fails the import; any other
+  // officeparser failure still imports from mammoth alone.
+  it("fails with LIMIT_EXCEEDED when a part only officeparser reads breaches a cap", async () => {
+    const deep = `<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">${"<a:x>".repeat(OOXML_LIMITS.maxXmlDepth + 1)}${"</a:x>".repeat(OOXML_LIMITS.maxXmlDepth + 1)}</a:theme>`;
+    const bytes = repack({
+      "word/theme/theme1.xml": {
+        name: "word/theme/theme1.xml",
+        data: new TextEncoder().encode(deep),
+      },
+    });
+
+    const result = await new DocxDocumentExtractor().extract(bytes, "docx");
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("DOCUMENT_LIMIT_EXCEEDED");
+  });
+
+  it("fails with LIMIT_EXCEEDED when officeparser itself raises a limit error", async () => {
+    vi.spyOn(OfficeParser, "parseOffice").mockRejectedValueOnce(
+      new OoxmlLimitError("too many XML elements"),
+    );
+
+    const result = await new DocxDocumentExtractor().extract(fixture, "docx");
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("DOCUMENT_LIMIT_EXCEEDED");
+  });
+
+  it.each([
+    "ZIP_SIZE_LIMIT_EXCEEDED",
+    "ZIP_ENTRY_COUNT_LIMIT_EXCEEDED",
+    "XML_ELEMENT_LIMIT_EXCEEDED",
+    "MAX_NESTING_DEPTH_EXCEEDED",
+  ])("fails with LIMIT_EXCEEDED on officeparser's own %s", async (code) => {
+    vi.spyOn(OfficeParser, "parseOffice").mockRejectedValueOnce(
+      Object.assign(new Error(`[OfficeParser]: ${code}`), {
+        officeIssue: { code },
+      }),
+    );
+
+    const result = await new DocxDocumentExtractor().extract(fixture, "docx");
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("DOCUMENT_LIMIT_EXCEEDED");
+  });
+
+  it("still imports from mammoth alone when officeparser fails for another reason", async () => {
+    vi.spyOn(OfficeParser, "parseOffice").mockRejectedValueOnce(
+      new Error("unexpected AST"),
+    );
+
+    const result = await new DocxDocumentExtractor().extract(fixture, "docx");
+
+    expect(result.ok).toBe(true);
   });
 
   it("does not start the engines once the time budget aborted the signal", async () => {

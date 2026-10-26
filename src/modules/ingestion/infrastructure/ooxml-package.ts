@@ -97,7 +97,9 @@ export class OoxmlPackage {
   }
 
   // UTF-8 text of an XML part, refused when it holds more elements (across
-  // every part read so far) or deeper nesting than the caps.
+  // every part read so far) or deeper nesting than the caps. A part is
+  // marked checked only once it passed (T10, T9b review), so a refused part
+  // is refused again on every later read; its elements are counted once.
   readText(name: string): string {
     const text = decoder.decode(this.readBytes(name));
     if (
@@ -105,15 +107,16 @@ export class OoxmlPackage {
       !this.replaced.has(name) &&
       !this.shapeChecked.has(name)
     ) {
-      this.shapeChecked.add(name);
       const shape = xmlShape(text);
-      this.xmlElements += shape.elements;
-      if (this.xmlElements > this.limits.maxXmlElements) {
+      const elements = this.xmlElements + shape.elements;
+      if (elements > this.limits.maxXmlElements) {
         throw new OoxmlLimitError("too many XML elements");
       }
       if (shape.depth > this.limits.maxXmlDepth) {
         throw new OoxmlLimitError(`XML nesting in ${name}`);
       }
+      this.xmlElements = elements;
+      this.shapeChecked.add(name);
     }
     return text;
   }

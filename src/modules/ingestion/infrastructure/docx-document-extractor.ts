@@ -45,7 +45,8 @@ import {
 // at the colour/equation offsets of the paired enrichment. A paragraph the
 // two engines read differently simply gets no enrichment; if officeparser
 // fails altogether the document still imports from mammoth alone (no
-// colours, starts or equations).
+// colours, starts or equations) — unless the failure is a limit breach,
+// which fails the import (T10).
 //
 // totalPages: a DOCX stores no reliable page count (Word's docProps
 // figure is whatever the last writer computed), so it is the number of
@@ -95,6 +96,30 @@ async function readMammothModel(file: MammothZipFile): Promise<MammothNode> {
   return model;
 }
 
+// officeparser's own decompression-limit errors (`err.officeIssue.code`,
+// officeparser/dist/types.js OfficeErrorType).
+const OFFICEPARSER_LIMIT_CODES: ReadonlySet<string> = new Set([
+  "ZIP_ENTRY_COUNT_LIMIT_EXCEEDED",
+  "ZIP_ENTRY_INVALID_SIZE",
+  "ZIP_SIZE_LIMIT_EXCEEDED",
+  "XML_ELEMENT_LIMIT_EXCEEDED",
+  "MAX_NESTING_DEPTH_EXCEEDED",
+  "OUTPUT_TOO_LARGE",
+]);
+
+function officeparserLimitCode(error: unknown): string | null {
+  const code = (error as { officeIssue?: { code?: unknown } } | null)
+    ?.officeIssue?.code;
+  return typeof code === "string" && OFFICEPARSER_LIMIT_CODES.has(code)
+    ? code
+    : null;
+}
+
+// The enrichment is optional — officeparser failing for any other reason
+// degrades to mammoth alone — but a limit breach is not (document-import
+// T10, T9b review): the caps are security bounds, so a part only this
+// path reads (xmlArchive() reads every XML part) or officeparser's own
+// fence tripping fails the import as LIMIT_EXCEEDED.
 async function readEnrichments(
   pkg: OoxmlPackage,
 ): Promise<ParagraphEnrichment[] | null> {
@@ -104,7 +129,10 @@ async function readEnrichments(
       OFFICEPARSER_CONFIG,
     );
     return collectEnrichments(ast.content as unknown as OfficeParserNode[]);
-  } catch {
+  } catch (error) {
+    if (error instanceof OoxmlLimitError) throw error;
+    const code = officeparserLimitCode(error);
+    if (code) throw new OoxmlLimitError(`officeparser ${code}`);
     return null;
   }
 }

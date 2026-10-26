@@ -109,6 +109,38 @@ describe("openOoxmlPackage", () => {
     }
   });
 
+  // document-import T10 (T9b review: shapeChecked latched before the
+  // verdict): a part that failed the shape check must fail every read,
+  // not pass unchecked the second time.
+  it("refuses a too-deep part on every read, not only the first", () => {
+    const limits = { ...OOXML_LIMITS, maxXmlDepth: 20 };
+    const opened = openOoxmlPackage(
+      makeZip([
+        basic[0],
+        textEntry("word/document.xml", "<a>".repeat(21) + "</a>".repeat(21)),
+      ]),
+      limits,
+    );
+    if (!opened.ok) throw new Error("guard");
+    expect(() => opened.value.readText("word/document.xml")).toThrow(
+      OoxmlLimitError,
+    );
+    expect(() => opened.value.readText("word/document.xml")).toThrow(
+      OoxmlLimitError,
+    );
+  });
+
+  it("counts a passing part's elements once however often it is read", () => {
+    const limits = { ...OOXML_LIMITS, maxXmlElements: 15 };
+    const opened = openOoxmlPackage(
+      makeZip([basic[0], textEntry("word/document.xml", "<a/>".repeat(10))]),
+      limits,
+    );
+    if (!opened.ok) throw new Error("guard");
+    opened.value.readText("word/document.xml");
+    expect(() => opened.value.readText("word/document.xml")).not.toThrow();
+  });
+
   it("refuses a media part over the image cap at read time, before inflating it", () => {
     const image = Buffer.alloc(OOXML_LIMITS.maxImageBytes + 1, 7);
     const pkg = open(
