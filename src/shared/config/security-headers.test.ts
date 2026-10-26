@@ -11,14 +11,16 @@ function directive(csp: string, name: string): string {
 
 describe("securityHeaders", () => {
   // document-import T3: the editor's YouTube embed (extensions/youtube.ts)
-  // always loads from youtube-nocookie.com; that is the only frame origin.
-  it("allows only the youtube-nocookie embed in frame-src", () => {
+  // always loads from youtube-nocookie.com. 'self' stays so same-origin
+  // frames keep the default-src 'self' behaviour they had before frame-src
+  // existed.
+  it("allows same-origin frames and the youtube-nocookie embed in frame-src", () => {
     for (const csp of [
       header("Content-Security-Policy") ?? "",
       buildSecurityHeaders("abc123")[0].value,
     ]) {
       expect(directive(csp, "frame-src ")).toBe(
-        "frame-src https://www.youtube-nocookie.com",
+        "frame-src 'self' https://www.youtube-nocookie.com",
       );
     }
   });

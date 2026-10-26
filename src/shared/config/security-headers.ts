@@ -38,8 +38,10 @@ function buildContentSecurityPolicy(nonce: string | undefined): string {
     "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://*.posthog.com https://*.i.posthog.com",
     "worker-src 'self' blob: data:",
     // The editor's YouTube embed (editor/ui/tiptap/extensions/youtube.ts)
-    // always renders from youtube-nocookie.com; no other frame origin.
-    "frame-src https://www.youtube-nocookie.com",
+    // always renders from youtube-nocookie.com. 'self' keeps same-origin
+    // frames allowed, as they were through default-src 'self' before
+    // frame-src existed.
+    "frame-src 'self' https://www.youtube-nocookie.com",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self' https://*.supabase.co https://accounts.google.com",
