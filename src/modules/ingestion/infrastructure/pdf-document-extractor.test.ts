@@ -8,7 +8,7 @@ import {
 import { textToBlocks } from "../domain/text-to-blocks";
 import { PdfDocumentExtractor } from "./pdf-document-extractor";
 
-// design.md, "unpdf 1.8.1": PdfDocumentExtractor (T5 of document-import,
+// design.md, "unpdf" (exact pin, 1.9.1): PdfDocumentExtractor (T5 of document-import,
 // formerly UnpdfTextExtractor) wraps getDocumentProxy +
 // extractText({ mergePages: false }) from `unpdf` and converts the page
 // texts with `textToBlocks`, exactly as processImportJob did before the

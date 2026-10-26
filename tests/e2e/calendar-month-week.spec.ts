@@ -115,8 +115,12 @@ test.describe("Calendario — Mes y Semana", () => {
     await nav.getByRole("link", { name: "Mes siguiente" }).click();
     await expect(page).toHaveURL(/\/calendario\?view=mes&date=\d{4}-\d{2}-01$/);
     await expect(title).not.toHaveText(current ?? "");
+    // Late in the month, today can show up as a greyed spill-over day in the
+    // next month's first row; only in-month days must not be marked as today.
     await expect(
-      card.locator('[data-slot="calendar-day"][data-today]'),
+      card.locator(
+        '[data-slot="calendar-day"][data-today]:not([data-outside="true"])',
+      ),
     ).toHaveCount(0);
 
     await nav.getByRole("link", { name: "Mes anterior" }).click();

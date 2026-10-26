@@ -10,7 +10,7 @@ import type { DocumentFormat } from "../domain/document-format";
 import { DOCUMENT_FILE_ERROR } from "../domain/errors";
 import { textToBlocks } from "../domain/text-to-blocks";
 
-// design.md, "unpdf 1.8.1" (version exacta). The PDF adapter for the
+// design.md, "unpdf" (exact pin, 1.9.1 since the Oct 2026 pdf.js fix). The PDF adapter for the
 // DocumentExtractor port (document-import T5; formerly UnpdfTextExtractor,
 // whose page texts processImportJob converted itself). Behaviour is
 // unchanged: `getDocumentProxy` + one text string per page, in order

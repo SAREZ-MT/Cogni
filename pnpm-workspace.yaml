@@ -2,18 +2,26 @@ ignoredBuiltDependencies:
   - sharp
   - unrs-resolver
 
-# GHSA-68fv-2mgg-jv7q: source-map-js <1.2.2 (transitive via tailwind, vitest, jsdom).
-# GHSA-wq5f-xc86-pv6w: sharp <0.35.5 (librsvg, transitive via next).
-# Oct 2026 advisories, pinned surgically because `pnpm update --depth Infinity`
-# re-resolves schema-utils to 4.8.1 and breaks its webpack ^5.112 peer:
-# dompurify <=3.4.16 (via posthog-js), fast-uri <3.1.9 (via ajv in the Sentry
-# webpack plugin, build-only), undici <7.30.1 (via @ai-sdk/provider-utils).
-# Late Oct 2026: vite <8.3.3 (dev/test only, via vitest and @vitejs/plugin-react;
-# both already accept ^8, so only an override moves the shared resolution).
+# Security overrides. Each entry is scoped to the vulnerable major (`pkg@N`) so
+# a future dependency on another major fails at install instead of being
+# silently forced across majors. The Oct 2026 entries are pinned surgically
+# because `pnpm update --depth Infinity` re-resolves schema-utils to 4.8.1 and
+# breaks its webpack ^5.112 peer. Drop an entry once its parent ships the fix.
 overrides:
-  dompurify: ^3.4.17
-  fast-uri: ^3.1.9
-  sharp: ^0.35.5
-  source-map-js: ^1.2.2
+  # Oct 2026, `pnpm audit`: DOMPurify <=3.4.16 template/IN_PLACE sanitizer
+  # bypasses (XSS), via posthog-js.
+  dompurify@3: ^3.4.17
+  # Oct 2026, GHSA-xhq7-xmqj-769h and GHSA-333x-w4r6-6crp: fast-uri <3.1.9,
+  # via ajv in the Sentry webpack plugin (build-only).
+  fast-uri@3: ^3.1.9
+  # GHSA-wq5f-xc86-pv6w: sharp <0.35.5 (librsvg), via next.
+  sharp@0: ^0.35.5
+  # GHSA-68fv-2mgg-jv7q: source-map-js <1.2.2, via tailwind, vitest and jsdom.
+  source-map-js@1: ^1.2.2
+  # Oct 2026, `pnpm audit`: undici <7.30.1 DoS and SRI bypass, via
+  # @ai-sdk/provider-utils.
   undici@7: ^7.30.1
-  vite: ^8.3.3
+  # Late Oct 2026, `pnpm audit`: vite <8.3.3 dev-server file exposure and
+  # launch-editor issues (dev/test only), via vitest and @vitejs/plugin-react;
+  # vite is an auto-installed peer, so only an override moves it.
+  vite@8: ^8.3.3
