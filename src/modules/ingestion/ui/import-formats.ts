@@ -26,15 +26,24 @@ export const IMPORT_INPUT_ACCEPT = [
 
 const EXTENSION = /\.([a-z0-9]+)$/i;
 
+// Types some systems report for Office files when no Office app is
+// registered (or none at all); for these the extension decides.
+const GENERIC_MIMES: readonly string[] = [
+  "",
+  "application/octet-stream",
+  "application/zip",
+  "application/x-zip-compressed",
+];
+
 // The mime the upload declares for a picked file, or null when the picker
-// does not take it. A declared type must be one of the offered mimes; a
-// file with no type at all (some systems report "" for Office files) is
-// judged by its extension. The server checks the real bytes either way.
+// does not take it. A specific declared type must be one of the offered
+// mimes; a missing or generic type is judged by its extension. The server
+// checks the real bytes either way.
 export function importMimeOf(file: {
   name: string;
   type: string;
 }): string | null {
-  if (file.type !== "") {
+  if (!GENERIC_MIMES.includes(file.type)) {
     return UI_IMPORT_MIMES.includes(file.type) ? file.type : null;
   }
   const extension = EXTENSION.exec(file.name)?.[1]?.toLowerCase();

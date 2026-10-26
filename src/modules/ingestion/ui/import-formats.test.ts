@@ -32,6 +32,10 @@ describe("importMimeOf", () => {
     // Some systems report no type at all: the extension decides.
     ["apuntes.DOCX", "", DOCX],
     ["apuntes.pdf", "", PDF],
+    // Machines without Office may report a generic type: the extension decides.
+    ["apuntes.docx", "application/octet-stream", DOCX],
+    ["apuntes.docx", "application/zip", DOCX],
+    ["apuntes.pdf", "application/octet-stream", PDF],
   ])("takes %s (%j) as %j", (name, type, expected) => {
     expect(importMimeOf({ name, type })).toBe(expected);
   });
@@ -44,6 +48,9 @@ describe("importMimeOf", () => {
     ["foto.png", "image/png"],
     // A declared type wins over the extension: a PNG named .pdf is refused.
     ["foto.pdf", "image/png"],
+    // A generic type does not let an unoffered extension through.
+    ["diapositivas.pptx", "application/zip"],
+    ["antiguo.doc", "application/octet-stream"],
   ])("refuses %s (%j)", (name, type) => {
     expect(importMimeOf({ name, type })).toBeNull();
   });
