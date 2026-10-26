@@ -809,6 +809,50 @@ describe("startPdfImport use case", () => {
       expect(result.ok).toBe(true);
     });
 
+    // document-import T10 (T9b review): a start refused by the storage
+    // checks (missing object, wrong mime, too large, transient error)
+    // must not spend one of the owner's hourly starts.
+    it.each([
+      ["a missing object", () => undefined],
+      [
+        "an object whose real mime is not allowed",
+        (deps: ReturnType<typeof makeDeps>, path: string) =>
+          deps.storage.put(path, { sizeBytes: 2048, mime: "text/plain" }),
+      ],
+      [
+        "an object over the size limit",
+        (deps: ReturnType<typeof makeDeps>, path: string) =>
+          deps.storage.put(path, {
+            sizeBytes: 21 * 1024 * 1024,
+            mime: "application/pdf",
+          }),
+      ],
+      [
+        "an object whose mime is not the path's format",
+        (deps: ReturnType<typeof makeDeps>, path: string) =>
+          deps.storage.put(path, { sizeBytes: 2048, mime: DOCX_MIME }),
+      ],
+      [
+        "a Storage error",
+        (deps: ReturnType<typeof makeDeps>) => {
+          vi.spyOn(deps.storage, "getObjectMetadata").mockRejectedValueOnce(
+            new Error("503"),
+          );
+          vi.spyOn(console, "error").mockImplementation(() => {});
+        },
+      ],
+    ] as const)("does not consume the start limit for %s", async (_case, seed) => {
+      const deps = makeDeps();
+      const path = uploadPath(OWNER_ID, NOW.getTime());
+      seed(deps, path);
+
+      const result = await startPdfImport(input(path), deps, OWNER_ID);
+
+      expect(result.ok).toBe(false);
+      expect(deps.startLimiter.consumed).toEqual([]);
+      vi.restoreAllMocks();
+    });
+
     it("does not consume the limit for an idempotent repeat of a started import", async () => {
       const deps = makeDeps();
       const path = uploadPath(OWNER_ID, NOW.getTime());

@@ -58,14 +58,16 @@ export interface StartPdfImportResult {
 // 4. The notebook is active and owned, re-checked (the grant may outlive
 //    the notebook).
 // 4b. T9b (security audit): the owner may not have MAX_ACTIVE_IMPORTS
-//    imports in flight already, and must have starts left in the hourly
-//    limit (`startLimiter`; only a new import consumes one, never an
-//    idempotent repeat). Both refuse with INGESTION_ERROR.RATE_LIMITED.
+//    imports in flight already (an early count; `create` enforces it
+//    atomically in step 7, T10).
 // 5. The object's real metadata from Storage — never the client-declared
 //    mime/size for a path this far in — whose mime must also be the format
 //    the path's extension declares (document-import T5).
+// 5b. Only then one start of the hourly limit (`startLimiter`; T10 moved
+//    it after the storage checks; an idempotent repeat never consumes
+//    one). Both 4b and 5b refuse with INGESTION_ERROR.RATE_LIMITED.
 // 6-7. Create the destination page, then the ImportJob in `queued` with
-//    the real object's size.
+//    the real object's size and format, under the atomic active cap.
 //
 // Note (design.md, risk table): steps 6 and 7 are not atomic across
 // modules. If job creation fails after the page was created, an orphan
@@ -117,11 +119,6 @@ export async function startPdfImport(
       new DomainError(INGESTION_ERROR.RATE_LIMITED, `${active} active imports`),
     );
   }
-  const allowance = await deps.startLimiter.consume(ownerId);
-  if (!allowance.allowed) {
-    return err(new DomainError(INGESTION_ERROR.RATE_LIMITED, "import starts"));
-  }
-
   // T7c follow-up (R3-metadata-throw-callers-unproved): the port now
   // throws on a transient error instead of reporting it as missing
   // (T7b/T7c: R3-metadata-transient-error-as-missing); this use case must
@@ -153,6 +150,14 @@ export async function startPdfImport(
     return err(
       new DomainError(DOCUMENT_FILE_ERROR.UNSUPPORTED_FORMAT, storagePath),
     );
+  }
+
+  // T10 (T9b review): the hourly allowance is spent only once the stored
+  // object passed every check, right before anything is created — a start
+  // refused for a missing, mistyped or oversized object costs nothing.
+  const allowance = await deps.startLimiter.consume(ownerId);
+  if (!allowance.allowed) {
+    return err(new DomainError(INGESTION_ERROR.RATE_LIMITED, "import starts"));
   }
 
   const page = await deps.notebookPages.createPage(ownerId, {
