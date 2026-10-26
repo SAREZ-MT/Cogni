@@ -134,6 +134,9 @@ export function uploadIdAgeMs(path: string, now: Date): number {
 
 const TITLE_MAX_LENGTH = 120;
 
+// The control characters (Cc) that separate words.
+const WHITESPACE_CONTROLS = /^[\t\n\v\f\r\u0085]$/u;
+
 // UTF-16 high surrogates (0xD800-0xDBFF): `slice` cuts by code unit, not
 // by code point, so slicing right after a high surrogate would keep a
 // lone surrogate in the result — an invalid, unrenderable half of an
@@ -162,10 +165,13 @@ export function pageTitleFromFileName(fileName: string): string | undefined {
   // zero-width ones, the BOM, soft hyphens — are dropped before anything
   // else, so a name cannot spoof another one ("factura\u202Efdp.docx"
   // renders as "facturaxcod.pdf") or hide text; whitespace controls (tab,
-  // newline, NEL) become a space instead of gluing words together.
+  // newline, vertical tab, form feed, carriage return, NEL) become a space
+  // instead of gluing words together. An explicit set, not `\s` (T10, T9b
+  // review): `\s` misses NEL (U+0085) and matches the BOM (U+FEFF), which
+  // is a format character to remove.
   const base = segments[segments.length - 1].replace(
     /[\p{Cc}\p{Cf}]/gu,
-    (char) => (/\s/u.test(char) ? " " : ""),
+    (char) => (WHITESPACE_CONTROLS.test(char) ? " " : ""),
   );
   const withoutExtension = base.trimEnd().replace(DOCUMENT_EXTENSION, "");
   const collapsed = withoutExtension.replace(/\s+/g, " ").trim();

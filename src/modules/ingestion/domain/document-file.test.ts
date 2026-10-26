@@ -332,6 +332,22 @@ describe("pageTitleFromFileName", () => {
     );
   });
 
+  // document-import T10 (T9b review): JavaScript's `\s` does not match
+  // NEL (U+0085) but does match the BOM (U+FEFF), the opposite of what a
+  // title needs; both cases sit mid-name so trimming cannot hide them.
+  it("turns NEL (U+0085) between words into a space", () => {
+    expect(pageTitleFromFileName("Notas\u0085de\u0085clase.pdf")).toBe(
+      "Notas de clase",
+    );
+  });
+
+  it("removes the BOM (U+FEFF) instead of turning it into a space", () => {
+    expect(pageTitleFromFileName("No\uFEFFtas.pdf")).toBe("Notas");
+    expect(pageTitleFromFileName("\uFEFFNotas de\uFEFF clase.pdf")).toBe(
+      "Notas de clase",
+    );
+  });
+
   it("returns undefined for a name made only of invisible characters", () => {
     expect(pageTitleFromFileName("\u200B\u202E\u0000.pdf")).toBeUndefined();
   });

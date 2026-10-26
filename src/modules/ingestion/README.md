@@ -359,7 +359,8 @@ counts in `skippedImages`.
 - `pageTitleFromFileName` drops control (`\p{Cc}`) and format
   (`\p{Cf}`: bidi overrides/isolates U+202A–U+202E and U+2066–U+2069,
   zero-width characters, BOM, soft hyphen) characters before collapsing
-  whitespace — whitespace controls become a space — so a title cannot
+  whitespace — whitespace controls (tab, LF, VT, FF, CR, NEL U+0085) become
+  a space, the BOM U+FEFF is removed — so a title cannot
   spoof another name (`factura\u202Efdp.docx`) or hide text.
 - `getImportJobStatus` looks the job up by (pageId, ownerId) and answers
   `ok(null)` for another user's page, exactly like a page without
