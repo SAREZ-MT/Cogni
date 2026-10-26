@@ -315,7 +315,7 @@ Intenta de nuevo más tarde."):
 |---|---|---|
 | `UPLOAD_GRANTS_PER_HOUR` | `requestPdfUpload`, after validation, before Storage | 20 per hour |
 | `IMPORT_STARTS_PER_HOUR` | `startPdfImport`, new imports only, consumed after the stored object passed the metadata/mime/size checks and right before the page is created (an idempotent repeat or a refused object consumes nothing) | 10 per hour |
-| `MAX_ACTIVE_IMPORTS` | `startPdfImport`: an early `countActiveJobs` (abandoned jobs excluded) before any page exists, then enforced atomically by `ImportJobRepository.create(job, { maxActiveJobs })` — Drizzle counts and inserts in one transaction under a per-owner `pg_advisory_xact_lock`, so concurrent starts never exceed it (a start that loses that race leaves its empty page, like the storage-path race) | 3 queued/processing |
+| `MAX_ACTIVE_IMPORTS` | `startPdfImport`: an early `countActiveJobs` (abandoned jobs excluded) before any page exists, then enforced atomically by `ImportJobRepository.create(job, { maxActiveJobs })` — Drizzle counts and inserts in one transaction under a per-owner `pg_advisory_xact_lock`, so concurrent starts never exceed it (a start that loses that race leaves its empty page, like the storage-path race). The storage path is checked before the cap at both points (T11): a concurrent repeat of the same upload replays its job instead of being refused | 3 queued/processing |
 
 `processPdfImport` needs no limit of its own: it only processes a queued
 job of the caller, created by a limited start. The limiters come from

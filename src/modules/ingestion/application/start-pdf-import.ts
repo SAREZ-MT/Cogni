@@ -59,7 +59,8 @@ export interface StartPdfImportResult {
 //    the notebook).
 // 4b. T9b (security audit): the owner may not have MAX_ACTIVE_IMPORTS
 //    imports in flight already (an early count; `create` enforces it
-//    atomically in step 7, T10).
+//    atomically in step 7, T10). A start of an upload that already has a
+//    job is a repeat and replays it, even at the cap (T11).
 // 5. The object's real metadata from Storage — never the client-declared
 //    mime/size for a path this far in — whose mime must also be the format
 //    the path's extension declares (document-import T5).
@@ -115,6 +116,13 @@ export async function startPdfImport(
 
   const active = await deps.jobs.countActiveJobs(ownerId, deps.clock.now());
   if (active >= MAX_ACTIVE_IMPORTS) {
+    // T11 (T10 review): a concurrent start of this same upload may have
+    // created its job since the idempotency lookup above, and be the one
+    // filling the cap — that is a repeat to replay, not a refusal.
+    const concurrent = await deps.jobs.findByStoragePath(storagePath);
+    if (concurrent) {
+      return echoIdempotentJob(deps, concurrent, notebookId, ownerId);
+    }
     return err(
       new DomainError(INGESTION_ERROR.RATE_LIMITED, `${active} active imports`),
     );

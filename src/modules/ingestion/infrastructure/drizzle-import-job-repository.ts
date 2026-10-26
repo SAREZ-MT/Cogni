@@ -90,7 +90,11 @@ export class DrizzleImportJobRepository implements ImportJobRepository {
   // holding a per-owner advisory lock, released at commit/rollback. A plain
   // `INSERT ... SELECT ... WHERE count < N` would not be enough under READ
   // COMMITTED — two concurrent statements both see N-1 rows — so the lock
-  // serializes one owner's creates (other owners never wait).
+  // serializes one owner's creates (other owners never wait). The
+  // storagePath is looked up first, under the same lock (T11): a repeat of
+  // an import that holds the last slot is the same import, so it reports
+  // the conflict startPdfImport replays, not the cap. A concurrent create
+  // of the same path is still caught by the unique constraint below.
   async create(
     job: ImportJob,
     options: { maxActiveJobs?: number } = {},
@@ -105,6 +109,19 @@ export class DrizzleImportJobRepository implements ImportJobRepository {
         await tx.execute(
           sql`select pg_advisory_xact_lock(hashtextextended(${`import-start:${job.ownerId}`}, 0))`,
         );
+        const [samePath] = await tx
+          .select({ id: importJobs.id })
+          .from(importJobs)
+          .where(eq(importJobs.storagePath, job.storagePath))
+          .limit(1);
+        if (samePath) {
+          return err(
+            new DomainError(
+              IMPORT_JOB_ERROR.STORAGE_PATH_CONFLICT,
+              job.storagePath,
+            ),
+          );
+        }
         if (
           (await countActive(tx, job.ownerId, job.createdAt)) >= maxActiveJobs
         ) {

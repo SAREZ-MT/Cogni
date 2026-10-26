@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { DomainError } from "@/shared/kernel/domain-error";
 import { err } from "@/shared/kernel/result";
 import { UPLOAD_GRANT_TTL_MS } from "../domain/document-file";
@@ -53,6 +53,12 @@ function seedObject(deps: ReturnType<typeof makeDeps>, path: string) {
 // specs/pdf-import/spec.md; design.md, "Decision: Flujo de subida y
 // procesamiento", step 3 ("startPdfImport").
 describe("startPdfImport use case", () => {
+  // Spies (Storage errors, console) never outlive the case that set them,
+  // even when its assertions fail before the end.
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("creates the page and a queued ImportJob from the real object metadata (Scenario: Importación iniciada)", async () => {
     const deps = makeDeps();
     const path = uploadPath(OWNER_ID, NOW.getTime());
@@ -775,6 +781,75 @@ describe("startPdfImport use case", () => {
       expect(MAX_ACTIVE_IMPORTS).toBe(3);
     });
 
+    // document-import T11 (T10 review): two starts of the same upload in
+    // flight at once, with the owner one slot below the cap. The first takes
+    // the last slot; the second is the same import, so it must replay the
+    // first one's job instead of reporting the active-import limit.
+    it("replays a concurrent start of the same upload that arrives once the owner is at the cap", async () => {
+      const deps = makeDeps();
+      for (let index = 0; index < MAX_ACTIVE_IMPORTS - 1; index++) {
+        await deps.jobs.create(
+          createImportJob(
+            {
+              id: `active-${index}`,
+              ownerId: OWNER_ID,
+              pageId: `page-${index}`,
+              storagePath: uploadPath(OWNER_ID, NOW.getTime() - index - 1),
+              fileName: "a.pdf",
+              sizeBytes: 1,
+            },
+            deps.clock,
+          ),
+        );
+      }
+      const path = uploadPath(OWNER_ID, NOW.getTime());
+      seedObject(deps, path);
+
+      const [first, second] = await Promise.all([
+        startPdfImport(input(path), deps, OWNER_ID),
+        startPdfImport(input(path), deps, OWNER_ID),
+      ]);
+
+      expect(first.ok).toBe(true);
+      expect(second.ok).toBe(true);
+      if (!first.ok || !second.ok) return;
+      expect(second.value.importJobId).toBe(first.value.importJobId);
+      expect(second.value.pageId).toBe(first.value.pageId);
+    });
+
+    it("replays a start of an upload that already holds the last active slot instead of refusing it", async () => {
+      const deps = makeDeps();
+      const path = uploadPath(OWNER_ID, NOW.getTime());
+      seedObject(deps, path);
+      const original = await startPdfImport(input(path), deps, OWNER_ID);
+      for (let index = 0; index < MAX_ACTIVE_IMPORTS - 1; index++) {
+        await deps.jobs.create(
+          createImportJob(
+            {
+              id: `active-${index}`,
+              ownerId: OWNER_ID,
+              pageId: `page-${index}`,
+              storagePath: uploadPath(OWNER_ID, NOW.getTime() - index - 1),
+              fileName: "a.pdf",
+              sizeBytes: 1,
+            },
+            deps.clock,
+          ),
+        );
+      }
+      // The idempotency lookup ran before the concurrent start of the same
+      // upload created its job; by the early count, that job fills the cap.
+      vi.spyOn(deps.jobs, "findByStoragePath").mockResolvedValueOnce(null);
+
+      const repeat = await startPdfImport(input(path), deps, OWNER_ID);
+
+      expect(original.ok).toBe(true);
+      expect(repeat.ok).toBe(true);
+      if (!original.ok || !repeat.ok) return;
+      expect(repeat.value.importJobId).toBe(original.value.importJobId);
+      expect(deps.notebookPages.createPageCalls).toHaveLength(1);
+    });
+
     it("lets another owner start while one owner is at the cap", async () => {
       const deps = makeDeps();
       deps.notebookPages.addNotebook({
@@ -850,7 +925,6 @@ describe("startPdfImport use case", () => {
 
       expect(result.ok).toBe(false);
       expect(deps.startLimiter.consumed).toEqual([]);
-      vi.restoreAllMocks();
     });
 
     it("does not consume the limit for an idempotent repeat of a started import", async () => {

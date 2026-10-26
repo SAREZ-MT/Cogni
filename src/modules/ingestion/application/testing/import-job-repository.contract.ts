@@ -200,5 +200,28 @@ export function runImportJobRepositoryContract(
       // Long after: both are abandoned, so neither blocks a new import.
       expect(await repo.countActiveJobs(ids.ownerId, later)).toBe(beforeLater);
     });
+
+    // document-import T11 (T10 review): a second start of the same upload
+    // that arrives once the owner is at the cap is a repeat of the first,
+    // so it must surface as the storagePath conflict (which startPdfImport
+    // replays idempotently), never as the active-import limit. The cap is
+    // set one above the current count so the case holds on a shared
+    // database too.
+    it("create with maxActiveJobs: a duplicate storagePath at the cap is a storagePath conflict, not the cap", async () => {
+      const repo = await context.createRepository();
+      const storagePath = `${ids.ownerId}/${randomUUID()}.pdf`;
+      const first = createImportJob(newJobInput(ids, { storagePath }), CLOCK);
+      const repeat = createImportJob(newJobInput(ids, { storagePath }), CLOCK);
+      const maxActiveJobs =
+        (await repo.countActiveJobs(ids.ownerId, first.createdAt)) + 1;
+
+      const firstCreated = await repo.create(first, { maxActiveJobs });
+      const repeatCreated = await repo.create(repeat, { maxActiveJobs });
+
+      expect(firstCreated.ok).toBe(true);
+      const repeatError = (repeatCreated as { ok: false; error: DomainError })
+        .error;
+      expect(repeatError.code).toBe("IMPORT_JOB_STORAGE_PATH_CONFLICT");
+    });
   });
 }
