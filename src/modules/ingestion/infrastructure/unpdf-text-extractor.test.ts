@@ -7,7 +7,7 @@ import {
 } from "../../../../tests/fixtures/pdf/make-minimal-pdf";
 import { UnpdfTextExtractor } from "./unpdf-text-extractor";
 
-// design.md, "unpdf 1.8.1": UnpdfTextExtractor wraps getDocumentProxy +
+// design.md, "unpdf" (exact pin, 1.9.1): UnpdfTextExtractor wraps getDocumentProxy +
 // extractText({ mergePages: false }) from `unpdf`. Real PDF bytes, built by
 // tests/fixtures/pdf/make-minimal-pdf.ts, so this proves the adapter
 // against the actual parsing library instead of a mock.

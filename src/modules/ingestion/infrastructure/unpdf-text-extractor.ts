@@ -4,7 +4,7 @@ import { err, ok, type Result } from "@/shared/kernel/result";
 import { PDF_FILE_ERROR } from "../domain/errors";
 import type { PdfTextExtractor } from "../domain/pdf-text-extractor";
 
-// design.md, "unpdf 1.8.1" (version exacta): the only adapter for
+// design.md, "unpdf" (exact pin, 1.9.1 since the Oct 2026 pdf.js fix): the only adapter for
 // PdfTextExtractor (domain/pdf-text-extractor.ts). `getDocumentProxy` +
 // `extractText(pdf, { mergePages: false })` return one string per page, in
 // order — an empty string for a real page with no text is a legitimate
