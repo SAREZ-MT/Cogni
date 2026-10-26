@@ -11,10 +11,14 @@
 // already exists (the DB unique constraint since T1), so `startPdfImport`
 // can resolve the race by re-fetching the winning job instead of leaking
 // an exception after the page was already created.
+// `ACTIVE_LIMIT_REACHED` (document-import T10, T9b review): `create` with
+// `maxActiveJobs` refuses a job when the owner already has that many
+// active (queued/processing, not abandoned) jobs, atomically.
 export const IMPORT_JOB_ERROR = {
   INVALID_TRANSITION: "IMPORT_JOB_INVALID_TRANSITION",
   NOT_FOUND: "IMPORT_JOB_NOT_FOUND",
   STORAGE_PATH_CONFLICT: "IMPORT_JOB_STORAGE_PATH_CONFLICT",
+  ACTIVE_LIMIT_REACHED: "IMPORT_JOB_ACTIVE_LIMIT_REACHED",
 } as const;
 
 // DomainError codes for `document-file.ts` (design.md, `errors.ts` code

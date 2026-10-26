@@ -604,6 +604,46 @@ describe("startPdfImport use case", () => {
     expect(await deps.jobs.findByStoragePath(path)).toBeNull();
   });
 
+  // document-import T10 (T9b review): the early count can race another
+  // start; the repository's atomic cap is the real guard.
+  it("refuses with RATE_LIMITED when the atomic cap in create() wins a race the early count missed", async () => {
+    const deps = makeDeps();
+    for (let index = 0; index < 3; index++) {
+      await deps.jobs.create(
+        createImportJob(
+          {
+            id: `active-${index}`,
+            ownerId: OWNER_ID,
+            pageId: `page-${index}`,
+            storagePath: `${OWNER_ID}/active-${index}.pdf`,
+            fileName: "otro.pdf",
+            sizeBytes: 1,
+          },
+          { now: () => NOW },
+        ),
+      );
+    }
+    vi.spyOn(deps.jobs, "countActiveJobs").mockResolvedValueOnce(0);
+    const path = uploadPath(OWNER_ID, NOW.getTime());
+    seedObject(deps, path);
+
+    const result = await startPdfImport(
+      {
+        notebookId: "nb-1",
+        storagePath: path,
+        fileName: "apuntes.pdf",
+        mime: "application/pdf",
+        sizeBytes: 2048,
+      },
+      deps,
+      OWNER_ID,
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("INGESTION_RATE_LIMITED");
+    expect(await deps.jobs.findByStoragePath(path)).toBeNull();
+  });
+
   it("rejects malformed input", async () => {
     const deps = makeDeps();
 

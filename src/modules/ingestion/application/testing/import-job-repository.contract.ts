@@ -143,6 +143,34 @@ export function runImportJobRepositoryContract(
       expect((await repo.findById(job.id))?.skippedImages).toBe(2);
     });
 
+    // document-import T10 (T9b review: check-then-act race): with
+    // `maxActiveJobs`, create() itself enforces the cap, so concurrent
+    // starts can never leave the owner with more active jobs than allowed.
+    // A far-future clock makes every job earlier tests left active read as
+    // abandoned, so the count starts at 0 on a shared database too.
+    it("create with maxActiveJobs: concurrent creates never exceed the cap", async () => {
+      const repo = await context.createRepository();
+      const now = new Date("2030-01-01T00:00:00.000Z");
+      const jobs = Array.from({ length: 5 }, () =>
+        createImportJob(newJobInput(ids), { now: () => now }),
+      );
+
+      const results = await Promise.all(
+        jobs.map((job) => repo.create(job, { maxActiveJobs: 3 })),
+      );
+
+      expect(results.filter((result) => result.ok)).toHaveLength(3);
+      const refused = results.filter((result) => !result.ok) as Array<{
+        ok: false;
+        error: DomainError;
+      }>;
+      expect(refused.map((result) => result.error.code)).toEqual([
+        "IMPORT_JOB_ACTIVE_LIMIT_REACHED",
+        "IMPORT_JOB_ACTIVE_LIMIT_REACHED",
+      ]);
+      expect(await repo.countActiveJobs(ids.ownerId, now)).toBe(3);
+    });
+
     // document-import T9b: the per-user cap on concurrent imports. Counted
     // as a delta so a shared database with earlier runs' rows stays exact.
     it("countActiveJobs: counts the owner's queued and processing jobs, not terminal or abandoned ones", async () => {

@@ -28,7 +28,20 @@ function clockAt(now: Date): Clock {
 export class InMemoryImportJobRepository implements ImportJobRepository {
   private readonly jobs = new Map<string, ImportJob>();
 
-  async create(job: ImportJob): Promise<Result<void, DomainError>> {
+  // No await before the write: the cap check and the insert run in one
+  // synchronous step, so concurrent creates are atomic here as well.
+  async create(
+    job: ImportJob,
+    options: { maxActiveJobs?: number } = {},
+  ): Promise<Result<void, DomainError>> {
+    if (
+      options.maxActiveJobs !== undefined &&
+      this.activeCount(job.ownerId, job.createdAt) >= options.maxActiveJobs
+    ) {
+      return err(
+        new DomainError(IMPORT_JOB_ERROR.ACTIVE_LIMIT_REACHED, job.ownerId),
+      );
+    }
     for (const existing of this.jobs.values()) {
       if (existing.storagePath === job.storagePath) {
         return err(
@@ -89,6 +102,10 @@ export class InMemoryImportJobRepository implements ImportJobRepository {
   }
 
   async countActiveJobs(ownerId: string, now: Date): Promise<number> {
+    return this.activeCount(ownerId, now);
+  }
+
+  private activeCount(ownerId: string, now: Date): number {
     let count = 0;
     for (const job of this.jobs.values()) {
       if (job.ownerId !== ownerId) continue;

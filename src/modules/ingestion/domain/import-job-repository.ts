@@ -16,7 +16,17 @@ export interface ImportJobRepository {
   // since T1) — the concurrent-call case `startPdfImport` (T6 follow-up)
   // resolves by re-fetching the winner through `findByStoragePath` instead
   // of leaking an exception after its own page was already created.
-  create(job: ImportJob): Promise<Result<void, DomainError>>;
+  //
+  // With `maxActiveJobs` (document-import T10, T9b review: the count in
+  // startPdfImport alone was check-then-act), the job is only inserted
+  // while the owner has fewer active jobs (countActiveJobs' rule, at
+  // `job.createdAt`) — checked and inserted atomically, so concurrent
+  // creates can never exceed it — and err(IMPORT_JOB_ERROR.
+  // ACTIVE_LIMIT_REACHED) otherwise.
+  create(
+    job: ImportJob,
+    options?: { maxActiveJobs?: number },
+  ): Promise<Result<void, DomainError>>;
   findById(id: string): Promise<ImportJob | null>;
   findByStoragePath(storagePath: string): Promise<ImportJob | null>;
   // With `ownerId` (T9b), only that owner's jobs are considered, so a

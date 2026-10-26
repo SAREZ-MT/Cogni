@@ -11,7 +11,11 @@ import {
   uploadIdAgeMs,
   validateDocumentInput,
 } from "../domain/document-file";
-import { DOCUMENT_FILE_ERROR, INGESTION_ERROR } from "../domain/errors";
+import {
+  DOCUMENT_FILE_ERROR,
+  IMPORT_JOB_ERROR,
+  INGESTION_ERROR,
+} from "../domain/errors";
 import { createImportJob, type ImportJobStatus } from "../domain/import-job";
 import type { ImportJobRepository } from "../domain/import-job-repository";
 import {
@@ -169,7 +173,22 @@ export async function startPdfImport(
     },
     deps.clock,
   );
-  const created = await deps.jobs.create(job);
+  const created = await deps.jobs.create(job, {
+    maxActiveJobs: MAX_ACTIVE_IMPORTS,
+  });
+  if (
+    !created.ok &&
+    created.error.code === IMPORT_JOB_ERROR.ACTIVE_LIMIT_REACHED
+  ) {
+    // T10 (T9b review): another start won the last active slot between
+    // the early count above and this atomic check. The page just created
+    // stays an orphan, the same accepted risk as the conflict below.
+    return err(
+      new DomainError(INGESTION_ERROR.RATE_LIMITED, "active imports", {
+        cause: created.error,
+      }),
+    );
+  }
   if (!created.ok) {
     // Lost the race: another concurrent call already created a job for
     // this storagePath between the idempotency check above and this
