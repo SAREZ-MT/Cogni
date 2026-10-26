@@ -14,11 +14,12 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { requestPdfUpload, startPdfImport } from "../actions";
-import { MAX_DOCUMENT_BYTES, PDF_MIME } from "../domain/document-file";
+import { MAX_DOCUMENT_BYTES } from "../domain/document-file";
 import { useActiveImportsActions } from "./active-imports-provider";
+import { IMPORT_INPUT_ACCEPT, importMimeOf } from "./import-formats";
 import { ImportProgress } from "./import-progress";
 import { INGESTION_COPY, messageForIngestionErrorCode } from "./ingestion-copy";
-import { uploadPdfToSignedUrl } from "./upload-pdf-to-signed-url";
+import { uploadDocumentToSignedUrl } from "./upload-document-to-signed-url";
 
 // design.md, "Decision: Menú de acciones del cuaderno con slot inyectado
 // desde la raíz de composición", step 3: this provider owns the single
@@ -48,7 +49,7 @@ interface StartInput {
   onPageCreated?: () => void;
 }
 
-interface PdfImportContextValue {
+interface DocumentImportContextValue {
   start: (input: StartInput) => void;
   state: BannerState | null;
 }
@@ -57,20 +58,20 @@ const IDLE_STATE: NotebookImportState = { status: "idle" };
 const BUSY_STATE: NotebookImportState = { status: "busy" };
 
 // Default value (no provider mounted): a no-op start and no banner, so
-// every consumer (ImportPdfMenuItem, its tests) works standalone, the same
+// every consumer (ImportDocumentMenuItem, its tests) works standalone, the same
 // default-context convention as notebooks/ui/notebook-actions-slot.tsx.
-const PdfImportContext = createContext<PdfImportContextValue>({
+const DocumentImportContext = createContext<DocumentImportContextValue>({
   start: () => {},
   state: null,
 });
 
-export function usePdfImport(): { start: (input: StartInput) => void } {
-  const { start } = useContext(PdfImportContext);
+export function useDocumentImport(): { start: (input: StartInput) => void } {
+  const { start } = useContext(DocumentImportContext);
   return { start };
 }
 
 export function useNotebookImport(notebookId: string): NotebookImportState {
-  const { state } = useContext(PdfImportContext);
+  const { state } = useContext(DocumentImportContext);
   if (!state) return IDLE_STATE;
   if (state.notebookId === notebookId) {
     return { status: state.status, error: state.error };
@@ -80,7 +81,7 @@ export function useNotebookImport(notebookId: string): NotebookImportState {
     : IDLE_STATE;
 }
 
-export function PdfImportProvider({ children }: { children: ReactNode }) {
+export function DocumentImportProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const activeImports = useActiveImportsActions();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -96,7 +97,7 @@ export function PdfImportProvider({ children }: { children: ReactNode }) {
   const start = useCallback(
     (input: StartInput) => {
       // One import at a time (T10 follow-up:
-      // R3-provider-concurrent-imports-clobber-banner). ImportPdfMenuItem
+      // R3-provider-concurrent-imports-clobber-banner). ImportDocumentMenuItem
       // already disables while busy; this guards a direct start() call
       // too (e.g. a second click before the disabled state re-renders).
       if (state && ACTIVE_BANNER_STATUSES.includes(state.status)) return;
@@ -125,8 +126,10 @@ export function PdfImportProvider({ children }: { children: ReactNode }) {
 
     // Client-side validation (design.md, "Mensajes de validación en el
     // cliente (antes de cualquier Server Action)"): never contacts the
-    // server for a file that is already known to be rejected.
-    if (file.type !== PDF_MIME) {
+    // server for a file that is already known to be rejected. The formats
+    // are import-formats.ts's (PDF and Word since document-import T11).
+    const mime = importMimeOf(file);
+    if (!mime) {
       setState({
         notebookId,
         status: "failed",
@@ -152,7 +155,7 @@ export function PdfImportProvider({ children }: { children: ReactNode }) {
       const grant = await requestPdfUpload({
         notebookId,
         fileName: file.name,
-        mime: file.type,
+        mime,
         sizeBytes: file.size,
       });
       if (!grant.ok) {
@@ -164,11 +167,12 @@ export function PdfImportProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const uploaded = await uploadPdfToSignedUrl(
+      const uploaded = await uploadDocumentToSignedUrl(
         grant.value.bucket,
         grant.value.storagePath,
         grant.value.token,
         file,
+        mime,
       );
       if (!uploaded.ok) {
         Sentry.captureException(uploaded.error);
@@ -185,7 +189,7 @@ export function PdfImportProvider({ children }: { children: ReactNode }) {
         notebookId,
         storagePath: grant.value.storagePath,
         fileName: file.name,
-        mime: file.type,
+        mime,
         sizeBytes: file.size,
       });
       if (!started.ok) {
@@ -218,7 +222,7 @@ export function PdfImportProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <PdfImportContext.Provider value={{ start, state }}>
+    <DocumentImportContext.Provider value={{ start, state }}>
       {state && (
         <ImportProgress
           state={state.status}
@@ -237,9 +241,9 @@ export function PdfImportProvider({ children }: { children: ReactNode }) {
           <input
             ref={fileInputRef}
             type="file"
-            accept="application/pdf"
+            accept={IMPORT_INPUT_ACCEPT}
             hidden
-            data-testid="pdf-import-input"
+            data-testid="document-import-input"
             onChange={(event) => {
               void handleFileChange(event);
             }}
@@ -247,6 +251,6 @@ export function PdfImportProvider({ children }: { children: ReactNode }) {
           document.body,
         )}
       {children}
-    </PdfImportContext.Provider>
+    </DocumentImportContext.Provider>
   );
 }

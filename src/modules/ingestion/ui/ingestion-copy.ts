@@ -9,14 +9,18 @@ import {
 // `progress` texts below are quoted verbatim from design.md's six-state
 // table ("Decision: Indicador de progreso y copy"): they start with a
 // lowercase letter on purpose ("oración con minúscula inicial").
+// document-import T11: the picker takes PDF and Word documents, so the copy
+// says "documento"; `invalidFileType` names the offered formats and must
+// change with import-formats.ts's set when PPTX joins.
 export const INGESTION_COPY = {
-  importPdf: "Importar PDF",
-  invalidFileType: "solo puedes importar archivos PDF",
-  fileTooLarge: "el PDF supera el límite de 20 MB",
+  importDocument: "Importar documento",
+  importingDocument: "Importando documento",
+  invalidFileType: "Solo puedes importar archivos PDF o Word (.docx).",
+  fileTooLarge: "El documento supera el límite de 20 MB.",
   sessionRequired: "Debes iniciar sesión para continuar.",
   invalidInput: "Revisa los datos: algo no tiene el formato esperado.",
   notebookNotFound: "No encontramos ese cuaderno.",
-  notebookMismatch: "Este PDF ya se está importando en otro cuaderno.",
+  notebookMismatch: "Este documento ya se está importando en otro cuaderno.",
   pageNotFound: "No encontramos la página de esa importación.",
   storageUnavailable:
     "No pudimos conectar con el almacenamiento. Inténtalo de nuevo.",
@@ -24,7 +28,7 @@ export const INGESTION_COPY = {
   uploadExpired: "El enlace de subida expiró. Vuelve a intentarlo.",
   uploadFailed:
     "No pudimos confirmar la subida del archivo. Vuelve a intentarlo.",
-  unreadablePdf: "No pudimos leer ese PDF.",
+  unreadableDocument: "No pudimos leer ese documento.",
   unsupportedFormat:
     "Solo puedes importar archivos PDF, Word (.docx) o PowerPoint (.pptx).",
   importNotFound: "No encontramos esa importación.",
@@ -34,7 +38,7 @@ export const INGESTION_COPY = {
   progress: {
     uploading: "subiendo el archivo…",
     queued: "preparando la importación…",
-    processing: "procesando el PDF…",
+    processing: "procesando el documento…",
     done: "listo",
     delay:
       "la importación está tardando más de lo esperado; esta página se actualizará sola",
@@ -48,6 +52,14 @@ export function pagesOmittedMessage(count: number): string {
   return count === 1
     ? "1 página no tenía texto y se omitió"
     : `${count} páginas no tenían texto y se omitieron`;
+}
+
+// document-import T11: images a done import could not keep (unsupported
+// format, over the size cap, out of upload budget).
+export function skippedImagesMessage(count: number): string {
+  return count === 1
+    ? "No pudimos importar 1 imagen de este documento."
+    : `No pudimos importar ${count} imágenes de este documento.`;
 }
 
 // Maps a Server Action's ActionError.code (always in English/technical,
@@ -82,7 +94,7 @@ export function messageForIngestionErrorCode(code: string): string {
     case DOCUMENT_FILE_ERROR.OBJECT_MISSING:
       return INGESTION_COPY.uploadFailed;
     case DOCUMENT_FILE_ERROR.UNREADABLE:
-      return INGESTION_COPY.unreadablePdf;
+      return INGESTION_COPY.unreadableDocument;
     case DOCUMENT_FILE_ERROR.UNSUPPORTED_FORMAT:
       return INGESTION_COPY.unsupportedFormat;
     case IMPORT_JOB_ERROR.NOT_FOUND:

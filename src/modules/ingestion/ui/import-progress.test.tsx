@@ -21,6 +21,27 @@ describe("ImportProgress", () => {
     expect(screen.getByText(pagesOmittedMessage(3))).toBeInTheDocument();
   });
 
+  it("renders done with skipped images as a warning with the real count", () => {
+    render(<ImportProgress state="done" skippedImages={1} />);
+    expect(
+      screen.getByText("No pudimos importar 1 imagen de este documento."),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("import-progress")).toHaveAttribute(
+      "data-status",
+      "done",
+    );
+  });
+
+  it("renders both notices when pages were omitted and images skipped", () => {
+    render(
+      <ImportProgress state="done" pagesWithoutText={2} skippedImages={2} />,
+    );
+    expect(screen.getByText(pagesOmittedMessage(2))).toBeInTheDocument();
+    expect(
+      screen.getByText("No pudimos importar 2 imágenes de este documento."),
+    ).toBeInTheDocument();
+  });
+
   it("renders the job's error text for the failed state (Scenario: Estados renderizados)", () => {
     render(<ImportProgress state="failed" error="el PDF no tiene texto" />);
     expect(screen.getByText("el PDF no tiene texto")).toBeInTheDocument();

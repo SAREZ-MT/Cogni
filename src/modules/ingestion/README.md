@@ -7,9 +7,10 @@ directly to a private Supabase Storage bucket, its content is extracted on
 the server and converted into an editable page in the TipTap editor
 (`docs/documento-maestro.md` §13, Phase 2). Since document-import T5 the
 pipeline is format-aware (PDF, Word `.docx`, PowerPoint `.pptx`); the PDF
-and DOCX adapters exist (DOCX since T6, PPTX lands in T7) and the UI still
-offers PDFs only (T11). The Server Actions keep their PDF names
-(`requestPdfUpload`, `startPdfImport`, `processPdfImport`) until T11.
+and DOCX adapters exist (DOCX since T6, PPTX lands in T7) and the UI
+offers PDF and Word since T11 (see "UI"). The Server Actions keep their
+PDF-era names (`requestPdfUpload`, `startPdfImport`, `processPdfImport`):
+renaming them changes nothing for the user and every caller, so they stay.
 
 ## Layers
 
@@ -67,9 +68,43 @@ Follows the same hexagonal shape as `notebooks`
   `ActiveImportsProvider`/`useIsImporting` (T13a) track the sidebar's
   active imports (initial ids from a server-side `getActiveImports()` call
   plus polling) so `ImportingPageBadge` can show next to a page under
-  import; `PdfImportProvider` calls `add()` right after `startPdfImport`
+  import; `DocumentImportProvider` calls `add()` right after `startPdfImport`
   succeeds and `PageImportView` calls `remove()` once its own job reaches a
   terminal state.
+
+## UI
+
+Since T11 the picker imports PDF and Word documents (`ui/`; components
+renamed from `Pdf*` to `Document*`, the old `PdfImportProvider`/
+`ImportPdfMenuItem` names stay as aliases in `index.ts` for
+`src/app/(app)/_components/notebook-actions.tsx`):
+
+- Entry points: the notebook menu's "Importar documento"
+  (`ImportDocumentMenuItem`) and the editor's `/` item "Importar
+  documento" — "Importa un PDF o un Word en esta página"
+  (`page-editor.tsx`). Both open `DocumentImportProvider`'s single hidden
+  input (`data-testid="document-import-input"`).
+- Formats (`ui/import-formats.ts`): `DOCUMENT_FORMATS` minus
+  `NOT_YET_IMPORTABLE_IN_UI` (`pptx` until its adapter, T7, exists —
+  enabling it is removing it from that set and updating
+  `invalidFileType`). The input's `accept` is
+  `.pdf,.docx,application/pdf,<docx mime>`; `importMimeOf` takes a file
+  whose declared type is one of those mimes, or whose type is empty and
+  extension is `.pdf`/`.docx`. That mime is what `requestPdfUpload`,
+  the signed upload (`uploadDocumentToSignedUrl`, its `contentType`) and
+  `startPdfImport` receive; the server still checks the stored object and
+  the real bytes.
+- Client-side refusals, before any Server Action: another type (a legacy
+  `.doc`, a `.pptx`, an image) → "Solo puedes importar archivos PDF o Word
+  (.docx)."; over 20 MiB → "El documento supera el límite de 20 MB.".
+  A rate-limited request or start shows "Llegaste al límite de
+  importaciones por ahora. …" in the failed banner.
+- Progress: "procesando el documento…"; the sidebar badge's accessible
+  name is "Importando documento".
+- Done with `skippedImages > 0` (`ImportJobStatusView.skippedImages`): the
+  warning card above the editor says "No pudimos importar N imágenes de
+  este documento." (singular for one), below the omitted-pages line when
+  both apply.
 
 ## Ports and adapters
 

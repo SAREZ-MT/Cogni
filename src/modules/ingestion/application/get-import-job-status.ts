@@ -21,6 +21,8 @@ export interface ImportJobStatusView {
   status: ImportJobStatus;
   pageCount: number | null;
   pagesWithoutText: number;
+  // Images of a done import that were not kept (document-import T11).
+  skippedImages: number;
   error: string | null;
   createdAt: string;
   updatedAt: string;
@@ -37,6 +39,7 @@ export function toImportJobStatusView(job: ImportJob): ImportJobStatusView {
     status: job.status,
     pageCount: job.pageCount,
     pagesWithoutText: job.pagesWithoutText,
+    skippedImages: job.skippedImages,
     error: job.error,
     createdAt: job.createdAt.toISOString(),
     updatedAt: job.updatedAt.toISOString(),

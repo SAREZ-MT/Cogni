@@ -22,7 +22,7 @@ describe("ImportingPageBadge", () => {
 
     render(<ImportingPageBadge pageId="page-1" />);
 
-    const icon = screen.getByRole("img", { name: "Importando PDF" });
+    const icon = screen.getByRole("img", { name: "Importando documento" });
     expect(icon).toBeInTheDocument();
     expect(icon).toHaveClass("animate-spin");
     expect(icon).toHaveClass("motion-reduce:animate-none");

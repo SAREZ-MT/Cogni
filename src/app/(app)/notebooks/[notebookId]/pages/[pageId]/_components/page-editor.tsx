@@ -12,12 +12,13 @@
 //   `listPagesForMention` Server Action, fetched once and cached for the
 //   life of this component (a failed fetch is never cached) — mentioning a page rarely needs live results,
 //   and this avoids a network round-trip per keystroke after "@".
-// - `extraSlashItems` (coordinator addition, "Importar PDF"): reuses
-//   ingestion's *existing* `usePdfImport()` hook (already mounted app-wide
-//   by layout.tsx's `NotebookActions` -> `PdfImportProvider`, independent
-//   of the sidebar tree — see PdfImportProvider's own header comment) and
-//   its existing PDF-picker flow: `start({ notebookId })` opens the same
-//   hidden file input the notebook menu's "Importar PDF" action uses,
+// - `extraSlashItems` (coordinator addition, "Importar documento" since
+//   document-import T11): reuses ingestion's *existing* `useDocumentImport()`
+//   hook (already mounted app-wide by layout.tsx's `NotebookActions` ->
+//   `DocumentImportProvider`, independent of the sidebar tree — see
+//   DocumentImportProvider's own header comment) and its existing picker
+//   flow (PDF and Word): `start({ notebookId })` opens the same hidden file
+//   input the notebook menu's "Importar documento" action uses,
 //   uploads, creates a new page in this page's own notebook, and navigates
 //   there. No upload logic is duplicated here.
 import { FileUp } from "lucide-react";
@@ -29,11 +30,11 @@ import {
   type MentionPort,
   type SlashCommandItem,
 } from "@/modules/editor";
-// Deep import, not `@/modules/ingestion`'s public index.ts: usePdfImport is
+// Deep import, not `@/modules/ingestion`'s public index.ts: useDocumentImport is
 // a plain "use client" React context hook with no server dependency, and
 // this route needs only it — same reasoning as notebook-actions.tsx's deep
 // import of notebook-actions-slot.tsx.
-import { usePdfImport } from "@/modules/ingestion/ui/pdf-import-provider";
+import { useDocumentImport } from "@/modules/ingestion/ui/document-import-provider";
 // Deep import, not `@/modules/notebooks`'s public index.ts — same
 // "server-only" build-graph reasoning as page-title.tsx's own deep import
 // (that barrel also re-exports `createNotebooksServerApi`, which pulls
@@ -50,7 +51,7 @@ interface PageEditorProps extends EditorProps {
 }
 
 export function PageEditor({ notebookId, ...editorProps }: PageEditorProps) {
-  const { start } = usePdfImport();
+  const { start } = useDocumentImport();
   const candidatesRef = useRef<Promise<MentionCandidate[]> | null>(null);
 
   const mentionPort: MentionPort = useMemo(
@@ -80,14 +81,14 @@ export function PageEditor({ notebookId, ...editorProps }: PageEditorProps) {
     [],
   );
 
-  const importPdfItem: SlashCommandItem = useMemo(
+  const importDocumentItem: SlashCommandItem = useMemo(
     () => ({
-      id: "import-pdf",
-      label: "Importar PDF",
-      keywords: ["importar", "pdf", "import", "documento"],
+      id: "import-document",
+      label: "Importar documento",
+      keywords: ["importar", "pdf", "word", "docx", "import", "documento"],
       icon: FileUp,
       group: "Contenido",
-      description: "Importa un PDF en esta página",
+      description: "Importa un PDF o un Word en esta página",
       run: (editor, range) => {
         editor.chain().focus().deleteRange(range).run();
         start({ notebookId });
@@ -100,7 +101,7 @@ export function PageEditor({ notebookId, ...editorProps }: PageEditorProps) {
     <Editor
       {...editorProps}
       mentionPort={mentionPort}
-      extraSlashItems={[importPdfItem]}
+      extraSlashItems={[importDocumentItem]}
     />
   );
 }

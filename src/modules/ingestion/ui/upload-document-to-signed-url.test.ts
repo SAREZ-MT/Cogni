@@ -24,7 +24,7 @@ function makeFile(): File {
   });
 }
 
-describe("uploadPdfToSignedUrl", () => {
+describe("uploadDocumentToSignedUrl", () => {
   beforeEach(() => {
     uploadToSignedUrl.mockReset();
     from.mockClear();
@@ -33,14 +33,17 @@ describe("uploadPdfToSignedUrl", () => {
 
   it("uploads the file to the signed url with the pdf content type and never leaks the service role key", async () => {
     uploadToSignedUrl.mockResolvedValue({ error: null });
-    const { uploadPdfToSignedUrl } = await import("./upload-pdf-to-signed-url");
+    const { uploadDocumentToSignedUrl } = await import(
+      "./upload-document-to-signed-url"
+    );
     const file = makeFile();
 
-    const result = await uploadPdfToSignedUrl(
+    const result = await uploadDocumentToSignedUrl(
       "page-pdfs",
       "owner-1/upload-1.pdf",
       "token-1",
       file,
+      "application/pdf",
     );
 
     expect(result.ok).toBe(true);
@@ -57,15 +60,47 @@ describe("uploadPdfToSignedUrl", () => {
     );
   });
 
+  // document-import T11: the object is stored with the file's real type,
+  // so a Word upload is not labelled application/pdf.
+  it("uploads a Word document with its own content type", async () => {
+    uploadToSignedUrl.mockResolvedValue({ error: null });
+    const { uploadDocumentToSignedUrl } = await import(
+      "./upload-document-to-signed-url"
+    );
+    const docxMime =
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    const file = new File([new Uint8Array(10)], "notas.docx", {
+      type: docxMime,
+    });
+
+    await uploadDocumentToSignedUrl(
+      "page-pdfs",
+      "owner-1/upload-1.docx",
+      "token-1",
+      file,
+      docxMime,
+    );
+
+    expect(uploadToSignedUrl).toHaveBeenCalledWith(
+      "owner-1/upload-1.docx",
+      "token-1",
+      file,
+      { contentType: docxMime },
+    );
+  });
+
   it("returns a typed failure on a non-2xx / error response instead of throwing", async () => {
     uploadToSignedUrl.mockResolvedValue({ error: new Error("upload failed") });
-    const { uploadPdfToSignedUrl } = await import("./upload-pdf-to-signed-url");
+    const { uploadDocumentToSignedUrl } = await import(
+      "./upload-document-to-signed-url"
+    );
 
-    const result = await uploadPdfToSignedUrl(
+    const result = await uploadDocumentToSignedUrl(
       "page-pdfs",
       "owner-1/upload-1.pdf",
       "token-1",
       makeFile(),
+      "application/pdf",
     );
 
     expect(result.ok).toBe(false);

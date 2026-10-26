@@ -12,7 +12,7 @@ import { getActiveImports } from "../actions";
 // provider polls getActiveImports itself every POLL_INTERVAL_MS, but only
 // while the cached list is non-empty. `add`/`remove` mutate the TanStack
 // Query cache directly (queryClient.setQueryData) instead of separate local
-// state: PdfImportProvider calls add() right after startPdfImport succeeds
+// state: DocumentImportProvider calls add() right after startPdfImport succeeds
 // (T13a) and PageImportView calls remove() once its own job reaches a
 // terminal state, both giving an immediate, optimistic update instead of
 // waiting up to POLL_INTERVAL_MS for the next tick — safe because the page
@@ -32,7 +32,7 @@ interface ActiveImportsContextValue {
 // Default (no provider mounted): nothing is ever "importing" and add/remove
 // are no-ops, same default-context convention as
 // notebooks/ui/notebook-actions-slot.tsx and
-// ingestion/ui/pdf-import-provider.tsx, so PdfImportProvider and
+// ingestion/ui/document-import-provider.tsx, so DocumentImportProvider and
 // PageImportView work standalone (and in their own tests) without this
 // provider mounted.
 const ActiveImportsContext = createContext<ActiveImportsContextValue>({

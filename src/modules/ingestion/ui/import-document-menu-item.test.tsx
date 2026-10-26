@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { DropdownMenu, DropdownMenuContent } from "@/shared/ui/dropdown-menu";
-import { ImportPdfMenuItem } from "./import-pdf-menu-item";
+import { ImportDocumentMenuItem } from "./import-document-menu-item";
 import { INGESTION_COPY } from "./ingestion-copy";
 
 type MockImportStatus = "idle" | "uploading" | "queued" | "failed" | "busy";
@@ -13,18 +13,18 @@ const { start, useNotebookImportMock } = vi.hoisted(() => ({
     status: "idle",
   })),
 }));
-vi.mock("./pdf-import-provider", () => ({
-  usePdfImport: () => ({ start }),
+vi.mock("./document-import-provider", () => ({
+  useDocumentImport: () => ({ start }),
   useNotebookImport: useNotebookImportMock,
 }));
 
 function renderMenuItem(
-  props: Partial<React.ComponentProps<typeof ImportPdfMenuItem>> = {},
+  props: Partial<React.ComponentProps<typeof ImportDocumentMenuItem>> = {},
 ) {
   return render(
     <DropdownMenu defaultOpen>
       <DropdownMenuContent>
-        <ImportPdfMenuItem
+        <ImportDocumentMenuItem
           notebook={{ id: "nb-1", title: "Biología" }}
           {...props}
         />
@@ -33,11 +33,11 @@ function renderMenuItem(
   );
 }
 
-describe("ImportPdfMenuItem", () => {
+describe("ImportDocumentMenuItem", () => {
   it("renders the Spanish label with the FileUp icon", () => {
     renderMenuItem();
     expect(
-      screen.getByRole("menuitem", { name: INGESTION_COPY.importPdf }),
+      screen.getByRole("menuitem", { name: INGESTION_COPY.importDocument }),
     ).toBeInTheDocument();
   });
 
@@ -46,7 +46,9 @@ describe("ImportPdfMenuItem", () => {
     const user = userEvent.setup();
     renderMenuItem({ onImported });
 
-    await user.click(screen.getByRole("menuitem", { name: "Importar PDF" }));
+    await user.click(
+      screen.getByRole("menuitem", { name: "Importar documento" }),
+    );
 
     expect(start).toHaveBeenCalledWith({
       notebookId: "nb-1",
@@ -59,7 +61,7 @@ describe("ImportPdfMenuItem", () => {
     renderMenuItem();
 
     expect(
-      screen.getByRole("menuitem", { name: "Importar PDF" }),
+      screen.getByRole("menuitem", { name: "Importar documento" }),
     ).toHaveAttribute("data-disabled");
   });
 
@@ -68,7 +70,7 @@ describe("ImportPdfMenuItem", () => {
     renderMenuItem();
 
     expect(
-      screen.getByRole("menuitem", { name: "Importar PDF" }),
+      screen.getByRole("menuitem", { name: "Importar documento" }),
     ).toHaveAttribute("data-disabled");
   });
 
@@ -76,7 +78,7 @@ describe("ImportPdfMenuItem", () => {
     renderMenuItem();
 
     expect(
-      screen.getByRole("menuitem", { name: "Importar PDF" }),
+      screen.getByRole("menuitem", { name: "Importar documento" }),
     ).not.toHaveAttribute("data-disabled");
   });
 
@@ -85,7 +87,7 @@ describe("ImportPdfMenuItem", () => {
     renderMenuItem();
 
     expect(
-      screen.getByRole("menuitem", { name: "Importar PDF" }),
+      screen.getByRole("menuitem", { name: "Importar documento" }),
     ).not.toHaveAttribute("data-disabled");
   });
 
@@ -94,7 +96,7 @@ describe("ImportPdfMenuItem", () => {
     renderMenuItem();
 
     expect(
-      screen.getByRole("menuitem", { name: "Importar PDF" }),
+      screen.getByRole("menuitem", { name: "Importar documento" }),
     ).toHaveAttribute("data-disabled");
   });
 });

@@ -4,10 +4,10 @@ import { useLayoutEffect } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ok } from "@/shared/kernel/result";
 import {
-  PdfImportProvider,
+  DocumentImportProvider,
+  useDocumentImport,
   useNotebookImport,
-  usePdfImport,
-} from "./pdf-import-provider";
+} from "./document-import-provider";
 
 const { requestPdfUpload, startPdfImport } = vi.hoisted(() => ({
   requestPdfUpload: vi.fn(),
@@ -15,10 +15,12 @@ const { requestPdfUpload, startPdfImport } = vi.hoisted(() => ({
 }));
 vi.mock("../actions", () => ({ requestPdfUpload, startPdfImport }));
 
-const { uploadPdfToSignedUrl } = vi.hoisted(() => ({
-  uploadPdfToSignedUrl: vi.fn(),
+const { uploadDocumentToSignedUrl } = vi.hoisted(() => ({
+  uploadDocumentToSignedUrl: vi.fn(),
 }));
-vi.mock("./upload-pdf-to-signed-url", () => ({ uploadPdfToSignedUrl }));
+vi.mock("./upload-document-to-signed-url", () => ({
+  uploadDocumentToSignedUrl,
+}));
 
 const { push } = vi.hoisted(() => ({ push: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
@@ -46,7 +48,7 @@ function Probe({
   notebookId: string;
   onImported?: () => void;
 }) {
-  const { start } = usePdfImport();
+  const { start } = useDocumentImport();
   const state = useNotebookImport(notebookId);
   return (
     <div>
@@ -66,14 +68,14 @@ function Probe({
 
 // Layout effects across a commit all run before any passive effect
 // (React's commit ordering), so calling start() here fires strictly
-// before PdfImportProvider's own useEffect sets `mounted` to true and the
+// before DocumentImportProvider's own useEffect sets `mounted` to true and the
 // hidden <input> is portaled — the one window where fileInputRef.current
 // is genuinely null. Exercises the T10 follow-up guard
 // (R3-start-null-ref-cast) that a synchronous DOM/RTL flush can never
 // reach through a normal button click.
 function LayoutStartProbe({ notebookId }: { notebookId: string }) {
-  const { start } = usePdfImport();
-  // biome-ignore lint/correctness/useExhaustiveDependencies: fires once on mount, before PdfImportProvider's own effect mounts the hidden input
+  const { start } = useDocumentImport();
+  // biome-ignore lint/correctness/useExhaustiveDependencies: fires once on mount, before DocumentImportProvider's own effect mounts the hidden input
   useLayoutEffect(() => {
     start({ notebookId });
   }, []);
@@ -83,15 +85,15 @@ function LayoutStartProbe({ notebookId }: { notebookId: string }) {
 async function pickFile(file: File) {
   const user = userEvent.setup();
   await user.click(screen.getByRole("button", { name: "importar" }));
-  const input = screen.getByTestId("pdf-import-input");
+  const input = screen.getByTestId("document-import-input");
   await userEvent.upload(input, file);
 }
 
-describe("PdfImportProvider", () => {
+describe("DocumentImportProvider", () => {
   beforeEach(() => {
     requestPdfUpload.mockReset();
     startPdfImport.mockReset();
-    uploadPdfToSignedUrl.mockReset();
+    uploadDocumentToSignedUrl.mockReset();
     push.mockReset();
     captureException.mockReset();
     addActiveImport.mockReset();
@@ -100,12 +102,12 @@ describe("PdfImportProvider", () => {
   it("portals the hidden file input outside the provider's subtree so a wrapping <nav> never contains it", async () => {
     render(
       <nav aria-label="Barra lateral">
-        <PdfImportProvider>
+        <DocumentImportProvider>
           <Probe notebookId="nb-1" />
-        </PdfImportProvider>
+        </DocumentImportProvider>
       </nav>,
     );
-    const input = await screen.findByTestId("pdf-import-input");
+    const input = await screen.findByTestId("document-import-input");
     expect(input).toBeInTheDocument();
     expect(
       screen.getByRole("navigation", { name: "Barra lateral" }),
@@ -115,20 +117,20 @@ describe("PdfImportProvider", () => {
 
   it("renders children and stays idle without any interaction", () => {
     render(
-      <PdfImportProvider>
+      <DocumentImportProvider>
         <Probe notebookId="nb-1" />
-      </PdfImportProvider>,
+      </DocumentImportProvider>,
     );
 
     expect(screen.getByTestId("status-nb-1")).toHaveTextContent("idle");
     expect(screen.queryByTestId("import-progress")).not.toBeInTheDocument();
   });
 
-  it("rejects a non-PDF file client-side without calling requestPdfUpload", async () => {
+  it("rejects a file that is neither PDF nor Word client-side without calling requestPdfUpload", async () => {
     render(
-      <PdfImportProvider>
+      <DocumentImportProvider>
         <Probe notebookId="nb-1" />
-      </PdfImportProvider>,
+      </DocumentImportProvider>,
     );
 
     const user = userEvent.setup();
@@ -137,7 +139,7 @@ describe("PdfImportProvider", () => {
     // `accept` attribute and silently no-ops for a mismatch; firing the
     // native change event directly is what actually exercises this
     // component's own client-side MIME check (the thing under test).
-    fireEvent.change(screen.getByTestId("pdf-import-input"), {
+    fireEvent.change(screen.getByTestId("document-import-input"), {
       target: { files: [makeFile("foto.png", "image/png", 1024)] },
     });
 
@@ -145,16 +147,138 @@ describe("PdfImportProvider", () => {
       expect(screen.getByTestId("status-nb-1")).toHaveTextContent("failed"),
     );
     expect(screen.getByTestId("error-nb-1")).toHaveTextContent(
-      "solo puedes importar archivos PDF",
+      "Solo puedes importar archivos PDF o Word (.docx).",
     );
     expect(requestPdfUpload).not.toHaveBeenCalled();
   });
 
+  // document-import T11: the picker offers PDF and Word, never PowerPoint
+  // (its adapter lands in T7) nor a legacy .doc.
+  it("accepts PDF and Word documents in the file input", async () => {
+    render(
+      <DocumentImportProvider>
+        <Probe notebookId="nb-1" />
+      </DocumentImportProvider>,
+    );
+
+    const input = await screen.findByTestId("document-import-input");
+    expect(input).toHaveAttribute(
+      "accept",
+      ".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    );
+  });
+
+  it.each([
+    [
+      "a PowerPoint deck",
+      "clase.pptx",
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    ],
+    ["a legacy Word document", "antiguo.doc", "application/msword"],
+  ])("rejects %s client-side without calling requestPdfUpload", async (_case, name, type) => {
+    render(
+      <DocumentImportProvider>
+        <Probe notebookId="nb-1" />
+      </DocumentImportProvider>,
+    );
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "importar" }));
+    fireEvent.change(screen.getByTestId("document-import-input"), {
+      target: { files: [makeFile(name, type, 1024)] },
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId("error-nb-1")).toHaveTextContent(
+        "Solo puedes importar archivos PDF o Word (.docx).",
+      ),
+    );
+    expect(requestPdfUpload).not.toHaveBeenCalled();
+  });
+
+  it("imports a Word document, declaring and uploading it with its own mime", async () => {
+    const docxMime =
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    requestPdfUpload.mockResolvedValue(
+      ok({
+        storagePath: "owner-1/upload-1.docx",
+        signedUrl: "https://signed.example/upload",
+        token: "token-1",
+        bucket: "page-pdfs",
+        expiresAt: new Date().toISOString(),
+      }),
+    );
+    uploadDocumentToSignedUrl.mockResolvedValue(ok(undefined));
+    startPdfImport.mockResolvedValue(
+      ok({
+        importJobId: "job-1",
+        pageId: "page-1",
+        notebookId: "nb-1",
+        status: "queued",
+      }),
+    );
+    render(
+      <DocumentImportProvider>
+        <Probe notebookId="nb-1" />
+      </DocumentImportProvider>,
+    );
+
+    await pickFile(makeFile("apuntes.docx", docxMime));
+
+    await waitFor(() =>
+      expect(push).toHaveBeenCalledWith("/notebooks/nb-1/pages/page-1"),
+    );
+    expect(requestPdfUpload).toHaveBeenCalledWith(
+      expect.objectContaining({ fileName: "apuntes.docx", mime: docxMime }),
+    );
+    expect(uploadDocumentToSignedUrl).toHaveBeenCalledWith(
+      "page-pdfs",
+      "owner-1/upload-1.docx",
+      "token-1",
+      expect.any(File),
+      docxMime,
+    );
+    expect(startPdfImport).toHaveBeenCalledWith(
+      expect.objectContaining({ mime: docxMime }),
+    );
+  });
+
+  it("shows the rate-limit message when the start is refused for the import limit", async () => {
+    requestPdfUpload.mockResolvedValue(
+      ok({
+        storagePath: "owner-1/upload-1.pdf",
+        signedUrl: "https://signed.example/upload",
+        token: "token-1",
+        bucket: "page-pdfs",
+        expiresAt: new Date().toISOString(),
+      }),
+    );
+    uploadDocumentToSignedUrl.mockResolvedValue(ok(undefined));
+    startPdfImport.mockResolvedValue({
+      ok: false,
+      error: { code: "INGESTION_RATE_LIMITED", message: "import starts" },
+    });
+    render(
+      <DocumentImportProvider>
+        <Probe notebookId="nb-1" />
+      </DocumentImportProvider>,
+    );
+
+    await pickFile(makeFile());
+
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "Llegaste al límite de importaciones por ahora. Intenta de nuevo más tarde.",
+      ),
+    );
+    expect(push).not.toHaveBeenCalled();
+  });
+
   it("rejects a file over 20 MiB client-side without calling requestPdfUpload", async () => {
     render(
-      <PdfImportProvider>
+      <DocumentImportProvider>
         <Probe notebookId="nb-1" />
-      </PdfImportProvider>,
+      </DocumentImportProvider>,
     );
 
     await pickFile(makeFile("grande.pdf", "application/pdf", 20_971_521));
@@ -163,7 +287,7 @@ describe("PdfImportProvider", () => {
       expect(screen.getByTestId("status-nb-1")).toHaveTextContent("failed"),
     );
     expect(screen.getByTestId("error-nb-1")).toHaveTextContent(
-      "el PDF supera el límite de 20 MB",
+      "El documento supera el límite de 20 MB.",
     );
     expect(requestPdfUpload).not.toHaveBeenCalled();
   });
@@ -178,7 +302,7 @@ describe("PdfImportProvider", () => {
         expiresAt: new Date().toISOString(),
       }),
     );
-    uploadPdfToSignedUrl.mockResolvedValue(ok(undefined));
+    uploadDocumentToSignedUrl.mockResolvedValue(ok(undefined));
     startPdfImport.mockResolvedValue(
       ok({
         importJobId: "job-1",
@@ -190,9 +314,9 @@ describe("PdfImportProvider", () => {
     const onImported = vi.fn();
 
     render(
-      <PdfImportProvider>
+      <DocumentImportProvider>
         <Probe notebookId="nb-1" onImported={onImported} />
-      </PdfImportProvider>,
+      </DocumentImportProvider>,
     );
 
     await pickFile(makeFile());
@@ -209,11 +333,12 @@ describe("PdfImportProvider", () => {
       mime: "application/pdf",
       sizeBytes: 1024,
     });
-    expect(uploadPdfToSignedUrl).toHaveBeenCalledWith(
+    expect(uploadDocumentToSignedUrl).toHaveBeenCalledWith(
       "page-pdfs",
       "owner-1/upload-1.pdf",
       "token-1",
       expect.any(File),
+      "application/pdf",
     );
     expect(startPdfImport).toHaveBeenCalledWith({
       notebookId: "nb-1",
@@ -234,7 +359,7 @@ describe("PdfImportProvider", () => {
         expiresAt: new Date().toISOString(),
       }),
     );
-    uploadPdfToSignedUrl.mockResolvedValue(ok(undefined));
+    uploadDocumentToSignedUrl.mockResolvedValue(ok(undefined));
     startPdfImport.mockResolvedValue(
       ok({
         importJobId: "job-1",
@@ -245,9 +370,9 @@ describe("PdfImportProvider", () => {
     );
 
     render(
-      <PdfImportProvider>
+      <DocumentImportProvider>
         <Probe notebookId="nb-1" />
-      </PdfImportProvider>,
+      </DocumentImportProvider>,
     );
 
     await pickFile(makeFile());
@@ -266,16 +391,16 @@ describe("PdfImportProvider", () => {
         expiresAt: new Date().toISOString(),
       }),
     );
-    uploadPdfToSignedUrl.mockResolvedValue(ok(undefined));
+    uploadDocumentToSignedUrl.mockResolvedValue(ok(undefined));
     startPdfImport.mockResolvedValue({
       ok: false,
       error: { code: "DOCUMENT_UPLOAD_EXPIRED", message: "expired" },
     });
 
     render(
-      <PdfImportProvider>
+      <DocumentImportProvider>
         <Probe notebookId="nb-1" />
-      </PdfImportProvider>,
+      </DocumentImportProvider>,
     );
 
     await pickFile(makeFile());
@@ -295,9 +420,9 @@ describe("PdfImportProvider", () => {
     );
 
     render(
-      <PdfImportProvider>
+      <DocumentImportProvider>
         <Probe notebookId="nb-1" />
-      </PdfImportProvider>,
+      </DocumentImportProvider>,
     );
 
     await pickFile(makeFile());
@@ -311,7 +436,7 @@ describe("PdfImportProvider", () => {
     );
 
     // Let the flow finish so no promise is left dangling past the test.
-    uploadPdfToSignedUrl.mockResolvedValue(ok(undefined));
+    uploadDocumentToSignedUrl.mockResolvedValue(ok(undefined));
     startPdfImport.mockResolvedValue(
       ok({
         importJobId: "job-1",
@@ -341,9 +466,9 @@ describe("PdfImportProvider", () => {
     });
 
     render(
-      <PdfImportProvider>
+      <DocumentImportProvider>
         <Probe notebookId="nb-1" />
-      </PdfImportProvider>,
+      </DocumentImportProvider>,
     );
 
     await pickFile(makeFile());
@@ -355,7 +480,7 @@ describe("PdfImportProvider", () => {
       "No encontramos ese cuaderno.",
     );
     expect(push).not.toHaveBeenCalled();
-    expect(uploadPdfToSignedUrl).not.toHaveBeenCalled();
+    expect(uploadDocumentToSignedUrl).not.toHaveBeenCalled();
   });
 
   it("reports the upload failure to Sentry and shows a failed banner without calling startPdfImport", async () => {
@@ -369,12 +494,15 @@ describe("PdfImportProvider", () => {
       }),
     );
     const uploadError = new Error("network down");
-    uploadPdfToSignedUrl.mockResolvedValue({ ok: false, error: uploadError });
+    uploadDocumentToSignedUrl.mockResolvedValue({
+      ok: false,
+      error: uploadError,
+    });
 
     render(
-      <PdfImportProvider>
+      <DocumentImportProvider>
         <Probe notebookId="nb-1" />
-      </PdfImportProvider>,
+      </DocumentImportProvider>,
     );
 
     await pickFile(makeFile());
@@ -397,16 +525,16 @@ describe("PdfImportProvider", () => {
         expiresAt: new Date().toISOString(),
       }),
     );
-    uploadPdfToSignedUrl.mockResolvedValue(ok(undefined));
+    uploadDocumentToSignedUrl.mockResolvedValue(ok(undefined));
     startPdfImport.mockResolvedValue({
       ok: false,
       error: { code: "DOCUMENT_UPLOAD_EXPIRED", message: "expired" },
     });
 
     render(
-      <PdfImportProvider>
+      <DocumentImportProvider>
         <Probe notebookId="nb-1" />
-      </PdfImportProvider>,
+      </DocumentImportProvider>,
     );
 
     await pickFile(makeFile());
@@ -421,9 +549,9 @@ describe("PdfImportProvider", () => {
     requestPdfUpload.mockRejectedValue(new Error("network down"));
 
     render(
-      <PdfImportProvider>
+      <DocumentImportProvider>
         <Probe notebookId="nb-1" />
-      </PdfImportProvider>,
+      </DocumentImportProvider>,
     );
 
     await pickFile(makeFile());
@@ -435,11 +563,11 @@ describe("PdfImportProvider", () => {
       "No pudimos completar la importación. Inténtalo de nuevo.",
     );
     expect(captureException).toHaveBeenCalledWith(expect.any(Error));
-    expect(uploadPdfToSignedUrl).not.toHaveBeenCalled();
+    expect(uploadDocumentToSignedUrl).not.toHaveBeenCalled();
     expect(push).not.toHaveBeenCalled();
   });
 
-  it("reports a throwing uploadPdfToSignedUrl helper to Sentry and ends in failed with the generic copy (T10 follow-up)", async () => {
+  it("reports a throwing uploadDocumentToSignedUrl helper to Sentry and ends in failed with the generic copy (T10 follow-up)", async () => {
     requestPdfUpload.mockResolvedValue(
       ok({
         storagePath: "owner-1/upload-1.pdf",
@@ -449,12 +577,12 @@ describe("PdfImportProvider", () => {
         expiresAt: new Date().toISOString(),
       }),
     );
-    uploadPdfToSignedUrl.mockRejectedValue(new Error("xhr exploded"));
+    uploadDocumentToSignedUrl.mockRejectedValue(new Error("xhr exploded"));
 
     render(
-      <PdfImportProvider>
+      <DocumentImportProvider>
         <Probe notebookId="nb-1" />
-      </PdfImportProvider>,
+      </DocumentImportProvider>,
     );
 
     await pickFile(makeFile());
@@ -480,13 +608,13 @@ describe("PdfImportProvider", () => {
         expiresAt: new Date().toISOString(),
       }),
     );
-    uploadPdfToSignedUrl.mockResolvedValue(ok(undefined));
+    uploadDocumentToSignedUrl.mockResolvedValue(ok(undefined));
     startPdfImport.mockRejectedValue(new Error("db down"));
 
     render(
-      <PdfImportProvider>
+      <DocumentImportProvider>
         <Probe notebookId="nb-1" />
-      </PdfImportProvider>,
+      </DocumentImportProvider>,
     );
 
     await pickFile(makeFile());
@@ -501,9 +629,9 @@ describe("PdfImportProvider", () => {
   it("start() called before the hidden input mounts is a harmless no-op (T10 follow-up: R3-start-null-ref-cast)", () => {
     expect(() =>
       render(
-        <PdfImportProvider>
+        <DocumentImportProvider>
           <LayoutStartProbe notebookId="nb-1" />
-        </PdfImportProvider>,
+        </DocumentImportProvider>,
       ),
     ).not.toThrow();
     expect(requestPdfUpload).not.toHaveBeenCalled();
@@ -516,17 +644,17 @@ describe("PdfImportProvider", () => {
     });
 
     render(
-      <PdfImportProvider>
+      <DocumentImportProvider>
         <Probe notebookId="nb-1" />
         <Probe notebookId="nb-2" />
-      </PdfImportProvider>,
+      </DocumentImportProvider>,
     );
 
     const user = userEvent.setup();
     await user.click(
       screen.getAllByRole("button", { name: "importar" })[0] as HTMLElement,
     );
-    const input = screen.getByTestId("pdf-import-input");
+    const input = screen.getByTestId("document-import-input");
     await userEvent.upload(input, makeFile());
 
     await waitFor(() =>
@@ -544,17 +672,17 @@ describe("PdfImportProvider", () => {
     );
 
     render(
-      <PdfImportProvider>
+      <DocumentImportProvider>
         <Probe notebookId="nb-1" />
         <Probe notebookId="nb-2" />
-      </PdfImportProvider>,
+      </DocumentImportProvider>,
     );
 
     const user = userEvent.setup();
     await user.click(
       screen.getAllByRole("button", { name: "importar" })[0] as HTMLElement,
     );
-    const input = screen.getByTestId("pdf-import-input");
+    const input = screen.getByTestId("document-import-input");
     await userEvent.upload(input, makeFile());
 
     await waitFor(() =>
@@ -571,7 +699,7 @@ describe("PdfImportProvider", () => {
     expect(screen.getByTestId("status-nb-1")).toHaveTextContent("uploading");
     expect(screen.getByTestId("status-nb-2")).toHaveTextContent("busy");
 
-    uploadPdfToSignedUrl.mockResolvedValue(ok(undefined));
+    uploadDocumentToSignedUrl.mockResolvedValue(ok(undefined));
     startPdfImport.mockResolvedValue(
       ok({
         importJobId: "job-1",
@@ -597,14 +725,16 @@ describe("PdfImportProvider", () => {
 
   it("does nothing when the file picker is cancelled (no file selected)", async () => {
     render(
-      <PdfImportProvider>
+      <DocumentImportProvider>
         <Probe notebookId="nb-1" />
-      </PdfImportProvider>,
+      </DocumentImportProvider>,
     );
 
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: "importar" }));
-    const input = screen.getByTestId("pdf-import-input") as HTMLInputElement;
+    const input = screen.getByTestId(
+      "document-import-input",
+    ) as HTMLInputElement;
     // Simulate the native picker being dismissed: change fires with no files.
     input.dispatchEvent(new Event("change", { bubbles: true }));
 
@@ -613,7 +743,7 @@ describe("PdfImportProvider", () => {
   });
 });
 
-describe("usePdfImport/useNotebookImport without a mounted provider", () => {
+describe("useDocumentImport/useNotebookImport without a mounted provider", () => {
   it("returns the idle state so every consumer works standalone", () => {
     render(<Probe notebookId="nb-1" />);
     expect(screen.getByTestId("status-nb-1")).toHaveTextContent("idle");

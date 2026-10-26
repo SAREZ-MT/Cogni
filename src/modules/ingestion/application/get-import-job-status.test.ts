@@ -62,11 +62,46 @@ describe("getImportJobStatus use case", () => {
       status: "queued",
       pageCount: null,
       pagesWithoutText: 0,
+      skippedImages: 0,
       error: null,
       createdAt: NOW.toISOString(),
       updatedAt: NOW.toISOString(),
     });
     expect(result.value && "storagePath" in result.value).toBe(false);
+  });
+
+  // document-import T11: the page view tells the user how many images of
+  // a done import were left out.
+  it("reports how many images a done import skipped", async () => {
+    const deps = makeDeps();
+    const created = createImportJob(
+      {
+        id: "job-1",
+        ownerId: OWNER_ID,
+        pageId: "page-1",
+        storagePath: `${OWNER_ID}/upload-1.docx`,
+        fileName: "notas.docx",
+        sizeBytes: 1024,
+      },
+      deps.clock,
+    );
+    await deps.jobs.create(created);
+    await deps.jobs.claim({ id: "job-1", now: NOW });
+    await deps.jobs.markDone({
+      id: "job-1",
+      pageCount: 1,
+      pagesWithoutText: 0,
+      skippedImages: 2,
+      now: NOW,
+    });
+
+    const result = await getImportJobStatus(
+      { pageId: "page-1" },
+      deps,
+      OWNER_ID,
+    );
+
+    expect(result.ok && result.value?.skippedImages).toBe(2);
   });
 
   // T9b (security audit: existence oracle): another user's page answers
@@ -196,6 +231,7 @@ describe("toImportJobStatusView", () => {
       status: "queued",
       pageCount: null,
       pagesWithoutText: 0,
+      skippedImages: 0,
       error: null,
       createdAt: NOW.toISOString(),
       updatedAt: NOW.toISOString(),

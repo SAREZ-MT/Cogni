@@ -8,8 +8,8 @@ import type {
 import { PageEditor } from "./page-editor";
 
 const { start } = vi.hoisted(() => ({ start: vi.fn() }));
-vi.mock("@/modules/ingestion/ui/pdf-import-provider", () => ({
-  usePdfImport: () => ({ start }),
+vi.mock("@/modules/ingestion/ui/document-import-provider", () => ({
+  useDocumentImport: () => ({ start }),
 }));
 
 const { listPagesForMention } = vi.hoisted(() => ({
@@ -126,15 +126,19 @@ describe("PageEditor", () => {
     });
   });
 
-  describe("Importar PDF slash item", () => {
-    it("is offered in the Contenido group", () => {
+  describe("Importar documento slash item", () => {
+    it("is offered in the Contenido group for PDF and Word documents", () => {
       const { extraSlashItems } = mountEditor();
       expect(extraSlashItems).toHaveLength(1);
       expect(extraSlashItems[0]).toMatchObject({
-        id: "import-pdf",
-        label: "Importar PDF",
+        id: "import-document",
+        label: "Importar documento",
+        description: "Importa un PDF o un Word en esta página",
         group: "Contenido",
       });
+      expect(extraSlashItems[0].keywords).toEqual(
+        expect.arrayContaining(["pdf", "word", "docx"]),
+      );
     });
 
     it("removes the typed slash command and starts the import for this page's notebook", () => {
