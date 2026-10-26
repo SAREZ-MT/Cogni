@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import type { Db } from "@/shared/db/client";
 import { type PageAssetRow, pageAssets } from "@/shared/db/schema";
 import type {
@@ -59,5 +59,19 @@ export class DrizzlePageAssetRepository implements PageAssetRepository {
           updatedAt: asset.updatedAt,
         },
       });
+  }
+
+  async deleteByIds(
+    ownerId: string,
+    ids: readonly string[],
+  ): Promise<PageAsset[]> {
+    if (ids.length === 0) return [];
+    const rows = await this.db
+      .delete(pageAssets)
+      .where(
+        and(eq(pageAssets.ownerId, ownerId), inArray(pageAssets.id, [...ids])),
+      )
+      .returning();
+    return rows.map(toPageAsset);
   }
 }

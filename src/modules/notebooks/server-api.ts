@@ -10,13 +10,20 @@ import { type Clock, systemClock } from "@/shared/kernel/clock";
 import type { DomainError } from "@/shared/kernel/domain-error";
 import { ok, type Result } from "@/shared/kernel/result";
 import { createPage as createPageUseCase } from "./application/create-page";
+import { deleteImportedAssets as deleteImportedAssetsUseCase } from "./application/delete-imported-assets";
 import { getPage as getPageUseCase } from "./application/get-page";
+import {
+  type StoreImportedAssetInput,
+  storeImportedAsset as storeImportedAssetUseCase,
+} from "./application/store-imported-asset";
 import { writeImportedContent as writeImportedContentUseCase } from "./application/write-imported-content";
 import type { PageTextReader } from "./domain/page-text-reader";
 import type { TiptapDoc } from "./domain/plain-text";
 import {
   DrizzleNotebookRepository,
+  DrizzlePageAssetRepository,
   DrizzlePageRepository,
+  SupabaseStorageGateway,
 } from "./infrastructure";
 
 export interface NotebooksServerApi extends PageTextReader {
@@ -46,6 +53,24 @@ export interface NotebooksServerApi extends PageTextReader {
   // deliverable; ingestion's NotebooksPagesAdapter, T7b, will implement
   // NotebookPagesPort.findPageNotebookId by calling this one-to-one).
   findPageNotebookId(ownerId: string, pageId: string): Promise<string | null>;
+  // document-import T9: uploads an image the importer extracted to the
+  // `page-assets` bucket (canonical `{ownerId}/{pageId}/{fileId}.{ext}`
+  // path) and registers its page_assets row; `assetId` is what the image
+  // node stores. err for a disallowed mime (ASSET_MIME_NOT_ALLOWED), more
+  // than MAX_ASSET_BYTES (ASSET_TOO_LARGE), a page that is not the
+  // caller's active page (PAGE_NOT_FOUND) or a Storage failure
+  // (ASSET_UPLOAD_FAILED). Never throws for those.
+  storeImportedAsset(
+    ownerId: string,
+    input: StoreImportedAssetInput,
+  ): Promise<Result<{ assetId: string }, DomainError>>;
+  // Best-effort cleanup of assets stored by storeImportedAsset (rows and
+  // objects), e.g. after the imported content could not be written. Only
+  // the caller's assets are touched; never throws.
+  deleteImportedAssets(
+    ownerId: string,
+    assetIds: readonly string[],
+  ): Promise<void>;
 }
 
 export function createNotebooksServerApi(deps: {
@@ -54,6 +79,10 @@ export function createNotebooksServerApi(deps: {
 }): NotebooksServerApi {
   const notebooks = new DrizzleNotebookRepository(deps.db);
   const pages = new DrizzlePageRepository(deps.db);
+  const assets = new DrizzlePageAssetRepository(deps.db);
+  // Service-role client (supabase-storage-gateway.ts): the importer runs on
+  // the server, outside any browser session.
+  const storage = new SupabaseStorageGateway();
   const clock = deps.clock ?? systemClock;
 
   return {
@@ -100,6 +129,22 @@ export function createNotebooksServerApi(deps: {
         return null;
       }
       return page.notebookId;
+    },
+
+    async storeImportedAsset(ownerId, input) {
+      return storeImportedAssetUseCase(
+        input,
+        { pages, assets, storage, clock },
+        ownerId,
+      );
+    },
+
+    async deleteImportedAssets(ownerId, assetIds) {
+      return deleteImportedAssetsUseCase(
+        assetIds,
+        { assets, storage },
+        ownerId,
+      );
     },
   };
 }

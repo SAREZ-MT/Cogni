@@ -2,6 +2,7 @@ export { archiveNotebook, archiveNotebookSchema } from "./archive-notebook";
 export { archivePage, archivePageSchema } from "./archive-page";
 export { createNotebook, createNotebookSchema } from "./create-notebook";
 export { createPage, createPageSchema } from "./create-page";
+export { deleteImportedAssets } from "./delete-imported-assets";
 export {
   getAssetReadUrl,
   getAssetReadUrlSchema,
@@ -37,6 +38,10 @@ export {
   setNotebookAppearance,
   setNotebookAppearanceSchema,
 } from "./set-notebook-appearance";
+export {
+  type StoreImportedAssetInput,
+  storeImportedAsset,
+} from "./store-imported-asset";
 export {
   writeImportedContent,
   writeImportedContentSchema,

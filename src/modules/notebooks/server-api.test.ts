@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createFixedClock } from "@/shared/kernel/clock";
+import { FakeStorageGateway } from "./application/testing/fake-storage-gateway";
 import { InMemoryNotebookRepository } from "./application/testing/in-memory-notebook-repository";
+import { InMemoryPageAssetRepository } from "./application/testing/in-memory-page-asset-repository";
 import { InMemoryPageRepository } from "./application/testing/in-memory-page-repository";
 import type { Notebook } from "./domain/notebook";
 import type { TiptapDoc } from "./domain/plain-text";
@@ -12,7 +14,15 @@ import type { TiptapDoc } from "./domain/plain-text";
 // the wiring without a real database.
 let notebooks = new InMemoryNotebookRepository();
 let pages = new InMemoryPageRepository();
+let assets = new InMemoryPageAssetRepository();
+let storage = new FakeStorageGateway();
 vi.mock("./infrastructure", () => ({
+  DrizzlePageAssetRepository: vi.fn(function DrizzlePageAssetRepository() {
+    return assets;
+  }),
+  SupabaseStorageGateway: vi.fn(function SupabaseStorageGateway() {
+    return storage;
+  }),
   DrizzleNotebookRepository: vi.fn(function DrizzleNotebookRepository() {
     return notebooks;
   }),
@@ -50,6 +60,8 @@ describe("createNotebooksServerApi", () => {
   beforeEach(() => {
     notebooks = new InMemoryNotebookRepository();
     pages = new InMemoryPageRepository();
+    assets = new InMemoryPageAssetRepository();
+    storage = new FakeStorageGateway();
   });
 
   describe("findActiveNotebook", () => {
@@ -377,6 +389,53 @@ describe("createNotebooksServerApi", () => {
 
       const stored = await pages.findById(created.value.id);
       expect(stored?.updatedAt).toEqual(fixed);
+    });
+  });
+
+  // document-import T9: the importer stores extracted images server-side.
+  describe("storeImportedAsset / deleteImportedAssets", () => {
+    const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3]);
+
+    it("uploads and registers an asset on an owned page, then deletes it", async () => {
+      const { createNotebooksServerApi } = await import("./server-api");
+      await notebooks.create(makeNotebook());
+      const api = createNotebooksServerApi({ db: FAKE_DB });
+      const created = await api.createPage(OWNER_ID, { notebookId: "nb-1" });
+      if (!created.ok) throw new Error("setup failed");
+
+      const stored = await api.storeImportedAsset(OWNER_ID, {
+        pageId: created.value.id,
+        bytes: PNG,
+        mime: "image/png",
+      });
+
+      expect(stored.ok).toBe(true);
+      if (!stored.ok) return;
+      expect(await assets.findById(stored.value.assetId)).not.toBeNull();
+      expect(storage.uploadCalls).toHaveLength(1);
+
+      await api.deleteImportedAssets(OWNER_ID, [stored.value.assetId]);
+
+      expect(await assets.findById(stored.value.assetId)).toBeNull();
+      expect(storage.removeCalls).toEqual([[storage.uploadCalls[0].path]]);
+    });
+
+    it("refuses another owner's page", async () => {
+      const { createNotebooksServerApi } = await import("./server-api");
+      await notebooks.create(makeNotebook());
+      const api = createNotebooksServerApi({ db: FAKE_DB });
+      const created = await api.createPage(OWNER_ID, { notebookId: "nb-1" });
+      if (!created.ok) throw new Error("setup failed");
+
+      const stored = await api.storeImportedAsset(OTHER_OWNER_ID, {
+        pageId: created.value.id,
+        bytes: PNG,
+        mime: "image/png",
+      });
+
+      expect(stored.ok).toBe(false);
+      if (!stored.ok) expect(stored.error.code).toBe("PAGE_NOT_FOUND");
+      expect(storage.uploadCalls).toHaveLength(0);
     });
   });
 });

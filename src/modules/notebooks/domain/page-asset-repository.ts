@@ -20,4 +20,8 @@ export interface PageAssetRepository {
   findById(id: string): Promise<PageAsset | null>;
   findByStoragePath(storagePath: string): Promise<PageAsset | null>;
   upsert(asset: PageAsset): Promise<void>;
+  // document-import T9: deletes the rows among `ids` owned by `ownerId`
+  // (never anyone else's) and returns them, so the caller can remove their
+  // Storage objects. Unknown or foreign ids are ignored.
+  deleteByIds(ownerId: string, ids: readonly string[]): Promise<PageAsset[]>;
 }

@@ -45,7 +45,11 @@ Hexagonal shape enforced by `.dependency-cruiser.cjs` (`domain-is-pure`,
   than http/https/mailto and empty text nodes, so imported content always
   renders in the editor), the signed image-upload flow
   (`request-image-upload.ts`/`register-page-asset.ts`/
-  `get-asset-read-url.ts`) and `list-sidebar.ts`. Tested against the
+  `get-asset-read-url.ts`), its server-side twin for imported images
+  (`store-imported-asset.ts`, which validates mime/size and ownership,
+  uploads to the canonical path and reuses `registerPageAsset`, plus the
+  best-effort cleanup `delete-imported-assets.ts`) and `list-sidebar.ts`.
+  Tested against the
   in-memory fakes under `application/testing/`.
 - `infrastructure/`: Drizzle repositories (`DrizzleNotebookRepository`,
   `DrizzlePageRepository`, `DrizzlePageAssetRepository`) and
@@ -69,7 +73,11 @@ Hexagonal shape enforced by `.dependency-cruiser.cjs` (`domain-is-pure`,
   `writeImportedContent` uses the same atomic compare-and-swap on
   `content_version` as `saveContent`'s `updateIfVersion`, filtering
   `archived_at IS NULL` so an archive racing the write cannot be
-  overwritten.
+  overwritten. `storeImportedAsset`/`deleteImportedAssets` (document-import
+  T9) let the importer upload extracted images and register their
+  `page_assets` rows; `SupabaseStorageGateway` uses the service-role key,
+  so these server-side uploads bypass the bucket's RLS and rely on the
+  use case's ownership and canonical-path checks.
 - `index.ts`: the public API — Server Actions, use cases (for their Zod
   schemas and types), domain types/constants, `createNotebooksServerApi`
   and `SidebarTree`. `cross-module-via-index` forbids any other module
@@ -81,7 +89,7 @@ Hexagonal shape enforced by `.dependency-cruiser.cjs` (`domain-is-pure`,
 through `index.ts`: `NotebooksPagesAdapter` wraps
 `createNotebooksServerApi()` to implement `NotebookPagesPort`
 (`findActiveNotebook`, `createPage`, `findPageNotebookId`,
-`writeImportedContent`), and the app's notebook menu/sidebar inject
+`writeImportedContent`, `storeImportedAsset`, `deleteImportedAssets`), and the app's notebook menu/sidebar inject
 `ingestion`'s "Importar PDF" item and importing badge through
 `notebook-actions-slot.tsx` — the reverse direction, `notebooks` never
 imports `ingestion`.
@@ -93,5 +101,6 @@ imports `ingestion`.
   and `server-api.ts` (mocked session/adapters), `ui` components (Testing
   Library). No `DATABASE_URL` or Supabase config needed.
 - `pnpm test:db` — DB smoke tests against `cogni-dev`: schema, cascades,
-  RLS predicates and the `updateIfVersion`/`writeImportedContent`
-  compare-and-swap races.
+  RLS predicates, the `updateIfVersion`/`writeImportedContent`
+  compare-and-swap races and the owner-scoped
+  `DrizzlePageAssetRepository.deleteByIds`.

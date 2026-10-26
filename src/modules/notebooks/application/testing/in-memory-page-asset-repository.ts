@@ -28,6 +28,20 @@ export class InMemoryPageAssetRepository implements PageAssetRepository {
     this.rows.set(asset.id, asset);
   }
 
+  async deleteByIds(
+    ownerId: string,
+    ids: readonly string[],
+  ): Promise<PageAsset[]> {
+    const deleted: PageAsset[] = [];
+    for (const id of ids) {
+      const asset = this.rows.get(id);
+      if (!asset || asset.ownerId !== ownerId) continue;
+      this.rows.delete(id);
+      deleted.push(asset);
+    }
+    return deleted;
+  }
+
   count(): number {
     return this.rows.size;
   }

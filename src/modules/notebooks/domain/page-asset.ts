@@ -30,6 +30,26 @@ export function validateAssetInput(input: {
   return ok(undefined);
 }
 
+const EXTENSION_FOR_MIME: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "image/gif": "gif",
+};
+
+// The canonical `{ownerId}/{pageId}/{fileId}.{ext}` object path every
+// asset is stored under, whether the browser uploads it through a signed
+// grant (RequestImageUpload) or the server uploads it directly
+// (StoreImportedAsset, document-import T9).
+export function canonicalAssetStoragePath(
+  ownerId: string,
+  pageId: string,
+  fileId: string,
+  mime: string,
+): string {
+  return `${ownerId}/${pageId}/${fileId}.${EXTENSION_FOR_MIME[mime] ?? "bin"}`;
+}
+
 // One file name segment as RequestImageUpload generates it: `{assetId}.{ext}`
 // with no dots, slashes or percent-escapes anywhere else, so neither a
 // literal nor an encoded dot-segment can appear.
