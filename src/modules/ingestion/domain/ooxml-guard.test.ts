@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { countStringScans } from "../application/testing/count-string-scans";
 import { makeZip, textEntry } from "../application/testing/make-zip";
 import { DOCUMENT_FILE_ERROR } from "./errors";
 import { inspectOoxmlPackage, OOXML_LIMITS, xmlShape } from "./ooxml-guard";
@@ -151,18 +152,21 @@ describe("inspectOoxmlPackage", () => {
     expect(rejectionCode(bytes)).toBe(DOCUMENT_FILE_ERROR.UNREADABLE);
   });
 
-  it("decides on a terabyte-declaring directory without inflating it", () => {
+  // T10: deterministic instead of a wall-clock bound — the guard decides
+  // at the first oversized entry (it never walks the other 1,499, and it
+  // has no inflater to call: it only reads the directory).
+  it("decides on a terabyte-declaring directory at its first oversized entry", () => {
     const parts = Array.from({ length: 1500 }, (_, i) => ({
       name: `word/media/x${i}.bin`,
       data: new Uint8Array(0),
       compressed: new Uint8Array(1000),
       declaredSize: 4_000_000_000,
     }));
-    const started = performance.now();
-    expect(rejectionCode(makeZip([...basic, ...parts]))).toBe(
-      DOCUMENT_FILE_ERROR.LIMIT_EXCEEDED,
-    );
-    expect(performance.now() - started).toBeLessThan(1000);
+    const result = inspectOoxmlPackage(makeZip([...basic, ...parts]));
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.code).toBe(DOCUMENT_FILE_ERROR.LIMIT_EXCEEDED);
+    expect(result.error.message).toBe("part word/media/x0.bin too large");
   });
 });
 
@@ -175,12 +179,15 @@ describe("xmlShape", () => {
     ).toEqual({ elements: 3, depth: 2 });
   });
 
+  // T10: linearity proven by counting the characters scanned (see
+  // countStringScans), not by a wall-clock bound; the test timeout is only
+  // a safety net.
   it("is linear on a flat flood of empty elements", () => {
     const flood = "<a/>".repeat(1_000_000);
-    const started = performance.now();
-    expect(xmlShape(flood)).toEqual({ elements: 1_000_000, depth: 1 });
-    expect(performance.now() - started).toBeLessThan(1000);
-  });
+    const { result, scanned } = countStringScans(() => xmlShape(flood));
+    expect(result).toEqual({ elements: 1_000_000, depth: 1 });
+    expect(scanned).toBeLessThanOrEqual(2 * flood.length);
+  }, 30_000);
 
   it("measures deep nesting", () => {
     const deep = "<a>".repeat(500) + "</a>".repeat(500);

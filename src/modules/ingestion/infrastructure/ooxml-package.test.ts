@@ -1,9 +1,19 @@
+import * as zlib from "node:zlib";
 import { deflateRawSync } from "node:zlib";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { makeZip, textEntry } from "../application/testing/make-zip";
 import { OOXML_LIMITS } from "../domain/ooxml-guard";
 import { readZipDirectory } from "../domain/zip-directory";
 import { OoxmlLimitError, openOoxmlPackage } from "./ooxml-package";
+
+// T10: the inflater is observed through a pass-through spy, so tests
+// assert what it was asked to produce instead of timing or heap deltas.
+vi.mock("node:zlib", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:zlib")>();
+  return { ...actual, inflateRawSync: vi.fn(actual.inflateRawSync) };
+});
+
+afterEach(() => vi.mocked(zlib.inflateRawSync).mockClear());
 
 const MiB = 1024 * 1024;
 
@@ -65,15 +75,13 @@ describe("openOoxmlPackage", () => {
         },
       ]),
     );
-    const heapBefore = process.memoryUsage().arrayBuffers;
-    const started = performance.now();
     expect(() => pkg.readText("word/document.xml")).toThrow(OoxmlLimitError);
-    expect(performance.now() - started).toBeLessThan(1000);
-    // Far below the 64 MiB the stream would inflate to.
-    expect(process.memoryUsage().arrayBuffers - heapBefore).toBeLessThan(
-      16 * MiB,
-    );
-  });
+    // One inflate, capped at the declared 100 KiB — never the 64 MiB the
+    // stream holds.
+    expect(vi.mocked(zlib.inflateRawSync).mock.calls).toEqual([
+      [expect.anything(), { maxOutputLength: 100 * 1024 }],
+    ]);
+  }, 30_000);
 
   it("never yields more bytes than a part declares, whatever its stream holds", () => {
     const limits = { ...OOXML_LIMITS, maxTotalBytes: 2 * MiB };

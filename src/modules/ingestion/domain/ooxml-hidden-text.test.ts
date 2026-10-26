@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { countStringScans } from "../application/testing/count-string-scans";
 import { stripHiddenRuns } from "./ooxml-hidden-text";
 
 const W =
@@ -115,10 +116,13 @@ describe("stripHiddenRuns", () => {
       ),
     );
     const xml = `${doc(body)}<w:r a="never closed`;
-    const started = performance.now();
-    const out = stripHiddenRuns(xml);
-    expect(performance.now() - started).toBeLessThan(1500);
+    // T10: characters scanned (countStringScans), not wall-clock time; the
+    // test timeout is only a safety net.
+    const { result: out, scanned } = countStringScans(() =>
+      stripHiddenRuns(xml),
+    );
+    expect(scanned).toBeLessThanOrEqual(2 * xml.length);
     expect(out).toContain("t0");
     expect(out).not.toContain("t1<");
-  });
+  }, 30_000);
 });

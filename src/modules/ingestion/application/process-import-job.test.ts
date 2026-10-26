@@ -581,19 +581,30 @@ describe("processImportJob use case", () => {
     }
   });
 
+  // T10 (T9b review: the cleanup was unproved): with fake timers, moving
+  // the clock past the whole budget after a finished import must neither
+  // abort the extractor's signal nor leave the budget timer pending.
   it("passes a live signal to the extractor and clears its timer once extraction ends", async () => {
-    const deps = makeDeps();
-    const job = await seedQueuedJob(deps);
-    seedTextExtraction(deps, ["Hola"]);
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      const deps = makeDeps();
+      const job = await seedQueuedJob(deps);
+      seedTextExtraction(deps, ["Hola"]);
 
-    const result = await processImportJob(
-      { importJobId: job.id },
-      deps,
-      OWNER_ID,
-    );
+      const result = await processImportJob(
+        { importJobId: job.id },
+        deps,
+        OWNER_ID,
+      );
+      expect(result.ok && result.value.status).toBe("done");
+      expect(vi.getTimerCount()).toBe(0);
 
-    expect(result.ok && result.value.status).toBe("done");
-    expect(deps.extractor.extractCalls[0].signal?.aborted).toBe(false);
+      await vi.advanceTimersByTimeAsync(PROCESSING_BUDGET_MS + 1);
+
+      expect(deps.extractor.extractCalls[0].signal?.aborted).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   // document-import T9b: a document over an import cap (zip bomb, page

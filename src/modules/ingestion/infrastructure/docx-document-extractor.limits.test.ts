@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import * as zlib from "node:zlib";
 import { deflateRawSync } from "node:zlib";
 import { Document, ImageRun, Packer, Paragraph } from "docx";
 import mammoth from "mammoth";
@@ -13,6 +14,15 @@ import { OoxmlLimitError, openOoxmlPackage } from "./ooxml-package";
 // document-import T9b (security audit, zip bomb): the DOCX adapter refuses
 // a package that declares or inflates past the caps before mammoth or
 // officeparser allocate it, and runs the two engines one after the other.
+//
+// T10: the inflater is a pass-through spy, so the bomb tests assert what it
+// was asked to inflate (nothing, or only up to the declared size) instead
+// of timing the call or measuring the heap.
+vi.mock("node:zlib", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:zlib")>();
+  return { ...actual, inflateRawSync: vi.fn(actual.inflateRawSync) };
+});
+
 const MiB = 1024 * 1024;
 const fixture = new Uint8Array(
   readFileSync(
@@ -34,7 +44,10 @@ function repack(replace: Record<string, ZipTestEntry>): Uint8Array {
 // 200 MiB of zeros deflate to ~200 KiB.
 const BOMB = deflateRawSync(Buffer.alloc(200 * MiB));
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.mocked(zlib.inflateRawSync).mockClear();
+});
 
 describe("DocxDocumentExtractor limits", () => {
   it("still reads the fixture once re-zipped (the repack itself is faithful)", async () => {
@@ -56,14 +69,14 @@ describe("DocxDocumentExtractor limits", () => {
         declaredSize: 200 * MiB,
       },
     });
-    const started = performance.now();
+    vi.mocked(zlib.inflateRawSync).mockClear();
     const result = await new DocxDocumentExtractor().extract(bytes, "docx");
-    expect(performance.now() - started).toBeLessThan(1000);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe("DOCUMENT_LIMIT_EXCEEDED");
+    expect(zlib.inflateRawSync).not.toHaveBeenCalled();
     expect(convert).not.toHaveBeenCalled();
     expect(parse).not.toHaveBeenCalled();
-  });
+  }, 30_000);
 
   it("refuses a bomb whose directory lies about its size, without inflating it", async () => {
     const parse = vi.spyOn(OfficeParser, "parseOffice");
@@ -75,15 +88,24 @@ describe("DocxDocumentExtractor limits", () => {
         declaredSize: 512 * 1024,
       },
     });
-    const before = process.memoryUsage().arrayBuffers;
-    const started = performance.now();
+    vi.mocked(zlib.inflateRawSync).mockClear();
     const result = await new DocxDocumentExtractor().extract(bytes, "docx");
-    expect(performance.now() - started).toBeLessThan(1000);
-    expect(process.memoryUsage().arrayBuffers - before).toBeLessThan(50 * MiB);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe("DOCUMENT_LIMIT_EXCEEDED");
+    // Every inflate was capped at its part's declared size; the bomb's
+    // part was asked for 512 KiB, never its 200 MiB.
+    const caps = vi
+      .mocked(zlib.inflateRawSync)
+      .mock.calls.map(
+        ([, options]) =>
+          (options as { maxOutputLength?: number }).maxOutputLength,
+      );
+    expect(caps).toContain(512 * 1024);
+    expect(caps.every((cap) => cap !== undefined && cap <= 512 * 1024)).toBe(
+      true,
+    );
     expect(parse).not.toHaveBeenCalled();
-  });
+  }, 30_000);
 
   it("refuses an XML element flood (a small zip of empty elements)", async () => {
     const flood = `<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${"<w:p/>".repeat(OOXML_LIMITS.maxXmlElements + 1)}</w:body></w:document>`;
