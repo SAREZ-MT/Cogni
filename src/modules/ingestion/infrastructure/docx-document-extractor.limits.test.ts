@@ -130,4 +130,18 @@ describe("DocxDocumentExtractor limits", () => {
       },
     });
   });
+
+  it("does not start the engines once the time budget aborted the signal", async () => {
+    const convert = vi.spyOn(mammoth, "convertToHtml");
+    const controller = new AbortController();
+    controller.abort();
+
+    const result = await new DocxDocumentExtractor().extract(fixture, "docx", {
+      signal: controller.signal,
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("DOCUMENT_UNREADABLE");
+    expect(convert).not.toHaveBeenCalled();
+  });
 });

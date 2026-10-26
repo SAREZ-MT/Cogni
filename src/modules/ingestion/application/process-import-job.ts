@@ -218,17 +218,56 @@ export async function processImportJob(
   // `err(...)` Result) so `finishFailed` only forwards a `cause` to
   // telemetry when there is a real exception with a stack to report.
   let extractCause: unknown;
+  //
+  // T9b (audit: parsing outside the time budget): the extraction is raced
+  // against what is left of the budget. A parser stuck on an async step
+  // loses the race and the job ends as `timeout`; the adapter's signal is
+  // aborted so it stops at its next step. Synchronous parser work cannot
+  // be preempted — the caps of "Límites y seguridad" bound it instead.
+  const extraction = new AbortController();
+  let budgetTimer: ReturnType<typeof setTimeout> | undefined;
+  const budgetSpent = new Promise<"timeout">((resolve) => {
+    budgetTimer = setTimeout(
+      () => {
+        extraction.abort();
+        resolve("timeout");
+      },
+      Math.max(remainingMs(), 0),
+    );
+  });
+  let timedOut = false;
   try {
-    extracted = await deps.extractor.extract(bytes, format);
+    const pending = deps.extractor.extract(bytes, format, {
+      signal: extraction.signal,
+    });
+    // A late rejection after the budget won must not go unhandled.
+    pending.catch(() => {});
+    const outcome = await Promise.race([pending, budgetSpent]);
+    if (outcome === "timeout") {
+      timedOut = true;
+      extracted = err(
+        new DomainError(DOCUMENT_FILE_ERROR.UNREADABLE, "timeout"),
+      );
+    } else {
+      extracted = outcome;
+    }
   } catch (error) {
     extractCause = error;
     extracted = err(new DomainError(DOCUMENT_FILE_ERROR.UNREADABLE, "threw"));
+  } finally {
+    clearTimeout(budgetTimer);
   }
   deps.telemetry.stage(
     claimed,
     "extract",
     deps.clock.now().getTime() - extractStart.getTime(),
   );
+  if (timedOut) {
+    return finishFailed({
+      kind: "timeout",
+      message: failureMessage("timeout"),
+    });
+  }
   if (!extracted.ok) {
     const kind: ImportFailureKind =
       extracted.error.code === DOCUMENT_FILE_ERROR.UNSUPPORTED_FORMAT

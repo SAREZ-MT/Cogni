@@ -112,4 +112,68 @@ describe("PdfDocumentExtractor", () => {
   it("throws when makeTextPdf is given no pages, instead of building an invalid PDF", () => {
     expect(() => makeTextPdf([])).toThrow();
   });
+
+  // document-import T9b (audit: no page cap, parsing outside the budget).
+  describe("limits", () => {
+    it("refuses a PDF over the page cap before extracting any page", async () => {
+      const result = await new PdfDocumentExtractor({ maxPages: 3 }).extract(
+        makeTextPdf(["uno", "dos", "tres", "cuatro"]),
+        "pdf",
+      );
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.error.code).toBe("DOCUMENT_LIMIT_EXCEEDED");
+    });
+
+    it("caps real documents at 300 pages by default", async () => {
+      const pages = Array.from({ length: 301 }, (_, i) => `Pagina ${i + 1}`);
+      const result = await new PdfDocumentExtractor().extract(
+        makeTextPdf(pages),
+        "pdf",
+      );
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.error.code).toBe("DOCUMENT_LIMIT_EXCEEDED");
+    });
+
+    it("accepts a document exactly at the page cap", async () => {
+      const result = await new PdfDocumentExtractor({ maxPages: 3 }).extract(
+        makeTextPdf(["uno", "dos", "tres"]),
+        "pdf",
+      );
+
+      expect(result.ok && result.value.totalPages).toBe(3);
+    });
+
+    it("refuses a page with more text than the per-page cap", async () => {
+      const result = await new PdfDocumentExtractor({
+        maxPageChars: 10,
+      }).extract(makeTextPdf(["corto", "una linea demasiado larga"]), "pdf");
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.error.code).toBe("DOCUMENT_LIMIT_EXCEEDED");
+    });
+
+    it("refuses a document whose pages together exceed the total text cap", async () => {
+      const result = await new PdfDocumentExtractor({
+        maxTotalChars: 12,
+      }).extract(makeTextPdf(["seis 6", "seis 6", "seis 6"]), "pdf");
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.error.code).toBe("DOCUMENT_LIMIT_EXCEEDED");
+    });
+
+    it("stops between pages once the signal is aborted", async () => {
+      const controller = new AbortController();
+      controller.abort();
+      const result = await new PdfDocumentExtractor().extract(
+        makeTextPdf(["uno", "dos"]),
+        "pdf",
+        { signal: controller.signal },
+      );
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.error.code).toBe("DOCUMENT_UNREADABLE");
+    });
+  });
 });

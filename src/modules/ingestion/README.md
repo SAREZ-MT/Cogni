@@ -245,6 +245,34 @@ so their peaks never add up. `processImportJob` reports a limit breach
 with `DOCUMENT_LIMIT_EXCEEDED_MESSAGE` ("Este documento es demasiado
 grande o complejo para importarlo. …").
 
+### Time and CPU bound
+
+Chosen bound: deterministic caps plus a budget race, not a
+`worker_thread`. A worker would give a hard kill, but it needs a separate
+entry file traced into the Next 16 server output (with mammoth bundled
+and officeparser external) and per-call worker start-up; the caps below
+bound the worst case without that.
+
+- `processImportJob` races `extractor.extract` against what is left of
+  `PROCESSING_BUDGET_MS`; when the budget wins the job fails as
+  `timeout` and the extractor's `AbortSignal` is aborted. Adapters check
+  the signal between their steps (each PDF page; before mammoth, before
+  officeparser, before mapping).
+- PDF (`PDF_LIMITS`, `pdf-document-extractor.ts`): more than 300 pages
+  (`numPages`, read before any page) is refused; pages are read one at a
+  time (unpdf's `extractText` reads all of them concurrently); a page
+  with more than 100,000 characters, or 2,000,000 in total, is refused.
+- DOCX: the OOXML caps above bound the XML mammoth and officeparser
+  parse (size, elements, nesting); tables nested more than
+  `MAX_TABLE_NESTING` (16) levels are refused by the mapper.
+
+Residual risk: parsing itself is synchronous (pdf.js per page, xmldom
+for a whole part), so the race cannot interrupt it; a single page or part
+within the caps can still run past the budget, after which the result is
+discarded. The platform's `maxDuration` (120 s) remains the hard ceiling,
+and `getImportJobStatus`'s abandoned-job rule still resolves a job the
+platform killed.
+
 ## Job lifecycle
 
 ```

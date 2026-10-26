@@ -3,6 +3,7 @@ import { err, type Result } from "@/shared/kernel/result";
 import type {
   DocumentExtractor,
   ExtractedDocument,
+  ExtractOptions,
 } from "../domain/document-extractor";
 import type { DocumentFormat } from "../domain/document-format";
 import { DOCUMENT_FILE_ERROR } from "../domain/errors";
@@ -24,6 +25,7 @@ export class FormatRoutingDocumentExtractor implements DocumentExtractor {
   async extract(
     bytes: Uint8Array,
     format: DocumentFormat,
+    options?: ExtractOptions,
   ): Promise<Result<ExtractedDocument, DomainError>> {
     const adapter = this.adapters[format];
     if (!adapter) {
@@ -34,7 +36,7 @@ export class FormatRoutingDocumentExtractor implements DocumentExtractor {
         ),
       );
     }
-    return adapter.extract(bytes, format);
+    return adapter.extract(bytes, format, options);
   }
 }
 

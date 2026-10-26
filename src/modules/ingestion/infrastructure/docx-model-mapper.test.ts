@@ -4,7 +4,12 @@ import {
   collectEnrichments,
   type ParagraphEnrichment,
 } from "./docx-enrichment";
-import { type MammothNode, mapDocxModel } from "./docx-model-mapper";
+import {
+  MAX_TABLE_NESTING,
+  type MammothNode,
+  mapDocxModel,
+} from "./docx-model-mapper";
+import { OoxmlLimitError } from "./ooxml-package";
 
 // document-import T6: the mapper on hand-built mammoth models, for the
 // cases the all-constructs fixture does not contain (the golden test in
@@ -379,5 +384,33 @@ describe("docx enrichment alignment", () => {
       null,
       null,
     ]);
+  });
+
+  // document-import T9b: nesting is bounded so a crafted document cannot
+  // drive the recursive mapping (and every recursive reader of the
+  // imported content after it) arbitrarily deep.
+  it("refuses tables nested deeper than the cap with a limit error", async () => {
+    const nest = (depth: number): MammothNode => {
+      let node: MammothNode = paragraph([run("fondo")]);
+      for (let level = 0; level < depth; level++) {
+        node = {
+          type: "table",
+          children: [
+            {
+              type: "tableRow",
+              children: [{ type: "tableCell", children: [node] }],
+            },
+          ],
+        };
+      }
+      return node;
+    };
+
+    await expect(
+      mapDocxModel(doc(nest(MAX_TABLE_NESTING)), null),
+    ).resolves.toBeDefined();
+    await expect(
+      mapDocxModel(doc(nest(MAX_TABLE_NESTING + 1)), null),
+    ).rejects.toBeInstanceOf(OoxmlLimitError);
   });
 });

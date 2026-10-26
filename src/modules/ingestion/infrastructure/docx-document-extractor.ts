@@ -5,6 +5,7 @@ import { err, ok, type Result } from "@/shared/kernel/result";
 import type {
   DocumentExtractor,
   ExtractedDocument,
+  ExtractOptions,
 } from "../domain/document-extractor";
 import type { DocumentFormat } from "../domain/document-format";
 import { DOCUMENT_FILE_ERROR } from "../domain/errors";
@@ -111,6 +112,7 @@ export class DocxDocumentExtractor implements DocumentExtractor {
   async extract(
     bytes: Uint8Array,
     format: DocumentFormat,
+    options?: ExtractOptions,
   ): Promise<Result<ExtractedDocument, DomainError>> {
     if (format !== "docx") {
       return err(
@@ -123,10 +125,18 @@ export class DocxDocumentExtractor implements DocumentExtractor {
     const opened = openOoxmlPackage(bytes);
     if (!opened.ok) return opened;
     const pkg = opened.value;
+    // The time budget (processImportJob) aborts the signal; each engine is
+    // synchronous work once started, so it is checked between them.
+    const aborted = () => options?.signal?.aborted === true;
+    const abortedResult = () =>
+      err(new DomainError(DOCUMENT_FILE_ERROR.UNREADABLE, "aborted"));
     let mapped: Awaited<ReturnType<typeof mapDocxModel>>;
     try {
+      if (aborted()) return abortedResult();
       const model = await readMammothModel(pkg.mammothFile());
+      if (aborted()) return abortedResult();
       const enrichments = await readEnrichments(pkg);
+      if (aborted()) return abortedResult();
       // Inside the try too (T6 review follow-up): a mapping bug on an
       // unexpected model shape becomes an error Result
       // (→ `invalid_document`) instead of escaping the port's contract.

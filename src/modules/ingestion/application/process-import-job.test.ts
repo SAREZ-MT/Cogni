@@ -436,7 +436,7 @@ describe("processImportJob use case", () => {
     expect(result.value.status).toBe("done");
     expect(result.value.pageCount).toBe(3);
     expect(deps.extractor.extractCalls).toEqual([
-      { bytes: DOCX_BYTES, format: "docx" },
+      { bytes: DOCX_BYTES, format: "docx", signal: expect.any(AbortSignal) },
     ]);
     expect(deps.notebookPages.getPage(job.pageId)?.content).toEqual(content);
   });
@@ -548,6 +548,52 @@ describe("processImportJob use case", () => {
     if (!result.ok) return;
     expect(result.value.status).toBe("failed");
     expect(result.value.error).toBe(INVALID_DOCUMENT_MESSAGE);
+  });
+
+  // document-import T9b (audit: parsing outside the time budget): the
+  // extraction is raced against the remaining budget, so a parser stuck on
+  // an async step ends the job as timeout instead of running past
+  // maxDuration; the adapter's signal is aborted so it stops between steps.
+  it("fails(timeout) and aborts the extractor when extraction outlives the budget", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      const deps = makeDeps();
+      const job = await seedQueuedJob(deps);
+      deps.storage.put(STORAGE_PATH, {
+        sizeBytes: PDF_BYTES.length,
+        mime: "application/pdf",
+        bytes: PDF_BYTES,
+      });
+      deps.extractor.hang();
+
+      const pending = processImportJob({ importJobId: job.id }, deps, OWNER_ID);
+      await vi.advanceTimersByTimeAsync(PROCESSING_BUDGET_MS);
+      const result = await pending;
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value.status).toBe("failed");
+      expect(result.value.error).toBe(TIMEOUT_MESSAGE);
+      expect(deps.extractor.extractCalls[0].signal?.aborted).toBe(true);
+      expect(deps.notebookPages.writeImportedContentCalls).toHaveLength(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("passes a live signal to the extractor and clears its timer once extraction ends", async () => {
+    const deps = makeDeps();
+    const job = await seedQueuedJob(deps);
+    seedTextExtraction(deps, ["Hola"]);
+
+    const result = await processImportJob(
+      { importJobId: job.id },
+      deps,
+      OWNER_ID,
+    );
+
+    expect(result.ok && result.value.status).toBe("done");
+    expect(deps.extractor.extractCalls[0].signal?.aborted).toBe(false);
   });
 
   // document-import T9b: a document over an import cap (zip bomb, page

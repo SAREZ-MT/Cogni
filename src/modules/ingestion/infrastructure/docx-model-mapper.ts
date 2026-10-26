@@ -26,6 +26,7 @@ import {
   type ColorSpan,
   type ParagraphEnrichment,
 } from "./docx-enrichment";
+import { OoxmlLimitError } from "./ooxml-package";
 
 // document-import T6: maps mammoth's DOCX document model (captured with
 // its `transformDocument` hook) to an ImportedDoc, enriched per paragraph
@@ -66,6 +67,11 @@ export type MappedDocx = {
 };
 
 const MAX_ALT_LENGTH = 2000;
+// document-import T9b: tables nested deeper than this fail the import
+// (OoxmlLimitError → DOCUMENT_LIMIT_EXCEEDED) instead of recursing on;
+// real documents rarely nest more than two or three. The XML nesting cap
+// (OOXML_LIMITS.maxXmlDepth) already bounds every other recursion here.
+export const MAX_TABLE_NESTING = 16;
 // A colour carried by at least this share of the body text is the
 // document's base colour (set by the Normal style, which officeparser
 // folds into every run), not an emphasis: it is not imported.
@@ -551,7 +557,7 @@ class DocxMapper {
 
   // Maps a sequence of body or cell children, grouping consecutive list,
   // task, code and quote paragraphs into one block each.
-  mapBlocks(nodes: readonly MammothNode[]): ImportedBlock[] {
+  mapBlocks(nodes: readonly MammothNode[], tableDepth = 0): ImportedBlock[] {
     const blocks: ImportedBlock[] = [];
     let group:
       | { kind: "list"; builder: ListBuilder }
@@ -584,7 +590,7 @@ class DocxMapper {
     for (const node of nodes) {
       if (node.type === "table") {
         closeGroup();
-        const table = this.table(node);
+        const table = this.table(node, tableDepth + 1);
         if (table) blocks.push(table);
         continue;
       }
@@ -666,14 +672,17 @@ class DocxMapper {
     return index + 1;
   }
 
-  private table(node: MammothNode): ImportedBlock | null {
+  private table(node: MammothNode, depth: number): ImportedBlock | null {
+    if (depth > MAX_TABLE_NESTING) {
+      throw new OoxmlLimitError(`tables nested ${depth} deep`);
+    }
     const rows: ImportedTableRow[] = [];
     for (const row of node.children ?? []) {
       if (row.type !== "tableRow") continue;
       const cells: ImportedTableCell[] = [];
       for (const cell of row.children ?? []) {
         if (cell.type !== "tableCell") continue;
-        const content = this.mapBlocks(cell.children ?? []);
+        const content = this.mapBlocks(cell.children ?? [], depth);
         cells.push({
           type: row.isHeader ? "tableHeader" : "tableCell",
           attrs: {

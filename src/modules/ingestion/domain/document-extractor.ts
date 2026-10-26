@@ -26,6 +26,12 @@ export type ExtractedDocument = {
   skippedImages: number;
 };
 
+// document-import T9b: aborted once processImportJob's time budget runs
+// out. Adapters check it between their steps (pages, engines) and stop
+// early; synchronous parser work in between cannot be interrupted (see
+// the README, "Límites y seguridad").
+export type ExtractOptions = { signal?: AbortSignal };
+
 // document-import T5 (replaces `PdfTextExtractor`): the port
 // `processImportJob` depends on instead of calling a parser library
 // directly (`domain-is-pure`/`application-no-infra-or-ui`). `format` is
@@ -41,8 +47,11 @@ export interface DocumentExtractor {
   // `failed(unsupported_format)` and every other error to
   // `failed(invalid_document)`. A readable document with no text is a
   // success: `processImportJob` owns the "no text" decision.
+  // err(DOCUMENT_FILE_ERROR.LIMIT_EXCEEDED) for a document over an
+  // import cap (T9b).
   extract(
     bytes: Uint8Array,
     format: DocumentFormat,
+    options?: ExtractOptions,
   ): Promise<Result<ExtractedDocument, DomainError>>;
 }

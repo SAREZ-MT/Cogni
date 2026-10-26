@@ -3,6 +3,7 @@ import { ok, type Result } from "@/shared/kernel/result";
 import type {
   DocumentExtractor,
   ExtractedDocument,
+  ExtractOptions,
 } from "../../domain/document-extractor";
 import type { DocumentFormat } from "../../domain/document-format";
 
@@ -15,8 +16,18 @@ export class FakeDocumentExtractor implements DocumentExtractor {
   // Records every call (bytes and the format it was asked for) so tests
   // can assert extraction never happens once an earlier step already
   // failed, and that the detected format reached the port.
-  readonly extractCalls: Array<{ bytes: Uint8Array; format: DocumentFormat }> =
-    [];
+  readonly extractCalls: Array<{
+    bytes: Uint8Array;
+    format: DocumentFormat;
+    signal?: AbortSignal;
+  }> = [];
+  private hanging = false;
+
+  // T9b: every later extract() never settles (a parser stuck on an async
+  // step), so the caller's time budget is what ends the import.
+  hang(): void {
+    this.hanging = true;
+  }
 
   // The result the next (and every subsequent) extract() call returns.
   // Defaults to an empty document with zero pages, matching "no text".
@@ -27,8 +38,14 @@ export class FakeDocumentExtractor implements DocumentExtractor {
   async extract(
     bytes: Uint8Array,
     format: DocumentFormat,
+    options?: ExtractOptions,
   ): Promise<Result<ExtractedDocument, DomainError>> {
-    this.extractCalls.push({ bytes, format });
+    this.extractCalls.push(
+      options?.signal
+        ? { bytes, format, signal: options.signal }
+        : { bytes, format },
+    );
+    if (this.hanging) return new Promise(() => {});
     return (
       this.result ??
       ok({
