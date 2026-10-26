@@ -3,9 +3,9 @@
 import type { ReactNode } from "react";
 import {
   ActiveImportsProvider,
+  DocumentImportProvider,
+  ImportDocumentMenuItem,
   ImportingPageBadge,
-  ImportPdfMenuItem,
-  PdfImportProvider,
 } from "@/modules/ingestion";
 // Deep import, not `@/modules/notebooks`'s public index.ts: that barrel
 // also re-exports `createNotebooksServerApi` (server-api.ts), which pulls
@@ -37,10 +37,10 @@ export function NotebookActions({
 }) {
   return (
     <ActiveImportsProvider initialPageIds={initialPageIds}>
-      <PdfImportProvider>
+      <DocumentImportProvider>
         <NotebookActionsSlotProvider
           menuItems={(notebook, helpers) => (
-            <ImportPdfMenuItem
+            <ImportDocumentMenuItem
               notebook={notebook}
               onImported={helpers.refreshTree}
             />
@@ -49,7 +49,7 @@ export function NotebookActions({
         >
           {children}
         </NotebookActionsSlotProvider>
-      </PdfImportProvider>
+      </DocumentImportProvider>
     </ActiveImportsProvider>
   );
 }

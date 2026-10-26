@@ -75,9 +75,8 @@ Follows the same hexagonal shape as `notebooks`
 ## UI
 
 Since T11 the picker imports PDF and Word documents (`ui/`; components
-renamed from `Pdf*` to `Document*`, the old `PdfImportProvider`/
-`ImportPdfMenuItem` names stay as aliases in `index.ts` for
-`src/app/(app)/_components/notebook-actions.tsx`):
+renamed from `Pdf*` to `Document*`; since T11b the app shell uses the
+`Document*` names and the old aliases are gone):
 
 - Entry points: the notebook menu's "Importar documento"
   (`ImportDocumentMenuItem`) and the editor's `/` item "Importar
@@ -141,7 +140,7 @@ its format from the bytes, and maps each outcome to a failure kind:
 
 | Outcome | Kind | Message |
 |---|---|---|
-| Legacy (`.doc`/`.ppt`), unknown bytes, or bytes that are not the format the path declares | `unsupported_format` | "Solo puedes importar archivos PDF, Word (.docx) o PowerPoint (.pptx)." |
+| Legacy (`.doc`/`.ppt`), unknown bytes, or bytes that are not the format the path declares | `unsupported_format` | "Solo puedes importar archivos PDF o Word (.docx)." (derived from `IMPORTABLE_FORMATS` in `domain/document-format.ts`, so PowerPoint joins the sentence when it is enabled) |
 | Extractor returns `DOCUMENT_UNSUPPORTED_FORMAT` | `unsupported_format` | same |
 | Any other extractor error, a thrown extractor, or a file over 20 MiB | `invalid_document` | "Este archivo no es un documento válido o está protegido. …" |
 | No block carries text (`hasTextContent`), PDF | `no_text_layer` | "Este PDF no tiene texto seleccionable y Cogni no hace OCR. …" |

@@ -29,18 +29,11 @@ export {
   ActiveImportsProvider,
   useIsImporting,
 } from "./ui/active-imports-provider";
-// PDF-era names kept as aliases (document-import T11) for the app-wide
-// composition root (src/app/(app)/_components/notebook-actions.tsx) until
-// it switches to the Document* names; they are the same components.
 export {
   DocumentImportProvider,
-  DocumentImportProvider as PdfImportProvider,
   useNotebookImport,
 } from "./ui/document-import-provider";
-export {
-  ImportDocumentMenuItem,
-  ImportDocumentMenuItem as ImportPdfMenuItem,
-} from "./ui/import-document-menu-item";
+export { ImportDocumentMenuItem } from "./ui/import-document-menu-item";
 export { ImportProgress } from "./ui/import-progress";
 export { ImportingPageBadge } from "./ui/importing-page-badge";
 export { PageImportView } from "./ui/page-import-view";
