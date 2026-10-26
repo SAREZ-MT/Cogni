@@ -175,6 +175,33 @@ describe("detectDocumentFormat (synthetic bytes)", () => {
     ).toBe("docx");
   });
 
+  // T6 review follow-up: a candidate declaring 0 entries "leads" to an
+  // empty, well-formed directory; accepting it stopped the search before
+  // the real record and judged the package by an empty name list.
+  it("keeps searching backwards past an end-of-central-directory candidate declaring 0 entries", () => {
+    const emptyEocd = [0x50, 0x4b, 0x05, 0x06];
+    for (let i = 0; i < 18; i++) emptyEocd.push(0);
+
+    expect(
+      detectDocumentFormat(
+        makeZip(["[Content_Types].xml", "word/document.xml"], {
+          comment: emptyEocd,
+        }),
+      ),
+    ).toBe("docx");
+    expect(
+      detectDocumentFormat(
+        makeZip(["[Content_Types].xml", "ppt/presentation.xml"], {
+          comment: emptyEocd,
+        }),
+      ),
+    ).toBe("pptx");
+  });
+
+  it("still reports an archive whose only directory is empty as unknown", () => {
+    expect(detectDocumentFormat(makeZip([]))).toBe("unknown");
+  });
+
   it("never throws on a ZIP signature followed by garbage", () => {
     const bytes = new Uint8Array(64).fill(0xff);
     bytes.set([0x50, 0x4b, 0x03, 0x04]);

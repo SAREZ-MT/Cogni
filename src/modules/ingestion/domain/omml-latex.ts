@@ -14,42 +14,47 @@
 // returns null) and the mapper keeps the equation as plain text.
 
 // Commands officeparser's OMML converter emits, with the number of
-// mandatory arguments each takes.
-const COMMAND_ARITY: Readonly<Record<string, number>> = {
-  frac: 2,
-  sqrt: 1,
-  operatorname: 1,
-  overline: 1,
-  underline: 1,
-  bar: 1,
-  vec: 1,
-  dot: 1,
-  hat: 1,
-  mathbb: 1,
-  mathcal: 1,
-  mathfrak: 1,
-  mathtt: 1,
-  mathsf: 1,
-  mathrm: 1,
-  mathbf: 1,
-  begin: 1,
-  end: 1,
-  sum: 0,
-  prod: 0,
-  int: 0,
-  iint: 0,
-  iiint: 0,
-  oint: 0,
-  bigcup: 0,
-  bigcap: 0,
-  bigwedge: 0,
-  bigvee: 0,
-  ldots: 0,
-  textbackslash: 0,
-  textasciitilde: 0,
-  textasciicircum: 0,
-};
-const KNOWN_COMMANDS = Object.keys(COMMAND_ARITY).sort(
+// mandatory arguments each takes. A Map, not an object literal: a lookup
+// like `name in {...}` also matches names inherited from Object.prototype
+// (`constructor`, `toString`, …), which would pass as known commands (T6
+// review follow-up).
+const COMMAND_ARITY: ReadonlyMap<string, number> = new Map(
+  Object.entries({
+    frac: 2,
+    sqrt: 1,
+    operatorname: 1,
+    overline: 1,
+    underline: 1,
+    bar: 1,
+    vec: 1,
+    dot: 1,
+    hat: 1,
+    mathbb: 1,
+    mathcal: 1,
+    mathfrak: 1,
+    mathtt: 1,
+    mathsf: 1,
+    mathrm: 1,
+    mathbf: 1,
+    begin: 1,
+    end: 1,
+    sum: 0,
+    prod: 0,
+    int: 0,
+    iint: 0,
+    iiint: 0,
+    oint: 0,
+    bigcup: 0,
+    bigcap: 0,
+    bigwedge: 0,
+    bigvee: 0,
+    ldots: 0,
+    textbackslash: 0,
+    textasciitilde: 0,
+    textasciicircum: 0,
+  }),
+);
+const KNOWN_COMMANDS = [...COMMAND_ARITY.keys()].sort(
   (a, b) => b.length - a.length,
 );
 
@@ -122,10 +127,9 @@ export function repairOmmlLatex(latex: string): string {
         continue;
       }
       const letters = source.slice(index + 1, end);
-      const name =
-        letters in COMMAND_ARITY
-          ? letters
-          : KNOWN_COMMANDS.find((command) => letters.startsWith(command));
+      const name = COMMAND_ARITY.has(letters)
+        ? letters
+        : KNOWN_COMMANDS.find((command) => letters.startsWith(command));
       if (!name) {
         // Not ours: copied as is, and importableLatex rejects it.
         out += source.slice(index, end);
@@ -137,7 +141,7 @@ export function repairOmmlLatex(latex: string): string {
       out += `\\${name}`;
       source = letters.slice(name.length) + source.slice(end);
       index = 0;
-      const arity = COMMAND_ARITY[name];
+      const arity = COMMAND_ARITY.get(name) ?? 0;
       if (arity === 0) {
         if (letters.length > name.length) out += " ";
         continue;
@@ -197,7 +201,7 @@ function usesOnlyKnownCommands(latex: string): boolean {
   let ends = 0;
   for (const match of latex.matchAll(/\\([a-zA-Z]+)/g)) {
     const name = match[1];
-    if (!(name in COMMAND_ARITY)) return false;
+    if (!COMMAND_ARITY.has(name)) return false;
     if (name === "begin") begins++;
     if (name === "end") ends++;
   }

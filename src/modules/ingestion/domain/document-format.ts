@@ -51,9 +51,13 @@ function asciiName(bytes: Uint8Array, start: number, length: number): string {
 
 // Names listed by the central directory an end-of-central-directory
 // candidate at `eocd` points to, or null when that candidate does not lead
-// to a well-formed directory (a header missing or out of bounds).
+// to a well-formed directory (a header missing or out of bounds) or
+// declares no entries at all: an OOXML package always has entries, and a
+// 0-entry record (e.g. one sitting in the archive comment) must not stop
+// the search before the real one (T6 review follow-up).
 function namesFromEocd(bytes: Uint8Array, eocd: number): string[] | null {
   const entries = u16(bytes, eocd + 10);
+  if (entries === 0) return null;
   let offset = u32(bytes, eocd + 16);
   const names: string[] = [];
   for (let entry = 0; entry < entries; entry++) {

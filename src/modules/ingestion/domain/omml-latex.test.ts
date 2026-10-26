@@ -56,4 +56,28 @@ describe("importableLatex", () => {
     expect(importableLatex("")).toBeNull();
     expect(importableLatex("   ")).toBeNull();
   });
+
+  // T6 review follow-up: `name in COMMAND_ARITY` also matched names
+  // inherited from Object.prototype, so these passed as known commands.
+  it("returns null for Object.prototype member names used as commands", () => {
+    for (const latex of [
+      "\\constructor",
+      "\\toString{x}",
+      "\\hasOwnProperty",
+      "\\valueOf",
+      "\\isPrototypeOf{a}{b}",
+    ]) {
+      expect(importableLatex(latex)).toBeNull();
+    }
+  });
+
+  it("never turns \\__proto__ into a command (the backslash escapes the underscore)", () => {
+    const latex = importableLatex("\\__proto__");
+
+    expect(latex === null || !/\\[a-zA-Z_]*proto/.test(latex)).toBe(true);
+  });
+
+  it("does not repair a prototype member name into a command and its arguments", () => {
+    expect(repairOmmlLatex("\\constructorab")).toBe("\\constructorab");
+  });
 });

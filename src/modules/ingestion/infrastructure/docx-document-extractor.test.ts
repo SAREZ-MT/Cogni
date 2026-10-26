@@ -560,5 +560,8 @@ describe("DocxDocumentExtractor budget", () => {
     expect(findCatalogueViolations(withAssetIds(result.value.content))).toEqual(
       [],
     );
-  });
+    // Explicit timeout above the 15 s assertion bound (T6 review
+    // follow-up): vitest's 5 s default would fail a slow run as a timeout
+    // before the budget assertion could report it.
+  }, 30_000);
 });

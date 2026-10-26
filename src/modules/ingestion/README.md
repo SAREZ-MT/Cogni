@@ -189,11 +189,13 @@ Equations: officeparser writes a one-character argument without braces
 right after a command (`\fracab`, `\sqrty`). `omml-latex.ts` restores them
 deterministically (officeparser escapes all document text, so every
 `\name` is one of its own commands), then accepts the LaTeX only if braces
-balance and every command is one officeparser emits.
+balance and every command is one officeparser emits (looked up in a
+`Map`, so `Object.prototype` names such as `\constructor` never pass).
 
 `totalPages` is the number of explicit page breaks + 1 (a DOCX stores no
 reliable page count); `pagesWithoutText` is always 0. A file mammoth
-cannot open (truncated, not a ZIP) returns `DOCUMENT_UNREADABLE`, which
+cannot open (truncated, not a ZIP), or whose model the mapper throws on,
+returns `DOCUMENT_UNREADABLE`, which
 `processImportJob` maps to `invalid_document`. `large-30p.docx` extracts
 in about 0.2 s locally.
 

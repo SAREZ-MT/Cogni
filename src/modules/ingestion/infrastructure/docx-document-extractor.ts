@@ -101,22 +101,24 @@ export class DocxDocumentExtractor implements DocumentExtractor {
       bytes.byteOffset,
       bytes.byteLength,
     );
-    let model: MammothNode;
-    let enrichments: ParagraphEnrichment[] | null;
+    let mapped: Awaited<ReturnType<typeof mapDocxModel>>;
     try {
-      [model, enrichments] = await Promise.all([
+      const [model, enrichments] = await Promise.all([
         readMammothModel(buffer),
         readEnrichments(buffer),
       ]);
+      // Inside the try too (T6 review follow-up): a mapping bug on an
+      // unexpected model shape becomes an error Result
+      // (→ `invalid_document`) instead of escaping the port's contract.
+      mapped = await mapDocxModel(model, enrichments);
     } catch {
       return err(
         new DomainError(
           DOCUMENT_FILE_ERROR.UNREADABLE,
-          "mammoth could not read the DOCX",
+          "the DOCX could not be read or mapped",
         ),
       );
     }
-    const mapped = await mapDocxModel(model, enrichments);
     return ok({
       content: mapped.content,
       totalPages: mapped.pageBreaks + 1,
