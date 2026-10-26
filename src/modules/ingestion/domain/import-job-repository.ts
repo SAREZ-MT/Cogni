@@ -19,7 +19,9 @@ export interface ImportJobRepository {
   create(job: ImportJob): Promise<Result<void, DomainError>>;
   findById(id: string): Promise<ImportJob | null>;
   findByStoragePath(storagePath: string): Promise<ImportJob | null>;
-  findLatestByPage(pageId: string): Promise<ImportJob | null>;
+  // With `ownerId` (T9b), only that owner's jobs are considered, so a
+  // caller can never learn about another user's page.
+  findLatestByPage(pageId: string, ownerId?: string): Promise<ImportJob | null>;
   // ids of pages with a `queued` or `processing`, non-abandoned job owned
   // by `ownerId` (read-only; for the sidebar importing badge).
   listActivePageIds(ownerId: string): Promise<string[]>;

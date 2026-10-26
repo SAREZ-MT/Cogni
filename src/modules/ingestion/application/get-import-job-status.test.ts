@@ -69,7 +69,10 @@ describe("getImportJobStatus use case", () => {
     expect(result.value && "storagePath" in result.value).toBe(false);
   });
 
-  it("rejects a job owned by someone else without revealing existence", async () => {
+  // T9b (security audit: existence oracle): another user's page answers
+  // exactly like a page without imports — ok(null) — instead of an error
+  // that would reveal the page has an import job.
+  it("answers ok(null) for another user's page, exactly like a page without imports", async () => {
     const deps = makeDeps();
     const job = createImportJob(
       {
@@ -90,8 +93,13 @@ describe("getImportJobStatus use case", () => {
       OWNER_ID,
     );
 
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error.code).toBe("IMPORT_JOB_NOT_FOUND");
+    const none = await getImportJobStatus(
+      { pageId: "page-without-jobs" },
+      deps,
+      OWNER_ID,
+    );
+    expect(result).toEqual({ ok: true, value: null });
+    expect(result).toEqual(none);
   });
 
   it("reports an abandoned processing job as failed(timeout) without writing", async () => {

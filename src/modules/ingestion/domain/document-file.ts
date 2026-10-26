@@ -157,8 +157,17 @@ export function pageTitleFromFileName(fileName: string): string | undefined {
   // always defined; no fallback needed (and none that vitest could ever
   // exercise, since `split` on a string can never return an empty array).
   const segments = fileName.split(/[/\\]/);
-  const base = segments[segments.length - 1];
-  const withoutExtension = base.replace(DOCUMENT_EXTENSION, "");
+  // document-import T9b (security audit): control (Cc) and format (Cf)
+  // characters — bidi overrides/isolates U+202A–U+202E and U+2066–U+2069,
+  // zero-width ones, the BOM, soft hyphens — are dropped before anything
+  // else, so a name cannot spoof another one ("factura\u202Efdp.docx"
+  // renders as "facturaxcod.pdf") or hide text; whitespace controls (tab,
+  // newline, NEL) become a space instead of gluing words together.
+  const base = segments[segments.length - 1].replace(
+    /[\p{Cc}\p{Cf}]/gu,
+    (char) => (/\s/u.test(char) ? " " : ""),
+  );
+  const withoutExtension = base.trimEnd().replace(DOCUMENT_EXTENSION, "");
   const collapsed = withoutExtension.replace(/\s+/g, " ").trim();
   // Truncating at a fixed length can land right after a space (leaving a
   // trailing space) as easily as mid-word; trim again after cutting

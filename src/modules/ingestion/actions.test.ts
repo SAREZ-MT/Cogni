@@ -366,7 +366,7 @@ describe("ingestion Server Actions", () => {
       expect(result).toEqual({ ok: true, value: [started.value.pageId] });
     });
 
-    it("getImportJobStatus maps a job owned by another user to an ActionError, without revealing it exists", async () => {
+    it("getImportJobStatus answers null for another user's page, without revealing it has a job", async () => {
       const path = freshUploadPath(OWNER_ID);
       current.storage.put(path, { sizeBytes: 2048, mime: "application/pdf" });
       const { startPdfImport, getImportJobStatus } = await import("./actions");
@@ -385,8 +385,7 @@ describe("ingestion Server Actions", () => {
       });
       const result = await getImportJobStatus({ pageId: started.value.pageId });
 
-      expect(result.ok).toBe(false);
-      if (!result.ok) expect(result.error.code).toBe("IMPORT_JOB_NOT_FOUND");
+      expect(result).toEqual({ ok: true, value: null });
     });
 
     // T8 review follow-up (R3-actions-never-throw-unenforced): a thrown

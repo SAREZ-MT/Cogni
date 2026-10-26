@@ -54,10 +54,14 @@ export class InMemoryImportJobRepository implements ImportJobRepository {
     return null;
   }
 
-  async findLatestByPage(pageId: string): Promise<ImportJob | null> {
+  async findLatestByPage(
+    pageId: string,
+    ownerId?: string,
+  ): Promise<ImportJob | null> {
     let latest: ImportJob | null = null;
     for (const job of this.jobs.values()) {
       if (job.pageId !== pageId) continue;
+      if (ownerId !== undefined && job.ownerId !== ownerId) continue;
       if (!latest || job.createdAt.getTime() > latest.createdAt.getTime()) {
         latest = job;
       }

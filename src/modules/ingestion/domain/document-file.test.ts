@@ -303,4 +303,40 @@ describe("pageTitleFromFileName", () => {
     // No lone surrogate (a half-emoji) survives in the result.
     expect(title).not.toMatch(/[\uD800-\uDFFF]/);
   });
+
+  // document-import T9b (security audit): the title comes from a name the
+  // client chose; control, bidi and zero-width characters would let it
+  // spoof another name ("factura\u202Efdp.docx" renders as
+  // "facturaxcod.pdf") or hide text, so they are dropped.
+  it("drops bidi overrides and isolates (U+202A-U+202E, U+2066-U+2069)", () => {
+    expect(pageTitleFromFileName("factura\u202Efdp.docx")).toBe("facturafdp");
+    expect(
+      pageTitleFromFileName(
+        "\u202Aa\u202Bb\u202Cc\u202Dd\u2066e\u2067f\u2068g\u2069.pdf",
+      ),
+    ).toBe("abcdefg");
+  });
+
+  it("drops zero-width and other format characters", () => {
+    expect(
+      pageTitleFromFileName("No\u200Bta\u200Cs\u200D\uFEFF\u2060\u00AD.pdf"),
+    ).toBe("Notas");
+  });
+
+  it("drops control characters, turning whitespace controls into a single space", () => {
+    expect(pageTitleFromFileName("Notas\u0000\u0007\u001B[31m.pdf")).toBe(
+      "Notas[31m",
+    );
+    expect(pageTitleFromFileName("Notas\tde\n\nclase\u0085.pdf")).toBe(
+      "Notas de clase",
+    );
+  });
+
+  it("returns undefined for a name made only of invisible characters", () => {
+    expect(pageTitleFromFileName("\u200B\u202E\u0000.pdf")).toBeUndefined();
+  });
+
+  it("strips the extension even when invisible characters trail it", () => {
+    expect(pageTitleFromFileName("Apuntes.docx\u200B")).toBe("Apuntes");
+  });
 });

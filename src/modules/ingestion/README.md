@@ -325,6 +325,18 @@ inflating, and checked again once read) is skipped, and once the images
 read reach 40 MiB in total the rest are not read. Every image not kept
 counts in `skippedImages`.
 
+### File names and import status
+
+- `pageTitleFromFileName` drops control (`\p{Cc}`) and format
+  (`\p{Cf}`: bidi overrides/isolates U+202A–U+202E and U+2066–U+2069,
+  zero-width characters, BOM, soft hyphen) characters before collapsing
+  whitespace — whitespace controls become a space — so a title cannot
+  spoof another name (`factura\u202Efdp.docx`) or hide text.
+- `getImportJobStatus` looks the job up by (pageId, ownerId) and answers
+  `ok(null)` for another user's page, exactly like a page without
+  imports, so it is no existence oracle (it returned `IMPORT_JOB_NOT_FOUND`
+  for a foreign page until T9b).
+
 ## Job lifecycle
 
 ```

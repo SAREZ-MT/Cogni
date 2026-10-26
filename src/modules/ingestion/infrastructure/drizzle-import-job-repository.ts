@@ -111,9 +111,15 @@ export class DrizzleImportJobRepository implements ImportJobRepository {
   // "Latest" by createdAt: a page can only ever have one non-abandoned
   // active job at a time (idempotent by storagePath), but a retried
   // import after a `failed` job creates a second row for the same page.
-  async findLatestByPage(pageId: string): Promise<ImportJob | null> {
+  async findLatestByPage(
+    pageId: string,
+    ownerId?: string,
+  ): Promise<ImportJob | null> {
     const row = await this.db.query.importJobs.findFirst({
-      where: eq(importJobs.pageId, pageId),
+      where:
+        ownerId === undefined
+          ? eq(importJobs.pageId, pageId)
+          : and(eq(importJobs.pageId, pageId), eq(importJobs.ownerId, ownerId)),
       orderBy: [desc(importJobs.createdAt)],
     });
     return row ? toImportJob(row) : null;

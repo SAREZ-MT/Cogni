@@ -1,8 +1,7 @@
 import { z } from "zod";
 import type { Clock } from "@/shared/kernel/clock";
-import { DomainError } from "@/shared/kernel/domain-error";
-import { err, ok, type Result } from "@/shared/kernel/result";
-import { IMPORT_JOB_ERROR } from "../domain/errors";
+import type { DomainError } from "@/shared/kernel/domain-error";
+import { ok, type Result } from "@/shared/kernel/result";
 import { failureMessage } from "../domain/import-failure";
 import {
   type ImportJob,
@@ -59,13 +58,12 @@ export async function getImportJobStatus(
   const parsed = parseInput(getImportJobStatusSchema, input);
   if (!parsed.ok) return parsed;
 
-  const job = await deps.jobs.findLatestByPage(parsed.value.pageId);
-  if (!job) return ok(null);
-  if (job.ownerId !== ownerId) {
-    return err(
-      new DomainError(IMPORT_JOB_ERROR.NOT_FOUND, parsed.value.pageId),
-    );
-  }
+  // T9b (security audit: existence oracle): looked up by (pageId,
+  // ownerId), so another user's page answers ok(null) exactly like a page
+  // that never had an import, instead of an error revealing that it has
+  // one. The owner check stays as a second guard on the adapter.
+  const job = await deps.jobs.findLatestByPage(parsed.value.pageId, ownerId);
+  if (!job || job.ownerId !== ownerId) return ok(null);
 
   if (isAbandoned(job, deps.clock.now())) {
     return ok({
