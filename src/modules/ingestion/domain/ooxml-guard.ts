@@ -17,7 +17,7 @@ const MiB = 1024 * 1024;
 export const OOXML_LIMITS = {
   // A large Word document has a few hundred parts.
   maxEntries: 2000,
-  // Any one non-media part (document.xml, styles.xml, …).
+  // Any one part, media included (the guard rejects the document past it).
   maxPartBytes: 50 * MiB,
   // Any one media part (word/media/…): bigger images are skipped by the
   // extractor, never inflated past this.
