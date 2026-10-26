@@ -63,32 +63,38 @@ describe("ImportTelemetryAdapter", () => {
     consoleInfo.mockRestore();
   });
 
-  it("sends pdf_imported with page_count/pages_without_text/duration_ms/status for a done job", async () => {
+  it("sends document_imported with page_count/pages_without_text/duration_ms/status for a done job", async () => {
     const analytics = makeAnalytics();
     const adapter = new ImportTelemetryAdapter(analytics);
 
     await adapter.finished(makeJob());
 
-    expect(analytics.track).toHaveBeenCalledWith("pdf_imported", "owner-1", {
-      page_count: 12,
-      pages_without_text: 0,
-      duration_ms: 4200,
-      status: "done",
-      format: "pdf",
-    });
+    expect(analytics.track).toHaveBeenCalledWith(
+      "document_imported",
+      "owner-1",
+      {
+        page_count: 12,
+        pages_without_text: 0,
+        duration_ms: 4200,
+        status: "done",
+        format: "pdf",
+        skipped_images: 0,
+      },
+    );
     expect(captureException).not.toHaveBeenCalled();
     expect(captureMessage).not.toHaveBeenCalled();
   });
 
-  // document-import T9: images dropped during the import.
-  it("adds skipped_images when the outcome reports it", async () => {
+  // document-import T9/T10: images dropped during the import, read from
+  // the job (import_jobs.skipped_images).
+  it("sends the job's skipped_images", async () => {
     const analytics = makeAnalytics();
     const adapter = new ImportTelemetryAdapter(analytics);
 
-    await adapter.finished(makeJob(), undefined, { skippedImages: 3 });
+    await adapter.finished(makeJob({ skippedImages: 3 }));
 
     expect(analytics.track).toHaveBeenCalledWith(
-      "pdf_imported",
+      "document_imported",
       "owner-1",
       expect.objectContaining({ status: "done", skipped_images: 3 }),
     );
@@ -101,13 +107,13 @@ describe("ImportTelemetryAdapter", () => {
     await adapter.finished(makeJob({ finishedAt: null }));
 
     expect(analytics.track).toHaveBeenCalledWith(
-      "pdf_imported",
+      "document_imported",
       "owner-1",
       expect.objectContaining({ duration_ms: null }),
     );
   });
 
-  it("sends pdf_imported with status failed and reports to Sentry at error level for most kinds", async () => {
+  it("sends document_imported with status failed and reports to Sentry at error level for most kinds", async () => {
     const analytics = makeAnalytics();
     const adapter = new ImportTelemetryAdapter(analytics);
     const cause = new Error("connection reset");
@@ -118,7 +124,7 @@ describe("ImportTelemetryAdapter", () => {
     });
 
     expect(analytics.track).toHaveBeenCalledWith(
-      "pdf_imported",
+      "document_imported",
       "owner-1",
       expect.objectContaining({ status: "failed", page_count: null }),
     );
@@ -143,19 +149,19 @@ describe("ImportTelemetryAdapter", () => {
     expect(captureException).not.toHaveBeenCalled();
   });
 
-  // document-import T5: the event keeps its name until T10 renames it,
-  // but already carries the job's declared format (from its storage path).
+  // document-import T10: the format-neutral event carries the job's
+  // recorded format (import_jobs.format).
   it.each([
-    ["owner-1/upload-1.docx", "docx"],
-    ["owner-1/upload-1.pptx", "pptx"],
-  ])("sends the declared format of %s as format=%s", async (storagePath, format) => {
+    "docx",
+    "pptx",
+  ] as const)("sends the job's format %s", async (format) => {
     const analytics = makeAnalytics();
     const adapter = new ImportTelemetryAdapter(analytics);
 
-    await adapter.finished(makeJob({ storagePath }));
+    await adapter.finished(makeJob({ format }));
 
     expect(analytics.track).toHaveBeenCalledWith(
-      "pdf_imported",
+      "document_imported",
       "owner-1",
       expect.objectContaining({ format }),
     );

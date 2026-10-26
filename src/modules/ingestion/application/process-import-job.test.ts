@@ -157,8 +157,8 @@ describe("processImportJob use case", () => {
 
   // T7b review follow-up from T6 (R3-idempotency-test-overclaims): the
   // test above only exercises `processing`; `done` and `failed` need
-  // their own proof of no download and no second `pdf_imported`.
-  it("is a no-op for a job already done: no download, no second pdf_imported", async () => {
+  // their own proof of no download and no second `document_imported`.
+  it("is a no-op for a job already done: no download, no second document_imported", async () => {
     const deps = makeDeps();
     const job = await seedQueuedJob(deps);
     seedTextExtraction(deps, ["hola mundo"]);
@@ -182,7 +182,7 @@ describe("processImportJob use case", () => {
     expect(deps.telemetry.finishedCalls).toHaveLength(1);
   });
 
-  it("is a no-op for a job already failed: no download, no second pdf_imported", async () => {
+  it("is a no-op for a job already failed: no download, no second document_imported", async () => {
     const deps = makeDeps();
     const job = await seedQueuedJob(deps);
     // No object was ever `put()`, so the first call fails(download).
@@ -850,7 +850,7 @@ describe("processImportJob use case", () => {
     ]);
   });
 
-  it("completes the job, writes the content and reports pdf_imported exactly once", async () => {
+  it("completes the job, writes the content and reports document_imported exactly once", async () => {
     const deps = makeDeps();
     const job = await seedQueuedJob(deps);
     seedTextExtraction(deps, ["Título\n\nUn párrafo de contenido."]);
@@ -868,7 +868,7 @@ describe("processImportJob use case", () => {
     expect(result.value.pagesWithoutText).toBe(0);
     expect(deps.notebookPages.getPage(job.pageId)?.content).toBeTruthy();
     expect(deps.telemetry.finishedCalls).toEqual([
-      { job: result.value, failure: undefined, outcome: { skippedImages: 0 } },
+      { job: result.value, failure: undefined },
     ]);
   });
 
@@ -911,7 +911,7 @@ describe("processImportJob use case", () => {
     }
   });
 
-  it("never emits a second pdf_imported when markDone/markFailed lose the race (job already terminal)", async () => {
+  it("never emits a second document_imported when markDone/markFailed lose the race (job already terminal)", async () => {
     const deps = makeDeps();
     const job = await seedQueuedJob(deps);
     seedTextExtraction(deps, ["hola mundo"]);
@@ -1078,9 +1078,7 @@ describe("processImportJob images", () => {
         attrs: { assetId, align: "center", alt: null },
       })),
     );
-    expect(deps.telemetry.finishedCalls.at(-1)?.outcome).toEqual({
-      skippedImages: 1,
-    });
+    expect(deps.telemetry.finishedCalls.at(-1)?.job.skippedImages).toBe(1);
     // document-import T10: persisted with the done job.
     expect(result.ok && result.value.skippedImages).toBe(1);
     expect((await deps.jobs.findById(job.id))?.skippedImages).toBe(1);
@@ -1106,9 +1104,7 @@ describe("processImportJob images", () => {
 
     expect(result.ok && result.value.status).toBe("done");
     expect(writtenImages(deps, job.pageId)).toHaveLength(1);
-    expect(deps.telemetry.finishedCalls.at(-1)?.outcome).toEqual({
-      skippedImages: 5,
-    });
+    expect(deps.telemetry.finishedCalls.at(-1)?.job.skippedImages).toBe(5);
   });
 
   it("only uploads images the content references", async () => {
@@ -1151,9 +1147,7 @@ describe("processImportJob images", () => {
     expect(result.ok && result.value.status).toBe("done");
     expect(deps.notebookPages.storeImportedAssetCalls).toHaveLength(1);
     expect(writtenImages(deps, job.pageId)).toHaveLength(1);
-    expect(deps.telemetry.finishedCalls.at(-1)?.outcome).toEqual({
-      skippedImages: 2,
-    });
+    expect(deps.telemetry.finishedCalls.at(-1)?.job.skippedImages).toBe(2);
   });
 
   it("deletes the stored assets when the content write fails", async () => {
@@ -1275,9 +1269,7 @@ describe("processImportJob images", () => {
 
       expect(result.ok && result.value.status).toBe("done");
       expect(writtenImages(deps, job.pageId)).toHaveLength(0);
-      expect(deps.telemetry.finishedCalls.at(-1)?.outcome).toEqual({
-        skippedImages: 2,
-      });
+      expect(deps.telemetry.finishedCalls.at(-1)?.job.skippedImages).toBe(2);
       expect(deps.notebookPages.storeImportedAssetCalls).toHaveLength(0);
 
       // The late upload finishes after the import moved on: its asset is

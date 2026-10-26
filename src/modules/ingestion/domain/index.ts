@@ -55,7 +55,7 @@ export {
   start,
 } from "./import-job";
 export type { ImportJobRepository } from "./import-job-repository";
-export type { ImportOutcome, ImportTelemetry } from "./import-telemetry";
+export type { ImportTelemetry } from "./import-telemetry";
 export {
   hasTextContent,
   type ImportedBlock,

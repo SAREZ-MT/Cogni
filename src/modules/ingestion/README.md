@@ -125,7 +125,7 @@ image's `pendingId` for its `assetId` and removes the rest (refused
 mime/size, failed or throwing upload, budget exhausted), at any depth
 (lists, tables, callouts, quotes, details); a container left empty gets an
 empty paragraph. Removed images add to the extractor's `skippedImages`,
-reported as `skipped_images` on `pdf_imported` and persisted in
+reported as `skipped_images` on `document_imported` and persisted in
 `import_jobs.skipped_images` (`markDone`) for a done job. Each upload is raced against what is left
 of the upload budget (T9b): one that outlives it is dropped and the
 remaining images are not attempted; if it completes later, its asset is
@@ -139,8 +139,11 @@ so the assets are kept and the case is logged instead. The "convert" stage timin
 object whose real mime is not the format its path declares. Only the
 message is stored on the job; the kind classifies the Sentry report
 (`warning` for `no_text_layer`, `empty_document`, `unsupported_format`).
-The `pdf_imported` event keeps its name until T10 and already carries the
-declared `format`.
+Telemetry: every terminal transition sends one PostHog event
+`document_imported` (`pdf_imported` until T10 renamed it) with
+`page_count`, `pages_without_text`, `duration_ms`, `status`
+(`done|failed`), `format` (`pdf|docx|pptx`, the job's column) and
+`skipped_images` (the job's column; 0 for a failed job).
 
 ## Storage and database
 
@@ -376,7 +379,7 @@ Idempotency is keyed by `storagePath` (a `UNIQUE` constraint since T1):
 `startPdfImport` called twice for the same upload returns the existing job
 instead of creating a second page/job pair, and a repeated
 `processPdfImport` on a non-`queued` job is a no-op (`ok(job)`, no
-download, no write, no second `pdf_imported`).
+download, no write, no second `document_imported`).
 
 ## `maxDuration`
 

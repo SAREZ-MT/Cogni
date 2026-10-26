@@ -21,10 +21,7 @@ import {
 } from "../domain/import-failure";
 import type { ImportJob } from "../domain/import-job";
 import type { ImportJobRepository } from "../domain/import-job-repository";
-import type {
-  ImportOutcome,
-  ImportTelemetry,
-} from "../domain/import-telemetry";
+import type { ImportTelemetry } from "../domain/import-telemetry";
 import { hasTextContent } from "../domain/imported-doc";
 import type { NotebookPagesPort } from "../domain/notebook-pages-port";
 import type { PdfStorageGateway } from "../domain/pdf-storage-gateway";
@@ -130,7 +127,7 @@ export async function processImportJob(
 
   // Idempotency against a repeated call (design.md's failure table):
   // `processing`, `done` and `failed` are all left exactly as they are,
-  // with no download, no write and no second `pdf_imported`.
+  // with no download, no write and no second `document_imported`.
   if (job.status !== "queued") {
     return ok(job);
   }
@@ -156,10 +153,9 @@ export async function processImportJob(
   const reportFinished = async (
     finishedJob: ImportJob,
     failure?: { kind: ImportFailureKind; cause?: unknown },
-    outcome?: ImportOutcome,
   ): Promise<void> => {
     try {
-      await deps.telemetry.finished(finishedJob, failure, outcome);
+      await deps.telemetry.finished(finishedJob, failure);
     } catch (error) {
       console.error("ingestion: telemetry.finished rejected", {
         importJobId: finishedJob.id,
@@ -487,6 +483,6 @@ export async function processImportJob(
     const current = await deps.jobs.findById(claimed.id);
     return ok(current ?? claimed);
   }
-  await reportFinished(completed, undefined, { skippedImages });
+  await reportFinished(completed);
   return ok(completed);
 }

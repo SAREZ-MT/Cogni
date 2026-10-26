@@ -1,14 +1,14 @@
 import { PostHog } from "posthog-node";
 
 // The only product events this app may send. Adding one here is a product
-// decision, not a code detail. `pdf_imported` is Fase 2's addition
-// (design.md, "Observabilidad: pdf_imported en toda transición terminal y
-// Sentry en todo fallo"), sent by ingestion's ImportTelemetryAdapter with
-// page_count/pages_without_text/duration_ms/status properties.
+// decision, not a code detail. `document_imported` (Fase 2's
+// `pdf_imported`, renamed in document-import T10 once DOCX/PPTX import) is
+// sent by ingestion's ImportTelemetryAdapter on every terminal import, with
+// page_count/pages_without_text/duration_ms/status/format/skipped_images.
 export type AnalyticsEvent =
   | "user_signed_up"
   | "user_signed_in"
-  | "pdf_imported"
+  | "document_imported"
   | "generation_requested"
   | "terms_accepted";
 
