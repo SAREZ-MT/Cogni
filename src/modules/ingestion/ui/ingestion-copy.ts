@@ -28,6 +28,8 @@ export const INGESTION_COPY = {
   unsupportedFormat:
     "Solo puedes importar archivos PDF, Word (.docx) o PowerPoint (.pptx).",
   importNotFound: "No encontramos esa importación.",
+  rateLimited:
+    "Llegaste al límite de importaciones por ahora. Intenta de nuevo más tarde.",
   unexpected: "No pudimos completar la importación. Inténtalo de nuevo.",
   progress: {
     uploading: "subiendo el archivo…",
@@ -65,6 +67,8 @@ export function messageForIngestionErrorCode(code: string): string {
       return INGESTION_COPY.storageUnavailable;
     case INGESTION_ERROR.UNEXPECTED:
       return INGESTION_COPY.unexpected;
+    case INGESTION_ERROR.RATE_LIMITED:
+      return INGESTION_COPY.rateLimited;
     case DOCUMENT_FILE_ERROR.MIME_NOT_ALLOWED:
       return INGESTION_COPY.invalidFileType;
     case DOCUMENT_FILE_ERROR.TOO_LARGE:

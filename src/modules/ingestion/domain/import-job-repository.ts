@@ -23,6 +23,9 @@ export interface ImportJobRepository {
   // ids of pages with a `queued` or `processing`, non-abandoned job owned
   // by `ownerId` (read-only; for the sidebar importing badge).
   listActivePageIds(ownerId: string): Promise<string[]>;
+  // document-import T9b: how many `queued`/`processing` jobs `ownerId` has
+  // that are not abandoned at `now` (startPdfImport's MAX_ACTIVE_IMPORTS).
+  countActiveJobs(ownerId: string, now: Date): Promise<number>;
   // queued -> processing. null when the job is no longer queued (another
   // call already won the transition).
   claim(input: { id: string; now: Date }): Promise<ImportJob | null>;

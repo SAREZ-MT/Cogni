@@ -78,6 +78,9 @@ export const DOCUMENT_FILE_ERROR = {
 // Server Action in `actions.ts` wraps its body in maps any exception a
 // dependency throws (`getCurrentUser`, a use case, an adapter) to this
 // code instead of ever letting it escape to the client.
+// `RATE_LIMITED` is T9b's addition (security audit: import rate limit):
+// raised by `requestPdfUpload`/`startPdfImport` when the owner spent the
+// hourly limit or already has MAX_ACTIVE_IMPORTS imports in flight.
 export const INGESTION_ERROR = {
   NOTEBOOK_NOT_FOUND: "INGESTION_NOTEBOOK_NOT_FOUND",
   NOTEBOOK_MISMATCH: "INGESTION_NOTEBOOK_MISMATCH",
@@ -85,4 +88,5 @@ export const INGESTION_ERROR = {
   SESSION_REQUIRED: "INGESTION_SESSION_REQUIRED",
   STORAGE_UNAVAILABLE: "INGESTION_STORAGE_UNAVAILABLE",
   UNEXPECTED: "INGESTION_UNEXPECTED",
+  RATE_LIMITED: "INGESTION_RATE_LIMITED",
 } as const;

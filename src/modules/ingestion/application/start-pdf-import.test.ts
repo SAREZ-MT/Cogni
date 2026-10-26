@@ -4,7 +4,9 @@ import { err } from "@/shared/kernel/result";
 import { UPLOAD_GRANT_TTL_MS } from "../domain/document-file";
 import { IMPORT_JOB_ERROR } from "../domain/errors";
 import { createImportJob } from "../domain/import-job";
+import { MAX_ACTIVE_IMPORTS } from "../domain/import-rate-limiter";
 import { startPdfImport } from "./start-pdf-import";
+import { FakeImportRateLimiter } from "./testing/fake-import-rate-limiter";
 import { FakeNotebookPagesPort } from "./testing/fake-notebook-pages-port";
 import { FakePdfStorageGateway } from "./testing/fake-pdf-storage-gateway";
 import { FixedClock } from "./testing/fixed-clock";
@@ -40,6 +42,7 @@ function makeDeps() {
     storage: new FakePdfStorageGateway(),
     jobs: new InMemoryImportJobRepository(),
     clock: new FixedClock(NOW),
+    startLimiter: new FakeImportRateLimiter(),
   };
 }
 
@@ -673,5 +676,106 @@ describe("startPdfImport use case", () => {
     } finally {
       consoleError.mockRestore();
     }
+  });
+
+  // document-import T9b (audit: no import rate limit or concurrency cap).
+  describe("limits", () => {
+    const input = (path: string) => ({
+      notebookId: "nb-1",
+      storagePath: path,
+      fileName: "notas.pdf",
+      mime: "application/pdf",
+      sizeBytes: 2048,
+    });
+
+    it("refuses with RATE_LIMITED, creating nothing, when the owner's start limit is spent", async () => {
+      const deps = makeDeps();
+      const path = uploadPath(OWNER_ID, NOW.getTime());
+      seedObject(deps, path);
+      deps.startLimiter.refuse();
+
+      const result = await startPdfImport(input(path), deps, OWNER_ID);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.error.code).toBe("INGESTION_RATE_LIMITED");
+      expect(deps.startLimiter.consumed).toEqual([OWNER_ID]);
+      expect(deps.notebookPages.createPageCalls).toEqual([]);
+      expect(await deps.jobs.findByStoragePath(path)).toBeNull();
+    });
+
+    it("refuses with RATE_LIMITED, without consuming the limit, while the owner has 3 imports in flight", async () => {
+      const deps = makeDeps();
+      for (let index = 0; index < MAX_ACTIVE_IMPORTS; index++) {
+        await deps.jobs.create(
+          createImportJob(
+            {
+              id: `active-${index}`,
+              ownerId: OWNER_ID,
+              pageId: `page-${index}`,
+              storagePath: uploadPath(OWNER_ID, NOW.getTime() - index - 1),
+              fileName: "a.pdf",
+              sizeBytes: 1,
+            },
+            deps.clock,
+          ),
+        );
+      }
+      const path = uploadPath(OWNER_ID, NOW.getTime());
+      seedObject(deps, path);
+
+      const result = await startPdfImport(input(path), deps, OWNER_ID);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.error.code).toBe("INGESTION_RATE_LIMITED");
+      expect(deps.startLimiter.consumed).toEqual([]);
+      expect(deps.notebookPages.createPageCalls).toEqual([]);
+      expect(MAX_ACTIVE_IMPORTS).toBe(3);
+    });
+
+    it("lets another owner start while one owner is at the cap", async () => {
+      const deps = makeDeps();
+      deps.notebookPages.addNotebook({
+        id: "nb-2",
+        ownerId: OTHER_OWNER_ID,
+        active: true,
+      });
+      for (let index = 0; index < MAX_ACTIVE_IMPORTS; index++) {
+        await deps.jobs.create(
+          createImportJob(
+            {
+              id: `active-${index}`,
+              ownerId: OWNER_ID,
+              pageId: `page-${index}`,
+              storagePath: uploadPath(OWNER_ID, NOW.getTime() - index - 1),
+              fileName: "a.pdf",
+              sizeBytes: 1,
+            },
+            deps.clock,
+          ),
+        );
+      }
+      const path = uploadPath(OTHER_OWNER_ID, NOW.getTime());
+      seedObject(deps, path);
+
+      const result = await startPdfImport(
+        { ...input(path), notebookId: "nb-2" },
+        deps,
+        OTHER_OWNER_ID,
+      );
+
+      expect(result.ok).toBe(true);
+    });
+
+    it("does not consume the limit for an idempotent repeat of a started import", async () => {
+      const deps = makeDeps();
+      const path = uploadPath(OWNER_ID, NOW.getTime());
+      seedObject(deps, path);
+
+      await startPdfImport(input(path), deps, OWNER_ID);
+      const repeat = await startPdfImport(input(path), deps, OWNER_ID);
+
+      expect(repeat.ok).toBe(true);
+      expect(deps.startLimiter.consumed).toEqual([OWNER_ID]);
+    });
   });
 });

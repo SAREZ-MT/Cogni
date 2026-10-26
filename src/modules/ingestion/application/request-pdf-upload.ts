@@ -10,6 +10,7 @@ import {
   validateFileName,
 } from "../domain/document-file";
 import { INGESTION_ERROR } from "../domain/errors";
+import type { ImportRateLimiter } from "../domain/import-rate-limiter";
 import type { NotebookPagesPort } from "../domain/notebook-pages-port";
 import type { PdfStorageGateway } from "../domain/pdf-storage-gateway";
 import { parseInput } from "./validation";
@@ -42,6 +43,7 @@ export async function requestPdfUpload(
     notebookPages: NotebookPagesPort;
     storage: PdfStorageGateway;
     clock: Clock;
+    uploadLimiter: ImportRateLimiter;
   },
   ownerId: string,
 ): Promise<Result<PdfUploadGrant, DomainError>> {
@@ -65,6 +67,13 @@ export async function requestPdfUpload(
         parsed.value.notebookId,
       ),
     );
+  }
+
+  // T9b (security audit): every grant counts against the owner's hourly
+  // limit, checked after validation and before Storage is contacted.
+  const allowance = await deps.uploadLimiter.consume(ownerId);
+  if (!allowance.allowed) {
+    return err(new DomainError(INGESTION_ERROR.RATE_LIMITED, "upload grants"));
   }
 
   const storagePath = documentStoragePath(

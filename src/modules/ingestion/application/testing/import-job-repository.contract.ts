@@ -116,5 +116,30 @@ export function runImportJobRepositoryContract(
       const winner = await repo.findByStoragePath(storagePath);
       expect(winner?.id).toBe(first.id);
     });
+
+    // document-import T9b: the per-user cap on concurrent imports. Counted
+    // as a delta so a shared database with earlier runs' rows stays exact.
+    it("countActiveJobs: counts the owner's queued and processing jobs, not terminal or abandoned ones", async () => {
+      const repo = await context.createRepository();
+      const now = new Date("2026-09-23T10:00:05.000Z");
+      const before = await repo.countActiveJobs(ids.ownerId, now);
+      const queued = createImportJob(newJobInput(ids), CLOCK);
+      const processing = createImportJob(newJobInput(ids), CLOCK);
+      const failed = createImportJob(newJobInput(ids), CLOCK);
+      for (const job of [queued, processing, failed]) await repo.create(job);
+      await repo.claim({ id: processing.id, now });
+      await repo.claim({ id: failed.id, now });
+      await repo.markFailed({
+        id: failed.id,
+        kind: "invalid_document",
+        message: "x",
+        now,
+      });
+
+      expect(await repo.countActiveJobs(ids.ownerId, now)).toBe(before + 2);
+      // Long after: both are abandoned, so neither blocks a new import.
+      const later = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+      expect(await repo.countActiveJobs(ids.ownerId, later)).toBe(0);
+    });
   });
 }

@@ -214,6 +214,32 @@ describe("ingestion Server Actions", () => {
       }
     });
 
+    // document-import T9b: the composition root wires a per-user upload
+    // grant limiter (in memory here: no AI_PROVIDER_MODE=live).
+    it("requestPdfUpload refuses with RATE_LIMITED after the hourly grant limit", async () => {
+      // Its own user: the in-memory limiter lives for the whole file.
+      const limitedOwner = "7a7a7a7a-1b1b-4c1c-8d1d-2e2e2e2e2e2e";
+      getCurrentUser.mockResolvedValue({ id: limitedOwner, email: "l@b.com" });
+      current.notebookPages.addNotebook({
+        id: "nb-1",
+        ownerId: limitedOwner,
+        active: true,
+      });
+      const { requestPdfUpload } = await import("./actions");
+      const request = () =>
+        requestPdfUpload({
+          notebookId: "nb-1",
+          fileName: "a.pdf",
+          mime: "application/pdf",
+          sizeBytes: 1024,
+        });
+      let last = await request();
+      for (let call = 1; call <= 20 && last.ok; call++) last = await request();
+
+      expect(last.ok).toBe(false);
+      if (!last.ok) expect(last.error.code).toBe("INGESTION_RATE_LIMITED");
+    });
+
     it("startPdfImport responds in queued without extracting, and revalidates the sidebar", async () => {
       const path = freshUploadPath(OWNER_ID);
       current.storage.put(path, { sizeBytes: 2048, mime: "application/pdf" });

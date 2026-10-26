@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { isOwnedDocumentPath } from "../domain/document-file";
 import { requestPdfUpload } from "./request-pdf-upload";
+import { FakeImportRateLimiter } from "./testing/fake-import-rate-limiter";
 import { FakeNotebookPagesPort } from "./testing/fake-notebook-pages-port";
 import { FakePdfStorageGateway } from "./testing/fake-pdf-storage-gateway";
 import { FixedClock } from "./testing/fixed-clock";
@@ -16,6 +17,7 @@ function makeDeps() {
     notebookPages,
     storage: new FakePdfStorageGateway(),
     clock: new FixedClock(NOW),
+    uploadLimiter: new FakeImportRateLimiter(),
   };
 }
 
@@ -252,5 +254,45 @@ describe("requestPdfUpload use case", () => {
     } finally {
       consoleError.mockRestore();
     }
+  });
+
+  // document-import T9b (audit: no import rate limit): every upload grant
+  // counts against the owner's hourly grant limit, before Storage is
+  // contacted.
+  it("refuses with RATE_LIMITED, issuing no grant, when the owner's upload limit is spent", async () => {
+    const deps = makeDeps();
+    deps.uploadLimiter.refuse();
+    const createSignedUploadUrl = vi.spyOn(
+      deps.storage,
+      "createSignedUploadUrl",
+    );
+
+    const result = await requestPdfUpload(
+      {
+        notebookId: "nb-1",
+        fileName: "notas.pdf",
+        mime: "application/pdf",
+        sizeBytes: 2048,
+      },
+      deps,
+      OWNER_ID,
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("INGESTION_RATE_LIMITED");
+    expect(deps.uploadLimiter.consumed).toEqual([OWNER_ID]);
+    expect(createSignedUploadUrl).not.toHaveBeenCalled();
+  });
+
+  it("does not consume the upload limit for an invalid request", async () => {
+    const deps = makeDeps();
+
+    await requestPdfUpload(
+      { notebookId: "nb-1", fileName: "notas.exe", mime: "x", sizeBytes: 1 },
+      deps,
+      OWNER_ID,
+    );
+
+    expect(deps.uploadLimiter.consumed).toEqual([]);
   });
 });

@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, inArray, sql } from "drizzle-orm";
+import { and, count, desc, eq, gt, inArray, sql } from "drizzle-orm";
 import postgres from "postgres";
 import type { Db } from "@/shared/db/client";
 import { type ImportJobRow, importJobs } from "@/shared/db/schema";
@@ -136,6 +136,23 @@ export class DrizzleImportJobRepository implements ImportJobRepository {
         ),
       );
     return rows.map((row) => row.pageId);
+  }
+
+  // document-import T9b: the same active-and-not-abandoned rule as
+  // listActivePageIds, against the caller's `now`.
+  async countActiveJobs(ownerId: string, now: Date): Promise<number> {
+    const cutoff = new Date(now.getTime() - ABANDONED_AFTER_MS);
+    const rows = await this.db
+      .select({ count: count() })
+      .from(importJobs)
+      .where(
+        and(
+          eq(importJobs.ownerId, ownerId),
+          inArray(importJobs.status, ["queued", "processing"]),
+          gt(importJobs.updatedAt, cutoff),
+        ),
+      );
+    return Number(rows[0]?.count ?? 0);
   }
 
   // queued -> processing. Conditional on the WHERE clause, not a

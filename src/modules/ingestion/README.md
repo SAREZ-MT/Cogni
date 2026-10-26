@@ -278,6 +278,28 @@ discarded. The platform's `maxDuration` (120 s) remains the hard ceiling,
 and `getImportJobStatus`'s abandoned-job rule still resolves a job the
 platform killed.
 
+### Rate limits
+
+Per user (`domain/import-rate-limiter.ts`), refused with
+`INGESTION_RATE_LIMITED` ("Llegaste al límite de importaciones por ahora.
+Intenta de nuevo más tarde."):
+
+| Limit | Where | Value |
+|---|---|---|
+| `UPLOAD_GRANTS_PER_HOUR` | `requestPdfUpload`, after validation, before Storage | 20 per hour |
+| `IMPORT_STARTS_PER_HOUR` | `startPdfImport`, new imports only (an idempotent repeat consumes nothing) | 10 per hour |
+| `MAX_ACTIVE_IMPORTS` | `startPdfImport` (`ImportJobRepository.countActiveJobs`, abandoned jobs excluded), checked before the hourly limit | 3 queued/processing |
+
+`processPdfImport` needs no limit of its own: it only processes a queued
+job of the caller, created by a limited start. The limiters come from
+`src/shared/rate-limit` (`createRateLimiter`), composed in `actions.ts`
+with the AI layer's configuration and no new variable:
+`AI_PROVIDER_MODE=live` → Upstash sliding window under
+`{REDIS_KEY_PREFIX}:rl:import-upload|import-start`
+(`UPSTASH_REDIS_REST_URL`/`TOKEN`); otherwise (fake mode: CI, e2e, local)
+an in-memory fixed window shared by the server process. Upstash errors
+fail open (logged): the database cap on active imports still holds.
+
 ### Hidden and invisible text
 
 Text the user never sees must not reach the AI (imported content feeds

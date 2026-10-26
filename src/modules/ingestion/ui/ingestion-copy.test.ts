@@ -61,6 +61,10 @@ describe("messageForIngestionErrorCode", () => {
     [IMPORT_JOB_ERROR.INVALID_TRANSITION, INGESTION_COPY.unexpected],
     [IMPORT_JOB_ERROR.STORAGE_PATH_CONFLICT, INGESTION_COPY.unexpected],
     ["INGESTION_INVALID_INPUT", INGESTION_COPY.invalidInput],
+    [
+      INGESTION_ERROR.RATE_LIMITED,
+      "Llegaste al límite de importaciones por ahora. Intenta de nuevo más tarde.",
+    ],
   ])("maps %s to its Spanish copy", (code, expected) => {
     expect(messageForIngestionErrorCode(code)).toBe(expected);
   });

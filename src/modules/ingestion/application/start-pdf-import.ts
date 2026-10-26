@@ -14,6 +14,10 @@ import {
 import { DOCUMENT_FILE_ERROR, INGESTION_ERROR } from "../domain/errors";
 import { createImportJob, type ImportJobStatus } from "../domain/import-job";
 import type { ImportJobRepository } from "../domain/import-job-repository";
+import {
+  type ImportRateLimiter,
+  MAX_ACTIVE_IMPORTS,
+} from "../domain/import-rate-limiter";
 import type { NotebookPagesPort } from "../domain/notebook-pages-port";
 import type { PdfStorageGateway } from "../domain/pdf-storage-gateway";
 import { parseInput } from "./validation";
@@ -49,6 +53,10 @@ export interface StartPdfImportResult {
 //    Number.isFinite guard is needed here.
 // 4. The notebook is active and owned, re-checked (the grant may outlive
 //    the notebook).
+// 4b. T9b (security audit): the owner may not have MAX_ACTIVE_IMPORTS
+//    imports in flight already, and must have starts left in the hourly
+//    limit (`startLimiter`; only a new import consumes one, never an
+//    idempotent repeat). Both refuse with INGESTION_ERROR.RATE_LIMITED.
 // 5. The object's real metadata from Storage — never the client-declared
 //    mime/size for a path this far in — whose mime must also be the format
 //    the path's extension declares (document-import T5).
@@ -65,6 +73,7 @@ export async function startPdfImport(
     storage: PdfStorageGateway;
     jobs: ImportJobRepository;
     clock: Clock;
+    startLimiter: ImportRateLimiter;
   },
   ownerId: string,
 ): Promise<Result<StartPdfImportResult, DomainError>> {
@@ -96,6 +105,17 @@ export async function startPdfImport(
   );
   if (!notebook) {
     return err(new DomainError(INGESTION_ERROR.NOTEBOOK_NOT_FOUND, notebookId));
+  }
+
+  const active = await deps.jobs.countActiveJobs(ownerId, deps.clock.now());
+  if (active >= MAX_ACTIVE_IMPORTS) {
+    return err(
+      new DomainError(INGESTION_ERROR.RATE_LIMITED, `${active} active imports`),
+    );
+  }
+  const allowance = await deps.startLimiter.consume(ownerId);
+  if (!allowance.allowed) {
+    return err(new DomainError(INGESTION_ERROR.RATE_LIMITED, "import starts"));
   }
 
   // T7c follow-up (R3-metadata-throw-callers-unproved): the port now

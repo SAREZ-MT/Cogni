@@ -133,11 +133,11 @@ module.exports = {
     {
       name: "upstash-only-in-ai-infra",
       comment:
-        "Upstash packages may only be imported from ai/infrastructure; domain and application depend on ports.",
+        "Upstash packages may only be imported from ai/infrastructure and the shared rate-limit adapter (src/shared/rate-limit, document-import T9b); domain and application depend on ports.",
       severity: "error",
       from: {
         path: "^src/",
-        pathNot: "^src/modules/ai/infrastructure/",
+        pathNot: "^src/(modules/ai/infrastructure|shared/rate-limit)/",
       },
       to: { path: "node_modules/@upstash/" },
     },

@@ -84,6 +84,16 @@ export class InMemoryImportJobRepository implements ImportJobRepository {
     return [...pageIds];
   }
 
+  async countActiveJobs(ownerId: string, now: Date): Promise<number> {
+    let count = 0;
+    for (const job of this.jobs.values()) {
+      if (job.ownerId !== ownerId) continue;
+      if (job.status !== "queued" && job.status !== "processing") continue;
+      if (!isAbandoned(job, now)) count++;
+    }
+    return count;
+  }
+
   async claim(input: { id: string; now: Date }): Promise<ImportJob | null> {
     const job = this.jobs.get(input.id);
     if (!job) return null;
