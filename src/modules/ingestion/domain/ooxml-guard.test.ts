@@ -186,6 +186,10 @@ describe("xmlShape", () => {
     const flood = "<a/>".repeat(1_000_000);
     const { result, scanned } = countStringScans(() => xmlShape(flood));
     expect(result).toEqual({ elements: 1_000_000, depth: 1 });
+    // T11: a lower bound too, so the upper one cannot pass vacuously — a
+    // scanner that stopped going through indexOf/charCodeAt (a regex, a
+    // parser) would count ~0 here. Every character must be looked at once.
+    expect(scanned).toBeGreaterThanOrEqual(flood.length);
     expect(scanned).toBeLessThanOrEqual(2 * flood.length);
   }, 30_000);
 

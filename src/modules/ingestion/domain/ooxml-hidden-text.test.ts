@@ -121,6 +121,11 @@ describe("stripHiddenRuns", () => {
     const { result: out, scanned } = countStringScans(() =>
       stripHiddenRuns(xml),
     );
+    // T11: a lower bound too, so the upper one cannot pass vacuously — a
+    // scanner that stopped going through indexOf/charCodeAt would count ~0.
+    // indexOf jumps over run text it does not need, so a quarter of the
+    // input is the floor, well under the ~55% the scanner walks today.
+    expect(scanned).toBeGreaterThanOrEqual(xml.length / 4);
     expect(scanned).toBeLessThanOrEqual(2 * xml.length);
     expect(out).toContain("t0");
     expect(out).not.toContain("t1<");

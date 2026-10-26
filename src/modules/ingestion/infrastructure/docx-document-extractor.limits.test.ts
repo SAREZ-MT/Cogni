@@ -252,11 +252,15 @@ describe("DocxDocumentExtractor limits", () => {
     if (!result.ok) expect(result.error.code).toBe("DOCUMENT_LIMIT_EXCEEDED");
   });
 
+  // All six of officeparser's limit codes (T11: ZIP_ENTRY_INVALID_SIZE and
+  // OUTPUT_TOO_LARGE were mapped but untested).
   it.each([
     "ZIP_SIZE_LIMIT_EXCEEDED",
     "ZIP_ENTRY_COUNT_LIMIT_EXCEEDED",
+    "ZIP_ENTRY_INVALID_SIZE",
     "XML_ELEMENT_LIMIT_EXCEEDED",
     "MAX_NESTING_DEPTH_EXCEEDED",
+    "OUTPUT_TOO_LARGE",
   ])("fails with LIMIT_EXCEEDED on officeparser's own %s", async (code) => {
     vi.spyOn(OfficeParser, "parseOffice").mockRejectedValueOnce(
       Object.assign(new Error(`[OfficeParser]: ${code}`), {
