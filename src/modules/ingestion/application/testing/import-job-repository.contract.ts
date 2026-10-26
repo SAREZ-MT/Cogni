@@ -172,11 +172,17 @@ export function runImportJobRepositoryContract(
     });
 
     // document-import T9b: the per-user cap on concurrent imports. Counted
-    // as a delta so a shared database with earlier runs' rows stays exact.
+    // as a delta at both instants so rows earlier cases left behind on a
+    // shared database stay out of the assertion (T11: the cap case above
+    // leaves three jobs updated in 2030, which are still active a day
+    // after `now` — abandonment is judged against the passed clock, and a
+    // job updated after it is not abandoned).
     it("countActiveJobs: counts the owner's queued and processing jobs, not terminal or abandoned ones", async () => {
       const repo = await context.createRepository();
       const now = new Date("2026-09-23T10:00:05.000Z");
+      const later = new Date(now.getTime() + 24 * 60 * 60 * 1000);
       const before = await repo.countActiveJobs(ids.ownerId, now);
+      const beforeLater = await repo.countActiveJobs(ids.ownerId, later);
       const queued = createImportJob(newJobInput(ids), CLOCK);
       const processing = createImportJob(newJobInput(ids), CLOCK);
       const failed = createImportJob(newJobInput(ids), CLOCK);
@@ -192,8 +198,7 @@ export function runImportJobRepositoryContract(
 
       expect(await repo.countActiveJobs(ids.ownerId, now)).toBe(before + 2);
       // Long after: both are abandoned, so neither blocks a new import.
-      const later = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-      expect(await repo.countActiveJobs(ids.ownerId, later)).toBe(0);
+      expect(await repo.countActiveJobs(ids.ownerId, later)).toBe(beforeLater);
     });
   });
 }
