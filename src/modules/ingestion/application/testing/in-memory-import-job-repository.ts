@@ -111,13 +111,18 @@ export class InMemoryImportJobRepository implements ImportJobRepository {
     id: string;
     pageCount: number;
     pagesWithoutText: number;
+    skippedImages: number;
     now: Date;
   }): Promise<ImportJob | null> {
     const job = this.jobs.get(input.id);
     if (!job) return null;
     const result = complete(
       job,
-      { pageCount: input.pageCount, pagesWithoutText: input.pagesWithoutText },
+      {
+        pageCount: input.pageCount,
+        pagesWithoutText: input.pagesWithoutText,
+        skippedImages: input.skippedImages,
+      },
       clockAt(input.now),
     );
     if (!result.ok) return null;

@@ -31,11 +31,13 @@ export interface ImportJobRepository {
   // queued -> processing. null when the job is no longer queued (another
   // call already won the transition).
   claim(input: { id: string; now: Date }): Promise<ImportJob | null>;
-  // processing -> done. null when nothing changed.
+  // processing -> done, with the images the import dropped (T10). null
+  // when nothing changed.
   markDone(input: {
     id: string;
     pageCount: number;
     pagesWithoutText: number;
+    skippedImages: number;
     now: Date;
   }): Promise<ImportJob | null>;
   // processing -> failed, or queued -> failed only when kind is "timeout".

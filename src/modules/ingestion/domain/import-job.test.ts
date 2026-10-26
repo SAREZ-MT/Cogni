@@ -40,9 +40,11 @@ function buildJob(overrides: Partial<ImportJob> = {}): ImportJob {
     storagePath: NEW_JOB.storagePath,
     fileName: NEW_JOB.fileName,
     sizeBytes: NEW_JOB.sizeBytes,
+    format: "pdf",
     status: "queued",
     pageCount: null,
     pagesWithoutText: 0,
+    skippedImages: 0,
     error: null,
     startedAt: null,
     finishedAt: null,
@@ -70,6 +72,35 @@ describe("createImportJob", () => {
     expect(job.finishedAt).toBeNull();
     expect(job.createdAt).toEqual(NOW);
     expect(job.updatedAt).toEqual(NOW);
+    expect(job.format).toBe("pdf");
+    expect(job.skippedImages).toBe(0);
+  });
+
+  // document-import T10: the job records which format it imports — derived
+  // from the storage path's extension unless the caller already knows it.
+  it.each([
+    ["docx", "docx"],
+    ["pptx", "pptx"],
+    ["PDF", "pdf"],
+  ] as const)("derives format %s from the storage path", (extension, format) => {
+    const job = createImportJob(
+      {
+        ...NEW_JOB,
+        storagePath: `${OWNER_ID}/0198a2b0-0000-7000-8000-000000000002.${extension}`,
+      },
+      createFixedClock(NOW),
+    );
+
+    expect(job.format).toBe(format);
+  });
+
+  it("keeps an explicit format over the path", () => {
+    const job = createImportJob(
+      { ...NEW_JOB, format: "docx" },
+      createFixedClock(NOW),
+    );
+
+    expect(job.format).toBe("docx");
   });
 });
 
@@ -117,9 +148,40 @@ describe("complete", () => {
     expect(result.value.status).toBe("done");
     expect(result.value.pageCount).toBe(30);
     expect(result.value.pagesWithoutText).toBe(0);
+    expect(result.value.skippedImages).toBe(0);
     expect(result.value.error).toBeNull();
     expect(result.value.finishedAt).toEqual(LATER);
     expect(result.value.updatedAt).toEqual(LATER);
+  });
+
+  // document-import T10: images dropped during the import are persisted
+  // with the done job (import_jobs.skipped_images).
+  it("records how many images were skipped", () => {
+    const job = buildJob({ status: "processing", startedAt: NOW });
+
+    const result = complete(
+      job,
+      { pageCount: 2, pagesWithoutText: 0, skippedImages: 3 },
+      createFixedClock(LATER),
+    );
+
+    expect(result.ok && result.value.skippedImages).toBe(3);
+  });
+
+  it.each([
+    -1,
+    1.5,
+    Number.NaN,
+  ])("rejects a skippedImages count of %s", (skippedImages) => {
+    const job = buildJob({ status: "processing", startedAt: NOW });
+
+    const result = complete(
+      job,
+      { pageCount: 2, pagesWithoutText: 0, skippedImages },
+      createFixedClock(LATER),
+    );
+
+    expect(result.ok).toBe(false);
   });
 
   it.each<ImportJobStatus>([

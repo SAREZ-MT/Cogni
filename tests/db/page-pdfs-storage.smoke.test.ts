@@ -42,7 +42,12 @@ describe.skipIf(!url)("0006 page-pdfs storage bucket and RLS", () => {
       // bucket upsert and domain/pdf-file.ts's MAX_PDF_BYTES (T1
       // follow-up: R2-magic-size-limit).
       expect(Number(bucket?.file_size_limit)).toBe(20971520);
-      expect(bucket?.allowed_mime_types).toEqual(["application/pdf"]);
+      // document-import T10 (0014): DOCX and PPTX too.
+      expect(bucket?.allowed_mime_types).toEqual([
+        "application/pdf",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      ]);
     } finally {
       await sql.end();
     }

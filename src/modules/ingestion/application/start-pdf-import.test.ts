@@ -115,6 +115,9 @@ describe("startPdfImport use case", () => {
     expect(deps.notebookPages.createPageCalls[0]?.title).toBe(
       "Apuntes de clase",
     );
+    // document-import T10: the job records the verified format.
+    const job = await deps.jobs.findByStoragePath(path);
+    expect(job?.format).toBe("docx");
   });
 
   it("rejects a stored object whose real mime does not match the path's declared format, before creating a page", async () => {

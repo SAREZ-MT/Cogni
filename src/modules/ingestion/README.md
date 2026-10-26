@@ -125,8 +125,8 @@ image's `pendingId` for its `assetId` and removes the rest (refused
 mime/size, failed or throwing upload, budget exhausted), at any depth
 (lists, tables, callouts, quotes, details); a container left empty gets an
 empty paragraph. Removed images add to the extractor's `skippedImages`,
-reported as `skipped_images` on `pdf_imported` for a done job (the
-`import_jobs` column is T10's). Each upload is raced against what is left
+reported as `skipped_images` on `pdf_imported` and persisted in
+`import_jobs.skipped_images` (`markDone`) for a done job. Each upload is raced against what is left
 of the upload budget (T9b): one that outlives it is dropped and the
 remaining images are not attempted; if it completes later, its asset is
 deleted again best effort (it stays an orphan if the function is frozen
@@ -140,9 +140,27 @@ object whose real mime is not the format its path declares. Only the
 message is stored on the job; the kind classifies the Sentry report
 (`warning` for `no_text_layer`, `empty_document`, `unsupported_format`).
 The `pdf_imported` event keeps its name until T10 and already carries the
-declared `format`. The `page-pdfs` bucket still allows only
-`application/pdf` (`drizzle/0006_page_pdfs_storage.sql`) until T10's
-migration, so a DOCX/PPTX upload is refused by Storage before then.
+declared `format`.
+
+## Storage and database
+
+- Bucket `page-pdfs` (private, `drizzle/0006_page_pdfs_storage.sql`, mimes
+  widened by `0014_document_formats.sql`): 20 MiB per object, accepts
+  `application/pdf`, the DOCX mime
+  (`application/vnd.openxmlformats-officedocument.wordprocessingml.document`)
+  and the PPTX mime
+  (`application/vnd.openxmlformats-officedocument.presentationml.presentation`).
+  Objects live under `{ownerId}/{uploadId}.{pdf|docx|pptx}`; RLS lets a user
+  read, write and delete only their own folder.
+  **Known naming debt:** the bucket (and `SUPABASE_PDF_BUCKET`,
+  `PdfStorageGateway`) keep the PDF-era name although they hold every
+  imported format; renaming a bucket means moving every object, so it is
+  left as is.
+- Table `import_jobs` (`0005`, `0014`): one row per import. `format`
+  (`pdf|docx|pptx`, CHECK, default `pdf` for rows before 0014, backfilled
+  from the path) is taken from the storage path when the job is created;
+  `skipped_images` (≥ 0, CHECK) is written by `markDone`. Server-only
+  (RLS on, no policies).
 
 ## DOCX
 

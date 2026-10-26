@@ -240,6 +240,7 @@ describe("InMemoryImportJobRepository", () => {
       id: job.id,
       pageCount: 3,
       pagesWithoutText: 0,
+      skippedImages: 0,
       now,
     });
 
@@ -254,6 +255,7 @@ describe("InMemoryImportJobRepository", () => {
         id: "missing",
         pageCount: 1,
         pagesWithoutText: 0,
+        skippedImages: 0,
         now: new Date(),
       }),
     ).toBeNull();
@@ -269,6 +271,7 @@ describe("InMemoryImportJobRepository", () => {
       id: job.id,
       pageCount: 1,
       pagesWithoutText: 0,
+      skippedImages: 0,
       now,
     });
 

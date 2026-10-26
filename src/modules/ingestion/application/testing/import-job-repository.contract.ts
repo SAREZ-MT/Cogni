@@ -117,6 +117,32 @@ export function runImportJobRepositoryContract(
       expect(winner?.id).toBe(first.id);
     });
 
+    // document-import T10: the format column and the skipped-images count.
+    it("create/findById round-trip the format; markDone persists skippedImages", async () => {
+      const repo = await context.createRepository();
+      const job = createImportJob(
+        newJobInput(ids, {
+          storagePath: `${ids.ownerId}/${randomUUID()}.docx`,
+        }),
+        CLOCK,
+      );
+      await repo.create(job);
+      expect((await repo.findById(job.id))?.format).toBe("docx");
+
+      const now = new Date("2026-09-23T10:00:05.000Z");
+      await repo.claim({ id: job.id, now });
+      const done = await repo.markDone({
+        id: job.id,
+        pageCount: 1,
+        pagesWithoutText: 0,
+        skippedImages: 2,
+        now,
+      });
+
+      expect(done?.skippedImages).toBe(2);
+      expect((await repo.findById(job.id))?.skippedImages).toBe(2);
+    });
+
     // document-import T9b: the per-user cap on concurrent imports. Counted
     // as a delta so a shared database with earlier runs' rows stays exact.
     it("countActiveJobs: counts the owner's queued and processing jobs, not terminal or abandoned ones", async () => {

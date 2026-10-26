@@ -23,9 +23,11 @@ function toImportJob(row: ImportJobRow): ImportJob {
     storagePath: row.storagePath,
     fileName: row.fileName,
     sizeBytes: row.sizeBytes,
+    format: row.format,
     status: row.status,
     pageCount: row.pageCount,
     pagesWithoutText: row.pagesWithoutText,
+    skippedImages: row.skippedImages,
     error: row.error,
     startedAt: row.startedAt,
     finishedAt: row.finishedAt,
@@ -71,9 +73,11 @@ export class DrizzleImportJobRepository implements ImportJobRepository {
         storagePath: job.storagePath,
         fileName: job.fileName,
         sizeBytes: job.sizeBytes,
+        format: job.format,
         status: job.status,
         pageCount: job.pageCount,
         pagesWithoutText: job.pagesWithoutText,
+        skippedImages: job.skippedImages,
         error: job.error,
         startedAt: job.startedAt,
         finishedAt: job.finishedAt,
@@ -178,6 +182,7 @@ export class DrizzleImportJobRepository implements ImportJobRepository {
     id: string;
     pageCount: number;
     pagesWithoutText: number;
+    skippedImages: number;
     now: Date;
   }): Promise<ImportJob | null> {
     const rows = await this.db
@@ -186,6 +191,7 @@ export class DrizzleImportJobRepository implements ImportJobRepository {
         status: "done",
         pageCount: input.pageCount,
         pagesWithoutText: input.pagesWithoutText,
+        skippedImages: input.skippedImages,
         finishedAt: input.now,
         updatedAt: input.now,
       })

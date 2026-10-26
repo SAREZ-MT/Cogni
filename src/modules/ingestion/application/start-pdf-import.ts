@@ -165,6 +165,7 @@ export async function startPdfImport(
       storagePath,
       fileName,
       sizeBytes: metadata.sizeBytes,
+      format: validMetadata.value,
     },
     deps.clock,
   );

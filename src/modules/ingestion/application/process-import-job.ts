@@ -480,6 +480,7 @@ export async function processImportJob(
     id: claimed.id,
     pageCount: document.totalPages,
     pagesWithoutText: document.pagesWithoutText,
+    skippedImages,
     now: deps.clock.now(),
   });
   if (!completed) {

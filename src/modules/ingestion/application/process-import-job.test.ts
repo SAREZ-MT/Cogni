@@ -1081,6 +1081,9 @@ describe("processImportJob images", () => {
     expect(deps.telemetry.finishedCalls.at(-1)?.outcome).toEqual({
       skippedImages: 1,
     });
+    // document-import T10: persisted with the done job.
+    expect(result.ok && result.value.skippedImages).toBe(1);
+    expect((await deps.jobs.findById(job.id))?.skippedImages).toBe(1);
     expect(deps.notebookPages.deleteImportedAssetsCalls).toEqual([]);
   });
 
