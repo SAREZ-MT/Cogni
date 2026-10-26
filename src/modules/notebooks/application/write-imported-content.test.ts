@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createFixedClock } from "@/shared/kernel/clock";
-import { CATALOGUE_SAMPLE_DOC } from "@/shared/kernel/tiptap-catalogue";
+import { CATALOGUE_SAMPLE_DOC } from "@/shared/kernel/testing/catalogue-sample-doc";
 import { createNotebook } from "./create-notebook";
 import { createPage } from "./create-page";
 import { InMemoryNotebookRepository } from "./testing/in-memory-notebook-repository";

@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { CATALOGUE_SAMPLE_DOC } from "./testing/catalogue-sample-doc";
+import * as catalogue from "./tiptap-catalogue";
 import {
   BLOCK_NODES,
+  CATALOGUE_MARK_ATTRS,
   CATALOGUE_MARKS,
+  CATALOGUE_NODE_ATTRS,
   CATALOGUE_NODES,
-  CATALOGUE_SAMPLE_DOC,
   findCatalogueViolations,
   INLINE_NODES,
 } from "./tiptap-catalogue";
@@ -38,6 +41,43 @@ describe("tiptap content catalogue", () => {
     for (const name of [...BLOCK_NODES, ...INLINE_NODES]) {
       expect(CATALOGUE_NODES).toContain(name);
     }
+  });
+
+  it("keeps the sample document out of the production module", () => {
+    expect("CATALOGUE_SAMPLE_DOC" in catalogue).toBe(false);
+  });
+
+  it("lists the attr names of every catalogue node and mark", () => {
+    expect(Object.keys(CATALOGUE_NODE_ATTRS).sort()).toEqual(
+      [...CATALOGUE_NODES].sort(),
+    );
+    expect(Object.keys(CATALOGUE_MARK_ATTRS).sort()).toEqual(
+      [...CATALOGUE_MARKS].sort(),
+    );
+    expect(CATALOGUE_NODE_ATTRS.orderedList).toEqual(
+      expect.arrayContaining(["start", "type", "blockId", "nodeBackground"]),
+    );
+    expect(CATALOGUE_MARK_ATTRS.textStyle).toEqual(
+      expect.arrayContaining([
+        "color",
+        "backgroundColor",
+        "fontFamily",
+        "fontSize",
+        "lineHeight",
+      ]),
+    );
+  });
+
+  it.each([0, 1, 7])("accepts an ordered list start of %s", (start) => {
+    expect(
+      findCatalogueViolations(
+        doc({
+          type: "orderedList",
+          attrs: { start },
+          content: [{ type: "listItem", content: [paragraph(text("a"))] }],
+        }),
+      ),
+    ).toEqual([]);
   });
 
   it("accepts the catalogue sample document", () => {
@@ -122,6 +162,14 @@ describe("tiptap content catalogue", () => {
         doc({
           type: "orderedList",
           attrs: { start: "3" },
+          content: [{ type: "listItem", content: [paragraph(text("a"))] }],
+        }),
+      ],
+      [
+        "a negative ordered list start",
+        doc({
+          type: "orderedList",
+          attrs: { start: -1 },
           content: [{ type: "listItem", content: [paragraph(text("a"))] }],
         }),
       ],

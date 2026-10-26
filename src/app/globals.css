@@ -477,6 +477,76 @@
     font-size: 0.75em;
   }
 
+  /* document-import T3: collapsible blocks (extensions/details.ts). The
+     @tiptap/extension-details node view renders
+     div[data-type="details"] > button + div > (summary, div[data-type=
+     "detailsContent"][hidden]) and toggles `.is-open` on the outer div;
+     the button is the disclosure triangle. */
+  .editor-content [data-type="details"] {
+    display: flex;
+    gap: 0.25rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .editor-content [data-type="details"] > button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 1.5rem;
+    height: 1.75rem;
+    border-radius: var(--radius-sm);
+    color: var(--color-fg-muted);
+    cursor: pointer;
+  }
+
+  .editor-content [data-type="details"] > button:hover {
+    background-color: var(--bg-hover);
+  }
+
+  .editor-content [data-type="details"] > button::after {
+    content: "";
+    border-block: 0.3rem solid transparent;
+    border-inline-start: 0.45rem solid currentColor;
+    transition: transform 150ms ease;
+  }
+
+  .editor-content [data-type="details"].is-open > button::after {
+    transform: rotate(90deg);
+  }
+
+  .editor-content [data-type="details"] > div {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .editor-content [data-type="details"] summary {
+    display: block;
+    list-style: none;
+    font-weight: 600;
+    line-height: 1.75rem;
+  }
+
+  .editor-content [data-type="detailsContent"] {
+    margin-top: 0.25rem;
+  }
+
+  /* document-import T3: YouTube embeds (extensions/youtube.ts). The iframe
+     carries width/height attributes; the block fills the column at 16:9. */
+  .editor-content [data-youtube-video] {
+    margin-bottom: 0.75rem;
+  }
+
+  .editor-content [data-youtube-video] iframe {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 16 / 9;
+    border: 0;
+    border-radius: var(--radius-2xl);
+    background-color: var(--color-neutral-100);
+  }
+
   /* E3 #2 (data-loss-and-table-fix bug report): @tiptap/extension-table's
      `<div class="tableWrapper"><table>...` had NO rules at all here — the
      inserted table rendered with zero borders/padding on a `min-width:50px`

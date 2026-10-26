@@ -12,14 +12,13 @@
 // which includes default attrs such as `textAlign: null`, so null is
 // accepted wherever the editor emits it.
 //
-// Not yet registered in the editor (T3 registers them, matching this file):
-// the details family (details, detailsSummary, detailsContent), youtube,
-// the image `alt` attr and the textStyle attrs backgroundColor, fontFamily,
-// fontSize and lineHeight.
-import type { TiptapDoc, TiptapNode } from "./tiptap-doc";
+// The editor imports its palette, callout kinds and global-attr node lists
+// from here, and editor/ui/tiptap/extensions/catalogue-parity.test.ts
+// proves the editor schema declares exactly these nodes, marks and attrs
+// (the sample document lives in ./testing/catalogue-sample-doc.ts).
 
-// The 7 pastel palette names (editor highlight-palette.tsx HIGHLIGHT_PALETTE
-// and node-background.ts reuse the same list).
+// The 7 pastel palette names (the editor's highlight mark, text colours and
+// node backgrounds all use this list).
 export const PALETTE_COLORS = [
   "pink",
   "green",
@@ -38,7 +37,7 @@ export type TextAlign = (typeof TEXT_ALIGNS)[number];
 export const IMAGE_ALIGNS = ["left", "center", "right"] as const;
 export type ImageAlign = (typeof IMAGE_ALIGNS)[number];
 
-// callout-node.tsx CALLOUT_KINDS; default "idea".
+// The editor callout node's kinds; default "idea".
 export const CALLOUT_KINDS = ["idea", "note", "warning"] as const;
 export type CalloutKind = (typeof CALLOUT_KINDS)[number];
 
@@ -49,9 +48,9 @@ export type HeadingLevel = (typeof HEADING_LEVELS)[number];
 export const ORDERED_LIST_TYPES = ["1", "a", "A", "i", "I"] as const;
 
 // Global attributes and the node types that carry them in the editor.
-// blockId: UniqueID `attributeName: "blockId"` (extensions/index.ts
-// UNIQUE_ID_TYPES). nodeBackground: node-background.ts
-// NODE_BACKGROUND_TYPES. textAlign: TextAlign `types`.
+// blockId: the editor's UniqueID `types` (`attributeName: "blockId"`).
+// nodeBackground: the editor's NodeBackground global attribute. textAlign:
+// the editor's TextAlign `types`.
 export const BLOCK_ID_NODES = [
   "paragraph",
   "heading",
@@ -223,7 +222,8 @@ const BASE_SPECS: Record<string, NodeSpec> = {
   bulletList: { attrs: {}, content: [{ of: ["listItem"], min: 1 }] },
   orderedList: {
     attrs: {
-      start: intAtLeast(1),
+      // Tiptap accepts 0 (a list numbered from zero).
+      start: intAtLeast(0),
       type: nullable(oneOf(ORDERED_LIST_TYPES)),
     },
     content: [{ of: ["listItem"], min: 1 }],
@@ -250,7 +250,8 @@ const BASE_SPECS: Record<string, NodeSpec> = {
     content: LEAF,
   },
   callout: { attrs: { kind: oneOf(CALLOUT_KINDS) }, content: BLOCKS_1 },
-  // @tiptap/extension-details: `open` exists only with `persist: true`.
+  // @tiptap/extension-details: `open` exists only with `persist: true`,
+  // which the editor sets so a collapsed/expanded state survives a save.
   details: {
     attrs: { open: isBool },
     content: [
@@ -290,8 +291,11 @@ const BASE_SPECS: Record<string, NodeSpec> = {
     inline: true,
   },
   tocBlock: { attrs: {}, content: LEAF },
-  // @tiptap/extension-youtube attrs; the src must be a YouTube URL so the
-  // CSP `frame-src` (youtube-nocookie) is the only embed origin.
+  // @tiptap/extension-youtube attrs (defaults: start 0, width 640, height
+  // 480). The src is a youtube.com watch URL or a youtube.com /
+  // youtube-nocookie.com embed URL; the editor always renders the iframe
+  // from youtube-nocookie.com, the only CSP `frame-src` origin. `start` is
+  // in seconds.
   youtube: {
     attrs: {
       src: matches(YOUTUBE_SRC),
@@ -326,6 +330,16 @@ const NODE_SPECS: Record<string, NodeSpec> = Object.fromEntries(
 );
 
 export const CATALOGUE_NODES = Object.keys(BASE_SPECS) as readonly string[];
+
+// Attr names per node, global attrs included: what the editor schema must
+// declare for that node (catalogue-parity.test.ts).
+export const CATALOGUE_NODE_ATTRS: Readonly<Record<string, readonly string[]>> =
+  Object.fromEntries(
+    Object.entries(NODE_SPECS).map(([name, spec]) => [
+      name,
+      Object.keys(spec.attrs),
+    ]),
+  );
 
 interface MarkSpec {
   attrs: Record<string, AttrCheck>;
@@ -363,6 +377,15 @@ const MARK_SPECS: Record<CatalogueMarkName, MarkSpec> = {
     },
   },
 };
+
+// Attr names per mark, the mark counterpart of CATALOGUE_NODE_ATTRS.
+export const CATALOGUE_MARK_ATTRS: Readonly<Record<string, readonly string[]>> =
+  Object.fromEntries(
+    Object.entries(MARK_SPECS).map(([name, spec]) => [
+      name,
+      Object.keys(spec.attrs),
+    ]),
+  );
 
 // ---------------------------------------------------------------------------
 // Walker
@@ -564,197 +587,3 @@ export function findBlockViolations(
   checkNode(block, path, true, out);
   return out;
 }
-
-// ---------------------------------------------------------------------------
-// Sample document: every catalogue node and mark with realistic attrs. Shared
-// test data for the strict schema (notebooks) and the editor round-trip (T3).
-
-const ASSET_ID = "6f1c2b9e-3d4a-4f5b-8c7d-9e0a1b2c3d4e";
-const t = (text: string, marks?: TiptapNode["marks"]): TiptapNode =>
-  marks ? { type: "text", text, marks } : { type: "text", text };
-const p = (...content: TiptapNode[]): TiptapNode => ({
-  type: "paragraph",
-  content,
-});
-
-export const CATALOGUE_SAMPLE_DOC: TiptapDoc = {
-  type: "doc",
-  content: [
-    { type: "tocBlock" },
-    {
-      type: "heading",
-      attrs: { level: 1, textAlign: "center", blockId: "h-intro" },
-      content: [t("Derivadas")],
-    },
-    {
-      type: "paragraph",
-      attrs: { textAlign: "justify", nodeBackground: "yellow" },
-      content: [
-        t("La "),
-        t("derivada", [{ type: "bold" }, { type: "italic" }]),
-        t(" mide el "),
-        t("cambio", [{ type: "underline" }]),
-        t(" instantáneo; "),
-        t("no la pendiente media", [{ type: "strike" }]),
-        t(". Usa "),
-        t("f'(x)", [{ type: "code" }]),
-        t(", H"),
-        t("2", [{ type: "subscript" }]),
-        t("O, x"),
-        t("2", [{ type: "superscript" }]),
-        { type: "hardBreak" },
-        t("Ver "),
-        t("Khan Academy", [
-          {
-            type: "link",
-            attrs: {
-              href: "https://es.khanacademy.org/math/calculus-1",
-              target: "_blank",
-              rel: "noopener noreferrer",
-              class: null,
-              title: null,
-            },
-          },
-        ]),
-        t(" o "),
-        t("escribe", [
-          { type: "link", attrs: { href: "mailto:profe@example.com" } },
-        ]),
-        t(". "),
-        t("Clave", [{ type: "highlight", attrs: { color: "pink" } }]),
-        t(" y "),
-        t("estilo", [
-          {
-            type: "textStyle",
-            attrs: {
-              color: "var(--color-pastel-purple-fg)",
-              backgroundColor: "#fff3c4",
-              fontFamily: "Inter, sans-serif",
-              fontSize: "18px",
-              lineHeight: "1.5",
-            },
-          },
-        ]),
-        t(": "),
-        { type: "inlineMath", attrs: { latex: "\\frac{dy}{dx}" } },
-        t(" "),
-        { type: "emoji", attrs: { name: "brain" } },
-        t(" "),
-        {
-          type: "mention",
-          attrs: {
-            id: "8a7b6c5d-4e3f-4a1b-9c8d-7e6f5a4b3c2d",
-            label: "Límites",
-            mentionSuggestionChar: "@",
-            notebookId: "1b2c3d4e-5f6a-4b7c-8d9e-0f1a2b3c4d5e",
-          },
-        },
-      ],
-    },
-    {
-      type: "heading",
-      attrs: { level: 6, id: null, "data-toc-id": null },
-      content: [t("Nivel 6")],
-    },
-    { type: "blockquote", content: [p(t("Todo cambio tiene una tasa."))] },
-    {
-      type: "codeBlock",
-      attrs: { language: "python" },
-      content: [t("def f(x):\n    return x ** 2")],
-    },
-    { type: "horizontalRule" },
-    {
-      type: "bulletList",
-      content: [
-        {
-          type: "listItem",
-          content: [
-            p(t("Reglas")),
-            {
-              type: "orderedList",
-              attrs: { start: 3, type: null },
-              content: [{ type: "listItem", content: [p(t("Cadena"))] }],
-            },
-          ],
-        },
-      ],
-    },
-    {
-      type: "taskList",
-      content: [
-        {
-          type: "taskItem",
-          attrs: { checked: true },
-          content: [p(t("Repasar límites"))],
-        },
-        {
-          type: "taskItem",
-          attrs: { checked: false },
-          content: [p(t("Practicar derivadas"))],
-        },
-      ],
-    },
-    {
-      type: "table",
-      content: [
-        {
-          type: "tableRow",
-          content: [
-            {
-              type: "tableHeader",
-              attrs: { colspan: 2, rowspan: 1, colwidth: null },
-              content: [p(t("Función y derivada"))],
-            },
-          ],
-        },
-        {
-          type: "tableRow",
-          content: [
-            {
-              type: "tableCell",
-              attrs: { colspan: 1, rowspan: 1, colwidth: [120] },
-              content: [p(t("x²"))],
-            },
-            { type: "tableCell", content: [p(t("2x"))] },
-          ],
-        },
-      ],
-    },
-    {
-      type: "image",
-      attrs: {
-        assetId: ASSET_ID,
-        pendingId: null,
-        align: "left",
-        caption: "Recta tangente",
-        alt: "Gráfica de una recta tangente a una parábola",
-      },
-    },
-    {
-      type: "callout",
-      attrs: { kind: "warning" },
-      content: [p(t("La derivada no siempre existe."))],
-    },
-    {
-      type: "details",
-      attrs: { open: false },
-      content: [
-        { type: "detailsSummary", content: [t("Notas del orador")] },
-        { type: "detailsContent", content: [p(t("Empieza con un ejemplo."))] },
-      ],
-    },
-    {
-      type: "blockMath",
-      attrs: { latex: "f'(x)=\\lim_{h\\to 0}\\frac{f(x+h)-f(x)}{h}" },
-    },
-    {
-      type: "youtube",
-      attrs: {
-        src: "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ",
-        width: 640,
-        height: 480,
-        start: 0,
-      },
-    },
-  ],
-};

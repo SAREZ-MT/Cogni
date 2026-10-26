@@ -8,18 +8,16 @@
 // Tailwind utility classes instead of hex/inline styles (docs/design-
 // system, "no hex values ever appear in a component").
 import Highlight from "@tiptap/extension-highlight";
+import {
+  PALETTE_COLORS,
+  type PaletteColor,
+} from "@/shared/kernel/tiptap-catalogue";
 
-export const HIGHLIGHT_PALETTE = [
-  "pink",
-  "green",
-  "yellow",
-  "purple",
-  "orange",
-  "blue",
-  "mint",
-] as const;
+// The palette is the content catalogue's (the import contract), so a colour
+// the editor offers is always one imported content may carry.
+export const HIGHLIGHT_PALETTE = PALETTE_COLORS;
 
-export type HighlightColor = (typeof HIGHLIGHT_PALETTE)[number];
+export type HighlightColor = PaletteColor;
 
 export function isHighlightColor(value: unknown): value is HighlightColor {
   return (

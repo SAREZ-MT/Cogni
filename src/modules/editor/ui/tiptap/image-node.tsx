@@ -120,6 +120,9 @@ function ImageNodeView({
   const pendingId = node.attrs.pendingId as string | null;
   const align = (node.attrs.align as ImageAlign | null) ?? "center";
   const caption = (node.attrs.caption as string | null) ?? "";
+  // Alternative text (an imported document's image description); the
+  // caption stands in when there is none.
+  const alt = (node.attrs.alt as string | null) ?? "";
   const [url, setUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -307,7 +310,7 @@ function ImageNodeView({
                 <img
                   data-testid="image-node-img"
                   src={url}
-                  alt={caption || ""}
+                  alt={alt || caption || ""}
                   className="max-w-full rounded-2xl"
                 />
               </div>
@@ -491,6 +494,14 @@ export const ImageBlock = Node.create<ImageBlockOptions>({
         parseHTML: (element) => element.getAttribute("data-caption"),
         renderHTML: (attributes) =>
           attributes.caption ? { "data-caption": attributes.caption } : {},
+      },
+      // document-import T3: alternative text carried by imported images
+      // (content catalogue `image.alt`); null keeps older documents valid.
+      alt: {
+        default: null,
+        parseHTML: (element) => element.getAttribute("data-alt"),
+        renderHTML: (attributes) =>
+          attributes.alt ? { "data-alt": attributes.alt } : {},
       },
     };
   },

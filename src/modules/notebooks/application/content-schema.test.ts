@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CATALOGUE_SAMPLE_DOC } from "@/shared/kernel/tiptap-catalogue";
+import { CATALOGUE_SAMPLE_DOC } from "@/shared/kernel/testing/catalogue-sample-doc";
 import { tiptapContentSchema, tiptapDocSchema } from "./content-schema";
 
 const OFF_CATALOGUE_DOC = {

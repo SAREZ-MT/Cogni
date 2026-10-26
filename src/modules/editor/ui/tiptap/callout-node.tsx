@@ -14,9 +14,14 @@ import {
   ReactNodeViewRenderer,
 } from "@tiptap/react";
 import { Info, Lightbulb, TriangleAlert } from "lucide-react";
+import {
+  CALLOUT_KINDS,
+  type CalloutKind,
+} from "@/shared/kernel/tiptap-catalogue";
 
-export const CALLOUT_KINDS = ["idea", "note", "warning"] as const;
-export type CalloutKind = (typeof CALLOUT_KINDS)[number];
+// The kinds come from the content catalogue (the import contract), so the
+// editor and imported content cannot drift apart.
+export { CALLOUT_KINDS, type CalloutKind };
 
 export function isCalloutKind(value: unknown): value is CalloutKind {
   return (
