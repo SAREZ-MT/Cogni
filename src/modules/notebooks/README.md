@@ -59,7 +59,7 @@ Hexagonal shape enforced by `.dependency-cruiser.cjs` (`domain-is-pure`,
   layer allowed to import Drizzle or the Supabase client.
 - `ui/`: `SidebarTree` and its dialogs, plus `notebook-actions-slot.tsx` —
   a slot the app shell injects a cross-module menu item and page badge
-  into (used by `ingestion`'s "Importar PDF" entry and importing badge,
+  into (used by `ingestion`'s "Importar documento" entry and importing badge,
   without `notebooks` importing `ingestion`).
 - `actions.ts`: the composition root. `"use server"` — every Server Action
   resolves the session first (`requireOwnerId`/`requireOwnerIdResult`,
@@ -92,7 +92,7 @@ through `index.ts`: `NotebooksPagesAdapter` wraps
 `createNotebooksServerApi()` to implement `NotebookPagesPort`
 (`findActiveNotebook`, `createPage`, `findPageNotebookId`,
 `writeImportedContent`, `storeImportedAsset`, `deleteImportedAssets`), and the app's notebook menu/sidebar inject
-`ingestion`'s "Importar PDF" item and importing badge through
+`ingestion`'s "Importar documento" item and importing badge through
 `notebook-actions-slot.tsx` — the reverse direction, `notebooks` never
 imports `ingestion`.
 

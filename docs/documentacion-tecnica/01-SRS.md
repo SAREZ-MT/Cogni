@@ -1,8 +1,8 @@
 # Especificación de Requisitos de Software (SRS) — Cogni
 
 **Proyecto:** Cogni — plataforma web de estudio a partir de apuntes propios
-**Versión:** 1.1
-**Fecha:** 2026-10-15
+**Versión:** 1.2
+**Fecha:** 2026-10-26
 **Estado:** Borrador
 **Autor:** Javier Sarez
 **Documentos relacionados:** ./02-SAD.md, ./03-DATA-API.md, ./04-ADR.md
@@ -13,7 +13,7 @@
 
 - Las Fases 0 a 7 están implementadas y los 11 módulos de `src/modules/` son reales; ninguno es un esqueleto.
   - Fase 0 (Cimientos) y Fase 1 (Cuadernos y editor): desplegadas en producción.
-  - Fase 2 (Importación de PDF): implementada bajo Organic Driven Development (ODD) el 2026-09-23 (`src/modules/ingestion`).
+  - Fase 2 (Importación de PDF): implementada bajo Organic Driven Development (ODD) el 2026-09-23 (`src/modules/ingestion`). Ampliada el 2026-10-26 (rama `feat/document-import`) a Word (`.docx`), con imágenes importadas y un catálogo estricto de contenido; PowerPoint (`.pptx`) está planificado y aún no se ofrece. Decisiones en `docs/adr/0009-importacion-multiformato-y-catalogo-de-contenido.md`.
   - Fase 3 (Capa de IA, PR #63–#69) y aceptación de términos de uso (PR #70): `src/modules/ai` e `identity`; decisiones en `docs/adr/0004-capa-de-ia-con-proveedores-gratuitos.md`.
   - Fase 4 (Motor de repetición y flashcards, PR #71–#77): `src/modules/study-engine` y `src/modules/flashcards`; decisiones en `docs/adr/0005-motor-de-repeticion-y-flashcards.md`.
   - Fase 5 (Exámenes, PR #78–#86): `src/modules/exams`; decisiones en `docs/adr/0006-examenes-y-repeticion-con-variantes.md`.
@@ -54,7 +54,7 @@ Cogni organiza su dominio en 11 módulos bajo `src/modules/`, cada uno con una �
 | `identity` | Registro, inicio de sesión (correo y Google), recuperación de contraseña, aceptación de los términos de uso y perfil del estudiante (incluida su zona horaria). | Implementado |
 | `notebooks` | Cuadernos, páginas, contenido de página, `plain_text` materializado y adjuntos de imagen. | Implementado |
 | `editor` | Editor de bloques Tiptap: menú `/`, barra de herramientas contextual, resaltado, autoguardado y subida de imágenes. | Implementado |
-| `ingestion` | Importación de un PDF a una página editable, con seguimiento de estado (`ImportJob`). | Implementado |
+| `ingestion` | Importación de un documento PDF o Word (`.docx`) a una página editable, con seguimiento de estado (`ImportJob`); PowerPoint (`.pptx`) planificado. | Implementado (PDF y Word) |
 | `ai` | Registro de proveedores de IA, rotación por cuota, salida estructurada y prompts versionados. | Implementado (Fase 3) |
 | `study-engine` | Estado SM-2 por ítem, nivel de dominio por página y cálculo de vencimientos. | Implementado (Fase 4) |
 | `flashcards` | Tarjetas de estudio, sesiones de repaso con SM-2 y retroalimentación. | Implementado (Fase 4) |
@@ -75,7 +75,7 @@ Las pantallas de flashcards, exámenes, recordación activa, calendario y dashbo
 | Nivel de dominio | Estado derivado de una página (`Nuevo`, `Aprendiendo`, `Consolidando`, `Dominado`) calculado a partir del estado SM-2 de sus ítems (`docs/documento-maestro.md` §7.3). Implementado (Fase 4): tabla `page_mastery`; los umbrales 0,35 y 0,7 viven en `src/shared/kernel/mastery-thresholds.ts`. |
 | Página | Unidad de estudio de Cogni; contiene el documento Tiptap (`content`) y es la dueña de sus ítems de estudio (cada flashcard, cada pregunta raíz de examen y cada pregunta de recordación activa tiene una fila en `study_items`). Tabla `pages` (`src/shared/db/schema.ts`). |
 | Cuaderno | Agrupación de páginas de un estudiante, sin semántica de estudio propia. Tabla `notebooks` (`src/shared/db/schema.ts`). |
-| ImportJob | Máquina de estados que rastrea una importación de PDF (`queued → processing → done/failed`). Tabla `import_jobs`; lógica en `src/modules/ingestion/domain/import-job.ts`. |
+| ImportJob | Máquina de estados que rastrea una importación de documento (`queued → processing → done/failed`), con su formato (`format`) y las imágenes omitidas (`skipped_images`). Tabla `import_jobs`; lógica en `src/modules/ingestion/domain/import-job.ts`. |
 | `plain_text` | Texto plano materializado a partir del documento Tiptap de una página en cada guardado. Columna `pages.plain_text`; función `extractPlainText` en `src/modules/notebooks/domain/plain-text.ts`. |
 | Retake 70 % | Regla de repetición de examen: una puntuación menor al 70 % marca la página para repetir el examen con preguntas reformuladas sobre los conceptos fallados (`docs/documento-maestro.md` §7.5). Implementado (Fase 5): `EXAM_PASS_THRESHOLD` en `src/modules/exams/domain/exam-session.ts`, estado en la tabla `exam_page_state`. |
 | Bloque Tiptap | Unidad de contenido del documento JSON producido por el editor Tiptap (párrafo, encabezado, lista, tabla, imagen, callout, etc.), almacenada en `pages.content`. |
@@ -96,13 +96,14 @@ Además del Estudiante, Cogni se apoya en los siguientes servicios para funciona
 |---|---|---|
 | Asistente de IA que genera material | Redacta flashcards, preguntas de examen (y sus variantes para repetir) y preguntas de recordación activa a partir del contenido de una página, evalúa las respuestas abiertas del estudiante y redacta la retroalimentación al final de las sesiones de flashcards y de examen. | Implementado (Fases 3 a 6) |
 | Planificador de repasos | Calcula, con el algoritmo SM-2, cuándo debe repasarse cada ítem y qué tan bien dominado está el contenido de cada página. | Implementado (Fase 4) |
-| Servicio de identidad y almacenamiento | Autentica al estudiante (correo y Google) y guarda de forma segura sus cuadernos, páginas, imágenes y PDF importados. | Implementado |
+| Servicio de identidad y almacenamiento | Autentica al estudiante (correo y Google) y guarda de forma segura sus cuadernos, páginas, imágenes y documentos importados. | Implementado |
 
 ### 2.3 Suposiciones y dependencias
 
 - El proyecto gratuito de Supabase se pausa tras aproximadamente 7 días de inactividad; el cron diario `0 6 * * *` de `vercel.json` contra `/api/keep-alive` asume que esa comprobación diaria basta para evitarlo. Un segundo cron, `30 6 * * *` contra `/api/recompute-mastery`, recalcula a diario el nivel de dominio de las páginas.
 - El plan Vercel Hobby asume un uso no comercial de la plataforma (`docs/documento-maestro.md` §4.2, §14).
-- La importación de PDF asume que el archivo tiene una capa de texto seleccionable; Cogni no hace OCR, por lo que un PDF escaneado sin texto no puede importarse (`src/modules/ingestion/domain/import-failure.ts`, motivo `no_text_layer`).
+- La importación de PDF asume que el archivo tiene una capa de texto seleccionable; Cogni no hace OCR, por lo que un PDF escaneado sin texto no puede importarse (`src/modules/ingestion/domain/import-failure.ts`, motivo `no_text_layer`). Un documento de Word sin texto falla como `empty_document`.
+- La importación de Word asume archivos OOXML (`.docx`); los formatos binarios antiguos `.doc` y `.ppt` no se admiten (`unsupported_format`), porque las librerías usadas (mammoth y officeparser) no los leen.
 - Cloudflare actúa como registrador y proveedor de DNS del dominio canónico; `src/proxy.ts` asume que `NEXT_PUBLIC_SITE_URL` refleja ese dominio para decidir la redirección del apex/`www`.
 - La capa de IA asume que al menos un proveedor con nivel gratuito está disponible en cada momento: la generación depende de Google Gemini, Cloudflare Workers AI u OpenRouter, y la evaluación puede usar además Groq, que solo atiende evaluación (registrados en `src/modules/ai/infrastructure/provider-registry.ts`); la rotación multiproveedor existe para mitigar el riesgo de que uno de ellos cambie o retire su nivel gratuito (`docs/documento-maestro.md` §4.3, §14; `docs/adr/0004-capa-de-ia-con-proveedores-gratuitos.md`).
 - El límite de una sola conexión de base de datos por instancia serverless (`postgres(..., { max: 1 })` en `src/shared/db/client.ts`) asume que Supabase sigue exponiendo el *transaction pooler* sin sentencias preparadas.
@@ -155,15 +156,15 @@ Además del Estudiante, Cogni se apoya en los siguientes servicios para funciona
 | Flujo alternativo | Conflicto de versión (3b). Tipo de archivo o tamaño de imagen no permitido → `ASSET_MIME_NOT_ALLOWED` / `ASSET_TOO_LARGE`. |
 | Estado | Implementado |
 
-### CU-05 — Importar PDF
+### CU-05 — Importar documento
 
 | Campo | Detalle |
 |---|---|
 | Actor principal | Estudiante |
-| Precondición | El estudiante tiene un cuaderno activo y un PDF con capa de texto de hasta 20 MiB. No necesita una página previa: la importación crea la página destino. |
-| Flujo principal | 1) El estudiante elige "Importar PDF" desde el menú del cuaderno (`src/modules/ingestion/ui/import-pdf-menu-item.tsx`).<br>2) `requestPdfUpload` genera una URL firmada de subida (bucket `page-pdfs`, vigencia 10 minutos) y el navegador sube el PDF directamente.<br>3) `startPdfImport` (`src/modules/ingestion/application/start-pdf-import.ts`) vuelve a comprobar el cuaderno y los metadatos reales del objeto, crea la página destino con un título derivado del nombre del archivo (`pageTitleFromFileName`) y luego un `ImportJob` en estado `queued`.<br>4) `processPdfImport` (acción de servidor con `maxDuration = 120`) reclama el job (`queued → processing`), descarga el archivo, valida el número mágico `%PDF-` y el tamaño, extrae el texto página por página (`unpdf`) y lo convierte a bloques Tiptap (`textToBlocks`).<br>4a) Si alguna validación falla (descarga, PDF inválido, sin capa de texto, tiempo agotado), el job pasa a `failed` con un mensaje específico en español.<br>4b) Si la conversión es exitosa, `writeImportedContent` escribe el contenido en la página destino (comparación-e-intercambio con `expectedVersion=1`) y el job pasa a `done`.<br>5) Mientras el job está activo, el progreso se muestra con `ImportProgress` (`src/modules/ingestion/ui/pdf-import-provider.tsx`, `src/modules/ingestion/ui/page-import-view.tsx`). |
-| Postcondición | La página destino contiene el texto del PDF convertido a bloques, o el `ImportJob` queda en `failed` con un mensaje accionable. |
-| Flujo alternativo | La página destino cambió o fue archivada durante la importación → falla con el mensaje de `persistence` o `PERSISTENCE_PAGE_UNAVAILABLE_MESSAGE`. |
+| Precondición | El estudiante tiene un cuaderno activo y un documento PDF (con capa de texto) o Word (`.docx`) de hasta 20 MiB. No necesita una página previa: la importación crea la página destino. |
+| Flujo principal | 1) El estudiante elige "Importar documento" desde el menú del cuaderno (`src/modules/ingestion/ui/import-document-menu-item.tsx`) o desde el ítem "Importar documento" del menú `/` del editor; el selector acepta `.pdf` y `.docx` (`src/modules/ingestion/ui/import-formats.ts`).<br>2) `requestPdfUpload` valida el tipo y el tamaño declarados, consume un permiso del límite por hora y genera una URL firmada de subida (bucket `page-pdfs`, vigencia 10 minutos); el navegador sube el documento directamente.<br>3) `startPdfImport` (`src/modules/ingestion/application/start-pdf-import.ts`) vuelve a comprobar el cuaderno y los metadatos reales del objeto, aplica el límite de inicios por hora y de importaciones activas, crea la página destino con un título saneado derivado del nombre del archivo (`pageTitleFromFileName`) y luego un `ImportJob` en estado `queued` con su formato.<br>4) `processPdfImport` (acción de servidor con `maxDuration = 120`) reclama el job (`queued → processing`), descarga el archivo, detecta su formato por los bytes reales y lo extrae con el adaptador del formato: Word con mammoth y officeparser, PDF con `unpdf` y `textToBlocks`. Las imágenes se suben a `page-assets` y se enlazan a sus bloques.<br>4a) Si algo falla (descarga, documento inválido o demasiado grande, formato no admitido, sin texto, tiempo agotado), el job pasa a `failed` con un mensaje específico en español.<br>4b) Si la conversión es exitosa, `writeImportedContent` valida el contenido contra el catálogo estricto y lo escribe en la página destino (comparación-e-intercambio con `expectedVersion=1`); el job pasa a `done`.<br>5) Mientras el job está activo, el progreso se muestra con `ImportProgress` (`src/modules/ingestion/ui/document-import-provider.tsx`, `src/modules/ingestion/ui/page-import-view.tsx`); al terminar, si se omitieron imágenes, la página lo avisa. |
+| Postcondición | La página destino contiene el documento convertido a bloques del catálogo, o el `ImportJob` queda en `failed` con un mensaje accionable. |
+| Flujo alternativo | La página destino cambió o fue archivada durante la importación → falla con el mensaje de `persistence` o `PERSISTENCE_PAGE_UNAVAILABLE_MESSAGE`. El estudiante superó un límite por usuario → la acción responde `INGESTION_RATE_LIMITED` y no crea la página. |
 | Estado | Implementado |
 
 ### CU-06 — Generar flashcards
@@ -281,14 +282,17 @@ Prioridad: **Alta** (el producto queda incompleto sin él), **Media** (mejora re
 
 | ID | Requisito | Prioridad | Estado |
 |---|---|---|---|
-| RF-IN-01 | El sistema debe aceptar únicamente archivos PDF de hasta 20 MiB para importación (`PDF_MIME`, `MAX_PDF_BYTES`). | Alta | Implementado |
+| RF-IN-01 | El sistema debe aceptar para importación archivos PDF y Word (`.docx`) de hasta 20 MiB, detectando el formato por los bytes reales y rechazando los formatos antiguos `.doc`/`.ppt` y cualquier otro (`DOCUMENT_MIME`, `MAX_DOCUMENT_BYTES`, `detectDocumentFormat`). PowerPoint (`.pptx`) se detecta, pero su importación está planificada. | Alta | Implementado (PDF y Word) |
 | RF-IN-02 | El sistema debe generar una URL de subida firmada con una vigencia de 10 minutos para cada importación (`UPLOAD_GRANT_TTL_MS`). | Alta | Implementado |
 | RF-IN-03 | El sistema debe rastrear cada importación como un `ImportJob` con los estados `queued`, `processing`, `done` y `failed`, sin permitir transiciones inválidas (`IMPORT_JOB_ERROR.INVALID_TRANSITION`). | Alta | Implementado |
 | RF-IN-04 | El sistema debe procesar la importación dentro de un presupuesto de tiempo acotado de 120 segundos (`MAX_DURATION_S`), marcando el job como `failed` por tiempo agotado si se excede. | Alta | Implementado |
 | RF-IN-05 | El sistema debe rechazar los PDF sin capa de texto seleccionable con un mensaje explícito, sin intentar reconocimiento óptico de caracteres (`no_text_layer`). | Alta | Implementado |
-| RF-IN-06 | El sistema debe convertir el texto extraído en bloques Tiptap (encabezados, listas, párrafos) mediante heurísticas deterministas (`textToBlocks`). | Alta | Implementado |
+| RF-IN-06 | El sistema debe convertir el documento en bloques Tiptap: un PDF mediante heurísticas deterministas sobre su texto (`textToBlocks`: encabezados, listas, párrafos); un Word conservando títulos, formato en línea, colores, enlaces seguros, listas anidadas, casillas, tablas con celdas combinadas, código, citas, saltos de página, ecuaciones e imágenes (`docx-model-mapper.ts`). | Alta | Implementado |
 | RF-IN-07 | El sistema debe mostrar el progreso de importación por cada página con un `ImportJob` activo. | Media | Implementado mediante `ImportProgress`; la insignia `ImportingPageBadge` existe, pero hoy no se muestra porque el árbol de la barra lateral que la consumía no está montado (`src/app/(app)/layout.tsx`). |
-| RF-IN-08 | El sistema debe informar, con un mensaje específico en español, la causa de una importación fallida (descarga, PDF inválido, sin texto, conflicto de persistencia o tiempo agotado). | Alta | Implementado |
+| RF-IN-08 | El sistema debe informar, con un mensaje específico en español, la causa de una importación fallida (descarga, documento inválido o demasiado grande, formato no admitido, PDF sin texto, documento vacío, conflicto de persistencia o tiempo agotado). | Alta | Implementado |
+| RF-IN-09 | El sistema debe importar las imágenes png, jpeg, gif y webp de un documento como recursos de la página (`page_assets`) y avisar al estudiante cuántas imágenes no pudo importar (`import_jobs.skipped_images`). | Media | Implementado (Word) |
+| RF-IN-10 | El sistema debe validar el contenido importado contra el catálogo estricto de nodos, marcas y atributos de Tiptap antes de escribirlo, para que todo bloque importado se muestre en el editor (`tiptapContentSchema`, `src/shared/kernel/tiptap-catalogue.ts`). | Alta | Implementado |
+| RF-IN-11 | El sistema debe limitar las importaciones por estudiante: 20 permisos de subida y 10 inicios de importación por hora, y como máximo 3 importaciones activas (`UPLOAD_GRANTS_PER_HOUR`, `IMPORT_STARTS_PER_HOUR`, `MAX_ACTIVE_IMPORTS`), respondiendo `INGESTION_RATE_LIMITED`. | Alta | Implementado |
 
 ### 4.5 `ai` (AI)
 
@@ -379,14 +383,17 @@ Agrupados por característica de calidad de ISO/IEC 25010. Solo se incluyen requ
 | RNF-S-06 | El sistema debe autenticar los endpoints de cron con una comparación de tiempo constante sobre un secreto de al menos 32 caracteres. | `timingSafeEqual` sobre `CRON_SECRET` (`z.string().min(32)`) en los dos endpoints. | `src/app/api/keep-alive/route.ts`, `src/app/api/recompute-mastery/route.ts`, `src/shared/config/env.schema.ts` |
 | RNF-S-07 | El sistema debe validar toda variable de entorno con un esquema al arrancar, separando el esquema de cliente del de servidor, e impedir que el de servidor se importe desde un componente cliente. | `parseServerEnv`/`parseClientEnv` con `safeParse`; `env.server.ts` importa `"server-only"`. | `src/shared/config/env.schema.ts`, `src/shared/config/env.server.ts` |
 | RNF-S-08 | El sistema debe auditar sus dependencias en cada integración continua y bloquear la construcción ante una vulnerabilidad de severidad alta o mayor. | `pnpm audit --audit-level=high` en cada PR y en `main`. | `.github/workflows/pr.yml`, `.github/workflows/main.yml` |
+| RNF-S-09 | El sistema debe rechazar, antes de analizarlo, un documento OOXML cuyo directorio ZIP no sea confiable o que declare demasiado contenido, e inflar cada parte con un tope de salida. | `OOXML_LIMITS`: 2000 entradas, 50 MiB por parte, 150 MiB en total, razón 200:1 desde 1 MiB, 1 000 000 de elementos XML y 256 niveles de anidamiento; `inflateRawSync({ maxOutputLength })`. | `src/modules/ingestion/domain/ooxml-guard.ts`, `src/modules/ingestion/infrastructure/ooxml-package.ts` |
+| RNF-S-10 | El sistema debe impedir que el texto que el estudiante no ve llegue a la IA: el texto oculto de Word y el texto alternativo de las imágenes no forman parte de `plain_text`. | `w:vanish`/`w:specVanish` eliminados antes de analizar; `extractPlainText` escribe solo el pie de una imagen. | `src/modules/ingestion/domain/ooxml-hidden-text.ts`, `src/modules/notebooks/domain/plain-text.ts` |
+| RNF-S-11 | El sistema no debe revelar si existe la importación de una página de otro estudiante ni permitir títulos que suplanten otro nombre. | `getImportJobStatus` busca por (página, dueño) y responde `null` para una página ajena; `pageTitleFromFileName` elimina caracteres de control y de formato (bidi, ancho cero, BOM). | `src/modules/ingestion/application/get-import-job-status.ts`, `src/modules/ingestion/domain/document-file.ts` |
 
 ### 5.2 Mantenibilidad (RNF-M)
 
 | ID | Requisito | Métrica o criterio | Verificación |
 |---|---|---|---|
 | RNF-M-01 | El sistema debe compilar con TypeScript en modo estricto en todo el código fuente. | `"strict": true`. | `tsconfig.json` |
-| RNF-M-02 | El sistema debe verificar en integración continua que ningún módulo de dominio dependa de infraestructura, de frameworks externos (salvo Zod) ni de otro módulo fuera de su índice público. | 12 reglas con `severity: "error"` en `dependency-cruiser` (entre ellas `ai-sdk-only-in-ai-infra`, `upstash-only-in-ai-infra`, `proxy-via-public-entry` y `domain-entry-is-pure`), con `tsPreCompilationDeps: true` para que también cuenten los imports solo de tipos; ejecutadas en cada PR y en `main`. | `.dependency-cruiser.cjs`, `.github/workflows/pr.yml`, `.github/workflows/main.yml` |
-| RNF-M-03 | El sistema debe mantener un script de reversión manual (`.down.sql`) para las migraciones que alteran datos o políticas de forma no trivial. | 12 de 14 migraciones tienen un `.down.sql` emparejado (la creación inicial y la activación de RLS de `profiles` no lo requieren). | `drizzle/0002_*.down.sql` a `drizzle/0013_*.down.sql` |
+| RNF-M-02 | El sistema debe verificar en integración continua que ningún módulo de dominio dependa de infraestructura, de frameworks externos (salvo Zod) ni de otro módulo fuera de su índice público. | 14 reglas con `severity: "error"` en `dependency-cruiser` (entre ellas `ai-sdk-only-in-ai-infra`, `upstash-only-in-ai-infra`, `proxy-via-public-entry`, `domain-entry-is-pure`, `mammoth-only-in-ingestion-infra` y `officeparser-only-in-ingestion-infra`), con `tsPreCompilationDeps: true` para que también cuenten los imports solo de tipos; ejecutadas en cada PR y en `main`. | `.dependency-cruiser.cjs`, `.github/workflows/pr.yml`, `.github/workflows/main.yml` |
+| RNF-M-03 | El sistema debe mantener un script de reversión manual (`.down.sql`) para las migraciones que alteran datos o políticas de forma no trivial. | 13 de 15 migraciones tienen un `.down.sql` emparejado (la creación inicial y la activación de RLS de `profiles` no lo requieren). | `drizzle/0002_*.down.sql` a `drizzle/0014_*.down.sql` |
 | RNF-M-04 | El sistema debe ejecutar linter, formateo y organización de imports mediante una única herramienta configurada. | `biome ci` en integración continua. | `biome.json`, `.github/workflows/pr.yml` |
 | RNF-M-05 | El sistema debe mantener una suite de pruebas unitarias y de integración (Vitest) y una suite de pruebas de extremo a extremo (Playwright) ejecutadas en integración continua: las pruebas unitarias en cada PR y las suites de integración con base de datos y de extremo a extremo en `main`. | Más de 400 archivos de prueba de Vitest; a 2026-10-15: 456 archivos `*.test.ts(x)` (411 bajo `src`, 5 bajo `tests/proxy` y `tests/identity`, 40 de integración con base de datos bajo `tests/db`, ejecutados con `pnpm test:db`) y 31 especificaciones de Playwright bajo `tests/e2e`. | `vitest.config.ts`, `vitest.db.config.ts`, `playwright.config.ts`, `.github/workflows/pr.yml`, `.github/workflows/main.yml` |
 | RNF-M-06 | El sistema debe aplicar las migraciones de base de datos exclusivamente durante la construcción de producción en Vercel, nunca en previsualizaciones. | `shouldRunMigrations` devuelve verdadero solo si `VERCEL_ENV` es `"production"` o `RUN_DB_MIGRATIONS` es `"1"`. | `scripts/migrate-in-build.mjs`, `package.json` |
@@ -397,7 +404,7 @@ Agrupados por característica de calidad de ISO/IEC 25010. Solo se incluyen requ
 |---|---|---|---|
 | RNF-U-01 | El sistema debe pedir confirmación explícita antes de ejecutar una acción de archivado, dado que no es reversible desde la interfaz. | Diálogo de confirmación antes de archivar cuaderno o página. | `src/modules/notebooks/ui/archive-confirm-dialog.tsx` |
 | RNF-U-02 | El sistema debe presentar toda la interfaz en español, con tratamiento de "tú". | `<html lang="es">`; copys en español en los módulos con interfaz. | `src/app/layout.tsx`, `src/modules/identity/ui/auth-copy.ts`, `src/modules/notebooks/ui/notebooks-copy.ts`, `src/modules/ingestion/ui/ingestion-copy.ts` |
-| RNF-U-03 | El sistema debe informar de forma visible el progreso de una importación de PDF mientras el `ImportJob` esté activo. | Componente de progreso `ImportProgress` en el proveedor de importación y en la vista de la página. | `src/modules/ingestion/ui/import-progress.tsx`, `src/modules/ingestion/ui/pdf-import-provider.tsx`, `src/modules/ingestion/ui/page-import-view.tsx` |
+| RNF-U-03 | El sistema debe informar de forma visible el progreso de una importación de documento mientras el `ImportJob` esté activo. | Componente de progreso `ImportProgress` en el proveedor de importación y en la vista de la página. | `src/modules/ingestion/ui/import-progress.tsx`, `src/modules/ingestion/ui/document-import-provider.tsx`, `src/modules/ingestion/ui/page-import-view.tsx` |
 | RNF-U-04 | El sistema debe mantener visible el estado del autoguardado del editor mientras el estudiante escribe. | Estados `idle`/`pending`/`saving`/`saved`/`error`/`conflict`. | `src/modules/editor/domain/autosave-state.ts`, `src/modules/editor/ui/save-status.tsx` |
 
 ### 5.4 Fiabilidad (RNF-F)
@@ -413,8 +420,8 @@ Agrupados por característica de calidad de ISO/IEC 25010. Solo se incluyen requ
 
 | ID | Requisito | Métrica o criterio | Verificación |
 |---|---|---|---|
-| RNF-P-01 | El sistema debe procesar una importación de PDF dentro de un presupuesto máximo de 120 segundos por invocación de función serverless. | `maxDuration = 120` (`MAX_DURATION_S`). | `src/app/(app)/notebooks/[notebookId]/pages/[pageId]/page.tsx`, `src/app/(app)/notebooks/[notebookId]/pages/[pageId]/max-duration.test.ts`, `src/modules/ingestion/domain/import-budget.ts` |
-| RNF-P-02 | El sistema debe limitar el tamaño máximo de un PDF importado a 20 MiB. | `MAX_PDF_BYTES = 20 971 520`. | `src/modules/ingestion/domain/pdf-file.ts`, `drizzle/0006_page_pdfs_storage.sql` |
+| RNF-P-01 | El sistema debe procesar una importación de documento dentro de un presupuesto máximo de 120 segundos por invocación de función serverless, con la extracción en carrera contra un presupuesto interno de 100 s y un PDF de hasta 300 páginas. | `maxDuration = 120` (`MAX_DURATION_S`), `PROCESSING_BUDGET_MS = 100 000`, `PDF_LIMITS`. | `src/app/(app)/notebooks/[notebookId]/pages/[pageId]/page.tsx`, `src/app/(app)/notebooks/[notebookId]/pages/[pageId]/max-duration.test.ts`, `src/modules/ingestion/domain/import-budget.ts` |
+| RNF-P-02 | El sistema debe limitar el tamaño máximo de un documento importado a 20 MiB en todos los formatos, y las imágenes extraídas a 10 MiB cada una, 100 por documento y 40 MiB en total. | `MAX_DOCUMENT_BYTES = 20 971 520`; `IMAGE_LIMITS`. | `src/modules/ingestion/domain/document-file.ts`, `src/modules/ingestion/infrastructure/docx-model-mapper.ts`, `drizzle/0006_page_pdfs_storage.sql`, `drizzle/0014_document_formats.sql` |
 | RNF-P-03 | El sistema debe limitar el tamaño máximo de una imagen subida a una página a 10 MiB. | `MAX_ASSET_BYTES = 10 485 760`. | `src/modules/notebooks/domain/page-asset.ts`, `drizzle/0004_page_assets_storage.sql` |
 | RNF-P-04 | El sistema debe autoguardar el contenido del editor con un retardo (debounce) de entre 800 y 1500 ms tras la última edición. | `debounceMs = 1000` por defecto. | `src/modules/editor/application/use-autosave.ts`, `openspec/specs/editor/spec.md` |
 | RNF-P-05 | El sistema debe usar como máximo una conexión de base de datos por instancia de función serverless. | `postgres(url, { prepare: false, max: 1 })`. | `src/shared/db/client.ts` |

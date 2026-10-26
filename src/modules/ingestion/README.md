@@ -448,7 +448,8 @@ Functions) — without it, the Hobby plan's ceiling is lower and
 ## Environment
 
 - `SUPABASE_PDF_BUCKET` (server-only, required, no default): the name of
-  the private Storage bucket for imported PDFs. Validated at boot by
+  the private Storage bucket for imported documents (PDF, DOCX and PPTX;
+  the PDF-era name is kept, see "Storage and database"). Validated at boot by
   `serverEnv()` (`src/shared/config/env.schema.ts`) — a deploy without it
   fails loudly instead of silently pointing at the wrong bucket.
 

@@ -2,8 +2,9 @@
 
 | Campo | Valor |
 |---|---|
-| Versión del documento | 1.6.0 |
-| Fecha | 2026-09-14 (actualizado 2026-10-14) |
+| Versión del documento | 1.7.0 |
+| Fecha | 2026-09-14 (actualizado 2026-10-26) |
+| Cambios de la versión 1.7.0 | ADR 0009: importación multiformato (PDF y Word `.docx` de punta a punta; PowerPoint `.pptx` detectado y planificado; `.doc`/`.ppt` sin soporte) con mammoth y officeparser para Word y `unpdf` para PDF por ahora; catálogo estricto de contenido Tiptap validado al importar y registrado completo en el editor; imágenes importadas como `PageAsset`; límites de seguridad de la importación; evento `pdf_imported` renombrado a `document_imported`. Sigue sin OCR. Campos nuevos de `ImportJob` (`format`, `skipped_images`, migración `0014`). Notas en §3.2, §4.1, §4.2, §5.2, §6.1, §8.1, §9, §10.3 y §13 (Fase 2). |
 | Cambios de la versión 1.6.0 | ADR 0008: decisiones de implementación de la Fase 7 ("Hoy" como pestaña de `/calendario`; el calendario muestra solo el próximo vencimiento de cada ítem y lo vencido en hoy; días en la zona horaria del perfil, elegida en `/configuracion` o detectada en el primer uso; tendencia desde `review_logs`; definiciones de tasa de acierto, racha y repasos completados; calibración solo con recordación activa; números del dashboard sin fuente resueltos por el usuario). Sin entidades ni migraciones nuevas. Notas en §3.5, §3.6, §5.2, §6.1 y §7.4; §13 (Fase 7 implementada). |
 | Cambios de la versión 1.5.0 | ADR 0007: decisiones de implementación de la Fase 6 (evaluación asíncrona con `after()`, reclamo y sondeo acotado, "Reintentar"; respuesta fallida sin SM-2 y respuesta saltada sin modelo; límite de 60 evaluaciones por usuario por día con clave propia; sin resumen de IA de la sesión; sesión fija de 10 preguntas; generación incremental por huellas de párrafo en las tres técnicas; panel de técnicas al estilo NotebookLM Studio, "Crear examen" y hub de recordación activa). Nueva entidad `GenerationFingerprint`. Notas en §3.1, §3.3, §6.1, §7.4, §8.2, §8.3, §8.4 y §8.5; §13 (Fase 6 implementada). |
 | Cambios de la versión 1.4.0 | ADR 0006: decisiones de implementación de la Fase 5 (exámenes de 10 a 30 preguntas, falladas primero; repetición con preguntas reformuladas y reglas para cuando no se puede armar; cronómetro solo dentro del examen; política de retroalimentación con reutilización; "Repasar contenido" antes de repetir). Notas en §3.3, §6.1, §7.2, §7.5 y §8.4; §13 (Fase 5 implementada). |
@@ -98,7 +99,8 @@ Notas de implementación de la Fase 6 (ADR 0007):
 - Menú de comandos con `/` para insertar cualquier bloque.
 - Autoguardado con debounce y actualización optimista.
 - El contenido se persiste como JSON de Tiptap; además se materializa un campo `plain_text` por página para la capa de IA.
-- Importación de PDF: extrae texto y lo convierte en bloques editables dentro de la página. Sin OCR.
+- Importación de documentos (ADR 0009): PDF y Word (`.docx`) se convierten en bloques editables dentro de una página nueva. Word conserva su estructura (títulos, formato y colores, listas, tablas con celdas combinadas, código, citas, casillas, ecuaciones e imágenes); el PDF se importa como texto con títulos y listas por heurística. PowerPoint (`.pptx`) está planificado y aún no se ofrece; los formatos antiguos `.doc` y `.ppt` no se admiten. Sin OCR.
+- Todo bloque importado pertenece al catálogo de contenido de Tiptap (`src/shared/kernel/tiptap-catalogue.ts`), que el servidor valida al importar y que el editor registra completo.
 
 ### 3.3 Las tres técnicas
 
@@ -214,17 +216,17 @@ Regla de versiones: en la Fase 0 se instala **la última versión estable** de c
 | ORM | Drizzle ORM + drizzle-kit | Acceso a Postgres y migraciones versionadas | 0 | Ninguna |
 | Lint y formato | Biome | Una sola herramienta | 0 | Ninguna |
 | Gráficos | shadcn/ui charts (Recharts) | Dashboard | 0 | Ninguna |
-| Extracción PDF | unpdf | Texto de PDF en serverless y en jobs | 0 | Ninguna |
+| Extracción de documentos | mammoth + officeparser (Word); unpdf (PDF) | Estructura de Word con mammoth y, con officeparser, colores, numeración y ecuaciones; texto de PDF con unpdf hasta que officeparser lo reemplace; officeparser leerá también PowerPoint (ADR 0009) | 0 | Ninguna; officeparser va en `serverExternalPackages` |
 
 ### 4.2 Infraestructura y servicios
 
 | Servicio | Uso | Plan | Límite relevante | Mitigación / condición de salida |
 |---|---|---|---|---|
 | Vercel | Hosting y deploy de Next.js, previews por rama | Hobby | Solo uso no comercial | Sin anuncios, donaciones ni cobros. Al monetizar: Pro. |
-| Supabase | Postgres, Auth (correo + Google), Storage (PDF e imágenes) | Free | Pausa tras 7 días sin actividad; 500 MB DB; 1 GB Storage | Cron diario de keep-alive. Con usuarios recurrentes: Pro. |
+| Supabase | Postgres, Auth (correo + Google), Storage (documentos importados e imágenes) | Free | Pausa tras 7 días sin actividad; 500 MB DB; 1 GB Storage | Cron diario de keep-alive. Con usuarios recurrentes: Pro. |
 | Cloudflare | Registrador de dominio y DNS | Registrar a costo | — | Solo DNS. Sin proxy delante de Vercel. |
 | Upstash Redis | Una única base `cogni` con prefijo `REDIS_KEY_PREFIX`: límites por usuario, cuotas por proveedor de IA y estado del circuit breaker | Free | 500.000 comandos/mes | No se usa como caché genérica. (actualizado en la Fase 3, ADR 0004) |
-| Vercel Functions (Fluid Compute) + Vercel Cron | Trabajo síncrono acotado (procesar PDF, generación con IA, evaluación) y tareas programadas diarias (keep-alive, cálculo de repasos) | Hobby | 300 s por función con `maxDuration` explícito; crons diarios | ADR 0003. Si un trabajo supera los 300 s, se reintroduce un servicio de jobs con un ADR nuevo. |
+| Vercel Functions (Fluid Compute) + Vercel Cron | Trabajo síncrono acotado (procesar documentos importados, generación con IA, evaluación) y tareas programadas diarias (keep-alive, cálculo de repasos) | Hobby | 300 s por función con `maxDuration` explícito; crons diarios | ADR 0003. Si un trabajo supera los 300 s, se reintroduce un servicio de jobs con un ADR nuevo. |
 | Sentry | Errores en cliente y servidor | Free | Eventos/mes del plan free | Muestreo si se acerca al límite. |
 | PostHog | Analítica de producto | Free | Eventos/mes del plan free | Eventos definidos explícitamente, sin autocaptura masiva. |
 | Better Stack | Logs centralizados | Free | — | **Diferido a Fase 9.** Se conecta con log drain de Vercel. |
@@ -276,7 +278,7 @@ Restricción conocida: los modelos Pro de Gemini no están en el tier gratuito. 
 | `identity` | Perfil de usuario, sesión, preferencias | Supabase Auth |
 | `notebooks` | Cuadernos, páginas, contenido, `plain_text` | `identity` |
 | `editor` | Extensiones Tiptap, bloques, menú `/`, resaltados, autoguardado | `notebooks` (por puerto de guardado) |
-| `ingestion` | Subida de PDF, extracción, conversión a bloques | `notebooks`, Storage |
+| `ingestion` | Subida de documentos (PDF y Word; PowerPoint planificado), extracción, conversión a bloques del catálogo e imágenes importadas | `notebooks`, Storage |
 | `ai` | Registro de proveedores, rotación por cuota, salida estructurada, prompts versionados, rate limiting | Upstash, proveedores |
 | `study-engine` | Estado SM-2 por ítem, nivel de dominio por página, cálculo de vencimientos | Nadie del dominio de estudio |
 | `flashcards` | Tarjetas, sesiones, retroalimentación | `study-engine`, `ai`, `notebooks` |
@@ -379,7 +381,7 @@ Convenciones comunes a todas las entidades de usuario: `id` (UUID v7), `owner_id
 | `Notebook` | notebooks | `title`, `icon` (emoji elegido por el usuario), `color`, `position`, `archived_at` |
 | `Page` | notebooks | `notebook_id`, `title`, `content` (jsonb Tiptap), `plain_text`, `content_version`, `position`, `archived_at` |
 | `PageAsset` | notebooks | `page_id`, `storage_path`, `mime`, `size_bytes` |
-| `ImportJob` | ingestion | `page_id`, `storage_path`, `file_name`, `status` (queued/processing/done/failed), `page_count`, `error` |
+| `ImportJob` | ingestion | `page_id`, `storage_path`, `file_name`, `format` (pdf/docx/pptx), `status` (queued/processing/done/failed), `page_count`, `skipped_images` (imágenes omitidas), `error` |
 | `StudyItem` | study-engine | `page_id`, `kind` (flashcard/exam_question/recall_question), `source_id` (id de la Flashcard, de la `ExamQuestion` raíz o de la `RecallQuestion`), `easiness` (≥1.3, inicial 2.5), `interval_days`, `repetitions`, `due_at`, `last_quality`, `last_reviewed_at`, `lapses`, `suspended_at` |
 | `ReviewLog` | study-engine | `item_id`, `quality`, `reviewed_at`, `interval_before`, `interval_after`, `easiness_after`, `session_kind`, `session_id` |
 | `PageMastery` | study-engine | `page_id`, `level` (Nuevo/Aprendiendo/Consolidando/Dominado), `score` (0–1), `items_total`, `items_due`, `computed_at` |
@@ -565,7 +567,7 @@ Notas de implementación de la Fase 5 (ADR 0006), que precisan los puntos anteri
 2. Toda salida es estructurada: `generateObject` con esquema Zod (AI SDK v7; `generateObject` figura como obsoleto a favor de `generateText` con `Output.object`, migración pendiente, ver ADR 0004). Si el proveedor no cumple el esquema, se reintenta una vez con otro proveedor; si falla, la operación se marca `failed` y el usuario ve un mensaje claro. Nunca se inventa un resultado.
 3. Los prompts son versionados en código (`prompts/<purpose>/v1.ts`). Cada `AiGeneration` registra la versión usada.
 4. Temperatura baja (≤ 0.3) para evaluación; moderada (≤ 0.7) para generación.
-5. Todo se ejecuta dentro del presupuesto de una función de Vercel (máximo 300 segundos, con `maxDuration` explícito). Las tareas programadas usan Vercel Cron. (ADR 0003) Si una función se interrumpe a mitad de un trabajo, el estado persistido queda como estaba: en la importación de PDF (Fase 2), una consulta de estado reporta como `failed` (tiempo agotado) un trabajo no terminal sin escrituras desde hace `maxDuration` + 30 s, sin reescribir la fila ni reintentarlo; no existe un mecanismo de recuperación automática.
+5. Todo se ejecuta dentro del presupuesto de una función de Vercel (máximo 300 segundos, con `maxDuration` explícito). Las tareas programadas usan Vercel Cron. (ADR 0003) Si una función se interrumpe a mitad de un trabajo, el estado persistido queda como estaba: en la importación de documentos (Fase 2), una consulta de estado reporta como `failed` (tiempo agotado) un trabajo no terminal sin escrituras desde hace `maxDuration` + 30 s, sin reescribir la fila ni reintentarlo; no existe un mecanismo de recuperación automática.
 
 ### 8.2 Registro de proveedores y rotación
 
@@ -636,6 +638,7 @@ Notas de implementación de la Fase 6 (ADR 0007):
 - Toda Server Action y route handler valida sesión y valida entrada con Zod antes de tocar `application`.
 - Autorización por propiedad: cada caso de uso recibe `ownerId` de la sesión y filtra por él. No existe acceso entre usuarios.
 - Storage: buckets privados con políticas RLS por `owner_id`. URLs firmadas de corta duración.
+- Importación de documentos (ADR 0009): formato detectado por los bytes reales, revisión del ZIP antes de analizar (entradas, tamaños declarados y razón de compresión) con inflado acotado, PDF de hasta 300 páginas, extracción contra el presupuesto de tiempo, topes de imágenes, límites por usuario (20 subidas y 10 inicios por hora, 3 importaciones activas), texto oculto de Word fuera de `plain_text`, títulos saneados y estado de importación que no revela páginas de otros usuarios.
 - Variables de entorno validadas al arranque con Zod (`shared/config`). Ninguna clave de proveedor llega al cliente.
 - Cabeceras de seguridad configuradas en `next.config` (CSP básica, HSTS lo maneja Vercel).
 - Dependencias auditadas en CI (`pnpm audit --audit-level=high`).
@@ -670,7 +673,7 @@ Merge a main
 
 - Keep-alive: Vercel Cron diario (`vercel.json` → `/api/keep-alive`, protegido con `CRON_SECRET`) que ejecuta `select 1` contra Supabase de producción.
 - Job diario de vencimientos: recalcula `PageMastery` y materializa la vista "Hoy".
-- Alertas: Sentry a correo. PostHog con eventos: `page_created`, `pdf_imported`, `generation_requested`, `session_started`, `session_finished`, `item_rated`.
+- Alertas: Sentry a correo. PostHog con eventos: `page_created`, `document_imported` (`pdf_imported` hasta el ADR 0009), `generation_requested`, `session_started`, `session_finished`, `item_rated`.
 - Presupuesto vigilado: la generación por lotes se trocea en unidades que quepan en los 300 s de una función; si el uso de funciones de Vercel se acerca al límite del plan Hobby, se reducen los lotes.
 
 ---
@@ -726,6 +729,8 @@ Hecho cuando: un usuario toma apuntes completos de una clase sin salir de Cogni 
 
 Entregables: subida a Storage, `ImportJob`, procesamiento síncrono con unpdf en una Server Action acotada por `maxDuration`, conversión de texto a bloques (títulos por heurística, párrafos, listas), estado de progreso en UI, manejo de PDF sin texto.
 Hecho cuando: un PDF de 30 páginas con capa de texto termina como página editable en menos de 60 segundos.
+
+> **Ampliada el 2026-10-26 (ADR 0009, rama `feat/document-import`).** La importación admite Word (`.docx`) además de PDF, con mammoth y officeparser, imágenes importadas y un catálogo estricto de contenido. PowerPoint (`.pptx`), el paso del PDF a officeparser y la decisión sobre OCR quedan pendientes. El PDF conserva `unpdf` y `textToBlocks` mientras tanto.
 
 ### Fase 3 — Capa de IA
 
