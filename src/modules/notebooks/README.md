@@ -23,9 +23,14 @@ Hexagonal shape enforced by `.dependency-cruiser.cjs` (`domain-is-pure`,
   The editor's `SavePagePort` belongs to `editor/domain`; this module's
   `saveContent`/`getCurrentContent` Server Actions satisfy it structurally.
 - `application/`: use cases for creating/renaming/archiving notebooks and
-  pages, saving and reading page content (`content-schema.ts` is the
-  shared Zod schema `save-page.ts` and `write-imported-content.ts` both
-  validate against), the signed image-upload flow
+  pages, saving and reading page content (`content-schema.ts` holds two
+  Zod schemas: the permissive `tiptapDocSchema` the editor autosave in
+  `save-page.ts` validates against, and the strict `tiptapContentSchema`
+  `write-imported-content.ts` uses — an allow-list built from the content
+  catalogue in `src/shared/kernel/tiptap-catalogue.ts` that rejects unknown
+  nodes, marks and attrs, invalid attr values, wrong nesting, links other
+  than http/https/mailto and empty text nodes, so imported content always
+  renders in the editor), the signed image-upload flow
   (`request-image-upload.ts`/`register-page-asset.ts`/
   `get-asset-read-url.ts`) and `list-sidebar.ts`. Tested against the
   in-memory fakes under `application/testing/`.

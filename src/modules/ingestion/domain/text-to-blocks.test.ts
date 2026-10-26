@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { findCatalogueViolations } from "@/shared/kernel/tiptap-catalogue";
 import {
   importedHeading as H,
   type ImportedBlock,
@@ -244,6 +245,16 @@ describe("textToBlocks", () => {
     expect(result.pagesWithText + result.pagesWithoutText).toBe(
       result.totalPages,
     );
+  });
+
+  // T2 (odd/tasks/document-import.md): every document textToBlocks emits
+  // must be one the strict import schema (and so the editor) accepts.
+  it.each(EXAMPLES)("$id: produces a document inside the content catalogue", ({
+    pages,
+  }) => {
+    const { doc } = textToBlocks(pages);
+    if (doc.content.length === 0) return;
+    expect(findCatalogueViolations(doc)).toEqual([]);
   });
 
   describe("rule branches not exercised by the E1-E20 table", () => {

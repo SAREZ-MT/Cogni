@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createFixedClock } from "@/shared/kernel/clock";
+import { CATALOGUE_SAMPLE_DOC } from "@/shared/kernel/tiptap-catalogue";
 import { createNotebook } from "./create-notebook";
 import { createPage } from "./create-page";
 import { InMemoryNotebookRepository } from "./testing/in-memory-notebook-repository";
@@ -128,6 +129,46 @@ describe("writeImportedContent use case", () => {
     const stored = await pages.findById(page.id);
     expect(stored?.content).toEqual({ type: "doc", content: [] });
     expect(stored?.contentVersion).toBe(1);
+  });
+
+  it("rejects a node outside the content catalogue, writing nothing (strict import contract)", async () => {
+    const { page, pages, clock } = await setupPage();
+
+    const result = await writeImportedContent(
+      {
+        pageId: page.id,
+        content: {
+          type: "doc",
+          content: [
+            { type: "paragraph", content: [{ type: "text", text: "ok" }] },
+            { type: "iframe", attrs: { src: "https://example.com" } },
+          ],
+        },
+        expectedVersion: 1,
+      },
+      { pages, clock },
+      OWNER_ID,
+    );
+
+    expect(result.ok).toBe(false);
+    expect(!result.ok && result.error.code).toBe("NOTEBOOKS_INVALID_INPUT");
+    const stored = await pages.findById(page.id);
+    expect(stored?.content).toEqual({ type: "doc", content: [] });
+    expect(stored?.contentVersion).toBe(1);
+  });
+
+  it("accepts the full catalogue sample document", async () => {
+    const { page, pages, clock } = await setupPage();
+
+    const result = await writeImportedContent(
+      { pageId: page.id, content: CATALOGUE_SAMPLE_DOC, expectedVersion: 1 },
+      { pages, clock },
+      OWNER_ID,
+    );
+
+    expect(result.ok).toBe(true);
+    const stored = await pages.findById(page.id);
+    expect(stored?.content).toEqual(CATALOGUE_SAMPLE_DOC);
   });
 
   it("rejects an empty document: initial content is never empty (design.md invariant 2)", async () => {

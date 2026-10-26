@@ -19,7 +19,10 @@ Follows the same hexagonal shape as `notebooks`
   transitions (`start`/`complete`/`fail`), the failure taxonomy and its
   UI-safe Spanish copy, PDF validation helpers (`pdf-file.ts`), the
   `textToBlocks` heuristic that turns extracted text into TipTap-shaped
-  blocks, the time budgets (`import-budget.ts`) and every port interface.
+  blocks, the `ImportedDoc` type (`imported-doc.ts`, every block of the
+  content catalogue in `src/shared/kernel/tiptap-catalogue.ts`; notebooks'
+  `writeImportedContent` rejects anything outside it) with its recursive
+  `hasTextContent` predicate, the time budgets (`import-budget.ts`) and every port interface.
   No framework, no npm dependency other than Zod.
 - `application/`: the five use cases (`requestPdfUpload`, `startPdfImport`,
   `processImportJob`, `getImportJobStatus`, `getActiveImports`), each
