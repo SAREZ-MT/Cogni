@@ -22,7 +22,7 @@ const ascii = (text: string) => new TextEncoder().encode(text);
 // with a real central directory and end-of-central-directory record.
 function makeZip(
   names: string[],
-  options: { centralDirectory?: boolean } = {},
+  options: { centralDirectory?: boolean; comment?: number[] } = {},
 ) {
   const parts: number[] = [];
   const central: number[] = [];
@@ -58,7 +58,9 @@ function makeZip(
   u16(parts, names.length);
   u32(parts, central.length);
   u32(parts, centralOffset);
-  u16(parts, 0);
+  const comment = options.comment ?? [];
+  u16(parts, comment.length);
+  parts.push(...comment);
   return new Uint8Array(parts);
 }
 
@@ -149,6 +151,28 @@ describe("detectDocumentFormat (synthetic bytes)", () => {
     expect(
       detectDocumentFormat(makeZip(["notes.txt"], { centralDirectory: false })),
     ).toBe("unknown");
+  });
+
+  // T5 review suggestion (folded into T6): a ZIP comment may itself hold
+  // the EOCD signature. The backward search must skip such an invalid
+  // candidate and keep looking for the real record, instead of giving up
+  // and judging the archive by its local headers (which would accept a
+  // package without [Content_Types].xml as docx).
+  it("keeps searching backwards past an invalid end-of-central-directory candidate", () => {
+    const fakeEocd = [0x50, 0x4b, 0x05, 0x06, 0, 0, 0, 0, 1, 0, 1, 0];
+    fakeEocd.push(0, 0, 0, 0, 0xf0, 0xff, 0xff, 0xff, 0, 0);
+    expect(
+      detectDocumentFormat(
+        makeZip(["word/document.xml"], { comment: fakeEocd }),
+      ),
+    ).toBe("unknown");
+    expect(
+      detectDocumentFormat(
+        makeZip(["[Content_Types].xml", "word/document.xml"], {
+          comment: fakeEocd,
+        }),
+      ),
+    ).toBe("docx");
   });
 
   it("never throws on a ZIP signature followed by garbage", () => {

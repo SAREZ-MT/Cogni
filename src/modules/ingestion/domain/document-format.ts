@@ -49,10 +49,32 @@ function asciiName(bytes: Uint8Array, start: number, length: number): string {
   return name;
 }
 
+// Names listed by the central directory an end-of-central-directory
+// candidate at `eocd` points to, or null when that candidate does not lead
+// to a well-formed directory (a header missing or out of bounds).
+function namesFromEocd(bytes: Uint8Array, eocd: number): string[] | null {
+  const entries = u16(bytes, eocd + 10);
+  let offset = u32(bytes, eocd + 16);
+  const names: string[] = [];
+  for (let entry = 0; entry < entries; entry++) {
+    if (offset + 46 > bytes.length) return null;
+    if (u32(bytes, offset) !== CENTRAL_HEADER_SIGNATURE) return null;
+    const nameLength = u16(bytes, offset + 28);
+    const extraLength = u16(bytes, offset + 30);
+    const commentLength = u16(bytes, offset + 32);
+    if (offset + 46 + nameLength > bytes.length) return null;
+    names.push(asciiName(bytes, offset + 46, nameLength));
+    offset += 46 + nameLength + extraLength + commentLength;
+  }
+  return names;
+}
+
 // Names from the central directory, located through the end-of-central-
-// directory record (searched backwards past an optional comment). Returns
-// null when the record or a header is missing or out of bounds — a
-// truncated or corrupt archive — so the caller can fall back.
+// directory record (searched backwards past an optional comment). A
+// candidate that does not lead to a valid directory — e.g. the signature
+// bytes occurring inside the comment — is skipped and the search goes on
+// (T5 review suggestion, fixed in T6). Returns null when no candidate is
+// valid — a truncated or corrupt archive — so the caller can fall back.
 function centralDirectoryNames(bytes: Uint8Array): string[] | null {
   const lowest = Math.max(
     0,
@@ -64,20 +86,8 @@ function centralDirectoryNames(bytes: Uint8Array): string[] | null {
     eocd--
   ) {
     if (u32(bytes, eocd) !== END_OF_CENTRAL_DIRECTORY_SIGNATURE) continue;
-    const entries = u16(bytes, eocd + 10);
-    let offset = u32(bytes, eocd + 16);
-    const names: string[] = [];
-    for (let entry = 0; entry < entries; entry++) {
-      if (offset + 46 > bytes.length) return null;
-      if (u32(bytes, offset) !== CENTRAL_HEADER_SIGNATURE) return null;
-      const nameLength = u16(bytes, offset + 28);
-      const extraLength = u16(bytes, offset + 30);
-      const commentLength = u16(bytes, offset + 32);
-      if (offset + 46 + nameLength > bytes.length) return null;
-      names.push(asciiName(bytes, offset + 46, nameLength));
-      offset += 46 + nameLength + extraLength + commentLength;
-    }
-    return names;
+    const names = namesFromEocd(bytes, eocd);
+    if (names) return names;
   }
   return null;
 }
