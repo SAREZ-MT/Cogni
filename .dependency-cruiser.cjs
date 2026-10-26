@@ -89,7 +89,7 @@ module.exports = {
     {
       name: "unpdf-only-in-ingestion-infra",
       comment:
-        "unpdf may only be imported from ingestion/infrastructure (unpdf-text-extractor.ts); every other layer and module must stay decoupled from the PDF parsing library. Unanchored (not `^node_modules/unpdf`): pnpm resolves it to a nested node_modules/.pnpm/unpdf@.../node_modules/unpdf/... path.",
+        "unpdf may only be imported from ingestion/infrastructure (pdf-document-extractor.ts, until document-import T8 removes it); every other layer and module must stay decoupled from the PDF parsing library. Unanchored (not `^node_modules/unpdf`): pnpm resolves it to a nested node_modules/.pnpm/unpdf@.../node_modules/unpdf/... path.",
       severity: "error",
       from: {
         path: "^src/",

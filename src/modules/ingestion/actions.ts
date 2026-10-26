@@ -26,11 +26,11 @@ import {
 } from "./application";
 import { INGESTION_ERROR } from "./domain/errors";
 import {
+  createDocumentExtractor,
   DrizzleImportJobRepository,
   ImportTelemetryAdapter,
   NotebooksPagesAdapter,
   SupabasePdfStorageGateway,
-  UnpdfTextExtractor,
 } from "./infrastructure";
 
 // Server Actions are the only client-reachable entry point of this module
@@ -78,7 +78,7 @@ function deps() {
       bucket: env.SUPABASE_PDF_BUCKET,
     }),
     jobs: new DrizzleImportJobRepository(db),
-    extractor: new UnpdfTextExtractor(),
+    extractor: createDocumentExtractor(),
     telemetry: new ImportTelemetryAdapter(analytics),
     clock: systemClock,
   };

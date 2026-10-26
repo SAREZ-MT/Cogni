@@ -1,7 +1,7 @@
 import {
+  DOCUMENT_FILE_ERROR,
   IMPORT_JOB_ERROR,
   INGESTION_ERROR,
-  PDF_FILE_ERROR,
 } from "../domain/errors";
 
 // Every user-facing ingestion message lives here: Spanish, "tú", sentence
@@ -25,6 +25,8 @@ export const INGESTION_COPY = {
   uploadFailed:
     "No pudimos confirmar la subida del archivo. Vuelve a intentarlo.",
   unreadablePdf: "No pudimos leer ese PDF.",
+  unsupportedFormat:
+    "Solo puedes importar archivos PDF, Word (.docx) o PowerPoint (.pptx).",
   importNotFound: "No encontramos esa importación.",
   unexpected: "No pudimos completar la importación. Inténtalo de nuevo.",
   progress: {
@@ -63,20 +65,22 @@ export function messageForIngestionErrorCode(code: string): string {
       return INGESTION_COPY.storageUnavailable;
     case INGESTION_ERROR.UNEXPECTED:
       return INGESTION_COPY.unexpected;
-    case PDF_FILE_ERROR.MIME_NOT_ALLOWED:
+    case DOCUMENT_FILE_ERROR.MIME_NOT_ALLOWED:
       return INGESTION_COPY.invalidFileType;
-    case PDF_FILE_ERROR.TOO_LARGE:
+    case DOCUMENT_FILE_ERROR.TOO_LARGE:
       return INGESTION_COPY.fileTooLarge;
-    case PDF_FILE_ERROR.FILE_NAME_INVALID:
+    case DOCUMENT_FILE_ERROR.FILE_NAME_INVALID:
       return INGESTION_COPY.invalidFileName;
-    case PDF_FILE_ERROR.PATH_OUT_OF_SCOPE:
+    case DOCUMENT_FILE_ERROR.PATH_OUT_OF_SCOPE:
       return INGESTION_COPY.uploadExpired;
-    case PDF_FILE_ERROR.UPLOAD_EXPIRED:
+    case DOCUMENT_FILE_ERROR.UPLOAD_EXPIRED:
       return INGESTION_COPY.uploadExpired;
-    case PDF_FILE_ERROR.OBJECT_MISSING:
+    case DOCUMENT_FILE_ERROR.OBJECT_MISSING:
       return INGESTION_COPY.uploadFailed;
-    case PDF_FILE_ERROR.UNREADABLE:
+    case DOCUMENT_FILE_ERROR.UNREADABLE:
       return INGESTION_COPY.unreadablePdf;
+    case DOCUMENT_FILE_ERROR.UNSUPPORTED_FORMAT:
+      return INGESTION_COPY.unsupportedFormat;
     case IMPORT_JOB_ERROR.NOT_FOUND:
       return INGESTION_COPY.importNotFound;
     case IMPORT_JOB_ERROR.INVALID_TRANSITION:

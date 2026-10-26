@@ -269,7 +269,7 @@ describe("PdfImportProvider", () => {
     uploadPdfToSignedUrl.mockResolvedValue(ok(undefined));
     startPdfImport.mockResolvedValue({
       ok: false,
-      error: { code: "PDF_UPLOAD_EXPIRED", message: "expired" },
+      error: { code: "DOCUMENT_UPLOAD_EXPIRED", message: "expired" },
     });
 
     render(
@@ -400,7 +400,7 @@ describe("PdfImportProvider", () => {
     uploadPdfToSignedUrl.mockResolvedValue(ok(undefined));
     startPdfImport.mockResolvedValue({
       ok: false,
-      error: { code: "PDF_UPLOAD_EXPIRED", message: "expired" },
+      error: { code: "DOCUMENT_UPLOAD_EXPIRED", message: "expired" },
     });
 
     render(

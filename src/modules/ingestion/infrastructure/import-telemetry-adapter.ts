@@ -1,5 +1,6 @@
 import * as Sentry from "@sentry/nextjs";
 import type { Analytics } from "@/shared/observability/analytics";
+import { documentFormatFromPath } from "../domain/document-file";
 import type { ImportFailureKind } from "../domain/import-failure";
 import type { ImportJob } from "../domain/import-job";
 import type { ImportTelemetry } from "../domain/import-telemetry";
@@ -11,10 +12,17 @@ import type { ImportTelemetry } from "../domain/import-telemetry";
 // through the injected Analytics (actions.ts composes it with
 // createServerAnalytics from serverEnv()'s PostHog config, the same
 // composition-root pattern identity/actions.ts already uses) and reports
-// failures to Sentry with `warning` for `no_text_layer` and `error` for
-// every other kind. Neither method ever throws or rejects — a telemetry
-// failure must never fail the caller.
-const WARNING_KIND: ImportFailureKind = "no_text_layer";
+// failures to Sentry with `warning` for the kinds caused by the user's file
+// itself (`no_text_layer`, and since document-import T5 `empty_document`
+// and `unsupported_format`) and `error` for every other kind. Neither
+// method ever throws or rejects — a telemetry failure must never fail the
+// caller. The event keeps the name `pdf_imported` until T10 renames it,
+// but already reports the job's declared `format` (from its storage path).
+const WARNING_KINDS: ReadonlySet<ImportFailureKind> = new Set([
+  "no_text_layer",
+  "empty_document",
+  "unsupported_format",
+]);
 
 export class ImportTelemetryAdapter implements ImportTelemetry {
   constructor(private readonly analytics: Analytics) {}
@@ -48,6 +56,7 @@ export class ImportTelemetryAdapter implements ImportTelemetry {
         pages_without_text: job.pagesWithoutText,
         duration_ms: durationMs,
         status: job.status === "done" ? "done" : "failed",
+        format: documentFormatFromPath(job.storagePath),
       });
     } catch (error) {
       console.error("[ingestion] pdf_imported tracking failed", {
@@ -58,7 +67,7 @@ export class ImportTelemetryAdapter implements ImportTelemetry {
 
     if (!failure) return;
     try {
-      const level = failure.kind === WARNING_KIND ? "warning" : "error";
+      const level = WARNING_KINDS.has(failure.kind) ? "warning" : "error";
       const extra = {
         importJobId: job.id,
         ownerId: job.ownerId,

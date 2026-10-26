@@ -18,12 +18,12 @@ export type {
   StartPdfImportResult,
 } from "./application";
 export {
+  DOCUMENT_FILE_ERROR,
   IMPORT_JOB_ERROR,
   IMPORT_JOB_STATUS,
   type ImportJobStatus,
   INGESTION_ERROR,
   MAX_DURATION_S,
-  PDF_FILE_ERROR,
 } from "./domain";
 export {
   ActiveImportsProvider,

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createFixedClock } from "@/shared/kernel/clock";
 import { ABANDONED_AFTER_MS } from "./import-budget";
+import type { ImportFailureKind } from "./import-failure";
 import {
   complete,
   createImportJob,
@@ -298,7 +299,7 @@ describe("fail", () => {
       {
         kind: "timeout",
         message:
-          "La importación tardó demasiado. Inténtalo de nuevo con un PDF más pequeño o en unos minutos.",
+          "La importación tardó demasiado. Inténtalo de nuevo con un documento más pequeño o en unos minutos.",
       },
       createFixedClock(LATER),
     );
@@ -308,10 +309,12 @@ describe("fail", () => {
     expect(result.value.status).toBe("failed");
   });
 
-  it.each<"download" | "invalid_pdf" | "no_text_layer" | "persistence">([
+  it.each<Exclude<ImportFailureKind, "timeout">>([
     "download",
-    "invalid_pdf",
+    "invalid_document",
+    "unsupported_format",
     "no_text_layer",
+    "empty_document",
     "persistence",
   ])("rejects queued -> failed for kind %s (only timeout may fail a queued job)", (kind) => {
     const job = buildJob({ status: "queued" });

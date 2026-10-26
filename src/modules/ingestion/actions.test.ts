@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createId } from "@/shared/kernel/id";
+import { FakeDocumentExtractor } from "./application/testing/fake-document-extractor";
 import { FakeImportTelemetry } from "./application/testing/fake-import-telemetry";
 import { FakeNotebookPagesPort } from "./application/testing/fake-notebook-pages-port";
 import { FakePdfStorageGateway } from "./application/testing/fake-pdf-storage-gateway";
-import { FakePdfTextExtractor } from "./application/testing/fake-pdf-text-extractor";
 import { InMemoryImportJobRepository } from "./application/testing/in-memory-import-job-repository";
 
 // Session and adapters are mocked so this test proves the Server Action
@@ -39,7 +39,7 @@ let current: {
   notebookPages: FakeNotebookPagesPort;
   storage: FakePdfStorageGateway;
   jobs: InMemoryImportJobRepository;
-  extractor: FakePdfTextExtractor;
+  extractor: FakeDocumentExtractor;
   telemetry: FakeImportTelemetry;
 };
 
@@ -53,7 +53,7 @@ vi.mock("./infrastructure", () => ({
   DrizzleImportJobRepository: vi.fn(function DrizzleImportJobRepository() {
     return current.jobs;
   }),
-  UnpdfTextExtractor: vi.fn(function UnpdfTextExtractor() {
+  createDocumentExtractor: vi.fn(function createDocumentExtractor() {
     return current.extractor;
   }),
   ImportTelemetryAdapter: vi.fn(function ImportTelemetryAdapter() {
@@ -88,7 +88,7 @@ describe("ingestion Server Actions", () => {
       notebookPages: new FakeNotebookPagesPort(),
       storage: new FakePdfStorageGateway(),
       jobs: new InMemoryImportJobRepository(),
-      extractor: new FakePdfTextExtractor(),
+      extractor: new FakeDocumentExtractor(),
       telemetry: new FakeImportTelemetry(),
     };
     current.notebookPages.addNotebook({
@@ -244,8 +244,18 @@ describe("ingestion Server Actions", () => {
       current.extractor.setResult({
         ok: true,
         value: {
+          content: {
+            type: "doc",
+            content: [
+              {
+                type: "paragraph",
+                content: [{ type: "text", text: "Un párrafo de texto." }],
+              },
+            ],
+          },
           totalPages: 1,
-          pages: ["Un encabezado\n\nUn párrafo de texto."],
+          pagesWithoutText: 0,
+          images: [],
         },
       });
       const { startPdfImport, processPdfImport } = await import("./actions");
@@ -290,7 +300,8 @@ describe("ingestion Server Actions", () => {
       });
 
       expect(result.ok).toBe(false);
-      if (!result.ok) expect(result.error.code).toBe("PDF_PATH_OUT_OF_SCOPE");
+      if (!result.ok)
+        expect(result.error.code).toBe("DOCUMENT_PATH_OUT_OF_SCOPE");
     });
 
     it("processPdfImport maps a not-found job to an ActionError instead of throwing", async () => {

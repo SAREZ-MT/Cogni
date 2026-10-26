@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { isOwnedPdfPath } from "../domain/pdf-file";
+import { isOwnedDocumentPath } from "../domain/document-file";
 import { requestPdfUpload } from "./request-pdf-upload";
 import { FakeNotebookPagesPort } from "./testing/fake-notebook-pages-port";
 import { FakePdfStorageGateway } from "./testing/fake-pdf-storage-gateway";
@@ -38,7 +38,7 @@ describe("requestPdfUpload use case", () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(isOwnedPdfPath(OWNER_ID, result.value.storagePath)).toBe(true);
+    expect(isOwnedDocumentPath(OWNER_ID, result.value.storagePath)).toBe(true);
     expect(result.value.signedUrl).toContain(result.value.storagePath);
     expect(result.value.token).toBeTruthy();
     expect(result.value.bucket).toBeTruthy();
@@ -48,6 +48,35 @@ describe("requestPdfUpload use case", () => {
     expect(deps.storage.signedUploadUrlCalls).toEqual([
       result.value.storagePath,
     ]);
+  });
+
+  // document-import T5: the same use case now issues grants for Word and
+  // PowerPoint files; the path's extension records the declared format so
+  // processImportJob can check the downloaded bytes against it.
+  it.each([
+    [
+      "Apuntes.docx",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      ".docx",
+    ],
+    [
+      "Clase 4.pptx",
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      ".pptx",
+    ],
+  ])("issues a grant for %s to a path ending in its format's extension", async (fileName, mime, extension) => {
+    const deps = makeDeps();
+
+    const result = await requestPdfUpload(
+      { notebookId: "nb-1", fileName, mime, sizeBytes: 1_048_576 },
+      deps,
+      OWNER_ID,
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.storagePath.endsWith(extension)).toBe(true);
+    expect(isOwnedDocumentPath(OWNER_ID, result.value.storagePath)).toBe(true);
   });
 
   it("rejects an empty file name without contacting Storage", async () => {
@@ -65,11 +94,12 @@ describe("requestPdfUpload use case", () => {
     );
 
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error.code).toBe("PDF_FILE_NAME_INVALID");
+    if (!result.ok)
+      expect(result.error.code).toBe("DOCUMENT_FILE_NAME_INVALID");
     expect(deps.storage.signedUploadUrlCalls).toHaveLength(0);
   });
 
-  it("rejects a non-PDF mime type without contacting Storage", async () => {
+  it("rejects a non-document mime type without contacting Storage", async () => {
     const deps = makeDeps();
 
     const result = await requestPdfUpload(
@@ -84,7 +114,7 @@ describe("requestPdfUpload use case", () => {
     );
 
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error.code).toBe("PDF_MIME_NOT_ALLOWED");
+    if (!result.ok) expect(result.error.code).toBe("DOCUMENT_MIME_NOT_ALLOWED");
     expect(deps.storage.signedUploadUrlCalls).toHaveLength(0);
   });
 
@@ -103,7 +133,7 @@ describe("requestPdfUpload use case", () => {
     );
 
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error.code).toBe("PDF_TOO_LARGE");
+    if (!result.ok) expect(result.error.code).toBe("DOCUMENT_TOO_LARGE");
     expect(deps.storage.signedUploadUrlCalls).toHaveLength(0);
   });
 

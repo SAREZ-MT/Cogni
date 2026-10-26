@@ -1,13 +1,16 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { DomainError } from "@/shared/kernel/domain-error";
 import { err, ok } from "@/shared/kernel/result";
 import { PROCESSING_BUDGET_MS } from "../domain/import-budget";
 import { createImportJob } from "../domain/import-job";
+import { textToBlocks } from "../domain/text-to-blocks";
 import { processImportJob } from "./process-import-job";
+import { FakeDocumentExtractor } from "./testing/fake-document-extractor";
 import { FakeImportTelemetry } from "./testing/fake-import-telemetry";
 import { FakeNotebookPagesPort } from "./testing/fake-notebook-pages-port";
 import { FakePdfStorageGateway } from "./testing/fake-pdf-storage-gateway";
-import { FakePdfTextExtractor } from "./testing/fake-pdf-text-extractor";
 import { FixedClock } from "./testing/fixed-clock";
 import { InMemoryImportJobRepository } from "./testing/in-memory-import-job-repository";
 
@@ -16,14 +19,33 @@ const OWNER_ID = "3d2f9a1e-5b6c-4d7e-8f90-1a2b3c4d5e6f";
 const OTHER_OWNER_ID = "0a1b2c3d-4e5f-4061-8798-a1b2c3d4e5f6";
 const STORAGE_PATH = `${OWNER_ID}/upload-1.pdf`;
 
+const DOCX_STORAGE_PATH = `${OWNER_ID}/upload-1.docx`;
+
 const PDF_BYTES = new TextEncoder().encode("%PDF-1.7 fake content");
+// Real OOXML from the T1 fixtures: format detection reads the ZIP entry
+// names, so a hand-written "PK" prefix would not be recognised as docx.
+const DOCX_BYTES = new Uint8Array(
+  readFileSync(
+    join(process.cwd(), "tests/fixtures/documents/files/all-constructs.docx"),
+  ),
+);
+const LEGACY_BYTES = new Uint8Array([
+  0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1, 0, 0, 0, 0,
+]);
+
+const INVALID_DOCUMENT_MESSAGE =
+  "Este archivo no es un documento válido o está protegido. Revisa que no tenga contraseña e inténtalo de nuevo.";
+const UNSUPPORTED_FORMAT_MESSAGE =
+  "Solo puedes importar archivos PDF, Word (.docx) o PowerPoint (.pptx).";
+const TIMEOUT_MESSAGE =
+  "La importación tardó demasiado. Inténtalo de nuevo con un documento más pequeño o en unos minutos.";
 
 function makeDeps(now: Date = NOW) {
   const notebookPages = new FakeNotebookPagesPort();
   return {
     jobs: new InMemoryImportJobRepository(),
     storage: new FakePdfStorageGateway(),
-    extractor: new FakePdfTextExtractor(),
+    extractor: new FakeDocumentExtractor(),
     notebookPages,
     telemetry: new FakeImportTelemetry(),
     clock: new FixedClock(now),
@@ -54,6 +76,18 @@ async function seedQueuedJob(
   return job;
 }
 
+// The PDF adapter still converts page text with textToBlocks (until T8),
+// so the fake returns exactly what that adapter would for these pages.
+function extractedFromPages(pages: string[]) {
+  const converted = textToBlocks(pages);
+  return {
+    content: converted.doc,
+    totalPages: converted.totalPages,
+    pagesWithoutText: converted.pagesWithoutText,
+    images: [],
+  };
+}
+
 function seedTextExtraction(
   deps: ReturnType<typeof makeDeps>,
   pages: string[],
@@ -63,7 +97,7 @@ function seedTextExtraction(
     mime: "application/pdf",
     bytes: PDF_BYTES,
   });
-  deps.extractor.setResult(ok({ totalPages: pages.length, pages }));
+  deps.extractor.setResult(ok(extractedFromPages(pages)));
 }
 
 // specs/pdf-import/spec.md; design.md, "Decision: Procesamiento síncrono
@@ -270,7 +304,7 @@ describe("processImportJob use case", () => {
     );
   });
 
-  it("fails(invalid_pdf) when the downloaded bytes do not start with the PDF magic number", async () => {
+  it("fails(unsupported_format) when the downloaded bytes are not any supported document", async () => {
     const deps = makeDeps();
     const job = await seedQueuedJob(deps);
     deps.storage.put(STORAGE_PATH, {
@@ -288,12 +322,148 @@ describe("processImportJob use case", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.status).toBe("failed");
-    expect(result.value.error).toBe(
-      "Este archivo no es un PDF válido o está protegido. Revisa que no tenga contraseña e inténtalo de nuevo.",
-    );
+    expect(result.value.error).toBe(UNSUPPORTED_FORMAT_MESSAGE);
+    expect(deps.extractor.extractCalls).toHaveLength(0);
+    expect(deps.telemetry.finishedCalls).toEqual([
+      { job: result.value, failure: { kind: "unsupported_format" } },
+    ]);
   });
 
-  it("fails(invalid_pdf) when the downloaded bytes exceed the size limit", async () => {
+  it("fails(unsupported_format) for a legacy binary Office file (OLE2 header)", async () => {
+    const deps = makeDeps();
+    const job = await seedQueuedJob(deps);
+    deps.storage.put(STORAGE_PATH, {
+      sizeBytes: LEGACY_BYTES.length,
+      mime: "application/pdf",
+      bytes: LEGACY_BYTES,
+    });
+
+    const result = await processImportJob(
+      { importJobId: job.id },
+      deps,
+      OWNER_ID,
+    );
+
+    expect(result.ok && result.value.error).toBe(UNSUPPORTED_FORMAT_MESSAGE);
+    expect(deps.extractor.extractCalls).toHaveLength(0);
+  });
+
+  it("fails(unsupported_format) when the detected format does not match the job's declared extension", async () => {
+    const deps = makeDeps();
+    const job = await seedQueuedJob(deps); // declared .pdf
+    deps.storage.put(STORAGE_PATH, {
+      sizeBytes: DOCX_BYTES.length,
+      mime: "application/pdf",
+      bytes: DOCX_BYTES,
+    });
+
+    const result = await processImportJob(
+      { importJobId: job.id },
+      deps,
+      OWNER_ID,
+    );
+
+    expect(result.ok && result.value.error).toBe(UNSUPPORTED_FORMAT_MESSAGE);
+    expect(deps.extractor.extractCalls).toHaveLength(0);
+  });
+
+  it("fails(unsupported_format) when the extractor has no adapter for the format yet", async () => {
+    const deps = makeDeps();
+    const job = await seedQueuedJob(deps, { storagePath: DOCX_STORAGE_PATH });
+    deps.storage.put(DOCX_STORAGE_PATH, {
+      sizeBytes: DOCX_BYTES.length,
+      mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      bytes: DOCX_BYTES,
+    });
+    deps.extractor.setResult(
+      err(new DomainError("DOCUMENT_UNSUPPORTED_FORMAT", "docx")),
+    );
+
+    const result = await processImportJob(
+      { importJobId: job.id },
+      deps,
+      OWNER_ID,
+    );
+
+    expect(result.ok && result.value.error).toBe(UNSUPPORTED_FORMAT_MESSAGE);
+    expect(deps.extractor.extractCalls.map((call) => call.format)).toEqual([
+      "docx",
+    ]);
+  });
+
+  it("imports a docx job: passes the detected format to the extractor and writes its content", async () => {
+    const deps = makeDeps();
+    const job = await seedQueuedJob(deps, { storagePath: DOCX_STORAGE_PATH });
+    deps.storage.put(DOCX_STORAGE_PATH, {
+      sizeBytes: DOCX_BYTES.length,
+      mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      bytes: DOCX_BYTES,
+    });
+    const content = {
+      type: "doc" as const,
+      content: [
+        {
+          type: "heading" as const,
+          attrs: { level: 1 as const },
+          content: [{ type: "text" as const, text: "Derivadas" }],
+        },
+      ],
+    };
+    deps.extractor.setResult(
+      ok({ content, totalPages: 3, pagesWithoutText: 0, images: [] }),
+    );
+
+    const result = await processImportJob(
+      { importJobId: job.id },
+      deps,
+      OWNER_ID,
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.status).toBe("done");
+    expect(result.value.pageCount).toBe(3);
+    expect(deps.extractor.extractCalls).toEqual([
+      { bytes: DOCX_BYTES, format: "docx" },
+    ]);
+    expect(deps.notebookPages.getPage(job.pageId)?.content).toEqual(content);
+  });
+
+  it("fails(empty_document) when a docx yields no text", async () => {
+    const deps = makeDeps();
+    const job = await seedQueuedJob(deps, { storagePath: DOCX_STORAGE_PATH });
+    deps.storage.put(DOCX_STORAGE_PATH, {
+      sizeBytes: DOCX_BYTES.length,
+      mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      bytes: DOCX_BYTES,
+    });
+    deps.extractor.setResult(
+      ok({
+        content: { type: "doc", content: [{ type: "horizontalRule" }] },
+        totalPages: 1,
+        pagesWithoutText: 1,
+        images: [],
+      }),
+    );
+
+    const result = await processImportJob(
+      { importJobId: job.id },
+      deps,
+      OWNER_ID,
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.status).toBe("failed");
+    expect(result.value.error).toBe(
+      "El documento no tiene texto que podamos importar.",
+    );
+    expect(deps.telemetry.finishedCalls).toEqual([
+      { job: result.value, failure: { kind: "empty_document" } },
+    ]);
+  });
+
+  it("fails(invalid_document) when the downloaded bytes exceed the size limit", async () => {
     const deps = makeDeps();
     const job = await seedQueuedJob(deps);
     const oversized = new Uint8Array(20 * 1024 * 1024 + 1);
@@ -313,9 +483,7 @@ describe("processImportJob use case", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.status).toBe("failed");
-    expect(result.value.error).toBe(
-      "Este archivo no es un PDF válido o está protegido. Revisa que no tenga contraseña e inténtalo de nuevo.",
-    );
+    expect(result.value.error).toBe(INVALID_DOCUMENT_MESSAGE);
   });
 
   it("fails(timeout) when the internal budget is already spent before extraction", async () => {
@@ -341,13 +509,11 @@ describe("processImportJob use case", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.status).toBe("failed");
-    expect(result.value.error).toBe(
-      "La importación tardó demasiado. Inténtalo de nuevo con un PDF más pequeño o en unos minutos.",
-    );
+    expect(result.value.error).toBe(TIMEOUT_MESSAGE);
     expect(deps.extractor.extractCalls).toHaveLength(0);
   });
 
-  it("fails(invalid_pdf) when the extractor returns an error", async () => {
+  it("fails(invalid_document) when the extractor returns an error", async () => {
     const deps = makeDeps();
     const job = await seedQueuedJob(deps);
     deps.storage.put(STORAGE_PATH, {
@@ -356,7 +522,7 @@ describe("processImportJob use case", () => {
       bytes: PDF_BYTES,
     });
     deps.extractor.setResult(
-      err(new DomainError("PDF_UNREADABLE", "encrypted")),
+      err(new DomainError("DOCUMENT_UNREADABLE", "encrypted")),
     );
 
     const result = await processImportJob(
@@ -368,9 +534,7 @@ describe("processImportJob use case", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.status).toBe("failed");
-    expect(result.value.error).toBe(
-      "Este archivo no es un PDF válido o está protegido. Revisa que no tenga contraseña e inténtalo de nuevo.",
-    );
+    expect(result.value.error).toBe(INVALID_DOCUMENT_MESSAGE);
   });
 
   // T7b review follow-up from T6 (R3-persist-and-extract-exceptions-
@@ -381,7 +545,7 @@ describe("processImportJob use case", () => {
   // exception must reach `telemetry.finished` as `failure.cause` so
   // `ImportTelemetryAdapter` can report it to Sentry with `captureException`
   // (stack included) instead of the stack-less `captureMessage`.
-  it("fails(invalid_pdf) when the extractor throws instead of returning an error Result, forwarding the exception as cause", async () => {
+  it("fails(invalid_document) when the extractor throws instead of returning an error Result, forwarding the exception as cause", async () => {
     const deps = makeDeps();
     const job = await seedQueuedJob(deps);
     deps.storage.put(STORAGE_PATH, {
@@ -401,15 +565,16 @@ describe("processImportJob use case", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.status).toBe("failed");
-    expect(result.value.error).toBe(
-      "Este archivo no es un PDF válido o está protegido. Revisa que no tenga contraseña e inténtalo de nuevo.",
-    );
+    expect(result.value.error).toBe(INVALID_DOCUMENT_MESSAGE);
     expect(deps.telemetry.finishedCalls).toEqual([
-      { job: result.value, failure: { kind: "invalid_pdf", cause: thrown } },
+      {
+        job: result.value,
+        failure: { kind: "invalid_document", cause: thrown },
+      },
     ]);
   });
 
-  it("fails(invalid_pdf) with no cause when the extractor returns an error Result without throwing", async () => {
+  it("fails(invalid_document) with no cause when the extractor returns an error Result without throwing", async () => {
     const deps = makeDeps();
     const job = await seedQueuedJob(deps);
     deps.storage.put(STORAGE_PATH, {
@@ -418,7 +583,7 @@ describe("processImportJob use case", () => {
       bytes: PDF_BYTES,
     });
     deps.extractor.setResult(
-      err(new DomainError("PDF_UNREADABLE", "encrypted")),
+      err(new DomainError("DOCUMENT_UNREADABLE", "encrypted")),
     );
 
     const result = await processImportJob(
@@ -430,7 +595,10 @@ describe("processImportJob use case", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(deps.telemetry.finishedCalls).toEqual([
-      { job: result.value, failure: { kind: "invalid_pdf", cause: undefined } },
+      {
+        job: result.value,
+        failure: { kind: "invalid_document", cause: undefined },
+      },
     ]);
   });
 
@@ -485,7 +653,7 @@ describe("processImportJob use case", () => {
     const writeSpy = vi.spyOn(deps.notebookPages, "writeImportedContent");
     vi.spyOn(deps.extractor, "extract").mockImplementationOnce(async () => {
       deps.clock.advanceMs(PROCESSING_BUDGET_MS + 1);
-      return ok({ totalPages: 1, pages: ["hola mundo"] });
+      return ok(extractedFromPages(["hola mundo"]));
     });
 
     const result = await processImportJob(
@@ -497,9 +665,7 @@ describe("processImportJob use case", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.status).toBe("failed");
-    expect(result.value.error).toBe(
-      "La importación tardó demasiado. Inténtalo de nuevo con un PDF más pequeño o en unos minutos.",
-    );
+    expect(result.value.error).toBe(TIMEOUT_MESSAGE);
     expect(writeSpy).not.toHaveBeenCalled();
   });
 
@@ -524,7 +690,7 @@ describe("processImportJob use case", () => {
     if (!result.ok) return;
     expect(result.value.status).toBe("failed");
     expect(result.value.error).toBe(
-      "La página cambió durante la importación, así que no reemplazamos su contenido. Vuelve a importar el PDF.",
+      "La página cambió durante la importación, así que no reemplazamos su contenido. Vuelve a importar el documento.",
     );
   });
 
@@ -558,7 +724,7 @@ describe("processImportJob use case", () => {
     if (!result.ok) return;
     expect(result.value.status).toBe("failed");
     expect(result.value.error).toBe(
-      "La página de destino ya no está disponible. Vuelve a importar el PDF.",
+      "La página de destino ya no está disponible. Vuelve a importar el documento.",
     );
   });
 
@@ -586,7 +752,7 @@ describe("processImportJob use case", () => {
     if (!result.ok) return;
     expect(result.value.status).toBe("failed");
     expect(result.value.error).toBe(
-      "La página de destino ya no está disponible. Vuelve a importar el PDF.",
+      "La página de destino ya no está disponible. Vuelve a importar el documento.",
     );
     expect(deps.telemetry.finishedCalls).toEqual([
       { job: result.value, failure: { kind: "persistence", cause: thrown } },

@@ -72,6 +72,7 @@ describe("ImportTelemetryAdapter", () => {
       pages_without_text: 0,
       duration_ms: 4200,
       status: "done",
+      format: "pdf",
     });
     expect(captureException).not.toHaveBeenCalled();
     expect(captureMessage).not.toHaveBeenCalled();
@@ -124,6 +125,41 @@ describe("ImportTelemetryAdapter", () => {
       expect.objectContaining({ level: "warning" }),
     );
     expect(captureException).not.toHaveBeenCalled();
+  });
+
+  // document-import T5: the event keeps its name until T10 renames it,
+  // but already carries the job's declared format (from its storage path).
+  it.each([
+    ["owner-1/upload-1.docx", "docx"],
+    ["owner-1/upload-1.pptx", "pptx"],
+  ])("sends the declared format of %s as format=%s", async (storagePath, format) => {
+    const analytics = makeAnalytics();
+    const adapter = new ImportTelemetryAdapter(analytics);
+
+    await adapter.finished(makeJob({ storagePath }));
+
+    expect(analytics.track).toHaveBeenCalledWith(
+      "pdf_imported",
+      "owner-1",
+      expect.objectContaining({ format }),
+    );
+  });
+
+  // A user's file, not a bug: an office document without text or a file
+  // in a format Cogni does not import is a warning, like no_text_layer.
+  it.each([
+    "empty_document",
+    "unsupported_format",
+  ] as const)("reports %s to Sentry at warning level", async (kind) => {
+    const analytics = makeAnalytics();
+    const adapter = new ImportTelemetryAdapter(analytics);
+
+    await adapter.finished(makeJob({ status: "failed" }), { kind });
+
+    expect(captureMessage).toHaveBeenCalledWith(
+      expect.stringContaining(kind),
+      expect.objectContaining({ level: "warning" }),
+    );
   });
 
   it("never rejects when analytics.track() itself throws", async () => {

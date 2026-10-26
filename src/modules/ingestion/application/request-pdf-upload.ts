@@ -3,13 +3,14 @@ import type { Clock } from "@/shared/kernel/clock";
 import { DomainError } from "@/shared/kernel/domain-error";
 import { createId } from "@/shared/kernel/id";
 import { err, ok, type Result } from "@/shared/kernel/result";
+import {
+  documentStoragePath,
+  UPLOAD_GRANT_TTL_MS,
+  validateDocumentInput,
+  validateFileName,
+} from "../domain/document-file";
 import { INGESTION_ERROR } from "../domain/errors";
 import type { NotebookPagesPort } from "../domain/notebook-pages-port";
-import {
-  UPLOAD_GRANT_TTL_MS,
-  validateFileName,
-  validatePdfInput,
-} from "../domain/pdf-file";
 import type { PdfStorageGateway } from "../domain/pdf-storage-gateway";
 import { parseInput } from "./validation";
 
@@ -31,8 +32,10 @@ export interface PdfUploadGrant {
 // design.md, "Decision: Flujo de subida y procesamiento", step 1:
 // validates the client-declared file (name, mime, size) and the target
 // notebook (active and owned), then issues a signed upload grant to the
-// canonical `{ownerId}/{uuid v7}.pdf` path. Any validation failure returns
-// a DomainError without ever contacting Storage.
+// canonical `{ownerId}/{uuid v7}.{pdf|docx|pptx}` path, its extension the
+// format of the validated mime (document-import T5; the name is kept for
+// the UI until T11). Any validation failure returns a DomainError without
+// ever contacting Storage.
 export async function requestPdfUpload(
   input: unknown,
   deps: {
@@ -48,8 +51,8 @@ export async function requestPdfUpload(
   const nameResult = validateFileName(parsed.value.fileName);
   if (!nameResult.ok) return nameResult;
 
-  const pdfResult = validatePdfInput(parsed.value);
-  if (!pdfResult.ok) return pdfResult;
+  const documentResult = validateDocumentInput(parsed.value);
+  if (!documentResult.ok) return documentResult;
 
   const notebook = await deps.notebookPages.findActiveNotebook(
     ownerId,
@@ -64,7 +67,11 @@ export async function requestPdfUpload(
     );
   }
 
-  const storagePath = `${ownerId}/${createId()}.pdf`;
+  const storagePath = documentStoragePath(
+    ownerId,
+    createId(),
+    documentResult.value,
+  );
   // T7c follow-up (R3-metadata-throw-callers-unproved): a thrown Storage
   // call (e.g. PdfStorageAdapterError for a transient failure) must
   // resolve to a typed failure instead of propagating out of the use case.

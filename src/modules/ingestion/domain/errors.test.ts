@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { IMPORT_JOB_ERROR, INGESTION_ERROR, PDF_FILE_ERROR } from "./errors";
+import {
+  DOCUMENT_FILE_ERROR,
+  IMPORT_JOB_ERROR,
+  INGESTION_ERROR,
+} from "./errors";
 
 describe("ingestion domain error codes", () => {
   it("exposes the import job error codes from design.md", () => {
@@ -10,15 +14,16 @@ describe("ingestion domain error codes", () => {
     });
   });
 
-  it("exposes the pdf-file error codes from design.md", () => {
-    expect(PDF_FILE_ERROR).toEqual({
-      MIME_NOT_ALLOWED: "PDF_MIME_NOT_ALLOWED",
-      TOO_LARGE: "PDF_TOO_LARGE",
-      FILE_NAME_INVALID: "PDF_FILE_NAME_INVALID",
-      PATH_OUT_OF_SCOPE: "PDF_PATH_OUT_OF_SCOPE",
-      UPLOAD_EXPIRED: "PDF_UPLOAD_EXPIRED",
-      OBJECT_MISSING: "PDF_OBJECT_MISSING",
-      UNREADABLE: "PDF_UNREADABLE",
+  it("exposes the document-file error codes (PDF_* renamed to DOCUMENT_* in document-import T5)", () => {
+    expect(DOCUMENT_FILE_ERROR).toEqual({
+      MIME_NOT_ALLOWED: "DOCUMENT_MIME_NOT_ALLOWED",
+      TOO_LARGE: "DOCUMENT_TOO_LARGE",
+      FILE_NAME_INVALID: "DOCUMENT_FILE_NAME_INVALID",
+      PATH_OUT_OF_SCOPE: "DOCUMENT_PATH_OUT_OF_SCOPE",
+      UPLOAD_EXPIRED: "DOCUMENT_UPLOAD_EXPIRED",
+      OBJECT_MISSING: "DOCUMENT_OBJECT_MISSING",
+      UNREADABLE: "DOCUMENT_UNREADABLE",
+      UNSUPPORTED_FORMAT: "DOCUMENT_UNSUPPORTED_FORMAT",
     });
   });
 

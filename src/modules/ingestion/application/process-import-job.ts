@@ -2,7 +2,13 @@ import { z } from "zod";
 import type { Clock } from "@/shared/kernel/clock";
 import { DomainError } from "@/shared/kernel/domain-error";
 import { err, ok, type Result } from "@/shared/kernel/result";
-import { IMPORT_JOB_ERROR, PDF_FILE_ERROR } from "../domain/errors";
+import type { DocumentExtractor } from "../domain/document-extractor";
+import {
+  documentFormatFromPath,
+  MAX_DOCUMENT_BYTES,
+} from "../domain/document-file";
+import { detectDocumentFormat } from "../domain/document-format";
+import { DOCUMENT_FILE_ERROR, IMPORT_JOB_ERROR } from "../domain/errors";
 import { PROCESSING_BUDGET_MS } from "../domain/import-budget";
 import {
   failureMessage,
@@ -14,10 +20,7 @@ import type { ImportJobRepository } from "../domain/import-job-repository";
 import type { ImportTelemetry } from "../domain/import-telemetry";
 import { hasTextContent } from "../domain/imported-doc";
 import type { NotebookPagesPort } from "../domain/notebook-pages-port";
-import { looksLikePdf, MAX_PDF_BYTES } from "../domain/pdf-file";
 import type { PdfStorageGateway } from "../domain/pdf-storage-gateway";
-import type { PdfTextExtractor } from "../domain/pdf-text-extractor";
-import { textToBlocks } from "../domain/text-to-blocks";
 import { parseInput } from "./validation";
 
 export const processImportJobSchema = z.object({
@@ -27,7 +30,7 @@ export const processImportJobSchema = z.object({
 export interface ProcessImportJobDeps {
   jobs: ImportJobRepository;
   storage: PdfStorageGateway;
-  extractor: PdfTextExtractor;
+  extractor: DocumentExtractor;
   notebookPages: NotebookPagesPort;
   telemetry: ImportTelemetry;
   clock: Clock;
@@ -58,8 +61,11 @@ interface Failure {
 
 // design.md, "Decision: Procesamiento síncrono en la Server Action con
 // maxDuration" — `processImportJob({ importJobId }, deps, ownerId)`.
-// Claims the queued job with a conditional transition, downloads the PDF,
-// extracts its text, converts it to blocks, writes it through
+// Claims the queued job with a conditional transition, downloads the
+// document, detects its format from the real bytes (document-import T5:
+// PDF, DOCX or PPTX, which must match the format its storage path
+// declares), extracts it into blocks through the DocumentExtractor port,
+// rejects it when no block carries text, writes it through
 // `NotebookPagesPort.writeImportedContent` with compare-and-swap, and
 // always leaves the job in a terminal state (unless the platform kills
 // the function first — `getImportJobStatus`'s abandoned-job rule covers
@@ -159,12 +165,28 @@ export async function processImportJob(
       message: failureMessage("download"),
     });
   }
-  if (!looksLikePdf(bytes) || bytes.length > MAX_PDF_BYTES) {
+  if (bytes.length > MAX_DOCUMENT_BYTES) {
     return finishFailed({
-      kind: "invalid_pdf",
-      message: failureMessage("invalid_pdf"),
+      kind: "invalid_document",
+      message: failureMessage("invalid_document"),
     });
   }
+  // The real bytes decide the format; a legacy/unknown file, or one whose
+  // bytes are not the format the upload declared (the path's extension,
+  // picked by requestPdfUpload from the validated mime), is refused before
+  // any parser sees it.
+  const detected = detectDocumentFormat(bytes);
+  if (
+    detected === "legacy" ||
+    detected === "unknown" ||
+    detected !== documentFormatFromPath(claimed.storagePath)
+  ) {
+    return finishFailed({
+      kind: "unsupported_format",
+      message: failureMessage("unsupported_format"),
+    });
+  }
+  const format = detected;
 
   if (remainingMs() <= 0) {
     return finishFailed({
@@ -176,18 +198,19 @@ export async function processImportJob(
   const extractStart = deps.clock.now();
   // Review follow-up from T6 (R3-persist-and-extract-exceptions-
   // unhandled): the port promises a Result, never a throw, but an adapter
-  // bug (or unpdf itself) can still reject; the job must reach a terminal
-  // state instead of leaking the exception out of processImportJob.
-  let extracted: Awaited<ReturnType<PdfTextExtractor["extract"]>>;
+  // bug (or the parser itself) can still reject; the job must reach a
+  // terminal state instead of leaking the exception out of
+  // processImportJob.
+  let extracted: Awaited<ReturnType<DocumentExtractor["extract"]>>;
   // Captured only when `extract` actually threw (never set for a plain
   // `err(...)` Result) so `finishFailed` only forwards a `cause` to
   // telemetry when there is a real exception with a stack to report.
   let extractCause: unknown;
   try {
-    extracted = await deps.extractor.extract(bytes);
+    extracted = await deps.extractor.extract(bytes, format);
   } catch (error) {
     extractCause = error;
-    extracted = err(new DomainError(PDF_FILE_ERROR.UNREADABLE, "threw"));
+    extracted = err(new DomainError(DOCUMENT_FILE_ERROR.UNREADABLE, "threw"));
   }
   deps.telemetry.stage(
     claimed,
@@ -195,31 +218,39 @@ export async function processImportJob(
     deps.clock.now().getTime() - extractStart.getTime(),
   );
   if (!extracted.ok) {
+    const kind: ImportFailureKind =
+      extracted.error.code === DOCUMENT_FILE_ERROR.UNSUPPORTED_FORMAT
+        ? "unsupported_format"
+        : "invalid_document";
     return finishFailed({
-      kind: "invalid_pdf",
-      message: failureMessage("invalid_pdf"),
+      kind,
+      message: failureMessage(kind),
       cause: extractCause,
     });
   }
+  const document = extracted.value;
 
+  // Conversion to blocks now happens inside the extractor adapter; this
+  // stage covers the post-extraction checks (and T9's image uploads).
   const convertStart = deps.clock.now();
-  const blocksResult = textToBlocks(extracted.value.pages);
+  const hasText = hasTextContent(document.content);
   deps.telemetry.stage(
     claimed,
     "convert",
     deps.clock.now().getTime() - convertStart.getTime(),
   );
 
-  if (
-    blocksResult.pagesWithText === 0 ||
-    blocksResult.doc.content.length === 0 ||
-    !hasTextContent(blocksResult.doc)
-  ) {
+  // `hasTextContent` is recursive: it also catches a doc whose blocks were
+  // all discarded as noise (e.g. page numbers only). A PDF without text is
+  // a missing text layer (scanned); a DOCX/PPTX without text is just empty.
+  if (!hasText) {
+    const kind: ImportFailureKind =
+      format === "pdf" ? "no_text_layer" : "empty_document";
     return finishFailed({
-      kind: "no_text_layer",
-      message: failureMessage("no_text_layer"),
-      pageCount: blocksResult.totalPages,
-      pagesWithoutText: blocksResult.pagesWithoutText,
+      kind,
+      message: failureMessage(kind),
+      pageCount: document.totalPages,
+      pagesWithoutText: document.pagesWithoutText,
     });
   }
 
@@ -244,7 +275,7 @@ export async function processImportJob(
   try {
     written = await deps.notebookPages.writeImportedContent(ownerId, {
       pageId: claimed.pageId,
-      content: blocksResult.doc,
+      content: document.content,
       expectedVersion: 1,
     });
   } catch (error) {
@@ -274,8 +305,8 @@ export async function processImportJob(
 
   const completed = await deps.jobs.markDone({
     id: claimed.id,
-    pageCount: blocksResult.totalPages,
-    pagesWithoutText: blocksResult.pagesWithoutText,
+    pageCount: document.totalPages,
+    pagesWithoutText: document.pagesWithoutText,
     now: deps.clock.now(),
   });
   if (!completed) {

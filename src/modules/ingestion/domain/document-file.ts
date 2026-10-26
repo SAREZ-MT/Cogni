@@ -1,37 +1,75 @@
 // design.md, "Decision: Flujo de subida y procesamiento" and the
-// `pdf-file.ts` signatures block. Pure validators/helpers around a PDF
-// upload: file constraints (mime/size/name), the server-assigned storage
-// path shape, its embedded upload instant, the real-bytes magic-number
-// check, and the page title derived from the original file name.
+// `pdf-file.ts` signatures block, generalized from PDF to PDF/DOCX/PPTX in
+// document-import T5. Pure validators/helpers around a document upload:
+// file constraints (mime/size/name), the server-assigned storage path
+// shape (its extension records the declared format), its embedded upload
+// instant, and the page title derived from the original file name. The
+// real bytes are checked by `detectDocumentFormat` (document-format.ts).
 import { DomainError } from "@/shared/kernel/domain-error";
 import { err, ok, type Result } from "@/shared/kernel/result";
-import { PDF_FILE_ERROR } from "./errors";
+import type { DocumentFormat } from "./document-format";
+import { DOCUMENT_FILE_ERROR } from "./errors";
 
 export const PDF_MIME = "application/pdf";
-export const MAX_PDF_BYTES = 20_971_520; // 20 MiB, product decision 1
+export const DOCX_MIME =
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+export const PPTX_MIME =
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+
+export const DOCUMENT_MIME: Readonly<Record<DocumentFormat, string>> = {
+  pdf: PDF_MIME,
+  docx: DOCX_MIME,
+  pptx: PPTX_MIME,
+};
+
+// 20 MiB for every format (product decision 1, kept for DOCX/PPTX: the T0
+// spike parsed the 30-page DOCX and 40-slide PPTX well under that size and
+// within the processing budget).
+export const MAX_DOCUMENT_BYTES = 20_971_520;
 export const UPLOAD_GRANT_TTL_MS = 10 * 60 * 1000; // C3: 10-minute upload grant
 
-// "%PDF-" as bytes.
-const PDF_MAGIC = [0x25, 0x50, 0x44, 0x46, 0x2d];
+// {ownerId}/{uuid v7}.{pdf|docx|pptx}, exactly — the server-assigned
+// canonical path (design.md, "Ruta canónica asignada por el servidor"). A
+// single "/" is required so no path traversal or extra segment can slip
+// through, and the second segment must be a syntactically valid UUID v7
+// (version nibble "7", RFC 4122 variant "8"/"9"/"a"/"b"), not any UUID
+// version.
+const OWNED_DOCUMENT_PATH =
+  /^([^/]+)\/([0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\.(pdf|docx|pptx)$/i;
 
-// {ownerId}/{uuid v7}.pdf, exactly — the server-assigned canonical path
-// (design.md, "Ruta canónica asignada por el servidor"). A single "/" is
-// required so no path traversal or extra segment can slip through, and
-// the second segment must be a syntactically valid UUID v7 (version
-// nibble "7", RFC 4122 variant "8"/"9"/"a"/"b"), not any UUID version.
-const OWNED_PDF_PATH =
-  /^([^/]+)\/([0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\.pdf$/i;
+const DOCUMENT_EXTENSION = /\.(pdf|docx|pptx)$/i;
 
-const PDF_EXTENSION = /\.pdf$/i;
+export function documentFormatFromMime(mime: string): DocumentFormat | null {
+  for (const [format, allowed] of Object.entries(DOCUMENT_MIME)) {
+    if (allowed === mime) return format as DocumentFormat;
+  }
+  return null;
+}
 
-export function validatePdfInput(input: {
+// The format a storage path declares through its extension (the server
+// picks it from the validated mime in `requestPdfUpload`).
+export function documentFormatFromPath(path: string): DocumentFormat | null {
+  const match = DOCUMENT_EXTENSION.exec(path);
+  return match ? (match[1].toLowerCase() as DocumentFormat) : null;
+}
+
+export function documentStoragePath(
+  ownerId: string,
+  uploadId: string,
+  format: DocumentFormat,
+): string {
+  return `${ownerId}/${uploadId}.${format}`;
+}
+
+export function validateDocumentInput(input: {
   mime: string;
   sizeBytes: number;
-}): Result<void, DomainError> {
-  if (input.mime !== PDF_MIME) {
+}): Result<DocumentFormat, DomainError> {
+  const format = documentFormatFromMime(input.mime);
+  if (!format) {
     return err(
       new DomainError(
-        PDF_FILE_ERROR.MIME_NOT_ALLOWED,
+        DOCUMENT_FILE_ERROR.MIME_NOT_ALLOWED,
         `unsupported mime type: ${input.mime}`,
       ),
     );
@@ -39,16 +77,16 @@ export function validatePdfInput(input: {
   if (
     !Number.isInteger(input.sizeBytes) ||
     input.sizeBytes <= 0 ||
-    input.sizeBytes > MAX_PDF_BYTES
+    input.sizeBytes > MAX_DOCUMENT_BYTES
   ) {
     return err(
       new DomainError(
-        PDF_FILE_ERROR.TOO_LARGE,
-        `sizeBytes out of range (0, ${MAX_PDF_BYTES}]: ${input.sizeBytes}`,
+        DOCUMENT_FILE_ERROR.TOO_LARGE,
+        `sizeBytes out of range (0, ${MAX_DOCUMENT_BYTES}]: ${input.sizeBytes}`,
       ),
     );
   }
-  return ok(undefined);
+  return ok(format);
 }
 
 export function validateFileName(
@@ -58,7 +96,7 @@ export function validateFileName(
   if (trimmed.length === 0 || trimmed.length > 255) {
     return err(
       new DomainError(
-        PDF_FILE_ERROR.FILE_NAME_INVALID,
+        DOCUMENT_FILE_ERROR.FILE_NAME_INVALID,
         "fileName must be 1..255 characters after trim",
       ),
     );
@@ -66,8 +104,8 @@ export function validateFileName(
   return ok(trimmed);
 }
 
-export function isOwnedPdfPath(ownerId: string, path: string): boolean {
-  const match = OWNED_PDF_PATH.exec(path);
+export function isOwnedDocumentPath(ownerId: string, path: string): boolean {
+  const match = OWNED_DOCUMENT_PATH.exec(path);
   return match !== null && match[1] === ownerId;
 }
 
@@ -85,18 +123,13 @@ export function isOwnedPdfPath(ownerId: string, path: string): boolean {
 // instead of its own `Number.isFinite` guard).
 export function uploadIdAgeMs(path: string, now: Date): number {
   const fileName = path.slice(path.lastIndexOf("/") + 1);
-  const uploadId = fileName.replace(PDF_EXTENSION, "");
+  const uploadId = fileName.replace(DOCUMENT_EXTENSION, "");
   const timestampHex = uploadId.replace(/-/g, "").slice(0, 12);
   if (!/^[0-9a-f]{12}$/i.test(timestampHex)) {
     return Number.POSITIVE_INFINITY;
   }
   const timestampMs = Number.parseInt(timestampHex, 16);
   return now.getTime() - timestampMs;
-}
-
-export function looksLikePdf(bytes: Uint8Array): boolean {
-  if (bytes.length < PDF_MAGIC.length) return false;
-  return PDF_MAGIC.every((byte, index) => bytes[index] === byte);
 }
 
 const TITLE_MAX_LENGTH = 120;
@@ -125,7 +158,7 @@ export function pageTitleFromFileName(fileName: string): string | undefined {
   // exercise, since `split` on a string can never return an empty array).
   const segments = fileName.split(/[/\\]/);
   const base = segments[segments.length - 1];
-  const withoutExtension = base.replace(PDF_EXTENSION, "");
+  const withoutExtension = base.replace(DOCUMENT_EXTENSION, "");
   const collapsed = withoutExtension.replace(/\s+/g, " ").trim();
   // Truncating at a fixed length can land right after a space (leaving a
   // trailing space) as easily as mid-word; trim again after cutting

@@ -1,14 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
-  isOwnedPdfPath,
-  looksLikePdf,
-  MAX_PDF_BYTES,
+  DOCX_MIME,
+  documentFormatFromMime,
+  documentFormatFromPath,
+  documentStoragePath,
+  isOwnedDocumentPath,
+  MAX_DOCUMENT_BYTES,
   PDF_MIME,
+  PPTX_MIME,
   pageTitleFromFileName,
   uploadIdAgeMs,
+  validateDocumentInput,
   validateFileName,
-  validatePdfInput,
-} from "./pdf-file";
+} from "./document-file";
 
 const OWNER_ID = "3d2f9a1e-5b6c-4d7e-8f90-1a2b3c4d5e6f"; // valid UUID, version 4
 
@@ -21,54 +25,89 @@ function uuidV7WithTimestamp(ms: number): string {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-7abc-89ab-000000000000`;
 }
 
-describe("validatePdfInput", () => {
+describe("validateDocumentInput", () => {
   it("accepts application/pdf within the size bounds", () => {
-    const result = validatePdfInput({ mime: PDF_MIME, sizeBytes: 1_048_576 });
-    expect(result.ok).toBe(true);
-  });
-
-  it("accepts exactly MAX_PDF_BYTES", () => {
-    const result = validatePdfInput({
+    const result = validateDocumentInput({
       mime: PDF_MIME,
-      sizeBytes: MAX_PDF_BYTES,
+      sizeBytes: 1_048_576,
     });
     expect(result.ok).toBe(true);
   });
 
-  it("rejects a non-PDF mime type", () => {
-    const result = validatePdfInput({
+  it("accepts exactly MAX_DOCUMENT_BYTES", () => {
+    const result = validateDocumentInput({
+      mime: PDF_MIME,
+      sizeBytes: MAX_DOCUMENT_BYTES,
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it.each([
+    [PDF_MIME, "pdf"],
+    [DOCX_MIME, "docx"],
+    [PPTX_MIME, "pptx"],
+  ])("accepts %s and returns its format (%s)", (mime, format) => {
+    const result = validateDocumentInput({ mime, sizeBytes: 1_048_576 });
+    expect(result).toEqual({ ok: true, value: format });
+  });
+
+  it("keeps the 20 MiB limit for every format", () => {
+    expect(MAX_DOCUMENT_BYTES).toBe(20_971_520);
+    const result = validateDocumentInput({
+      mime: DOCX_MIME,
+      sizeBytes: MAX_DOCUMENT_BYTES + 1,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.code).toBe("DOCUMENT_TOO_LARGE");
+  });
+
+  it("rejects the legacy binary Office mimes", () => {
+    for (const mime of [
+      "application/msword",
+      "application/vnd.ms-powerpoint",
+    ]) {
+      const result = validateDocumentInput({ mime, sizeBytes: 1_048_576 });
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.error.code).toBe("DOCUMENT_MIME_NOT_ALLOWED");
+    }
+  });
+
+  it("rejects a non-document mime type", () => {
+    const result = validateDocumentInput({
       mime: "image/png",
       sizeBytes: 1_048_576,
     });
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(result.error.code).toBe("PDF_MIME_NOT_ALLOWED");
+    expect(result.error.code).toBe("DOCUMENT_MIME_NOT_ALLOWED");
   });
 
   it("rejects sizeBytes of 0", () => {
-    const result = validatePdfInput({ mime: PDF_MIME, sizeBytes: 0 });
+    const result = validateDocumentInput({ mime: PDF_MIME, sizeBytes: 0 });
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(result.error.code).toBe("PDF_TOO_LARGE");
+    expect(result.error.code).toBe("DOCUMENT_TOO_LARGE");
   });
 
-  it("rejects sizeBytes one over MAX_PDF_BYTES (20 971 521)", () => {
-    const result = validatePdfInput({
+  it("rejects sizeBytes one over MAX_DOCUMENT_BYTES (20 971 521)", () => {
+    const result = validateDocumentInput({
       mime: PDF_MIME,
-      sizeBytes: MAX_PDF_BYTES + 1,
+      sizeBytes: MAX_DOCUMENT_BYTES + 1,
     });
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(result.error.code).toBe("PDF_TOO_LARGE");
+    expect(result.error.code).toBe("DOCUMENT_TOO_LARGE");
   });
 
   it("rejects a negative sizeBytes", () => {
-    const result = validatePdfInput({ mime: PDF_MIME, sizeBytes: -1 });
+    const result = validateDocumentInput({ mime: PDF_MIME, sizeBytes: -1 });
     expect(result.ok).toBe(false);
   });
 
   it("rejects a non-integer sizeBytes", () => {
-    const result = validatePdfInput({ mime: PDF_MIME, sizeBytes: 100.5 });
+    const result = validateDocumentInput({ mime: PDF_MIME, sizeBytes: 100.5 });
     expect(result.ok).toBe(false);
   });
 });
@@ -90,43 +129,77 @@ describe("validateFileName", () => {
     const result = validateFileName("a".repeat(256));
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(result.error.code).toBe("PDF_FILE_NAME_INVALID");
+    expect(result.error.code).toBe("DOCUMENT_FILE_NAME_INVALID");
   });
 
   it("rejects an empty name after trim", () => {
     const result = validateFileName("   ");
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(result.error.code).toBe("PDF_FILE_NAME_INVALID");
+    expect(result.error.code).toBe("DOCUMENT_FILE_NAME_INVALID");
   });
 });
 
-describe("isOwnedPdfPath", () => {
-  it("accepts the exact {ownerId}/{uuid v7}.pdf shape", () => {
-    const path = `${OWNER_ID}/${uuidV7WithTimestamp(Date.now())}.pdf`;
-    expect(isOwnedPdfPath(OWNER_ID, path)).toBe(true);
+describe("isOwnedDocumentPath", () => {
+  it.each([
+    "pdf",
+    "docx",
+    "pptx",
+  ])("accepts the exact {ownerId}/{uuid v7}.%s shape", (extension) => {
+    const path = `${OWNER_ID}/${uuidV7WithTimestamp(Date.now())}.${extension}`;
+    expect(isOwnedDocumentPath(OWNER_ID, path)).toBe(true);
+  });
+
+  it("rejects an extension outside the three formats (e.g. .doc)", () => {
+    const path = `${OWNER_ID}/${uuidV7WithTimestamp(Date.now())}.doc`;
+    expect(isOwnedDocumentPath(OWNER_ID, path)).toBe(false);
   });
 
   it("rejects a path owned by someone else", () => {
     const otherOwner = "00000000-0000-4000-8000-000000000000";
     const path = `${otherOwner}/${uuidV7WithTimestamp(Date.now())}.pdf`;
-    expect(isOwnedPdfPath(OWNER_ID, path)).toBe(false);
+    expect(isOwnedDocumentPath(OWNER_ID, path)).toBe(false);
   });
 
   it("rejects a path containing ..", () => {
     const path = `${OWNER_ID}/../${uuidV7WithTimestamp(Date.now())}.pdf`;
-    expect(isOwnedPdfPath(OWNER_ID, path)).toBe(false);
+    expect(isOwnedDocumentPath(OWNER_ID, path)).toBe(false);
   });
 
   it("rejects a UUID that is not version 7", () => {
     // version nibble "4", not "7"
     const path = `${OWNER_ID}/3d2f9a1e-5b6c-4d7e-8f90-1a2b3c4d5e6f.pdf`;
-    expect(isOwnedPdfPath(OWNER_ID, path)).toBe(false);
+    expect(isOwnedDocumentPath(OWNER_ID, path)).toBe(false);
   });
 
-  it("rejects a path missing the .pdf extension", () => {
+  it("rejects a path missing the extension", () => {
     const path = `${OWNER_ID}/${uuidV7WithTimestamp(Date.now())}`;
-    expect(isOwnedPdfPath(OWNER_ID, path)).toBe(false);
+    expect(isOwnedDocumentPath(OWNER_ID, path)).toBe(false);
+  });
+});
+
+describe("documentStoragePath / documentFormatFromPath / documentFormatFromMime", () => {
+  it("builds {ownerId}/{uploadId}.{extension} and reads the format back", () => {
+    const uploadId = uuidV7WithTimestamp(Date.now());
+    for (const format of ["pdf", "docx", "pptx"] as const) {
+      const path = documentStoragePath(OWNER_ID, uploadId, format);
+      expect(path).toBe(`${OWNER_ID}/${uploadId}.${format}`);
+      expect(isOwnedDocumentPath(OWNER_ID, path)).toBe(true);
+      expect(documentFormatFromPath(path)).toBe(format);
+    }
+  });
+
+  it("reads the extension case-insensitively and returns null for anything else", () => {
+    expect(documentFormatFromPath("a/b.PPTX")).toBe("pptx");
+    expect(documentFormatFromPath("a/b.doc")).toBeNull();
+    expect(documentFormatFromPath("a/b")).toBeNull();
+  });
+
+  it("maps each allowed mime to its format and anything else to null", () => {
+    expect(documentFormatFromMime(PDF_MIME)).toBe("pdf");
+    expect(documentFormatFromMime(DOCX_MIME)).toBe("docx");
+    expect(documentFormatFromMime(PPTX_MIME)).toBe("pptx");
+    expect(documentFormatFromMime("application/msword")).toBeNull();
   });
 });
 
@@ -137,6 +210,15 @@ describe("uploadIdAgeMs", () => {
     const now = new Date(issuedAt + 90_000);
 
     expect(uploadIdAgeMs(path, now)).toBe(90_000);
+  });
+
+  it("reads the same timestamp from a .docx or .pptx path", () => {
+    const issuedAt = new Date("2026-09-23T10:00:00.000Z").getTime();
+    const uploadId = uuidV7WithTimestamp(issuedAt);
+    const now = new Date(issuedAt + 5_000);
+
+    expect(uploadIdAgeMs(`${OWNER_ID}/${uploadId}.docx`, now)).toBe(5_000);
+    expect(uploadIdAgeMs(`${OWNER_ID}/${uploadId}.pptx`, now)).toBe(5_000);
   });
 
   it("returns a negative age when now is before the embedded timestamp", () => {
@@ -164,28 +246,17 @@ describe("uploadIdAgeMs", () => {
   });
 });
 
-describe("looksLikePdf", () => {
-  it("accepts bytes starting with %PDF-", () => {
-    const bytes = new TextEncoder().encode("%PDF-1.7\n%âãÏÓ\n");
-    expect(looksLikePdf(bytes)).toBe(true);
-  });
-
-  it("rejects bytes not starting with %PDF-", () => {
-    const bytes = new TextEncoder().encode("not a pdf at all");
-    expect(looksLikePdf(bytes)).toBe(false);
-  });
-
-  it("rejects a byte array shorter than the magic number", () => {
-    const bytes = new TextEncoder().encode("%PD");
-    expect(looksLikePdf(bytes)).toBe(false);
-  });
-});
-
 describe("pageTitleFromFileName", () => {
   it("strips the .pdf extension case-insensitively", () => {
     expect(pageTitleFromFileName("Cálculo I - unidad 3.PDF")).toBe(
       "Cálculo I - unidad 3",
     );
+  });
+
+  it("strips the .docx and .pptx extensions too", () => {
+    expect(pageTitleFromFileName("Apuntes.docx")).toBe("Apuntes");
+    expect(pageTitleFromFileName("Clase 4.PPTX")).toBe("Clase 4");
+    expect(pageTitleFromFileName("informe.doc")).toBe("informe.doc");
   });
 
   it("strips directory components", () => {

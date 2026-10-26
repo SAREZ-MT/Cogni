@@ -1,7 +1,7 @@
 import { createBrowserClient } from "@supabase/ssr";
 import { clientEnv } from "@/shared/config/env.client";
 import { err, ok, type Result } from "@/shared/kernel/result";
-import { PDF_MIME } from "../domain/pdf-file";
+import { PDF_MIME } from "../domain/document-file";
 
 // The actual byte upload direct to Storage (design.md, "Subida directa
 // desde el navegador"): never a Server Action, so it cannot be part of a

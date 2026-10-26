@@ -14,7 +14,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { requestPdfUpload, startPdfImport } from "../actions";
-import { MAX_PDF_BYTES, PDF_MIME } from "../domain/pdf-file";
+import { MAX_DOCUMENT_BYTES, PDF_MIME } from "../domain/document-file";
 import { useActiveImportsActions } from "./active-imports-provider";
 import { ImportProgress } from "./import-progress";
 import { INGESTION_COPY, messageForIngestionErrorCode } from "./ingestion-copy";
@@ -134,7 +134,7 @@ export function PdfImportProvider({ children }: { children: ReactNode }) {
       });
       return;
     }
-    if (file.size > MAX_PDF_BYTES) {
+    if (file.size > MAX_DOCUMENT_BYTES) {
       setState({
         notebookId,
         status: "failed",

@@ -123,7 +123,7 @@ describe("getImportJobStatus use case", () => {
     if (!result.ok) return;
     expect(result.value?.status).toBe("failed");
     expect(result.value?.error).toBe(
-      "La importación tardó demasiado. Inténtalo de nuevo con un PDF más pequeño o en unos minutos.",
+      "La importación tardó demasiado. Inténtalo de nuevo con un documento más pequeño o en unos minutos.",
     );
     expect(markFailedSpy).not.toHaveBeenCalled();
     // Nothing was persisted: re-reading directly still shows `processing`.

@@ -17,22 +17,29 @@ export const IMPORT_JOB_ERROR = {
   STORAGE_PATH_CONFLICT: "IMPORT_JOB_STORAGE_PATH_CONFLICT",
 } as const;
 
-// DomainError codes for `pdf-file.ts` (design.md, `errors.ts` code list).
-// `MIME_NOT_ALLOWED`/`TOO_LARGE`/`FILE_NAME_INVALID` are raised by this
-// task's pure validators (`validatePdfInput`/`validateFileName`).
+// DomainError codes for `document-file.ts` (design.md, `errors.ts` code
+// list; `PDF_*` renamed to `DOCUMENT_*` when document-import T5 widened the
+// import from PDF to PDF/DOCX/PPTX — no code is persisted, so the rename
+// only touches this module and its UI copy).
+// `MIME_NOT_ALLOWED`/`TOO_LARGE`/`FILE_NAME_INVALID` are raised by the pure
+// validators (`validateDocumentInput`/`validateFileName`).
 // `PATH_OUT_OF_SCOPE`, `UPLOAD_EXPIRED`, `OBJECT_MISSING` and `UNREADABLE`
-// are raised by the application layer (T5's `startPdfImport`, T6's
+// are raised by the application layer (`startPdfImport`,
 // `processImportJob`) from the boolean/number results
-// `isOwnedPdfPath`/`uploadIdAgeMs` return and from `PdfStorageGateway`
-// calls — never from inside `pdf-file.ts`.
-export const PDF_FILE_ERROR = {
-  MIME_NOT_ALLOWED: "PDF_MIME_NOT_ALLOWED",
-  TOO_LARGE: "PDF_TOO_LARGE",
-  FILE_NAME_INVALID: "PDF_FILE_NAME_INVALID",
-  PATH_OUT_OF_SCOPE: "PDF_PATH_OUT_OF_SCOPE",
-  UPLOAD_EXPIRED: "PDF_UPLOAD_EXPIRED",
-  OBJECT_MISSING: "PDF_OBJECT_MISSING",
-  UNREADABLE: "PDF_UNREADABLE",
+// `isOwnedDocumentPath`/`uploadIdAgeMs` return and from `PdfStorageGateway`
+// calls, and by the `DocumentExtractor` adapters (`UNREADABLE`).
+// `UNSUPPORTED_FORMAT` (T5): the stored object's real mime does not match
+// the format its path declares (`startPdfImport`), or a `DocumentExtractor`
+// has no adapter for the format (`FormatRoutingDocumentExtractor`).
+export const DOCUMENT_FILE_ERROR = {
+  MIME_NOT_ALLOWED: "DOCUMENT_MIME_NOT_ALLOWED",
+  TOO_LARGE: "DOCUMENT_TOO_LARGE",
+  FILE_NAME_INVALID: "DOCUMENT_FILE_NAME_INVALID",
+  PATH_OUT_OF_SCOPE: "DOCUMENT_PATH_OUT_OF_SCOPE",
+  UPLOAD_EXPIRED: "DOCUMENT_UPLOAD_EXPIRED",
+  OBJECT_MISSING: "DOCUMENT_OBJECT_MISSING",
+  UNREADABLE: "DOCUMENT_UNREADABLE",
+  UNSUPPORTED_FORMAT: "DOCUMENT_UNSUPPORTED_FORMAT",
 } as const;
 
 // DomainError codes owned by `application` that are not specific to a PDF

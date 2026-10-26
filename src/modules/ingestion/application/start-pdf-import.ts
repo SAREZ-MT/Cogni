@@ -3,17 +3,18 @@ import type { Clock } from "@/shared/kernel/clock";
 import { DomainError } from "@/shared/kernel/domain-error";
 import { createId } from "@/shared/kernel/id";
 import { err, ok, type Result } from "@/shared/kernel/result";
-import { INGESTION_ERROR, PDF_FILE_ERROR } from "../domain/errors";
-import { createImportJob, type ImportJobStatus } from "../domain/import-job";
-import type { ImportJobRepository } from "../domain/import-job-repository";
-import type { NotebookPagesPort } from "../domain/notebook-pages-port";
 import {
-  isOwnedPdfPath,
+  documentFormatFromPath,
+  isOwnedDocumentPath,
   pageTitleFromFileName,
   UPLOAD_GRANT_TTL_MS,
   uploadIdAgeMs,
-  validatePdfInput,
-} from "../domain/pdf-file";
+  validateDocumentInput,
+} from "../domain/document-file";
+import { DOCUMENT_FILE_ERROR, INGESTION_ERROR } from "../domain/errors";
+import { createImportJob, type ImportJobStatus } from "../domain/import-job";
+import type { ImportJobRepository } from "../domain/import-job-repository";
+import type { NotebookPagesPort } from "../domain/notebook-pages-port";
 import type { PdfStorageGateway } from "../domain/pdf-storage-gateway";
 import { parseInput } from "./validation";
 
@@ -35,8 +36,9 @@ export interface StartPdfImportResult {
 // design.md, "Decision: Flujo de subida y procesamiento", step 3 —
 // `startPdfImport` is fast (no download, no extraction). In order:
 //
-// 1. The storage path must have the exact `{ownerId}/{uuid v7}.pdf` shape
-//    (isOwnedPdfPath), checked before touching the repository or Storage.
+// 1. The storage path must have the exact
+//    `{ownerId}/{uuid v7}.{pdf|docx|pptx}` shape (isOwnedDocumentPath),
+//    checked before touching the repository or Storage.
 // 2. Idempotency by storagePath, checked *before* the expiry check
 //    (review follow-up: a repeated call for an already-started import must
 //    return the existing job even if the upload grant has since expired).
@@ -48,7 +50,8 @@ export interface StartPdfImportResult {
 // 4. The notebook is active and owned, re-checked (the grant may outlive
 //    the notebook).
 // 5. The object's real metadata from Storage — never the client-declared
-//    mime/size for a path this far in.
+//    mime/size for a path this far in — whose mime must also be the format
+//    the path's extension declares (document-import T5).
 // 6-7. Create the destination page, then the ImportJob in `queued` with
 //    the real object's size.
 //
@@ -69,8 +72,10 @@ export async function startPdfImport(
   if (!parsed.ok) return parsed;
   const { notebookId, storagePath, fileName } = parsed.value;
 
-  if (!isOwnedPdfPath(ownerId, storagePath)) {
-    return err(new DomainError(PDF_FILE_ERROR.PATH_OUT_OF_SCOPE, storagePath));
+  if (!isOwnedDocumentPath(ownerId, storagePath)) {
+    return err(
+      new DomainError(DOCUMENT_FILE_ERROR.PATH_OUT_OF_SCOPE, storagePath),
+    );
   }
 
   const existing = await deps.jobs.findByStoragePath(storagePath);
@@ -80,7 +85,9 @@ export async function startPdfImport(
 
   const ageMs = uploadIdAgeMs(storagePath, deps.clock.now());
   if (ageMs > UPLOAD_GRANT_TTL_MS) {
-    return err(new DomainError(PDF_FILE_ERROR.UPLOAD_EXPIRED, storagePath));
+    return err(
+      new DomainError(DOCUMENT_FILE_ERROR.UPLOAD_EXPIRED, storagePath),
+    );
   }
 
   const notebook = await deps.notebookPages.findActiveNotebook(
@@ -112,10 +119,17 @@ export async function startPdfImport(
     );
   }
   if (!metadata) {
-    return err(new DomainError(PDF_FILE_ERROR.OBJECT_MISSING, storagePath));
+    return err(
+      new DomainError(DOCUMENT_FILE_ERROR.OBJECT_MISSING, storagePath),
+    );
   }
-  const validMetadata = validatePdfInput(metadata);
+  const validMetadata = validateDocumentInput(metadata);
   if (!validMetadata.ok) return validMetadata;
+  if (validMetadata.value !== documentFormatFromPath(storagePath)) {
+    return err(
+      new DomainError(DOCUMENT_FILE_ERROR.UNSUPPORTED_FORMAT, storagePath),
+    );
+  }
 
   const page = await deps.notebookPages.createPage(ownerId, {
     notebookId,

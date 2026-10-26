@@ -146,8 +146,13 @@ export type ImportedBlock =
   | {
       type: "image";
       // assetId: a page_assets row id (T9); align defaults to "center".
+      // pendingId (document-import T5): an ExtractedImage key
+      // (document-extractor.ts) for an image not uploaded yet. Ingestion-
+      // internal: T9 replaces it with assetId before writing, since
+      // notebooks' strict content schema does not accept it.
       attrs: {
         assetId: string | null;
+        pendingId?: string;
         align?: ImageAlign;
         caption?: string | null;
         alt?: string | null;

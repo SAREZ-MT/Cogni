@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { DomainError } from "@/shared/kernel/domain-error";
 import { err } from "@/shared/kernel/result";
+import { UPLOAD_GRANT_TTL_MS } from "../domain/document-file";
 import { IMPORT_JOB_ERROR } from "../domain/errors";
 import { createImportJob } from "../domain/import-job";
-import { UPLOAD_GRANT_TTL_MS } from "../domain/pdf-file";
 import { startPdfImport } from "./start-pdf-import";
 import { FakeNotebookPagesPort } from "./testing/fake-notebook-pages-port";
 import { FakePdfStorageGateway } from "./testing/fake-pdf-storage-gateway";
@@ -18,12 +18,19 @@ const OTHER_OWNER_ID = "0a1b2c3d-4e5f-4061-8798-a1b2c3d4e5f6";
 // whose first 12 hex digits encode `ms` as a big-endian 48-bit timestamp,
 // matching how `@/shared/kernel/id.ts`'s `createId()` lays out bytes 0-5
 // (design.md: "uploadId = createId()"). Mirrors the helper in
-// domain/pdf-file.test.ts so `startPdfImport` can control an upload
+// domain/document-file.test.ts so `startPdfImport` can control an upload
 // grant's age without waiting on the real clock.
-function uploadPath(ownerId: string, issuedAtMs: number): string {
+function uploadPath(
+  ownerId: string,
+  issuedAtMs: number,
+  extension = "pdf",
+): string {
   const hex = issuedAtMs.toString(16).padStart(12, "0");
-  return `${ownerId}/${hex.slice(0, 8)}-${hex.slice(8, 12)}-7abc-89ab-000000000000.pdf`;
+  return `${ownerId}/${hex.slice(0, 8)}-${hex.slice(8, 12)}-7abc-89ab-000000000000.${extension}`;
 }
+
+const DOCX_MIME =
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
 function makeDeps() {
   const notebookPages = new FakeNotebookPagesPort();
@@ -82,6 +89,53 @@ describe("startPdfImport use case", () => {
       sizeBytes: 2048, // from the real object, not the client-declared 999
       status: "queued",
     });
+  });
+
+  it("starts a docx import whose stored object is a Word document, titling the page without .docx", async () => {
+    const deps = makeDeps();
+    const path = uploadPath(OWNER_ID, NOW.getTime(), "docx");
+    deps.storage.put(path, { sizeBytes: 4096, mime: DOCX_MIME });
+
+    const result = await startPdfImport(
+      {
+        notebookId: "nb-1",
+        storagePath: path,
+        fileName: "Apuntes de clase.docx",
+        mime: DOCX_MIME,
+        sizeBytes: 4096,
+      },
+      deps,
+      OWNER_ID,
+    );
+
+    expect(result.ok).toBe(true);
+    expect(deps.notebookPages.createPageCalls[0]?.title).toBe(
+      "Apuntes de clase",
+    );
+  });
+
+  it("rejects a stored object whose real mime does not match the path's declared format, before creating a page", async () => {
+    const deps = makeDeps();
+    const path = uploadPath(OWNER_ID, NOW.getTime(), "docx");
+    deps.storage.put(path, { sizeBytes: 4096, mime: "application/pdf" });
+
+    const result = await startPdfImport(
+      {
+        notebookId: "nb-1",
+        storagePath: path,
+        fileName: "Apuntes.docx",
+        mime: DOCX_MIME,
+        sizeBytes: 4096,
+      },
+      deps,
+      OWNER_ID,
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("DOCUMENT_UNSUPPORTED_FORMAT");
+    }
+    expect(deps.notebookPages.createPageCalls).toHaveLength(0);
   });
 
   it("falls back to the default page title when the file name leaves nothing after stripping", async () => {
@@ -333,7 +387,8 @@ describe("startPdfImport use case", () => {
     );
 
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error.code).toBe("PDF_PATH_OUT_OF_SCOPE");
+    if (!result.ok)
+      expect(result.error.code).toBe("DOCUMENT_PATH_OUT_OF_SCOPE");
     expect(deps.storage.getObjectMetadataCalls).toHaveLength(0);
     expect(deps.notebookPages.createPageCalls).toHaveLength(0);
   });
@@ -354,7 +409,8 @@ describe("startPdfImport use case", () => {
     );
 
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error.code).toBe("PDF_PATH_OUT_OF_SCOPE");
+    if (!result.ok)
+      expect(result.error.code).toBe("DOCUMENT_PATH_OUT_OF_SCOPE");
   });
 
   it("rejects an upload grant older than 10 minutes when no job exists yet (C3)", async () => {
@@ -377,7 +433,7 @@ describe("startPdfImport use case", () => {
     );
 
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error.code).toBe("PDF_UPLOAD_EXPIRED");
+    if (!result.ok) expect(result.error.code).toBe("DOCUMENT_UPLOAD_EXPIRED");
     expect(deps.storage.getObjectMetadataCalls).toHaveLength(0);
   });
 
@@ -468,7 +524,7 @@ describe("startPdfImport use case", () => {
     );
 
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error.code).toBe("PDF_OBJECT_MISSING");
+    if (!result.ok) expect(result.error.code).toBe("DOCUMENT_OBJECT_MISSING");
     expect(deps.notebookPages.createPageCalls).toHaveLength(0);
   });
 
@@ -490,7 +546,7 @@ describe("startPdfImport use case", () => {
     );
 
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error.code).toBe("PDF_MIME_NOT_ALLOWED");
+    if (!result.ok) expect(result.error.code).toBe("DOCUMENT_MIME_NOT_ALLOWED");
     expect(deps.notebookPages.createPageCalls).toHaveLength(0);
   });
 
@@ -515,7 +571,7 @@ describe("startPdfImport use case", () => {
     );
 
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error.code).toBe("PDF_TOO_LARGE");
+    if (!result.ok) expect(result.error.code).toBe("DOCUMENT_TOO_LARGE");
   });
 
   it("propagates a page-creation failure without creating a job", async () => {

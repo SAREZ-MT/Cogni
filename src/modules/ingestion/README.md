@@ -2,10 +2,14 @@
 
 ## Responsibility
 
-PDF import: a user picks a PDF from a notebook, it is uploaded directly to
-a private Supabase Storage bucket, its text is extracted on the server and
-converted into an editable page in the TipTap editor (`docs/documento-maestro.md`
-§13, Phase 2).
+Document import: a user picks a document from a notebook, it is uploaded
+directly to a private Supabase Storage bucket, its content is extracted on
+the server and converted into an editable page in the TipTap editor
+(`docs/documento-maestro.md` §13, Phase 2). Since document-import T5 the
+pipeline is format-aware (PDF, Word `.docx`, PowerPoint `.pptx`); today
+only the PDF adapter exists (DOCX/PPTX adapters land in T6/T7) and the UI
+still offers PDFs only (T11). The Server Actions keep their PDF names
+(`requestPdfUpload`, `startPdfImport`, `processPdfImport`) until T11.
 
 ## Layers
 
@@ -17,9 +21,16 @@ Follows the same hexagonal shape as `notebooks`
 
 - `domain/`: pure TypeScript — the `ImportJob` entity and its lifecycle
   transitions (`start`/`complete`/`fail`), the failure taxonomy and its
-  UI-safe Spanish copy, PDF validation helpers (`pdf-file.ts`), the
-  `textToBlocks` heuristic that turns extracted text into TipTap-shaped
-  blocks, the `ImportedDoc` type (`imported-doc.ts`, every block of the
+  UI-safe Spanish copy, the document file rules (`document-file.ts`:
+  allowed mimes, 20 MiB limit for every format, the
+  `{ownerId}/{uuid v7}.{pdf|docx|pptx}` storage path whose extension
+  records the declared format, page title from the file name), format
+  detection from the real bytes (`document-format.ts`: `%PDF-`; a ZIP whose
+  entries include `[Content_Types].xml` plus `word/document.xml` or
+  `ppt/presentation.xml`; OLE2 → `legacy`; read in pure TypeScript from
+  the ZIP central directory, or the local headers of a truncated archive),
+  the `textToBlocks` heuristic that turns extracted PDF text into
+  TipTap-shaped blocks, the `ImportedDoc` type (`imported-doc.ts`, every block of the
   content catalogue in `src/shared/kernel/tiptap-catalogue.ts`; notebooks'
   `writeImportedContent` rejects anything outside it) with its recursive
   `hasTextContent` predicate, the time budgets (`import-budget.ts`) and every port interface.
@@ -30,7 +41,9 @@ Follows the same hexagonal shape as `notebooks`
   `application/testing/`. Never imports `infrastructure` or `ui`.
 - `infrastructure/`: the only layer allowed to import `unpdf`, the Supabase
   client and `@/modules/notebooks`. `SupabasePdfStorageGateway` wraps the
-  private `page-pdfs` bucket, `UnpdfTextExtractor` wraps `unpdf`,
+  private `page-pdfs` bucket, `FormatRoutingDocumentExtractor`
+  (`createDocumentExtractor()`) dispatches to one `DocumentExtractor` per
+  format — `PdfDocumentExtractor` wraps `unpdf` plus `textToBlocks` —
   `NotebooksPagesAdapter` wraps `createNotebooksServerApi` to implement
   `NotebookPagesPort`, `ImportTelemetryAdapter` reports to PostHog and
   Sentry, and `DrizzleImportJobRepository` persists `import_jobs`.
@@ -57,7 +70,7 @@ Follows the same hexagonal shape as `notebooks`
 | Port (`domain/`) | Adapter (`infrastructure/`) | Fake (`application/testing/`) |
 |---|---|---|
 | `PdfStorageGateway` | `SupabasePdfStorageGateway` | `FakePdfStorageGateway` |
-| `PdfTextExtractor` | `UnpdfTextExtractor` | `FakePdfTextExtractor` |
+| `DocumentExtractor` | `FormatRoutingDocumentExtractor` → `PdfDocumentExtractor` | `FakeDocumentExtractor` |
 | `NotebookPagesPort` | `NotebooksPagesAdapter` | `FakeNotebookPagesPort` |
 | `ImportTelemetry` | `ImportTelemetryAdapter` | `FakeImportTelemetry` |
 | `ImportJobRepository` | `DrizzleImportJobRepository` | `InMemoryImportJobRepository` |
@@ -68,6 +81,38 @@ runs against both `InMemoryImportJobRepository` (`pnpm test`) and
 two never drift on the transition semantics (`create`/`claim`/`markDone`/
 `markFailed` are each meant to be one atomic conditional `UPDATE ...
 RETURNING`).
+
+## Document port
+
+`DocumentExtractor.extract(bytes, format)` returns
+`Result<ExtractedDocument, DomainError>`, where `ExtractedDocument` is
+`{ content: ImportedDoc; totalPages; pagesWithoutText; images:
+ExtractedImage[] }` and `ExtractedImage` is `{ key, bytes, mime, alt }`.
+An image node in `content` points at its image with `attrs.pendingId ===
+key`; T9 uploads the bytes and swaps `pendingId` for `assetId` before the
+write (no adapter emits images yet). Errors: `DOCUMENT_UNSUPPORTED_FORMAT`
+when no adapter handles the format, `DOCUMENT_UNREADABLE` for a corrupt,
+encrypted or truncated file.
+
+`processImportJob` downloads the object, rejects it above 20 MiB, detects
+its format from the bytes, and maps each outcome to a failure kind:
+
+| Outcome | Kind | Message |
+|---|---|---|
+| Legacy (`.doc`/`.ppt`), unknown bytes, or bytes that are not the format the path declares | `unsupported_format` | "Solo puedes importar archivos PDF, Word (.docx) o PowerPoint (.pptx)." |
+| Extractor returns `DOCUMENT_UNSUPPORTED_FORMAT` | `unsupported_format` | same |
+| Any other extractor error, a thrown extractor, or a file over 20 MiB | `invalid_document` | "Este archivo no es un documento válido o está protegido. …" |
+| No block carries text (`hasTextContent`), PDF | `no_text_layer` | "Este PDF no tiene texto seleccionable y Cogni no hace OCR. …" |
+| No block carries text, DOCX/PPTX | `empty_document` | "El documento no tiene texto que podamos importar." |
+
+`startPdfImport` also refuses (`DOCUMENT_UNSUPPORTED_FORMAT`) a stored
+object whose real mime is not the format its path declares. Only the
+message is stored on the job; the kind classifies the Sentry report
+(`warning` for `no_text_layer`, `empty_document`, `unsupported_format`).
+The `pdf_imported` event keeps its name until T10 and already carries the
+declared `format`. The `page-pdfs` bucket still allows only
+`application/pdf` (`drizzle/0006_page_pdfs_storage.sql`) until T10's
+migration, so a DOCX/PPTX upload is refused by Storage before then.
 
 ## Job lifecycle
 
