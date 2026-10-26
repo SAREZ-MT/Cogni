@@ -15,7 +15,7 @@ ALTER TABLE "import_jobs" ADD COLUMN "skipped_images" integer DEFAULT 0 NOT NULL
 ALTER TABLE "import_jobs" ADD CONSTRAINT "import_jobs_format_check" CHECK ("import_jobs"."format" in ('pdf', 'docx', 'pptx'));--> statement-breakpoint
 ALTER TABLE "import_jobs" ADD CONSTRAINT "import_jobs_skipped_images_check" CHECK ("import_jobs"."skipped_images" >= 0);--> statement-breakpoint
 update "import_jobs"
-set "format" = lower(substring("storage_path" from '\.(pdf|docx|pptx)$'))
+set "format" = substring(lower("storage_path") from '\.(pdf|docx|pptx)$')
 where "storage_path" ~* '\.(pdf|docx|pptx)$';--> statement-breakpoint
 update storage.buckets
 set file_size_limit = 20971520,
