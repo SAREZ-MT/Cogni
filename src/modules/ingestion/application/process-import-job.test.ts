@@ -3,8 +3,13 @@ import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { DomainError } from "@/shared/kernel/domain-error";
 import { err, ok } from "@/shared/kernel/result";
-import { PROCESSING_BUDGET_MS } from "../domain/import-budget";
+import type { ExtractedDocument } from "../domain/document-extractor";
+import {
+  IMAGE_UPLOAD_RESERVE_MS,
+  PROCESSING_BUDGET_MS,
+} from "../domain/import-budget";
 import { createImportJob } from "../domain/import-job";
+import type { ImportedBlock } from "../domain/imported-doc";
 import { textToBlocks } from "../domain/text-to-blocks";
 import { processImportJob } from "./process-import-job";
 import { FakeDocumentExtractor } from "./testing/fake-document-extractor";
@@ -785,7 +790,7 @@ describe("processImportJob use case", () => {
     expect(result.value.pagesWithoutText).toBe(0);
     expect(deps.notebookPages.getPage(job.pageId)?.content).toBeTruthy();
     expect(deps.telemetry.finishedCalls).toEqual([
-      { job: result.value, failure: undefined },
+      { job: result.value, failure: undefined, outcome: { skippedImages: 0 } },
     ]);
   });
 
@@ -915,5 +920,225 @@ describe("processImportJob use case", () => {
 
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe("INGESTION_INVALID_INPUT");
+  });
+});
+
+// document-import T9: extracted images become page assets before the
+// content is written; whatever cannot be stored is dropped and counted.
+describe("processImportJob images", () => {
+  const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+  function pendingImage(key: string): ImportedBlock {
+    return {
+      type: "image",
+      attrs: { assetId: null, pendingId: key, align: "center", alt: null },
+    };
+  }
+
+  function withImages(
+    keys: string[],
+    overrides: Partial<ExtractedDocument> = {},
+  ): ExtractedDocument {
+    return {
+      content: {
+        type: "doc",
+        content: [
+          { type: "paragraph", content: [{ type: "text", text: "hola" }] },
+          ...keys.map(pendingImage),
+        ],
+      },
+      totalPages: 1,
+      pagesWithoutText: 0,
+      images: keys.map((key) => ({
+        key,
+        bytes: PNG,
+        mime: "image/png",
+        alt: null,
+      })),
+      skippedImages: 0,
+      ...overrides,
+    };
+  }
+
+  function seedExtraction(
+    deps: ReturnType<typeof makeDeps>,
+    extracted: ExtractedDocument,
+  ) {
+    deps.storage.put(STORAGE_PATH, {
+      sizeBytes: PDF_BYTES.length,
+      mime: "application/pdf",
+      bytes: PDF_BYTES,
+    });
+    deps.extractor.setResult(ok(extracted));
+  }
+
+  function writtenImages(deps: ReturnType<typeof makeDeps>, pageId: string) {
+    const content = deps.notebookPages.getPage(pageId)?.content;
+    return (content?.content ?? []).filter((block) => block.type === "image");
+  }
+
+  it("stores every referenced image and writes the content with their assetIds", async () => {
+    const deps = makeDeps();
+    const job = await seedQueuedJob(deps);
+    seedExtraction(deps, withImages(["img-1", "img-2"], { skippedImages: 1 }));
+
+    const result = await processImportJob(
+      { importJobId: job.id },
+      deps,
+      OWNER_ID,
+    );
+
+    expect(result.ok && result.value.status).toBe("done");
+    expect(deps.notebookPages.storeImportedAssetCalls).toEqual([
+      { ownerId: OWNER_ID, pageId: job.pageId, mime: "image/png", size: 8 },
+      { ownerId: OWNER_ID, pageId: job.pageId, mime: "image/png", size: 8 },
+    ]);
+    const assetIds = deps.notebookPages.storedAssetIds();
+    expect(writtenImages(deps, job.pageId)).toEqual(
+      assetIds.map((assetId) => ({
+        type: "image",
+        attrs: { assetId, align: "center", alt: null },
+      })),
+    );
+    expect(deps.telemetry.finishedCalls.at(-1)?.outcome).toEqual({
+      skippedImages: 1,
+    });
+    expect(deps.notebookPages.deleteImportedAssetsCalls).toEqual([]);
+  });
+
+  it("drops and counts images whose upload fails, throws or is not an allowed type", async () => {
+    const deps = makeDeps();
+    const job = await seedQueuedJob(deps);
+    const extracted = withImages(["ok", "fails", "throws", "tiff"], {
+      skippedImages: 2,
+    });
+    extracted.images[3] = { ...extracted.images[3], mime: "image/tiff" };
+    seedExtraction(deps, extracted);
+    deps.notebookPages.failStoreAt(1, "error");
+    deps.notebookPages.failStoreAt(2, "throw");
+
+    const result = await processImportJob(
+      { importJobId: job.id },
+      deps,
+      OWNER_ID,
+    );
+
+    expect(result.ok && result.value.status).toBe("done");
+    expect(writtenImages(deps, job.pageId)).toHaveLength(1);
+    expect(deps.telemetry.finishedCalls.at(-1)?.outcome).toEqual({
+      skippedImages: 5,
+    });
+  });
+
+  it("only uploads images the content references", async () => {
+    const deps = makeDeps();
+    const job = await seedQueuedJob(deps);
+    const extracted = withImages(["img-1"]);
+    extracted.images.push({
+      key: "orphan",
+      bytes: PNG,
+      mime: "image/png",
+      alt: null,
+    });
+    seedExtraction(deps, extracted);
+
+    await processImportJob({ importJobId: job.id }, deps, OWNER_ID);
+
+    expect(deps.notebookPages.storeImportedAssetCalls).toHaveLength(1);
+  });
+
+  it("stops uploading once the processing budget only leaves the persist reserve, dropping the rest", async () => {
+    const deps = makeDeps();
+    const job = await seedQueuedJob(deps);
+    seedExtraction(deps, withImages(["img-1", "img-2", "img-3"]));
+    const original = deps.notebookPages.storeImportedAsset.bind(
+      deps.notebookPages,
+    );
+    vi.spyOn(deps.notebookPages, "storeImportedAsset").mockImplementation(
+      async (ownerId, input) => {
+        deps.clock.advanceMs(PROCESSING_BUDGET_MS - IMAGE_UPLOAD_RESERVE_MS);
+        return original(ownerId, input);
+      },
+    );
+
+    const result = await processImportJob(
+      { importJobId: job.id },
+      deps,
+      OWNER_ID,
+    );
+
+    expect(result.ok && result.value.status).toBe("done");
+    expect(deps.notebookPages.storeImportedAssetCalls).toHaveLength(1);
+    expect(writtenImages(deps, job.pageId)).toHaveLength(1);
+    expect(deps.telemetry.finishedCalls.at(-1)?.outcome).toEqual({
+      skippedImages: 2,
+    });
+  });
+
+  it("deletes the stored assets when the content write fails", async () => {
+    const deps = makeDeps();
+    const job = await seedQueuedJob(deps);
+    seedExtraction(deps, withImages(["img-1", "img-2"]));
+    vi.spyOn(deps.notebookPages, "writeImportedContent").mockResolvedValueOnce(
+      err(new DomainError("PAGE_VERSION_CONFLICT", job.pageId)),
+    );
+
+    const result = await processImportJob(
+      { importJobId: job.id },
+      deps,
+      OWNER_ID,
+    );
+
+    expect(result.ok && result.value.status).toBe("failed");
+    const [cleanup] = deps.notebookPages.deleteImportedAssetsCalls;
+    expect(deps.notebookPages.deleteImportedAssetsCalls).toHaveLength(1);
+    expect(cleanup.ownerId).toBe(OWNER_ID);
+    expect(cleanup.assetIds).toHaveLength(2);
+    // Both stored assets are gone again.
+    expect(deps.notebookPages.storedAssetIds()).toEqual([]);
+  });
+
+  it("deletes the stored assets when the content write throws, even if the cleanup throws too", async () => {
+    const deps = makeDeps();
+    const job = await seedQueuedJob(deps);
+    seedExtraction(deps, withImages(["img-1"]));
+    vi.spyOn(deps.notebookPages, "writeImportedContent").mockRejectedValueOnce(
+      new Error("db down"),
+    );
+    const cleanup = vi
+      .spyOn(deps.notebookPages, "deleteImportedAssets")
+      .mockRejectedValueOnce(new Error("storage down"));
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+
+    try {
+      const result = await processImportJob(
+        { importJobId: job.id },
+        deps,
+        OWNER_ID,
+      );
+
+      expect(result.ok && result.value.status).toBe("failed");
+      expect(cleanup).toHaveBeenCalledWith(
+        OWNER_ID,
+        deps.notebookPages.storedAssetIds(),
+      );
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  it("never calls the cleanup when nothing was stored", async () => {
+    const deps = makeDeps();
+    const job = await seedQueuedJob(deps);
+    seedExtraction(deps, withImages([]));
+    vi.spyOn(deps.notebookPages, "writeImportedContent").mockResolvedValueOnce(
+      err(new DomainError("PAGE_VERSION_CONFLICT", job.pageId)),
+    );
+
+    await processImportJob({ importJobId: job.id }, deps, OWNER_ID);
+
+    expect(deps.notebookPages.deleteImportedAssetsCalls).toEqual([]);
   });
 });

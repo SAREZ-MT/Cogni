@@ -159,4 +159,86 @@ describe("FakeNotebookPagesPort", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe("PAGE_VERSION_CONFLICT");
   });
+
+  // document-import T9.
+  it("stores an allowed image on an owned page and returns a fresh assetId", async () => {
+    const port = new FakeNotebookPagesPort();
+    const page = await port.createPage(OWNER_ID, { notebookId: "nb-1" });
+    if (!page.ok) throw new Error("setup failed");
+
+    const stored = await port.storeImportedAsset(OWNER_ID, {
+      pageId: page.value.id,
+      bytes: new Uint8Array(4),
+      mime: "image/png",
+    });
+
+    expect(stored.ok).toBe(true);
+    expect(port.storedAssetIds()).toEqual(
+      stored.ok ? [stored.value.assetId] : [],
+    );
+  });
+
+  it("refuses a disallowed mime or another owner's page like notebooks does", async () => {
+    const port = new FakeNotebookPagesPort();
+    const page = await port.createPage(OWNER_ID, { notebookId: "nb-1" });
+    if (!page.ok) throw new Error("setup failed");
+
+    const tiff = await port.storeImportedAsset(OWNER_ID, {
+      pageId: page.value.id,
+      bytes: new Uint8Array(4),
+      mime: "image/tiff",
+    });
+    const foreign = await port.storeImportedAsset(OTHER_OWNER_ID, {
+      pageId: page.value.id,
+      bytes: new Uint8Array(4),
+      mime: "image/png",
+    });
+
+    expect(tiff.ok).toBe(false);
+    if (!tiff.ok) expect(tiff.error.code).toBe("ASSET_MIME_NOT_ALLOWED");
+    expect(foreign.ok).toBe(false);
+    if (!foreign.ok) expect(foreign.error.code).toBe("PAGE_NOT_FOUND");
+    expect(port.storedAssetIds()).toEqual([]);
+  });
+
+  it("fails a chosen store call with an error or a throw", async () => {
+    const port = new FakeNotebookPagesPort();
+    const page = await port.createPage(OWNER_ID, { notebookId: "nb-1" });
+    if (!page.ok) throw new Error("setup failed");
+    port.failStoreAt(0, "error");
+    port.failStoreAt(1, "throw");
+    const input = {
+      pageId: page.value.id,
+      bytes: new Uint8Array(4),
+      mime: "image/png",
+    };
+
+    const first = await port.storeImportedAsset(OWNER_ID, input);
+
+    expect(first.ok).toBe(false);
+    await expect(port.storeImportedAsset(OWNER_ID, input)).rejects.toThrow();
+    expect(port.storedAssetIds()).toEqual([]);
+  });
+
+  it("deletes only the caller's stored assets and records the call", async () => {
+    const port = new FakeNotebookPagesPort();
+    const page = await port.createPage(OWNER_ID, { notebookId: "nb-1" });
+    if (!page.ok) throw new Error("setup failed");
+    const stored = await port.storeImportedAsset(OWNER_ID, {
+      pageId: page.value.id,
+      bytes: new Uint8Array(4),
+      mime: "image/png",
+    });
+    if (!stored.ok) throw new Error("setup failed");
+
+    await port.deleteImportedAssets(OTHER_OWNER_ID, [stored.value.assetId]);
+    expect(port.storedAssetIds()).toHaveLength(1);
+    await port.deleteImportedAssets(OWNER_ID, [stored.value.assetId]);
+
+    expect(port.storedAssetIds()).toEqual([]);
+    expect(port.deleteImportedAssetsCalls).toEqual([
+      { ownerId: OTHER_OWNER_ID, assetIds: [stored.value.assetId] },
+      { ownerId: OWNER_ID, assetIds: [stored.value.assetId] },
+    ]);
+  });
 });

@@ -78,6 +78,20 @@ describe("ImportTelemetryAdapter", () => {
     expect(captureMessage).not.toHaveBeenCalled();
   });
 
+  // document-import T9: images dropped during the import.
+  it("adds skipped_images when the outcome reports it", async () => {
+    const analytics = makeAnalytics();
+    const adapter = new ImportTelemetryAdapter(analytics);
+
+    await adapter.finished(makeJob(), undefined, { skippedImages: 3 });
+
+    expect(analytics.track).toHaveBeenCalledWith(
+      "pdf_imported",
+      "owner-1",
+      expect.objectContaining({ status: "done", skipped_images: 3 }),
+    );
+  });
+
   it("sends duration_ms: null when the job has no finishedAt (defensive)", async () => {
     const analytics = makeAnalytics();
     const adapter = new ImportTelemetryAdapter(analytics);

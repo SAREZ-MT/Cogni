@@ -9,7 +9,10 @@ import {
 } from "../domain/document-file";
 import { detectDocumentFormat } from "../domain/document-format";
 import { DOCUMENT_FILE_ERROR, IMPORT_JOB_ERROR } from "../domain/errors";
-import { PROCESSING_BUDGET_MS } from "../domain/import-budget";
+import {
+  IMAGE_UPLOAD_RESERVE_MS,
+  PROCESSING_BUDGET_MS,
+} from "../domain/import-budget";
 import {
   failureMessage,
   type ImportFailureKind,
@@ -17,10 +20,17 @@ import {
 } from "../domain/import-failure";
 import type { ImportJob } from "../domain/import-job";
 import type { ImportJobRepository } from "../domain/import-job-repository";
-import type { ImportTelemetry } from "../domain/import-telemetry";
+import type {
+  ImportOutcome,
+  ImportTelemetry,
+} from "../domain/import-telemetry";
 import { hasTextContent } from "../domain/imported-doc";
 import type { NotebookPagesPort } from "../domain/notebook-pages-port";
 import type { PdfStorageGateway } from "../domain/pdf-storage-gateway";
+import {
+  pendingImageKeys,
+  resolvePendingImages,
+} from "../domain/pending-images";
 import { parseInput } from "./validation";
 
 export const processImportJobSchema = z.object({
@@ -115,9 +125,10 @@ export async function processImportJob(
   const reportFinished = async (
     finishedJob: ImportJob,
     failure?: { kind: ImportFailureKind; cause?: unknown },
+    outcome?: ImportOutcome,
   ): Promise<void> => {
     try {
-      await deps.telemetry.finished(finishedJob, failure);
+      await deps.telemetry.finished(finishedJob, failure, outcome);
     } catch (error) {
       console.error("ingestion: telemetry.finished rejected", {
         importJobId: finishedJob.id,
@@ -231,19 +242,19 @@ export async function processImportJob(
   const document = extracted.value;
 
   // Conversion to blocks now happens inside the extractor adapter; this
-  // stage covers the post-extraction checks (and T9's image uploads).
+  // stage covers the post-extraction checks and T9's image uploads.
   const convertStart = deps.clock.now();
   const hasText = hasTextContent(document.content);
-  deps.telemetry.stage(
-    claimed,
-    "convert",
-    deps.clock.now().getTime() - convertStart.getTime(),
-  );
 
   // `hasTextContent` is recursive: it also catches a doc whose blocks were
   // all discarded as noise (e.g. page numbers only). A PDF without text is
   // a missing text layer (scanned); a DOCX/PPTX without text is just empty.
   if (!hasText) {
+    deps.telemetry.stage(
+      claimed,
+      "convert",
+      deps.clock.now().getTime() - convertStart.getTime(),
+    );
     const kind: ImportFailureKind =
       format === "pdf" ? "no_text_layer" : "empty_document";
     return finishFailed({
@@ -255,11 +266,64 @@ export async function processImportJob(
   }
 
   if (remainingMs() <= 0) {
+    deps.telemetry.stage(
+      claimed,
+      "convert",
+      deps.clock.now().getTime() - convertStart.getTime(),
+    );
     return finishFailed({
       kind: "timeout",
       message: failureMessage("timeout"),
     });
   }
+
+  // document-import T9: every image the content references is stored as a
+  // page asset, one at a time, while more than IMAGE_UPLOAD_RESERVE_MS of
+  // the budget is left; the content then carries their assetIds. Images
+  // that could not be stored (refused mime/size, failed or throwing
+  // upload, budget exhausted) are dropped from the content and counted
+  // with the ones the extractor already skipped.
+  const imagesByKey = new Map(
+    document.images.map((image) => [image.key, image]),
+  );
+  const resolvedImages = new Map<string, string>();
+  for (const key of pendingImageKeys(document.content)) {
+    if (remainingMs() <= IMAGE_UPLOAD_RESERVE_MS) break;
+    const image = imagesByKey.get(key);
+    if (!image) continue;
+    try {
+      const stored = await deps.notebookPages.storeImportedAsset(ownerId, {
+        pageId: claimed.pageId,
+        bytes: image.bytes,
+        mime: image.mime,
+      });
+      if (stored.ok) resolvedImages.set(key, stored.value.assetId);
+    } catch {
+      // Dropped and counted like any other image that was not stored.
+    }
+  }
+  const storedAssetIds = [...resolvedImages.values()];
+  const resolved = resolvePendingImages(document.content, resolvedImages);
+  const skippedImages = document.skippedImages + resolved.removed;
+  deps.telemetry.stage(
+    claimed,
+    "convert",
+    deps.clock.now().getTime() - convertStart.getTime(),
+  );
+
+  // Best effort: the assets of a page whose content was never written are
+  // unreferenced, so a cleanup failure is only logged.
+  const discardStoredAssets = async (): Promise<void> => {
+    if (storedAssetIds.length === 0) return;
+    try {
+      await deps.notebookPages.deleteImportedAssets(ownerId, storedAssetIds);
+    } catch (error) {
+      console.error("ingestion: deleteImportedAssets rejected", {
+        importJobId: claimed.id,
+        error,
+      });
+    }
+  };
 
   const persistStart = deps.clock.now();
   // Review follow-up from T6 (R3-persist-and-extract-exceptions-
@@ -275,7 +339,7 @@ export async function processImportJob(
   try {
     written = await deps.notebookPages.writeImportedContent(ownerId, {
       pageId: claimed.pageId,
-      content: document.content,
+      content: resolved.content,
       expectedVersion: 1,
     });
   } catch (error) {
@@ -296,6 +360,7 @@ export async function processImportJob(
     deps.clock.now().getTime() - persistStart.getTime(),
   );
   if (!written.ok) {
+    await discardStoredAssets();
     const message =
       written.error.code === PAGE_VERSION_CONFLICT_CODE
         ? failureMessage("persistence")
@@ -313,6 +378,6 @@ export async function processImportJob(
     const current = await deps.jobs.findById(claimed.id);
     return ok(current ?? claimed);
   }
-  await reportFinished(completed);
+  await reportFinished(completed, undefined, { skippedImages });
   return ok(completed);
 }

@@ -54,7 +54,7 @@ export {
   start,
 } from "./import-job";
 export type { ImportJobRepository } from "./import-job-repository";
-export type { ImportTelemetry } from "./import-telemetry";
+export type { ImportOutcome, ImportTelemetry } from "./import-telemetry";
 export {
   hasTextContent,
   type ImportedBlock,
@@ -74,4 +74,5 @@ export {
 } from "./imported-doc";
 export type { NotebookPagesPort } from "./notebook-pages-port";
 export type { PdfStorageGateway } from "./pdf-storage-gateway";
+export { pendingImageKeys, resolvePendingImages } from "./pending-images";
 export { type TextToBlocksResult, textToBlocks } from "./text-to-blocks";

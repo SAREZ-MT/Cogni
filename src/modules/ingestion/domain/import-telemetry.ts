@@ -1,6 +1,8 @@
 import type { ImportFailureKind } from "./import-failure";
 import type { ImportJob } from "./import-job";
 
+export type ImportOutcome = { skippedImages: number };
+
 // design.md, "Decision: Observabilidad: pdf_imported en toda transición
 // terminal y Sentry en todo fallo" — the port `processImportJob` (T6)
 // depends on instead of calling PostHog/Sentry directly
@@ -24,8 +26,12 @@ export interface ImportTelemetry {
   // `pdf_imported` (`distinctId = ownerId`) and, when `failure` is given,
   // reports to Sentry with `warning` for `no_text_layer` and `error` for
   // every other kind.
+  // `outcome` (document-import T9) is given for a done job: how many of the
+  // document's images were dropped (unsupported format, failed upload,
+  // budget exhausted).
   finished(
     job: ImportJob,
     failure?: { kind: ImportFailureKind; cause?: unknown },
+    outcome?: ImportOutcome,
   ): Promise<void>;
 }

@@ -95,10 +95,9 @@ RETURNING`).
 `{ content: ImportedDoc; totalPages; pagesWithoutText; images:
 ExtractedImage[]; skippedImages }` and `ExtractedImage` is `{ key, bytes,
 mime, alt }`. An image node in `content` points at its image with
-`attrs.pendingId === key`; T9 uploads the bytes and swaps `pendingId` for
-`assetId` before the write (the DOCX adapter emits images since T6).
+`attrs.pendingId === key` (the DOCX adapter emits images since T6).
 `skippedImages` counts images found in the source but not kept because
-their format is not png/jpeg/gif/webp (T9 reports it in the job result). Errors: `DOCUMENT_UNSUPPORTED_FORMAT`
+their format is not png/jpeg/gif/webp. Errors: `DOCUMENT_UNSUPPORTED_FORMAT`
 when no adapter handles the format, `DOCUMENT_UNREADABLE` for a corrupt,
 encrypted or truncated file.
 
@@ -112,6 +111,24 @@ its format from the bytes, and maps each outcome to a failure kind:
 | Any other extractor error, a thrown extractor, or a file over 20 MiB | `invalid_document` | "Este archivo no es un documento válido o está protegido. …" |
 | No block carries text (`hasTextContent`), PDF | `no_text_layer` | "Este PDF no tiene texto seleccionable y Cogni no hace OCR. …" |
 | No block carries text, DOCX/PPTX | `empty_document` | "El documento no tiene texto que podamos importar." |
+
+### Images (T9)
+
+After the text check, `processImportJob` stores every image the content
+references (`pendingImageKeys`, each key once) through
+`NotebookPagesPort.storeImportedAsset` — notebooks uploads it to the
+`page-assets` bucket under `{ownerId}/{pageId}/{fileId}.{ext}` and inserts
+the `page_assets` row — one at a time, while more than
+`IMAGE_UPLOAD_RESERVE_MS` (10 s) of the processing budget is left. The pure
+`resolvePendingImages` (`domain/pending-images.ts`) then swaps each stored
+image's `pendingId` for its `assetId` and removes the rest (refused
+mime/size, failed or throwing upload, budget exhausted), at any depth
+(lists, tables, callouts, quotes, details); a container left empty gets an
+empty paragraph. Removed images add to the extractor's `skippedImages`,
+reported as `skipped_images` on `pdf_imported` for a done job (the
+`import_jobs` column is T10's). When the write fails or throws, the stored
+assets are deleted again with `deleteImportedAssets` (best effort, only
+logged on failure). The "convert" stage timing includes the uploads.
 
 `startPdfImport` also refuses (`DOCUMENT_UNSUPPORTED_FORMAT`) a stored
 object whose real mime is not the format its path declares. Only the

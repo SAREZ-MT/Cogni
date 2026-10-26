@@ -3,7 +3,10 @@ import type { Analytics } from "@/shared/observability/analytics";
 import { documentFormatFromPath } from "../domain/document-file";
 import type { ImportFailureKind } from "../domain/import-failure";
 import type { ImportJob } from "../domain/import-job";
-import type { ImportTelemetry } from "../domain/import-telemetry";
+import type {
+  ImportOutcome,
+  ImportTelemetry,
+} from "../domain/import-telemetry";
 
 // design.md, "Decision: Observabilidad: pdf_imported en toda transición
 // terminal y Sentry en todo fallo". The only adapter for ImportTelemetry
@@ -46,6 +49,7 @@ export class ImportTelemetryAdapter implements ImportTelemetry {
   async finished(
     job: ImportJob,
     failure?: { kind: ImportFailureKind; cause?: unknown },
+    outcome?: ImportOutcome,
   ): Promise<void> {
     const durationMs = job.finishedAt
       ? job.finishedAt.getTime() - job.createdAt.getTime()
@@ -57,6 +61,8 @@ export class ImportTelemetryAdapter implements ImportTelemetry {
         duration_ms: durationMs,
         status: job.status === "done" ? "done" : "failed",
         format: documentFormatFromPath(job.storagePath),
+        // document-import T9 (the import_jobs column is T10's).
+        ...(outcome ? { skipped_images: outcome.skippedImages } : {}),
       });
     } catch (error) {
       console.error("[ingestion] pdf_imported tracking failed", {

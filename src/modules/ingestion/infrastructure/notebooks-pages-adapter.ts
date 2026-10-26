@@ -51,4 +51,18 @@ export class NotebooksPagesAdapter implements NotebookPagesPort {
   ): Promise<Result<{ version: number }, DomainError>> {
     return this.api.writeImportedContent(ownerId, input);
   }
+
+  async storeImportedAsset(
+    ownerId: string,
+    input: { pageId: string; bytes: Uint8Array; mime: string },
+  ): Promise<Result<{ assetId: string }, DomainError>> {
+    return this.api.storeImportedAsset(ownerId, input);
+  }
+
+  async deleteImportedAssets(
+    ownerId: string,
+    assetIds: readonly string[],
+  ): Promise<void> {
+    return this.api.deleteImportedAssets(ownerId, assetIds);
+  }
 }

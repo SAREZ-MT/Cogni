@@ -1,6 +1,9 @@
 import type { ImportFailureKind } from "../../domain/import-failure";
 import type { ImportJob } from "../../domain/import-job";
-import type { ImportTelemetry } from "../../domain/import-telemetry";
+import type {
+  ImportOutcome,
+  ImportTelemetry,
+} from "../../domain/import-telemetry";
 
 // Test double for the ImportTelemetry port — records every call in memory
 // so `processImportJob` (T6) tests can assert `pdf_imported` (`finished`)
@@ -16,6 +19,7 @@ export class FakeImportTelemetry implements ImportTelemetry {
   readonly finishedCalls: Array<{
     job: ImportJob;
     failure?: { kind: ImportFailureKind; cause?: unknown };
+    outcome?: ImportOutcome;
   }> = [];
 
   stage(
@@ -29,7 +33,10 @@ export class FakeImportTelemetry implements ImportTelemetry {
   async finished(
     job: ImportJob,
     failure?: { kind: ImportFailureKind; cause?: unknown },
+    outcome?: ImportOutcome,
   ): Promise<void> {
-    this.finishedCalls.push({ job, failure });
+    this.finishedCalls.push(
+      outcome ? { job, failure, outcome } : { job, failure },
+    );
   }
 }
