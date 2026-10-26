@@ -456,6 +456,23 @@
     font-size: 1.05em;
   }
 
+  /* document-import T11b: block math (BlockMath, rendered with KaTeX's
+     `displayMode`) is a centred, display-size block with paragraph-scale
+     vertical rhythm; KaTeX's own `.katex-display` margin is replaced by
+     the wrapper's so spacing matches the surrounding blocks, and wide
+     formulas scroll instead of overflowing the page column. */
+  .editor-content [data-type="block-math"] {
+    margin-block: 1rem;
+    overflow-x: auto;
+    text-align: center;
+  }
+  .editor-content [data-type="block-math"] .katex-display {
+    margin: 0;
+  }
+  .editor-content [data-type="block-math"] .katex-display > .katex {
+    font-size: 1.21em;
+  }
+
   .editor-content span[data-type="emoji"] img {
     display: inline-block;
     height: 1em;

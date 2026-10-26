@@ -35,4 +35,24 @@ describe("existing math content", () => {
     });
     expect(editor.view.dom.querySelector(".katex")).not.toBeNull();
   });
+
+  it("renders block math in display mode and inline math inline", () => {
+    const content = {
+      type: "doc",
+      content: [
+        { type: "blockMath", attrs: { latex: "\\sum_{i=1}^{n} x_i" } },
+        {
+          type: "paragraph",
+          content: [{ type: "inlineMath", attrs: { latex: "a+b" } }],
+        },
+      ],
+    };
+    editor = new Editor({ extensions: createEditorExtensions(), content });
+
+    const block = editor.view.dom.querySelector('[data-type="block-math"]');
+    expect(block?.querySelector(".katex-display")).not.toBeNull();
+    const paragraph = editor.view.dom.querySelector("p");
+    expect(paragraph?.querySelector(".katex")).not.toBeNull();
+    expect(paragraph?.querySelector(".katex-display")).toBeNull();
+  });
 });

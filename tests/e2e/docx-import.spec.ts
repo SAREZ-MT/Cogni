@@ -91,6 +91,9 @@ async function expectStructure(editable: Locator) {
   const blockMath = editable.locator('[data-type="block-math"]');
   await expect(blockMath).toHaveCount(3);
   await expect(blockMath.locator(".katex")).toHaveCount(3);
+  // Block math is typeset in KaTeX display mode; inline math is not (T11b).
+  await expect(blockMath.locator(".katex-display")).toHaveCount(3);
+  await expect(inlineMath.locator(".katex-display")).toHaveCount(0);
 
   // Images: stored in page-assets and rendered through Cogni's image node.
   const images = editable.getByTestId("image-node-img");

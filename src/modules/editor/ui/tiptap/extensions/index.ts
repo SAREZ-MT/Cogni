@@ -18,7 +18,7 @@
 // dependencies.
 import type { AnyExtension } from "@tiptap/core";
 import Emoji from "@tiptap/extension-emoji";
-import { Mathematics } from "@tiptap/extension-mathematics";
+import { BlockMath, InlineMath } from "@tiptap/extension-mathematics";
 import { NodeRange } from "@tiptap/extension-node-range";
 import Subscript from "@tiptap/extension-subscript";
 import Superscript from "@tiptap/extension-superscript";
@@ -192,8 +192,17 @@ export function createEditorExtensions(
     // E1: KaTeX-rendered inline `$…$` / block `$$…$$` math. Kept
     // registered so existing math content renders and round-trips; there is
     // no insert entry point until a math editing UI exists.
-    Mathematics.configure({
-      katexOptions: { throwOnError: false },
+    //
+    // document-import T11b: registered as the two node extensions instead
+    // of the `Mathematics` bundle, because the bundle hands one shared
+    // `katexOptions` to both (3.31.3's `blockOptions` omits it), so block
+    // math could never get KaTeX's `displayMode` (display-size, centred
+    // `.katex-display`) while inline math stays inline.
+    BlockMath.configure({
+      katexOptions: { throwOnError: false, displayMode: true },
+    }),
+    InlineMath.configure({
+      katexOptions: { throwOnError: false, displayMode: false },
     }),
     // E1: heading-tracking utility extension (see toc-node.tsx's header
     // comment for why the TOC *node view* computes its own heading list
