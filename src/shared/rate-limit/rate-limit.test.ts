@@ -81,6 +81,23 @@ describe("createInMemoryRateLimiter", () => {
     clock.advance(RULE.windowMs);
     expect((await limiter.consume("a")).allowed).toBe(true);
   });
+
+  // document-import T10 (T9b review: the map grew with every key forever):
+  // windows that ended are evicted on access, whichever key is consumed.
+  it("evicts expired windows of other keys on access", async () => {
+    const clock = clockAt("2026-10-26T10:00:00.000Z");
+    const windows = new Map<string, { startedAt: number; used: number }>();
+    const limiter = createInMemoryRateLimiter(RULE, clock, windows);
+
+    await limiter.consume("a");
+    await limiter.consume("b");
+    expect([...windows.keys()]).toEqual(["a", "b"]);
+
+    clock.advance(RULE.windowMs);
+    await limiter.consume("c");
+
+    expect([...windows.keys()]).toEqual(["c"]);
+  });
 });
 
 describe("createRateLimiter", () => {
