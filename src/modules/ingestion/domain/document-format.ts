@@ -7,6 +7,18 @@ import { asciiName, readZipDirectory, u16, u32 } from "./zip-directory";
 export const DOCUMENT_FORMATS = ["pdf", "docx", "pptx"] as const;
 export type DocumentFormat = (typeof DOCUMENT_FORMATS)[number];
 
+// document-import T11/T11b: the pipeline reads every DOCUMENT_FORMATS
+// entry, but a format is offered to users only once its adapter exists —
+// PPTX lands with T7, and enabling it is removing it from this set. The
+// picker (ui/import-formats.ts) and the unsupported-format copy
+// (import-failure.ts) both read IMPORTABLE_FORMATS, so they cannot drift.
+export const NOT_YET_IMPORTABLE: ReadonlySet<DocumentFormat> = new Set([
+  "pptx",
+]);
+
+export const IMPORTABLE_FORMATS: readonly DocumentFormat[] =
+  DOCUMENT_FORMATS.filter((format) => !NOT_YET_IMPORTABLE.has(format));
+
 // `legacy`: an OLE2 compound file — binary .doc/.ppt (and .xls), out of
 // scope. `unknown`: anything else, including a ZIP that is not a Word or
 // PowerPoint package (e.g. .xlsx).

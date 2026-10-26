@@ -1,19 +1,17 @@
 import { DOCUMENT_MIME } from "../domain/document-file";
 import {
-  DOCUMENT_FORMATS,
-  type DocumentFormat,
+  IMPORTABLE_FORMATS,
+  NOT_YET_IMPORTABLE,
 } from "../domain/document-format";
 
 // document-import T11: the formats the picker offers. The pipeline reads
 // every DOCUMENT_FORMATS entry, but a format joins the UI only once its
 // adapter exists — PPTX lands with T7, and enabling it is removing it from
-// this set (plus the invalid-type copy in ingestion-copy.ts).
-export const NOT_YET_IMPORTABLE_IN_UI: ReadonlySet<DocumentFormat> = new Set([
-  "pptx",
-]);
+// the domain's NOT_YET_IMPORTABLE set (T11b moved it there so the
+// unsupported-format copy reads the same set).
+export const NOT_YET_IMPORTABLE_IN_UI = NOT_YET_IMPORTABLE;
 
-export const UI_IMPORT_FORMATS: readonly DocumentFormat[] =
-  DOCUMENT_FORMATS.filter((format) => !NOT_YET_IMPORTABLE_IN_UI.has(format));
+export const UI_IMPORT_FORMATS = IMPORTABLE_FORMATS;
 
 const UI_IMPORT_MIMES: readonly string[] = UI_IMPORT_FORMATS.map(
   (format) => DOCUMENT_MIME[format],

@@ -1,8 +1,10 @@
+import { IMPORTABLE_FORMATS } from "../domain/document-format";
 import {
   DOCUMENT_FILE_ERROR,
   IMPORT_JOB_ERROR,
   INGESTION_ERROR,
 } from "../domain/errors";
+import { supportedFormatsMessage } from "../domain/import-failure";
 
 // Every user-facing ingestion message lives here: Spanish, "tú", sentence
 // case, no emoji — same pattern as notebooks/ui/notebooks-copy.ts. The
@@ -10,12 +12,13 @@ import {
 // table ("Decision: Indicador de progreso y copy"): they start with a
 // lowercase letter on purpose ("oración con minúscula inicial").
 // document-import T11: the picker takes PDF and Word documents, so the copy
-// says "documento"; `invalidFileType` names the offered formats and must
-// change with import-formats.ts's set when PPTX joins.
+// says "documento". T11b: `invalidFileType` and `unsupportedFormat` name
+// the offered formats by deriving from the domain's IMPORTABLE_FORMATS, so
+// they change on their own when PPTX joins.
 export const INGESTION_COPY = {
   importDocument: "Importar documento",
   importingDocument: "Importando documento",
-  invalidFileType: "Solo puedes importar archivos PDF o Word (.docx).",
+  invalidFileType: supportedFormatsMessage(IMPORTABLE_FORMATS),
   fileTooLarge: "El documento supera el límite de 20 MB.",
   sessionRequired: "Debes iniciar sesión para continuar.",
   invalidInput: "Revisa los datos: algo no tiene el formato esperado.",
@@ -29,8 +32,7 @@ export const INGESTION_COPY = {
   uploadFailed:
     "No pudimos confirmar la subida del archivo. Vuelve a intentarlo.",
   unreadableDocument: "No pudimos leer ese documento.",
-  unsupportedFormat:
-    "Solo puedes importar archivos PDF, Word (.docx) o PowerPoint (.pptx).",
+  unsupportedFormat: supportedFormatsMessage(IMPORTABLE_FORMATS),
   importNotFound: "No encontramos esa importación.",
   rateLimited:
     "Llegaste al límite de importaciones por ahora. Intenta de nuevo más tarde.",

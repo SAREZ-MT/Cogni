@@ -10,6 +10,8 @@
 // `unsupported_format` covers bytes that are legacy (.doc/.ppt), unknown, or
 // not the format the upload declared; `no_text_layer` stays PDF-only (a
 // scanned PDF), and `empty_document` is its DOCX/PPTX counterpart.
+import { type DocumentFormat, IMPORTABLE_FORMATS } from "./document-format";
+
 export const IMPORT_FAILURE_KIND = [
   "download",
   "invalid_document",
@@ -22,6 +24,27 @@ export const IMPORT_FAILURE_KIND = [
 
 export type ImportFailureKind = (typeof IMPORT_FAILURE_KIND)[number];
 
+const FORMAT_LABEL: Record<DocumentFormat, string> = {
+  pdf: "PDF",
+  docx: "Word (.docx)",
+  pptx: "PowerPoint (.pptx)",
+};
+
+// document-import T11b: "Solo puedes importar archivos A, B o C." for the
+// given formats — the `unsupported_format` copy below (and the picker's
+// invalid-type copy in ui/ingestion-copy.ts) is this sentence over
+// IMPORTABLE_FORMATS, so it names only what users can actually import.
+export function supportedFormatsMessage(
+  formats: readonly DocumentFormat[],
+): string {
+  const labels = formats.map((format) => FORMAT_LABEL[format]);
+  const list =
+    labels.length <= 1
+      ? labels.join("")
+      : `${labels.slice(0, -1).join(", ")} o ${labels[labels.length - 1]}`;
+  return `Solo puedes importar archivos ${list}.`;
+}
+
 // UI-safe Spanish copy per failure kind (design.md's message table). Lives
 // in `domain` because `processImportJob` (application) and the abandoned-job
 // rule of `getImportJobStatus` (application) both need the exact same
@@ -32,8 +55,7 @@ const FAILURE_MESSAGE: Record<ImportFailureKind, string> = {
   download: "No pudimos leer el archivo que subiste. Vuelve a importarlo.",
   invalid_document:
     "Este archivo no es un documento válido o está protegido. Revisa que no tenga contraseña e inténtalo de nuevo.",
-  unsupported_format:
-    "Solo puedes importar archivos PDF, Word (.docx) o PowerPoint (.pptx).",
+  unsupported_format: supportedFormatsMessage(IMPORTABLE_FORMATS),
   no_text_layer:
     "Este PDF no tiene texto seleccionable y Cogni no hace OCR. Prueba con un PDF que tenga texto.",
   empty_document: "El documento no tiene texto que podamos importar.",

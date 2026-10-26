@@ -92,7 +92,7 @@ describe("messageForIngestionErrorCode", () => {
     [DOCUMENT_FILE_ERROR.UNREADABLE, INGESTION_COPY.unreadableDocument],
     [
       DOCUMENT_FILE_ERROR.UNSUPPORTED_FORMAT,
-      "Solo puedes importar archivos PDF, Word (.docx) o PowerPoint (.pptx).",
+      "Solo puedes importar archivos PDF o Word (.docx).",
     ],
     [IMPORT_JOB_ERROR.NOT_FOUND, INGESTION_COPY.importNotFound],
     [IMPORT_JOB_ERROR.INVALID_TRANSITION, INGESTION_COPY.unexpected],

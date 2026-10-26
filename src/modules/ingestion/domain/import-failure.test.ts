@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { IMPORTABLE_FORMATS } from "./document-format";
 import {
   failureMessage,
   IMPORT_FAILURE_KIND,
   type ImportFailureKind,
   PERSISTENCE_PAGE_UNAVAILABLE_MESSAGE,
+  supportedFormatsMessage,
 } from "./import-failure";
 
 describe("failureMessage", () => {
@@ -32,10 +34,7 @@ describe("failureMessage", () => {
       "invalid_document",
       "Este archivo no es un documento válido o está protegido. Revisa que no tenga contraseña e inténtalo de nuevo.",
     ],
-    [
-      "unsupported_format",
-      "Solo puedes importar archivos PDF, Word (.docx) o PowerPoint (.pptx).",
-    ],
+    ["unsupported_format", "Solo puedes importar archivos PDF o Word (.docx)."],
     [
       "no_text_layer",
       "Este PDF no tiene texto seleccionable y Cogni no hace OCR. Prueba con un PDF que tenga texto.",
@@ -72,5 +71,27 @@ describe("failureMessage", () => {
         expect(message).not.toMatch(pattern);
       }
     }
+  });
+});
+
+// document-import T11b: the `unsupported_format` copy names exactly the
+// formats users can import today (IMPORTABLE_FORMATS, the same set the
+// picker offers), so it changes by itself when PowerPoint is enabled.
+describe("supportedFormatsMessage", () => {
+  it("names the importable formats in the unsupported_format copy", () => {
+    expect(failureMessage("unsupported_format")).toBe(
+      supportedFormatsMessage(IMPORTABLE_FORMATS),
+    );
+  });
+
+  it.each([
+    [["pdf"], "Solo puedes importar archivos PDF."],
+    [["pdf", "docx"], "Solo puedes importar archivos PDF o Word (.docx)."],
+    [
+      ["pdf", "docx", "pptx"],
+      "Solo puedes importar archivos PDF, Word (.docx) o PowerPoint (.pptx).",
+    ],
+  ] as const)("lists %j as %j", (formats, expected) => {
+    expect(supportedFormatsMessage(formats)).toBe(expected);
   });
 });
