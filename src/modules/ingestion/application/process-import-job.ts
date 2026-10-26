@@ -83,6 +83,36 @@ interface Failure {
 // that case). No failure ever propagates as an exception: every branch
 // resolves to `ok(job)` in its final state, `err` only for "job not
 // found/not owned" before anything was claimed.
+// Settles with `work`'s value, "threw" when it rejects, or "timeout" once
+// `budgetMs` passes first; `onLate` then receives the value it settles
+// with afterwards, if any.
+async function withinBudget<T>(
+  work: Promise<T>,
+  budgetMs: number,
+  onLate: (value: T) => void,
+): Promise<T | "threw" | "timeout"> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let timedOut = false;
+  const settled = work.then(
+    (value) => {
+      if (timedOut) onLate(value);
+      return value;
+    },
+    () => "threw" as const,
+  );
+  const timeout = new Promise<"timeout">((resolve) => {
+    timer = setTimeout(() => {
+      timedOut = true;
+      resolve("timeout");
+    }, budgetMs);
+  });
+  try {
+    return await Promise.race([settled, timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function processImportJob(
   input: unknown,
   deps: ProcessImportJobDeps,
@@ -331,19 +361,42 @@ export async function processImportJob(
   );
   const resolvedImages = new Map<string, string>();
   for (const key of pendingImageKeys(document.content)) {
-    if (remainingMs() <= IMAGE_UPLOAD_RESERVE_MS) break;
+    const uploadBudgetMs = remainingMs() - IMAGE_UPLOAD_RESERVE_MS;
+    if (uploadBudgetMs <= 0) break;
     const image = imagesByKey.get(key);
     if (!image) continue;
-    try {
-      const stored = await deps.notebookPages.storeImportedAsset(ownerId, {
-        pageId: claimed.pageId,
-        bytes: image.bytes,
-        mime: image.mime,
-      });
-      if (stored.ok) resolvedImages.set(key, stored.value.assetId);
-    } catch {
-      // Dropped and counted like any other image that was not stored.
+    // T9b (T9 review follow-up): each upload is raced against what is left
+    // of the upload budget, so one stalled upload cannot eat the persist
+    // reserve. A timed-out upload is dropped like a failed one and the
+    // loop stops; if it completes later its asset is unreferenced, so it is
+    // deleted again best effort (it stays orphaned if the function is
+    // frozen first — page assets are swept with their page).
+    const outcome = await withinBudget(
+      (async () =>
+        deps.notebookPages.storeImportedAsset(ownerId, {
+          pageId: claimed.pageId,
+          bytes: image.bytes,
+          mime: image.mime,
+        }))(),
+      uploadBudgetMs,
+      (late) => {
+        if (!late.ok) return;
+        deps.notebookPages
+          .deleteImportedAssets(ownerId, [late.value.assetId])
+          .catch((error) => {
+            console.error("ingestion: late asset cleanup rejected", {
+              importJobId: claimed.id,
+              error,
+            });
+          });
+      },
+    );
+    if (outcome === "timeout") break;
+    if (outcome !== "threw" && outcome.ok) {
+      resolvedImages.set(key, outcome.value.assetId);
     }
+    // Otherwise (refused or throwing upload): dropped and counted like
+    // any other image that was not stored.
   }
   const storedAssetIds = [...resolvedImages.values()];
   const resolved = resolvePendingImages(document.content, resolvedImages);
@@ -403,7 +456,19 @@ export async function processImportJob(
     deps.clock.now().getTime() - persistStart.getTime(),
   );
   if (!written.ok) {
-    await discardStoredAssets();
+    if (writeCause === undefined) {
+      await discardStoredAssets();
+    } else if (storedAssetIds.length > 0) {
+      // T9b (T9 review follow-up): a thrown write is ambiguous — it may
+      // have committed before the error reached us — so deleting the
+      // assets could leave committed image nodes pointing at nothing.
+      // They are kept (unreferenced assets of an unwritten page are the
+      // lesser harm) and logged; only a definite error Result deletes.
+      console.error("ingestion: write outcome unknown, imported assets kept", {
+        importJobId: claimed.id,
+        assetIds: storedAssetIds,
+      });
+    }
     const message =
       written.error.code === PAGE_VERSION_CONFLICT_CODE
         ? failureMessage("persistence")

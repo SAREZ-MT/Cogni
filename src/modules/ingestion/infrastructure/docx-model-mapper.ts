@@ -841,35 +841,60 @@ function newList(
     : { type: "orderedList", content: [item] };
 }
 
-// Reads every image's bytes up front (mammoth's reads are async) so the
-// mapping itself stays synchronous.
+// document-import T9b (audit: images all buffered): limits on the images
+// one document may bring. Over them an image is skipped (counted in
+// `skippedImages`), never the document.
+const MiB = 1024 * 1024;
+export const IMAGE_LIMITS = {
+  maxImages: 100,
+  // Also enforced before inflating by OoxmlPackage (OOXML_LIMITS).
+  maxImageBytes: 10 * MiB,
+  maxTotalBytes: 40 * MiB,
+};
+
+export type ImageLimits = typeof IMAGE_LIMITS;
+
+// Reads the images' bytes up front (mammoth's reads are async) so the
+// mapping itself stays synchronous — one image at a time (T9b), so only
+// one is ever being inflated. A read refused by the package (declared over
+// the image cap), an image over the cap once read, and every image after
+// the count or total cap is reached are left unread or dropped.
 async function readImages(
   document: MammothNode,
+  limits: ImageLimits,
 ): Promise<Map<MammothNode, Uint8Array>> {
   const nodes: MammothNode[] = [];
   collectImages(document.children ?? [], nodes);
-  const entries = await Promise.all(
-    nodes.map(async (node): Promise<[MammothNode, Uint8Array] | null> => {
-      try {
-        const buffer = await node.readAsArrayBuffer?.();
-        return buffer ? [node, new Uint8Array(buffer)] : null;
-      } catch {
-        // A missing or unreadable image part: counted as skipped.
-        return null;
-      }
-    }),
-  );
-  return new Map(entries.filter((entry) => entry !== null));
+  const read = new Map<MammothNode, Uint8Array>();
+  let totalBytes = 0;
+  for (const node of nodes) {
+    if (read.size >= limits.maxImages) break;
+    let bytes: Uint8Array;
+    try {
+      const buffer = await node.readAsArrayBuffer?.();
+      if (!buffer) continue;
+      bytes = new Uint8Array(buffer);
+    } catch {
+      // Missing, unreadable or over the declared image cap: skipped.
+      continue;
+    }
+    if (bytes.length > limits.maxImageBytes) continue;
+    if (totalBytes + bytes.length > limits.maxTotalBytes) break;
+    totalBytes += bytes.length;
+    read.set(node, bytes);
+  }
+  return read;
 }
 
 export async function mapDocxModel(
   document: MammothNode,
   enrichments: readonly ParagraphEnrichment[] | null,
+  imageLimits: ImageLimits = IMAGE_LIMITS,
 ): Promise<MappedDocx> {
   const mapper = new DocxMapper(
     document,
     enrichments,
-    await readImages(document),
+    await readImages(document, imageLimits),
   );
   const content = mapper.mapBlocks(document.children ?? []);
   return {

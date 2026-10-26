@@ -126,9 +126,14 @@ mime/size, failed or throwing upload, budget exhausted), at any depth
 (lists, tables, callouts, quotes, details); a container left empty gets an
 empty paragraph. Removed images add to the extractor's `skippedImages`,
 reported as `skipped_images` on `pdf_imported` for a done job (the
-`import_jobs` column is T10's). When the write fails or throws, the stored
-assets are deleted again with `deleteImportedAssets` (best effort, only
-logged on failure). The "convert" stage timing includes the uploads.
+`import_jobs` column is T10's). Each upload is raced against what is left
+of the upload budget (T9b): one that outlives it is dropped and the
+remaining images are not attempted; if it completes later, its asset is
+deleted again best effort (it stays an orphan if the function is frozen
+first). When the write returns an error, the stored assets are deleted
+again with `deleteImportedAssets` (best effort, only logged on failure);
+when the write *throws*, the outcome is unknown (it may have committed),
+so the assets are kept and the case is logged instead. The "convert" stage timing includes the uploads.
 
 `startPdfImport` also refuses (`DOCUMENT_UNSUPPORTED_FORMAT`) a stored
 object whose real mime is not the format its path declares. Only the
@@ -288,6 +293,15 @@ Text the user never sees must not reach the AI (imported content feeds
 - Image alt text (≤ 2000 characters, from the DOCX description) stays on
   the image node for accessibility, but `extractPlainText` (notebooks)
   writes an image's caption only, never its alt.
+
+### Images
+
+The DOCX mapper (`IMAGE_LIMITS`, `docx-model-mapper.ts`) reads embedded
+images one at a time, never more than 100 per document; an image over
+10 MiB (refused by `OoxmlPackage` from its declared size, before
+inflating, and checked again once read) is skipped, and once the images
+read reach 40 MiB in total the rest are not read. Every image not kept
+counts in `skippedImages`.
 
 ## Job lifecycle
 

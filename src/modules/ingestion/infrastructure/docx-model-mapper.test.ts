@@ -5,6 +5,7 @@ import {
   type ParagraphEnrichment,
 } from "./docx-enrichment";
 import {
+  IMAGE_LIMITS,
   MAX_TABLE_NESTING,
   type MammothNode,
   mapDocxModel,
@@ -412,5 +413,94 @@ describe("docx enrichment alignment", () => {
     await expect(
       mapDocxModel(doc(nest(MAX_TABLE_NESTING + 1)), null),
     ).rejects.toBeInstanceOf(OoxmlLimitError);
+  });
+
+  // document-import T9b (audit: images all buffered): images are read one
+  // at a time, never past the count, per-image or total caps; what is not
+  // read is skipped and counted.
+  describe("image limits", () => {
+    const tracked = () => {
+      const state = { active: 0, peak: 0, reads: 0 };
+      const node = (bytes: number[]): MammothNode => ({
+        type: "image",
+        altText: null,
+        readAsArrayBuffer: async () => {
+          state.reads++;
+          state.active++;
+          state.peak = Math.max(state.peak, state.active);
+          await new Promise((resolve) => setTimeout(resolve, 0));
+          state.active--;
+          return new Uint8Array(bytes).buffer;
+        },
+      });
+      return { state, node };
+    };
+    const docOf = (images: MammothNode[]) =>
+      doc(
+        paragraph([run("Texto")]),
+        ...images.map((img) => paragraph([{ type: "run", children: [img] }])),
+      );
+
+    it("reads images one at a time", async () => {
+      const { state, node } = tracked();
+      const mapped = await mapDocxModel(
+        docOf([node(PNG), node(PNG), node(PNG)]),
+        null,
+      );
+      expect(mapped.images).toHaveLength(3);
+      expect(state.peak).toBe(1);
+    });
+
+    it("keeps at most maxImages and never reads the rest", async () => {
+      const { state, node } = tracked();
+      const mapped = await mapDocxModel(
+        docOf([node(PNG), node(PNG), node(PNG)]),
+        null,
+        { ...IMAGE_LIMITS, maxImages: 2 },
+      );
+      expect(mapped.images).toHaveLength(2);
+      expect(mapped.skippedImages).toBe(1);
+      expect(state.reads).toBe(2);
+    });
+
+    it("caps real documents at 100 images by default", async () => {
+      const { state, node } = tracked();
+      const mapped = await mapDocxModel(
+        docOf(Array.from({ length: 101 }, () => node(PNG))),
+        null,
+      );
+      expect(mapped.images).toHaveLength(100);
+      expect(mapped.skippedImages).toBe(1);
+      expect(state.reads).toBe(100);
+      expect(IMAGE_LIMITS).toEqual({
+        maxImages: 100,
+        maxImageBytes: 10 * 1024 * 1024,
+        maxTotalBytes: 40 * 1024 * 1024,
+      });
+    });
+
+    it("skips an image over the per-image cap", async () => {
+      const big = [...PNG, ...new Array(10).fill(0)];
+      const { node } = tracked();
+      const mapped = await mapDocxModel(docOf([node(big), node(PNG)]), null, {
+        ...IMAGE_LIMITS,
+        maxImageBytes: 15,
+      });
+      expect(mapped.images).toHaveLength(1);
+      expect(mapped.skippedImages).toBe(1);
+    });
+
+    it("skips images once the total image bytes would pass the cap, without reading further ones", async () => {
+      const { state, node } = tracked();
+      const mapped = await mapDocxModel(
+        docOf([node(PNG), node(PNG), node(PNG), node(PNG)]),
+        null,
+        { ...IMAGE_LIMITS, maxTotalBytes: 25 },
+      );
+      expect(mapped.images).toHaveLength(2);
+      expect(mapped.skippedImages).toBe(2);
+      // The third read finds the budget spent; the fourth is not read.
+      expect(state.reads).toBe(3);
+    });
   });
 });

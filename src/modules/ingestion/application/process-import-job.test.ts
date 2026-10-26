@@ -1176,12 +1176,49 @@ describe("processImportJob images", () => {
     expect(deps.notebookPages.storedAssetIds()).toEqual([]);
   });
 
-  it("deletes the stored assets when the content write throws, even if the cleanup throws too", async () => {
+  // T9b (T9 review follow-up): a thrown write is ambiguous — the content
+  // may have committed before the connection dropped — so its assets are
+  // kept (and the case logged) instead of possibly orphaning committed
+  // image nodes. Only a definite failure (an error Result) deletes them.
+  it("keeps the stored assets and logs when the content write throws (it may have committed)", async () => {
     const deps = makeDeps();
     const job = await seedQueuedJob(deps);
     seedExtraction(deps, withImages(["img-1"]));
     vi.spyOn(deps.notebookPages, "writeImportedContent").mockRejectedValueOnce(
-      new Error("db down"),
+      new Error("connection reset"),
+    );
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+
+    try {
+      const result = await processImportJob(
+        { importJobId: job.id },
+        deps,
+        OWNER_ID,
+      );
+
+      expect(result.ok && result.value.status).toBe("failed");
+      expect(deps.notebookPages.deleteImportedAssetsCalls).toEqual([]);
+      expect(deps.notebookPages.storedAssetIds()).toHaveLength(1);
+      expect(consoleError).toHaveBeenCalledWith(
+        "ingestion: write outcome unknown, imported assets kept",
+        expect.objectContaining({
+          importJobId: job.id,
+          assetIds: expect.any(Array),
+        }),
+      );
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  it("still fails the job when the cleanup after a definite write failure throws", async () => {
+    const deps = makeDeps();
+    const job = await seedQueuedJob(deps);
+    seedExtraction(deps, withImages(["img-1"]));
+    vi.spyOn(deps.notebookPages, "writeImportedContent").mockResolvedValueOnce(
+      err(new DomainError("PAGE_NOT_FOUND", job.pageId)),
     );
     const cleanup = vi
       .spyOn(deps.notebookPages, "deleteImportedAssets")
@@ -1204,6 +1241,52 @@ describe("processImportJob images", () => {
       );
     } finally {
       consoleError.mockRestore();
+    }
+  });
+
+  // T9b (T9 review follow-up): one upload that hangs must not eat the
+  // persist reserve; it is raced against the upload budget, dropped as
+  // skipped, and the remaining images are not attempted.
+  it("drops an upload that outlives the upload budget and skips the rest", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      const deps = makeDeps();
+      const job = await seedQueuedJob(deps);
+      seedExtraction(deps, withImages(["img-1", "img-2"]));
+      let release: (() => void) | undefined;
+      const original = deps.notebookPages.storeImportedAsset.bind(
+        deps.notebookPages,
+      );
+      vi.spyOn(deps.notebookPages, "storeImportedAsset").mockImplementationOnce(
+        (ownerId, input) =>
+          new Promise((resolve) => {
+            release = () => resolve(original(ownerId, input));
+          }),
+      );
+
+      const pending = processImportJob({ importJobId: job.id }, deps, OWNER_ID);
+      await vi.advanceTimersByTimeAsync(
+        PROCESSING_BUDGET_MS - IMAGE_UPLOAD_RESERVE_MS,
+      );
+      const result = await pending;
+
+      expect(result.ok && result.value.status).toBe("done");
+      expect(writtenImages(deps, job.pageId)).toHaveLength(0);
+      expect(deps.telemetry.finishedCalls.at(-1)?.outcome).toEqual({
+        skippedImages: 2,
+      });
+      expect(deps.notebookPages.storeImportedAssetCalls).toHaveLength(0);
+
+      // The late upload finishes after the import moved on: its asset is
+      // unreferenced and deleted again (best effort).
+      release?.();
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.waitFor(() =>
+        expect(deps.notebookPages.deleteImportedAssetsCalls).toHaveLength(1),
+      );
+      expect(deps.notebookPages.storedAssetIds()).toEqual([]);
+    } finally {
+      vi.useRealTimers();
     }
   });
 
