@@ -22,14 +22,16 @@ Hexagonal shape enforced by `.dependency-cruiser.cjs` (`domain-is-pure`,
   `src/shared/kernel/tiptap-doc.ts` and re-exported from `plain-text.ts`.
   `extractPlainText` covers every catalogue node (its comment table lists
   the rule per node): inline atoms stay on their line (`@label`, `:emoji:`,
-  inline LaTeX), block math is its LaTeX line, an image is its caption or
-  alt, and youtube/divider/table-of-contents write nothing. Text taken from
-  attrs (LaTeX, mention label, caption, alt) has its line breaks replaced by
-  one space, and an unknown node among inline content stays on that line,
-  so neither ever splits a line. `plain_text` feeds the AI paragraph split
+  inline LaTeX), block math is its LaTeX line, an image is its caption
+  (never its alt: alt text is invisible on the page, so since
+  document-import T9b it no longer feeds search or the AI; it stays on the
+  node for accessibility), and youtube/divider/table-of-contents write
+  nothing. Text taken from attrs (LaTeX, mention label, caption) has its
+  line breaks replaced by one space, and an unknown node among inline
+  content stays on that line, so neither ever splits a line. `plain_text` feeds the AI paragraph split
   (`src/shared/kernel/page-paragraphs.ts`), so output for pre-catalogue
   nodes is pinned byte-identical to keep paragraph fingerprints stable —
-  except, deliberately, images (caption/alt is new text; the previous
+  except, deliberately, images (the caption is new text; the previous
   implementation wrote nothing for them) and unknown inline nodes (no
   longer split their line): such pages get new fingerprints once, on their
   next save.

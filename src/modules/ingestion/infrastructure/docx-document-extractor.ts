@@ -10,6 +10,7 @@ import type {
 import type { DocumentFormat } from "../domain/document-format";
 import { DOCUMENT_FILE_ERROR } from "../domain/errors";
 import { OOXML_LIMITS } from "../domain/ooxml-guard";
+import { stripHiddenRuns } from "../domain/ooxml-hidden-text";
 import {
   collectEnrichments,
   type OfficeParserNode,
@@ -108,6 +109,21 @@ async function readEnrichments(
   }
 }
 
+const DOCUMENT_PART = "word/document.xml";
+const STYLES_PART = "word/styles.xml";
+
+// T9b (audit: AI-bound invisible text): runs Word hides (w:vanish,
+// w:specVanish, directly or through a style) are cut from the main part
+// before either engine reads it — mammoth ignores both properties. See
+// domain/ooxml-hidden-text.ts for the rules and what is not resolved.
+function removeHiddenText(pkg: OoxmlPackage): void {
+  if (!pkg.has(DOCUMENT_PART)) return;
+  const styles = pkg.has(STYLES_PART) ? pkg.readText(STYLES_PART) : "";
+  const documentXml = pkg.readText(DOCUMENT_PART);
+  const visible = stripHiddenRuns(documentXml, styles);
+  if (visible !== documentXml) pkg.replaceText(DOCUMENT_PART, visible);
+}
+
 export class DocxDocumentExtractor implements DocumentExtractor {
   async extract(
     bytes: Uint8Array,
@@ -133,6 +149,7 @@ export class DocxDocumentExtractor implements DocumentExtractor {
     let mapped: Awaited<ReturnType<typeof mapDocxModel>>;
     try {
       if (aborted()) return abortedResult();
+      removeHiddenText(pkg);
       const model = await readMammothModel(pkg.mammothFile());
       if (aborted()) return abortedResult();
       const enrichments = await readEnrichments(pkg);

@@ -273,6 +273,22 @@ discarded. The platform's `maxDuration` (120 s) remains the hard ceiling,
 and `getImportJobStatus`'s abandoned-job rule still resolves a job the
 platform killed.
 
+### Hidden and invisible text
+
+Text the user never sees must not reach the AI (imported content feeds
+`plain_text`, the AI paragraph split and generation):
+
+- DOCX runs Word hides — `w:vanish` or `w:specVanish` on the run, or on
+  its character style or paragraph style (`basedOn` followed), unless
+  turned off with `w:val="0|false|off"` — are cut from
+  `word/document.xml` (`domain/ooxml-hidden-text.ts`) before mammoth and
+  officeparser read it; mammoth 1.13 ignores both properties. Not
+  resolved: `docDefaults`, table/numbering styles. Tracked formatting
+  changes (`w:rPrChange`) are ignored on purpose.
+- Image alt text (≤ 2000 characters, from the DOCX description) stays on
+  the image node for accessibility, but `extractPlainText` (notebooks)
+  writes an image's caption only, never its alt.
+
 ## Job lifecycle
 
 ```

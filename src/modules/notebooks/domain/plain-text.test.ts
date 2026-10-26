@@ -343,7 +343,10 @@ describe("extractPlainText", () => {
       ).toBe("Antes\n\\int_0^1 x\\,dx\nDespués");
     });
 
-    it("writes an image's caption, else its alt, else nothing", () => {
+    // document-import T9b (security audit): alt text is never shown on the
+    // page, so it must not reach search or the AI — only a visible caption
+    // does. The alt stays on the node for accessibility.
+    it("writes an image's caption only, never its alt", () => {
       expect(
         extractPlainText(
           doc(
@@ -353,7 +356,7 @@ describe("extractPlainText", () => {
             { type: "image", attrs: { assetId: "x" } },
           ),
         ),
-      ).toBe("Pie\nSolo alt");
+      ).toBe("Pie");
     });
 
     it("writes nothing for youtube, horizontalRule and tocBlock", () => {
@@ -462,7 +465,7 @@ describe("extractPlainText", () => {
       ).toBe("Ver a\\ b y @Tema largo");
     });
 
-    it("keeps block math and an image caption or alt on a single line", () => {
+    it("keeps block math and an image caption on a single line, without the alt", () => {
       expect(
         extractPlainText(
           doc(
@@ -477,9 +480,7 @@ describe("extractPlainText", () => {
             },
           ),
         ),
-      ).toBe(
-        "\\begin{aligned} a &= b \\end{aligned}\nFigura 1: derivada\nGráfico de barras",
-      );
+      ).toBe("\\begin{aligned} a &= b \\end{aligned}\nFigura 1: derivada");
     });
 
     it("splits the catalogue sample into the expected AI paragraphs", () => {

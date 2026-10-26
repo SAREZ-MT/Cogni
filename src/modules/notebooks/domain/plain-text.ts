@@ -17,7 +17,7 @@ export type { TiptapDoc, TiptapNode } from "@/shared/kernel/tiptap-doc";
 // (shared/kernel/page-paragraphs.ts: one non-blank line = one paragraph),
 // so every block is one or more lines and inline content never breaks a
 // line except at a hardBreak. Text read from attrs (latex, mention label,
-// caption, alt) has each run of line breaks replaced by one space, so an
+// caption) has each run of line breaks replaced by one space, so an
 // atom never splits its line.
 //
 // | Node                          | Plain text                                |
@@ -36,7 +36,8 @@ export type { TiptapDoc, TiptapNode } from "@/shared/kernel/tiptap-doc";
 // | details                       | summary line, then content lines          |
 // | callout, blockquote, lists,   | their children's lines                    |
 // | taskItem, table, others       | (taskItem: no checkbox glyph)             |
-// | image                         | caption, else alt, else nothing           |
+// | image                         | its caption, else nothing (never the alt: |
+// |                               | invisible on the page, T9b)               |
 // | youtube, horizontalRule,      | nothing                                   |
 // | tocBlock                      |                                           |
 // | unknown type                  | recurse into its content (never throws);  |
@@ -47,8 +48,8 @@ export type { TiptapDoc, TiptapNode } from "@/shared/kernel/tiptap-doc";
 // lists, table, codeBlock, blockquote, hardBreak) produce byte-identical
 // output to the previous implementation, so their paragraph fingerprints
 // do not change (plain-text.test.ts pins it). Two changes are deliberate:
-// an image now writes its caption or alt (the previous implementation
-// wrote nothing for it), and an unknown node among inline content no
+// an image now writes its caption (the previous implementation wrote
+// nothing for it; its alt was written too until document-import T9b), and an unknown node among inline content no
 // longer splits the line; pages with either get new paragraph
 // fingerprints once, on their next save.
 const INLINE_TYPES: ReadonlySet<string> = new Set(INLINE_NODES);
@@ -92,7 +93,9 @@ function nodeText(node: TiptapNode): string {
     case "blockMath":
       return attrLine(node, "latex");
     case "image":
-      return attrLine(node, "caption") || attrLine(node, "alt");
+      // Caption only (document-import T9b): alt text is never shown on the
+      // page, so it must not feed search or the AI; it stays on the node.
+      return attrLine(node, "caption");
   }
   if (NO_CONTRIBUTION.has(node.type)) return "";
 
