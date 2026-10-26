@@ -1,8 +1,8 @@
 # Registro de Decisiones de Arquitectura (ADR) — Cogni
 
 **Proyecto:** Cogni — plataforma web de estudio a partir de apuntes propios
-**Versión:** 1.1
-**Fecha:** 2026-10-15
+**Versión:** 1.2
+**Fecha:** 2026-10-26
 **Estado:** Borrador
 **Autor:** Javier Sarez
 **Documentos relacionados:** ./01-SRS.md, ./02-SAD.md, ./03-DATA-API.md
@@ -13,7 +13,7 @@
 
 - Las Fases 0 a 7 están implementadas y los 11 módulos de `src/modules/` son reales; ninguno es un esqueleto.
   - Fase 0 (Cimientos) y Fase 1 (Cuadernos y editor): desplegadas en producción (`identity`, `notebooks`, `editor`).
-  - Fase 2 (Importación de PDF): implementada bajo Organic Driven Development (ODD) el 2026-09-23 (`src/modules/ingestion`).
+  - Fase 2 (Importación de PDF): implementada bajo Organic Driven Development (ODD) el 2026-09-23 (`src/modules/ingestion`). Desde el 2026-10-26 (rama `feat/document-import`) la importación admite PDF y Word (`.docx`); PowerPoint (`.pptx`) está planificado. Decisiones en `docs/adr/0009-importacion-multiformato-y-catalogo-de-contenido.md`.
   - Fase 3 (Capa de IA, PR #63–#69) y aceptación de términos de uso (PR #70): `src/modules/ai` e `identity`; decisiones en `docs/adr/0004-capa-de-ia-con-proveedores-gratuitos.md`.
   - Fase 4 (Motor de repetición y flashcards, PR #71–#77): `src/modules/study-engine` y `src/modules/flashcards`; decisiones en `docs/adr/0005-motor-de-repeticion-y-flashcards.md`.
   - Fase 5 (Exámenes, PR #78–#86): `src/modules/exams`; decisiones en `docs/adr/0006-examenes-y-repeticion-con-variantes.md`.
@@ -26,7 +26,7 @@
 
 - Referencias a decisiones: "`04-ADR.md`, ADR-0NN" designa una entrada de este documento; "`docs/adr/00NN`" designa un ADR numerado del repositorio. Son dos numeraciones distintas e independientes (por ejemplo, `04-ADR.md`, ADR-008 trata el Vercel AI SDK, mientras que `docs/adr/0008` trata el calendario y el dashboard). Este documento no se renumera.
 - Este documento consolida, con comparación retrospectiva de alternativas, las decisiones de producto, stack y arquitectura tomadas antes de programar (`docs/adr/0001-decisiones-fundacionales.md` y `docs/documento-maestro.md`).
-- `docs/adr/0001` a `docs/adr/0008` son el registro cronológico de decisiones por fase, escritas al construir cada una. Relación verificable con las entradas de este documento:
+- `docs/adr/0001` a `docs/adr/0009` son el registro cronológico de decisiones por fase, escritas al construir cada una. Relación verificable con las entradas de este documento:
 
 | ADR numerado | Fecha / estado | Relación con este documento |
 |---|---|---|
@@ -38,6 +38,7 @@
 | `docs/adr/0006` | 2026-10-06 (Fase 5) | Precisa ADR-007 y ADR-008 (exámenes y repetición con variantes). |
 | `docs/adr/0007` | 2026-10-10 (Fase 6) | Precisa ADR-007 (calidad combinada en SM-2), ADR-008 (límite de evaluaciones) y ADR-009 (evaluación asíncrona con `after()` dentro de `maxDuration`, sin cola). |
 | `docs/adr/0008` | 2026-10-14 (Fase 7) | Precisa ADR-001 (calendario y métricas por página), ADR-002 (lectores Drizzle de solo lectura propios de `scheduling` y `analytics`) y ADR-007 (el calendario muestra solo el próximo vencimiento). |
+| `docs/adr/0009` | 2026-10-26 (importación de documentos) | Precisa ADR-002 (reglas `mammoth-only-in-ingestion-infra` y `officeparser-only-in-ingestion-infra`; `upstash-only-in-ai-infra` admite `src/shared/rate-limit`), ADR-006 (catálogo estricto de contenido y paridad del editor con él) y ADR-011 (`frame-src` para `youtube-nocookie.com`); reemplaza `unpdf` como único extractor por mammoth y officeparser para Word, con PDF todavía sobre `unpdf`. |
 
 ### Documento vivo
 
@@ -57,11 +58,11 @@ Este documento se actualiza a medida que avanza la construcción de Cogni; la no
 | ID | Título | Estado | Origen |
 |---|---|---|---|
 | ADR-001 | Página como unidad de estudio y cuaderno como agrupación | Aceptado — implementado | `docs/adr/0001-decisiones-fundacionales.md` (ítem 1) |
-| ADR-002 | Monolito modular con arquitectura hexagonal por módulo | Aceptado — implementado (12 reglas; excepción de lectores de `docs/adr/0008`) | `docs/adr/0001-decisiones-fundacionales.md` (ítem 4) |
+| ADR-002 | Monolito modular con arquitectura hexagonal por módulo | Aceptado — implementado (14 reglas; excepción de lectores de `docs/adr/0008`) | `docs/adr/0001-decisiones-fundacionales.md` (ítem 4) |
 | ADR-003 | Next.js con TypeScript estricto como framework de aplicación | Aceptado — implementado | `docs/adr/0001-decisiones-fundacionales.md` (ítem 5) |
 | ADR-004 | Supabase Postgres con Drizzle ORM como capa de datos | Aceptado — implementado | `docs/documento-maestro.md` §4.1–§4.2 |
 | ADR-005 | Supabase Auth con RLS y proxy de sesión | Aceptado — implementado | `docs/documento-maestro.md` §9 |
-| ADR-006 | Tiptap como base del editor de bloques | Aceptado — implementado | `docs/adr/0001-decisiones-fundacionales.md` (ítem 3) |
+| ADR-006 | Tiptap como base del editor de bloques | Aceptado — implementado; precisado por `docs/adr/0009` (catálogo estricto) | `docs/adr/0001-decisiones-fundacionales.md` (ítem 3) |
 | ADR-007 | SM-2 por ítem con nivel de dominio derivado por página | Aceptado — implementado (Fase 4) | `docs/adr/0001-decisiones-fundacionales.md` (ítem 2); precisado por `docs/adr/0005`, `docs/adr/0006`, `docs/adr/0007` y `docs/adr/0008` |
 | ADR-008 | Vercel AI SDK con rotación multiproveedor y salida estructurada | Aceptado — implementado (Fase 3); lista de proveedores reemplazada por `docs/adr/0004` | `docs/adr/0001-decisiones-fundacionales.md` (ítem 6); actualizado por `docs/adr/0004-capa-de-ia-con-proveedores-gratuitos.md` |
 | ADR-009 | Vercel Hobby con Cloudflare DNS, Fluid Compute y Vercel Cron | Aceptado — implementado; precisado por `docs/adr/0003` y `docs/adr/0007` | `docs/documento-maestro.md` §4.2, §10 |
@@ -122,7 +123,7 @@ Sin mitigación por ahora — el documento maestro no planifica este tipo de aju
 
 ### Estado
 
-Aceptado — implementado. Actualización (2026-10-15): la decisión se tomó con 8 reglas `severity: "error"`; hoy `.dependency-cruiser.cjs` aplica 12, con `tsPreCompilationDeps: true` para que también cuenten los imports solo de tipos. Las cuatro reglas añadidas son `ai-sdk-only-in-ai-infra` (los paquetes `ai`/`@ai-sdk/*`/`@openrouter/ai-sdk-provider` solo en `ai/infrastructure`), `upstash-only-in-ai-infra` (`@upstash/*` solo en `ai/infrastructure`), `proxy-via-public-entry` (`src/proxy.ts` solo importa un módulo por `index.ts` o por una entrada ligera `proxy.ts`) y `domain-entry-is-pure` (una entrada pública de solo dominio, `calibration.ts`, solo reexporta su `domain/` o `src/shared/kernel`). Ver "Consecuencias actuales" para la estructura real de capas y la excepción de `docs/adr/0008`.
+Aceptado — implementado. Actualización (2026-10-15): la decisión se tomó con 8 reglas `severity: "error"`; hoy `.dependency-cruiser.cjs` aplica 12, con `tsPreCompilationDeps: true` para que también cuenten los imports solo de tipos. Las cuatro reglas añadidas son `ai-sdk-only-in-ai-infra` (los paquetes `ai`/`@ai-sdk/*`/`@openrouter/ai-sdk-provider` solo en `ai/infrastructure`), `upstash-only-in-ai-infra` (`@upstash/*` solo en `ai/infrastructure`), `proxy-via-public-entry` (`src/proxy.ts` solo importa un módulo por `index.ts` o por una entrada ligera `proxy.ts`) y `domain-entry-is-pure` (una entrada pública de solo dominio, `calibration.ts`, solo reexporta su `domain/` o `src/shared/kernel`). Ver "Consecuencias actuales" para la estructura real de capas y la excepción de `docs/adr/0008`. Actualización (2026-10-26, `docs/adr/0009`): son 14 reglas; se añadieron `mammoth-only-in-ingestion-infra` y `officeparser-only-in-ingestion-infra` (las librerías de análisis de documentos solo en `ingestion/infrastructure`), y `upstash-only-in-ai-infra` admite también `src/shared/rate-limit`, el limitador por usuario que reutiliza `ingestion`.
 
 ### Contexto
 
@@ -143,7 +144,7 @@ Cogni se desarrolla con presupuesto de infraestructura cercano a cero y una sola
 ### Justificación
 
 - Un solo despliegue en Vercel Hobby mantiene el costo de infraestructura en cero y evita que una persona deba operar múltiples servicios.
-- Las 8 reglas originales de `.dependency-cruiser.cjs` (`domain-is-pure`, `domain-no-npm`, `application-no-infra-or-ui`, `ui-never-touches-infra`, `cross-module-via-index`, `editor-tiptap-only-in-ui`, `study-engine-knows-no-technique`, `unpdf-only-in-ingestion-infra`; hoy acompañadas por las 4 del Estado) convierten los límites de la arquitectura en errores de integración continua (RNF-M-02), no en convenciones que dependan de la disciplina del único desarrollador.
+- Las 8 reglas originales de `.dependency-cruiser.cjs` (`domain-is-pure`, `domain-no-npm`, `application-no-infra-or-ui`, `ui-never-touches-infra`, `cross-module-via-index`, `editor-tiptap-only-in-ui`, `study-engine-knows-no-technique`, `unpdf-only-in-ingestion-infra`; hoy acompañadas por las 6 del Estado) convierten los límites de la arquitectura en errores de integración continua (RNF-M-02), no en convenciones que dependan de la disciplina del único desarrollador.
 - La regla `cross-module-via-index` obliga a que todo acceso entre módulos pase por un `index.ts` público (p. ej. `src/modules/ingestion/infrastructure/notebooks-pages-adapter.ts` consume `notebooks` solo a través de `createNotebooksServerApi`), preservando el desacoplamiento propio de un límite de proceso sin pagar su costo de red.
 - **vs. monolito sin capas internas:** nada impediría, sin estas reglas, que la UI de un módulo importara Drizzle u otro módulo por una ruta interna; la propia regla `unpdf-only-in-ingestion-infra` documenta un riesgo concreto de este tipo (resolución de `pnpm` a una ruta anidada de `node_modules`).
 - **vs. microservicios por módulo:** una persona no puede operar 11 servicios, 11 *pipelines* y la coordinación de red entre ellos con presupuesto cero; además, módulos reales se llaman entre sí en el mismo proceso hoy (`ingestion` → `src/modules/notebooks/server-api.ts`), algo que en microservicios exigiría una llamada de red o un bus de eventos.
@@ -162,7 +163,7 @@ Cogni se desarrolla con presupuesto de infraestructura cercano a cero y una sola
 
 **Mitigación**
 
-Texto original: "cuando cada módulo se implemente, las mismas 8 reglas (con alcance `^src/modules/[^/]+/...`) lo cubrirán automáticamente sin cambios de configuración". Las reglas genéricas sí cubrieron los módulos nuevos sin cambios, pero la configuración cambió: se añadieron las 4 reglas del Estado y `tsPreCompilationDeps: true`.
+Texto original: "cuando cada módulo se implemente, las mismas 8 reglas (con alcance `^src/modules/[^/]+/...`) lo cubrirán automáticamente sin cambios de configuración". Las reglas genéricas sí cubrieron los módulos nuevos sin cambios, pero la configuración cambió: se añadieron las 6 reglas del Estado y `tsPreCompilationDeps: true`.
 
 **Consecuencias actuales (2026-10-15)**
 
@@ -329,7 +330,7 @@ El puerto `AuthGateway` (`src/modules/identity/domain/auth-gateway.ts`) aísla e
 
 ### Estado
 
-Aceptado — implementado.
+Aceptado — implementado. Actualización (2026-10-26, `docs/adr/0009`): el contenido importado se valida contra un catálogo estricto de nodos, marcas y atributos de Tiptap (`src/shared/kernel/tiptap-catalogue.ts`, esquema `tiptapContentSchema` de `notebooks`); el editor registra todo ese catálogo (se añadieron detalles, YouTube, color de fondo, familia, tamaño e interlineado de fuente y el texto alternativo de la imagen) y una prueba de paridad (`src/modules/editor/ui/tiptap/extensions/catalogue-parity.test.ts`) mantiene idénticos el esquema del editor y el catálogo. Nuevas dependencias exactas: `@tiptap/extension-details` y `@tiptap/extension-youtube` (`3.31.3`).
 
 ### Contexto
 
@@ -584,7 +585,7 @@ Sin mitigación por ahora — no existe un umbral de cobertura configurado ni un
 
 ### Estado
 
-Aceptado — implementado. Actualización (2026-10-15): el cambio de `style-src` se aplicó el 2026-09-30 (commit `0e4cee7`, "keep style-src on unsafe-inline so SSR inline styles apply on hard loads"): `styleSrc()` en `src/shared/config/security-headers.ts` devuelve siempre `style-src 'self' 'unsafe-inline'`, con su prueba en `src/shared/config/security-headers.test.ts`. Row Level Security está activa en las 20 tablas.
+Aceptado — implementado. Actualización (2026-10-15): el cambio de `style-src` se aplicó el 2026-09-30 (commit `0e4cee7`, "keep style-src on unsafe-inline so SSR inline styles apply on hard loads"): `styleSrc()` en `src/shared/config/security-headers.ts` devuelve siempre `style-src 'self' 'unsafe-inline'`, con su prueba en `src/shared/config/security-headers.test.ts`. Row Level Security está activa en las 20 tablas. Actualización (2026-10-26, `docs/adr/0009`): la CSP añade `frame-src 'self' https://www.youtube-nocookie.com` para el bloque de YouTube del editor, que siempre se inserta desde `youtube-nocookie.com`.
 
 ### Contexto
 
