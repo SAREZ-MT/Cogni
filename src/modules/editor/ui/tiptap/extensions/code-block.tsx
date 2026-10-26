@@ -29,8 +29,23 @@ import typescript from "highlight.js/lib/languages/typescript";
 import xml from "highlight.js/lib/languages/xml";
 import { createLowlight } from "lowlight";
 
-const lowlight = createLowlight();
-lowlight.register({ bash, css, javascript, json, python, typescript, xml });
+const registry = createLowlight();
+registry.register({ bash, css, javascript, json, python, typescript, xml });
+
+// document-import T11b: the lowlight plugin falls back to
+// `highlightAuto` whenever a block's `language` is null (or not
+// registered), and 3.31.3 has no option to turn that off — so a block the
+// selector labels "Texto sin formato" still came out coloured. Answering
+// auto-detection with the text as one unclassed node keeps such blocks
+// plain; blocks with a registered language still go through `highlight`.
+const lowlight: typeof registry = {
+  ...registry,
+  highlightAuto: (value) => ({
+    type: "root",
+    children: [{ type: "text", value }],
+    data: { language: undefined, relevance: 0 },
+  }),
+};
 
 export interface CodeBlockLanguageOption {
   value: string | null;

@@ -81,6 +81,10 @@ async function expectStructure(editable: Locator) {
   await expect
     .poll(() => editable.locator("pre code").textContent())
     .toBe("function add(a, b) {\n  return a + b;\n}");
+  // Word carries no code language, so the block is plain text: the picker
+  // says "Texto sin formato" and nothing is syntax-coloured (T11b).
+  await expect(editable.getByTestId("code-block-language")).toHaveValue("");
+  await expect(editable.locator('pre code [class*="hljs-"]')).toHaveCount(0);
 
   await expect(editable.locator("blockquote")).toHaveText(
     "A quoted sentence from someone wise.",

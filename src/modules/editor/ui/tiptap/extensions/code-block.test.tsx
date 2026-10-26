@@ -89,5 +89,9 @@ describe("code block", () => {
       "code-block-language",
     )) as HTMLSelectElement;
     expect(select.value).toBe("");
+    // No auto-detection: the picker says "Texto sin formato", so the code
+    // must carry no syntax colours either.
+    const codeBlock = screen.getByTestId("code-block");
+    expect(codeBlock.querySelector('[class*="hljs-"]')).toBeNull();
   });
 });
