@@ -20,6 +20,13 @@ Hexagonal shape enforced by `.dependency-cruiser.cjs` (`domain-is-pure`,
   `PageAssetRepository`, `StorageGateway`). No framework, no npm
   dependency other than Zod. `TiptapDoc`/`TiptapNode` are defined in
   `src/shared/kernel/tiptap-doc.ts` and re-exported from `plain-text.ts`.
+  `extractPlainText` covers every catalogue node (its comment table lists
+  the rule per node): inline atoms stay on their line (`@label`, `:emoji:`,
+  inline LaTeX), block math is its LaTeX line, an image is its caption or
+  alt, and youtube/divider/table-of-contents write nothing. `plain_text`
+  feeds the AI paragraph split (`src/shared/kernel/page-paragraphs.ts`), so
+  output for pre-catalogue nodes is pinned byte-identical to keep paragraph
+  fingerprints stable.
   The editor's `SavePagePort` belongs to `editor/domain`; this module's
   `saveContent`/`getCurrentContent` Server Actions satisfy it structurally.
 - `application/`: use cases for creating/renaming/archiving notebooks and
