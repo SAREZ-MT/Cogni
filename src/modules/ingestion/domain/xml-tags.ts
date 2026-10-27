@@ -91,7 +91,21 @@ const ENTITIES: Readonly<Record<string, string>> = {
   apos: "'",
 };
 
-// The five predefined entities and numeric character references.
+// XML 1.0's `Char`: a reference to anything else (NUL, other C0
+// controls, surrogates, U+FFFE/U+FFFF, past U+10FFFF) is not well-formed.
+function isXmlChar(code: number): boolean {
+  return (
+    code === 0x9 ||
+    code === 0xa ||
+    code === 0xd ||
+    (code >= 0x20 && code <= 0xd7ff) ||
+    (code >= 0xe000 && code <= 0xfffd) ||
+    (code >= 0x10000 && code <= 0x10ffff)
+  );
+}
+
+// The five predefined entities and numeric character references, in one
+// pass (`&amp;lt;` becomes `&lt;`). Anything else is kept as written.
 export function decodeXmlEntities(value: string): string {
   return value.replace(/&(#x[0-9a-f]+|#\d+|\w+);/gi, (whole, ref: string) => {
     if (ref[0] === "#") {
@@ -99,9 +113,7 @@ export function decodeXmlEntities(value: string): string {
         ref[1] === "x" || ref[1] === "X"
           ? Number.parseInt(ref.slice(2), 16)
           : Number.parseInt(ref.slice(1), 10);
-      return Number.isFinite(code) && code <= 0x10ffff
-        ? String.fromCodePoint(code)
-        : whole;
+      return isXmlChar(code) ? String.fromCodePoint(code) : whole;
     }
     return Object.hasOwn(ENTITIES, ref) ? ENTITIES[ref] : whole;
   });
