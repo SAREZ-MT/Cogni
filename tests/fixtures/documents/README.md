@@ -55,8 +55,9 @@ so all of them are committed (largest: `large-30p.pdf`, about 570 KB).
   same way.
 - The scanned page is a clean render, not a photographed page: OCR accuracy
   on it is an upper bound.
-- `pptxgenjs` 4.0.1 depends on `image-size`, which has a high-severity
-  advisory. Both generator libraries are dev dependencies used only here;
+- `pptxgenjs` 4.0.1 declares `image-size` ^1, which has high-severity
+  advisories; `pnpm-workspace.yaml` overrides it to ^2.0.3 (pptxgenjs never
+  loads it). Both generator libraries are dev dependencies used only here;
   they never ship in the app bundle.
 - PDF bytes depend on the local Chromium build and system fonts. They are
   stable run to run on one machine, but `large-30p.pdf` once came out

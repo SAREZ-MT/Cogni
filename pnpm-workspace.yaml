@@ -16,6 +16,11 @@ overrides:
   fast-uri@3: ^3.1.9
   # GHSA-wq5f-xc86-pv6w: sharp <0.35.5 (librsvg), via next.
   sharp@0: ^0.35.5
+  # Late Oct 2026, GHSA-w3rx-r6r6-pgpr (JXL/HEIF) and the ICNS advisory:
+  # image-size <=2.0.2 infinite-loop DoS, via pptxgenjs (dev-only fixture
+  # generator). pptxgenjs 4.0.1 declares image-size ^1 but never loads it
+  # (its Node path requires 'sizeof'), so the major bump is safe.
+  image-size@1: ^2.0.3
   # GHSA-68fv-2mgg-jv7q: source-map-js <1.2.2, via tailwind, vitest and jsdom.
   source-map-js@1: ^1.2.2
   # Oct 2026, `pnpm audit`: undici <7.30.1 DoS and SRI bypass, via
