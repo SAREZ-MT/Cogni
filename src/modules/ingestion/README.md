@@ -432,8 +432,8 @@ the reason code and caps only — no file name, owner or text. The golden
 tests assert the real fixtures never take this path.
 
 Tests run under jsdom (vitest.config.ts), where officeparser takes itself
-for a browser; the PDF test files set its `isBrowser` flag back to false,
-as Node detects it.
+for a browser; the PDF test files opt into `// @vitest-environment node`
+(vitest.setup.ts skips its DOM stubs there).
 
 ## Límites y seguridad
 

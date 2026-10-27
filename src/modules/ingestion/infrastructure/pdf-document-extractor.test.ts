@@ -1,5 +1,8 @@
-import { createRequire } from "node:module";
-import { beforeAll, describe, expect, it } from "vitest";
+// @vitest-environment node
+// officeparser takes a jsdom window for a browser and runs pdf.js the
+// browser way (no DOMMatrix); these tests need its Node path, as on the
+// server.
+import { describe, expect, it } from "vitest";
 import {
   makeCorruptPdfBytes,
   makeMinimalPdf,
@@ -8,16 +11,6 @@ import {
 } from "../../../../tests/fixtures/pdf/make-minimal-pdf";
 import { textToBlocks } from "../domain/text-to-blocks";
 import { PdfDocumentExtractor } from "./pdf-document-extractor";
-
-// Vitest runs this file under jsdom (vitest.config.ts), where officeparser
-// takes itself for a browser (`window.document` exists) and runs pdf.js
-// the browser way, which fails without DOMMatrix. The server is plain
-// Node: tell officeparser so, as it would detect it there. It reads the
-// flag at call time.
-beforeAll(() => {
-  const officeparserRequire = createRequire(require.resolve("officeparser"));
-  officeparserRequire("./utils/envUtils.js").isBrowser = false;
-});
 
 // PdfDocumentExtractor on PDFs built by tests/fixtures/pdf/make-minimal-pdf.ts
 // (real bytes, real officeparser run, nothing mocked). These PDFs hold

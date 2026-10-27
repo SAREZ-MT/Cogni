@@ -1,8 +1,11 @@
+// @vitest-environment node
+// officeparser takes a jsdom window for a browser and runs pdf.js the
+// browser way (no DOMMatrix); these tests need its Node path, as on the
+// server.
 import { ChildProcess } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { createRequire } from "node:module";
 import { join } from "node:path";
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { findCatalogueViolations } from "@/shared/kernel/tiptap-catalogue";
 import { processImportJob } from "../application/process-import-job";
 import { FakeImportTelemetry } from "../application/testing/fake-import-telemetry";
@@ -15,16 +18,6 @@ import { createImportJob } from "../domain/import-job";
 import type { ImportedBlock, ImportedDoc } from "../domain/imported-doc";
 import { createDocumentExtractor } from "./format-routing-document-extractor";
 import { PdfDocumentExtractor } from "./pdf-document-extractor";
-
-// Vitest runs this file under jsdom (vitest.config.ts), where officeparser
-// takes itself for a browser (`window.document` exists) and runs pdf.js
-// the browser way, which fails without DOMMatrix. The server is plain
-// Node: tell officeparser so, as it would detect it there. It reads the
-// flag at call time.
-beforeAll(() => {
-  const officeparserRequire = createRequire(require.resolve("officeparser"));
-  officeparserRequire("./utils/envUtils.js").isBrowser = false;
-});
 
 vi.mock("server-only", () => ({}));
 
