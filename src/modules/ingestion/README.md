@@ -79,28 +79,30 @@ Follows the same hexagonal shape as `notebooks`
 
 ## UI
 
-Since T11 the picker imports PDF and Word documents (`ui/`; components
+Since T11 the picker imports PDF and Word documents, and PowerPoint
+decks since T7 (`ui/`; components
 renamed from `Pdf*` to `Document*`; since T11b the app shell uses the
 `Document*` names and the old aliases are gone):
 
 - Entry points: the notebook menu's "Importar documento"
   (`ImportDocumentMenuItem`) and the editor's `/` item "Importar
   documento" — "Importa un PDF o un Word en esta página"
-  (`page-editor.tsx`). Both open `DocumentImportProvider`'s single hidden
+  (`page-editor.tsx`; its description still omits PowerPoint, pending
+  outside this module). Both open `DocumentImportProvider`'s single hidden
   input (`data-testid="document-import-input"`).
 - Formats (`ui/import-formats.ts`): `DOCUMENT_FORMATS` minus
-  `NOT_YET_IMPORTABLE_IN_UI` (`pptx` until its adapter, T7, exists —
-  enabling it is removing it from that set and updating
-  `invalidFileType`). The input's `accept` is
-  `.pdf,.docx,application/pdf,<docx mime>`; `importMimeOf` takes a file
-  whose declared type is one of those mimes, or whose type is empty and
-  extension is `.pdf`/`.docx`. That mime is what `requestPdfUpload`,
+  `NOT_YET_IMPORTABLE_IN_UI` (empty since T7; a future format waits there
+  until its adapter exists, and `invalidFileType` follows by itself). The
+  input's `accept` is `.pdf,.docx,.pptx,application/pdf,<docx mime>,<pptx
+  mime>`; `importMimeOf` takes a file whose declared type is one of those
+  mimes, or whose type is empty or generic (`application/octet-stream`,
+  `application/zip`, …) and extension is `.pdf`/`.docx`/`.pptx`. That mime is what `requestPdfUpload`,
   the signed upload (`uploadDocumentToSignedUrl`, its `contentType`) and
   `startPdfImport` receive; the server still checks the stored object and
   the real bytes.
 - Client-side refusals, before any Server Action: another type (a legacy
-  `.doc`, a `.pptx`, an image) → "Solo puedes importar archivos PDF o Word
-  (.docx)."; over 20 MiB → "El documento supera el límite de 20 MB.".
+  `.doc`/`.ppt`, an image) → "Solo puedes importar archivos PDF, Word
+  (.docx) o PowerPoint (.pptx)."; over 20 MiB → "El documento supera el límite de 20 MB.".
   A rate-limited request or start shows "Llegaste al límite de
   importaciones por ahora. …" in the failed banner.
 - Progress: "procesando el documento…"; the sidebar badge's accessible
@@ -146,7 +148,7 @@ its format from the bytes, and maps each outcome to a failure kind:
 
 | Outcome | Kind | Message |
 |---|---|---|
-| Legacy (`.doc`/`.ppt`), unknown bytes, or bytes that are not the format the path declares | `unsupported_format` | "Solo puedes importar archivos PDF o Word (.docx)." (derived from `IMPORTABLE_FORMATS` in `domain/document-format.ts`, so PowerPoint joins the sentence when it is enabled) |
+| Legacy (`.doc`/`.ppt`), unknown bytes, or bytes that are not the format the path declares | `unsupported_format` | "Solo puedes importar archivos PDF, Word (.docx) o PowerPoint (.pptx)." (derived from `IMPORTABLE_FORMATS` in `domain/document-format.ts`) |
 | Extractor returns `DOCUMENT_UNSUPPORTED_FORMAT` | `unsupported_format` | same |
 | Any other extractor error, a thrown extractor, or a file over 20 MiB | `invalid_document` | "Este archivo no es un documento válido o está protegido. …" |
 | No block carries text (`hasTextContent`), PDF | `no_text_layer` | "Este PDF no tiene texto seleccionable y Cogni no hace OCR. …" |

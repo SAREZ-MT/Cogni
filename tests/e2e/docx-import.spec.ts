@@ -254,7 +254,7 @@ test.describe("docx import acceptance", () => {
     const banner = page.getByTestId("import-progress");
     await expect(banner).toHaveAttribute("data-status", "failed");
     await expect(banner).toContainText(
-      "Solo puedes importar archivos PDF o Word (.docx).",
+      "Solo puedes importar archivos PDF, Word (.docx) o PowerPoint (.pptx).",
     );
     await expect(page).toHaveURL(/\/notebooks$/);
   });

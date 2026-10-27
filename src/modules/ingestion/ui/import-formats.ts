@@ -6,9 +6,9 @@ import {
 
 // document-import T11: the formats the picker offers. The pipeline reads
 // every DOCUMENT_FORMATS entry, but a format joins the UI only once its
-// adapter exists — PPTX lands with T7, and enabling it is removing it from
-// the domain's NOT_YET_IMPORTABLE set (T11b moved it there so the
-// unsupported-format copy reads the same set).
+// adapter exists — PPTX joined with T7 by leaving the domain's
+// NOT_YET_IMPORTABLE set (T11b moved it there so the unsupported-format
+// copy reads the same set).
 export const NOT_YET_IMPORTABLE_IN_UI = NOT_YET_IMPORTABLE;
 
 export const UI_IMPORT_FORMATS = IMPORTABLE_FORMATS;

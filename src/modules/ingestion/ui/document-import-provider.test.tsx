@@ -126,7 +126,7 @@ describe("DocumentImportProvider", () => {
     expect(screen.queryByTestId("import-progress")).not.toBeInTheDocument();
   });
 
-  it("rejects a file that is neither PDF nor Word client-side without calling requestPdfUpload", async () => {
+  it("rejects a file that is not a PDF, Word or PowerPoint document client-side without calling requestPdfUpload", async () => {
     render(
       <DocumentImportProvider>
         <Probe notebookId="nb-1" />
@@ -147,14 +147,14 @@ describe("DocumentImportProvider", () => {
       expect(screen.getByTestId("status-nb-1")).toHaveTextContent("failed"),
     );
     expect(screen.getByTestId("error-nb-1")).toHaveTextContent(
-      "Solo puedes importar archivos PDF o Word (.docx).",
+      "Solo puedes importar archivos PDF, Word (.docx) o PowerPoint (.pptx).",
     );
     expect(requestPdfUpload).not.toHaveBeenCalled();
   });
 
-  // document-import T11: the picker offers PDF and Word, never PowerPoint
-  // (its adapter lands in T7) nor a legacy .doc.
-  it("accepts PDF and Word documents in the file input", async () => {
+  // document-import T11/T7: the picker offers PDF, Word and PowerPoint,
+  // never a legacy .doc/.ppt.
+  it("accepts PDF, Word and PowerPoint documents in the file input", async () => {
     render(
       <DocumentImportProvider>
         <Probe notebookId="nb-1" />
@@ -164,16 +164,12 @@ describe("DocumentImportProvider", () => {
     const input = await screen.findByTestId("document-import-input");
     expect(input).toHaveAttribute(
       "accept",
-      ".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      ".pdf,.docx,.pptx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation",
     );
   });
 
   it.each([
-    [
-      "a PowerPoint deck",
-      "clase.pptx",
-      "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-    ],
+    ["a legacy PowerPoint deck", "clase.ppt", "application/vnd.ms-powerpoint"],
     ["a legacy Word document", "antiguo.doc", "application/msword"],
   ])("rejects %s client-side without calling requestPdfUpload", async (_case, name, type) => {
     render(
@@ -190,7 +186,7 @@ describe("DocumentImportProvider", () => {
 
     await waitFor(() =>
       expect(screen.getByTestId("error-nb-1")).toHaveTextContent(
-        "Solo puedes importar archivos PDF o Word (.docx).",
+        "Solo puedes importar archivos PDF, Word (.docx) o PowerPoint (.pptx).",
       ),
     );
     expect(requestPdfUpload).not.toHaveBeenCalled();

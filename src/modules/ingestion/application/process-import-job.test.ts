@@ -41,7 +41,7 @@ const LEGACY_BYTES = new Uint8Array([
 const INVALID_DOCUMENT_MESSAGE =
   "Este archivo no es un documento válido o está protegido. Revisa que no tenga contraseña e inténtalo de nuevo.";
 const UNSUPPORTED_FORMAT_MESSAGE =
-  "Solo puedes importar archivos PDF o Word (.docx).";
+  "Solo puedes importar archivos PDF, Word (.docx) o PowerPoint (.pptx).";
 const TIMEOUT_MESSAGE =
   "La importación tardó demasiado. Inténtalo de nuevo con un documento más pequeño o en unos minutos.";
 
