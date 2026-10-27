@@ -85,7 +85,16 @@ export function PageEditor({ notebookId, ...editorProps }: PageEditorProps) {
     () => ({
       id: "import-document",
       label: "Importar documento",
-      keywords: ["importar", "pdf", "word", "docx", "import", "documento"],
+      keywords: [
+        "importar",
+        "pdf",
+        "word",
+        "docx",
+        "powerpoint",
+        "pptx",
+        "import",
+        "documento",
+      ],
       icon: FileUp,
       group: "Contenido",
       description: "Importa un PDF, un Word o un PowerPoint en esta página",
