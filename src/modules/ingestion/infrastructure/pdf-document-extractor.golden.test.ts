@@ -1,3 +1,4 @@
+import { ChildProcess } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
@@ -30,7 +31,7 @@ vi.mock("server-only", () => ({}));
 // document-import T8: golden tests of the PDF adapter against the T1
 // fixtures (tests/fixtures/documents/expected/tagged.pdf.md lists every
 // construct of tagged.pdf and the block it must become). Real officeparser
-// and unpdf runs: nothing is mocked.
+// runs (pdf.js in its separate process): nothing is mocked.
 const FILES = join(process.cwd(), "tests/fixtures/documents/files");
 const fixture = (name: string) =>
   new Uint8Array(readFileSync(join(FILES, name)));
@@ -85,6 +86,25 @@ const item = (text: string, ...nested: unknown[]) => ({
 });
 
 describe("PdfDocumentExtractor (tagged.pdf golden)", () => {
+  // These tests must exercise the server's real path: pdf.js in its
+  // separate process, never the degraded in-process parse (T8b).
+  it(
+    "parses with pdf.js in its separate process, never in-process",
+    async () => {
+      const reporter = vi.fn();
+
+      const result = await new PdfDocumentExtractor(
+        {},
+        undefined,
+        reporter,
+      ).extract(fixture("tagged.pdf"), "pdf");
+
+      expect(result.ok).toBe(true);
+      expect(reporter).not.toHaveBeenCalled();
+    },
+    PARSE_TIMEOUT_MS,
+  );
+
   it(
     "emits the blocks of expected/tagged.pdf.md in order",
     async () => {
@@ -502,21 +522,41 @@ describe("PdfDocumentExtractor budget", () => {
     expect(elapsed).toBeLessThan(15_000);
   }, 30_000);
 
-  it("stops with DOCUMENT_UNREADABLE when the budget signal fires during the parse", async () => {
-    const controller = new AbortController();
-    const pending = new PdfDocumentExtractor().extract(
-      fixture("large-30p.pdf"),
-      "pdf",
-      { signal: controller.signal },
-    );
-    controller.abort();
+  // T8b: the abort must stop the parse itself, not only its result. A warm
+  // full parse of large-30p.pdf is timed first (after one more to start
+  // the pooled pdf.js process); the parse under test is aborted at a
+  // quarter of that time. It must end aborted, well before a full parse
+  // would, with its pdf.js process killed mid-stream — officeparser ends a
+  // process only when the abort finds it reading.
+  it("stops the parse mid-stream with DOCUMENT_UNREADABLE when the budget signal fires", async () => {
+    const extractor = new PdfDocumentExtractor();
+    await extractor.extract(fixture("large-30p.pdf"), "pdf");
+    const fullStarted = performance.now();
+    const full = await extractor.extract(fixture("large-30p.pdf"), "pdf");
+    const fullMs = performance.now() - fullStarted;
+    expect(full.ok).toBe(true);
 
-    const result = await pending;
+    const kill = vi.spyOn(ChildProcess.prototype, "kill");
+    try {
+      const controller = new AbortController();
+      const started = performance.now();
+      const pending = extractor.extract(fixture("large-30p.pdf"), "pdf", {
+        signal: controller.signal,
+      });
+      setTimeout(() => controller.abort(), fullMs / 4);
 
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error.code).toBe("DOCUMENT_UNREADABLE");
-      expect(result.error.message).toBe("aborted");
+      const result = await pending;
+      const elapsed = performance.now() - started;
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.code).toBe("DOCUMENT_UNREADABLE");
+        expect(result.error.message).toBe("aborted");
+      }
+      expect(kill).toHaveBeenCalled();
+      expect(elapsed).toBeLessThan(fullMs * 0.75);
+    } finally {
+      kill.mockRestore();
     }
   }, 30_000);
 
