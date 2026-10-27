@@ -1,8 +1,10 @@
 // Makes the OOXML generators reproducible. `docx` and `pptxgenjs` stamp the
 // current time into docProps/core.xml, JSZip stamps it into every ZIP entry,
-// `docx` draws relationship and hyperlink ids from crypto.getRandomValues
-// (nanoid) and both libraries call Math.random. Inside `withFrozenRuntime`
-// all four sources are fixed, so two runs produce byte-identical files.
+// `docx` draws salts from crypto.getRandomValues and relationship and
+// hyperlink ids from its bundled nanoid (the Math.random variant), and both
+// libraries call Math.random. Inside `withFrozenRuntime` all of these are fixed,
+// so two runs produce byte-identical files. Neither library nor JSZip calls
+// node:crypto (randomBytes/randomFillSync/randomUUID), so those stay real.
 
 // 2026-01-01T00:00:00Z: the fixed "now" written into every generated file.
 export const FIXED_TIME_MS = Date.UTC(2026, 0, 1, 0, 0, 0);
@@ -27,22 +29,24 @@ export async function withFrozenRuntime<T>(
   const realRandom = Math.random;
   const realGetRandomValues = globalThis.crypto.getRandomValues;
 
-  class FrozenDate extends RealDate {
-    constructor(...args: unknown[]) {
-      if (args.length === 0) {
-        super(FIXED_TIME_MS);
-      } else {
-        super(...(args as [number]));
-      }
-    }
-
-    static now(): number {
-      return FIXED_TIME_MS;
-    }
+  // A plain function rather than a class, so `Date()` without `new` (which
+  // returns the current time as a string) is frozen too.
+  function FrozenDate(this: unknown, ...args: unknown[]): Date | string {
+    if (!new.target) return new RealDate(FIXED_TIME_MS).toString();
+    return Reflect.construct(
+      RealDate,
+      args.length === 0 ? [FIXED_TIME_MS] : args,
+      new.target,
+    );
   }
+  // Statics (parse, UTC) come from the real Date; instances share its
+  // prototype, so `instanceof Date` keeps working.
+  Object.setPrototypeOf(FrozenDate, RealDate);
+  FrozenDate.prototype = RealDate.prototype;
+  FrozenDate.now = (): number => FIXED_TIME_MS;
 
   const random = seededRandom(seed);
-  globalThis.Date = FrozenDate as DateConstructor;
+  globalThis.Date = FrozenDate as unknown as DateConstructor;
   Math.random = random;
   globalThis.crypto.getRandomValues = <A extends ArrayBufferView | null>(
     array: A,

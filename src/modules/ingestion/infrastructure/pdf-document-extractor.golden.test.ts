@@ -515,41 +515,78 @@ describe("PdfDocumentExtractor budget", () => {
     expect(elapsed).toBeLessThan(15_000);
   }, 30_000);
 
-  // T8b: the abort must stop the parse itself, not only its result. A warm
-  // full parse of large-30p.pdf is timed first (after one more to start
-  // the pooled pdf.js process); the parse under test is aborted at a
-  // quarter of that time. It must end aborted, well before a full parse
-  // would, with its pdf.js process killed mid-stream — officeparser ends a
-  // process only when the abort finds it reading.
+  // T8b: the abort must stop the parse itself, not only its result. No
+  // wall clock: the pdf.js process reports "StartRenderPage" to this one
+  // as it starts reading each page (officeparser's IPC port, one message
+  // per page: 30 for large-30p.pdf), so the budget signal fires exactly
+  // when page 1 is being read. The parse must end aborted, with its pdf.js
+  // process killed and far fewer than the 30 pages read — officeparser
+  // ends a process only when the abort finds it reading. A slower machine
+  // only reads fewer pages before the kill.
   it("stops the parse mid-stream with DOCUMENT_UNREADABLE when the budget signal fires", async () => {
-    const extractor = new PdfDocumentExtractor();
-    await extractor.extract(fixture("large-30p.pdf"), "pdf");
-    const fullStarted = performance.now();
-    const full = await extractor.extract(fixture("large-30p.pdf"), "pdf");
-    const fullMs = performance.now() - fullStarted;
-    expect(full.ok).toBe(true);
+    const pagesStarted = () => {
+      let count = 0;
+      let onPage: (count: number) => void = () => {};
+      const emit = ChildProcess.prototype.emit;
+      const spy = vi
+        .spyOn(ChildProcess.prototype, "emit")
+        .mockImplementation(function (
+          this: ChildProcess,
+          event: string | symbol,
+          ...args: unknown[]
+        ) {
+          const action = (args[0] as { action?: unknown } | null)?.action;
+          if (event === "message" && action === "StartRenderPage") {
+            count += 1;
+            onPage(count);
+          }
+          return Reflect.apply(emit, this, [event, ...args]);
+        });
+      return {
+        count: () => count,
+        onPage: (listener: (count: number) => void) => {
+          onPage = listener;
+        },
+        restore: () => spy.mockRestore(),
+      };
+    };
 
+    // The full parse, counted the same way, is the reference.
+    const extractor = new PdfDocumentExtractor();
+    const reference = pagesStarted();
+    try {
+      const full = await extractor.extract(fixture("large-30p.pdf"), "pdf");
+      expect(full.ok).toBe(true);
+      expect(reference.count()).toBe(30);
+    } finally {
+      reference.restore();
+    }
+
+    const pages = pagesStarted();
     const kill = vi.spyOn(ChildProcess.prototype, "kill");
     try {
       const controller = new AbortController();
-      const started = performance.now();
-      const pending = extractor.extract(fixture("large-30p.pdf"), "pdf", {
+      pages.onPage((count) => {
+        if (count === 1) controller.abort();
+      });
+
+      const result = await extractor.extract(fixture("large-30p.pdf"), "pdf", {
         signal: controller.signal,
       });
-      setTimeout(() => controller.abort(), fullMs / 4);
 
-      const result = await pending;
-      const elapsed = performance.now() - started;
-
+      expect(controller.signal.aborted).toBe(true);
       expect(result.ok).toBe(false);
       if (!result.ok) {
         expect(result.error.code).toBe("DOCUMENT_UNREADABLE");
         expect(result.error.message).toBe("aborted");
       }
       expect(kill).toHaveBeenCalled();
-      expect(elapsed).toBeLessThan(fullMs * 0.75);
+      // Pages already announced before the kill may still arrive, never
+      // the rest of the document.
+      expect(pages.count()).toBeLessThan(15);
     } finally {
       kill.mockRestore();
+      pages.restore();
     }
   }, 30_000);
 

@@ -6,17 +6,39 @@ Extensiones Tiptap, bloques, menú `/`, resaltados y autoguardado.
 
 ## Estado
 
-PR3a completo: dominio y aplicación sin Tiptap. `domain/save-page-port.ts`
-declara el puerto `SavePagePort` (propiedad de `editor`; los Server Actions
-`saveContent`/`getCurrentContent` de `notebooks` lo cumplen de forma
-estructural, sin importarlo), toma `TiptapDoc`/`TiptapNode` de
-`src/shared/kernel/tiptap-doc.ts` y declara el código de conflicto de
-versión; `domain/autosave-state.ts` define
-el estado puro del autoguardado; `application/use-autosave.ts` implementa el
-debounce, el reintento y la reconciliación de conflicto contra un
-`SavePagePort` inyectado, sin importar Tiptap ni ProseMirror
-(`.dependency-cruiser.cjs`, regla `editor-tiptap-only-in-ui`). El componente
-`Editor` de Tiptap llega en PR3b.
+Implementado. El editor es un editor de bloques tipo Notion construido con
+extensiones gratuitas de Tiptap 3.
+
+- Dominio y aplicación sin Tiptap (`.dependency-cruiser.cjs`, regla
+  `editor-tiptap-only-in-ui`): `domain/save-page-port.ts` declara el puerto
+  `SavePagePort` (los Server Actions `saveContent`/`getCurrentContent` de
+  `notebooks` lo cumplen de forma estructural, sin importarlo) y toma
+  `TiptapDoc`/`TiptapNode` de `src/shared/kernel/tiptap-doc.ts`;
+  `domain/image-upload-port.ts` (`ImageUploadPort`) y
+  `domain/mention-port.ts` (`MentionPort`) son los otros dos puertos que la
+  raíz de composición inyecta; `domain/autosave-state.ts` define el estado
+  puro del autoguardado y `application/use-autosave.ts` implementa el
+  debounce, el reintento y la reconciliación de conflictos de versión.
+- `ui/tiptap/editor.tsx` exporta `Editor` (`pageId`, `initialContent`,
+  `initialVersion`, `port`, y opcionales `imagePort`, `mentionPort`,
+  `extraSlashItems`, `statusPortalId`). Monta el estado de guardado
+  (`save-status.tsx`), el aviso de conflicto (`conflict-banner.tsx`), la
+  barra flotante de formato (`bubble-toolbar.tsx`), la barra de tablas
+  (`table-toolbar.tsx`) y el asa de arrastre con su menú contextual
+  (`block-handle.tsx`, `block-context-menu.tsx`).
+- `ui/tiptap/extensions/index.ts` (`createEditorExtensions()`) registra
+  StarterKit, listas de tareas, resaltado con paleta, callouts, bloques de
+  código con lowlight, imágenes (subida directa a Supabase Storage con URL
+  firmada mediante `ImageUploadPort`), tablas, detalles, emoji, menciones
+  `@` a páginas, matemáticas KaTeX, tabla de contenidos, alineación,
+  subíndice y superíndice, estilos de texto (color, fondo, familia, tamaño,
+  interlineado), fondo de bloque, identificadores de bloque estables
+  (`UniqueID`), atajos de bloque, tipografía, YouTube y el texto indicativo de los bloques vacíos (`Placeholder`).
+- Menú `/` (`slash-command.tsx`, `slash-command-items.ts`): texto, títulos
+  1–3, cita, bloque de código, listas con viñetas, numeradas y de tareas,
+  imagen, tabla, divisor, tabla de contenidos, emoji, mención y callouts de
+  idea, nota y advertencia. La página agrega "Importar documento" con
+  `extraSlashItems` (el editor no conoce `ingestion`).
 
 ## Catálogo de contenido (document-import, `docs/adr/0009`)
 
@@ -46,12 +68,7 @@ que `notebooks` valida el contenido importado (`tiptapContentSchema`):
   `highlightAuto` con el texto sin clases; los bloques con un lenguaje
   registrado siguen resaltados.
 
-## Fase pendiente
-
-PR3b — Tiptap base, bloques principales y menú "/" (ver
-`openspec/changes/phase-1-notebooks-editor/tasks.md`, Fase 3b).
-
 ## Dependencias declaradas
 
 Ver `docs/documento-maestro.md` §5.2 (mapa de módulos) para las dependencias
-permitidas de este módulo una vez implementado.
+permitidas de este módulo.
