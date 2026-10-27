@@ -185,6 +185,47 @@ describe("PptxDocumentExtractor master bullets", () => {
       ],
     });
   });
+
+  // T7b: officeparser splits a bulleted `a:p` at each `a:br` into the list
+  // node and continuation paragraphs; a separate `a:p` (even indented with
+  // marL) is a paragraph of its own.
+  it("keeps a bullet's soft line breaks in its item and an indented body paragraph apart", async () => {
+    const bullet = (runs: string) =>
+      `<a:p><a:pPr marL="342900" indent="-342900"><a:buChar char="•"/></a:pPr>${runs}</a:p>`;
+    const run = (value: string) =>
+      `<a:r><a:rPr lang="es"/><a:t>${value}</a:t></a:r>`;
+    const slide = fixtureText(SLIDE(5)).replace(
+      /<p:sp><p:nvSpPr><p:cNvPr id="3" name="Text 1">[\s\S]*?<\/p:sp>/,
+      `<p:sp><p:nvSpPr><p:cNvPr id="3" name="Text 1"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr><p:spPr/><p:txBody><a:bodyPr/><a:lstStyle/>${bullet(
+        `${run("Punto")}<a:br/>${run("misma viñeta")}`,
+      )}${bullet(`${run(" ")}<a:br/>${run("Tras una línea en blanco")}`)}<a:p><a:pPr marL="457200" indent="0"><a:buNone/></a:pPr>${run(
+        "Cuerpo sangrado",
+      )}</a:p></p:txBody></p:sp>`,
+    );
+    const { content } = await extractOk(repack({ [SLIDE(5)]: slide }));
+    const item = (...inlines: object[]) => ({
+      type: "listItem",
+      content: [{ type: "paragraph", content: inlines }],
+    });
+
+    expect(content.content.slice(-3, -1)).toEqual([
+      {
+        type: "bulletList",
+        content: [
+          item(
+            { type: "text", text: "Punto" },
+            { type: "hardBreak" },
+            { type: "text", text: "misma viñeta" },
+          ),
+          item({ type: "text", text: "Tras una línea en blanco" }),
+        ],
+      },
+      {
+        type: "paragraph",
+        content: [{ type: "text", text: "Cuerpo sangrado" }],
+      },
+    ]);
+  });
 });
 
 describe("PptxDocumentExtractor empty decks", () => {

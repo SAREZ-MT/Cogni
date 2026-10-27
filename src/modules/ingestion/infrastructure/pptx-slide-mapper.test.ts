@@ -84,6 +84,145 @@ describe("mapPptxSlides", () => {
     });
   });
 
+  // T7b: officeparser's continuation for an `a:br` inside a bullet is a
+  // paragraph whose only metadata is `paragraphIndentation: { left: lvl }`
+  // (the bullet's level) and its alignment, right after the bullet. Any
+  // other paragraph stays a paragraph.
+  describe("soft line break continuation", () => {
+    const item = (
+      value: string | OfficeNode[],
+      metadata: Record<string, unknown> = {},
+    ): OfficeNode => ({
+      type: "list",
+      children: typeof value === "string" ? [text(value)] : value,
+      metadata: {
+        listType: "unordered",
+        indentation: 0,
+        listId: "1",
+        alignment: "left",
+        ...metadata,
+      },
+    });
+    const continuation = (
+      value: string,
+      metadata: Record<string, unknown> = {
+        paragraphIndentation: { left: 0 },
+        alignment: "left",
+      },
+    ): OfficeNode => ({ type: "paragraph", children: [text(value)], metadata });
+    const listItem = (...content: object[]) => ({
+      type: "listItem",
+      content: [{ type: "paragraph", content }],
+    });
+    const plain = (value: string) => ({
+      type: "paragraph",
+      content: [{ type: "text", text: value }],
+    });
+    const body = (nodes: OfficeNode[]) =>
+      mapPptxSlides(
+        [slide([title("T"), ...nodes])],
+        noMedia,
+      ).content.content.slice(1);
+
+    it("keeps an indented body paragraph after a list as its own paragraph", () => {
+      expect(
+        body([
+          item("Punto"),
+          continuation("Sangrado", { paragraphIndentation: { left: 457200 } }),
+          continuation("Con sangría francesa", {
+            paragraphIndentation: { left: 0, hanging: 360 },
+          }),
+        ]),
+      ).toEqual([
+        {
+          type: "bulletList",
+          content: [listItem({ type: "text", text: "Punto" })],
+        },
+        plain("Sangrado"),
+        plain("Con sangría francesa"),
+      ]);
+    });
+
+    it("does not merge a paragraph indented at another level than the bullet", () => {
+      expect(
+        body([item("Punto", { indentation: 1 }), continuation("Cuerpo")]),
+      ).toEqual([
+        {
+          type: "bulletList",
+          content: [listItem({ type: "text", text: "Punto" })],
+        },
+        plain("Cuerpo"),
+      ]);
+    });
+
+    it("does not merge across a node that maps to nothing", () => {
+      expect(
+        body([item("Punto"), paragraph(text("   ")), continuation("Cuerpo")]),
+      ).toEqual([
+        {
+          type: "bulletList",
+          content: [listItem({ type: "text", text: "Punto" })],
+        },
+        plain("Cuerpo"),
+      ]);
+    });
+
+    it("starts a new item with the line after a bullet whose own text is blank", () => {
+      expect(
+        body([item("Uno"), item([text(" ")]), continuation("Dos")]),
+      ).toEqual([
+        {
+          type: "bulletList",
+          content: [
+            listItem({ type: "text", text: "Uno" }),
+            listItem({ type: "text", text: "Dos" }),
+          ],
+        },
+      ]);
+    });
+
+    it("keeps every soft line break of a nested bullet in that bullet", () => {
+      expect(
+        body([
+          item("Padre"),
+          item("Hijo", { indentation: 1 }),
+          continuation("dos", {
+            paragraphIndentation: { left: 1 },
+            alignment: "left",
+          }),
+          continuation("tres", {
+            paragraphIndentation: { left: 1 },
+            alignment: "left",
+          }),
+        ]),
+      ).toEqual([
+        {
+          type: "bulletList",
+          content: [
+            {
+              type: "listItem",
+              content: [
+                plain("Padre"),
+                {
+                  type: "bulletList",
+                  content: [
+                    listItem(
+                      { type: "text", text: "Hijo" },
+                      { type: "hardBreak" },
+                      { type: "text", text: "dos" },
+                      { type: "hardBreak" },
+                      { type: "text", text: "tres" },
+                    ),
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ]);
+    });
+  });
+
   it("turns a line break inside a paragraph into a hard break", () => {
     const { content } = mapPptxSlides(
       [slide([title("T"), paragraph(text("one\ntwo"))])],

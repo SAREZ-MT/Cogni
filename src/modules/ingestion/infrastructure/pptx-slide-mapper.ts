@@ -191,51 +191,65 @@ class PptxMapper {
   ): ImportedBlock[] {
     const out: ImportedBlock[] = [];
     let list: ListBuilder | null = null;
-    let lastItem: ImportedListItem | null = null;
+    // The bullet the next node may continue (its officeparser node and
+    // the item it became, null while its text is still blank). Reset by
+    // every node that does not continue it.
+    type OpenBullet = { node: OfficeNode; item: ImportedListItem | null };
+    let open: OpenBullet | null = null;
     const flushList = () => {
       if (list) out.push(...list.finish());
       list = null;
-      lastItem = null;
+    };
+    const addItem = (
+      source: OfficeNode,
+      flow: ImportedBlock[],
+    ): ImportedListItem => {
+      list ??= new ListBuilder();
+      return list.add(
+        clampLevel(source.metadata?.indentation),
+        source.metadata?.listType === "ordered",
+        stringOf(source.metadata?.listId),
+        () => 1,
+        itemContent(flow),
+      );
     };
     for (const node of nodes) {
+      const bullet: OpenBullet | null = open;
+      open = null;
       switch (node.type) {
         case "list": {
           const flow = this.flow(node, { colorable: true });
-          if (flow.length === 0) break;
-          const level = clampLevel(node.metadata?.indentation);
-          const ordered = node.metadata?.listType === "ordered";
-          const listId = stringOf(node.metadata?.listId);
-          if (!list) list = new ListBuilder();
-          lastItem = list.add(
-            level,
-            ordered,
-            listId,
-            () => 1,
-            itemContent(flow),
-          );
+          open = { node, item: flow.length > 0 ? addItem(node, flow) : null };
           break;
         }
         case "paragraph": {
           const flow = this.flow(node, { colorable: true });
-          if (flow.length === 0) break;
-          // officeparser splits a list item at a soft line break and
-          // continues it as a paragraph with `paragraphIndentation`: it
-          // stays in its item, after a line break.
           const first = flow[0];
-          if (
-            lastItem &&
-            node.metadata?.paragraphIndentation &&
-            flow.length === 1 &&
-            first.type === "paragraph"
-          ) {
-            const paragraph = lastItem.content[0];
-            paragraph.content = [
-              ...(paragraph.content ?? []),
-              { type: "hardBreak" },
-              ...(first.content ?? []),
-            ];
+          const continues =
+            bullet !== null && isSoftBreakContinuation(node, bullet.node);
+          if (continues && flow.length === 0) {
+            // A blank line of the bullet: the next one may still follow.
+            open = bullet;
             break;
           }
+          if (continues && flow.length === 1 && first.type === "paragraph") {
+            // The next line of the same bullet: after a line break in its
+            // item, or the item's first line when the text before the
+            // break was blank.
+            if (bullet.item) {
+              const paragraph = bullet.item.content[0];
+              paragraph.content = [
+                ...(paragraph.content ?? []),
+                { type: "hardBreak" },
+                ...(first.content ?? []),
+              ];
+            } else {
+              bullet.item = addItem(bullet.node, flow);
+            }
+            open = bullet;
+            break;
+          }
+          if (flow.length === 0) break;
           flushList();
           out.push(...flow);
           break;
@@ -511,6 +525,36 @@ class PptxMapper {
     this.images.push({ key, bytes, mime, alt });
     return key;
   }
+}
+
+// officeparser 8.2 splits a bulleted `a:p` at each `a:br` (a soft line
+// break, Shift+Enter) into the list node and one paragraph per further
+// line, emitted right after it, whose metadata is exactly
+// `paragraphIndentation: { left: <the bullet's lvl> }` and the bullet's
+// alignment. A separate `a:p` — indented or not — never has that shape, so
+// it stays a paragraph of its own. The caller checks adjacency.
+function isSoftBreakContinuation(
+  node: OfficeNode,
+  bullet: OfficeNode,
+): boolean {
+  const metadata = node.metadata ?? {};
+  const indentation = metadata.paragraphIndentation;
+  if (
+    typeof indentation !== "object" ||
+    indentation === null ||
+    Object.keys(indentation).join() !== "left"
+  ) {
+    return false;
+  }
+  const left = (indentation as { left: unknown }).left;
+  return (
+    Object.keys(metadata).every(
+      (key) => key === "paragraphIndentation" || key === "alignment",
+    ) &&
+    typeof left === "number" &&
+    left === bullet.metadata?.indentation &&
+    metadata.alignment === bullet.metadata?.alignment
+  );
 }
 
 function clampLevel(value: unknown): number {
