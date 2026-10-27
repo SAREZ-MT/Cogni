@@ -73,3 +73,27 @@ export function isMonospaceFont(font: string | null | undefined): boolean {
   const name = font.trim().toLowerCase();
   return MONOSPACE_FONTS.has(name) || /\bmono\b/.test(name);
 }
+
+// Pure black/white text or shading would vanish in one of the editor
+// themes; they are the default look, not formatting worth keeping.
+export const NEUTRAL_COLORS: ReadonlySet<string> = new Set([
+  "#000000",
+  "#ffffff",
+]);
+
+// A colour carried by at least this share of the body text is the
+// document's base colour (a Normal style, a deck's text colour), not an
+// emphasis: the mappers do not import it.
+export const DOMINANT_COLOR_SHARE = 0.5;
+
+// The colour of `weights` (characters per normalized colour) covering at
+// least DOMINANT_COLOR_SHARE of `total` characters, or null.
+export function dominantColor(
+  weights: ReadonlyMap<string, number>,
+  total: number,
+): string | null {
+  for (const [color, size] of weights) {
+    if (total > 0 && size / total >= DOMINANT_COLOR_SHARE) return color;
+  }
+  return null;
+}

@@ -3,7 +3,7 @@
 | Campo | Valor |
 |---|---|
 | Fecha | 2026-10-26 |
-| Estado | Aceptado (implementado para PDF y Word; PowerPoint pendiente) |
+| Estado | Aceptado (implementado para PDF, Word y PowerPoint) |
 | Reemplaza | La fila "Extracción PDF: unpdf" de §4.1 y la restricción "solo PDF" de §3.2, §5.2 y §13 (Fase 2) del documento maestro 1.6.0; recogido en la versión 1.7.0. No cambia la decisión de no hacer OCR (§1.2) ni el procesamiento síncrono de ADR 0003 |
 
 ## Contexto
@@ -22,7 +22,7 @@ La investigación del 2026-10-26 comparó extractores y la tarea T0 (prueba de c
 2. **Un adaptador por formato detrás de un puerto único.** `DocumentExtractor.extract(bytes, format)` devuelve el documento importado, las imágenes extraídas y los conteos de páginas e imágenes omitidas; `FormatRoutingDocumentExtractor` elige el adaptador. Las librerías de análisis solo se importan desde `ingestion/infrastructure` (reglas `mammoth-only-in-ingestion-infra` y `officeparser-only-in-ingestion-infra`, junto a `unpdf-only-in-ingestion-infra`); el mapeo a bloques es dominio puro.
 3. **Word: mammoth para la estructura y officeparser para lo que mammoth descarta.** mammoth lee títulos, listas anidadas, tablas con celdas combinadas, código, citas, casillas, saltos de página e imágenes con su texto alternativo; officeparser aporta el color del texto, el sombreado y el resaltado, el número inicial de las listas numeradas y las ecuaciones OMML convertidas a LaTeX. Los dos motores corren uno después del otro, nunca en paralelo, y si officeparser falla el documento se importa solo con mammoth (salvo que su falla sea un límite superado).
 4. **PDF: `unpdf` y `textToBlocks` se mantienen por ahora.** Pasar el PDF a officeparser (estructura de los PDF etiquetados, con `textToBlocks` solo como respaldo para los no etiquetados) es la tarea T8; hasta entonces el PDF sigue entrando como texto con títulos y listas por heurística.
-5. **PowerPoint: officeparser (T7).** Título de diapositiva como encabezado, cuerpo como bloques, tablas, imágenes y notas del orador como un bloque de detalles.
+5. **PowerPoint: officeparser (T7, implementado).** Cada diapositiva, en el orden de la presentación, aporta su título como encabezado de nivel 2 (nivel 1 si es el título centrado de una diapositiva de título; "Diapositiva N" si no tiene título), su cuerpo como bloques (párrafos con formato y enlaces seguros, listas anidadas reconstruidas desde el nivel de cada párrafo, incluidas las viñetas heredadas del patrón, tablas con fila de encabezado y celdas combinadas leídas del XML de la diapositiva, imágenes con su texto alternativo) y sus notas del orador como un bloque de detalles cerrado "Notas del orador". No se añade separador entre diapositivas. Las diapositivas y formas ocultas, y los marcadores de número de diapositiva, fecha y pie, no se importan.
 6. **Sin OCR.** Un PDF escaneado sigue fallando como `no_text_layer`. La prueba de concepto mostró que `tesseract.js` es viable sin conexión (unos 5 a 8 s por página en una vCPU, tope de unas 10 páginas, solo texto), pero adoptarlo es una decisión pendiente del usuario (T12).
 7. **Canalización local y de costo cero.** Todo corre dentro de la Server Action de la página con `maxDuration = 120` (ADR 0003), sin servicios externos ni otro alojamiento. officeparser se declara en `serverExternalPackages` de `next.config.ts`, porque Turbopack rompe su envoltorio ESM al empaquetarlo; mammoth se empaqueta normalmente.
 
@@ -56,7 +56,7 @@ La investigación del 2026-10-26 comparó extractores y la tarea T0 (prueba de c
 
 ### Pendientes
 
-- T7 (adaptador de PowerPoint), T8 (PDF con officeparser y retiro de `unpdf`), T12 (decisión sobre OCR) y T13 (pruebas e2e por formato).
+- T8 (PDF con officeparser y retiro de `unpdf`), T12 (decisión sobre OCR) y T13 (pruebas e2e por formato; Word y PowerPoint ya tienen la suya). PowerPoint (T7) quedó implementado el 2026-10-26.
 - Actualizar los insights de PostHog al nombre `document_imported`.
 - Aplicar la migración `0014` en `cogni-prod` (aplicada en `cogni-dev` el 2026-10-26).
 - Observaciones de revisión no bloqueantes registradas en `odd/tasks/document-import.md`.

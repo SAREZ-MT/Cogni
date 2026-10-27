@@ -190,6 +190,26 @@ export class OoxmlPackage {
   }
 }
 
+// officeparser's own decompression-limit errors (shared by the DOCX and
+// PPTX adapters) (`err.officeIssue.code`,
+// officeparser/dist/types.js OfficeErrorType).
+const OFFICEPARSER_LIMIT_CODES: ReadonlySet<string> = new Set([
+  "ZIP_ENTRY_COUNT_LIMIT_EXCEEDED",
+  "ZIP_ENTRY_INVALID_SIZE",
+  "ZIP_SIZE_LIMIT_EXCEEDED",
+  "XML_ELEMENT_LIMIT_EXCEEDED",
+  "MAX_NESTING_DEPTH_EXCEEDED",
+  "OUTPUT_TOO_LARGE",
+]);
+
+export function officeparserLimitCode(error: unknown): string | null {
+  const code = (error as { officeIssue?: { code?: unknown } } | null)
+    ?.officeIssue?.code;
+  return typeof code === "string" && OFFICEPARSER_LIMIT_CODES.has(code)
+    ? code
+    : null;
+}
+
 // The checked package, or the guard's error (UNREADABLE/LIMIT_EXCEEDED).
 export function openOoxmlPackage(
   bytes: Uint8Array,

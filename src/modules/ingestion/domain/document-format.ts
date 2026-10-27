@@ -8,13 +8,12 @@ export const DOCUMENT_FORMATS = ["pdf", "docx", "pptx"] as const;
 export type DocumentFormat = (typeof DOCUMENT_FORMATS)[number];
 
 // document-import T11/T11b: the pipeline reads every DOCUMENT_FORMATS
-// entry, but a format is offered to users only once its adapter exists —
-// PPTX lands with T7, and enabling it is removing it from this set. The
+// entry, but a format is offered to users only once its adapter exists;
+// a new format waits here until then (empty since T7 enabled PPTX). The
 // picker (ui/import-formats.ts) and the unsupported-format copy
 // (import-failure.ts) both read IMPORTABLE_FORMATS, so they cannot drift.
-export const NOT_YET_IMPORTABLE: ReadonlySet<DocumentFormat> = new Set([
-  "pptx",
-]);
+export const NOT_YET_IMPORTABLE: ReadonlySet<DocumentFormat> =
+  new Set<DocumentFormat>([]);
 
 export const IMPORTABLE_FORMATS: readonly DocumentFormat[] =
   DOCUMENT_FORMATS.filter((format) => !NOT_YET_IMPORTABLE.has(format));

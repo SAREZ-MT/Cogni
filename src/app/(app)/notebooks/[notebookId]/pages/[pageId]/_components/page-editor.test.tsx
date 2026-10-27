@@ -5,6 +5,8 @@ import type {
   MentionPort,
   SlashCommandItem,
 } from "@/modules/editor";
+// The editor's own slash filter, so the test types what a user types.
+import { filterItemsFrom } from "@/modules/editor/ui/tiptap/slash-command";
 import { PageEditor } from "./page-editor";
 
 const { start } = vi.hoisted(() => ({ start: vi.fn() }));
@@ -127,18 +129,32 @@ describe("PageEditor", () => {
   });
 
   describe("Importar documento slash item", () => {
-    it("is offered in the Contenido group for PDF and Word documents", () => {
+    it("is offered in the Contenido group for PDF, Word and PowerPoint documents", () => {
       const { extraSlashItems } = mountEditor();
       expect(extraSlashItems).toHaveLength(1);
       expect(extraSlashItems[0]).toMatchObject({
         id: "import-document",
         label: "Importar documento",
-        description: "Importa un PDF o un Word en esta página",
+        description: "Importa un PDF, un Word o un PowerPoint en esta página",
         group: "Contenido",
       });
       expect(extraSlashItems[0].keywords).toEqual(
-        expect.arrayContaining(["pdf", "word", "docx"]),
+        expect.arrayContaining(["pdf", "word", "docx", "powerpoint", "pptx"]),
       );
+    });
+
+    it.each([
+      "pdf",
+      "word",
+      "docx",
+      "powerpoint",
+      "pptx",
+      "PowerPoint",
+    ])("is found by typing /%s", (query) => {
+      const { extraSlashItems } = mountEditor();
+      expect(filterItemsFrom(extraSlashItems, query)).toEqual([
+        extraSlashItems[0],
+      ]);
     });
 
     it("removes the typed slash command and starts the import for this page's notebook", () => {

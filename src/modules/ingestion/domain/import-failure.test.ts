@@ -34,7 +34,10 @@ describe("failureMessage", () => {
       "invalid_document",
       "Este archivo no es un documento válido o está protegido. Revisa que no tenga contraseña e inténtalo de nuevo.",
     ],
-    ["unsupported_format", "Solo puedes importar archivos PDF o Word (.docx)."],
+    [
+      "unsupported_format",
+      "Solo puedes importar archivos PDF, Word (.docx) o PowerPoint (.pptx).",
+    ],
     [
       "no_text_layer",
       "Este PDF no tiene texto seleccionable y Cogni no hace OCR. Prueba con un PDF que tenga texto.",

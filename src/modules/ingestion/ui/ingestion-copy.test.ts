@@ -33,7 +33,10 @@ describe("document copy", () => {
   it.each([
     ["importDocument", "Importar documento"],
     ["importingDocument", "Importando documento"],
-    ["invalidFileType", "Solo puedes importar archivos PDF o Word (.docx)."],
+    [
+      "invalidFileType",
+      "Solo puedes importar archivos PDF, Word (.docx) o PowerPoint (.pptx).",
+    ],
     ["fileTooLarge", "El documento supera el límite de 20 MB."],
     [
       "notebookMismatch",
@@ -92,7 +95,7 @@ describe("messageForIngestionErrorCode", () => {
     [DOCUMENT_FILE_ERROR.UNREADABLE, INGESTION_COPY.unreadableDocument],
     [
       DOCUMENT_FILE_ERROR.UNSUPPORTED_FORMAT,
-      "Solo puedes importar archivos PDF o Word (.docx).",
+      "Solo puedes importar archivos PDF, Word (.docx) o PowerPoint (.pptx).",
     ],
     [IMPORT_JOB_ERROR.NOT_FOUND, INGESTION_COPY.importNotFound],
     [IMPORT_JOB_ERROR.INVALID_TRANSITION, INGESTION_COPY.unexpected],

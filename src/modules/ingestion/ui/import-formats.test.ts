@@ -13,15 +13,15 @@ const PPTX =
   "application/vnd.openxmlformats-officedocument.presentationml.presentation";
 
 // document-import T11: the picker offers the domain's formats minus the
-// ones whose adapter has not landed yet (PPTX until T7).
+// ones whose adapter has not landed yet (none since T7 enabled PPTX).
 describe("import formats offered by the picker", () => {
-  it("offers PDF and Word, holding PowerPoint back until its adapter exists", () => {
-    expect([...NOT_YET_IMPORTABLE_IN_UI]).toEqual(["pptx"]);
-    expect(UI_IMPORT_FORMATS).toEqual(["pdf", "docx"]);
+  it("offers PDF, Word and PowerPoint, holding nothing back", () => {
+    expect([...NOT_YET_IMPORTABLE_IN_UI]).toEqual([]);
+    expect(UI_IMPORT_FORMATS).toEqual(["pdf", "docx", "pptx"]);
   });
 
   it("accepts the offered extensions and their mimes in the file input", () => {
-    expect(IMPORT_INPUT_ACCEPT).toBe(`.pdf,.docx,${PDF},${DOCX}`);
+    expect(IMPORT_INPUT_ACCEPT).toBe(`.pdf,.docx,.pptx,${PDF},${DOCX},${PPTX}`);
   });
 });
 
@@ -36,20 +36,23 @@ describe("importMimeOf", () => {
     ["apuntes.docx", "application/octet-stream", DOCX],
     ["apuntes.docx", "application/zip", DOCX],
     ["apuntes.pdf", "application/octet-stream", PDF],
+    ["diapositivas.pptx", PPTX, PPTX],
+    ["diapositivas.pptx", "", PPTX],
+    ["diapositivas.PPTX", "application/zip", PPTX],
   ])("takes %s (%j) as %j", (name, type, expected) => {
     expect(importMimeOf({ name, type })).toBe(expected);
   });
 
   it.each([
-    ["diapositivas.pptx", PPTX],
-    ["diapositivas.pptx", ""],
     ["antiguo.doc", "application/msword"],
+    ["antiguo.ppt", "application/vnd.ms-powerpoint"],
+    ["antiguo.ppt", ""],
     ["antiguo.doc", ""],
     ["foto.png", "image/png"],
     // A declared type wins over the extension: a PNG named .pdf is refused.
     ["foto.pdf", "image/png"],
     // A generic type does not let an unoffered extension through.
-    ["diapositivas.pptx", "application/zip"],
+    ["hoja.xlsx", "application/zip"],
     ["antiguo.doc", "application/octet-stream"],
   ])("refuses %s (%j)", (name, type) => {
     expect(importMimeOf({ name, type })).toBeNull();

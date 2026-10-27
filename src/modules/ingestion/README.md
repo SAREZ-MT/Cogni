@@ -6,9 +6,9 @@ Document import: a user picks a document from a notebook, it is uploaded
 directly to a private Supabase Storage bucket, its content is extracted on
 the server and converted into an editable page in the TipTap editor
 (`docs/documento-maestro.md` §13, Phase 2). Since document-import T5 the
-pipeline is format-aware (PDF, Word `.docx`, PowerPoint `.pptx`); the PDF
-and DOCX adapters exist (DOCX since T6, PPTX lands in T7) and the UI
-offers PDF and Word since T11 (see "UI"). The Server Actions keep their
+pipeline is format-aware (PDF, Word `.docx`, PowerPoint `.pptx`); every
+format has its adapter (DOCX since T6, PPTX since T7) and the UI offers
+PDF and Word since T11 (see "UI"). The Server Actions keep their
 PDF-era names (`requestPdfUpload`, `startPdfImport`, `processPdfImport`):
 renaming them changes nothing for the user and every caller, so they stay.
 
@@ -37,9 +37,13 @@ Follows the same hexagonal shape as `notebooks`
   `writeImportedContent` rejects anything outside it) with its recursive
   `hasTextContent` predicate, the time budgets (`import-budget.ts`), the
   rules the format mappers share (`imported-marks.ts`: safe link schemes,
-  Word highlight → palette, hex colours, monospace fonts; `image-mime.ts`:
-  png/jpeg/gif/webp by magic bytes; `omml-latex.ts`: repair and validation
-  of officeparser's equation LaTeX) and every port interface.
+  Word highlight → palette, hex colours, the dominant-colour rule,
+  monospace fonts; `imported-blocks.ts`: nested lists from flat levels,
+  inline merging and trimming; `image-mime.ts`: png/jpeg/gif/webp by magic
+  bytes and the image caps; `omml-latex.ts`: repair and validation of
+  officeparser's equation LaTeX), the OOXML readers (`zip-directory.ts`,
+  `ooxml-guard.ts`, `xml-tags.ts`, `ooxml-hidden-text.ts`, `pptx-xml.ts`)
+  and every port interface.
   No framework, no npm dependency other than Zod.
 - `application/`: the five use cases (`requestPdfUpload`, `startPdfImport`,
   `processImportJob`, `getImportJobStatus`, `getActiveImports`), each
@@ -50,7 +54,8 @@ Follows the same hexagonal shape as `notebooks`
   private `page-pdfs` bucket, `FormatRoutingDocumentExtractor`
   (`createDocumentExtractor()`) dispatches to one `DocumentExtractor` per
   format — `PdfDocumentExtractor` wraps `unpdf` plus `textToBlocks`,
-  `DocxDocumentExtractor` merges mammoth and officeparser (see "DOCX") —
+  `DocxDocumentExtractor` merges mammoth and officeparser (see "DOCX"),
+  `PptxDocumentExtractor` maps officeparser's slides (see "PPTX") —
   `NotebooksPagesAdapter` wraps `createNotebooksServerApi` to implement
   `NotebookPagesPort`, `ImportTelemetryAdapter` reports to PostHog and
   Sentry, and `DrizzleImportJobRepository` persists `import_jobs`.
@@ -74,28 +79,29 @@ Follows the same hexagonal shape as `notebooks`
 
 ## UI
 
-Since T11 the picker imports PDF and Word documents (`ui/`; components
+Since T11 the picker imports PDF and Word documents, and PowerPoint
+decks since T7 (`ui/`; components
 renamed from `Pdf*` to `Document*`; since T11b the app shell uses the
 `Document*` names and the old aliases are gone):
 
 - Entry points: the notebook menu's "Importar documento"
   (`ImportDocumentMenuItem`) and the editor's `/` item "Importar
-  documento" — "Importa un PDF o un Word en esta página"
+  documento" — "Importa un PDF, un Word o un PowerPoint en esta página"
   (`page-editor.tsx`). Both open `DocumentImportProvider`'s single hidden
   input (`data-testid="document-import-input"`).
 - Formats (`ui/import-formats.ts`): `DOCUMENT_FORMATS` minus
-  `NOT_YET_IMPORTABLE_IN_UI` (`pptx` until its adapter, T7, exists —
-  enabling it is removing it from that set and updating
-  `invalidFileType`). The input's `accept` is
-  `.pdf,.docx,application/pdf,<docx mime>`; `importMimeOf` takes a file
-  whose declared type is one of those mimes, or whose type is empty and
-  extension is `.pdf`/`.docx`. That mime is what `requestPdfUpload`,
+  `NOT_YET_IMPORTABLE_IN_UI` (empty since T7; a future format waits there
+  until its adapter exists, and `invalidFileType` follows by itself). The
+  input's `accept` is `.pdf,.docx,.pptx,application/pdf,<docx mime>,<pptx
+  mime>`; `importMimeOf` takes a file whose declared type is one of those
+  mimes, or whose type is empty or generic (`application/octet-stream`,
+  `application/zip`, …) and extension is `.pdf`/`.docx`/`.pptx`. That mime is what `requestPdfUpload`,
   the signed upload (`uploadDocumentToSignedUrl`, its `contentType`) and
   `startPdfImport` receive; the server still checks the stored object and
   the real bytes.
 - Client-side refusals, before any Server Action: another type (a legacy
-  `.doc`, a `.pptx`, an image) → "Solo puedes importar archivos PDF o Word
-  (.docx)."; over 20 MiB → "El documento supera el límite de 20 MB.".
+  `.doc`/`.ppt`, an image) → "Solo puedes importar archivos PDF, Word
+  (.docx) o PowerPoint (.pptx)."; over 20 MiB → "El documento supera el límite de 20 MB.".
   A rate-limited request or start shows "Llegaste al límite de
   importaciones por ahora. …" in the failed banner.
 - Progress: "procesando el documento…"; the sidebar badge's accessible
@@ -110,7 +116,7 @@ renamed from `Pdf*` to `Document*`; since T11b the app shell uses the
 | Port (`domain/`) | Adapter (`infrastructure/`) | Fake (`application/testing/`) |
 |---|---|---|
 | `PdfStorageGateway` | `SupabasePdfStorageGateway` | `FakePdfStorageGateway` |
-| `DocumentExtractor` | `FormatRoutingDocumentExtractor` → `PdfDocumentExtractor`, `DocxDocumentExtractor` | `FakeDocumentExtractor` |
+| `DocumentExtractor` | `FormatRoutingDocumentExtractor` → `PdfDocumentExtractor`, `DocxDocumentExtractor`, `PptxDocumentExtractor` | `FakeDocumentExtractor` |
 | `NotebookPagesPort` | `NotebooksPagesAdapter` | `FakeNotebookPagesPort` |
 | `ImportTelemetry` | `ImportTelemetryAdapter` | `FakeImportTelemetry` |
 | `ImportJobRepository` | `DrizzleImportJobRepository` | `InMemoryImportJobRepository` |
@@ -129,7 +135,8 @@ RETURNING`).
 `{ content: ImportedDoc; totalPages; pagesWithoutText; images:
 ExtractedImage[]; skippedImages }` and `ExtractedImage` is `{ key, bytes,
 mime, alt }`. An image node in `content` points at its image with
-`attrs.pendingId === key` (the DOCX adapter emits images since T6).
+`attrs.pendingId === key` (the DOCX adapter emits images since T6, the
+PPTX adapter since T7).
 `skippedImages` counts images found in the source but not kept because
 their format is not png/jpeg/gif/webp. Errors: `DOCUMENT_UNSUPPORTED_FORMAT`
 when no adapter handles the format, `DOCUMENT_UNREADABLE` for a corrupt,
@@ -140,7 +147,7 @@ its format from the bytes, and maps each outcome to a failure kind:
 
 | Outcome | Kind | Message |
 |---|---|---|
-| Legacy (`.doc`/`.ppt`), unknown bytes, or bytes that are not the format the path declares | `unsupported_format` | "Solo puedes importar archivos PDF o Word (.docx)." (derived from `IMPORTABLE_FORMATS` in `domain/document-format.ts`, so PowerPoint joins the sentence when it is enabled) |
+| Legacy (`.doc`/`.ppt`), unknown bytes, or bytes that are not the format the path declares | `unsupported_format` | "Solo puedes importar archivos PDF, Word (.docx) o PowerPoint (.pptx)." (derived from `IMPORTABLE_FORMATS` in `domain/document-format.ts`) |
 | Extractor returns `DOCUMENT_UNSUPPORTED_FORMAT` | `unsupported_format` | same |
 | Any other extractor error, a thrown extractor, or a file over 20 MiB | `invalid_document` | "Este archivo no es un documento válido o está protegido. …" |
 | No block carries text (`hasTextContent`), PDF | `no_text_layer` | "Este PDF no tiene texto seleccionable y Cogni no hace OCR. …" |
@@ -264,6 +271,72 @@ in about 0.2 s locally.
 Turbopack breaks its ESM wrapper when bundled. Its optional
 `@napi-rs/canvas` (through pdfjs-dist) is not used on the DOCX path.
 
+## PPTX
+
+`PptxDocumentExtractor` (T7) runs officeparser 8.2 alone (T0 spike
+decision) on the checked package and maps its AST slide by slide
+(`pptx-slide-mapper.ts`). What officeparser does not report is read from
+the slide XML first (`domain/pptx-xml.ts`, a linear tag scan, no DOM):
+the deck order (the presentation's slide list, the same order
+officeparser numbers the slides in), hidden slides, hidden shapes, the
+title kind, the bullets a placeholder inherits from the slide master,
+table spans and each picture's media part.
+
+| PPTX construct | Block |
+|---|---|
+| Slide title (`title` placeholder) | `heading` 2 — the page title already names the deck |
+| Title slide's centred title (`ctrTitle`) | `heading` 1 |
+| Slide without a title but with content | `heading` 2 "Diapositiva N" (N = its place in the deck, hidden slides counted, as PowerPoint numbers it) |
+| Body text (text boxes, placeholders, subtitle) | `paragraph`; a line break → `hardBreak` |
+| Bold, italic, underline, strike, sub/superscript | marks |
+| Monospace run font | `code` mark (alone) |
+| Run colour / highlight (`srgbClr`) | `textStyle.color` / `textStyle.backgroundColor` `#rrggbb`, except on titles and links, pure black/white and the deck's dominant body colour (≥ 50 % of the body text) |
+| Hyperlink | `link` for http/https/mailto; other schemes and jumps to slides keep the text, drop the mark. The underline PowerPoint draws on hyperlink runs goes with the link |
+| Bulleted/numbered paragraphs (own bullet, or a content placeholder's bullet from the master's body style) | nested `bulletList`/`orderedList` by level (`lvl`); a soft break inside an item stays in it |
+| Table | `table`; first row → `tableHeader`; `colspan`/`rowspan` from `gridSpan`/`rowSpan`, covered (`hMerge`/`vMerge`) cells left out; `colwidth: null`; empty cell → empty paragraph |
+| Picture (png/jpeg/gif/webp, by magic bytes) | `image` (`pendingId`, `alt` from `p:cNvPr@descr`); a picture shown on several slides is one upload |
+| Picture in another format, missing or over a cap | skipped, counted in `skippedImages` |
+| Equation in a paragraph with text / paragraph of equations only | `inlineMath` / `blockMath` (`omml-latex.ts`), else the LaTeX as text |
+| Speaker notes | last block of the slide: `details` (`open: false`) > `detailsSummary` "Notas del orador" + `detailsContent` with the notes' blocks |
+
+Separators: none — each slide opens with its heading, so no
+`horizontalRule` is added between slides.
+
+Skipped on purpose: hidden slides (`<p:sld show="0">`, notes included),
+hidden shapes (`p:cNvPr hidden="1"`, a hidden group with all its
+children) and page furniture (slide number, date, footer and header
+placeholders, on slides and notes pages — this is how the slide number
+officeparser would read from every notes page disappears). The text of
+all of them never reaches the page or the AI (same policy as Word's
+`w:vanish`).
+
+Speaker notes and the AI: notes are visible content (the details block
+opens), so `extractPlainText` (notebooks) writes them — and the summary
+"Notas del orador" — into `plain_text` like any other block; the AI
+generates from them too (test: "feeds the speaker notes to the plain
+text").
+
+SmartArt: officeparser reads a diagram's text as a nested bulleted list,
+which imports as one (the diagram's shapes and layout are lost).
+
+Not mapped: charts (officeparser reads no chart data without
+attachments), comments,
+slide layouts' own placeholder overrides of the master bullets, a
+numbered list's `startAt` (always 1), paragraph alignment, text box
+geometry, slide transitions and animations.
+
+Pages: `totalPages` is the number of visible slides; `pagesWithoutText`
+the visible slides with no text of their own (title or body; notes not
+counted). A slide with no title, body, picture or notes is left out. A
+deck with no text anywhere (notes included) gets no "Diapositiva N"
+headings either, so `processImportJob` fails it as `empty_document`.
+
+Errors: a package the guard refuses, a ZIP without
+`ppt/presentation.xml`, or any officeparser/mapper failure →
+`DOCUMENT_UNREADABLE` (`invalid_document`); a cap breach →
+`DOCUMENT_LIMIT_EXCEEDED`. `large-40s.pptx` extracts in about 0.05 s
+locally.
+
 ## Límites y seguridad
 
 Import hardening from the 2026-10-26 security audit (T9b). Every cap is a
@@ -301,7 +374,10 @@ inflates; officeparser parses a rebuilt stored archive of the XML parts
 only, with `decompressionLimits` (`maxUncompressedBytes`,
 `maxZipEntries`, `maxXmlElements`) at the same caps as a second fence.
 No new dependency: `fflate` was not needed. The engines run sequentially
-so their peaks never add up. officeparser's enrichment (colours, list
+so their peaks never add up. PPTX (T7) goes through the same package:
+officeparser parses `xmlArchive()` with the same `decompressionLimits`,
+never reads a media part itself (`extractAttachments: false`), and any
+officeparser limit error fails the import as `DOCUMENT_LIMIT_EXCEEDED`. officeparser's enrichment (colours, list
 starts, equations) is optional — any other officeparser failure imports
 from mammoth alone — but a limit breach on its path (a part only
 `xmlArchive()` reads, or officeparser's own `ZIP_*`/`XML_ELEMENT_*`/
@@ -331,6 +407,9 @@ bound the worst case without that.
 - DOCX: the OOXML caps above bound the XML mammoth and officeparser
   parse (size, elements, nesting); tables nested more than
   `MAX_TABLE_NESTING` (16) levels are refused by the mapper.
+- PPTX: the same OOXML caps; the signal is checked before and after
+  officeparser and handed to it as `abortSignal` (it checks it per
+  slide).
 
 Residual risk: parsing itself is synchronous (pdf.js per page, xmldom
 for a whole part), so the race cannot interrupt it; a single page or part
@@ -373,18 +452,21 @@ Text the user never sees must not reach the AI (imported content feeds
   officeparser read it; mammoth 1.13 ignores both properties. Not
   resolved: `docDefaults`, table/numbering styles. Tracked formatting
   changes (`w:rPrChange`) are ignored on purpose.
-- Image alt text (≤ 2000 characters, from the DOCX description) stays on
+- PPTX: hidden slides, hidden shapes and page-furniture placeholders are
+  skipped or cut before officeparser reads the slide (see "PPTX").
+- Image alt text (≤ 2000 characters, from the DOCX/PPTX description) stays on
   the image node for accessibility, but `extractPlainText` (notebooks)
   writes an image's caption only, never its alt.
 
 ### Images
 
-The DOCX mapper (`IMAGE_LIMITS`, `docx-model-mapper.ts`) reads embedded
+The DOCX and PPTX mappers (`IMAGE_LIMITS`, `domain/image-mime.ts`) read embedded
 images one at a time, never more than 100 per document; an image over
 10 MiB (refused by `OoxmlPackage` from its declared size, before
 inflating, and checked again once read) is skipped and counted — the rest
-of the document still imports (regression test in
-`docx-document-extractor.limits.test.ts`) — and once the images
+of the document still imports (regression tests in
+`docx-document-extractor.limits.test.ts` and
+`pptx-document-extractor.variants.test.ts`) — and once the images
 read reach 40 MiB in total the rest are not read. Every image not kept
 counts in `skippedImages`.
 
@@ -457,8 +539,9 @@ Functions) — without it, the Hobby plan's ceiling is lower and
 
 - `pnpm test -- ingestion` — unit tests (Vitest): `domain`, `application`
   (against the in-memory fakes), `infrastructure` adapters (against mocked
-  clients, or real parsers for the document extractors: the DOCX golden
-  test reads `tests/fixtures/documents/files/all-constructs.docx`) and
+  clients, or real parsers for the document extractors: the DOCX and PPTX
+  golden tests read `tests/fixtures/documents/files/all-constructs.docx`
+  and `all-constructs.pptx`) and
   `actions.ts` (against mocked adapters + session, matching
   `notebooks/actions.test.ts`'s pattern). No `DATABASE_URL` or
   `SUPABASE_PDF_BUCKET` needed.
