@@ -123,6 +123,9 @@ describe("InMemoryImportJobRepository", () => {
     await repo.create(evenOlder);
 
     expect(await repo.findLatestByPage("page-1")).toEqual(newer);
+    // T9b: scoped to an owner, another owner's jobs are invisible.
+    expect(await repo.findLatestByPage("page-1", OWNER_ID)).toEqual(newer);
+    expect(await repo.findLatestByPage("page-1", "someone-else")).toBeNull();
   });
 
   it("returns null from findLatestByPage when the page has no jobs", async () => {
@@ -237,6 +240,7 @@ describe("InMemoryImportJobRepository", () => {
       id: job.id,
       pageCount: 3,
       pagesWithoutText: 0,
+      skippedImages: 0,
       now,
     });
 
@@ -251,6 +255,7 @@ describe("InMemoryImportJobRepository", () => {
         id: "missing",
         pageCount: 1,
         pagesWithoutText: 0,
+        skippedImages: 0,
         now: new Date(),
       }),
     ).toBeNull();
@@ -266,6 +271,7 @@ describe("InMemoryImportJobRepository", () => {
       id: job.id,
       pageCount: 1,
       pagesWithoutText: 0,
+      skippedImages: 0,
       now,
     });
 

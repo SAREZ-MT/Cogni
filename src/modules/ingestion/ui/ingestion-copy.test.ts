@@ -1,13 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
+  DOCUMENT_FILE_ERROR,
   IMPORT_JOB_ERROR,
   INGESTION_ERROR,
-  PDF_FILE_ERROR,
 } from "../domain/errors";
 import {
   INGESTION_COPY,
   messageForIngestionErrorCode,
   pagesOmittedMessage,
+  skippedImagesMessage,
 } from "./ingestion-copy";
 
 describe("INGESTION_COPY", () => {
@@ -23,6 +24,42 @@ describe("INGESTION_COPY", () => {
     for (const text of Object.values(INGESTION_COPY.progress)) {
       expect(text[0]).toBe(text[0]?.toLowerCase());
     }
+  });
+});
+
+// document-import T11: the picker takes PDF and Word documents, so no copy
+// a user sees while importing names the PDF format alone.
+describe("document copy", () => {
+  it.each([
+    ["importDocument", "Importar documento"],
+    ["importingDocument", "Importando documento"],
+    ["invalidFileType", "Solo puedes importar archivos PDF o Word (.docx)."],
+    ["fileTooLarge", "El documento supera el límite de 20 MB."],
+    [
+      "notebookMismatch",
+      "Este documento ya se está importando en otro cuaderno.",
+    ],
+    ["unreadableDocument", "No pudimos leer ese documento."],
+  ] as const)("%s reads %j", (key, text) => {
+    expect(INGESTION_COPY[key]).toBe(text);
+  });
+
+  it("says the document is being processed, not a PDF", () => {
+    expect(INGESTION_COPY.progress.processing).toBe("procesando el documento…");
+  });
+});
+
+describe("skippedImagesMessage", () => {
+  it("uses the singular form for exactly one image", () => {
+    expect(skippedImagesMessage(1)).toBe(
+      "No pudimos importar 1 imagen de este documento.",
+    );
+  });
+
+  it("uses the plural form with the real count otherwise", () => {
+    expect(skippedImagesMessage(4)).toBe(
+      "No pudimos importar 4 imágenes de este documento.",
+    );
   });
 });
 
@@ -46,17 +83,25 @@ describe("messageForIngestionErrorCode", () => {
     [INGESTION_ERROR.PAGE_NOT_FOUND, INGESTION_COPY.pageNotFound],
     [INGESTION_ERROR.STORAGE_UNAVAILABLE, INGESTION_COPY.storageUnavailable],
     [INGESTION_ERROR.UNEXPECTED, INGESTION_COPY.unexpected],
-    [PDF_FILE_ERROR.MIME_NOT_ALLOWED, INGESTION_COPY.invalidFileType],
-    [PDF_FILE_ERROR.TOO_LARGE, INGESTION_COPY.fileTooLarge],
-    [PDF_FILE_ERROR.FILE_NAME_INVALID, INGESTION_COPY.invalidFileName],
-    [PDF_FILE_ERROR.PATH_OUT_OF_SCOPE, INGESTION_COPY.uploadExpired],
-    [PDF_FILE_ERROR.UPLOAD_EXPIRED, INGESTION_COPY.uploadExpired],
-    [PDF_FILE_ERROR.OBJECT_MISSING, INGESTION_COPY.uploadFailed],
-    [PDF_FILE_ERROR.UNREADABLE, INGESTION_COPY.unreadablePdf],
+    [DOCUMENT_FILE_ERROR.MIME_NOT_ALLOWED, INGESTION_COPY.invalidFileType],
+    [DOCUMENT_FILE_ERROR.TOO_LARGE, INGESTION_COPY.fileTooLarge],
+    [DOCUMENT_FILE_ERROR.FILE_NAME_INVALID, INGESTION_COPY.invalidFileName],
+    [DOCUMENT_FILE_ERROR.PATH_OUT_OF_SCOPE, INGESTION_COPY.uploadExpired],
+    [DOCUMENT_FILE_ERROR.UPLOAD_EXPIRED, INGESTION_COPY.uploadExpired],
+    [DOCUMENT_FILE_ERROR.OBJECT_MISSING, INGESTION_COPY.uploadFailed],
+    [DOCUMENT_FILE_ERROR.UNREADABLE, INGESTION_COPY.unreadableDocument],
+    [
+      DOCUMENT_FILE_ERROR.UNSUPPORTED_FORMAT,
+      "Solo puedes importar archivos PDF o Word (.docx).",
+    ],
     [IMPORT_JOB_ERROR.NOT_FOUND, INGESTION_COPY.importNotFound],
     [IMPORT_JOB_ERROR.INVALID_TRANSITION, INGESTION_COPY.unexpected],
     [IMPORT_JOB_ERROR.STORAGE_PATH_CONFLICT, INGESTION_COPY.unexpected],
     ["INGESTION_INVALID_INPUT", INGESTION_COPY.invalidInput],
+    [
+      INGESTION_ERROR.RATE_LIMITED,
+      "Llegaste al límite de importaciones por ahora. Intenta de nuevo más tarde.",
+    ],
   ])("maps %s to its Spanish copy", (code, expected) => {
     expect(messageForIngestionErrorCode(code)).toBe(expected);
   });

@@ -284,9 +284,39 @@
     margin-top: 1rem;
     margin-bottom: 0.5rem;
   }
+  /* document-import T11b: imported documents (DOCX/PPTX) carry heading
+     levels 4–6 too. They continue the h1–h3 scale downwards — always
+     semibold and with heading margins, so they stay distinguishable from
+     body text even where the size meets it — and h6 drops to the muted
+     secondary tone as the lowest rung. */
+  .editor-content h4 {
+    font-size: var(--text-lg);
+    font-weight: 600;
+    line-height: var(--leading-snug);
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
+  }
+  .editor-content h5 {
+    font-size: var(--text-base);
+    font-weight: 600;
+    line-height: var(--leading-snug);
+    margin-top: 0.875rem;
+    margin-bottom: 0.375rem;
+  }
+  .editor-content h6 {
+    font-size: var(--text-sm);
+    font-weight: 600;
+    line-height: var(--leading-snug);
+    color: var(--color-fg-secondary);
+    margin-top: 0.75rem;
+    margin-bottom: 0.375rem;
+  }
   .editor-content h1:first-child,
   .editor-content h2:first-child,
-  .editor-content h3:first-child {
+  .editor-content h3:first-child,
+  .editor-content h4:first-child,
+  .editor-content h5:first-child,
+  .editor-content h6:first-child {
     margin-top: 0;
   }
 
@@ -456,6 +486,24 @@
     font-size: 1.05em;
   }
 
+  /* document-import T11b: block math (BlockMath, rendered with KaTeX's
+     `displayMode`) is a centred, display-size block with paragraph-scale
+     vertical rhythm. The wrapper takes the body text size (the editor
+     root is smaller, and only `p` sets body size), so display math is
+     never smaller than inline math in a paragraph; KaTeX's own
+     `.katex-display` margin is replaced by the wrapper's so spacing
+     matches the surrounding blocks, and wide formulas scroll instead of
+     overflowing the page column. */
+  .editor-content [data-type="block-math"] {
+    font-size: var(--text-base);
+    margin-block: 1rem;
+    overflow-x: auto;
+    text-align: center;
+  }
+  .editor-content [data-type="block-math"] .katex-display {
+    margin: 0;
+  }
+
   .editor-content span[data-type="emoji"] img {
     display: inline-block;
     height: 1em;
@@ -475,6 +523,76 @@
   .editor-content sup,
   .editor-content sub {
     font-size: 0.75em;
+  }
+
+  /* document-import T3: collapsible blocks (extensions/details.ts). The
+     @tiptap/extension-details node view renders
+     div[data-type="details"] > button + div > (summary, div[data-type=
+     "detailsContent"][hidden]) and toggles `.is-open` on the outer div;
+     the button is the disclosure triangle. */
+  .editor-content [data-type="details"] {
+    display: flex;
+    gap: 0.25rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .editor-content [data-type="details"] > button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 1.5rem;
+    height: 1.75rem;
+    border-radius: var(--radius-sm);
+    color: var(--color-fg-muted);
+    cursor: pointer;
+  }
+
+  .editor-content [data-type="details"] > button:hover {
+    background-color: var(--bg-hover);
+  }
+
+  .editor-content [data-type="details"] > button::after {
+    content: "";
+    border-block: 0.3rem solid transparent;
+    border-inline-start: 0.45rem solid currentColor;
+    transition: transform 150ms ease;
+  }
+
+  .editor-content [data-type="details"].is-open > button::after {
+    transform: rotate(90deg);
+  }
+
+  .editor-content [data-type="details"] > div {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .editor-content [data-type="details"] summary {
+    display: block;
+    list-style: none;
+    font-weight: 600;
+    line-height: 1.75rem;
+  }
+
+  .editor-content [data-type="detailsContent"] {
+    margin-top: 0.25rem;
+  }
+
+  /* document-import T3: YouTube embeds (extensions/youtube.ts). The iframe
+     carries width/height attributes; the block fills the column at 16:9. */
+  .editor-content [data-youtube-video] {
+    margin-bottom: 0.75rem;
+  }
+
+  .editor-content [data-youtube-video] iframe {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 16 / 9;
+    border: 0;
+    border-radius: var(--radius-2xl);
+    background-color: var(--color-neutral-100);
   }
 
   /* E3 #2 (data-loss-and-table-fix bug report): @tiptap/extension-table's

@@ -25,6 +25,7 @@ describe("notebooks domain error codes", () => {
       TOO_LARGE: "ASSET_TOO_LARGE",
       PATH_OUT_OF_SCOPE: "ASSET_PATH_OUT_OF_SCOPE",
       FORBIDDEN: "ASSET_FORBIDDEN",
+      UPLOAD_FAILED: "ASSET_UPLOAD_FAILED",
     });
   });
 });

@@ -13,6 +13,7 @@ import {
 } from "@/shared/kernel/domain-error";
 import { err, ok, type Result } from "@/shared/kernel/result";
 import { createServerAnalytics } from "@/shared/observability/analytics";
+import { createRateLimiter } from "@/shared/rate-limit";
 import {
   getActiveImports as getActiveImportsUseCase,
   getImportJobStatus as getImportJobStatusUseCase,
@@ -26,11 +27,15 @@ import {
 } from "./application";
 import { INGESTION_ERROR } from "./domain/errors";
 import {
+  IMPORT_STARTS_PER_HOUR,
+  UPLOAD_GRANTS_PER_HOUR,
+} from "./domain/import-rate-limiter";
+import {
+  createDocumentExtractor,
   DrizzleImportJobRepository,
   ImportTelemetryAdapter,
   NotebooksPagesAdapter,
   SupabasePdfStorageGateway,
-  UnpdfTextExtractor,
 } from "./infrastructure";
 
 // Server Actions are the only client-reachable entry point of this module
@@ -70,7 +75,26 @@ function deps() {
     key: env.NEXT_PUBLIC_POSTHOG_KEY,
     host: env.NEXT_PUBLIC_POSTHOG_HOST,
   });
+  // T9b: per-user import limits over the AI layer's Upstash database and
+  // switch (AI_PROVIDER_MODE=live → Upstash, otherwise in memory); no new
+  // environment variable.
+  const limiterConfig = {
+    mode:
+      env.AI_PROVIDER_MODE === "live" ? ("live" as const) : ("fake" as const),
+    upstashUrl: env.UPSTASH_REDIS_REST_URL,
+    upstashToken: env.UPSTASH_REDIS_REST_TOKEN,
+    prefix: env.REDIS_KEY_PREFIX,
+    clock: systemClock,
+  };
   return {
+    uploadLimiter: createRateLimiter(
+      { name: "import-upload", ...UPLOAD_GRANTS_PER_HOUR },
+      limiterConfig,
+    ),
+    startLimiter: createRateLimiter(
+      { name: "import-start", ...IMPORT_STARTS_PER_HOUR },
+      limiterConfig,
+    ),
     notebookPages: new NotebooksPagesAdapter(db),
     storage: new SupabasePdfStorageGateway({
       supabaseUrl: env.NEXT_PUBLIC_SUPABASE_URL,
@@ -78,7 +102,7 @@ function deps() {
       bucket: env.SUPABASE_PDF_BUCKET,
     }),
     jobs: new DrizzleImportJobRepository(db),
-    extractor: new UnpdfTextExtractor(),
+    extractor: createDocumentExtractor(),
     telemetry: new ImportTelemetryAdapter(analytics),
     clock: systemClock,
   };
@@ -120,10 +144,10 @@ export async function requestPdfUpload(
   return withBoundary(async () => {
     const ownerId = await requireOwnerId();
     if (!ownerId.ok) return ownerId;
-    const { notebookPages, storage, clock } = deps();
+    const { notebookPages, storage, clock, uploadLimiter } = deps();
     const result = await requestPdfUploadUseCase(
       input,
-      { notebookPages, storage, clock },
+      { notebookPages, storage, clock, uploadLimiter },
       ownerId.value,
     );
     if (!result.ok) return err(toActionError(result.error));
@@ -140,10 +164,10 @@ export async function startPdfImport(
   return withBoundary(async () => {
     const ownerId = await requireOwnerId();
     if (!ownerId.ok) return ownerId;
-    const { notebookPages, storage, jobs, clock } = deps();
+    const { notebookPages, storage, jobs, clock, startLimiter } = deps();
     const result = await startPdfImportUseCase(
       input,
-      { notebookPages, storage, jobs, clock },
+      { notebookPages, storage, jobs, clock, startLimiter },
       ownerId.value,
     );
     if (!result.ok) return err(toActionError(result.error));

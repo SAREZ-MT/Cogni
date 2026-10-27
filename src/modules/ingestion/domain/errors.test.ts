@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { IMPORT_JOB_ERROR, INGESTION_ERROR, PDF_FILE_ERROR } from "./errors";
+import {
+  DOCUMENT_FILE_ERROR,
+  IMPORT_JOB_ERROR,
+  INGESTION_ERROR,
+} from "./errors";
 
 describe("ingestion domain error codes", () => {
   it("exposes the import job error codes from design.md", () => {
@@ -7,18 +11,21 @@ describe("ingestion domain error codes", () => {
       INVALID_TRANSITION: "IMPORT_JOB_INVALID_TRANSITION",
       NOT_FOUND: "IMPORT_JOB_NOT_FOUND",
       STORAGE_PATH_CONFLICT: "IMPORT_JOB_STORAGE_PATH_CONFLICT",
+      ACTIVE_LIMIT_REACHED: "IMPORT_JOB_ACTIVE_LIMIT_REACHED",
     });
   });
 
-  it("exposes the pdf-file error codes from design.md", () => {
-    expect(PDF_FILE_ERROR).toEqual({
-      MIME_NOT_ALLOWED: "PDF_MIME_NOT_ALLOWED",
-      TOO_LARGE: "PDF_TOO_LARGE",
-      FILE_NAME_INVALID: "PDF_FILE_NAME_INVALID",
-      PATH_OUT_OF_SCOPE: "PDF_PATH_OUT_OF_SCOPE",
-      UPLOAD_EXPIRED: "PDF_UPLOAD_EXPIRED",
-      OBJECT_MISSING: "PDF_OBJECT_MISSING",
-      UNREADABLE: "PDF_UNREADABLE",
+  it("exposes the document-file error codes (PDF_* renamed to DOCUMENT_* in document-import T5)", () => {
+    expect(DOCUMENT_FILE_ERROR).toEqual({
+      MIME_NOT_ALLOWED: "DOCUMENT_MIME_NOT_ALLOWED",
+      TOO_LARGE: "DOCUMENT_TOO_LARGE",
+      FILE_NAME_INVALID: "DOCUMENT_FILE_NAME_INVALID",
+      PATH_OUT_OF_SCOPE: "DOCUMENT_PATH_OUT_OF_SCOPE",
+      UPLOAD_EXPIRED: "DOCUMENT_UPLOAD_EXPIRED",
+      OBJECT_MISSING: "DOCUMENT_OBJECT_MISSING",
+      UNREADABLE: "DOCUMENT_UNREADABLE",
+      UNSUPPORTED_FORMAT: "DOCUMENT_UNSUPPORTED_FORMAT",
+      LIMIT_EXCEEDED: "DOCUMENT_LIMIT_EXCEEDED",
     });
   });
 
@@ -30,6 +37,7 @@ describe("ingestion domain error codes", () => {
       SESSION_REQUIRED: "INGESTION_SESSION_REQUIRED",
       STORAGE_UNAVAILABLE: "INGESTION_STORAGE_UNAVAILABLE",
       UNEXPECTED: "INGESTION_UNEXPECTED",
+      RATE_LIMITED: "INGESTION_RATE_LIMITED",
     });
   });
 });

@@ -2,9 +2,19 @@ import { z } from "zod";
 import type { Clock } from "@/shared/kernel/clock";
 import { DomainError } from "@/shared/kernel/domain-error";
 import { err, ok, type Result } from "@/shared/kernel/result";
-import { IMPORT_JOB_ERROR, PDF_FILE_ERROR } from "../domain/errors";
-import { PROCESSING_BUDGET_MS } from "../domain/import-budget";
+import type { DocumentExtractor } from "../domain/document-extractor";
 import {
+  documentFormatFromPath,
+  MAX_DOCUMENT_BYTES,
+} from "../domain/document-file";
+import { detectDocumentFormat } from "../domain/document-format";
+import { DOCUMENT_FILE_ERROR, IMPORT_JOB_ERROR } from "../domain/errors";
+import {
+  IMAGE_UPLOAD_RESERVE_MS,
+  PROCESSING_BUDGET_MS,
+} from "../domain/import-budget";
+import {
+  DOCUMENT_LIMIT_EXCEEDED_MESSAGE,
   failureMessage,
   type ImportFailureKind,
   PERSISTENCE_PAGE_UNAVAILABLE_MESSAGE,
@@ -14,10 +24,11 @@ import type { ImportJobRepository } from "../domain/import-job-repository";
 import type { ImportTelemetry } from "../domain/import-telemetry";
 import { hasTextContent } from "../domain/imported-doc";
 import type { NotebookPagesPort } from "../domain/notebook-pages-port";
-import { looksLikePdf, MAX_PDF_BYTES } from "../domain/pdf-file";
 import type { PdfStorageGateway } from "../domain/pdf-storage-gateway";
-import type { PdfTextExtractor } from "../domain/pdf-text-extractor";
-import { textToBlocks } from "../domain/text-to-blocks";
+import {
+  pendingImageKeys,
+  resolvePendingImages,
+} from "../domain/pending-images";
 import { parseInput } from "./validation";
 
 export const processImportJobSchema = z.object({
@@ -27,7 +38,7 @@ export const processImportJobSchema = z.object({
 export interface ProcessImportJobDeps {
   jobs: ImportJobRepository;
   storage: PdfStorageGateway;
-  extractor: PdfTextExtractor;
+  extractor: DocumentExtractor;
   notebookPages: NotebookPagesPort;
   telemetry: ImportTelemetry;
   clock: Clock;
@@ -58,14 +69,47 @@ interface Failure {
 
 // design.md, "Decision: Procesamiento síncrono en la Server Action con
 // maxDuration" — `processImportJob({ importJobId }, deps, ownerId)`.
-// Claims the queued job with a conditional transition, downloads the PDF,
-// extracts its text, converts it to blocks, writes it through
+// Claims the queued job with a conditional transition, downloads the
+// document, detects its format from the real bytes (document-import T5:
+// PDF, DOCX or PPTX, which must match the format its storage path
+// declares), extracts it into blocks through the DocumentExtractor port,
+// rejects it when no block carries text, writes it through
 // `NotebookPagesPort.writeImportedContent` with compare-and-swap, and
 // always leaves the job in a terminal state (unless the platform kills
 // the function first — `getImportJobStatus`'s abandoned-job rule covers
 // that case). No failure ever propagates as an exception: every branch
 // resolves to `ok(job)` in its final state, `err` only for "job not
 // found/not owned" before anything was claimed.
+// Settles with `work`'s value, "threw" when it rejects, or "timeout" once
+// `budgetMs` passes first; `onLate` then receives the value it settles
+// with afterwards, if any.
+async function withinBudget<T>(
+  work: Promise<T>,
+  budgetMs: number,
+  onLate: (value: T) => void,
+): Promise<T | "threw" | "timeout"> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let timedOut = false;
+  const settled = work.then(
+    (value) => {
+      if (timedOut) onLate(value);
+      return value;
+    },
+    () => "threw" as const,
+  );
+  const timeout = new Promise<"timeout">((resolve) => {
+    timer = setTimeout(() => {
+      timedOut = true;
+      resolve("timeout");
+    }, budgetMs);
+  });
+  try {
+    return await Promise.race([settled, timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function processImportJob(
   input: unknown,
   deps: ProcessImportJobDeps,
@@ -83,7 +127,7 @@ export async function processImportJob(
 
   // Idempotency against a repeated call (design.md's failure table):
   // `processing`, `done` and `failed` are all left exactly as they are,
-  // with no download, no write and no second `pdf_imported`.
+  // with no download, no write and no second `document_imported`.
   if (job.status !== "queued") {
     return ok(job);
   }
@@ -159,12 +203,28 @@ export async function processImportJob(
       message: failureMessage("download"),
     });
   }
-  if (!looksLikePdf(bytes) || bytes.length > MAX_PDF_BYTES) {
+  if (bytes.length > MAX_DOCUMENT_BYTES) {
     return finishFailed({
-      kind: "invalid_pdf",
-      message: failureMessage("invalid_pdf"),
+      kind: "invalid_document",
+      message: failureMessage("invalid_document"),
     });
   }
+  // The real bytes decide the format; a legacy/unknown file, or one whose
+  // bytes are not the format the upload declared (the path's extension,
+  // picked by requestPdfUpload from the validated mime), is refused before
+  // any parser sees it.
+  const detected = detectDocumentFormat(bytes);
+  if (
+    detected === "legacy" ||
+    detected === "unknown" ||
+    detected !== documentFormatFromPath(claimed.storagePath)
+  ) {
+    return finishFailed({
+      kind: "unsupported_format",
+      message: failureMessage("unsupported_format"),
+    });
+  }
+  const format = detected;
 
   if (remainingMs() <= 0) {
     return finishFailed({
@@ -176,59 +236,186 @@ export async function processImportJob(
   const extractStart = deps.clock.now();
   // Review follow-up from T6 (R3-persist-and-extract-exceptions-
   // unhandled): the port promises a Result, never a throw, but an adapter
-  // bug (or unpdf itself) can still reject; the job must reach a terminal
-  // state instead of leaking the exception out of processImportJob.
-  let extracted: Awaited<ReturnType<PdfTextExtractor["extract"]>>;
+  // bug (or the parser itself) can still reject; the job must reach a
+  // terminal state instead of leaking the exception out of
+  // processImportJob.
+  let extracted: Awaited<ReturnType<DocumentExtractor["extract"]>>;
   // Captured only when `extract` actually threw (never set for a plain
   // `err(...)` Result) so `finishFailed` only forwards a `cause` to
   // telemetry when there is a real exception with a stack to report.
   let extractCause: unknown;
+  //
+  // T9b (audit: parsing outside the time budget): the extraction is raced
+  // against what is left of the budget. A parser stuck on an async step
+  // loses the race and the job ends as `timeout`; the adapter's signal is
+  // aborted so it stops at its next step. Synchronous parser work cannot
+  // be preempted — the caps of "Límites y seguridad" bound it instead.
+  const extraction = new AbortController();
+  let budgetTimer: ReturnType<typeof setTimeout> | undefined;
+  const budgetSpent = new Promise<"timeout">((resolve) => {
+    budgetTimer = setTimeout(
+      () => {
+        extraction.abort();
+        resolve("timeout");
+      },
+      Math.max(remainingMs(), 0),
+    );
+  });
+  let timedOut = false;
   try {
-    extracted = await deps.extractor.extract(bytes);
+    const pending = deps.extractor.extract(bytes, format, {
+      signal: extraction.signal,
+    });
+    // A late rejection after the budget won must not go unhandled.
+    pending.catch(() => {});
+    const outcome = await Promise.race([pending, budgetSpent]);
+    if (outcome === "timeout") {
+      timedOut = true;
+      extracted = err(
+        new DomainError(DOCUMENT_FILE_ERROR.UNREADABLE, "timeout"),
+      );
+    } else {
+      extracted = outcome;
+    }
   } catch (error) {
     extractCause = error;
-    extracted = err(new DomainError(PDF_FILE_ERROR.UNREADABLE, "threw"));
+    extracted = err(new DomainError(DOCUMENT_FILE_ERROR.UNREADABLE, "threw"));
+  } finally {
+    clearTimeout(budgetTimer);
   }
   deps.telemetry.stage(
     claimed,
     "extract",
     deps.clock.now().getTime() - extractStart.getTime(),
   );
-  if (!extracted.ok) {
+  if (timedOut) {
     return finishFailed({
-      kind: "invalid_pdf",
-      message: failureMessage("invalid_pdf"),
+      kind: "timeout",
+      message: failureMessage("timeout"),
+    });
+  }
+  if (!extracted.ok) {
+    const kind: ImportFailureKind =
+      extracted.error.code === DOCUMENT_FILE_ERROR.UNSUPPORTED_FORMAT
+        ? "unsupported_format"
+        : "invalid_document";
+    return finishFailed({
+      kind,
+      message:
+        extracted.error.code === DOCUMENT_FILE_ERROR.LIMIT_EXCEEDED
+          ? DOCUMENT_LIMIT_EXCEEDED_MESSAGE
+          : failureMessage(kind),
       cause: extractCause,
     });
   }
+  const document = extracted.value;
 
+  // Conversion to blocks now happens inside the extractor adapter; this
+  // stage covers the post-extraction checks and T9's image uploads.
   const convertStart = deps.clock.now();
-  const blocksResult = textToBlocks(extracted.value.pages);
+  const hasText = hasTextContent(document.content);
+
+  // `hasTextContent` is recursive: it also catches a doc whose blocks were
+  // all discarded as noise (e.g. page numbers only). A PDF without text is
+  // a missing text layer (scanned); a DOCX/PPTX without text is just empty.
+  if (!hasText) {
+    deps.telemetry.stage(
+      claimed,
+      "convert",
+      deps.clock.now().getTime() - convertStart.getTime(),
+    );
+    const kind: ImportFailureKind =
+      format === "pdf" ? "no_text_layer" : "empty_document";
+    return finishFailed({
+      kind,
+      message: failureMessage(kind),
+      pageCount: document.totalPages,
+      pagesWithoutText: document.pagesWithoutText,
+    });
+  }
+
+  if (remainingMs() <= 0) {
+    deps.telemetry.stage(
+      claimed,
+      "convert",
+      deps.clock.now().getTime() - convertStart.getTime(),
+    );
+    return finishFailed({
+      kind: "timeout",
+      message: failureMessage("timeout"),
+    });
+  }
+
+  // document-import T9: every image the content references is stored as a
+  // page asset, one at a time, while more than IMAGE_UPLOAD_RESERVE_MS of
+  // the budget is left; the content then carries their assetIds. Images
+  // that could not be stored (refused mime/size, failed or throwing
+  // upload, budget exhausted) are dropped from the content and counted
+  // with the ones the extractor already skipped.
+  const imagesByKey = new Map(
+    document.images.map((image) => [image.key, image]),
+  );
+  const resolvedImages = new Map<string, string>();
+  for (const key of pendingImageKeys(document.content)) {
+    const uploadBudgetMs = remainingMs() - IMAGE_UPLOAD_RESERVE_MS;
+    if (uploadBudgetMs <= 0) break;
+    const image = imagesByKey.get(key);
+    if (!image) continue;
+    // T9b (T9 review follow-up): each upload is raced against what is left
+    // of the upload budget, so one stalled upload cannot eat the persist
+    // reserve. A timed-out upload is dropped like a failed one and the
+    // loop stops; if it completes later its asset is unreferenced, so it is
+    // deleted again best effort (it stays orphaned if the function is
+    // frozen first — page assets are swept with their page).
+    const outcome = await withinBudget(
+      (async () =>
+        deps.notebookPages.storeImportedAsset(ownerId, {
+          pageId: claimed.pageId,
+          bytes: image.bytes,
+          mime: image.mime,
+        }))(),
+      uploadBudgetMs,
+      (late) => {
+        if (!late.ok) return;
+        deps.notebookPages
+          .deleteImportedAssets(ownerId, [late.value.assetId])
+          .catch((error) => {
+            console.error("ingestion: late asset cleanup rejected", {
+              importJobId: claimed.id,
+              error,
+            });
+          });
+      },
+    );
+    if (outcome === "timeout") break;
+    if (outcome !== "threw" && outcome.ok) {
+      resolvedImages.set(key, outcome.value.assetId);
+    }
+    // Otherwise (refused or throwing upload): dropped and counted like
+    // any other image that was not stored.
+  }
+  const storedAssetIds = [...resolvedImages.values()];
+  const resolved = resolvePendingImages(document.content, resolvedImages);
+  const skippedImages = document.skippedImages + resolved.removed;
   deps.telemetry.stage(
     claimed,
     "convert",
     deps.clock.now().getTime() - convertStart.getTime(),
   );
 
-  if (
-    blocksResult.pagesWithText === 0 ||
-    blocksResult.doc.content.length === 0 ||
-    !hasTextContent(blocksResult.doc)
-  ) {
-    return finishFailed({
-      kind: "no_text_layer",
-      message: failureMessage("no_text_layer"),
-      pageCount: blocksResult.totalPages,
-      pagesWithoutText: blocksResult.pagesWithoutText,
-    });
-  }
-
-  if (remainingMs() <= 0) {
-    return finishFailed({
-      kind: "timeout",
-      message: failureMessage("timeout"),
-    });
-  }
+  // Best effort: the assets of a page whose content was never written are
+  // unreferenced, so a cleanup failure is only logged.
+  const discardStoredAssets = async (): Promise<void> => {
+    if (storedAssetIds.length === 0) return;
+    try {
+      await deps.notebookPages.deleteImportedAssets(ownerId, storedAssetIds);
+    } catch (error) {
+      console.error("ingestion: deleteImportedAssets rejected", {
+        importJobId: claimed.id,
+        error,
+      });
+    }
+  };
 
   const persistStart = deps.clock.now();
   // Review follow-up from T6 (R3-persist-and-extract-exceptions-
@@ -244,7 +431,7 @@ export async function processImportJob(
   try {
     written = await deps.notebookPages.writeImportedContent(ownerId, {
       pageId: claimed.pageId,
-      content: blocksResult.doc,
+      content: resolved.content,
       expectedVersion: 1,
     });
   } catch (error) {
@@ -265,6 +452,19 @@ export async function processImportJob(
     deps.clock.now().getTime() - persistStart.getTime(),
   );
   if (!written.ok) {
+    if (writeCause === undefined) {
+      await discardStoredAssets();
+    } else if (storedAssetIds.length > 0) {
+      // T9b (T9 review follow-up): a thrown write is ambiguous — it may
+      // have committed before the error reached us — so deleting the
+      // assets could leave committed image nodes pointing at nothing.
+      // They are kept (unreferenced assets of an unwritten page are the
+      // lesser harm) and logged; only a definite error Result deletes.
+      console.error("ingestion: write outcome unknown, imported assets kept", {
+        importJobId: claimed.id,
+        assetIds: storedAssetIds,
+      });
+    }
     const message =
       written.error.code === PAGE_VERSION_CONFLICT_CODE
         ? failureMessage("persistence")
@@ -274,8 +474,9 @@ export async function processImportJob(
 
   const completed = await deps.jobs.markDone({
     id: claimed.id,
-    pageCount: blocksResult.totalPages,
-    pagesWithoutText: blocksResult.pagesWithoutText,
+    pageCount: document.totalPages,
+    pagesWithoutText: document.pagesWithoutText,
+    skippedImages,
     now: deps.clock.now(),
   });
   if (!completed) {

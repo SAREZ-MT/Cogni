@@ -56,11 +56,11 @@ function chapterPages(count: number): string[] {
 }
 
 // Opens the PDF import from the notebook's card on /notebooks: the "Importar
-// PDF" item of its "Acciones de {título}" kebab (injected by ingestion through
+// documento" item of its "Acciones de {título}" kebab (injected by ingestion through
 // the notebook actions slot, src/app/(app)/_components/notebook-actions.tsx).
 async function openPdfImport(page: Page, title: string) {
   await page.getByRole("button", { name: `Acciones de ${title}` }).click();
-  await page.getByRole("menuitem", { name: "Importar PDF" }).click();
+  await page.getByRole("menuitem", { name: "Importar documento" }).click();
 }
 
 test.describe("pdf import acceptance", () => {
@@ -83,7 +83,7 @@ test.describe("pdf import acceptance", () => {
     await openPdfImport(page, title);
 
     const pdfBytes = makeTextPdf(chapterPages(30));
-    await page.getByTestId("pdf-import-input").setInputFiles({
+    await page.getByTestId("document-import-input").setInputFiles({
       name: "text-30-pages.pdf",
       mimeType: "application/pdf",
       buffer: Buffer.from(pdfBytes),
@@ -148,7 +148,7 @@ test.describe("pdf import acceptance", () => {
     await openPdfImport(page, title);
 
     const pdfBytes = makeNoTextPdf();
-    await page.getByTestId("pdf-import-input").setInputFiles({
+    await page.getByTestId("document-import-input").setInputFiles({
       name: "no-text.pdf",
       mimeType: "application/pdf",
       buffer: Buffer.from(pdfBytes),

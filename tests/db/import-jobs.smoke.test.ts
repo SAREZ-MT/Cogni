@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import postgres from "postgres";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { IMPORT_JOB_STATUSES } from "@/shared/db/schema";
+import { IMPORT_JOB_FORMATS, IMPORT_JOB_STATUSES } from "@/shared/db/schema";
 import {
   ForceRollback,
   inRolledBackReversion,
@@ -16,7 +16,9 @@ import {
 
 // Guards drizzle/0005_import_jobs.sql (+ .down.sql). Scenarios "Migración
 // aplicada" / "Migración revertida", specs/pdf-import/spec.md, Requirement
-// "Modelo de datos de `ImportJob`".
+// "Modelo de datos de `ImportJob`". Also guards 0014_document_formats.sql
+// (+ .down.sql, document-import T10): the `format` and `skipped_images`
+// columns and their CHECK constraints.
 const url = process.env.DATABASE_URL;
 
 // Returns the name of the constraint the statement violated, or null.
@@ -109,9 +111,11 @@ describe.skipIf(!url)("0005 import_jobs schema", () => {
         "storage_path",
         "file_name",
         "size_bytes",
+        "format",
         "status",
         "page_count",
         "pages_without_text",
+        "skipped_images",
         "error",
         "started_at",
         "finished_at",
@@ -126,13 +130,15 @@ describe.skipIf(!url)("0005 import_jobs schema", () => {
       const [row] = await tx`
         insert into import_jobs (id, owner_id, page_id, storage_path, file_name, size_bytes)
         values (${randomUUID()}, ${ownerId()}, ${pageId}, ${`${ownerId()}/defaults.pdf`}, 'apuntes.pdf', 1024)
-        returning status, page_count, pages_without_text, error
+        returning status, page_count, pages_without_text, error, format, skipped_images
       `;
       expect(row).toEqual({
         status: "queued",
         page_count: null,
         pages_without_text: 0,
         error: null,
+        format: "pdf",
+        skipped_images: 0,
       });
     });
   });
@@ -162,6 +168,58 @@ describe.skipIf(!url)("0005 import_jobs schema", () => {
       ...String(constraint?.definition ?? "").matchAll(/'([^']+)'/g),
     ].map((match) => match[1]);
     expect(new Set(allowedValues)).toEqual(new Set(IMPORT_JOB_STATUSES));
+  });
+
+  // document-import T10 (0014).
+  it("rejects a format outside pdf, docx and pptx", async () => {
+    const constraint = await violatedConstraint(
+      sql,
+      (tx) => tx`
+        insert into import_jobs (id, owner_id, page_id, storage_path, file_name, size_bytes, format)
+        values (${randomUUID()}, ${ownerId()}, ${pageId}, ${`${ownerId()}/bad-format.doc`}, 'apuntes.doc', 1024, 'doc')
+      `,
+    );
+    expect(constraint).toBe("import_jobs_format_check");
+  });
+
+  it("rejects a negative skipped_images", async () => {
+    const constraint = await violatedConstraint(
+      sql,
+      (tx) => tx`
+        insert into import_jobs (id, owner_id, page_id, storage_path, file_name, size_bytes, skipped_images)
+        values (${randomUUID()}, ${ownerId()}, ${pageId}, ${`${ownerId()}/bad-skipped.pdf`}, 'apuntes.pdf', 1024, -1)
+      `,
+    );
+    expect(constraint).toBe("import_jobs_skipped_images_check");
+  });
+
+  it("keeps the format CHECK constraint's allowed values equal to IMPORT_JOB_FORMATS", async () => {
+    const [constraint] = await sql`
+      select pg_get_constraintdef(oid) as definition
+      from pg_constraint
+      where conname = 'import_jobs_format_check'
+    `;
+    const allowedValues = [
+      ...String(constraint?.definition ?? "").matchAll(/'([^']+)'/g),
+    ].map((match) => match[1]);
+    expect(new Set(allowedValues)).toEqual(new Set(IMPORT_JOB_FORMATS));
+  });
+
+  it("0014 reversion drops format and skipped_images and restores the PDF-only bucket", async () => {
+    await inRolledBackTx(sql, async (tx) => {
+      await tx.unsafe(readDownSql("0014_document_formats"));
+
+      const columns = await tx`
+        select column_name from information_schema.columns
+        where table_schema = 'public' and table_name = 'import_jobs'
+          and column_name in ('format', 'skipped_images')
+      `;
+      expect(columns).toHaveLength(0);
+      const [bucket] = await tx`
+        select allowed_mime_types from storage.buckets where id = 'page-pdfs'
+      `;
+      expect(bucket?.allowed_mime_types).toEqual(["application/pdf"]);
+    });
   });
 
   it("rejects a duplicated storage_path", async () => {

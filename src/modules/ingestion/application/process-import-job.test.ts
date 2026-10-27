@@ -1,13 +1,21 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { DomainError } from "@/shared/kernel/domain-error";
 import { err, ok } from "@/shared/kernel/result";
-import { PROCESSING_BUDGET_MS } from "../domain/import-budget";
+import type { ExtractedDocument } from "../domain/document-extractor";
+import {
+  IMAGE_UPLOAD_RESERVE_MS,
+  PROCESSING_BUDGET_MS,
+} from "../domain/import-budget";
 import { createImportJob } from "../domain/import-job";
+import type { ImportedBlock } from "../domain/imported-doc";
+import { textToBlocks } from "../domain/text-to-blocks";
 import { processImportJob } from "./process-import-job";
+import { FakeDocumentExtractor } from "./testing/fake-document-extractor";
 import { FakeImportTelemetry } from "./testing/fake-import-telemetry";
 import { FakeNotebookPagesPort } from "./testing/fake-notebook-pages-port";
 import { FakePdfStorageGateway } from "./testing/fake-pdf-storage-gateway";
-import { FakePdfTextExtractor } from "./testing/fake-pdf-text-extractor";
 import { FixedClock } from "./testing/fixed-clock";
 import { InMemoryImportJobRepository } from "./testing/in-memory-import-job-repository";
 
@@ -16,14 +24,33 @@ const OWNER_ID = "3d2f9a1e-5b6c-4d7e-8f90-1a2b3c4d5e6f";
 const OTHER_OWNER_ID = "0a1b2c3d-4e5f-4061-8798-a1b2c3d4e5f6";
 const STORAGE_PATH = `${OWNER_ID}/upload-1.pdf`;
 
+const DOCX_STORAGE_PATH = `${OWNER_ID}/upload-1.docx`;
+
 const PDF_BYTES = new TextEncoder().encode("%PDF-1.7 fake content");
+// Real OOXML from the T1 fixtures: format detection reads the ZIP entry
+// names, so a hand-written "PK" prefix would not be recognised as docx.
+const DOCX_BYTES = new Uint8Array(
+  readFileSync(
+    join(process.cwd(), "tests/fixtures/documents/files/all-constructs.docx"),
+  ),
+);
+const LEGACY_BYTES = new Uint8Array([
+  0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1, 0, 0, 0, 0,
+]);
+
+const INVALID_DOCUMENT_MESSAGE =
+  "Este archivo no es un documento válido o está protegido. Revisa que no tenga contraseña e inténtalo de nuevo.";
+const UNSUPPORTED_FORMAT_MESSAGE =
+  "Solo puedes importar archivos PDF o Word (.docx).";
+const TIMEOUT_MESSAGE =
+  "La importación tardó demasiado. Inténtalo de nuevo con un documento más pequeño o en unos minutos.";
 
 function makeDeps(now: Date = NOW) {
   const notebookPages = new FakeNotebookPagesPort();
   return {
     jobs: new InMemoryImportJobRepository(),
     storage: new FakePdfStorageGateway(),
-    extractor: new FakePdfTextExtractor(),
+    extractor: new FakeDocumentExtractor(),
     notebookPages,
     telemetry: new FakeImportTelemetry(),
     clock: new FixedClock(now),
@@ -54,6 +81,19 @@ async function seedQueuedJob(
   return job;
 }
 
+// The PDF adapter still converts page text with textToBlocks (until T8),
+// so the fake returns exactly what that adapter would for these pages.
+function extractedFromPages(pages: string[]) {
+  const converted = textToBlocks(pages);
+  return {
+    content: converted.doc,
+    totalPages: converted.totalPages,
+    pagesWithoutText: converted.pagesWithoutText,
+    images: [],
+    skippedImages: 0,
+  };
+}
+
 function seedTextExtraction(
   deps: ReturnType<typeof makeDeps>,
   pages: string[],
@@ -63,7 +103,7 @@ function seedTextExtraction(
     mime: "application/pdf",
     bytes: PDF_BYTES,
   });
-  deps.extractor.setResult(ok({ totalPages: pages.length, pages }));
+  deps.extractor.setResult(ok(extractedFromPages(pages)));
 }
 
 // specs/pdf-import/spec.md; design.md, "Decision: Procesamiento síncrono
@@ -117,8 +157,8 @@ describe("processImportJob use case", () => {
 
   // T7b review follow-up from T6 (R3-idempotency-test-overclaims): the
   // test above only exercises `processing`; `done` and `failed` need
-  // their own proof of no download and no second `pdf_imported`.
-  it("is a no-op for a job already done: no download, no second pdf_imported", async () => {
+  // their own proof of no download and no second `document_imported`.
+  it("is a no-op for a job already done: no download, no second document_imported", async () => {
     const deps = makeDeps();
     const job = await seedQueuedJob(deps);
     seedTextExtraction(deps, ["hola mundo"]);
@@ -142,7 +182,7 @@ describe("processImportJob use case", () => {
     expect(deps.telemetry.finishedCalls).toHaveLength(1);
   });
 
-  it("is a no-op for a job already failed: no download, no second pdf_imported", async () => {
+  it("is a no-op for a job already failed: no download, no second document_imported", async () => {
     const deps = makeDeps();
     const job = await seedQueuedJob(deps);
     // No object was ever `put()`, so the first call fails(download).
@@ -270,7 +310,7 @@ describe("processImportJob use case", () => {
     );
   });
 
-  it("fails(invalid_pdf) when the downloaded bytes do not start with the PDF magic number", async () => {
+  it("fails(unsupported_format) when the downloaded bytes are not any supported document", async () => {
     const deps = makeDeps();
     const job = await seedQueuedJob(deps);
     deps.storage.put(STORAGE_PATH, {
@@ -288,12 +328,155 @@ describe("processImportJob use case", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.status).toBe("failed");
-    expect(result.value.error).toBe(
-      "Este archivo no es un PDF válido o está protegido. Revisa que no tenga contraseña e inténtalo de nuevo.",
-    );
+    expect(result.value.error).toBe(UNSUPPORTED_FORMAT_MESSAGE);
+    expect(deps.extractor.extractCalls).toHaveLength(0);
+    expect(deps.telemetry.finishedCalls).toEqual([
+      { job: result.value, failure: { kind: "unsupported_format" } },
+    ]);
   });
 
-  it("fails(invalid_pdf) when the downloaded bytes exceed the size limit", async () => {
+  it("fails(unsupported_format) for a legacy binary Office file (OLE2 header)", async () => {
+    const deps = makeDeps();
+    const job = await seedQueuedJob(deps);
+    deps.storage.put(STORAGE_PATH, {
+      sizeBytes: LEGACY_BYTES.length,
+      mime: "application/pdf",
+      bytes: LEGACY_BYTES,
+    });
+
+    const result = await processImportJob(
+      { importJobId: job.id },
+      deps,
+      OWNER_ID,
+    );
+
+    expect(result.ok && result.value.error).toBe(UNSUPPORTED_FORMAT_MESSAGE);
+    expect(deps.extractor.extractCalls).toHaveLength(0);
+  });
+
+  it("fails(unsupported_format) when the detected format does not match the job's declared extension", async () => {
+    const deps = makeDeps();
+    const job = await seedQueuedJob(deps); // declared .pdf
+    deps.storage.put(STORAGE_PATH, {
+      sizeBytes: DOCX_BYTES.length,
+      mime: "application/pdf",
+      bytes: DOCX_BYTES,
+    });
+
+    const result = await processImportJob(
+      { importJobId: job.id },
+      deps,
+      OWNER_ID,
+    );
+
+    expect(result.ok && result.value.error).toBe(UNSUPPORTED_FORMAT_MESSAGE);
+    expect(deps.extractor.extractCalls).toHaveLength(0);
+  });
+
+  it("fails(unsupported_format) when the extractor has no adapter for the format yet", async () => {
+    const deps = makeDeps();
+    const job = await seedQueuedJob(deps, { storagePath: DOCX_STORAGE_PATH });
+    deps.storage.put(DOCX_STORAGE_PATH, {
+      sizeBytes: DOCX_BYTES.length,
+      mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      bytes: DOCX_BYTES,
+    });
+    deps.extractor.setResult(
+      err(new DomainError("DOCUMENT_UNSUPPORTED_FORMAT", "docx")),
+    );
+
+    const result = await processImportJob(
+      { importJobId: job.id },
+      deps,
+      OWNER_ID,
+    );
+
+    expect(result.ok && result.value.error).toBe(UNSUPPORTED_FORMAT_MESSAGE);
+    expect(deps.extractor.extractCalls.map((call) => call.format)).toEqual([
+      "docx",
+    ]);
+  });
+
+  it("imports a docx job: passes the detected format to the extractor and writes its content", async () => {
+    const deps = makeDeps();
+    const job = await seedQueuedJob(deps, { storagePath: DOCX_STORAGE_PATH });
+    deps.storage.put(DOCX_STORAGE_PATH, {
+      sizeBytes: DOCX_BYTES.length,
+      mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      bytes: DOCX_BYTES,
+    });
+    const content = {
+      type: "doc" as const,
+      content: [
+        {
+          type: "heading" as const,
+          attrs: { level: 1 as const },
+          content: [{ type: "text" as const, text: "Derivadas" }],
+        },
+      ],
+    };
+    deps.extractor.setResult(
+      ok({
+        content,
+        totalPages: 3,
+        pagesWithoutText: 0,
+        images: [],
+        skippedImages: 0,
+      }),
+    );
+
+    const result = await processImportJob(
+      { importJobId: job.id },
+      deps,
+      OWNER_ID,
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.status).toBe("done");
+    expect(result.value.pageCount).toBe(3);
+    expect(deps.extractor.extractCalls).toEqual([
+      { bytes: DOCX_BYTES, format: "docx", signal: expect.any(AbortSignal) },
+    ]);
+    expect(deps.notebookPages.getPage(job.pageId)?.content).toEqual(content);
+  });
+
+  it("fails(empty_document) when a docx yields no text", async () => {
+    const deps = makeDeps();
+    const job = await seedQueuedJob(deps, { storagePath: DOCX_STORAGE_PATH });
+    deps.storage.put(DOCX_STORAGE_PATH, {
+      sizeBytes: DOCX_BYTES.length,
+      mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      bytes: DOCX_BYTES,
+    });
+    deps.extractor.setResult(
+      ok({
+        content: { type: "doc", content: [{ type: "horizontalRule" }] },
+        totalPages: 1,
+        pagesWithoutText: 1,
+        images: [],
+        skippedImages: 0,
+      }),
+    );
+
+    const result = await processImportJob(
+      { importJobId: job.id },
+      deps,
+      OWNER_ID,
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.status).toBe("failed");
+    expect(result.value.error).toBe(
+      "El documento no tiene texto que podamos importar.",
+    );
+    expect(deps.telemetry.finishedCalls).toEqual([
+      { job: result.value, failure: { kind: "empty_document" } },
+    ]);
+  });
+
+  it("fails(invalid_document) when the downloaded bytes exceed the size limit", async () => {
     const deps = makeDeps();
     const job = await seedQueuedJob(deps);
     const oversized = new Uint8Array(20 * 1024 * 1024 + 1);
@@ -313,9 +496,7 @@ describe("processImportJob use case", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.status).toBe("failed");
-    expect(result.value.error).toBe(
-      "Este archivo no es un PDF válido o está protegido. Revisa que no tenga contraseña e inténtalo de nuevo.",
-    );
+    expect(result.value.error).toBe(INVALID_DOCUMENT_MESSAGE);
   });
 
   it("fails(timeout) when the internal budget is already spent before extraction", async () => {
@@ -341,13 +522,11 @@ describe("processImportJob use case", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.status).toBe("failed");
-    expect(result.value.error).toBe(
-      "La importación tardó demasiado. Inténtalo de nuevo con un PDF más pequeño o en unos minutos.",
-    );
+    expect(result.value.error).toBe(TIMEOUT_MESSAGE);
     expect(deps.extractor.extractCalls).toHaveLength(0);
   });
 
-  it("fails(invalid_pdf) when the extractor returns an error", async () => {
+  it("fails(invalid_document) when the extractor returns an error", async () => {
     const deps = makeDeps();
     const job = await seedQueuedJob(deps);
     deps.storage.put(STORAGE_PATH, {
@@ -356,7 +535,91 @@ describe("processImportJob use case", () => {
       bytes: PDF_BYTES,
     });
     deps.extractor.setResult(
-      err(new DomainError("PDF_UNREADABLE", "encrypted")),
+      err(new DomainError("DOCUMENT_UNREADABLE", "encrypted")),
+    );
+
+    const result = await processImportJob(
+      { importJobId: job.id },
+      deps,
+      OWNER_ID,
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.status).toBe("failed");
+    expect(result.value.error).toBe(INVALID_DOCUMENT_MESSAGE);
+  });
+
+  // document-import T9b (audit: parsing outside the time budget): the
+  // extraction is raced against the remaining budget, so a parser stuck on
+  // an async step ends the job as timeout instead of running past
+  // maxDuration; the adapter's signal is aborted so it stops between steps.
+  it("fails(timeout) and aborts the extractor when extraction outlives the budget", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      const deps = makeDeps();
+      const job = await seedQueuedJob(deps);
+      deps.storage.put(STORAGE_PATH, {
+        sizeBytes: PDF_BYTES.length,
+        mime: "application/pdf",
+        bytes: PDF_BYTES,
+      });
+      deps.extractor.hang();
+
+      const pending = processImportJob({ importJobId: job.id }, deps, OWNER_ID);
+      await vi.advanceTimersByTimeAsync(PROCESSING_BUDGET_MS);
+      const result = await pending;
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value.status).toBe("failed");
+      expect(result.value.error).toBe(TIMEOUT_MESSAGE);
+      expect(deps.extractor.extractCalls[0].signal?.aborted).toBe(true);
+      expect(deps.notebookPages.writeImportedContentCalls).toHaveLength(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // T10 (T9b review: the cleanup was unproved): with fake timers, moving
+  // the clock past the whole budget after a finished import must neither
+  // abort the extractor's signal nor leave the budget timer pending.
+  it("passes a live signal to the extractor and clears its timer once extraction ends", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      const deps = makeDeps();
+      const job = await seedQueuedJob(deps);
+      seedTextExtraction(deps, ["Hola"]);
+
+      const result = await processImportJob(
+        { importJobId: job.id },
+        deps,
+        OWNER_ID,
+      );
+      expect(result.ok && result.value.status).toBe("done");
+      expect(vi.getTimerCount()).toBe(0);
+
+      await vi.advanceTimersByTimeAsync(PROCESSING_BUDGET_MS + 1);
+
+      expect(deps.extractor.extractCalls[0].signal?.aborted).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // document-import T9b: a document over an import cap (zip bomb, page
+  // cap, XML element flood) fails as invalid_document with its own
+  // message, so the user knows to split it instead of checking a password.
+  it("fails(invalid_document) with the too-large message when the extractor reports a limit", async () => {
+    const deps = makeDeps();
+    const job = await seedQueuedJob(deps);
+    deps.storage.put(STORAGE_PATH, {
+      sizeBytes: PDF_BYTES.length,
+      mime: "application/pdf",
+      bytes: PDF_BYTES,
+    });
+    deps.extractor.setResult(
+      err(new DomainError("DOCUMENT_LIMIT_EXCEEDED", "301 pages")),
     );
 
     const result = await processImportJob(
@@ -369,7 +632,10 @@ describe("processImportJob use case", () => {
     if (!result.ok) return;
     expect(result.value.status).toBe("failed");
     expect(result.value.error).toBe(
-      "Este archivo no es un PDF válido o está protegido. Revisa que no tenga contraseña e inténtalo de nuevo.",
+      "Este documento es demasiado grande o complejo para importarlo. Divídelo en partes más pequeñas e inténtalo de nuevo.",
+    );
+    expect(deps.telemetry.finishedCalls.at(-1)?.failure?.kind).toBe(
+      "invalid_document",
     );
   });
 
@@ -381,7 +647,7 @@ describe("processImportJob use case", () => {
   // exception must reach `telemetry.finished` as `failure.cause` so
   // `ImportTelemetryAdapter` can report it to Sentry with `captureException`
   // (stack included) instead of the stack-less `captureMessage`.
-  it("fails(invalid_pdf) when the extractor throws instead of returning an error Result, forwarding the exception as cause", async () => {
+  it("fails(invalid_document) when the extractor throws instead of returning an error Result, forwarding the exception as cause", async () => {
     const deps = makeDeps();
     const job = await seedQueuedJob(deps);
     deps.storage.put(STORAGE_PATH, {
@@ -401,15 +667,16 @@ describe("processImportJob use case", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.status).toBe("failed");
-    expect(result.value.error).toBe(
-      "Este archivo no es un PDF válido o está protegido. Revisa que no tenga contraseña e inténtalo de nuevo.",
-    );
+    expect(result.value.error).toBe(INVALID_DOCUMENT_MESSAGE);
     expect(deps.telemetry.finishedCalls).toEqual([
-      { job: result.value, failure: { kind: "invalid_pdf", cause: thrown } },
+      {
+        job: result.value,
+        failure: { kind: "invalid_document", cause: thrown },
+      },
     ]);
   });
 
-  it("fails(invalid_pdf) with no cause when the extractor returns an error Result without throwing", async () => {
+  it("fails(invalid_document) with no cause when the extractor returns an error Result without throwing", async () => {
     const deps = makeDeps();
     const job = await seedQueuedJob(deps);
     deps.storage.put(STORAGE_PATH, {
@@ -418,7 +685,7 @@ describe("processImportJob use case", () => {
       bytes: PDF_BYTES,
     });
     deps.extractor.setResult(
-      err(new DomainError("PDF_UNREADABLE", "encrypted")),
+      err(new DomainError("DOCUMENT_UNREADABLE", "encrypted")),
     );
 
     const result = await processImportJob(
@@ -430,7 +697,10 @@ describe("processImportJob use case", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(deps.telemetry.finishedCalls).toEqual([
-      { job: result.value, failure: { kind: "invalid_pdf", cause: undefined } },
+      {
+        job: result.value,
+        failure: { kind: "invalid_document", cause: undefined },
+      },
     ]);
   });
 
@@ -485,7 +755,7 @@ describe("processImportJob use case", () => {
     const writeSpy = vi.spyOn(deps.notebookPages, "writeImportedContent");
     vi.spyOn(deps.extractor, "extract").mockImplementationOnce(async () => {
       deps.clock.advanceMs(PROCESSING_BUDGET_MS + 1);
-      return ok({ totalPages: 1, pages: ["hola mundo"] });
+      return ok(extractedFromPages(["hola mundo"]));
     });
 
     const result = await processImportJob(
@@ -497,9 +767,7 @@ describe("processImportJob use case", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.status).toBe("failed");
-    expect(result.value.error).toBe(
-      "La importación tardó demasiado. Inténtalo de nuevo con un PDF más pequeño o en unos minutos.",
-    );
+    expect(result.value.error).toBe(TIMEOUT_MESSAGE);
     expect(writeSpy).not.toHaveBeenCalled();
   });
 
@@ -524,7 +792,7 @@ describe("processImportJob use case", () => {
     if (!result.ok) return;
     expect(result.value.status).toBe("failed");
     expect(result.value.error).toBe(
-      "La página cambió durante la importación, así que no reemplazamos su contenido. Vuelve a importar el PDF.",
+      "La página cambió durante la importación, así que no reemplazamos su contenido. Vuelve a importar el documento.",
     );
   });
 
@@ -558,7 +826,7 @@ describe("processImportJob use case", () => {
     if (!result.ok) return;
     expect(result.value.status).toBe("failed");
     expect(result.value.error).toBe(
-      "La página de destino ya no está disponible. Vuelve a importar el PDF.",
+      "La página de destino ya no está disponible. Vuelve a importar el documento.",
     );
   });
 
@@ -586,14 +854,14 @@ describe("processImportJob use case", () => {
     if (!result.ok) return;
     expect(result.value.status).toBe("failed");
     expect(result.value.error).toBe(
-      "La página de destino ya no está disponible. Vuelve a importar el PDF.",
+      "La página de destino ya no está disponible. Vuelve a importar el documento.",
     );
     expect(deps.telemetry.finishedCalls).toEqual([
       { job: result.value, failure: { kind: "persistence", cause: thrown } },
     ]);
   });
 
-  it("completes the job, writes the content and reports pdf_imported exactly once", async () => {
+  it("completes the job, writes the content and reports document_imported exactly once", async () => {
     const deps = makeDeps();
     const job = await seedQueuedJob(deps);
     seedTextExtraction(deps, ["Título\n\nUn párrafo de contenido."]);
@@ -654,7 +922,7 @@ describe("processImportJob use case", () => {
     }
   });
 
-  it("never emits a second pdf_imported when markDone/markFailed lose the race (job already terminal)", async () => {
+  it("never emits a second document_imported when markDone/markFailed lose the race (job already terminal)", async () => {
     const deps = makeDeps();
     const job = await seedQueuedJob(deps);
     seedTextExtraction(deps, ["hola mundo"]);
@@ -741,5 +1009,303 @@ describe("processImportJob use case", () => {
 
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe("INGESTION_INVALID_INPUT");
+  });
+});
+
+// document-import T9: extracted images become page assets before the
+// content is written; whatever cannot be stored is dropped and counted.
+describe("processImportJob images", () => {
+  const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+  function pendingImage(key: string): ImportedBlock {
+    return {
+      type: "image",
+      attrs: { assetId: null, pendingId: key, align: "center", alt: null },
+    };
+  }
+
+  function withImages(
+    keys: string[],
+    overrides: Partial<ExtractedDocument> = {},
+  ): ExtractedDocument {
+    return {
+      content: {
+        type: "doc",
+        content: [
+          { type: "paragraph", content: [{ type: "text", text: "hola" }] },
+          ...keys.map(pendingImage),
+        ],
+      },
+      totalPages: 1,
+      pagesWithoutText: 0,
+      images: keys.map((key) => ({
+        key,
+        bytes: PNG,
+        mime: "image/png",
+        alt: null,
+      })),
+      skippedImages: 0,
+      ...overrides,
+    };
+  }
+
+  function seedExtraction(
+    deps: ReturnType<typeof makeDeps>,
+    extracted: ExtractedDocument,
+  ) {
+    deps.storage.put(STORAGE_PATH, {
+      sizeBytes: PDF_BYTES.length,
+      mime: "application/pdf",
+      bytes: PDF_BYTES,
+    });
+    deps.extractor.setResult(ok(extracted));
+  }
+
+  function writtenImages(deps: ReturnType<typeof makeDeps>, pageId: string) {
+    const content = deps.notebookPages.getPage(pageId)?.content;
+    return (content?.content ?? []).filter((block) => block.type === "image");
+  }
+
+  it("stores every referenced image and writes the content with their assetIds", async () => {
+    const deps = makeDeps();
+    const job = await seedQueuedJob(deps);
+    seedExtraction(deps, withImages(["img-1", "img-2"], { skippedImages: 1 }));
+
+    const result = await processImportJob(
+      { importJobId: job.id },
+      deps,
+      OWNER_ID,
+    );
+
+    expect(result.ok && result.value.status).toBe("done");
+    expect(deps.notebookPages.storeImportedAssetCalls).toEqual([
+      { ownerId: OWNER_ID, pageId: job.pageId, mime: "image/png", size: 8 },
+      { ownerId: OWNER_ID, pageId: job.pageId, mime: "image/png", size: 8 },
+    ]);
+    const assetIds = deps.notebookPages.storedAssetIds();
+    expect(writtenImages(deps, job.pageId)).toEqual(
+      assetIds.map((assetId) => ({
+        type: "image",
+        attrs: { assetId, align: "center", alt: null },
+      })),
+    );
+    expect(deps.telemetry.finishedCalls.at(-1)?.job.skippedImages).toBe(1);
+    // document-import T10: persisted with the done job.
+    expect(result.ok && result.value.skippedImages).toBe(1);
+    expect((await deps.jobs.findById(job.id))?.skippedImages).toBe(1);
+    expect(deps.notebookPages.deleteImportedAssetsCalls).toEqual([]);
+  });
+
+  it("drops and counts images whose upload fails, throws or is not an allowed type", async () => {
+    const deps = makeDeps();
+    const job = await seedQueuedJob(deps);
+    const extracted = withImages(["ok", "fails", "throws", "tiff"], {
+      skippedImages: 2,
+    });
+    extracted.images[3] = { ...extracted.images[3], mime: "image/tiff" };
+    seedExtraction(deps, extracted);
+    deps.notebookPages.failStoreAt(1, "error");
+    deps.notebookPages.failStoreAt(2, "throw");
+
+    const result = await processImportJob(
+      { importJobId: job.id },
+      deps,
+      OWNER_ID,
+    );
+
+    expect(result.ok && result.value.status).toBe("done");
+    expect(writtenImages(deps, job.pageId)).toHaveLength(1);
+    expect(deps.telemetry.finishedCalls.at(-1)?.job.skippedImages).toBe(5);
+  });
+
+  it("only uploads images the content references", async () => {
+    const deps = makeDeps();
+    const job = await seedQueuedJob(deps);
+    const extracted = withImages(["img-1"]);
+    extracted.images.push({
+      key: "orphan",
+      bytes: PNG,
+      mime: "image/png",
+      alt: null,
+    });
+    seedExtraction(deps, extracted);
+
+    await processImportJob({ importJobId: job.id }, deps, OWNER_ID);
+
+    expect(deps.notebookPages.storeImportedAssetCalls).toHaveLength(1);
+  });
+
+  it("stops uploading once the processing budget only leaves the persist reserve, dropping the rest", async () => {
+    const deps = makeDeps();
+    const job = await seedQueuedJob(deps);
+    seedExtraction(deps, withImages(["img-1", "img-2", "img-3"]));
+    const original = deps.notebookPages.storeImportedAsset.bind(
+      deps.notebookPages,
+    );
+    vi.spyOn(deps.notebookPages, "storeImportedAsset").mockImplementation(
+      async (ownerId, input) => {
+        deps.clock.advanceMs(PROCESSING_BUDGET_MS - IMAGE_UPLOAD_RESERVE_MS);
+        return original(ownerId, input);
+      },
+    );
+
+    const result = await processImportJob(
+      { importJobId: job.id },
+      deps,
+      OWNER_ID,
+    );
+
+    expect(result.ok && result.value.status).toBe("done");
+    expect(deps.notebookPages.storeImportedAssetCalls).toHaveLength(1);
+    expect(writtenImages(deps, job.pageId)).toHaveLength(1);
+    expect(deps.telemetry.finishedCalls.at(-1)?.job.skippedImages).toBe(2);
+  });
+
+  it("deletes the stored assets when the content write fails", async () => {
+    const deps = makeDeps();
+    const job = await seedQueuedJob(deps);
+    seedExtraction(deps, withImages(["img-1", "img-2"]));
+    vi.spyOn(deps.notebookPages, "writeImportedContent").mockResolvedValueOnce(
+      err(new DomainError("PAGE_VERSION_CONFLICT", job.pageId)),
+    );
+
+    const result = await processImportJob(
+      { importJobId: job.id },
+      deps,
+      OWNER_ID,
+    );
+
+    expect(result.ok && result.value.status).toBe("failed");
+    const [cleanup] = deps.notebookPages.deleteImportedAssetsCalls;
+    expect(deps.notebookPages.deleteImportedAssetsCalls).toHaveLength(1);
+    expect(cleanup.ownerId).toBe(OWNER_ID);
+    expect(cleanup.assetIds).toHaveLength(2);
+    // Both stored assets are gone again.
+    expect(deps.notebookPages.storedAssetIds()).toEqual([]);
+  });
+
+  // T9b (T9 review follow-up): a thrown write is ambiguous — the content
+  // may have committed before the connection dropped — so its assets are
+  // kept (and the case logged) instead of possibly orphaning committed
+  // image nodes. Only a definite failure (an error Result) deletes them.
+  it("keeps the stored assets and logs when the content write throws (it may have committed)", async () => {
+    const deps = makeDeps();
+    const job = await seedQueuedJob(deps);
+    seedExtraction(deps, withImages(["img-1"]));
+    vi.spyOn(deps.notebookPages, "writeImportedContent").mockRejectedValueOnce(
+      new Error("connection reset"),
+    );
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+
+    try {
+      const result = await processImportJob(
+        { importJobId: job.id },
+        deps,
+        OWNER_ID,
+      );
+
+      expect(result.ok && result.value.status).toBe("failed");
+      expect(deps.notebookPages.deleteImportedAssetsCalls).toEqual([]);
+      expect(deps.notebookPages.storedAssetIds()).toHaveLength(1);
+      expect(consoleError).toHaveBeenCalledWith(
+        "ingestion: write outcome unknown, imported assets kept",
+        expect.objectContaining({
+          importJobId: job.id,
+          assetIds: expect.any(Array),
+        }),
+      );
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  it("still fails the job when the cleanup after a definite write failure throws", async () => {
+    const deps = makeDeps();
+    const job = await seedQueuedJob(deps);
+    seedExtraction(deps, withImages(["img-1"]));
+    vi.spyOn(deps.notebookPages, "writeImportedContent").mockResolvedValueOnce(
+      err(new DomainError("PAGE_NOT_FOUND", job.pageId)),
+    );
+    const cleanup = vi
+      .spyOn(deps.notebookPages, "deleteImportedAssets")
+      .mockRejectedValueOnce(new Error("storage down"));
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+
+    try {
+      const result = await processImportJob(
+        { importJobId: job.id },
+        deps,
+        OWNER_ID,
+      );
+
+      expect(result.ok && result.value.status).toBe("failed");
+      expect(cleanup).toHaveBeenCalledWith(
+        OWNER_ID,
+        deps.notebookPages.storedAssetIds(),
+      );
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  // T9b (T9 review follow-up): one upload that hangs must not eat the
+  // persist reserve; it is raced against the upload budget, dropped as
+  // skipped, and the remaining images are not attempted.
+  it("drops an upload that outlives the upload budget and skips the rest", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      const deps = makeDeps();
+      const job = await seedQueuedJob(deps);
+      seedExtraction(deps, withImages(["img-1", "img-2"]));
+      let release: (() => void) | undefined;
+      const original = deps.notebookPages.storeImportedAsset.bind(
+        deps.notebookPages,
+      );
+      vi.spyOn(deps.notebookPages, "storeImportedAsset").mockImplementationOnce(
+        (ownerId, input) =>
+          new Promise((resolve) => {
+            release = () => resolve(original(ownerId, input));
+          }),
+      );
+
+      const pending = processImportJob({ importJobId: job.id }, deps, OWNER_ID);
+      await vi.advanceTimersByTimeAsync(
+        PROCESSING_BUDGET_MS - IMAGE_UPLOAD_RESERVE_MS,
+      );
+      const result = await pending;
+
+      expect(result.ok && result.value.status).toBe("done");
+      expect(writtenImages(deps, job.pageId)).toHaveLength(0);
+      expect(deps.telemetry.finishedCalls.at(-1)?.job.skippedImages).toBe(2);
+      expect(deps.notebookPages.storeImportedAssetCalls).toHaveLength(0);
+
+      // The late upload finishes after the import moved on: its asset is
+      // unreferenced and deleted again (best effort).
+      release?.();
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.waitFor(() =>
+        expect(deps.notebookPages.deleteImportedAssetsCalls).toHaveLength(1),
+      );
+      expect(deps.notebookPages.storedAssetIds()).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("never calls the cleanup when nothing was stored", async () => {
+    const deps = makeDeps();
+    const job = await seedQueuedJob(deps);
+    seedExtraction(deps, withImages([]));
+    vi.spyOn(deps.notebookPages, "writeImportedContent").mockResolvedValueOnce(
+      err(new DomainError("PAGE_VERSION_CONFLICT", job.pageId)),
+    );
+
+    await processImportJob({ importJobId: job.id }, deps, OWNER_ID);
+
+    expect(deps.notebookPages.deleteImportedAssetsCalls).toEqual([]);
   });
 });

@@ -28,7 +28,14 @@ function clockAt(now: Date): Clock {
 export class InMemoryImportJobRepository implements ImportJobRepository {
   private readonly jobs = new Map<string, ImportJob>();
 
-  async create(job: ImportJob): Promise<Result<void, DomainError>> {
+  // No await before the write: the checks and the insert run in one
+  // synchronous step, so concurrent creates are atomic here as well. The
+  // storagePath conflict is checked before the cap (T11): a repeat of an
+  // import that holds the last slot is a replay, not a new import.
+  async create(
+    job: ImportJob,
+    options: { maxActiveJobs?: number } = {},
+  ): Promise<Result<void, DomainError>> {
     for (const existing of this.jobs.values()) {
       if (existing.storagePath === job.storagePath) {
         return err(
@@ -38,6 +45,14 @@ export class InMemoryImportJobRepository implements ImportJobRepository {
           ),
         );
       }
+    }
+    if (
+      options.maxActiveJobs !== undefined &&
+      this.activeCount(job.ownerId, job.createdAt) >= options.maxActiveJobs
+    ) {
+      return err(
+        new DomainError(IMPORT_JOB_ERROR.ACTIVE_LIMIT_REACHED, job.ownerId),
+      );
     }
     this.jobs.set(job.id, job);
     return ok(undefined);
@@ -54,10 +69,14 @@ export class InMemoryImportJobRepository implements ImportJobRepository {
     return null;
   }
 
-  async findLatestByPage(pageId: string): Promise<ImportJob | null> {
+  async findLatestByPage(
+    pageId: string,
+    ownerId?: string,
+  ): Promise<ImportJob | null> {
     let latest: ImportJob | null = null;
     for (const job of this.jobs.values()) {
       if (job.pageId !== pageId) continue;
+      if (ownerId !== undefined && job.ownerId !== ownerId) continue;
       if (!latest || job.createdAt.getTime() > latest.createdAt.getTime()) {
         latest = job;
       }
@@ -84,6 +103,20 @@ export class InMemoryImportJobRepository implements ImportJobRepository {
     return [...pageIds];
   }
 
+  async countActiveJobs(ownerId: string, now: Date): Promise<number> {
+    return this.activeCount(ownerId, now);
+  }
+
+  private activeCount(ownerId: string, now: Date): number {
+    let count = 0;
+    for (const job of this.jobs.values()) {
+      if (job.ownerId !== ownerId) continue;
+      if (job.status !== "queued" && job.status !== "processing") continue;
+      if (!isAbandoned(job, now)) count++;
+    }
+    return count;
+  }
+
   async claim(input: { id: string; now: Date }): Promise<ImportJob | null> {
     const job = this.jobs.get(input.id);
     if (!job) return null;
@@ -97,13 +130,18 @@ export class InMemoryImportJobRepository implements ImportJobRepository {
     id: string;
     pageCount: number;
     pagesWithoutText: number;
+    skippedImages: number;
     now: Date;
   }): Promise<ImportJob | null> {
     const job = this.jobs.get(input.id);
     if (!job) return null;
     const result = complete(
       job,
-      { pageCount: input.pageCount, pagesWithoutText: input.pagesWithoutText },
+      {
+        pageCount: input.pageCount,
+        pagesWithoutText: input.pagesWithoutText,
+        skippedImages: input.skippedImages,
+      },
       clockAt(input.now),
     );
     if (!result.ok) return null;

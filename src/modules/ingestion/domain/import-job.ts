@@ -1,6 +1,8 @@
 import type { Clock } from "@/shared/kernel/clock";
 import { DomainError } from "@/shared/kernel/domain-error";
 import { err, ok, type Result } from "@/shared/kernel/result";
+import { documentFormatFromPath } from "./document-file";
+import type { DocumentFormat } from "./document-format";
 import { IMPORT_JOB_ERROR } from "./errors";
 import { ABANDONED_AFTER_MS } from "./import-budget";
 import type { ImportFailureKind } from "./import-failure";
@@ -22,9 +24,15 @@ export interface ImportJob {
   readonly storagePath: string;
   readonly fileName: string;
   readonly sizeBytes: number; // from the real Storage object
+  // document-import T10: the imported format (import_jobs.format; rows
+  // older than 0014 default to "pdf").
+  readonly format: DocumentFormat;
   readonly status: ImportJobStatus;
   readonly pageCount: number | null; // null until known
   readonly pagesWithoutText: number; // starts at 0
+  // document-import T10: images found in the document but not imported
+  // (unsupported, oversized, failed upload, over a cap); set by complete().
+  readonly skippedImages: number; // starts at 0
   readonly error: string | null; // UI-safe Spanish message, only when failed
   readonly startedAt: Date | null; // start of processing
   readonly finishedAt: Date | null; // terminal instant
@@ -39,6 +47,9 @@ export interface NewImportJob {
   storagePath: string;
   fileName: string;
   sizeBytes: number;
+  // Defaults to the storage path's extension (`{ownerId}/{uploadId}.{ext}`);
+  // "pdf" for a path without one, the same default as the column.
+  format?: DocumentFormat;
 }
 
 function invalidTransition(from: ImportJobStatus, action: string): DomainError {
@@ -70,9 +81,11 @@ export function createImportJob(input: NewImportJob, clock: Clock): ImportJob {
     storagePath: input.storagePath,
     fileName: input.fileName,
     sizeBytes: input.sizeBytes,
+    format: input.format ?? documentFormatFromPath(input.storagePath) ?? "pdf",
     status: "queued",
     pageCount: null,
     pagesWithoutText: 0,
+    skippedImages: 0,
     error: null,
     startedAt: null,
     finishedAt: null,
@@ -95,9 +108,14 @@ export function start(
 
 // processing -> done. Requires a known pageCount with pagesWithoutText
 // strictly less than pageCount (Requirement "Ciclo de vida del ImportJob").
+// `skippedImages` (document-import T10) defaults to 0.
 export function complete(
   job: ImportJob,
-  counts: { pageCount: number; pagesWithoutText: number },
+  counts: {
+    pageCount: number;
+    pagesWithoutText: number;
+    skippedImages?: number;
+  },
   clock: Clock,
 ): Result<ImportJob, DomainError> {
   if (job.status !== "processing") {
@@ -106,12 +124,13 @@ export function complete(
   if (
     !isValidCount(counts.pageCount) ||
     !isValidCount(counts.pagesWithoutText) ||
+    !isValidCount(counts.skippedImages ?? 0) ||
     counts.pagesWithoutText >= counts.pageCount
   ) {
     return err(
       new DomainError(
         IMPORT_JOB_ERROR.INVALID_TRANSITION,
-        "complete requires a known pageCount with pagesWithoutText less than pageCount",
+        "complete requires a known pageCount with pagesWithoutText less than pageCount and a non-negative integer skippedImages",
       ),
     );
   }
@@ -121,6 +140,7 @@ export function complete(
     status: "done",
     pageCount: counts.pageCount,
     pagesWithoutText: counts.pagesWithoutText,
+    skippedImages: counts.skippedImages ?? 0,
     finishedAt: now,
     updatedAt: now,
   });

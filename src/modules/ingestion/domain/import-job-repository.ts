@@ -16,21 +16,38 @@ export interface ImportJobRepository {
   // since T1) — the concurrent-call case `startPdfImport` (T6 follow-up)
   // resolves by re-fetching the winner through `findByStoragePath` instead
   // of leaking an exception after its own page was already created.
-  create(job: ImportJob): Promise<Result<void, DomainError>>;
+  //
+  // With `maxActiveJobs` (document-import T10, T9b review: the count in
+  // startPdfImport alone was check-then-act), the job is only inserted
+  // while the owner has fewer active jobs (countActiveJobs' rule, at
+  // `job.createdAt`) — checked and inserted atomically, so concurrent
+  // creates can never exceed it — and err(IMPORT_JOB_ERROR.
+  // ACTIVE_LIMIT_REACHED) otherwise.
+  create(
+    job: ImportJob,
+    options?: { maxActiveJobs?: number },
+  ): Promise<Result<void, DomainError>>;
   findById(id: string): Promise<ImportJob | null>;
   findByStoragePath(storagePath: string): Promise<ImportJob | null>;
-  findLatestByPage(pageId: string): Promise<ImportJob | null>;
+  // With `ownerId` (T9b), only that owner's jobs are considered, so a
+  // caller can never learn about another user's page.
+  findLatestByPage(pageId: string, ownerId?: string): Promise<ImportJob | null>;
   // ids of pages with a `queued` or `processing`, non-abandoned job owned
   // by `ownerId` (read-only; for the sidebar importing badge).
   listActivePageIds(ownerId: string): Promise<string[]>;
+  // document-import T9b: how many `queued`/`processing` jobs `ownerId` has
+  // that are not abandoned at `now` (startPdfImport's MAX_ACTIVE_IMPORTS).
+  countActiveJobs(ownerId: string, now: Date): Promise<number>;
   // queued -> processing. null when the job is no longer queued (another
   // call already won the transition).
   claim(input: { id: string; now: Date }): Promise<ImportJob | null>;
-  // processing -> done. null when nothing changed.
+  // processing -> done, with the images the import dropped (T10). null
+  // when nothing changed.
   markDone(input: {
     id: string;
     pageCount: number;
     pagesWithoutText: number;
+    skippedImages: number;
     now: Date;
   }): Promise<ImportJob | null>;
   // processing -> failed, or queued -> failed only when kind is "timeout".

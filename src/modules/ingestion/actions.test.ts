@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createId } from "@/shared/kernel/id";
+import { FakeDocumentExtractor } from "./application/testing/fake-document-extractor";
 import { FakeImportTelemetry } from "./application/testing/fake-import-telemetry";
 import { FakeNotebookPagesPort } from "./application/testing/fake-notebook-pages-port";
 import { FakePdfStorageGateway } from "./application/testing/fake-pdf-storage-gateway";
-import { FakePdfTextExtractor } from "./application/testing/fake-pdf-text-extractor";
 import { InMemoryImportJobRepository } from "./application/testing/in-memory-import-job-repository";
 
 // Session and adapters are mocked so this test proves the Server Action
@@ -39,7 +39,7 @@ let current: {
   notebookPages: FakeNotebookPagesPort;
   storage: FakePdfStorageGateway;
   jobs: InMemoryImportJobRepository;
-  extractor: FakePdfTextExtractor;
+  extractor: FakeDocumentExtractor;
   telemetry: FakeImportTelemetry;
 };
 
@@ -53,7 +53,7 @@ vi.mock("./infrastructure", () => ({
   DrizzleImportJobRepository: vi.fn(function DrizzleImportJobRepository() {
     return current.jobs;
   }),
-  UnpdfTextExtractor: vi.fn(function UnpdfTextExtractor() {
+  createDocumentExtractor: vi.fn(function createDocumentExtractor() {
     return current.extractor;
   }),
   ImportTelemetryAdapter: vi.fn(function ImportTelemetryAdapter() {
@@ -88,7 +88,7 @@ describe("ingestion Server Actions", () => {
       notebookPages: new FakeNotebookPagesPort(),
       storage: new FakePdfStorageGateway(),
       jobs: new InMemoryImportJobRepository(),
-      extractor: new FakePdfTextExtractor(),
+      extractor: new FakeDocumentExtractor(),
       telemetry: new FakeImportTelemetry(),
     };
     current.notebookPages.addNotebook({
@@ -214,6 +214,32 @@ describe("ingestion Server Actions", () => {
       }
     });
 
+    // document-import T9b: the composition root wires a per-user upload
+    // grant limiter (in memory here: no AI_PROVIDER_MODE=live).
+    it("requestPdfUpload refuses with RATE_LIMITED after the hourly grant limit", async () => {
+      // Its own user: the in-memory limiter lives for the whole file.
+      const limitedOwner = "7a7a7a7a-1b1b-4c1c-8d1d-2e2e2e2e2e2e";
+      getCurrentUser.mockResolvedValue({ id: limitedOwner, email: "l@b.com" });
+      current.notebookPages.addNotebook({
+        id: "nb-1",
+        ownerId: limitedOwner,
+        active: true,
+      });
+      const { requestPdfUpload } = await import("./actions");
+      const request = () =>
+        requestPdfUpload({
+          notebookId: "nb-1",
+          fileName: "a.pdf",
+          mime: "application/pdf",
+          sizeBytes: 1024,
+        });
+      let last = await request();
+      for (let call = 1; call <= 20 && last.ok; call++) last = await request();
+
+      expect(last.ok).toBe(false);
+      if (!last.ok) expect(last.error.code).toBe("INGESTION_RATE_LIMITED");
+    });
+
     it("startPdfImport responds in queued without extracting, and revalidates the sidebar", async () => {
       const path = freshUploadPath(OWNER_ID);
       current.storage.put(path, { sizeBytes: 2048, mime: "application/pdf" });
@@ -244,8 +270,19 @@ describe("ingestion Server Actions", () => {
       current.extractor.setResult({
         ok: true,
         value: {
+          content: {
+            type: "doc",
+            content: [
+              {
+                type: "paragraph",
+                content: [{ type: "text", text: "Un párrafo de texto." }],
+              },
+            ],
+          },
           totalPages: 1,
-          pages: ["Un encabezado\n\nUn párrafo de texto."],
+          pagesWithoutText: 0,
+          images: [],
+          skippedImages: 0,
         },
       });
       const { startPdfImport, processPdfImport } = await import("./actions");
@@ -290,7 +327,8 @@ describe("ingestion Server Actions", () => {
       });
 
       expect(result.ok).toBe(false);
-      if (!result.ok) expect(result.error.code).toBe("PDF_PATH_OUT_OF_SCOPE");
+      if (!result.ok)
+        expect(result.error.code).toBe("DOCUMENT_PATH_OUT_OF_SCOPE");
     });
 
     it("processPdfImport maps a not-found job to an ActionError instead of throwing", async () => {
@@ -328,7 +366,7 @@ describe("ingestion Server Actions", () => {
       expect(result).toEqual({ ok: true, value: [started.value.pageId] });
     });
 
-    it("getImportJobStatus maps a job owned by another user to an ActionError, without revealing it exists", async () => {
+    it("getImportJobStatus answers null for another user's page, without revealing it has a job", async () => {
       const path = freshUploadPath(OWNER_ID);
       current.storage.put(path, { sizeBytes: 2048, mime: "application/pdf" });
       const { startPdfImport, getImportJobStatus } = await import("./actions");
@@ -347,8 +385,7 @@ describe("ingestion Server Actions", () => {
       });
       const result = await getImportJobStatus({ pageId: started.value.pageId });
 
-      expect(result.ok).toBe(false);
-      if (!result.ok) expect(result.error.code).toBe("IMPORT_JOB_NOT_FOUND");
+      expect(result).toEqual({ ok: true, value: null });
     });
 
     // T8 review follow-up (R3-actions-never-throw-unenforced): a thrown

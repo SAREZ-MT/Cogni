@@ -20,9 +20,11 @@ function makeJob(overrides: Partial<ImportJob> = {}): ImportJob {
     storagePath: "owner-1/upload-1.pdf",
     fileName: "notas.pdf",
     sizeBytes: 2048,
+    format: "pdf",
     status: "done",
     pageCount: 12,
     pagesWithoutText: 0,
+    skippedImages: 0,
     error: null,
     startedAt: CREATED_AT,
     finishedAt: FINISHED_AT,
@@ -61,20 +63,41 @@ describe("ImportTelemetryAdapter", () => {
     consoleInfo.mockRestore();
   });
 
-  it("sends pdf_imported with page_count/pages_without_text/duration_ms/status for a done job", async () => {
+  it("sends document_imported with page_count/pages_without_text/duration_ms/status for a done job", async () => {
     const analytics = makeAnalytics();
     const adapter = new ImportTelemetryAdapter(analytics);
 
     await adapter.finished(makeJob());
 
-    expect(analytics.track).toHaveBeenCalledWith("pdf_imported", "owner-1", {
-      page_count: 12,
-      pages_without_text: 0,
-      duration_ms: 4200,
-      status: "done",
-    });
+    expect(analytics.track).toHaveBeenCalledWith(
+      "document_imported",
+      "owner-1",
+      {
+        page_count: 12,
+        pages_without_text: 0,
+        duration_ms: 4200,
+        status: "done",
+        format: "pdf",
+        skipped_images: 0,
+      },
+    );
     expect(captureException).not.toHaveBeenCalled();
     expect(captureMessage).not.toHaveBeenCalled();
+  });
+
+  // document-import T9/T10: images dropped during the import, read from
+  // the job (import_jobs.skipped_images).
+  it("sends the job's skipped_images", async () => {
+    const analytics = makeAnalytics();
+    const adapter = new ImportTelemetryAdapter(analytics);
+
+    await adapter.finished(makeJob({ skippedImages: 3 }));
+
+    expect(analytics.track).toHaveBeenCalledWith(
+      "document_imported",
+      "owner-1",
+      expect.objectContaining({ status: "done", skipped_images: 3 }),
+    );
   });
 
   it("sends duration_ms: null when the job has no finishedAt (defensive)", async () => {
@@ -84,13 +107,13 @@ describe("ImportTelemetryAdapter", () => {
     await adapter.finished(makeJob({ finishedAt: null }));
 
     expect(analytics.track).toHaveBeenCalledWith(
-      "pdf_imported",
+      "document_imported",
       "owner-1",
       expect.objectContaining({ duration_ms: null }),
     );
   });
 
-  it("sends pdf_imported with status failed and reports to Sentry at error level for most kinds", async () => {
+  it("sends document_imported with status failed and reports to Sentry at error level for most kinds", async () => {
     const analytics = makeAnalytics();
     const adapter = new ImportTelemetryAdapter(analytics);
     const cause = new Error("connection reset");
@@ -101,7 +124,7 @@ describe("ImportTelemetryAdapter", () => {
     });
 
     expect(analytics.track).toHaveBeenCalledWith(
-      "pdf_imported",
+      "document_imported",
       "owner-1",
       expect.objectContaining({ status: "failed", page_count: null }),
     );
@@ -124,6 +147,41 @@ describe("ImportTelemetryAdapter", () => {
       expect.objectContaining({ level: "warning" }),
     );
     expect(captureException).not.toHaveBeenCalled();
+  });
+
+  // document-import T10: the format-neutral event carries the job's
+  // recorded format (import_jobs.format).
+  it.each([
+    "docx",
+    "pptx",
+  ] as const)("sends the job's format %s", async (format) => {
+    const analytics = makeAnalytics();
+    const adapter = new ImportTelemetryAdapter(analytics);
+
+    await adapter.finished(makeJob({ format }));
+
+    expect(analytics.track).toHaveBeenCalledWith(
+      "document_imported",
+      "owner-1",
+      expect.objectContaining({ format }),
+    );
+  });
+
+  // A user's file, not a bug: an office document without text or a file
+  // in a format Cogni does not import is a warning, like no_text_layer.
+  it.each([
+    "empty_document",
+    "unsupported_format",
+  ] as const)("reports %s to Sentry at warning level", async (kind) => {
+    const analytics = makeAnalytics();
+    const adapter = new ImportTelemetryAdapter(analytics);
+
+    await adapter.finished(makeJob({ status: "failed" }), { kind });
+
+    expect(captureMessage).toHaveBeenCalledWith(
+      expect.stringContaining(kind),
+      expect.objectContaining({ level: "warning" }),
+    );
   });
 
   it("never rejects when analytics.track() itself throws", async () => {

@@ -1,6 +1,6 @@
-import { and, desc, eq, gt, inArray, sql } from "drizzle-orm";
+import { and, count, desc, eq, gt, inArray, sql } from "drizzle-orm";
 import postgres from "postgres";
-import type { Db } from "@/shared/db/client";
+import type { Db, DbExecutor } from "@/shared/db/client";
 import { type ImportJobRow, importJobs } from "@/shared/db/schema";
 import { DomainError } from "@/shared/kernel/domain-error";
 import { err, ok, type Result } from "@/shared/kernel/result";
@@ -23,9 +23,11 @@ function toImportJob(row: ImportJobRow): ImportJob {
     storagePath: row.storagePath,
     fileName: row.fileName,
     sizeBytes: row.sizeBytes,
+    format: row.format,
     status: row.status,
     pageCount: row.pageCount,
     pagesWithoutText: row.pagesWithoutText,
+    skippedImages: row.skippedImages,
     error: row.error,
     startedAt: row.startedAt,
     finishedAt: row.finishedAt,
@@ -59,28 +61,77 @@ function isStoragePathUniqueViolation(error: unknown): boolean {
   return false;
 }
 
+// queued or processing and updated after the abandonment cutoff at `now`
+// (domain isAbandoned), for one owner.
+function activeJobsOf(ownerId: string, now: Date) {
+  return and(
+    eq(importJobs.ownerId, ownerId),
+    inArray(importJobs.status, ["queued", "processing"]),
+    gt(importJobs.updatedAt, new Date(now.getTime() - ABANDONED_AFTER_MS)),
+  );
+}
+
+async function countActive(
+  db: DbExecutor,
+  ownerId: string,
+  now: Date,
+): Promise<number> {
+  const rows = await db
+    .select({ count: count() })
+    .from(importJobs)
+    .where(activeJobsOf(ownerId, now));
+  return Number(rows[0]?.count ?? 0);
+}
+
 export class DrizzleImportJobRepository implements ImportJobRepository {
   constructor(private readonly db: Db) {}
 
-  async create(job: ImportJob): Promise<Result<void, DomainError>> {
+  // With `maxActiveJobs` (T10): count and insert inside one transaction
+  // holding a per-owner advisory lock, released at commit/rollback. A plain
+  // `INSERT ... SELECT ... WHERE count < N` would not be enough under READ
+  // COMMITTED — two concurrent statements both see N-1 rows — so the lock
+  // serializes one owner's creates (other owners never wait). The
+  // storagePath is looked up first, under the same lock (T11): a repeat of
+  // an import that holds the last slot is the same import, so it reports
+  // the conflict startPdfImport replays, not the cap. A concurrent create
+  // of the same path is still caught by the unique constraint below.
+  async create(
+    job: ImportJob,
+    options: { maxActiveJobs?: number } = {},
+  ): Promise<Result<void, DomainError>> {
+    const { maxActiveJobs } = options;
     try {
-      await this.db.insert(importJobs).values({
-        id: job.id,
-        ownerId: job.ownerId,
-        pageId: job.pageId,
-        storagePath: job.storagePath,
-        fileName: job.fileName,
-        sizeBytes: job.sizeBytes,
-        status: job.status,
-        pageCount: job.pageCount,
-        pagesWithoutText: job.pagesWithoutText,
-        error: job.error,
-        startedAt: job.startedAt,
-        finishedAt: job.finishedAt,
-        createdAt: job.createdAt,
-        updatedAt: job.updatedAt,
+      if (maxActiveJobs === undefined) {
+        await this.insert(this.db, job);
+        return ok(undefined);
+      }
+      return await this.db.transaction(async (tx) => {
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtextextended(${`import-start:${job.ownerId}`}, 0))`,
+        );
+        const [samePath] = await tx
+          .select({ id: importJobs.id })
+          .from(importJobs)
+          .where(eq(importJobs.storagePath, job.storagePath))
+          .limit(1);
+        if (samePath) {
+          return err(
+            new DomainError(
+              IMPORT_JOB_ERROR.STORAGE_PATH_CONFLICT,
+              job.storagePath,
+            ),
+          );
+        }
+        if (
+          (await countActive(tx, job.ownerId, job.createdAt)) >= maxActiveJobs
+        ) {
+          return err(
+            new DomainError(IMPORT_JOB_ERROR.ACTIVE_LIMIT_REACHED, job.ownerId),
+          );
+        }
+        await this.insert(tx, job);
+        return ok(undefined);
       });
-      return ok(undefined);
     } catch (error) {
       if (isStoragePathUniqueViolation(error)) {
         return err(
@@ -92,6 +143,27 @@ export class DrizzleImportJobRepository implements ImportJobRepository {
       }
       throw error;
     }
+  }
+
+  private async insert(db: DbExecutor, job: ImportJob): Promise<void> {
+    await db.insert(importJobs).values({
+      id: job.id,
+      ownerId: job.ownerId,
+      pageId: job.pageId,
+      storagePath: job.storagePath,
+      fileName: job.fileName,
+      sizeBytes: job.sizeBytes,
+      format: job.format,
+      status: job.status,
+      pageCount: job.pageCount,
+      pagesWithoutText: job.pagesWithoutText,
+      skippedImages: job.skippedImages,
+      error: job.error,
+      startedAt: job.startedAt,
+      finishedAt: job.finishedAt,
+      createdAt: job.createdAt,
+      updatedAt: job.updatedAt,
+    });
   }
 
   async findById(id: string): Promise<ImportJob | null> {
@@ -111,9 +183,15 @@ export class DrizzleImportJobRepository implements ImportJobRepository {
   // "Latest" by createdAt: a page can only ever have one non-abandoned
   // active job at a time (idempotent by storagePath), but a retried
   // import after a `failed` job creates a second row for the same page.
-  async findLatestByPage(pageId: string): Promise<ImportJob | null> {
+  async findLatestByPage(
+    pageId: string,
+    ownerId?: string,
+  ): Promise<ImportJob | null> {
     const row = await this.db.query.importJobs.findFirst({
-      where: eq(importJobs.pageId, pageId),
+      where:
+        ownerId === undefined
+          ? eq(importJobs.pageId, pageId)
+          : and(eq(importJobs.pageId, pageId), eq(importJobs.ownerId, ownerId)),
       orderBy: [desc(importJobs.createdAt)],
     });
     return row ? toImportJob(row) : null;
@@ -138,6 +216,12 @@ export class DrizzleImportJobRepository implements ImportJobRepository {
     return rows.map((row) => row.pageId);
   }
 
+  // document-import T9b: the same active-and-not-abandoned rule as
+  // listActivePageIds, against the caller's `now`.
+  async countActiveJobs(ownerId: string, now: Date): Promise<number> {
+    return countActive(this.db, ownerId, now);
+  }
+
   // queued -> processing. Conditional on the WHERE clause, not a
   // read-then-write: two concurrent claims race the same UPDATE and only
   // one RETURNING row ever comes back (design.md's claim SQL).
@@ -155,6 +239,7 @@ export class DrizzleImportJobRepository implements ImportJobRepository {
     id: string;
     pageCount: number;
     pagesWithoutText: number;
+    skippedImages: number;
     now: Date;
   }): Promise<ImportJob | null> {
     const rows = await this.db
@@ -163,6 +248,7 @@ export class DrizzleImportJobRepository implements ImportJobRepository {
         status: "done",
         pageCount: input.pageCount,
         pagesWithoutText: input.pagesWithoutText,
+        skippedImages: input.skippedImages,
         finishedAt: input.now,
         updatedAt: input.now,
       })

@@ -1,8 +1,8 @@
 # Documento de Arquitectura de Software (SAD) — Cogni
 
 **Proyecto:** Cogni — plataforma web de estudio a partir de apuntes propios
-**Versión:** 1.1
-**Fecha:** 2026-10-15
+**Versión:** 1.2
+**Fecha:** 2026-10-26
 **Estado:** Borrador
 **Autor:** Javier Sarez
 **Documentos relacionados:** ./01-SRS.md, ./03-DATA-API.md, ./04-ADR.md
@@ -13,7 +13,7 @@
 
 - Las Fases 0 a 7 están implementadas y los 11 módulos de `src/modules/` son reales; ninguno es un esqueleto.
   - Fase 0 (Cimientos) y Fase 1 (Cuadernos y editor): desplegadas en producción (`identity`, `notebooks`, `editor`).
-  - Fase 2 (Importación de PDF): implementada bajo Organic Driven Development (ODD) el 2026-09-23 (`src/modules/ingestion`).
+  - Fase 2 (Importación de PDF): implementada bajo Organic Driven Development (ODD) el 2026-09-23 (`src/modules/ingestion`). Ampliada el 2026-10-26 (rama `feat/document-import`) a Word (`.docx`) con mammoth y officeparser, imágenes importadas y un catálogo estricto de contenido; PowerPoint (`.pptx`) está planificado. Decisiones en `docs/adr/0009-importacion-multiformato-y-catalogo-de-contenido.md`.
   - Fase 3 (Capa de IA, PR #63–#69) y aceptación de términos de uso (PR #70): `src/modules/ai` e `identity`; decisiones en `docs/adr/0004-capa-de-ia-con-proveedores-gratuitos.md`.
   - Fase 4 (Motor de repetición y flashcards, PR #71–#77): `src/modules/study-engine` y `src/modules/flashcards`; decisiones en `docs/adr/0005-motor-de-repeticion-y-flashcards.md`.
   - Fase 5 (Exámenes, PR #78–#86): `src/modules/exams`; decisiones en `docs/adr/0006-examenes-y-repeticion-con-variantes.md`.
@@ -53,7 +53,7 @@ Este documento describe la arquitectura de software de Cogni usando el modelo C4
 | 2 | Simplicidad para un equipo de una persona | Cogni lo construye y mantiene una sola persona (`docs/documento-maestro.md` §14, riesgo "Una sola persona desarrollando"). Se prioriza un stack con curva de aprendizaje conocida y una arquitectura que un solo desarrollador pueda razonar por completo. |
 | 3 | Mantenibilidad por arquitectura verificable | Los límites entre capas y módulos se verifican automáticamente en cada `pull request`, no solo por convención (RNF-M-01 a RNF-M-06; `.dependency-cruiser.cjs`, `tsconfig.json`, `.github/workflows/pr.yml`). |
 | 4 | Seguridad de los datos del estudiante | Cada estudiante solo puede ver y modificar sus propios cuadernos, páginas y archivos (RNF-S-01 a RNF-S-08; Row Level Security, `src/proxy.ts`, `security-headers.ts`). |
-| 5 | Rendimiento percibido del editor | El autoguardado y la importación de PDF tienen presupuestos de tiempo explícitos y verificados por prueba (RNF-P-01 a RNF-P-05; `debounceMs`, `maxDuration`). |
+| 5 | Rendimiento percibido del editor | El autoguardado y la importación de documentos tienen presupuestos de tiempo explícitos y verificados por prueba (RNF-P-01 a RNF-P-05; `debounceMs`, `maxDuration`). |
 
 ---
 
@@ -67,24 +67,24 @@ Este documento describe la arquitectura de software de Cogni usando el modelo C4
 |---|---|---|---|
 | Estudiante | Actor humano | Escribe o importa apuntes, genera material de estudio y lo repasa con flashcards, exámenes y recordación activa (SRS §2.2). | Implementado |
 | Cogni | Sistema de software | La plataforma web en sí: organiza apuntes en cuadernos y páginas, genera material de estudio con IA y coordina flashcards, exámenes y recordación activa con un motor de repetición espaciada, un calendario y un dashboard. | Implementado |
-| Supabase — Auth, Postgres, Storage | Sistema externo (BaaS) | Autentica al estudiante, persiste todos los datos relacionales y almacena imágenes y PDF importados en buckets privados. | Implementado |
+| Supabase — Auth, Postgres, Storage | Sistema externo (BaaS) | Autentica al estudiante, persiste todos los datos relacionales y almacena imágenes y documentos importados en buckets privados. | Implementado |
 | Google (OAuth) | Sistema externo | Proveedor de identidad federada; el navegador del estudiante navega directamente a su pantalla de consentimiento antes de volver a Cogni (`form-action` de la CSP incluye `https://accounts.google.com`). | Implementado |
 | Vercel (Cron) | Sistema externo | Dispara dos peticiones HTTP diarias autenticadas: `/api/keep-alive` (evita que el proyecto gratuito de Supabase se pause) y `/api/recompute-mastery` (recalcula el nivel de dominio de las páginas). | Implementado |
 | Cloudflare (DNS) | Sistema externo | Registrador y proveedor de DNS del dominio canónico; resuelve el dominio antes de que cualquier petición llegue a Vercel. No recibe llamadas de la aplicación en tiempo de ejecución. | Implementado |
 | Proveedores de IA (Google AI Studio — Gemini, Groq, Cloudflare Workers AI, OpenRouter) | Sistema externo | Generan flashcards, preguntas de examen y sus variantes, preguntas de recordación activa y retroalimentación de sesión, y evalúan respuestas abiertas, a través del Vercel AI SDK (`src/modules/ai/infrastructure/provider-registry.ts`). | Implementado |
 | Upstash Redis | Sistema externo (Redis serverless, REST) | Guarda el estado compartido entre invocaciones de la capa de IA: límites diarios por estudiante (generaciones y evaluaciones), cuota diaria por proveedor y estado del *circuit breaker* (`src/modules/ai/infrastructure/upstash-*.ts`). | Implementado |
 | Sentry | Sistema externo | Recibe errores no controlados de Server Components, Server Actions y Route Handlers. | Implementado |
-| PostHog | Sistema externo | Recibe cinco eventos de producto explícitos (`user_signed_up`, `user_signed_in`, `pdf_imported`, `generation_requested`, `terms_accepted`). | Implementado |
+| PostHog | Sistema externo | Recibe cinco eventos de producto explícitos (`user_signed_up`, `user_signed_in`, `document_imported`, `generation_requested`, `terms_accepted`). | Implementado |
 
 ### 2.2 Conexiones
 
 | Origen | Destino | Protocolo / mecanismo | Dirección | Descripción |
 |---|---|---|---|---|
-| Estudiante | Cogni | HTTPS (navegador) | Estudiante → Cogni | Navega la aplicación, escribe apuntes, importa PDF. |
+| Estudiante | Cogni | HTTPS (navegador) | Estudiante → Cogni | Navega la aplicación, escribe apuntes, importa documentos (PDF y Word). |
 | Cogni | Supabase Auth | HTTPS, `@supabase/ssr` (cookies de sesión) | Cogni → Supabase | Registro, inicio de sesión, verificación de correo, recuperación de contraseña. |
 | Estudiante (navegador) | Google | Redirección HTTP + consentimiento OAuth | Estudiante → Google → Cogni (`/auth/callback`) | Inicio de sesión con Google (RF-ID-02). |
 | Cogni | Supabase Postgres | Drizzle ORM sobre `postgres.js` (TCP, *transaction pooler*, `max: 1`) | Cogni → Supabase | Lectura/escritura de las 20 tablas del esquema (cuadernos, páginas, adjuntos, importaciones, generaciones de IA, material de estudio, estado SM-2, sesiones y respuestas). |
-| Cogni / Estudiante (navegador) | Supabase Storage | HTTPS, URL firmada (subida directa) y API con `service role` (servidor) | Bidireccional | Subida de imágenes y PDF, lectura de adjuntos. |
+| Cogni / Estudiante (navegador) | Supabase Storage | HTTPS, URL firmada (subida directa) y API con `service role` (servidor) | Bidireccional | Subida de imágenes y documentos, lectura de adjuntos; el servidor sube las imágenes extraídas de un documento importado. |
 | Vercel Cron | Cogni (`/api/keep-alive`, `/api/recompute-mastery`) | HTTPS GET, `Authorization: Bearer <CRON_SECRET>` | Vercel → Cogni | Mantiene activo el proyecto gratuito de Supabase y al día el nivel de dominio de cada página (RNF-F-01). |
 | Cogni | Proveedores de IA | HTTPS, Vercel AI SDK (`generateObject`), salida estructurada validada con Zod | Cogni → Proveedor | Generación y evaluación de material de estudio. |
 | Cogni | Upstash Redis | HTTPS (API REST de `@upstash/redis`, `@upstash/ratelimit`) | Cogni → Upstash | Consulta y consume límites diarios, cuota por proveedor y estado del *circuit breaker*. |
@@ -104,7 +104,7 @@ Este documento describe la arquitectura de software de Cogni usando el modelo C4
 | Aplicación web Cogni | Next.js 16 (App Router) sobre Vercel, TypeScript | Sirve la interfaz (Server/Client Components), ejecuta Server Actions y Route Handlers, y aplica el proxy de sesión y las cabeceras de seguridad. | Implementado |
 | Proxy de sesión | `src/proxy.ts` (Next.js `proxy`, ejecutado en cada petición) | Refresca la sesión de Supabase, genera el nonce de CSP por petición, redirige al apex canónico y protege rutas sin sesión. | Implementado |
 | Base de datos Postgres | Supabase Postgres, Drizzle ORM | Persiste las 20 tablas del esquema (`src/shared/db/schema.ts`), todas con Row Level Security activa. | Implementado |
-| Almacenamiento de objetos | Supabase Storage (buckets `page-assets`, `page-pdfs`) | Guarda imágenes de página y PDF subidos, con políticas RLS por `owner_id`. | Implementado |
+| Almacenamiento de objetos | Supabase Storage (buckets `page-assets`, `page-pdfs`) | Guarda imágenes de página (también las extraídas de documentos importados) y documentos subidos (PDF, DOCX y PPTX en `page-pdfs`, nombre histórico), con políticas RLS por `owner_id`. | Implementado |
 | Servicio de identidad | Supabase Auth | Emite y valida sesiones (correo/contraseña y Google OAuth). | Implementado |
 | Programador de tareas | Vercel Cron (`vercel.json`) | Dispara `/api/keep-alive` (`0 6 * * *`) y `/api/recompute-mastery` (`30 6 * * *`) una vez al día. | Implementado |
 | Registro de proveedores de IA | Vercel AI SDK (lógico, dentro de la aplicación) | Selecciona y rota entre proveedores de IA por cuota y salud (`src/modules/ai/infrastructure/provider-registry.ts`). | Implementado |
@@ -145,7 +145,7 @@ La aplicación web Cogni (el contenedor Next.js) se descompone en el proxy, el �
 | `identity` | Registro, inicio de sesión (correo y Google), recuperación de contraseña, perfil del estudiante, aceptación de términos de uso y zona horaria. | Supabase Auth, `@supabase/ssr` | Implementado |
 | `notebooks` | Cuadernos, páginas, `plain_text` materializado, adjuntos de imagen; sus Server Actions satisfacen la forma del `SavePagePort` del editor (la ruta de página compone el puerto) y `server-api.ts` sirve a otros módulos. | Drizzle ORM, Supabase Storage | Implementado |
 | `editor` | Autoguardado, estado de conflicto de versión y el editor de bloques Tiptap (menú `/`, barra contextual, resaltado); declara su propio `SavePagePort`. | Tiptap 3, TanStack Query | Implementado |
-| `ingestion` | Importación de un PDF a una página editable, con `ImportJob` como máquina de estados. | `unpdf`, Supabase Storage | Implementado |
+| `ingestion` | Importación de un documento PDF o Word a una página editable (PowerPoint planificado), con `ImportJob` como máquina de estados, imágenes importadas y límites por usuario. | `mammoth`, `officeparser`, `unpdf`, Supabase Storage, `src/shared/rate-limit` | Implementado (PDF y Word) |
 | `ai` | Registro de proveedores de IA, rotación por cuota y salud, *circuit breaker*, límites diarios por estudiante, salida estructurada validada con Zod, prompts versionados y auditoría de cada intento (`ai_generations`). | Vercel AI SDK 7, Upstash Redis | Implementado (Fase 3) |
 | `study-engine` | Estado SM-2 por ítem (`StudyItem`), historial (`ReviewLog`), nivel de dominio por página (`PageMastery`), sesiones de flashcards y retroalimentación de sesión; registra los repasos de exámenes y recordación activa. | Drizzle ORM | Implementado (Fase 4; ver §5.2) |
 | `flashcards` | Mazo de tarjetas por página, generación incremental con IA, tarjetas manuales y retroalimentación de la sesión de repaso. | Drizzle ORM | Implementado (Fase 4; ver §10.2) |
@@ -155,15 +155,16 @@ La aplicación web Cogni (el contenedor Next.js) se descompone en el proxy, el �
 | `analytics` | Dashboard de progreso, métricas por técnica, calibración metacognitiva. | Drizzle (lectura), Recharts en la ruta | Implementado (Fase 7; ver §10.5) |
 | `shared/config` | Validación de variables de entorno (Zod), cabeceras de seguridad, patrones de imágenes remotas. | Zod | Implementado |
 | `shared/db` | Cliente único de Postgres (Drizzle + `postgres.js`) y el esquema de las 20 tablas. | Drizzle ORM | Implementado |
-| `shared/kernel` | Primitivas transversales puras: `Clock`, `DomainError`/`ActionError`, `createId` (UUID v7), tipo `Result`, tipos del documento Tiptap (`tiptap-doc.ts`), umbrales de dominio (`mastery-thresholds.ts`), párrafos de página, conteo de palabras y huellas de generación. | TypeScript puro | Implementado |
+| `shared/kernel` | Primitivas transversales puras: `Clock`, `DomainError`/`ActionError`, `createId` (UUID v7), tipo `Result`, tipos del documento Tiptap (`tiptap-doc.ts`), catálogo estricto de contenido (`tiptap-catalogue.ts`), umbrales de dominio (`mastery-thresholds.ts`), párrafos de página, conteo de palabras y huellas de generación. | TypeScript puro | Implementado |
 | `shared/observability` | Puerto `Analytics` (PostHog) y opciones de Sentry compartidas. | `@sentry/nextjs`, `posthog-node` | Implementado |
+| `shared/rate-limit` | Limitador por clave con ventana deslizante en Upstash (`AI_PROVIDER_MODE=live`) o ventana fija en memoria (resto); falla abierto ante un error de Upstash. Lo usa `ingestion`. | `@upstash/ratelimit` | Implementado |
 | `shared/ui` | Primitivos de estilo shadcn/ui (`Button`, `Dialog`, `DropdownMenu`, etc.) y unos 60 átomos de dominio (`Card`, `Pill`, `KpiCard`, `CalendarGrid`, `FlipCard`, `Chart`, `Sparkline`, etc.), documentados en `docs/design-system/ATOMS.md`. | Radix UI, `class-variance-authority`, Recharts | Implementado |
 
 ---
 
 ## 5. Vista de código — C4 Nivel 4
 
-Esta vista se limita a dos módulos, ambos con código suficientemente cargado de decisiones: `ingestion` (la máquina de estados de la importación de PDF) y `study-engine` (el algoritmo central del producto).
+Esta vista se limita a dos módulos, ambos con código suficientemente cargado de decisiones: `ingestion` (la máquina de estados de la importación de documentos) y `study-engine` (el algoritmo central del producto).
 
 ### 5.1 `ingestion` — implementado
 
@@ -173,31 +174,38 @@ Esta vista se limita a dos módulos, ambos con código suficientemente cargado d
 
 | Elemento | Tipo | Responsabilidad |
 |---|---|---|
-| `ImportJob` | Entidad + máquina de estados (`domain/import-job.ts`) | Representa una importación; expone `createImportJob`, `start`, `complete`, `fail`, `isTerminal`, `isAbandoned`. |
+| `ImportJob` | Entidad + máquina de estados (`domain/import-job.ts`) | Representa una importación con su formato (`format`) y las imágenes omitidas (`skippedImages`); expone `createImportJob`, `start`, `complete`, `fail`, `isTerminal`, `isAbandoned`. |
 | `ImportJobStatus` | Tipo (`domain/import-job.ts`) | Unión de cadenas: `"queued"`, `"processing"`, `"done"`, `"failed"`. |
-| `ImportFailureKind` | Tipo (`domain/import-failure.ts`) | `download`, `invalid_pdf`, `no_text_layer`, `persistence`, `timeout`, cada uno con su mensaje en español. |
+| `ImportFailureKind` | Tipo (`domain/import-failure.ts`) | `download`, `invalid_document`, `unsupported_format`, `no_text_layer`, `empty_document`, `persistence`, `timeout`, cada uno con su mensaje en español. |
+| `detectDocumentFormat` | Función de dominio pura (`domain/document-format.ts`) | Detecta el formato por los bytes reales: `%PDF-`, o un ZIP con `[Content_Types].xml` y `word/document.xml` (DOCX) o `ppt/presentation.xml` (PPTX); OLE2 → `legacy`. |
+| `inspectOoxmlPackage` | Función de dominio pura (`domain/ooxml-guard.ts`) | Revisa el directorio central del ZIP antes de analizar y rechaza un paquete no confiable o que declare demasiado (`OOXML_LIMITS`). |
 | `textToBlocks` | Función de dominio pura (`domain/text-to-blocks.ts`) | Convierte el texto extraído de un PDF en bloques Tiptap mediante heurísticas deterministas. |
-| `PdfStorageGateway` | Puerto (`domain/pdf-storage-gateway.ts`) | Subida firmada, metadatos y descarga de un objeto PDF. |
-| `PdfTextExtractor` | Puerto (`domain/pdf-text-extractor.ts`) | Extrae texto de los bytes de un PDF, página por página. |
-| `NotebookPagesPort` | Puerto (`domain/notebook-pages-port.ts`) | Busca cuadernos/páginas y escribe el contenido importado, sin depender de `notebooks` directamente. |
-| `ImportJobRepository` | Puerto (`domain/import-job-repository.ts`) | Persistencia de `ImportJob` mediante transiciones atómicas. |
+| `ImportedDoc` | Tipo (`domain/imported-doc.ts`) | Documento importado restringido a los bloques del catálogo de contenido (`src/shared/kernel/tiptap-catalogue.ts`). |
+| `resolvePendingImages` | Función de dominio pura (`domain/pending-images.ts`) | Cambia el `pendingId` de cada imagen guardada por su `assetId` y quita las que no se guardaron, a cualquier profundidad. |
+| `PdfStorageGateway` | Puerto (`domain/pdf-storage-gateway.ts`) | Subida firmada, metadatos y descarga del documento subido (conserva su nombre de la era PDF). |
+| `DocumentExtractor` | Puerto (`domain/document-extractor.ts`) | Extrae de los bytes y el formato un `ExtractedDocument`: contenido, páginas, imágenes e imágenes omitidas. |
+| `NotebookPagesPort` | Puerto (`domain/notebook-pages-port.ts`) | Busca cuadernos/páginas, escribe el contenido importado y guarda o borra las imágenes importadas, sin depender de `notebooks` directamente. |
+| `ImportJobRepository` | Puerto (`domain/import-job-repository.ts`) | Persistencia de `ImportJob` mediante transiciones atómicas, con el tope atómico de importaciones activas. |
+| `ImportRateLimiter` | Puerto (`domain/import-rate-limiter.ts`) | Límites por estudiante de permisos de subida e inicios por hora; implementado con `src/shared/rate-limit`. |
 | `SupabasePdfStorageGateway` | Adaptador (`infrastructure/`) | Implementa `PdfStorageGateway` contra el bucket `page-pdfs`. |
-| `UnpdfTextExtractor` | Adaptador (`infrastructure/`) | Implementa `PdfTextExtractor` con la librería `unpdf`. |
-| `NotebooksPagesAdapter` | Adaptador (`infrastructure/`) | Implementa `NotebookPagesPort` envolviendo `createNotebooksServerApi` de `notebooks`. |
+| `FormatRoutingDocumentExtractor` | Adaptador (`infrastructure/`) | Implementa `DocumentExtractor` eligiendo el adaptador del formato (`createDocumentExtractor()`). |
+| `PdfDocumentExtractor` | Adaptador (`infrastructure/`) | Lee el PDF con `unpdf` página por página (`PDF_LIMITS`) y aplica `textToBlocks`. |
+| `DocxDocumentExtractor` | Adaptador (`infrastructure/`) | Lee el Word con mammoth (estructura) y officeparser (colores, numeración, ecuaciones), uno después del otro, sobre un `OoxmlPackage` que infla cada parte con tope de salida. |
+| `NotebooksPagesAdapter` | Adaptador (`infrastructure/`) | Implementa `NotebookPagesPort` envolviendo `createNotebooksServerApi` de `notebooks` (incluidos `storeImportedAsset` y `deleteImportedAssets`). |
 | `DrizzleImportJobRepository` | Adaptador (`infrastructure/`) | Implementa `ImportJobRepository` sobre la tabla `import_jobs`. |
-| `ImportTelemetryAdapter` | Adaptador (`infrastructure/`) | Reporta a Sentry y registra el evento `pdf_imported` en PostHog. |
-| `requestPdfUpload`, `startPdfImport`, `processImportJob`, `getImportJobStatus`, `getActiveImports` | Casos de uso (`application/`) | Orquestan el ciclo completo de importación. |
+| `ImportTelemetryAdapter` | Adaptador (`infrastructure/`) | Reporta a Sentry y registra el evento `document_imported` en PostHog. |
+| `requestPdfUpload`, `startPdfImport`, `processImportJob`, `getImportJobStatus`, `getActiveImports` | Casos de uso (`application/`) | Orquestan el ciclo completo de importación (conservan sus nombres de la era PDF). |
 
 #### 5.1.2 Relaciones
 
-1. `requestPdfUpload` invoca `PdfStorageGateway.createSignedUploadUrl`.
-2. `startPdfImport` invoca `ImportJobRepository.create` (idempotente por `storagePath`) y construye un `ImportJob` con `createImportJob`.
-3. `processImportJob` invoca `ImportJobRepository.claim` (aplica `start` sobre el `ImportJob`), luego `PdfStorageGateway.download`, luego `PdfTextExtractor.extract`, luego `textToBlocks` (función pura, sin puerto), luego `NotebookPagesPort.writeImportedContent`, y finalmente `ImportJobRepository.markDone` (aplica `complete`) o `ImportJobRepository.markFailed` (aplica `fail`) según el resultado.
+1. `requestPdfUpload` valida tipo, tamaño y nombre, consume `UPLOAD_GRANTS_PER_HOUR` e invoca `PdfStorageGateway.createSignedUploadUrl`.
+2. `startPdfImport` revalida los metadatos reales del objeto, consume `IMPORT_STARTS_PER_HOUR`, crea la página e invoca `ImportJobRepository.create` (idempotente por `storagePath`, con `maxActiveJobs = MAX_ACTIVE_IMPORTS` aplicado bajo un candado consultivo por dueño) con un `ImportJob` de `createImportJob`.
+3. `processImportJob` invoca `ImportJobRepository.claim` (aplica `start` sobre el `ImportJob`), luego `PdfStorageGateway.download`, `detectDocumentFormat` y `DocumentExtractor.extract` en carrera contra `PROCESSING_BUDGET_MS`; después guarda cada imagen con `NotebookPagesPort.storeImportedAsset` mientras quede más de `IMAGE_UPLOAD_RESERVE_MS`, aplica `resolvePendingImages`, invoca `NotebookPagesPort.writeImportedContent` y finalmente `ImportJobRepository.markDone` (aplica `complete`, con `skippedImages`) o `ImportJobRepository.markFailed` (aplica `fail`) según el resultado. Si la escritura devuelve un error, borra las imágenes guardadas con `deleteImportedAssets`.
 4. `processImportJob` invoca `ImportTelemetryAdapter.finished` exactamente una vez por transición terminal.
-5. `getImportJobStatus` usa `ImportJob.isAbandoned` (función de solo lectura) para reportar como fallido por tiempo agotado un job que el runtime ya interrumpió, sin escribir ese estado.
-6. `SupabasePdfStorageGateway` implementa `PdfStorageGateway`; `UnpdfTextExtractor` implementa `PdfTextExtractor`; `NotebooksPagesAdapter` implementa `NotebookPagesPort`; `DrizzleImportJobRepository` implementa `ImportJobRepository`.
+5. `getImportJobStatus` busca el job por (página, dueño), responde `null` para una página ajena y usa `ImportJob.isAbandoned` (función de solo lectura) para reportar como fallido por tiempo agotado un job que el runtime ya interrumpió, sin escribir ese estado.
+6. `SupabasePdfStorageGateway` implementa `PdfStorageGateway`; `FormatRoutingDocumentExtractor` implementa `DocumentExtractor` y delega en `PdfDocumentExtractor` o `DocxDocumentExtractor`; `NotebooksPagesAdapter` implementa `NotebookPagesPort`; `DrizzleImportJobRepository` implementa `ImportJobRepository`.
 7. `DrizzleImportJobRepository` persiste sobre la tabla `import_jobs` (Postgres) mediante una sentencia `UPDATE ... RETURNING` atómica por cada transición.
-8. Solo `src/modules/ingestion/infrastructure/` puede importar `unpdf` (regla `unpdf-only-in-ingestion-infra` de `.dependency-cruiser.cjs`); hoy el único archivo que lo importa es `unpdf-text-extractor.ts` (`UnpdfTextExtractor`).
+8. Solo `src/modules/ingestion/infrastructure/` puede importar `unpdf`, `mammoth` y `officeparser` (reglas `unpdf-only-in-ingestion-infra`, `mammoth-only-in-ingestion-infra` y `officeparser-only-in-ingestion-infra` de `.dependency-cruiser.cjs`); hoy `unpdf` lo importa `pdf-document-extractor.ts`, y mammoth y officeparser, `docx-document-extractor.ts`. PowerPoint (T7) no tiene adaptador todavía: `FormatRoutingDocumentExtractor` responde `DOCUMENT_UNSUPPORTED_FORMAT` para `pptx`.
 
 ### 5.2 `study-engine` — implementado
 
@@ -235,7 +243,7 @@ Nota de la Fase 7 (`docs/adr/0008`): `scheduling` y `analytics` no leen por un p
 
 ### 5.3 Detalle de interfaces y tipos clave
 
-Bloques copiados verbatim de `src/modules/ingestion/domain/`.
+Bloques copiados verbatim de `src/modules/ingestion/domain/` (sin comentarios de línea completa).
 
 ```ts
 // src/modules/ingestion/domain/import-job.ts
@@ -255,9 +263,11 @@ export interface ImportJob {
   readonly storagePath: string;
   readonly fileName: string;
   readonly sizeBytes: number; // from the real Storage object
+  readonly format: DocumentFormat;
   readonly status: ImportJobStatus;
   readonly pageCount: number | null; // null until known
   readonly pagesWithoutText: number; // starts at 0
+  readonly skippedImages: number; // starts at 0
   readonly error: string | null; // UI-safe Spanish message, only when failed
   readonly startedAt: Date | null; // start of processing
   readonly finishedAt: Date | null; // terminal instant
@@ -282,15 +292,42 @@ export interface NotebookPagesPort {
     ownerId: string,
     input: { pageId: string; content: ImportedDoc; expectedVersion: number },
   ): Promise<Result<{ version: number }, DomainError>>;
+  storeImportedAsset(
+    ownerId: string,
+    input: { pageId: string; bytes: Uint8Array; mime: string },
+  ): Promise<Result<{ assetId: string }, DomainError>>;
+  deleteImportedAssets(
+    ownerId: string,
+    assetIds: readonly string[],
+  ): Promise<void>;
 }
 ```
 
 ```ts
-// src/modules/ingestion/domain/pdf-text-extractor.ts
-export interface PdfTextExtractor {
+// src/modules/ingestion/domain/document-extractor.ts
+export type ExtractedImage = {
+  key: string;
+  bytes: Uint8Array;
+  mime: string;
+  alt: string | null;
+};
+
+export type ExtractedDocument = {
+  content: ImportedDoc;
+  totalPages: number;
+  pagesWithoutText: number;
+  images: ExtractedImage[];
+  skippedImages: number;
+};
+
+export type ExtractOptions = { signal?: AbortSignal };
+
+export interface DocumentExtractor {
   extract(
     bytes: Uint8Array,
-  ): Promise<Result<{ totalPages: number; pages: string[] }, DomainError>>;
+    format: DocumentFormat,
+    options?: ExtractOptions,
+  ): Promise<Result<ExtractedDocument, DomainError>>;
 }
 ```
 
@@ -313,16 +350,21 @@ export interface PdfStorageGateway {
 ```ts
 // src/modules/ingestion/domain/import-job-repository.ts
 export interface ImportJobRepository {
-  create(job: ImportJob): Promise<Result<void, DomainError>>;
+  create(
+    job: ImportJob,
+    options?: { maxActiveJobs?: number },
+  ): Promise<Result<void, DomainError>>;
   findById(id: string): Promise<ImportJob | null>;
   findByStoragePath(storagePath: string): Promise<ImportJob | null>;
-  findLatestByPage(pageId: string): Promise<ImportJob | null>;
+  findLatestByPage(pageId: string, ownerId?: string): Promise<ImportJob | null>;
   listActivePageIds(ownerId: string): Promise<string[]>;
+  countActiveJobs(ownerId: string, now: Date): Promise<number>;
   claim(input: { id: string; now: Date }): Promise<ImportJob | null>;
   markDone(input: {
     id: string;
     pageCount: number;
     pagesWithoutText: number;
+    skippedImages: number;
     now: Date;
   }): Promise<ImportJob | null>;
   markFailed(input: {
@@ -340,17 +382,42 @@ export interface ImportJobRepository {
 // src/modules/ingestion/domain/import-budget.ts
 export const MAX_DURATION_S = 120;
 export const PROCESSING_BUDGET_MS = 100_000;
+export const IMAGE_UPLOAD_RESERVE_MS = 10_000;
 export const ABANDONED_AFTER_MS = (MAX_DURATION_S + 30) * 1000;
 ```
 
 ```ts
-// src/modules/ingestion/domain/pdf-file.ts (extracto)
-export const PDF_MIME = "application/pdf";
-export const MAX_PDF_BYTES = 20_971_520; // 20 MiB
-export const UPLOAD_GRANT_TTL_MS = 10 * 60 * 1000; // 10 minutos
+// src/modules/ingestion/domain/import-rate-limiter.ts
+export interface ImportRateLimiter {
+  consume(ownerId: string): Promise<{ allowed: boolean }>;
+}
 
-export function looksLikePdf(bytes: Uint8Array): boolean {
-  // comprueba el número mágico "%PDF-"
+const HOUR_MS = 60 * 60 * 1000;
+
+export const IMPORT_STARTS_PER_HOUR = { limit: 10, windowMs: HOUR_MS };
+export const UPLOAD_GRANTS_PER_HOUR = { limit: 20, windowMs: HOUR_MS };
+export const MAX_ACTIVE_IMPORTS = 3;
+```
+
+```ts
+// src/modules/ingestion/domain/document-file.ts (extracto)
+export const PDF_MIME = "application/pdf";
+export const DOCX_MIME =
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+export const PPTX_MIME =
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+
+export const MAX_DOCUMENT_BYTES = 20_971_520;
+export const UPLOAD_GRANT_TTL_MS = 10 * 60 * 1000; // C3: 10-minute upload grant
+```
+
+```ts
+// src/modules/ingestion/domain/document-format.ts (extracto)
+export const DOCUMENT_FORMATS = ["pdf", "docx", "pptx"] as const;
+export type DocumentFormat = (typeof DOCUMENT_FORMATS)[number];
+export type DetectedFormat = DocumentFormat | "legacy" | "unknown";
+export function detectDocumentFormat(bytes: Uint8Array): DetectedFormat {
+  // …
 }
 ```
 
@@ -366,10 +433,10 @@ export function looksLikePdf(bytes: Uint8Array): boolean {
 |---|---|---|---|
 | Dispositivo del estudiante | Cliente | Navegador de escritorio o móvil que ejecuta la interfaz de Cogni. | Navegador web |
 | Cloudflare (DNS) | Servicio de red | Resuelve el dominio canónico de Cogni antes de que la petición llegue a Vercel; también actúa como registrador. | Cloudflare DNS |
-| Vercel (funciones y borde) | Plataforma de cómputo serverless | Ejecuta la aplicación Next.js: Server Components, Server Actions y Route Handlers, con Fluid Compute para invocaciones más largas (importación de PDF y acciones de la página de examen con `maxDuration = 120`; evaluación de recordación activa y recálculo de dominio con `maxDuration = 300`). | Vercel (funciones Node.js) |
+| Vercel (funciones y borde) | Plataforma de cómputo serverless | Ejecuta la aplicación Next.js: Server Components, Server Actions y Route Handlers, con Fluid Compute para invocaciones más largas (importación de documentos y acciones de la página de examen con `maxDuration = 120`; evaluación de recordación activa y recálculo de dominio con `maxDuration = 300`). | Vercel (funciones Node.js) |
 | Vercel Cron | Programador gestionado | Invoca `/api/keep-alive` y `/api/recompute-mastery` diariamente según `vercel.json`. | Vercel Cron |
 | Supabase Postgres | Servicio de base de datos gestionado | Almacena las 20 tablas del esquema, todas con RLS activa. | Supabase (Postgres) |
-| Supabase Storage | Servicio de almacenamiento de objetos gestionado | Guarda imágenes de página (`page-assets`) y PDF importados (`page-pdfs`) en buckets privados. | Supabase (Storage, compatible S3) |
+| Supabase Storage | Servicio de almacenamiento de objetos gestionado | Guarda imágenes de página (`page-assets`) y documentos importados (`page-pdfs`, PDF, DOCX y PPTX) en buckets privados. | Supabase (Storage, compatible S3) |
 | Supabase Auth | Servicio de identidad gestionado | Emite y valida sesiones. | Supabase Auth |
 | Upstash Redis | Servicio Redis serverless gestionado | Guarda límites diarios, cuota por proveedor y estado del *circuit breaker* de la capa de IA. | Upstash (Redis, API REST) |
 | Proveedores de IA | SaaS externos | Google AI Studio (Gemini), Groq, Cloudflare Workers AI y OpenRouter, en sus niveles gratuitos. | APIs HTTPS de cada proveedor |
@@ -419,7 +486,7 @@ Los 11 módulos tienen capas reales; la forma de cada uno depende de lo que nece
 
 Además de las capas, la raíz de los módulos con Server Actions (todos salvo `ai`, `editor` y `study-engine`) contiene esas acciones (`actions.ts` y, según el módulo, `session-actions.ts`, `hub-actions.ts`, `retake-actions.ts`, `feedback-actions.ts`, `evaluation-actions.ts`) y, en cinco módulos (`ai`, `notebooks`, `study-engine`, `scheduling`, `analytics`), un `server-api.ts`: la raíz de composición sin `"use server"` que el `index.ts` reexporta para que otros módulos o Route Handlers usen el módulo desde el servidor. `ai`, `flashcards`, `notebooks`, `scheduling`, `analytics` y `study-engine` exponen también un `testing.ts` con dobles de prueba.
 
-**Entradas públicas.** Entre módulos, cada módulo se importa por su `index.ts` (regla `cross-module-via-index`, que solo se aplica a importaciones con origen en `src/modules/`). La capa de aplicación (`src/app`) importa además, de forma directa, la `ui/` y el `actions.ts` de algunos módulos (por ejemplo `@/modules/identity/ui`, `@/modules/ingestion/ui/pdf-import-provider`, `@/modules/notebooks/actions`, `@/modules/notebooks/ui/notebook-actions-slot` y `@/modules/notebooks/ui/page-title-editor`). Hay dos entradas públicas adicionales, cada una protegida por su propia regla (§7.3):
+**Entradas públicas.** Entre módulos, cada módulo se importa por su `index.ts` (regla `cross-module-via-index`, que solo se aplica a importaciones con origen en `src/modules/`). La capa de aplicación (`src/app`) importa además, de forma directa, la `ui/` y el `actions.ts` de algunos módulos (por ejemplo `@/modules/identity/ui`, `@/modules/ingestion/ui/document-import-provider`, `@/modules/notebooks/actions`, `@/modules/notebooks/ui/notebook-actions-slot` y `@/modules/notebooks/ui/page-title-editor`). Hay dos entradas públicas adicionales, cada una protegida por su propia regla (§7.3):
 
 - `src/modules/identity/proxy.ts` — entrada liviana que solo reexporta `updateSession`, para que `src/proxy.ts` (que corre en cada petición) no cargue el grafo `server-only` del `index.ts` de `identity` (regla `proxy-via-public-entry`).
 - `src/modules/active-recall/calibration.ts` — entrada solo de dominio que expone `calibrationOf`, para que `analytics` la use sin cargar las Server Actions de `active-recall` (regla `domain-entry-is-pure`).
@@ -474,7 +541,7 @@ Especificado en `docs/documento-maestro.md` §5.2; la tercera columna registra l
 | `identity` | Supabase Auth (externo) | Ningún otro módulo. |
 | `notebooks` | `identity` (vía su `index.ts`, para `ownerId`/sesión) | `identity`. |
 | `editor` | `notebooks` (solo el puerto de guardado, inyectado) | Ningún otro módulo: declara su propio `SavePagePort`; la ruta de página lo compone con las Server Actions de `notebooks`. |
-| `ingestion` | `notebooks` (para crear páginas y escribir contenido) | `notebooks` (vía `createNotebooksServerApi`) e `identity` (sesión). |
+| `ingestion` | `notebooks` (para crear páginas y escribir contenido) | `notebooks` (vía `createNotebooksServerApi`, también para guardar las imágenes importadas) e `identity` (sesión); además `src/shared/rate-limit`. |
 | `ai` | Upstash y proveedores de IA (externos) | Ningún otro módulo; externos: Vercel AI SDK, proveedores de IA y Upstash. |
 | `study-engine` | Ninguna del dominio de estudio (es la base) | Ningún otro módulo. |
 | `flashcards` | `study-engine`, `ai`, `notebooks` | `study-engine`, `ai`, `notebooks` e `identity` (sesión). |
@@ -487,7 +554,7 @@ Todos los módulos dependen además de `src/shared/kernel` (dominio puro compart
 
 ### 7.3 Reglas de dependencia
 
-Las 12 reglas reales de `.dependency-cruiser.cjs`, todas con `severity: "error"`, verificadas con `pnpm depcruise` dentro de `.github/workflows/pr.yml` y `.github/workflows/main.yml`. La opción `tsPreCompilationDeps: true` hace que también cuenten los imports solo de tipos (`import type`), que `tsc` borra pero siguen siendo dependencias arquitectónicas.
+Las 14 reglas reales de `.dependency-cruiser.cjs`, todas con `severity: "error"`, verificadas con `pnpm depcruise` dentro de `.github/workflows/pr.yml` y `.github/workflows/main.yml`. La opción `tsPreCompilationDeps: true` hace que también cuenten los imports solo de tipos (`import type`), que `tsc` borra pero siguen siendo dependencias arquitectónicas.
 
 1. **`domain-is-pure`** — el dominio no debe importar de otras capas ni de otros módulos; solo `shared/kernel` está permitido.
 2. **`domain-no-npm`** — el dominio no debe depender de paquetes npm externos (Next.js, Drizzle, AI SDK, React, etc.); Zod es la única excepción permitida.
@@ -498,9 +565,11 @@ Las 12 reglas reales de `.dependency-cruiser.cjs`, todas con `severity: "error"`
 7. **`proxy-via-public-entry`** — `src/proxy.ts` solo puede importar un módulo por una entrada pública: su `index.ts` o una entrada liviana `proxy.ts` (`identity/proxy.ts`) que evita el grafo `server-only` del índice.
 8. **`editor-tiptap-only-in-ui`** — los paquetes de Tiptap y ProseMirror solo pueden importarse desde `editor/ui`; `editor/domain` y `editor/application` deben permanecer independientes del framework.
 9. **`study-engine-knows-no-technique`** — `study-engine` es agnóstico de técnica; no puede importar `flashcards`, `exams` ni `active-recall`, que le hablan a través de su API pública.
-10. **`unpdf-only-in-ingestion-infra`** — `unpdf` solo puede importarse desde `ingestion/infrastructure` (`unpdf-text-extractor.ts`).
-11. **`ai-sdk-only-in-ai-infra`** — el Vercel AI SDK y sus paquetes de proveedor (`ai`, `@ai-sdk/*`, `@openrouter/*`) solo pueden importarse desde `ai/infrastructure`; el resto pasa por `ai.application`.
-12. **`upstash-only-in-ai-infra`** — los paquetes de Upstash solo pueden importarse desde `ai/infrastructure`; el dominio y la aplicación dependen de puertos.
+10. **`unpdf-only-in-ingestion-infra`** — `unpdf` solo puede importarse desde `ingestion/infrastructure` (`pdf-document-extractor.ts`, hasta que T8 lo retire).
+11. **`mammoth-only-in-ingestion-infra`** — mammoth (estructura de Word) solo puede importarse desde `ingestion/infrastructure` (`docx-document-extractor.ts`).
+12. **`officeparser-only-in-ingestion-infra`** — officeparser (colores, numeración y ecuaciones de Word; PowerPoint y PDF planificados) solo puede importarse desde `ingestion/infrastructure`.
+13. **`ai-sdk-only-in-ai-infra`** — el Vercel AI SDK y sus paquetes de proveedor (`ai`, `@ai-sdk/*`, `@openrouter/*`) solo pueden importarse desde `ai/infrastructure`; el resto pasa por `ai.application`.
+14. **`upstash-only-in-ai-infra`** — los paquetes de Upstash solo pueden importarse desde `ai/infrastructure` y desde el limitador compartido `src/shared/rate-limit`; el dominio y la aplicación dependen de puertos.
 
 ---
 
@@ -564,16 +633,16 @@ Ver `04-ADR.md`, ADR-005.
 
 Ver `04-ADR.md`, ADR-006.
 
-### 8.6 `unpdf`
+### 8.6 `unpdf`, mammoth y officeparser
 
 | Criterio | Evaluación |
 |---|---|
-| Costo | Gratuito, sin dependencias nativas (a diferencia de otras librerías de PDF basadas en binarios). |
-| Cobertura funcional | Extrae texto página por página (`extractText(pdf, { mergePages: false })`), suficiente para RF-IN-06 sin necesitar OCR. |
-| Aislamiento arquitectónico | Confinado a `ingestion/infrastructure` por la regla `unpdf-only-in-ingestion-infra`. |
-| Riesgo | No soporta OCR; un PDF sin capa de texto se rechaza explícitamente (`no_text_layer`), una limitación de producto aceptada, no un defecto. |
+| Costo | Gratuitos, de código abierto y sin dependencias nativas ni servicios externos: toda la extracción corre dentro de la función de Vercel (`docs/adr/0009`). |
+| Cobertura funcional | `unpdf` extrae el texto de un PDF página por página, que `textToBlocks` convierte en títulos, párrafos y listas (RF-IN-06). mammoth 1.13 lee la estructura de un Word (títulos, listas anidadas, tablas con celdas combinadas, código, citas, casillas, saltos de página e imágenes) y officeparser 8.2 aporta colores, sombreado, número inicial de las listas y ecuaciones OMML como LaTeX. officeparser leerá también PowerPoint (T7) y reemplazará a `unpdf` en PDF (T8). |
+| Aislamiento arquitectónico | Confinados a `ingestion/infrastructure` por las reglas `unpdf-only-in-ingestion-infra`, `mammoth-only-in-ingestion-infra` y `officeparser-only-in-ingestion-infra`. officeparser va en `serverExternalPackages` de `next.config.ts` porque Turbopack rompe su envoltorio ESM al empaquetarlo. Ningún motor descomprime el ZIP por su cuenta: `OoxmlPackage` infla cada parte con tope de salida. |
+| Riesgo | Ninguno hace OCR; un PDF sin capa de texto se rechaza explícitamente (`no_text_layer`), una limitación de producto aceptada (decisión sobre OCR pendiente, T12). El análisis es síncrono: una página o una parte dentro de los límites puede pasar del presupuesto interno, con `maxDuration = 120` como techo. Los formatos antiguos `.doc`/`.ppt` no se leen. |
 
-Sin ADR dedicado en la suite; decisión de bajo nivel dentro del alcance de `04-ADR.md`, ADR-002.
+Decisión registrada en `docs/adr/0009-importacion-multiformato-y-catalogo-de-contenido.md`; dentro del alcance de `04-ADR.md`, ADR-002.
 
 ### 8.7 Zod
 
@@ -603,7 +672,7 @@ Ver `04-ADR.md`, ADR-010.
 |---|---|
 | Costo | Ambos planes son gratuitos; el riesgo aceptado es que Vercel Hobby asume uso no comercial (SRS §2.3). |
 | Simplicidad operativa | Integración Git nativa: cada `push` a `main` despliega a producción; cada rama abre un *preview*. |
-| Rendimiento | Fluid Compute permite invocaciones más largas (`maxDuration = 120` en la importación de PDF; `maxDuration = 300` en la evaluación de recordación activa, programada con `after()`, y en el cron de dominio) sin migrar a un servicio de colas separado (`docs/adr/0003`). |
+| Rendimiento | Fluid Compute permite invocaciones más largas (`maxDuration = 120` en la importación de documentos; `maxDuration = 300` en la evaluación de recordación activa, programada con `after()`, y en el cron de dominio) sin migrar a un servicio de colas separado (`docs/adr/0003`). |
 | Riesgo | El plan gratuito de Vercel puede reclasificar el uso como comercial si el tráfico crece; migrar de plan no requiere cambios de código, solo de facturación. |
 
 Ver `04-ADR.md`, ADR-009.
@@ -614,7 +683,7 @@ Ver `04-ADR.md`, ADR-009.
 |---|---|
 | Costo | Cuatro proveedores con nivel gratuito, rotados para no depender de uno solo: Google AI Studio (`@ai-sdk/google`, Gemini), Groq (`@ai-sdk/groq`), Cloudflare Workers AI (`@ai-sdk/openai-compatible`) y OpenRouter (`@openrouter/ai-sdk-provider`, modelos `:free`), registrados en `src/modules/ai/infrastructure/provider-registry.ts`. Upstash Redis (plan gratuito) guarda límites, cuota y *circuit breaker* (`docs/adr/0004`). |
 | Cobertura funcional | Salida estructurada validada con Zod para los seis propósitos de `src/modules/ai/domain/purpose.ts` (`generate_flashcards`, `generate_exam_questions`, `generate_exam_variants`, `generate_recall_questions`, `evaluate_recall_answer`, `session_feedback`), cada uno con prompts versionados en `src/modules/ai/application/prompts/`. |
-| Aislamiento arquitectónico | El SDK y sus paquetes de proveedor solo se importan desde `ai/infrastructure` (regla `ai-sdk-only-in-ai-infra`), igual que Upstash (`upstash-only-in-ai-infra`); los demás módulos usan `generateStructured` a través del `index.ts` de `ai`. Con `AI_PROVIDER_MODE=fake`, CI y las pruebas de extremo a extremo usan un proveedor y almacenes falsos, sin claves. |
+| Aislamiento arquitectónico | El SDK y sus paquetes de proveedor solo se importan desde `ai/infrastructure` (regla `ai-sdk-only-in-ai-infra`), igual que Upstash (`upstash-only-in-ai-infra`, que admite también el limitador compartido `src/shared/rate-limit` que usa `ingestion`); los demás módulos usan `generateStructured` a través del `index.ts` de `ai`. Con `AI_PROVIDER_MODE=fake`, CI y las pruebas de extremo a extremo usan un proveedor y almacenes falsos, sin claves. |
 | Riesgo | La llamada usada, `generateObject` de `ai@7`, está marcada como obsoleta en favor de `generateText` con `output` (comentario en `src/modules/ai/infrastructure/ai-sdk-provider.ts`); sigue disponible y se revisará cuando se elimine. El riesgo de negocio (niveles gratuitos que cambian o desaparecen) está documentado en `docs/documento-maestro.md` §14. |
 
 Ver `04-ADR.md`, ADR-008, y `docs/adr/0004-capa-de-ia-con-proveedores-gratuitos.md`.
@@ -786,6 +855,7 @@ Dashboard:
 
 ```ts
 const nextConfig: NextConfig = {
+  serverExternalPackages: ["officeparser"],
   images: {
     remotePatterns: supabaseImageRemotePatterns(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -856,7 +926,7 @@ Solo nombres; ningún valor real fue leído ni se reproduce aquí.
 | `CRON_SECRET` | Secreto de al menos 32 caracteres para autenticar `/api/keep-alive` y `/api/recompute-mastery`. | Vercel Cron |
 | `SENTRY_DSN` | DSN de Sentry para el servidor (opcional). | Sentry |
 | `SUPABASE_STORAGE_BUCKET` | Nombre del bucket privado de imágenes de página. | Supabase Storage |
-| `SUPABASE_PDF_BUCKET` | Nombre del bucket privado de PDF importados. | Supabase Storage |
+| `SUPABASE_PDF_BUCKET` | Nombre del bucket privado de documentos importados (PDF, DOCX y PPTX; conserva el nombre de la era PDF). | Supabase Storage |
 | `GOOGLE_GENERATIVE_AI_API_KEY` | Clave de Google AI Studio (Gemini) (opcional; sin ella el proveedor queda fuera de la rotación). | Proveedores de IA |
 | `GROQ_API_KEY` | Clave de Groq (opcional). | Proveedores de IA |
 | `CLOUDFLARE_ACCOUNT_ID` | Cuenta de Cloudflare para Workers AI (opcional). | Proveedores de IA |
@@ -898,7 +968,7 @@ Los buckets de Storage sí tienen políticas RLS reales por `owner_id`, sobre `s
 
 - `script-src` usa `'self' 'nonce-{value}' 'strict-dynamic'` una vez que existe un nonce, y `'self' 'unsafe-inline'` sin él (el `headers()` estático de `next.config.ts`, red de seguridad solo para rutas fuera del `matcher` del proxy). Además permite `https://*.posthog.com`, porque `posthog-js` carga su configuración remota y módulos diferidos como scripts, y agrega `'unsafe-eval'` solo en desarrollo.
 - `style-src` es `'self' 'unsafe-inline'` y nunca lleva nonce: un nonce no cubre los atributos `style=""`, y una `style-src` con nonce bloqueaba los estilos en línea generados en servidor en cargas completas del navegador (decisión del 2026-09-24, `04-ADR.md`, ADR-011).
-- El resto de directivas: `default-src 'self'`, `img-src` (Supabase y `googleusercontent.com`), `font-src 'self'`, `connect-src` (Supabase, Sentry, PostHog), `worker-src 'self' blob: data:`, `form-action 'self' https://*.supabase.co https://accounts.google.com`, `frame-ancestors 'none'`, `object-src 'none'`, `base-uri 'self'` y `upgrade-insecure-requests`, junto con `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy` y `Permissions-Policy`.
+- El resto de directivas: `default-src 'self'`, `img-src` (Supabase y `googleusercontent.com`), `font-src 'self'`, `connect-src` (Supabase, Sentry, PostHog), `worker-src 'self' blob: data:`, `frame-src 'self' https://www.youtube-nocookie.com` (el bloque de YouTube del editor, `docs/adr/0009`), `form-action 'self' https://*.supabase.co https://accounts.google.com`, `frame-ancestors 'none'`, `object-src 'none'`, `base-uri 'self'` y `upgrade-insecure-requests`, junto con `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy` y `Permissions-Policy`.
 
 ### 12.4 Validación de variables de entorno
 
@@ -906,7 +976,7 @@ Los buckets de Storage sí tienen políticas RLS reales por `owner_id`, sobre `s
 
 ### 12.5 Restricciones de subida
 
-`src/modules/notebooks/domain/page-asset.ts` limita las imágenes de página a `image/jpeg`, `image/png`, `image/webp`, `image/gif`, hasta 10 MiB (RF-NB-07, RNF-P-03). `src/modules/ingestion/domain/pdf-file.ts` limita los PDF importados a `application/pdf`, hasta 20 MiB, valida el número mágico `%PDF-` (`looksLikePdf`) y exige una ruta de almacenamiento canónica por propietario (RF-IN-01, RNF-P-02).
+`src/modules/notebooks/domain/page-asset.ts` limita las imágenes de página a `image/jpeg`, `image/png`, `image/webp`, `image/gif`, hasta 10 MiB (RF-NB-07, RNF-P-03). `src/modules/ingestion/domain/document-file.ts` limita los documentos importados a los tipos de PDF, DOCX y PPTX, hasta 20 MiB, y exige una ruta de almacenamiento canónica por propietario cuya extensión registra el formato declarado (RF-IN-01, RNF-P-02); `detectDocumentFormat` comprueba los bytes reales y rechaza los que no son el formato declarado. Antes de analizar un Word, `inspectOoxmlPackage` revisa el directorio del ZIP y `OoxmlPackage` infla cada parte con tope (RNF-S-09); el PDF admite hasta 300 páginas (`PDF_LIMITS`), las imágenes extraídas tienen sus propios topes (`IMAGE_LIMITS`), y cada estudiante tiene 20 permisos de subida y 10 inicios por hora y hasta 3 importaciones activas (RF-IN-11). Las imágenes importadas pasan por la misma validación de tipo y tamaño que las de página (`storeImportedAsset`).
 
 ### 12.6 Patrones de imágenes remotas
 
@@ -946,11 +1016,11 @@ Esta tabla documenta alineación, no cumplimiento ni certificación: describe qu
 - `src/instrumentation-client.ts` inicializa Sentry en el navegador (antes de la hidratación) y PostHog (`autocapture: false`, `capture_pageview: false`, `capture_pageleave: false`) — sin captura automática, solo eventos explícitos.
 - `sentry.server.config.ts` y `sentry.edge.config.ts` inicializan Sentry con las mismas opciones (`src/shared/observability/sentry-options.ts`): `tracesSampleRate: 0` (solo errores, sin trazas de rendimiento, decisión de cuota) y `sendDefaultPii: false`.
 - `next.config.ts` envuelve la configuración con `withSentryConfig`, usando `/monitoring` como ruta de túnel para que el tráfico de Sentry sea del mismo origen (compatible con la CSP).
-- `src/shared/observability/analytics.ts` define el puerto `Analytics`; `createServerAnalytics` construye un cliente PostHog por llamada y descarta cualquier fallo sin propagarlo (RNF-F-03). Existen cinco eventos en código: `user_signed_up` (registro), `user_signed_in` (cada intercambio exitoso en `/auth/callback` y cada inicio de sesión con correo y contraseña), `pdf_imported` (importación terminada), `generation_requested` (generaciones de flashcards, exámenes y recordación activa) y `terms_accepted` (aceptación de términos, con su versión).
+- `src/shared/observability/analytics.ts` define el puerto `Analytics`; `createServerAnalytics` construye un cliente PostHog por llamada y descarta cualquier fallo sin propagarlo (RNF-F-03). Existen cinco eventos en código: `user_signed_up` (registro), `user_signed_in` (cada intercambio exitoso en `/auth/callback` y cada inicio de sesión con correo y contraseña), `document_imported` (importación terminada, antes `pdf_imported`; con `format` y `skipped_images`), `generation_requested` (generaciones de flashcards, exámenes y recordación activa) y `terms_accepted` (aceptación de términos, con su versión).
 
 **Lo que no existe:**
 
-- La lista de eventos de `docs/documento-maestro.md` §10.3 (`page_created`, `pdf_imported`, `generation_requested`, `session_started`, `session_finished`, `item_rated`) es aspiracional en lo que no coincide con la lista anterior: `pdf_imported` y `generation_requested` están implementados; `page_created`, `session_started`, `session_finished` e `item_rated` no.
+- La lista de eventos de `docs/documento-maestro.md` §10.3 (`page_created`, `document_imported`, `generation_requested`, `session_started`, `session_finished`, `item_rated`) es aspiracional en lo que no coincide con la lista anterior: `document_imported` y `generation_requested` están implementados; `page_created`, `session_started`, `session_finished` e `item_rated` no.
 - No hay trazas de rendimiento (`tracesSampleRate: 0`), ni *dashboards* de métricas de infraestructura propios.
 - No hay un `error.tsx` por ruta bajo `src/app` (solo `global-error.tsx` en la raíz) ni `loading.tsx` en ninguna ruta.
 - Better Stack (registro de logs externo, entregable de la Fase 9) no está integrado.

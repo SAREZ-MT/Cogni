@@ -52,6 +52,7 @@ function job(
     status: "queued",
     pageCount: null,
     pagesWithoutText: 0,
+    skippedImages: 0,
     error: null,
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
@@ -161,6 +162,23 @@ describe("PageImportView", () => {
     );
     expect(screen.getByText(pagesOmittedMessage(2))).toBeInTheDocument();
     expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  // document-import T11: images the import could not keep (format, size,
+  // budget) are reported once the page is ready, without blocking it.
+  it("shows the skipped-images notice above the editor when done with skipped images", async () => {
+    processPdfImport.mockResolvedValue(
+      ok(job({ status: "done", skippedImages: 3 })),
+    );
+
+    renderView({ initial: job({ status: "queued" }) });
+
+    await waitFor(() =>
+      expect(screen.getByTestId("editor")).toBeInTheDocument(),
+    );
+    expect(
+      screen.getByText("No pudimos importar 3 imágenes de este documento."),
+    ).toBeInTheDocument();
   });
 
   it("shows the failed card above the (empty) editor when processPdfImport resolves failed", async () => {

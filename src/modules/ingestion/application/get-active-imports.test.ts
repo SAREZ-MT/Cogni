@@ -82,6 +82,7 @@ describe("getActiveImports use case", () => {
       id: job.id,
       pageCount: 1,
       pagesWithoutText: 0,
+      skippedImages: 0,
       now: new Date(),
     });
 

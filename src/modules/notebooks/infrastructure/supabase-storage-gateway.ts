@@ -63,4 +63,25 @@ export class SupabaseStorageGateway implements StorageGateway {
     if (typeof data.size !== "number" || !data.contentType) return null;
     return { sizeBytes: data.size, mime: data.contentType };
   }
+
+  // document-import T9: the importer runs server-side, so it uploads with
+  // this same service-role client (RLS bypassed; StoreImportedAsset has
+  // already checked page ownership and the canonical path).
+  async upload(
+    path: string,
+    bytes: Uint8Array,
+    contentType: string,
+  ): Promise<void> {
+    const { error } = await storageBucket().upload(path, bytes, {
+      contentType,
+      upsert: false,
+    });
+    if (error) throw error;
+  }
+
+  async remove(paths: string[]): Promise<void> {
+    if (paths.length === 0) return;
+    const { error } = await storageBucket().remove(paths);
+    if (error) throw error;
+  }
 }

@@ -13,10 +13,10 @@ const { capturedActiveImportsProps } = vi.hoisted(() => ({
   capturedActiveImportsProps: [] as Array<{ initialPageIds: string[] }>,
 }));
 vi.mock("@/modules/ingestion", () => ({
-  PdfImportProvider: ({ children }: { children: ReactNode }) => (
-    <div data-testid="pdf-import-provider">{children}</div>
+  DocumentImportProvider: ({ children }: { children: ReactNode }) => (
+    <div data-testid="document-import-provider">{children}</div>
   ),
-  ImportPdfMenuItem: ({
+  ImportDocumentMenuItem: ({
     notebook,
     onImported,
   }: {
@@ -30,7 +30,7 @@ vi.mock("@/modules/ingestion", () => ({
         onImported?.();
       }}
     >
-      Importar PDF de {notebook.title}
+      Importar documento de {notebook.title}
     </button>
   ),
   ActiveImportsProvider: ({
@@ -77,7 +77,7 @@ async function importNotebookActions() {
 }
 
 describe("NotebookActions composition root", () => {
-  it("mounts ActiveImportsProvider around PdfImportProvider around NotebookActionsSlotProvider and renders the children", async () => {
+  it("mounts ActiveImportsProvider around DocumentImportProvider around NotebookActionsSlotProvider and renders the children", async () => {
     const NotebookActions = await importNotebookActions();
 
     render(
@@ -87,7 +87,7 @@ describe("NotebookActions composition root", () => {
     );
 
     expect(screen.getByTestId("active-imports-provider")).toBeInTheDocument();
-    expect(screen.getByTestId("pdf-import-provider")).toBeInTheDocument();
+    expect(screen.getByTestId("document-import-provider")).toBeInTheDocument();
     expect(screen.getByTestId("slot-provider")).toBeInTheDocument();
     expect(screen.getByTestId("sidebar-tree-stub")).toBeInTheDocument();
   });
@@ -107,7 +107,7 @@ describe("NotebookActions composition root", () => {
     ]);
   });
 
-  it("passes a menuItems function that renders ImportPdfMenuItem wired to the caller's refreshTree helper", async () => {
+  it("passes a menuItems function that renders ImportDocumentMenuItem wired to the caller's refreshTree helper", async () => {
     const NotebookActions = await importNotebookActions();
     const refreshTree = vi.fn();
     const user = userEvent.setup();
@@ -123,7 +123,7 @@ describe("NotebookActions composition root", () => {
     render(menuItems?.({ id: "nb-1", title: "Biología" }, { refreshTree }));
 
     await user.click(
-      screen.getByRole("button", { name: "Importar PDF de Biología" }),
+      screen.getByRole("button", { name: "Importar documento de Biología" }),
     );
 
     expect(start).toHaveBeenCalledWith({ notebookId: "nb-1" });

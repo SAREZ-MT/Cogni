@@ -1,10 +1,12 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { DomainError } from "@/shared/kernel/domain-error";
 import { err } from "@/shared/kernel/result";
+import { UPLOAD_GRANT_TTL_MS } from "../domain/document-file";
 import { IMPORT_JOB_ERROR } from "../domain/errors";
 import { createImportJob } from "../domain/import-job";
-import { UPLOAD_GRANT_TTL_MS } from "../domain/pdf-file";
+import { MAX_ACTIVE_IMPORTS } from "../domain/import-rate-limiter";
 import { startPdfImport } from "./start-pdf-import";
+import { FakeImportRateLimiter } from "./testing/fake-import-rate-limiter";
 import { FakeNotebookPagesPort } from "./testing/fake-notebook-pages-port";
 import { FakePdfStorageGateway } from "./testing/fake-pdf-storage-gateway";
 import { FixedClock } from "./testing/fixed-clock";
@@ -18,12 +20,19 @@ const OTHER_OWNER_ID = "0a1b2c3d-4e5f-4061-8798-a1b2c3d4e5f6";
 // whose first 12 hex digits encode `ms` as a big-endian 48-bit timestamp,
 // matching how `@/shared/kernel/id.ts`'s `createId()` lays out bytes 0-5
 // (design.md: "uploadId = createId()"). Mirrors the helper in
-// domain/pdf-file.test.ts so `startPdfImport` can control an upload
+// domain/document-file.test.ts so `startPdfImport` can control an upload
 // grant's age without waiting on the real clock.
-function uploadPath(ownerId: string, issuedAtMs: number): string {
+function uploadPath(
+  ownerId: string,
+  issuedAtMs: number,
+  extension = "pdf",
+): string {
   const hex = issuedAtMs.toString(16).padStart(12, "0");
-  return `${ownerId}/${hex.slice(0, 8)}-${hex.slice(8, 12)}-7abc-89ab-000000000000.pdf`;
+  return `${ownerId}/${hex.slice(0, 8)}-${hex.slice(8, 12)}-7abc-89ab-000000000000.${extension}`;
 }
+
+const DOCX_MIME =
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
 function makeDeps() {
   const notebookPages = new FakeNotebookPagesPort();
@@ -33,6 +42,7 @@ function makeDeps() {
     storage: new FakePdfStorageGateway(),
     jobs: new InMemoryImportJobRepository(),
     clock: new FixedClock(NOW),
+    startLimiter: new FakeImportRateLimiter(),
   };
 }
 
@@ -43,6 +53,12 @@ function seedObject(deps: ReturnType<typeof makeDeps>, path: string) {
 // specs/pdf-import/spec.md; design.md, "Decision: Flujo de subida y
 // procesamiento", step 3 ("startPdfImport").
 describe("startPdfImport use case", () => {
+  // Spies (Storage errors, console) never outlive the case that set them,
+  // even when its assertions fail before the end.
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("creates the page and a queued ImportJob from the real object metadata (Scenario: Importación iniciada)", async () => {
     const deps = makeDeps();
     const path = uploadPath(OWNER_ID, NOW.getTime());
@@ -82,6 +98,56 @@ describe("startPdfImport use case", () => {
       sizeBytes: 2048, // from the real object, not the client-declared 999
       status: "queued",
     });
+  });
+
+  it("starts a docx import whose stored object is a Word document, titling the page without .docx", async () => {
+    const deps = makeDeps();
+    const path = uploadPath(OWNER_ID, NOW.getTime(), "docx");
+    deps.storage.put(path, { sizeBytes: 4096, mime: DOCX_MIME });
+
+    const result = await startPdfImport(
+      {
+        notebookId: "nb-1",
+        storagePath: path,
+        fileName: "Apuntes de clase.docx",
+        mime: DOCX_MIME,
+        sizeBytes: 4096,
+      },
+      deps,
+      OWNER_ID,
+    );
+
+    expect(result.ok).toBe(true);
+    expect(deps.notebookPages.createPageCalls[0]?.title).toBe(
+      "Apuntes de clase",
+    );
+    // document-import T10: the job records the verified format.
+    const job = await deps.jobs.findByStoragePath(path);
+    expect(job?.format).toBe("docx");
+  });
+
+  it("rejects a stored object whose real mime does not match the path's declared format, before creating a page", async () => {
+    const deps = makeDeps();
+    const path = uploadPath(OWNER_ID, NOW.getTime(), "docx");
+    deps.storage.put(path, { sizeBytes: 4096, mime: "application/pdf" });
+
+    const result = await startPdfImport(
+      {
+        notebookId: "nb-1",
+        storagePath: path,
+        fileName: "Apuntes.docx",
+        mime: DOCX_MIME,
+        sizeBytes: 4096,
+      },
+      deps,
+      OWNER_ID,
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("DOCUMENT_UNSUPPORTED_FORMAT");
+    }
+    expect(deps.notebookPages.createPageCalls).toHaveLength(0);
   });
 
   it("falls back to the default page title when the file name leaves nothing after stripping", async () => {
@@ -333,7 +399,8 @@ describe("startPdfImport use case", () => {
     );
 
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error.code).toBe("PDF_PATH_OUT_OF_SCOPE");
+    if (!result.ok)
+      expect(result.error.code).toBe("DOCUMENT_PATH_OUT_OF_SCOPE");
     expect(deps.storage.getObjectMetadataCalls).toHaveLength(0);
     expect(deps.notebookPages.createPageCalls).toHaveLength(0);
   });
@@ -354,7 +421,8 @@ describe("startPdfImport use case", () => {
     );
 
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error.code).toBe("PDF_PATH_OUT_OF_SCOPE");
+    if (!result.ok)
+      expect(result.error.code).toBe("DOCUMENT_PATH_OUT_OF_SCOPE");
   });
 
   it("rejects an upload grant older than 10 minutes when no job exists yet (C3)", async () => {
@@ -377,7 +445,7 @@ describe("startPdfImport use case", () => {
     );
 
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error.code).toBe("PDF_UPLOAD_EXPIRED");
+    if (!result.ok) expect(result.error.code).toBe("DOCUMENT_UPLOAD_EXPIRED");
     expect(deps.storage.getObjectMetadataCalls).toHaveLength(0);
   });
 
@@ -468,7 +536,7 @@ describe("startPdfImport use case", () => {
     );
 
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error.code).toBe("PDF_OBJECT_MISSING");
+    if (!result.ok) expect(result.error.code).toBe("DOCUMENT_OBJECT_MISSING");
     expect(deps.notebookPages.createPageCalls).toHaveLength(0);
   });
 
@@ -490,7 +558,7 @@ describe("startPdfImport use case", () => {
     );
 
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error.code).toBe("PDF_MIME_NOT_ALLOWED");
+    if (!result.ok) expect(result.error.code).toBe("DOCUMENT_MIME_NOT_ALLOWED");
     expect(deps.notebookPages.createPageCalls).toHaveLength(0);
   });
 
@@ -515,7 +583,7 @@ describe("startPdfImport use case", () => {
     );
 
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error.code).toBe("PDF_TOO_LARGE");
+    if (!result.ok) expect(result.error.code).toBe("DOCUMENT_TOO_LARGE");
   });
 
   it("propagates a page-creation failure without creating a job", async () => {
@@ -539,6 +607,46 @@ describe("startPdfImport use case", () => {
 
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toBe(forced);
+    expect(await deps.jobs.findByStoragePath(path)).toBeNull();
+  });
+
+  // document-import T10 (T9b review): the early count can race another
+  // start; the repository's atomic cap is the real guard.
+  it("refuses with RATE_LIMITED when the atomic cap in create() wins a race the early count missed", async () => {
+    const deps = makeDeps();
+    for (let index = 0; index < 3; index++) {
+      await deps.jobs.create(
+        createImportJob(
+          {
+            id: `active-${index}`,
+            ownerId: OWNER_ID,
+            pageId: `page-${index}`,
+            storagePath: `${OWNER_ID}/active-${index}.pdf`,
+            fileName: "otro.pdf",
+            sizeBytes: 1,
+          },
+          { now: () => NOW },
+        ),
+      );
+    }
+    vi.spyOn(deps.jobs, "countActiveJobs").mockResolvedValueOnce(0);
+    const path = uploadPath(OWNER_ID, NOW.getTime());
+    seedObject(deps, path);
+
+    const result = await startPdfImport(
+      {
+        notebookId: "nb-1",
+        storagePath: path,
+        fileName: "apuntes.pdf",
+        mime: "application/pdf",
+        sizeBytes: 2048,
+      },
+      deps,
+      OWNER_ID,
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("INGESTION_RATE_LIMITED");
     expect(await deps.jobs.findByStoragePath(path)).toBeNull();
   });
 
@@ -617,5 +725,218 @@ describe("startPdfImport use case", () => {
     } finally {
       consoleError.mockRestore();
     }
+  });
+
+  // document-import T9b (audit: no import rate limit or concurrency cap).
+  describe("limits", () => {
+    const input = (path: string) => ({
+      notebookId: "nb-1",
+      storagePath: path,
+      fileName: "notas.pdf",
+      mime: "application/pdf",
+      sizeBytes: 2048,
+    });
+
+    it("refuses with RATE_LIMITED, creating nothing, when the owner's start limit is spent", async () => {
+      const deps = makeDeps();
+      const path = uploadPath(OWNER_ID, NOW.getTime());
+      seedObject(deps, path);
+      deps.startLimiter.refuse();
+
+      const result = await startPdfImport(input(path), deps, OWNER_ID);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.error.code).toBe("INGESTION_RATE_LIMITED");
+      expect(deps.startLimiter.consumed).toEqual([OWNER_ID]);
+      expect(deps.notebookPages.createPageCalls).toEqual([]);
+      expect(await deps.jobs.findByStoragePath(path)).toBeNull();
+    });
+
+    it("refuses with RATE_LIMITED, without consuming the limit, while the owner has 3 imports in flight", async () => {
+      const deps = makeDeps();
+      for (let index = 0; index < MAX_ACTIVE_IMPORTS; index++) {
+        await deps.jobs.create(
+          createImportJob(
+            {
+              id: `active-${index}`,
+              ownerId: OWNER_ID,
+              pageId: `page-${index}`,
+              storagePath: uploadPath(OWNER_ID, NOW.getTime() - index - 1),
+              fileName: "a.pdf",
+              sizeBytes: 1,
+            },
+            deps.clock,
+          ),
+        );
+      }
+      const path = uploadPath(OWNER_ID, NOW.getTime());
+      seedObject(deps, path);
+
+      const result = await startPdfImport(input(path), deps, OWNER_ID);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.error.code).toBe("INGESTION_RATE_LIMITED");
+      expect(deps.startLimiter.consumed).toEqual([]);
+      expect(deps.notebookPages.createPageCalls).toEqual([]);
+      expect(MAX_ACTIVE_IMPORTS).toBe(3);
+    });
+
+    // document-import T11 (T10 review): two starts of the same upload in
+    // flight at once, with the owner one slot below the cap. The first takes
+    // the last slot; the second is the same import, so it must replay the
+    // first one's job instead of reporting the active-import limit.
+    it("replays a concurrent start of the same upload that arrives once the owner is at the cap", async () => {
+      const deps = makeDeps();
+      for (let index = 0; index < MAX_ACTIVE_IMPORTS - 1; index++) {
+        await deps.jobs.create(
+          createImportJob(
+            {
+              id: `active-${index}`,
+              ownerId: OWNER_ID,
+              pageId: `page-${index}`,
+              storagePath: uploadPath(OWNER_ID, NOW.getTime() - index - 1),
+              fileName: "a.pdf",
+              sizeBytes: 1,
+            },
+            deps.clock,
+          ),
+        );
+      }
+      const path = uploadPath(OWNER_ID, NOW.getTime());
+      seedObject(deps, path);
+
+      const [first, second] = await Promise.all([
+        startPdfImport(input(path), deps, OWNER_ID),
+        startPdfImport(input(path), deps, OWNER_ID),
+      ]);
+
+      expect(first.ok).toBe(true);
+      expect(second.ok).toBe(true);
+      if (!first.ok || !second.ok) return;
+      expect(second.value.importJobId).toBe(first.value.importJobId);
+      expect(second.value.pageId).toBe(first.value.pageId);
+    });
+
+    it("replays a start of an upload that already holds the last active slot instead of refusing it", async () => {
+      const deps = makeDeps();
+      const path = uploadPath(OWNER_ID, NOW.getTime());
+      seedObject(deps, path);
+      const original = await startPdfImport(input(path), deps, OWNER_ID);
+      for (let index = 0; index < MAX_ACTIVE_IMPORTS - 1; index++) {
+        await deps.jobs.create(
+          createImportJob(
+            {
+              id: `active-${index}`,
+              ownerId: OWNER_ID,
+              pageId: `page-${index}`,
+              storagePath: uploadPath(OWNER_ID, NOW.getTime() - index - 1),
+              fileName: "a.pdf",
+              sizeBytes: 1,
+            },
+            deps.clock,
+          ),
+        );
+      }
+      // The idempotency lookup ran before the concurrent start of the same
+      // upload created its job; by the early count, that job fills the cap.
+      vi.spyOn(deps.jobs, "findByStoragePath").mockResolvedValueOnce(null);
+
+      const repeat = await startPdfImport(input(path), deps, OWNER_ID);
+
+      expect(original.ok).toBe(true);
+      expect(repeat.ok).toBe(true);
+      if (!original.ok || !repeat.ok) return;
+      expect(repeat.value.importJobId).toBe(original.value.importJobId);
+      expect(deps.notebookPages.createPageCalls).toHaveLength(1);
+    });
+
+    it("lets another owner start while one owner is at the cap", async () => {
+      const deps = makeDeps();
+      deps.notebookPages.addNotebook({
+        id: "nb-2",
+        ownerId: OTHER_OWNER_ID,
+        active: true,
+      });
+      for (let index = 0; index < MAX_ACTIVE_IMPORTS; index++) {
+        await deps.jobs.create(
+          createImportJob(
+            {
+              id: `active-${index}`,
+              ownerId: OWNER_ID,
+              pageId: `page-${index}`,
+              storagePath: uploadPath(OWNER_ID, NOW.getTime() - index - 1),
+              fileName: "a.pdf",
+              sizeBytes: 1,
+            },
+            deps.clock,
+          ),
+        );
+      }
+      const path = uploadPath(OTHER_OWNER_ID, NOW.getTime());
+      seedObject(deps, path);
+
+      const result = await startPdfImport(
+        { ...input(path), notebookId: "nb-2" },
+        deps,
+        OTHER_OWNER_ID,
+      );
+
+      expect(result.ok).toBe(true);
+    });
+
+    // document-import T10 (T9b review): a start refused by the storage
+    // checks (missing object, wrong mime, too large, transient error)
+    // must not spend one of the owner's hourly starts.
+    it.each([
+      ["a missing object", () => undefined],
+      [
+        "an object whose real mime is not allowed",
+        (deps: ReturnType<typeof makeDeps>, path: string) =>
+          deps.storage.put(path, { sizeBytes: 2048, mime: "text/plain" }),
+      ],
+      [
+        "an object over the size limit",
+        (deps: ReturnType<typeof makeDeps>, path: string) =>
+          deps.storage.put(path, {
+            sizeBytes: 21 * 1024 * 1024,
+            mime: "application/pdf",
+          }),
+      ],
+      [
+        "an object whose mime is not the path's format",
+        (deps: ReturnType<typeof makeDeps>, path: string) =>
+          deps.storage.put(path, { sizeBytes: 2048, mime: DOCX_MIME }),
+      ],
+      [
+        "a Storage error",
+        (deps: ReturnType<typeof makeDeps>) => {
+          vi.spyOn(deps.storage, "getObjectMetadata").mockRejectedValueOnce(
+            new Error("503"),
+          );
+          vi.spyOn(console, "error").mockImplementation(() => {});
+        },
+      ],
+    ] as const)("does not consume the start limit for %s", async (_case, seed) => {
+      const deps = makeDeps();
+      const path = uploadPath(OWNER_ID, NOW.getTime());
+      seed(deps, path);
+
+      const result = await startPdfImport(input(path), deps, OWNER_ID);
+
+      expect(result.ok).toBe(false);
+      expect(deps.startLimiter.consumed).toEqual([]);
+    });
+
+    it("does not consume the limit for an idempotent repeat of a started import", async () => {
+      const deps = makeDeps();
+      const path = uploadPath(OWNER_ID, NOW.getTime());
+      seedObject(deps, path);
+
+      await startPdfImport(input(path), deps, OWNER_ID);
+      const repeat = await startPdfImport(input(path), deps, OWNER_ID);
+
+      expect(repeat.ok).toBe(true);
+      expect(deps.startLimiter.consumed).toEqual([OWNER_ID]);
+    });
   });
 });

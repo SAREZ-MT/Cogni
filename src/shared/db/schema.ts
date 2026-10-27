@@ -149,6 +149,13 @@ export const IMPORT_JOB_STATUSES = [
 
 export type ImportJobStatusValue = (typeof IMPORT_JOB_STATUSES)[number];
 
+// document-import T10: the formats an import job may record, same
+// convention as IMPORT_JOB_STATUSES (mirrors ingestion's DOCUMENT_FORMATS;
+// `import-jobs.smoke.test.ts` asserts the CHECK constraint matches it).
+export const IMPORT_JOB_FORMATS = ["pdf", "docx", "pptx"] as const;
+
+export type ImportJobFormatValue = (typeof IMPORT_JOB_FORMATS)[number];
+
 // One row per PDF import (design.md, "Tabla `import_jobs` solo accesible
 // desde el servidor"). RLS is on with no policies, like pages: only the
 // server connection reads or writes it. There is no external run id
@@ -166,12 +173,19 @@ export const importJobs = pgTable(
     storagePath: text("storage_path").notNull(),
     fileName: text("file_name").notNull(),
     sizeBytes: integer("size_bytes").notNull(),
+    // document-import T10 (0014): rows before it were all PDF imports.
+    format: text("format")
+      .notNull()
+      .default("pdf")
+      .$type<ImportJobFormatValue>(),
     status: text("status")
       .notNull()
       .default("queued")
       .$type<ImportJobStatusValue>(),
     pageCount: integer("page_count"),
     pagesWithoutText: integer("pages_without_text").notNull().default(0),
+    // document-import T10 (0014): images not imported by a done job.
+    skippedImages: integer("skipped_images").notNull().default(0),
     error: text("error"),
     startedAt: timestamp("started_at", { withTimezone: true }),
     finishedAt: timestamp("finished_at", { withTimezone: true }),
@@ -191,6 +205,11 @@ export const importJobs = pgTable(
       "import_jobs_status_check",
       sql`${table.status} in ('queued', 'processing', 'done', 'failed')`,
     ),
+    check(
+      "import_jobs_format_check",
+      sql`${table.format} in ('pdf', 'docx', 'pptx')`,
+    ),
+    check("import_jobs_skipped_images_check", sql`${table.skippedImages} >= 0`),
   ],
 ).enableRLS();
 

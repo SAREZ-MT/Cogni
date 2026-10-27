@@ -11,28 +11,44 @@
 // already exists (the DB unique constraint since T1), so `startPdfImport`
 // can resolve the race by re-fetching the winning job instead of leaking
 // an exception after the page was already created.
+// `ACTIVE_LIMIT_REACHED` (document-import T10, T9b review): `create` with
+// `maxActiveJobs` refuses a job when the owner already has that many
+// active (queued/processing, not abandoned) jobs, atomically.
 export const IMPORT_JOB_ERROR = {
   INVALID_TRANSITION: "IMPORT_JOB_INVALID_TRANSITION",
   NOT_FOUND: "IMPORT_JOB_NOT_FOUND",
   STORAGE_PATH_CONFLICT: "IMPORT_JOB_STORAGE_PATH_CONFLICT",
+  ACTIVE_LIMIT_REACHED: "IMPORT_JOB_ACTIVE_LIMIT_REACHED",
 } as const;
 
-// DomainError codes for `pdf-file.ts` (design.md, `errors.ts` code list).
-// `MIME_NOT_ALLOWED`/`TOO_LARGE`/`FILE_NAME_INVALID` are raised by this
-// task's pure validators (`validatePdfInput`/`validateFileName`).
+// DomainError codes for `document-file.ts` (design.md, `errors.ts` code
+// list; `PDF_*` renamed to `DOCUMENT_*` when document-import T5 widened the
+// import from PDF to PDF/DOCX/PPTX — no code is persisted, so the rename
+// only touches this module and its UI copy).
+// `MIME_NOT_ALLOWED`/`TOO_LARGE`/`FILE_NAME_INVALID` are raised by the pure
+// validators (`validateDocumentInput`/`validateFileName`).
 // `PATH_OUT_OF_SCOPE`, `UPLOAD_EXPIRED`, `OBJECT_MISSING` and `UNREADABLE`
-// are raised by the application layer (T5's `startPdfImport`, T6's
+// are raised by the application layer (`startPdfImport`,
 // `processImportJob`) from the boolean/number results
-// `isOwnedPdfPath`/`uploadIdAgeMs` return and from `PdfStorageGateway`
-// calls — never from inside `pdf-file.ts`.
-export const PDF_FILE_ERROR = {
-  MIME_NOT_ALLOWED: "PDF_MIME_NOT_ALLOWED",
-  TOO_LARGE: "PDF_TOO_LARGE",
-  FILE_NAME_INVALID: "PDF_FILE_NAME_INVALID",
-  PATH_OUT_OF_SCOPE: "PDF_PATH_OUT_OF_SCOPE",
-  UPLOAD_EXPIRED: "PDF_UPLOAD_EXPIRED",
-  OBJECT_MISSING: "PDF_OBJECT_MISSING",
-  UNREADABLE: "PDF_UNREADABLE",
+// `isOwnedDocumentPath`/`uploadIdAgeMs` return and from `PdfStorageGateway`
+// calls, and by the `DocumentExtractor` adapters (`UNREADABLE`).
+// `UNSUPPORTED_FORMAT` (T5): the stored object's real mime does not match
+// the format its path declares (`startPdfImport`), or a `DocumentExtractor`
+// has no adapter for the format (`FormatRoutingDocumentExtractor`).
+// `LIMIT_EXCEEDED` (T9b): the document is readable but bigger or more
+// complex than the import accepts (OOXML part/total/ratio/entry caps, XML
+// element or nesting caps, PDF page or text caps). `processImportJob`
+// maps it to `invalid_document` with `DOCUMENT_LIMIT_EXCEEDED_MESSAGE`.
+export const DOCUMENT_FILE_ERROR = {
+  MIME_NOT_ALLOWED: "DOCUMENT_MIME_NOT_ALLOWED",
+  TOO_LARGE: "DOCUMENT_TOO_LARGE",
+  FILE_NAME_INVALID: "DOCUMENT_FILE_NAME_INVALID",
+  PATH_OUT_OF_SCOPE: "DOCUMENT_PATH_OUT_OF_SCOPE",
+  UPLOAD_EXPIRED: "DOCUMENT_UPLOAD_EXPIRED",
+  OBJECT_MISSING: "DOCUMENT_OBJECT_MISSING",
+  UNREADABLE: "DOCUMENT_UNREADABLE",
+  UNSUPPORTED_FORMAT: "DOCUMENT_UNSUPPORTED_FORMAT",
+  LIMIT_EXCEEDED: "DOCUMENT_LIMIT_EXCEEDED",
 } as const;
 
 // DomainError codes owned by `application` that are not specific to a PDF
@@ -66,6 +82,9 @@ export const PDF_FILE_ERROR = {
 // Server Action in `actions.ts` wraps its body in maps any exception a
 // dependency throws (`getCurrentUser`, a use case, an adapter) to this
 // code instead of ever letting it escape to the client.
+// `RATE_LIMITED` is T9b's addition (security audit: import rate limit):
+// raised by `requestPdfUpload`/`startPdfImport` when the owner spent the
+// hourly limit or already has MAX_ACTIVE_IMPORTS imports in flight.
 export const INGESTION_ERROR = {
   NOTEBOOK_NOT_FOUND: "INGESTION_NOTEBOOK_NOT_FOUND",
   NOTEBOOK_MISMATCH: "INGESTION_NOTEBOOK_MISMATCH",
@@ -73,4 +92,5 @@ export const INGESTION_ERROR = {
   SESSION_REQUIRED: "INGESTION_SESSION_REQUIRED",
   STORAGE_UNAVAILABLE: "INGESTION_STORAGE_UNAVAILABLE",
   UNEXPECTED: "INGESTION_UNEXPECTED",
+  RATE_LIMITED: "INGESTION_RATE_LIMITED",
 } as const;

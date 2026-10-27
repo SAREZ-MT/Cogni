@@ -16,6 +16,12 @@ export const MAX_DURATION_S = 120;
 // PROCESSING_BUDGET_MS`) for the last write plus the response.
 export const PROCESSING_BUDGET_MS = 100_000;
 
+// document-import T9: image uploads stop once less than this is left of
+// `PROCESSING_BUDGET_MS`, so writing the content (and the terminal
+// transition) always keeps time. Images not uploaded by then are dropped
+// from the content and counted as skipped.
+export const IMAGE_UPLOAD_RESERVE_MS = 10_000;
+
 // How long a non-terminal job may go without an `updated_at` write before
 // `isAbandoned` reports it as abandoned. The platform kills the function at
 // `MAX_DURATION_S`, so nothing can still be running past that instant; the

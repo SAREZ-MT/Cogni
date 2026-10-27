@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { findCatalogueViolations } from "@/shared/kernel/tiptap-catalogue";
 import {
   hasTextContent,
+  type ImportedBlock,
+  type ImportedDoc,
   importedBulletList,
   importedHeading,
   importedListItem,
@@ -189,5 +192,230 @@ describe("hasTextContent", () => {
         content: [importedOrderedList(["  ", " \t"])],
       }),
     ).toBe(false);
+  });
+
+  describe("recursive (every catalogue block)", () => {
+    const blank = importedParagraph("  ");
+    const cases: Array<[string, ImportedBlock, boolean]> = [
+      [
+        "a table cell with text",
+        {
+          type: "table",
+          content: [
+            {
+              type: "tableRow",
+              content: [
+                { type: "tableHeader", content: [blank] },
+                { type: "tableCell", content: [importedParagraph("celda")] },
+              ],
+            },
+          ],
+        },
+        true,
+      ],
+      [
+        "a table of blank cells",
+        {
+          type: "table",
+          content: [
+            {
+              type: "tableRow",
+              content: [{ type: "tableCell", content: [blank] }],
+            },
+          ],
+        },
+        false,
+      ],
+      [
+        "speaker notes inside details",
+        {
+          type: "details",
+          content: [
+            { type: "detailsSummary" },
+            { type: "detailsContent", content: [importedParagraph("notas")] },
+          ],
+        },
+        true,
+      ],
+      [
+        "a callout with text",
+        {
+          type: "callout",
+          attrs: { kind: "note" },
+          content: [importedParagraph("ojo")],
+        },
+        true,
+      ],
+      [
+        "a blockquote of blanks",
+        { type: "blockquote", content: [blank] },
+        false,
+      ],
+      [
+        "a block equation",
+        { type: "blockMath", attrs: { latex: "E=mc^2" } },
+        true,
+      ],
+      [
+        "an empty block equation",
+        { type: "blockMath", attrs: { latex: " " } },
+        false,
+      ],
+      [
+        "an inline equation",
+        {
+          type: "paragraph",
+          content: [{ type: "inlineMath", attrs: { latex: "x^2" } }],
+        },
+        true,
+      ],
+      [
+        "a code block",
+        {
+          type: "codeBlock",
+          attrs: { language: "python" },
+          content: [importedText("x = 1")],
+        },
+        true,
+      ],
+      [
+        "a nested list",
+        {
+          type: "bulletList",
+          content: [
+            {
+              type: "listItem",
+              content: [blank, importedOrderedList(["anidado"])],
+            },
+          ],
+        },
+        true,
+      ],
+      [
+        "a checked task",
+        {
+          type: "taskList",
+          content: [
+            {
+              type: "taskItem",
+              attrs: { checked: true },
+              content: [importedParagraph("hecho")],
+            },
+          ],
+        },
+        true,
+      ],
+      [
+        "an image alone",
+        { type: "image", attrs: { assetId: null, caption: null } },
+        false,
+      ],
+      ["a horizontal rule alone", { type: "horizontalRule" }, false],
+      ["an empty paragraph", { type: "paragraph" }, false],
+    ];
+
+    it.each(cases)("%s → %s", (_label, block, expected) => {
+      expect(hasTextContent({ type: "doc", content: [block] })).toBe(expected);
+    });
+  });
+});
+
+// T2: the widened ImportedDoc type is the catalogue seen from ingestion; a
+// doc using every block variant must pass the same check
+// writeImportedContent applies.
+describe("ImportedDoc", () => {
+  it("covers only catalogue nodes, marks and attrs", () => {
+    const item = (text: string) => importedParagraph(text);
+    const doc: ImportedDoc = {
+      type: "doc",
+      content: [
+        importedHeading(1, "Tema"),
+        {
+          type: "heading",
+          attrs: { level: 5, textAlign: "right" },
+          content: [importedText("Sub")],
+        },
+        {
+          type: "paragraph",
+          attrs: { textAlign: "center", nodeBackground: "mint" },
+          content: [
+            { type: "text", text: "negrita", marks: [{ type: "bold" }] },
+            {
+              type: "text",
+              text: "enlace",
+              marks: [
+                { type: "link", attrs: { href: "https://example.com" } },
+                { type: "highlight", attrs: { color: "blue" } },
+                { type: "textStyle", attrs: { color: "#336699" } },
+              ],
+            },
+            { type: "hardBreak" },
+            { type: "inlineMath", attrs: { latex: "a^2" } },
+            { type: "emoji", attrs: { name: "star" } },
+            { type: "mention", attrs: { id: "page-1", label: "Otra" } },
+          ],
+        },
+        { type: "blockquote", content: [item("cita")] },
+        { type: "callout", attrs: { kind: "idea" }, content: [item("idea")] },
+        {
+          type: "codeBlock",
+          attrs: { language: null },
+          content: [importedText("x = 1")],
+        },
+        { type: "horizontalRule" },
+        importedBulletList(["uno"]),
+        importedOrderedList(["dos"], 2),
+        {
+          type: "taskList",
+          content: [
+            {
+              type: "taskItem",
+              attrs: { checked: false },
+              content: [item("t")],
+            },
+          ],
+        },
+        {
+          type: "table",
+          content: [
+            {
+              type: "tableRow",
+              content: [
+                {
+                  type: "tableHeader",
+                  attrs: { colspan: 2 },
+                  content: [item("h")],
+                },
+              ],
+            },
+          ],
+        },
+        {
+          type: "image",
+          attrs: {
+            assetId: "6f1c2b9e-3d4a-4f5b-8c7d-9e0a1b2c3d4e",
+            alt: "diagrama",
+          },
+        },
+        {
+          type: "details",
+          content: [
+            {
+              type: "detailsSummary",
+              content: [importedText("Notas del orador")],
+            },
+            { type: "detailsContent", content: [item("nota")] },
+          ],
+        },
+        { type: "blockMath", attrs: { latex: "\\int x\\,dx" } },
+        { type: "tocBlock" },
+        {
+          type: "youtube",
+          attrs: { src: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" },
+        },
+      ],
+    };
+
+    expect(findCatalogueViolations(doc)).toEqual([]);
   });
 });

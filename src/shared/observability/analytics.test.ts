@@ -40,13 +40,14 @@ describe("createServerAnalytics", () => {
     expect(shutdown).toHaveBeenCalledWith(2000);
   });
 
-  // Fase 2 (T7b): pdf_imported needs page_count/pages_without_text/
+  // Fase 2 (T7b): the import event (document_imported since
+  // document-import T10) needs page_count/pages_without_text/
   // duration_ms/status alongside distinctId.
   it("forwards optional properties to PostHog's capture call", async () => {
     const { createServerAnalytics } = await import("./analytics");
     const analytics = createServerAnalytics(config);
 
-    await analytics.track("pdf_imported", "user-1", {
+    await analytics.track("document_imported", "user-1", {
       page_count: 12,
       pages_without_text: 0,
       duration_ms: 4200,
@@ -55,7 +56,7 @@ describe("createServerAnalytics", () => {
 
     expect(capture).toHaveBeenCalledWith({
       distinctId: "user-1",
-      event: "pdf_imported",
+      event: "document_imported",
       properties: {
         page_count: 12,
         pages_without_text: 0,

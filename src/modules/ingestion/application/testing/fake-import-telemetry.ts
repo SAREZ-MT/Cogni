@@ -3,7 +3,7 @@ import type { ImportJob } from "../../domain/import-job";
 import type { ImportTelemetry } from "../../domain/import-telemetry";
 
 // Test double for the ImportTelemetry port — records every call in memory
-// so `processImportJob` (T6) tests can assert `pdf_imported` (`finished`)
+// so `processImportJob` (T6) tests can assert `document_imported` (`finished`)
 // fires exactly once per terminal job and never for a job `getImportJobStatus`
 // merely reports as abandoned without writing.
 export class FakeImportTelemetry implements ImportTelemetry {

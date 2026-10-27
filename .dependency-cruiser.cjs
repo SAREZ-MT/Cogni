@@ -89,13 +89,35 @@ module.exports = {
     {
       name: "unpdf-only-in-ingestion-infra",
       comment:
-        "unpdf may only be imported from ingestion/infrastructure (unpdf-text-extractor.ts); every other layer and module must stay decoupled from the PDF parsing library. Unanchored (not `^node_modules/unpdf`): pnpm resolves it to a nested node_modules/.pnpm/unpdf@.../node_modules/unpdf/... path.",
+        "unpdf may only be imported from ingestion/infrastructure (pdf-document-extractor.ts, until document-import T8 removes it); every other layer and module must stay decoupled from the PDF parsing library. Unanchored (not `^node_modules/unpdf`): pnpm resolves it to a nested node_modules/.pnpm/unpdf@.../node_modules/unpdf/... path.",
       severity: "error",
       from: {
         path: "^src/",
         pathNot: "^src/modules/ingestion/infrastructure/",
       },
       to: { path: "node_modules/unpdf" },
+    },
+    {
+      name: "mammoth-only-in-ingestion-infra",
+      comment:
+        "mammoth (DOCX block structure, document-import T6) may only be imported from ingestion/infrastructure (docx-document-extractor.ts); every other layer and module stays decoupled from the parsing library. Unanchored for the same pnpm nested node_modules reason as unpdf.",
+      severity: "error",
+      from: {
+        path: "^src/",
+        pathNot: "^src/modules/ingestion/infrastructure/",
+      },
+      to: { path: "node_modules/mammoth/" },
+    },
+    {
+      name: "officeparser-only-in-ingestion-infra",
+      comment:
+        "officeparser (DOCX colours/lists/equations since document-import T6; PPTX/PDF in T7/T8) may only be imported from ingestion/infrastructure; every other layer and module stays decoupled from the parsing library. Unanchored for the same pnpm nested node_modules reason as unpdf.",
+      severity: "error",
+      from: {
+        path: "^src/",
+        pathNot: "^src/modules/ingestion/infrastructure/",
+      },
+      to: { path: "node_modules/officeparser/" },
     },
     {
       name: "ai-sdk-only-in-ai-infra",
@@ -111,11 +133,11 @@ module.exports = {
     {
       name: "upstash-only-in-ai-infra",
       comment:
-        "Upstash packages may only be imported from ai/infrastructure; domain and application depend on ports.",
+        "Upstash packages may only be imported from ai/infrastructure and the shared rate-limit adapter (src/shared/rate-limit, document-import T9b); domain and application depend on ports.",
       severity: "error",
       from: {
         path: "^src/",
-        pathNot: "^src/modules/ai/infrastructure/",
+        pathNot: "^src/(modules/ai/infrastructure|shared/rate-limit)/",
       },
       to: { path: "node_modules/@upstash/" },
     },

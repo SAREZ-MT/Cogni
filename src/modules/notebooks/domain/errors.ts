@@ -24,4 +24,6 @@ export const ASSET_ERROR = {
   TOO_LARGE: "ASSET_TOO_LARGE",
   PATH_OUT_OF_SCOPE: "ASSET_PATH_OUT_OF_SCOPE",
   FORBIDDEN: "ASSET_FORBIDDEN",
+  // document-import T9: Storage rejected a server-side upload.
+  UPLOAD_FAILED: "ASSET_UPLOAD_FAILED",
 } as const;

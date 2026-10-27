@@ -37,4 +37,19 @@ export interface NotebookPagesPort {
     ownerId: string,
     input: { pageId: string; content: ImportedDoc; expectedVersion: number },
   ): Promise<Result<{ version: number }, DomainError>>;
+  // document-import T9: stores an extracted image as a page asset of
+  // `pageId` (upload to the page-assets bucket + page_assets row) and
+  // returns the id the image node must carry as `assetId`. err for a mime
+  // or size the page assets do not accept, a page that is not the caller's
+  // active page, or a Storage failure.
+  storeImportedAsset(
+    ownerId: string,
+    input: { pageId: string; bytes: Uint8Array; mime: string },
+  ): Promise<Result<{ assetId: string }, DomainError>>;
+  // Best-effort cleanup of assets storeImportedAsset created, when the
+  // content that referenced them could not be written.
+  deleteImportedAssets(
+    ownerId: string,
+    assetIds: readonly string[],
+  ): Promise<void>;
 }

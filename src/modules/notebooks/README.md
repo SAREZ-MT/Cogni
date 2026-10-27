@@ -20,14 +20,38 @@ Hexagonal shape enforced by `.dependency-cruiser.cjs` (`domain-is-pure`,
   `PageAssetRepository`, `StorageGateway`). No framework, no npm
   dependency other than Zod. `TiptapDoc`/`TiptapNode` are defined in
   `src/shared/kernel/tiptap-doc.ts` and re-exported from `plain-text.ts`.
+  `extractPlainText` covers every catalogue node (its comment table lists
+  the rule per node): inline atoms stay on their line (`@label`, `:emoji:`,
+  inline LaTeX), block math is its LaTeX line, an image is its caption
+  (never its alt: alt text is invisible on the page, so since
+  document-import T9b it no longer feeds search or the AI; it stays on the
+  node for accessibility), and youtube/divider/table-of-contents write
+  nothing. Text taken from attrs (LaTeX, mention label, caption) has its
+  line breaks replaced by one space, and an unknown node among inline
+  content stays on that line, so neither ever splits a line. `plain_text` feeds the AI paragraph split
+  (`src/shared/kernel/page-paragraphs.ts`), so output for pre-catalogue
+  nodes is pinned byte-identical to keep paragraph fingerprints stable —
+  except, deliberately, images (the caption is new text; the previous
+  implementation wrote nothing for them) and unknown inline nodes (no
+  longer split their line): such pages get new fingerprints once, on their
+  next save.
   The editor's `SavePagePort` belongs to `editor/domain`; this module's
   `saveContent`/`getCurrentContent` Server Actions satisfy it structurally.
 - `application/`: use cases for creating/renaming/archiving notebooks and
-  pages, saving and reading page content (`content-schema.ts` is the
-  shared Zod schema `save-page.ts` and `write-imported-content.ts` both
-  validate against), the signed image-upload flow
+  pages, saving and reading page content (`content-schema.ts` holds two
+  Zod schemas: the permissive `tiptapDocSchema` the editor autosave in
+  `save-page.ts` validates against, and the strict `tiptapContentSchema`
+  `write-imported-content.ts` uses — an allow-list built from the content
+  catalogue in `src/shared/kernel/tiptap-catalogue.ts` that rejects unknown
+  nodes, marks and attrs, invalid attr values, wrong nesting, links other
+  than http/https/mailto and empty text nodes, so imported content always
+  renders in the editor), the signed image-upload flow
   (`request-image-upload.ts`/`register-page-asset.ts`/
-  `get-asset-read-url.ts`) and `list-sidebar.ts`. Tested against the
+  `get-asset-read-url.ts`), its server-side twin for imported images
+  (`store-imported-asset.ts`, which validates mime/size and ownership,
+  uploads to the canonical path and reuses `registerPageAsset`, plus the
+  best-effort cleanup `delete-imported-assets.ts`) and `list-sidebar.ts`.
+  Tested against the
   in-memory fakes under `application/testing/`.
 - `infrastructure/`: Drizzle repositories (`DrizzleNotebookRepository`,
   `DrizzlePageRepository`, `DrizzlePageAssetRepository`) and
@@ -35,7 +59,7 @@ Hexagonal shape enforced by `.dependency-cruiser.cjs` (`domain-is-pure`,
   layer allowed to import Drizzle or the Supabase client.
 - `ui/`: `SidebarTree` and its dialogs, plus `notebook-actions-slot.tsx` —
   a slot the app shell injects a cross-module menu item and page badge
-  into (used by `ingestion`'s "Importar PDF" entry and importing badge,
+  into (used by `ingestion`'s "Importar documento" entry and importing badge,
   without `notebooks` importing `ingestion`).
 - `actions.ts`: the composition root. `"use server"` — every Server Action
   resolves the session first (`requireOwnerId`/`requireOwnerIdResult`,
@@ -51,7 +75,11 @@ Hexagonal shape enforced by `.dependency-cruiser.cjs` (`domain-is-pure`,
   `writeImportedContent` uses the same atomic compare-and-swap on
   `content_version` as `saveContent`'s `updateIfVersion`, filtering
   `archived_at IS NULL` so an archive racing the write cannot be
-  overwritten.
+  overwritten. `storeImportedAsset`/`deleteImportedAssets` (document-import
+  T9) let the importer upload extracted images and register their
+  `page_assets` rows; `SupabaseStorageGateway` uses the service-role key,
+  so these server-side uploads bypass the bucket's RLS and rely on the
+  use case's ownership and canonical-path checks.
 - `index.ts`: the public API — Server Actions, use cases (for their Zod
   schemas and types), domain types/constants, `createNotebooksServerApi`
   and `SidebarTree`. `cross-module-via-index` forbids any other module
@@ -63,8 +91,8 @@ Hexagonal shape enforced by `.dependency-cruiser.cjs` (`domain-is-pure`,
 through `index.ts`: `NotebooksPagesAdapter` wraps
 `createNotebooksServerApi()` to implement `NotebookPagesPort`
 (`findActiveNotebook`, `createPage`, `findPageNotebookId`,
-`writeImportedContent`), and the app's notebook menu/sidebar inject
-`ingestion`'s "Importar PDF" item and importing badge through
+`writeImportedContent`, `storeImportedAsset`, `deleteImportedAssets`), and the app's notebook menu/sidebar inject
+`ingestion`'s "Importar documento" item and importing badge through
 `notebook-actions-slot.tsx` — the reverse direction, `notebooks` never
 imports `ingestion`.
 
@@ -75,5 +103,6 @@ imports `ingestion`.
   and `server-api.ts` (mocked session/adapters), `ui` components (Testing
   Library). No `DATABASE_URL` or Supabase config needed.
 - `pnpm test:db` — DB smoke tests against `cogni-dev`: schema, cascades,
-  RLS predicates and the `updateIfVersion`/`writeImportedContent`
-  compare-and-swap races.
+  RLS predicates, the `updateIfVersion`/`writeImportedContent`
+  compare-and-swap races and the owner-scoped
+  `DrizzlePageAssetRepository.deleteByIds`.

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   ABANDONED_AFTER_MS,
+  IMAGE_UPLOAD_RESERVE_MS,
   MAX_DURATION_S,
   PROCESSING_BUDGET_MS,
 } from "./import-budget";
@@ -17,5 +18,10 @@ describe("import budget constants", () => {
 
   it("derives ABANDONED_AFTER_MS from MAX_DURATION_S plus a 30 s margin", () => {
     expect(ABANDONED_AFTER_MS).toBe((MAX_DURATION_S + 30) * 1000);
+  });
+
+  it("reserves part of the processing budget for the write after image uploads", () => {
+    expect(IMAGE_UPLOAD_RESERVE_MS).toBe(10_000);
+    expect(IMAGE_UPLOAD_RESERVE_MS).toBeLessThan(PROCESSING_BUDGET_MS);
   });
 });

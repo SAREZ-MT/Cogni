@@ -2,6 +2,7 @@
 
 import { LoaderCircle } from "lucide-react";
 import { useIsImporting } from "./active-imports-provider";
+import { INGESTION_COPY } from "./ingestion-copy";
 
 export interface ImportingPageBadgeProps {
   pageId: string;
@@ -22,7 +23,7 @@ export function ImportingPageBadge({ pageId }: ImportingPageBadgeProps) {
       size={14}
       strokeWidth={1.75}
       role="img"
-      aria-label="Importando PDF"
+      aria-label={INGESTION_COPY.importingDocument}
       className="animate-spin text-muted-foreground motion-reduce:animate-none"
     />
   );

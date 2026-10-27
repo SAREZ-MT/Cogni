@@ -19,4 +19,12 @@ export interface StorageGateway {
   getObjectMetadata(
     path: string,
   ): Promise<{ sizeBytes: number; mime: string } | null>;
+  // document-import T9: server-side upload of an image the importer
+  // extracted (StoreImportedAsset). Never overwrites an existing object.
+  // Rejects when Storage refuses the object.
+  upload(path: string, bytes: Uint8Array, contentType: string): Promise<void>;
+  // Best-effort cleanup of objects (DeleteImportedAssets, and
+  // StoreImportedAsset when registration fails). Rejects on failure; the
+  // callers swallow it.
+  remove(paths: string[]): Promise<void>;
 }

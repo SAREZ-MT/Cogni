@@ -19,7 +19,7 @@ import {
 // breadcrumb publishing) and the editor mount as `<PageEditor>` (the client
 // wrapper that injects the mention port / "Importar PDF" slash item).
 // Both are mocked wholesale here, same as `Editor` used to be — their own
-// internals (which pull in Server Actions, `usePdfImport`, etc.) are never
+// internals (which pull in Server Actions, `useDocumentImport`, etc.) are never
 // executed by this non-rendering, server-component-only test, and are
 // covered by their own behavior elsewhere (page-title-editor.test.tsx-style
 // coverage is a known gap noted in the E1 report, not added in this pass).

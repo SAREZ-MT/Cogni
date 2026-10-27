@@ -10,6 +10,39 @@ function directive(csp: string, name: string): string {
 }
 
 describe("securityHeaders", () => {
+  // document-import T3: the editor's YouTube embed (extensions/youtube.ts)
+  // always loads from youtube-nocookie.com. 'self' stays so same-origin
+  // frames keep the default-src 'self' behaviour they had before frame-src
+  // existed.
+  it("allows same-origin frames and the youtube-nocookie embed in frame-src", () => {
+    for (const csp of [
+      header("Content-Security-Policy") ?? "",
+      buildSecurityHeaders("abc123")[0].value,
+    ]) {
+      expect(directive(csp, "frame-src ")).toBe(
+        "frame-src 'self' https://www.youtube-nocookie.com",
+      );
+    }
+  });
+
+  it("keeps every other CSP directive unchanged", () => {
+    const csp = buildSecurityHeaders("abc123")[0].value;
+    expect(csp.split("; ").filter((d) => !d.startsWith("frame-src "))).toEqual([
+      "default-src 'self'",
+      "script-src 'self' 'nonce-abc123' 'strict-dynamic' https://*.posthog.com",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' blob: data: https://*.googleusercontent.com https://*.supabase.co",
+      "font-src 'self'",
+      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://*.posthog.com https://*.i.posthog.com",
+      "worker-src 'self' blob: data:",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "form-action 'self' https://*.supabase.co https://accounts.google.com",
+      "frame-ancestors 'none'",
+      "upgrade-insecure-requests",
+    ]);
+  });
+
   it("declares every header the spec requires", () => {
     expect(securityHeaders.map((h) => h.key)).toEqual([
       "Content-Security-Policy",

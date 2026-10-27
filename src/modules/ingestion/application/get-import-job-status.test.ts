@@ -62,6 +62,7 @@ describe("getImportJobStatus use case", () => {
       status: "queued",
       pageCount: null,
       pagesWithoutText: 0,
+      skippedImages: 0,
       error: null,
       createdAt: NOW.toISOString(),
       updatedAt: NOW.toISOString(),
@@ -69,7 +70,44 @@ describe("getImportJobStatus use case", () => {
     expect(result.value && "storagePath" in result.value).toBe(false);
   });
 
-  it("rejects a job owned by someone else without revealing existence", async () => {
+  // document-import T11: the page view tells the user how many images of
+  // a done import were left out.
+  it("reports how many images a done import skipped", async () => {
+    const deps = makeDeps();
+    const created = createImportJob(
+      {
+        id: "job-1",
+        ownerId: OWNER_ID,
+        pageId: "page-1",
+        storagePath: `${OWNER_ID}/upload-1.docx`,
+        fileName: "notas.docx",
+        sizeBytes: 1024,
+      },
+      deps.clock,
+    );
+    await deps.jobs.create(created);
+    await deps.jobs.claim({ id: "job-1", now: NOW });
+    await deps.jobs.markDone({
+      id: "job-1",
+      pageCount: 1,
+      pagesWithoutText: 0,
+      skippedImages: 2,
+      now: NOW,
+    });
+
+    const result = await getImportJobStatus(
+      { pageId: "page-1" },
+      deps,
+      OWNER_ID,
+    );
+
+    expect(result.ok && result.value?.skippedImages).toBe(2);
+  });
+
+  // T9b (security audit: existence oracle): another user's page answers
+  // exactly like a page without imports — ok(null) — instead of an error
+  // that would reveal the page has an import job.
+  it("answers ok(null) for another user's page, exactly like a page without imports", async () => {
     const deps = makeDeps();
     const job = createImportJob(
       {
@@ -90,8 +128,13 @@ describe("getImportJobStatus use case", () => {
       OWNER_ID,
     );
 
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error.code).toBe("IMPORT_JOB_NOT_FOUND");
+    const none = await getImportJobStatus(
+      { pageId: "page-without-jobs" },
+      deps,
+      OWNER_ID,
+    );
+    expect(result).toEqual({ ok: true, value: null });
+    expect(result).toEqual(none);
   });
 
   it("reports an abandoned processing job as failed(timeout) without writing", async () => {
@@ -123,7 +166,7 @@ describe("getImportJobStatus use case", () => {
     if (!result.ok) return;
     expect(result.value?.status).toBe("failed");
     expect(result.value?.error).toBe(
-      "La importación tardó demasiado. Inténtalo de nuevo con un PDF más pequeño o en unos minutos.",
+      "La importación tardó demasiado. Inténtalo de nuevo con un documento más pequeño o en unos minutos.",
     );
     expect(markFailedSpy).not.toHaveBeenCalled();
     // Nothing was persisted: re-reading directly still shows `processing`.
@@ -188,6 +231,7 @@ describe("toImportJobStatusView", () => {
       status: "queued",
       pageCount: null,
       pagesWithoutText: 0,
+      skippedImages: 0,
       error: null,
       createdAt: NOW.toISOString(),
       updatedAt: NOW.toISOString(),

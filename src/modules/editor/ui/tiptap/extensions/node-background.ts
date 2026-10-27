@@ -9,6 +9,7 @@
 // palette, so "no hex values ever appear in a component" (docs/design-
 // system) still holds and both pickers show the exact same 7 swatches.
 import { Extension } from "@tiptap/core";
+import { NODE_BACKGROUND_NODES } from "@/shared/kernel/tiptap-catalogue";
 import { type HIGHLIGHT_PALETTE, isHighlightColor } from "../highlight-palette";
 
 // Tailwind v4 needs literal class names to keep them in the generated CSS
@@ -30,15 +31,9 @@ const NODE_BACKGROUND_CLASSES: Record<
 
 // The block types the E2 brief names for "Colores" > "Fondo": paragraph,
 // heading, the three list containers (a background on the list itself,
-// not per-item) and blockquote.
-export const NODE_BACKGROUND_TYPES = [
-  "paragraph",
-  "heading",
-  "bulletList",
-  "orderedList",
-  "taskList",
-  "blockquote",
-] as const;
+// not per-item) and blockquote. Owned by the content catalogue so imported
+// content and the editor agree on where a background may appear.
+export const NODE_BACKGROUND_TYPES = NODE_BACKGROUND_NODES;
 
 export const NodeBackground = Extension.create({
   name: "nodeBackground",

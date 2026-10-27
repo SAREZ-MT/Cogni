@@ -5,7 +5,7 @@ import { err, ok, type Result } from "@/shared/kernel/result";
 import { PAGE_ERROR } from "../domain/errors";
 import type { PageRepository } from "../domain/page-repository";
 import { extractPlainText, type TiptapDoc } from "../domain/plain-text";
-import { tiptapDocSchema } from "./content-schema";
+import { tiptapContentSchema } from "./content-schema";
 import { parseInput } from "./validation";
 
 // .strict(): an extra top-level field, in particular plainText or
@@ -15,7 +15,9 @@ import { parseInput } from "./validation";
 export const writeImportedContentSchema = z
   .object({
     pageId: z.string(),
-    content: tiptapDocSchema,
+    // Strict catalogue schema, unlike save-page.ts (T2,
+    // odd/tasks/document-import.md).
+    content: tiptapContentSchema,
     expectedVersion: z.number().int(),
   })
   .strict();

@@ -93,9 +93,11 @@ if (url) {
         storagePath,
         fileName: "concurrente-a.pdf",
         sizeBytes: 2048,
+        format: "pdf" as const,
         status: "queued" as const,
         pageCount: null,
         pagesWithoutText: 0,
+        skippedImages: 0,
         error: null,
         startedAt: null,
         finishedAt: null,
@@ -168,9 +170,11 @@ if (url) {
         storagePath: `${owner.id}/${randomUUID()}.pdf`,
         fileName: "notas.pdf",
         sizeBytes: 1024,
+        format: "pdf",
         status: "queued",
         pageCount: null,
         pagesWithoutText: 0,
+        skippedImages: 0,
         error: null,
         startedAt: null,
         finishedAt: null,
@@ -189,6 +193,7 @@ if (url) {
         id: job.id,
         pageCount: 12,
         pagesWithoutText: 2,
+        skippedImages: 0,
         now,
       });
 
@@ -206,6 +211,7 @@ if (url) {
         id: job.id,
         pageCount: 5,
         pagesWithoutText: 0,
+        skippedImages: 0,
         now: new Date("2026-09-23T09:05:00.000Z"),
       });
 
@@ -227,6 +233,7 @@ if (url) {
         id: job.id,
         pageCount: 5,
         pagesWithoutText: 0,
+        skippedImages: 0,
         now: new Date("2026-09-23T09:05:00.000Z"),
       });
 

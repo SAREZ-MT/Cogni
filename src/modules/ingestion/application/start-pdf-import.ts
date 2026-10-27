@@ -3,17 +3,26 @@ import type { Clock } from "@/shared/kernel/clock";
 import { DomainError } from "@/shared/kernel/domain-error";
 import { createId } from "@/shared/kernel/id";
 import { err, ok, type Result } from "@/shared/kernel/result";
-import { INGESTION_ERROR, PDF_FILE_ERROR } from "../domain/errors";
-import { createImportJob, type ImportJobStatus } from "../domain/import-job";
-import type { ImportJobRepository } from "../domain/import-job-repository";
-import type { NotebookPagesPort } from "../domain/notebook-pages-port";
 import {
-  isOwnedPdfPath,
+  documentFormatFromPath,
+  isOwnedDocumentPath,
   pageTitleFromFileName,
   UPLOAD_GRANT_TTL_MS,
   uploadIdAgeMs,
-  validatePdfInput,
-} from "../domain/pdf-file";
+  validateDocumentInput,
+} from "../domain/document-file";
+import {
+  DOCUMENT_FILE_ERROR,
+  IMPORT_JOB_ERROR,
+  INGESTION_ERROR,
+} from "../domain/errors";
+import { createImportJob, type ImportJobStatus } from "../domain/import-job";
+import type { ImportJobRepository } from "../domain/import-job-repository";
+import {
+  type ImportRateLimiter,
+  MAX_ACTIVE_IMPORTS,
+} from "../domain/import-rate-limiter";
+import type { NotebookPagesPort } from "../domain/notebook-pages-port";
 import type { PdfStorageGateway } from "../domain/pdf-storage-gateway";
 import { parseInput } from "./validation";
 
@@ -35,8 +44,9 @@ export interface StartPdfImportResult {
 // design.md, "Decision: Flujo de subida y procesamiento", step 3 —
 // `startPdfImport` is fast (no download, no extraction). In order:
 //
-// 1. The storage path must have the exact `{ownerId}/{uuid v7}.pdf` shape
-//    (isOwnedPdfPath), checked before touching the repository or Storage.
+// 1. The storage path must have the exact
+//    `{ownerId}/{uuid v7}.{pdf|docx|pptx}` shape (isOwnedDocumentPath),
+//    checked before touching the repository or Storage.
 // 2. Idempotency by storagePath, checked *before* the expiry check
 //    (review follow-up: a repeated call for an already-started import must
 //    return the existing job even if the upload grant has since expired).
@@ -47,10 +57,18 @@ export interface StartPdfImportResult {
 //    Number.isFinite guard is needed here.
 // 4. The notebook is active and owned, re-checked (the grant may outlive
 //    the notebook).
+// 4b. T9b (security audit): the owner may not have MAX_ACTIVE_IMPORTS
+//    imports in flight already (an early count; `create` enforces it
+//    atomically in step 7, T10). A start of an upload that already has a
+//    job is a repeat and replays it, even at the cap (T11).
 // 5. The object's real metadata from Storage — never the client-declared
-//    mime/size for a path this far in.
+//    mime/size for a path this far in — whose mime must also be the format
+//    the path's extension declares (document-import T5).
+// 5b. Only then one start of the hourly limit (`startLimiter`; T10 moved
+//    it after the storage checks; an idempotent repeat never consumes
+//    one). Both 4b and 5b refuse with INGESTION_ERROR.RATE_LIMITED.
 // 6-7. Create the destination page, then the ImportJob in `queued` with
-//    the real object's size.
+//    the real object's size and format, under the atomic active cap.
 //
 // Note (design.md, risk table): steps 6 and 7 are not atomic across
 // modules. If job creation fails after the page was created, an orphan
@@ -62,6 +80,7 @@ export async function startPdfImport(
     storage: PdfStorageGateway;
     jobs: ImportJobRepository;
     clock: Clock;
+    startLimiter: ImportRateLimiter;
   },
   ownerId: string,
 ): Promise<Result<StartPdfImportResult, DomainError>> {
@@ -69,8 +88,10 @@ export async function startPdfImport(
   if (!parsed.ok) return parsed;
   const { notebookId, storagePath, fileName } = parsed.value;
 
-  if (!isOwnedPdfPath(ownerId, storagePath)) {
-    return err(new DomainError(PDF_FILE_ERROR.PATH_OUT_OF_SCOPE, storagePath));
+  if (!isOwnedDocumentPath(ownerId, storagePath)) {
+    return err(
+      new DomainError(DOCUMENT_FILE_ERROR.PATH_OUT_OF_SCOPE, storagePath),
+    );
   }
 
   const existing = await deps.jobs.findByStoragePath(storagePath);
@@ -80,7 +101,9 @@ export async function startPdfImport(
 
   const ageMs = uploadIdAgeMs(storagePath, deps.clock.now());
   if (ageMs > UPLOAD_GRANT_TTL_MS) {
-    return err(new DomainError(PDF_FILE_ERROR.UPLOAD_EXPIRED, storagePath));
+    return err(
+      new DomainError(DOCUMENT_FILE_ERROR.UPLOAD_EXPIRED, storagePath),
+    );
   }
 
   const notebook = await deps.notebookPages.findActiveNotebook(
@@ -91,6 +114,19 @@ export async function startPdfImport(
     return err(new DomainError(INGESTION_ERROR.NOTEBOOK_NOT_FOUND, notebookId));
   }
 
+  const active = await deps.jobs.countActiveJobs(ownerId, deps.clock.now());
+  if (active >= MAX_ACTIVE_IMPORTS) {
+    // T11 (T10 review): a concurrent start of this same upload may have
+    // created its job since the idempotency lookup above, and be the one
+    // filling the cap — that is a repeat to replay, not a refusal.
+    const concurrent = await deps.jobs.findByStoragePath(storagePath);
+    if (concurrent) {
+      return echoIdempotentJob(deps, concurrent, notebookId, ownerId);
+    }
+    return err(
+      new DomainError(INGESTION_ERROR.RATE_LIMITED, `${active} active imports`),
+    );
+  }
   // T7c follow-up (R3-metadata-throw-callers-unproved): the port now
   // throws on a transient error instead of reporting it as missing
   // (T7b/T7c: R3-metadata-transient-error-as-missing); this use case must
@@ -112,10 +148,25 @@ export async function startPdfImport(
     );
   }
   if (!metadata) {
-    return err(new DomainError(PDF_FILE_ERROR.OBJECT_MISSING, storagePath));
+    return err(
+      new DomainError(DOCUMENT_FILE_ERROR.OBJECT_MISSING, storagePath),
+    );
   }
-  const validMetadata = validatePdfInput(metadata);
+  const validMetadata = validateDocumentInput(metadata);
   if (!validMetadata.ok) return validMetadata;
+  if (validMetadata.value !== documentFormatFromPath(storagePath)) {
+    return err(
+      new DomainError(DOCUMENT_FILE_ERROR.UNSUPPORTED_FORMAT, storagePath),
+    );
+  }
+
+  // T10 (T9b review): the hourly allowance is spent only once the stored
+  // object passed every check, right before anything is created — a start
+  // refused for a missing, mistyped or oversized object costs nothing.
+  const allowance = await deps.startLimiter.consume(ownerId);
+  if (!allowance.allowed) {
+    return err(new DomainError(INGESTION_ERROR.RATE_LIMITED, "import starts"));
+  }
 
   const page = await deps.notebookPages.createPage(ownerId, {
     notebookId,
@@ -131,10 +182,26 @@ export async function startPdfImport(
       storagePath,
       fileName,
       sizeBytes: metadata.sizeBytes,
+      format: validMetadata.value,
     },
     deps.clock,
   );
-  const created = await deps.jobs.create(job);
+  const created = await deps.jobs.create(job, {
+    maxActiveJobs: MAX_ACTIVE_IMPORTS,
+  });
+  if (
+    !created.ok &&
+    created.error.code === IMPORT_JOB_ERROR.ACTIVE_LIMIT_REACHED
+  ) {
+    // T10 (T9b review): another start won the last active slot between
+    // the early count above and this atomic check. The page just created
+    // stays an orphan, the same accepted risk as the conflict below.
+    return err(
+      new DomainError(INGESTION_ERROR.RATE_LIMITED, "active imports", {
+        cause: created.error,
+      }),
+    );
+  }
   if (!created.ok) {
     // Lost the race: another concurrent call already created a job for
     // this storagePath between the idempotency check above and this

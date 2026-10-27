@@ -7,7 +7,11 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { cn } from "@/shared/ui/utils";
-import { INGESTION_COPY, pagesOmittedMessage } from "./ingestion-copy";
+import {
+  INGESTION_COPY,
+  pagesOmittedMessage,
+  skippedImagesMessage,
+} from "./ingestion-copy";
 
 // specs/design-tokens-and-shell/spec.md, "Requirement: Indicador de
 // progreso de importación" — the six states of an import job's lifecycle
@@ -29,6 +33,9 @@ const ACTIVE_STATES: readonly ImportProgressState[] = [
 export interface ImportProgressProps {
   state: ImportProgressState;
   pagesWithoutText?: number;
+  // Images a done import left out (document-import T11): the same warning
+  // variant as omitted pages, as its own line when both apply.
+  skippedImages?: number;
   error?: string | null;
   // The 90-second "tardando más de lo esperado" notice (design.md's table,
   // last row). Owned by the caller (T11's polling view): this component
@@ -88,6 +95,7 @@ function visualFor(
 function messageFor(
   state: ImportProgressState,
   pagesWithoutText: number,
+  skippedImages: number,
   error: string | null | undefined,
 ): string {
   switch (state) {
@@ -98,9 +106,9 @@ function messageFor(
     case "processing":
       return INGESTION_COPY.progress.processing;
     case "done":
-      return pagesWithoutText > 0
-        ? pagesOmittedMessage(pagesWithoutText)
-        : INGESTION_COPY.progress.done;
+      if (pagesWithoutText > 0) return pagesOmittedMessage(pagesWithoutText);
+      if (skippedImages > 0) return skippedImagesMessage(skippedImages);
+      return INGESTION_COPY.progress.done;
     case "failed":
       return error ?? INGESTION_COPY.progress.genericError;
   }
@@ -113,12 +121,19 @@ function messageFor(
 export function ImportProgress({
   state,
   pagesWithoutText = 0,
+  skippedImages = 0,
   error,
   delayed = false,
 }: ImportProgressProps) {
-  const hasOmissions = state === "done" && pagesWithoutText > 0;
+  const hasOmissions =
+    state === "done" && (pagesWithoutText > 0 || skippedImages > 0);
   const { icon: Icon, spin, circleClassName } = visualFor(state, hasOmissions);
-  const text = messageFor(state, pagesWithoutText, error);
+  const text = messageFor(state, pagesWithoutText, skippedImages, error);
+  // Omitted pages take the main line; skipped images then go below it.
+  const secondary =
+    state === "done" && pagesWithoutText > 0 && skippedImages > 0
+      ? skippedImagesMessage(skippedImages)
+      : null;
   const isAlert = state === "failed";
 
   return (
@@ -150,6 +165,7 @@ export function ImportProgress({
         >
           {text}
         </p>
+        {secondary && <p className="text-fg-muted text-xs">{secondary}</p>}
         {delayed && ACTIVE_STATES.includes(state) && (
           <output aria-live="polite" className="text-fg-muted text-xs">
             {INGESTION_COPY.progress.delay}

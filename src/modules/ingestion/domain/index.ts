@@ -1,7 +1,34 @@
+export type {
+  DocumentExtractor,
+  ExtractedDocument,
+  ExtractedImage,
+} from "./document-extractor";
 export {
+  DOCUMENT_MIME,
+  DOCX_MIME,
+  documentFormatFromMime,
+  documentFormatFromPath,
+  documentStoragePath,
+  isOwnedDocumentPath,
+  MAX_DOCUMENT_BYTES,
+  PDF_MIME,
+  PPTX_MIME,
+  pageTitleFromFileName,
+  UPLOAD_GRANT_TTL_MS,
+  uploadIdAgeMs,
+  validateDocumentInput,
+  validateFileName,
+} from "./document-file";
+export {
+  type DetectedFormat,
+  DOCUMENT_FORMATS,
+  type DocumentFormat,
+  detectDocumentFormat,
+} from "./document-format";
+export {
+  DOCUMENT_FILE_ERROR,
   IMPORT_JOB_ERROR,
   INGESTION_ERROR,
-  PDF_FILE_ERROR,
 } from "./errors";
 export {
   ABANDONED_AFTER_MS,
@@ -9,6 +36,7 @@ export {
   PROCESSING_BUDGET_MS,
 } from "./import-budget";
 export {
+  DOCUMENT_LIMIT_EXCEEDED_MESSAGE,
   failureMessage,
   IMPORT_FAILURE_KIND,
   type ImportFailureKind,
@@ -46,17 +74,6 @@ export {
   importedText,
 } from "./imported-doc";
 export type { NotebookPagesPort } from "./notebook-pages-port";
-export {
-  isOwnedPdfPath,
-  looksLikePdf,
-  MAX_PDF_BYTES,
-  PDF_MIME,
-  pageTitleFromFileName,
-  UPLOAD_GRANT_TTL_MS,
-  uploadIdAgeMs,
-  validateFileName,
-  validatePdfInput,
-} from "./pdf-file";
 export type { PdfStorageGateway } from "./pdf-storage-gateway";
-export type { PdfTextExtractor } from "./pdf-text-extractor";
+export { pendingImageKeys, resolvePendingImages } from "./pending-images";
 export { type TextToBlocksResult, textToBlocks } from "./text-to-blocks";

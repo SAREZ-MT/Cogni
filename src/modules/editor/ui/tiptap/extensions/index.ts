@@ -18,7 +18,7 @@
 // dependencies.
 import type { AnyExtension } from "@tiptap/core";
 import Emoji from "@tiptap/extension-emoji";
-import { Mathematics } from "@tiptap/extension-mathematics";
+import { BlockMath, InlineMath } from "@tiptap/extension-mathematics";
 import { NodeRange } from "@tiptap/extension-node-range";
 import Subscript from "@tiptap/extension-subscript";
 import Superscript from "@tiptap/extension-superscript";
@@ -29,7 +29,19 @@ import TextAlign from "@tiptap/extension-text-align";
 // Context7-confirmed (tiptap-docs, editor/extensions/functionality/
 // color.mdx): Color ships inside @tiptap/extension-text-style in 3.31, not
 // a separate @tiptap/extension-color package.
-import { Color, TextStyle } from "@tiptap/extension-text-style";
+//
+// document-import T3: BackgroundColor, FontFamily, FontSize and LineHeight
+// are the remaining textStyle attribute extensions of the same package
+// (content catalogue `textStyle` attrs); they render as inline `style`
+// declarations, which the CSP's `style-src 'unsafe-inline'` allows.
+import {
+  BackgroundColor,
+  Color,
+  FontFamily,
+  FontSize,
+  LineHeight,
+  TextStyle,
+} from "@tiptap/extension-text-style";
 import Typography from "@tiptap/extension-typography";
 import { UniqueID } from "@tiptap/extension-unique-id";
 import { Placeholder } from "@tiptap/extensions";
@@ -38,6 +50,10 @@ import StarterKit from "@tiptap/starter-kit";
 // builds on top of this) — required for Mathematics's rendered nodes to
 // look like actual typeset math instead of unstyled raw markup.
 import "katex/dist/katex.min.css";
+import {
+  BLOCK_ID_NODES,
+  TEXT_ALIGN_NODES,
+} from "@/shared/kernel/tiptap-catalogue";
 import type { ImageUploadPort } from "../../../domain/image-upload-port";
 import type { MentionPort } from "../../../domain/mention-port";
 import { Callout } from "../callout-node";
@@ -50,27 +66,20 @@ import type { SlashCommandItem } from "../slash-command-items";
 import { TocBlock } from "../toc-node";
 import { BlockShortcuts } from "./block-shortcuts";
 import { CodeBlock } from "./code-block";
+import { createDetailsExtensions } from "./details";
 import { NodeBackground } from "./node-background";
 import { createTableExtensions } from "./table";
+import { CogniYoutube } from "./youtube";
 
 // E2 (block-context-menu.tsx's "Copiar enlace" + drag-handle "Convertir
 // en"/"Colores"): every block type either surface can target needs a
 // stable id (UniqueID below) so "Copiar enlace" has something to copy.
 // Deliberately excludes inline/leaf types (text, hardBreak) and nodes the
 // context menu never opens on (tocBlock — an editor-computed view, not a
-// block a user "converts" or links to).
-const UNIQUE_ID_TYPES = [
-  "paragraph",
-  "heading",
-  "bulletList",
-  "orderedList",
-  "taskList",
-  "blockquote",
-  "codeBlock",
-  "image",
-  "callout",
-  "table",
-];
+// block a user "converts" or links to). The list is the content
+// catalogue's BLOCK_ID_NODES, so imported content carries blockId exactly
+// where the editor does (details and youtube have none yet).
+const UNIQUE_ID_TYPES = [...BLOCK_ID_NODES];
 
 // specs/editor/spec.md, "Marcas de texto": a link MUST accept only http,
 // https or mailto URLs; anything else (in particular `javascript:`) MUST be
@@ -183,8 +192,17 @@ export function createEditorExtensions(
     // E1: KaTeX-rendered inline `$…$` / block `$$…$$` math. Kept
     // registered so existing math content renders and round-trips; there is
     // no insert entry point until a math editing UI exists.
-    Mathematics.configure({
-      katexOptions: { throwOnError: false },
+    //
+    // document-import T11b: registered as the two node extensions instead
+    // of the `Mathematics` bundle, because the bundle hands one shared
+    // `katexOptions` to both (3.31.3's `blockOptions` omits it), so block
+    // math could never get KaTeX's `displayMode` (display-size, centred
+    // `.katex-display`) while inline math stays inline.
+    BlockMath.configure({
+      katexOptions: { throwOnError: false, displayMode: true },
+    }),
+    InlineMath.configure({
+      katexOptions: { throwOnError: false, displayMode: false },
     }),
     // E1: heading-tracking utility extension (see toc-node.tsx's header
     // comment for why the TOC *node view* computes its own heading list
@@ -198,7 +216,7 @@ export function createEditorExtensions(
     // and paragraphs — the template's confirmed alignment scope (bubble-
     // toolbar buttons for it are E2 chrome; the attribute/extension itself
     // is in scope for this pass).
-    TextAlign.configure({ types: ["heading", "paragraph"] }),
+    TextAlign.configure({ types: [...TEXT_ALIGN_NODES] }),
     Superscript,
     Subscript,
     // E1: TextStyle + Color (Context7-confirmed: Color ships inside
@@ -207,7 +225,15 @@ export function createEditorExtensions(
     // (E2), but the marks themselves are usable via editor commands.
     TextStyle,
     Color,
+    BackgroundColor,
+    FontFamily,
+    FontSize,
+    LineHeight,
     Typography,
+    // document-import T3: collapsible blocks (speaker notes) and YouTube
+    // embeds, rendering only (details.ts, youtube.ts).
+    ...createDetailsExtensions(),
+    CogniYoutube,
     // S6a (Editor directive, .agents/skills/cogni-design/SKILL.md
     // "Editor"): placeholder copy per the Tiptap docs Notion-style editor,
     // level-aware for headings. `.editor-content .is-empty::before`

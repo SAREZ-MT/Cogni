@@ -220,11 +220,12 @@ export function PageImportView({
       )}
       {state.phase === "terminal" &&
         state.view.status === "done" &&
-        state.view.pagesWithoutText > 0 && (
+        (state.view.pagesWithoutText > 0 || state.view.skippedImages > 0) && (
           <div className="mx-auto w-full max-w-2xl">
             <ImportProgress
               state="done"
               pagesWithoutText={state.view.pagesWithoutText}
+              skippedImages={state.view.skippedImages}
             />
           </div>
         )}

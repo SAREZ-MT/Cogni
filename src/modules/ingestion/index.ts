@@ -18,22 +18,22 @@ export type {
   StartPdfImportResult,
 } from "./application";
 export {
+  DOCUMENT_FILE_ERROR,
   IMPORT_JOB_ERROR,
   IMPORT_JOB_STATUS,
   type ImportJobStatus,
   INGESTION_ERROR,
   MAX_DURATION_S,
-  PDF_FILE_ERROR,
 } from "./domain";
 export {
   ActiveImportsProvider,
   useIsImporting,
 } from "./ui/active-imports-provider";
-export { ImportPdfMenuItem } from "./ui/import-pdf-menu-item";
+export {
+  DocumentImportProvider,
+  useNotebookImport,
+} from "./ui/document-import-provider";
+export { ImportDocumentMenuItem } from "./ui/import-document-menu-item";
 export { ImportProgress } from "./ui/import-progress";
 export { ImportingPageBadge } from "./ui/importing-page-badge";
 export { PageImportView } from "./ui/page-import-view";
-export {
-  PdfImportProvider,
-  useNotebookImport,
-} from "./ui/pdf-import-provider";

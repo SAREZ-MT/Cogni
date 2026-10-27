@@ -1,8 +1,8 @@
 # Modelo de datos y contrato de API — Cogni
 
 **Proyecto:** Cogni — plataforma web de estudio a partir de apuntes propios
-**Versión:** 1.1
-**Fecha:** 2026-10-15
+**Versión:** 1.2
+**Fecha:** 2026-10-26
 **Estado:** Borrador
 **Autor:** Javier Sarez
 **Documentos relacionados:** ./01-SRS.md, ./02-SAD.md, ./04-ADR.md
@@ -13,7 +13,7 @@
 
 - Las Fases 0 a 7 están implementadas y los 11 módulos de `src/modules/` son reales; ninguno es un esqueleto.
   - Fase 0 (Cimientos) y Fase 1 (Cuadernos y editor): desplegadas en producción; tablas `profiles`, `notebooks`, `pages` y `page_assets` (migraciones `0000`–`0004`).
-  - Fase 2 (Importación de PDF): implementada bajo Organic Driven Development (ODD) el 2026-09-23; tabla `import_jobs` y bucket `page-pdfs` (migraciones `0005`–`0006`).
+  - Fase 2 (Importación de PDF): implementada bajo Organic Driven Development (ODD) el 2026-09-23; tabla `import_jobs` y bucket `page-pdfs` (migraciones `0005`–`0006`). Ampliada el 2026-10-26 (rama `feat/document-import`, `docs/adr/0009`) a Word (`.docx`), con PowerPoint (`.pptx`) planificado: migración `0014` (columnas `import_jobs.format` y `skipped_images`, tipos MIME de DOCX y PPTX en `page-pdfs`) e imágenes importadas registradas en `page_assets`.
   - Fase 3 (Capa de IA, PR #63–#69) y aceptación de términos de uso (PR #70): tablas `ai_generations` y `flashcards` (migración `0007`) y columnas de términos en `profiles` (migración `0008`); decisiones en `docs/adr/0004-capa-de-ia-con-proveedores-gratuitos.md`.
   - Fase 4 (Motor de repetición y flashcards, PR #71–#77): tablas `study_items`, `review_logs`, `page_mastery`, `flashcard_sessions` y `session_feedback`, y `flashcards.archived_at` (migración `0009`); decisiones en `docs/adr/0005-motor-de-repeticion-y-flashcards.md`.
   - Fase 5 (Exámenes, PR #78–#86): tablas `exam_questions`, `exam_page_state`, `exam_sessions` y `exam_answers` (migraciones `0010`–`0011`); decisiones en `docs/adr/0006-examenes-y-repeticion-con-variantes.md`.
@@ -121,7 +121,7 @@ Se relaciona con Notebook: pertenece a uno (`notebook_id`, `ON DELETE CASCADE`).
 | created_at | timestamptz |
 | updated_at | timestamptz |
 
-Se relaciona con Page: pertenece a una (`page_id`, `ON DELETE CASCADE`). Se relaciona con Profile: pertenece a uno (`owner_id`, `ON DELETE CASCADE`). `storage_path` es único (`UNIQUE`), lo que permite registrar el mismo objeto subido de forma idempotente.
+Se relaciona con Page: pertenece a una (`page_id`, `ON DELETE CASCADE`). Se relaciona con Profile: pertenece a uno (`owner_id`, `ON DELETE CASCADE`). `storage_path` es único (`UNIQUE`), lo que permite registrar el mismo objeto subido de forma idempotente. Desde `docs/adr/0009`, la importación de documentos también crea filas: cada imagen extraída se sube desde el servidor a `page-assets` y se registra con `storeImportedAsset` de `notebooks/server-api.ts`, y el bloque `image` la referencia por su `id` (`assetId`).
 
 #### ImportJob — Estado: Implementado (Fase 2)
 
@@ -134,15 +134,17 @@ Se relaciona con Page: pertenece a una (`page_id`, `ON DELETE CASCADE`). Se rela
 | file_name | text |
 | size_bytes | integer |
 | status | text |
+| format | text |
 | page_count | integer |
 | pages_without_text | integer |
+| skipped_images | integer |
 | error | text |
 | started_at | timestamptz |
 | finished_at | timestamptz |
 | created_at | timestamptz |
 | updated_at | timestamptz |
 
-Se relaciona con Page: pertenece a una (`page_id`, `ON DELETE CASCADE`). Se relaciona con Profile: pertenece a uno (`owner_id`, `ON DELETE CASCADE`). `storage_path` es único. A diferencia de la especificación original del documento maestro (§6.1), esta tabla **no** tiene columna `trigger_run_id`: `04-ADR.md`, ADR-009 (y `docs/adr/0003`), fija el procesamiento síncrono dentro de la propia Server Action (`maxDuration = 120`, Vercel Fluid Compute) como mecanismo de trabajo en segundo plano.
+Se relaciona con Page: pertenece a una (`page_id`, `ON DELETE CASCADE`). Se relaciona con Profile: pertenece a uno (`owner_id`, `ON DELETE CASCADE`). `storage_path` es único. A diferencia de la especificación original del documento maestro (§6.1), esta tabla **no** tiene columna `trigger_run_id`: `04-ADR.md`, ADR-009 (y `docs/adr/0003`), fija el procesamiento síncrono dentro de la propia Server Action (`maxDuration = 120`, Vercel Fluid Compute) como mecanismo de trabajo en segundo plano. `format` (`pdf`, `docx` o `pptx`, `CHECK import_jobs_format_check`, por defecto `pdf`) se toma de la extensión de la ruta al crear el job; `skipped_images` (≥ 0, `CHECK import_jobs_skipped_images_check`) cuenta las imágenes de una importación terminada que no se conservaron. Ambas columnas llegaron con `0014`.
 
 #### AiGeneration — Estado: Implementado (Fase 3)
 
@@ -657,6 +659,29 @@ create policy "page-pdfs delete own"
   using (bucket_id = 'page-pdfs' and (storage.foldername(name))[1] = auth.uid()::text);
 ```
 
+```sql
+-- drizzle/0014_document_formats.sql (encabezado de comentarios abreviado; sentencias SQL textuales)
+-- document-import T10: DOCX and PPTX imports. The bucket keeps its
+-- historical name (renaming a bucket means moving every object).
+ALTER TABLE "import_jobs" ADD COLUMN "format" text DEFAULT 'pdf' NOT NULL;--> statement-breakpoint
+ALTER TABLE "import_jobs" ADD COLUMN "skipped_images" integer DEFAULT 0 NOT NULL;--> statement-breakpoint
+ALTER TABLE "import_jobs" ADD CONSTRAINT "import_jobs_format_check" CHECK ("import_jobs"."format" in ('pdf', 'docx', 'pptx'));--> statement-breakpoint
+ALTER TABLE "import_jobs" ADD CONSTRAINT "import_jobs_skipped_images_check" CHECK ("import_jobs"."skipped_images" >= 0);--> statement-breakpoint
+update "import_jobs"
+set "format" = substring(lower("storage_path") from '\.(pdf|docx|pptx)$')
+where "storage_path" ~* '\.(pdf|docx|pptx)$';--> statement-breakpoint
+update storage.buckets
+set file_size_limit = 20971520,
+  allowed_mime_types = array[
+    'application/pdf',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+  ]
+where id = 'page-pdfs';
+```
+
+Las rutas de los objetos pasan a ser `{ownerId}/{uploadId}.{pdf|docx|pptx}`; las políticas RLS de `0006` no cambian. `0014_document_formats.down.sql` revierte las columnas, las restricciones y la lista de tipos MIME.
+
 ### 2.4 Módulos de las Fases 3 a 6
 
 `ai`, `flashcards`, `study-engine`, `exams` y `active-recall` tienen tablas (migraciones `0007` y `0009`–`0013`); `scheduling` y `analytics` (Fase 7) no tienen tablas: solo leen las de `study-engine`, `notebooks` y `active-recall`. Todas las tablas de esta sección tienen RLS activa sin políticas, como el resto.
@@ -1105,6 +1130,7 @@ Los demás conjuntos cerrados siguen el mismo patrón (`text` + `CHECK`):
 | `recall_sessions.evaluation_status` | `pending`, `done`, `partial` | Evaluación en curso; todas las respuestas evaluadas; alguna respuesta `failed`. |
 | `recall_answers.evaluation_status` | `pending`, `done`, `failed` | Sin evaluar o reclamada; evaluada (modelo o saltada); falló en todos los proveedores o por el límite diario. |
 | `generation_fingerprints.technique` | `flashcards`, `exam`, `recall` | Técnica que ya envió el párrafo a la IA. |
+| `import_jobs.format` | `pdf`, `docx`, `pptx` | Formato del documento importado, tomado de la extensión de la ruta (`0014`; `pptx` se acepta en datos, pero su importación está planificada). |
 
 ### 2.6 Relaciones y borrado en cascada
 
@@ -1163,7 +1189,7 @@ Todas las claves foráneas usan `ON UPDATE no action`. Eliminar un `Profile` eli
 
 ### 2.7 Estrategia de migraciones
 
-Incremental-aditiva: cada cambio de esquema es un nuevo archivo `NNNN_nombre.sql` generado por `drizzle-kit generate` (nunca se edita una migración ya aplicada), registrado en `drizzle/meta/_journal.json` (14 entradas, de `0000_profiles` a `0013_generation_fingerprints`): `0000` crea `profiles`, `0001` activa su RLS, `0002` la ata a `auth.users`, `0003` crea `notebooks`, `pages` y `page_assets`, `0004` el bucket `page-assets`, `0005` `import_jobs`, `0006` el bucket `page-pdfs`, `0007` `ai_generations` y `flashcards`, `0008` las columnas de términos de `profiles`, `0009` las cinco tablas de `study-engine` y `flashcards.archived_at` (con relleno de ítems), `0010` las cuatro tablas de `exams`, `0011` `exam_sessions.question_ids`, `0012` las tres tablas de `active-recall` y `0013` `generation_fingerprints`. `drizzle-kit` no tiene comando `down`: 12 de las 14 migraciones (`0002` a `0013`) traen un `.down.sql` hermano con la reversión manual, pensado para aplicarse a mano con `psql` o el editor SQL de Supabase; las dos primeras (`0000` crea la tabla, `0001` activa RLS) no lo tienen. Las migraciones de Storage (`0004`, `0006`) son idempotentes por diseño (`on conflict (id) do update`), para que la misma migración sea la fuente de verdad de los límites del bucket tanto en `cogni-dev` como en `cogni-prod`; las de tablas son SQL generado, salvo los bloques escritos a mano de `0002` (guarda y limpieza de huérfanos), `0009` (relleno de `study_items`) y el comentario de `0011`.
+Incremental-aditiva: cada cambio de esquema es un nuevo archivo `NNNN_nombre.sql` generado por `drizzle-kit generate` (nunca se edita una migración ya aplicada), registrado en `drizzle/meta/_journal.json` (15 entradas, de `0000_profiles` a `0014_document_formats`): `0000` crea `profiles`, `0001` activa su RLS, `0002` la ata a `auth.users`, `0003` crea `notebooks`, `pages` y `page_assets`, `0004` el bucket `page-assets`, `0005` `import_jobs`, `0006` el bucket `page-pdfs`, `0007` `ai_generations` y `flashcards`, `0008` las columnas de términos de `profiles`, `0009` las cinco tablas de `study-engine` y `flashcards.archived_at` (con relleno de ítems), `0010` las cuatro tablas de `exams`, `0011` `exam_sessions.question_ids`, `0012` las tres tablas de `active-recall`, `0013` `generation_fingerprints` y `0014` las columnas `format` y `skipped_images` de `import_jobs` junto con los tipos MIME de DOCX y PPTX del bucket `page-pdfs`. `drizzle-kit` no tiene comando `down`: 13 de las 15 migraciones (`0002` a `0014`) traen un `.down.sql` hermano con la reversión manual, pensado para aplicarse a mano con `psql` o el editor SQL de Supabase; las dos primeras (`0000` crea la tabla, `0001` activa RLS) no lo tienen. Las migraciones de Storage (`0004`, `0006`) son idempotentes por diseño (`on conflict (id) do update`; `0014` actualiza el mismo bucket con un `update` que también puede repetirse), para que la misma migración sea la fuente de verdad de los límites del bucket tanto en `cogni-dev` como en `cogni-prod`; las de tablas son SQL generado, salvo los bloques escritos a mano de `0002` (guarda y limpieza de huérfanos), `0009` (relleno de `study_items`) y el comentario de `0011`.
 
 Las migraciones se aplican exclusivamente durante la construcción de producción en Vercel, nunca en previsualizaciones (`package.json`: `"build": "node scripts/migrate-in-build.mjs && next build"`). `scripts/migrate-in-build.mjs` expone el predicado puro `shouldRunMigrations(env)`, verdadero solo si `env.VERCEL_ENV === "production"` o `env.RUN_DB_MIGRATIONS === "1"` (esta última, una escotilla para migrar manualmente contra `cogni-dev` sin desplegar). Cuando el predicado es verdadero ejecuta `pnpm exec drizzle-kit migrate`; en cualquier otro caso lo omite con un mensaje en consola. `drizzle.config.ts` fija `dialect: "postgresql"`, `schema: "./src/shared/db/schema.ts"` y `out: "./drizzle"`.
 
@@ -1311,41 +1337,51 @@ Ejemplo de retorno no trivial (`getHomeOverview`):
 
 #### `notebooks/server-api.ts` (composición interna, sin `"use server"`)
 
-`createNotebooksServerApi({ db, clock? }): NotebooksServerApi` no es un punto de entrada alcanzable por el cliente: lo consumen en el mismo proceso del servidor `ingestion` (`ingestion/infrastructure/notebooks-pages-adapter.ts`), `flashcards` (`actions.ts`, `session-actions.ts`), `exams` (`actions.ts`, `session-actions.ts`, `feedback-actions.ts`, `retake-actions.ts`) y `active-recall` (`actions.ts`, `session-actions.ts`, `evaluation-runner.ts`). `NotebooksServerApi` extiende `PageTextReader` (`notebooks/domain/page-text-reader.ts`), de donde hereda `getPageText`; tiene cinco métodos.
+`createNotebooksServerApi({ db, clock? }): NotebooksServerApi` no es un punto de entrada alcanzable por el cliente: lo consumen en el mismo proceso del servidor `ingestion` (`ingestion/infrastructure/notebooks-pages-adapter.ts`), `flashcards` (`actions.ts`, `session-actions.ts`), `exams` (`actions.ts`, `session-actions.ts`, `feedback-actions.ts`, `retake-actions.ts`) y `active-recall` (`actions.ts`, `session-actions.ts`, `evaluation-runner.ts`). `NotebooksServerApi` extiende `PageTextReader` (`notebooks/domain/page-text-reader.ts`), de donde hereda `getPageText`; tiene siete métodos.
 
 | Método | Parámetros | Retorno | Auth | Errores |
 |---|---|---|---|---|
 | `findActiveNotebook` | `ownerId: string, notebookId: string` | `{ id: string } o null` | N/A — invocado en proceso, no expuesto a cliente | — |
 | `createPage` | `ownerId: string, { notebookId: string; title?: string }` | `Result<{ id: string; notebookId: string }, DomainError>` | N/A | `NOTEBOOK_NOT_FOUND`, `NOTEBOOK_ARCHIVED` |
-| `writeImportedContent` | `ownerId: string, { pageId: string; content: TiptapDoc; expectedVersion: number }` | `Result<{ version: number }, DomainError>` | N/A | `PAGE_NOT_FOUND`, `PAGE_VERSION_CONFLICT`, `PAGE_INVALID_CONTENT` |
+| `writeImportedContent` | `ownerId: string, { pageId: string; content: TiptapDoc; expectedVersion: number }` | `Result<{ version: number }, DomainError>` | N/A | `PAGE_NOT_FOUND`, `PAGE_VERSION_CONFLICT`, `PAGE_INVALID_CONTENT` (contenido fuera del catálogo estricto) |
+| `storeImportedAsset` | `ownerId: string, { pageId: string; bytes: Uint8Array; mime: string }` | `Result<{ assetId: string }, DomainError>` | N/A | `ASSET_MIME_NOT_ALLOWED`, `ASSET_TOO_LARGE`, `PAGE_NOT_FOUND`, `ASSET_UPLOAD_FAILED` |
+| `deleteImportedAssets` | `ownerId: string, assetIds: readonly string[]` | `Promise<void>` (limpieza de mejor esfuerzo; nunca lanza) | N/A | — |
 | `getPageText` (de `PageTextReader`) | `pageId: string, ownerId: string` | `Result<{ title: string; plainText: string }, DomainError>` | N/A | `PAGE_NOT_FOUND` (página inexistente, de otro dueño o archivada) |
 | `findPageNotebookId` | `ownerId: string, pageId: string` | `string o null` | N/A | — |
 
 `getPageText` es la única lectura del texto de una página que usan las técnicas de estudio (generación, retroalimentación y evaluación de IA) y su comprobación de propiedad de la página. Nótese el orden de parámetros: `getPageText` recibe `(pageId, ownerId)`, al revés que los otros cuatro métodos.
 
-`writeImportedContent` usa un esquema Zod `.strict()`: un campo extra (por ejemplo `plainText`) invalida toda la entrada, a diferencia de `saveContent`, que descarta silenciosamente un `plain_text` enviado por el cliente.
+`writeImportedContent` usa un esquema Zod `.strict()`: un campo extra (por ejemplo `plainText`) invalida toda la entrada, a diferencia de `saveContent`, que descarta silenciosamente un `plain_text` enviado por el cliente. Desde `docs/adr/0009`, `content` se valida además con `tiptapContentSchema`, la lista de permitidos construida desde `src/shared/kernel/tiptap-catalogue.ts`: rechaza nodos, marcas o atributos desconocidos, valores inválidos, anidamientos incorrectos, nodos de texto vacíos y enlaces que no sean `http`, `https` o `mailto`. `storeImportedAsset` sube la imagen a `{ownerId}/{pageId}/{fileId}.{ext}` con la clave de servicio y reutiliza `registerPageAsset`; la validación de tipo, tamaño y propiedad la hace el caso de uso, no la RLS del bucket.
 
 ### 4.3 `ingestion`
 
-Corresponden a CU-05 (Importar PDF) y a los requisitos RF-IN-01 a RF-IN-08 (componente `ingestion`, `02-SAD.md` §4.1), además de RNF-P-01 y RNF-P-02 (presupuesto de tiempo y tamaño máximo del PDF). Server Actions (`"use server"`, `src/modules/ingestion/actions.ts`). Las cinco están envueltas en `withBoundary()`: cualquier excepción no prevista se reporta a Sentry y se convierte en `INGESTION_UNEXPECTED` en vez de propagarse al cliente. `processPdfImport` es la única de duración larga, acotada por `maxDuration = 120` en `src/app/(app)/notebooks/[notebookId]/pages/[pageId]/page.tsx`.
+Corresponden a CU-05 (Importar documento) y a los requisitos RF-IN-01 a RF-IN-11 (componente `ingestion`, `02-SAD.md` §4.1), además de RNF-P-01 y RNF-P-02 (presupuesto de tiempo y tamaño máximo del documento). Las acciones conservan sus nombres de la era PDF, pero aceptan PDF y Word (`.docx`); `mime` debe ser `application/pdf` o el tipo de DOCX (o de PPTX, que el servidor acepta y la interfaz aún no ofrece). Server Actions (`"use server"`, `src/modules/ingestion/actions.ts`). Las cinco están envueltas en `withBoundary()`: cualquier excepción no prevista se reporta a Sentry y se convierte en `INGESTION_UNEXPECTED` en vez de propagarse al cliente. `processPdfImport` es la única de duración larga, acotada por `maxDuration = 120` en `src/app/(app)/notebooks/[notebookId]/pages/[pageId]/page.tsx`.
 
 | Acción | Parámetros | Retorno | Auth | Errores |
 |---|---|---|---|---|
-| `requestPdfUpload` | `{ notebookId: string; fileName: string; mime: string; sizeBytes: number }` | `Result<PdfUploadGrant, ActionError>` | Requiere sesión (Result) | `INGESTION_SESSION_REQUIRED`, `INGESTION_INVALID_INPUT`, `PDF_FILE_NAME_INVALID`, `PDF_MIME_NOT_ALLOWED`, `PDF_TOO_LARGE`, `INGESTION_NOTEBOOK_NOT_FOUND`, `INGESTION_STORAGE_UNAVAILABLE`, `INGESTION_UNEXPECTED` |
-| `startPdfImport` | `{ notebookId: string; storagePath: string; fileName: string; mime: string; sizeBytes: number }` | `Result<StartPdfImportResult, ActionError>` | Requiere sesión (Result) | `INGESTION_SESSION_REQUIRED`, `INGESTION_INVALID_INPUT`, `PDF_PATH_OUT_OF_SCOPE`, `PDF_UPLOAD_EXPIRED`, `PDF_OBJECT_MISSING`, `PDF_MIME_NOT_ALLOWED`, `PDF_TOO_LARGE` (revalidación de los metadatos reales del objeto con `validatePdfInput`), `INGESTION_NOTEBOOK_NOT_FOUND`, `INGESTION_NOTEBOOK_MISMATCH`, `NOTEBOOK_NOT_FOUND`, `NOTEBOOK_ARCHIVED` (de `notebooks` al crear la página, si el cuaderno se archivó entre la comprobación y la creación), `INGESTION_PAGE_NOT_FOUND`, `INGESTION_STORAGE_UNAVAILABLE`, `INGESTION_UNEXPECTED` |
+| `requestPdfUpload` | `{ notebookId: string; fileName: string; mime: string; sizeBytes: number }` | `Result<PdfUploadGrant, ActionError>` | Requiere sesión (Result) | `INGESTION_SESSION_REQUIRED`, `INGESTION_INVALID_INPUT`, `DOCUMENT_FILE_NAME_INVALID`, `DOCUMENT_MIME_NOT_ALLOWED`, `DOCUMENT_TOO_LARGE`, `INGESTION_NOTEBOOK_NOT_FOUND`, `INGESTION_RATE_LIMITED` (más de 20 permisos de subida en una hora), `INGESTION_STORAGE_UNAVAILABLE`, `INGESTION_UNEXPECTED` |
+| `startPdfImport` | `{ notebookId: string; storagePath: string; fileName: string; mime: string; sizeBytes: number }` | `Result<StartPdfImportResult, ActionError>` | Requiere sesión (Result) | `INGESTION_SESSION_REQUIRED`, `INGESTION_INVALID_INPUT`, `DOCUMENT_PATH_OUT_OF_SCOPE`, `DOCUMENT_UPLOAD_EXPIRED`, `DOCUMENT_OBJECT_MISSING`, `DOCUMENT_MIME_NOT_ALLOWED`, `DOCUMENT_TOO_LARGE` (revalidación de los metadatos reales del objeto con `validateDocumentInput`), `DOCUMENT_UNSUPPORTED_FORMAT` (el tipo real del objeto no es el formato que declara su ruta), `INGESTION_RATE_LIMITED` (más de 10 inicios en una hora o ya hay 3 importaciones activas), `INGESTION_NOTEBOOK_NOT_FOUND`, `INGESTION_NOTEBOOK_MISMATCH`, `NOTEBOOK_NOT_FOUND`, `NOTEBOOK_ARCHIVED` (de `notebooks` al crear la página, si el cuaderno se archivó entre la comprobación y la creación), `INGESTION_PAGE_NOT_FOUND`, `INGESTION_STORAGE_UNAVAILABLE`, `INGESTION_UNEXPECTED` |
 | `processPdfImport` | `{ importJobId: string }` | `Result<ImportJobStatusView, ActionError>` | Requiere sesión (Result) | `INGESTION_SESSION_REQUIRED`, `INGESTION_INVALID_INPUT`, `IMPORT_JOB_NOT_FOUND`, `INGESTION_UNEXPECTED` |
-| `getImportJobStatus` | `{ pageId: string }` | `Result<ImportJobStatusView o null, ActionError>` | Requiere sesión (Result) | `INGESTION_SESSION_REQUIRED`, `INGESTION_INVALID_INPUT`, `IMPORT_JOB_NOT_FOUND`, `INGESTION_UNEXPECTED` |
+| `getImportJobStatus` | `{ pageId: string }` | `Result<ImportJobStatusView o null, ActionError>` (`null` también para la página de otro estudiante) | Requiere sesión (Result) | `INGESTION_SESSION_REQUIRED`, `INGESTION_INVALID_INPUT`, `INGESTION_UNEXPECTED` |
 | `getActiveImports` | — | `Result<string[], ActionError>` | Requiere sesión (Result) | `INGESTION_SESSION_REQUIRED`, `INGESTION_UNEXPECTED` |
 
-`processPdfImport` nunca devuelve un error de dominio por un PDF ilegible, sin capa de texto, con conflicto de persistencia o por tiempo agotado: esos cinco desenlaces se registran como el `status`/`error` terminal del propio `ImportJob` (ver §2.5) y se leen a través del mismo `ImportJobStatusView` que devuelven `processPdfImport` y `getImportJobStatus` con éxito (`ok(...)`). Mensajes exactos en español por causa:
+`processPdfImport` nunca devuelve un error de dominio por un documento ilegible, sin texto, con conflicto de persistencia o por tiempo agotado: esos desenlaces se registran como el `status`/`error` terminal del propio `ImportJob` (ver §2.5) y se leen a través del mismo `ImportJobStatusView` que devuelven `processPdfImport` y `getImportJobStatus` con éxito (`ok(...)`). Solo se guarda el mensaje; la causa clasifica el reporte a Sentry. Mensajes exactos en español por causa:
 
-| Causa (`IMPORT_FAILURE_KIND`) | Mensaje mostrado al estudiante |
-|---|---|
-| `download` | "No pudimos leer el archivo que subiste. Vuelve a importarlo." |
-| `invalid_pdf` | "Este archivo no es un PDF válido o está protegido. Revisa que no tenga contraseña e inténtalo de nuevo." |
-| `no_text_layer` | "Este PDF no tiene texto seleccionable y Cogni no hace OCR. Prueba con un PDF que tenga texto." |
-| `persistence` | "La página cambió durante la importación, así que no reemplazamos su contenido. Vuelve a importar el PDF." |
-| `timeout` | "La importación tardó demasiado. Inténtalo de nuevo con un PDF más pequeño o en unos minutos." |
+| Causa (`IMPORT_FAILURE_KIND`) | Cuándo | Mensaje mostrado al estudiante |
+|---|---|---|
+| `download` | No se pudo descargar el objeto. | "No pudimos leer el archivo que subiste. Vuelve a importarlo." |
+| `invalid_document` | El documento está dañado, cifrado o truncado, supera 20 MiB o el extractor falla. | "Este archivo no es un documento válido o está protegido. Revisa que no tenga contraseña e inténtalo de nuevo." |
+| `invalid_document` (límite superado, `DOCUMENT_LIMIT_EXCEEDED`) | El documento supera un límite de importación (ZIP, XML, páginas o caracteres del PDF). | "Este documento es demasiado grande o complejo para importarlo. Divídelo en partes más pequeñas e inténtalo de nuevo." |
+| `unsupported_format` | Formato antiguo (`.doc`/`.ppt`), bytes desconocidos, bytes que no son el formato declarado o formato sin adaptador (PPTX). | "Solo puedes importar archivos PDF o Word (.docx)." (derivado de `IMPORTABLE_FORMATS`) |
+| `no_text_layer` | Un PDF sin texto seleccionable (escaneado). | "Este PDF no tiene texto seleccionable y Cogni no hace OCR. Prueba con un PDF que tenga texto." |
+| `empty_document` | Un Word sin texto (también un PowerPoint, cuando exista su adaptador). | "El documento no tiene texto que podamos importar." |
+| `persistence` | La página cambió durante la importación. | "La página cambió durante la importación, así que no reemplazamos su contenido. Vuelve a importar el documento." |
+| `persistence` (página no disponible) | La página destino se archivó o ya no existe. | "La página de destino ya no está disponible. Vuelve a importar el documento." |
+| `timeout` | Se agotó el presupuesto de procesamiento. | "La importación tardó demasiado. Inténtalo de nuevo con un documento más pequeño o en unos minutos." |
+
+Una importación terminada (`done`) puede traer `skippedImages > 0`: las imágenes en otros formatos (EMF, WMF, TIFF), de más de 10 MiB, más allá de los topes del documento o que no alcanzaron a subirse se omiten, y la página muestra "No pudimos importar N imágenes de este documento.".
+
+Telemetría: cada transición terminal envía un único evento de PostHog `document_imported` (antes `pdf_imported`) con `page_count`, `pages_without_text`, `duration_ms`, `status` (`done|failed`), `format` (`pdf|docx|pptx`) y `skipped_images` (0 para un job fallido).
 
 `getImportJobStatus` reporta como `status: "failed"` (con el mensaje de `timeout`) cualquier job cuyo último cambio de estado supere `ABANDONED_AFTER_MS` (150 000 ms) sin haber llegado a un estado terminal, aunque nunca escribe ese estado en la base de datos: solo `processPdfImport` puede hacerlo.
 
@@ -1358,6 +1394,7 @@ Ejemplo de retorno no trivial (`ImportJobStatusView`):
   "status": "failed",
   "pageCount": 12,
   "pagesWithoutText": 0,
+  "skippedImages": 0,
   "error": "Este PDF no tiene texto seleccionable y Cogni no hace OCR. Prueba con un PDF que tenga texto.",
   "createdAt": "2026-09-24T18:00:00.000Z",
   "updatedAt": "2026-09-24T18:01:32.000Z"
@@ -1467,6 +1504,14 @@ Upstash Ratelimit con ventana fija de un día por usuario (`src/modules/ai/infra
 | Generaciones de IA | `AI_DAILY_GENERATIONS` (6) | `{REDIS_KEY_PREFIX}:ai:gen` | Una unidad por "Generar" de flashcards o exámenes (antes de llamar al modelo y después de descartar páginas vacías o sin contenido nuevo); recordación activa la consume solo tras guardar las preguntas; la repetición de un examen, solo cuando se creó con llamada a la IA. La retroalimentación de sesión de flashcards y exámenes solo consulta el límite (`peek`) y nunca lo consume | `AI_DAILY_LIMIT_REACHED` con `resetAt`; la retroalimentación queda `failed` |
 | Evaluaciones de recordación activa | `AI_DAILY_EVALUATIONS` (60) | `{REDIS_KEY_PREFIX}:ai:eval` | Una unidad por respuesta evaluada por el modelo, solo si queda `done` (Fase 6); las respuestas saltadas no consumen | La respuesta queda `failed` con `code: "AI_DAILY_LIMIT_REACHED"` y `resetAt`; "Reintentar" la evalúa tras la renovación |
 
+Importación de documentos (`docs/adr/0009`): límites por estudiante con `src/shared/rate-limit` (ventana deslizante de Upstash con `AI_PROVIDER_MODE=live`; ventana fija en memoria en los demás modos), sin variables nuevas. Un error de Upstash falla abierto (se registra); el tope de importaciones activas lo aplica la base de datos.
+
+| Límite | Valor | Clave en Redis | Se consume | Al agotarse |
+|---|---|---|---|---|
+| `UPLOAD_GRANTS_PER_HOUR` | 20 por hora | `{REDIS_KEY_PREFIX}:rl:import-upload` | En `requestPdfUpload`, después de validar la entrada y antes de pedir la URL firmada | `INGESTION_RATE_LIMITED` |
+| `IMPORT_STARTS_PER_HOUR` | 10 por hora | `{REDIS_KEY_PREFIX}:rl:import-start` | En `startPdfImport`, solo para una importación nueva, después de validar el objeto guardado y justo antes de crear la página; una repetición idempotente no consume | `INGESTION_RATE_LIMITED` |
+| `MAX_ACTIVE_IMPORTS` | 3 en `queued`/`processing` (sin contar las abandonadas) | — (Postgres) | `ImportJobRepository.create(job, { maxActiveJobs })` cuenta e inserta en una transacción bajo `pg_advisory_xact_lock` por dueño | `INGESTION_RATE_LIMITED` |
+
 
 ### Variables de entorno del contrato
 
@@ -1476,7 +1521,7 @@ Validadas con Zod al arrancar (`src/shared/config/env.schema.ts`); una cadena va
 |---|---|---|
 | `DATABASE_URL` | URL obligatoria | Conexión de servidor (pooler de Supabase) de todas las Server Actions y Route Handlers. |
 | `CRON_SECRET` | Texto obligatorio de al menos 32 caracteres | Portador de `/api/keep-alive` y `/api/recompute-mastery`. |
-| `SUPABASE_STORAGE_BUCKET`, `SUPABASE_PDF_BUCKET` | Texto obligatorio | Nombres de los buckets de imágenes (`page-assets`) y de PDF importados (`page-pdfs`). |
+| `SUPABASE_STORAGE_BUCKET`, `SUPABASE_PDF_BUCKET` | Texto obligatorio | Nombres de los buckets de imágenes (`page-assets`) y de documentos importados (`page-pdfs`, nombre histórico de la era PDF). |
 | `SUPABASE_SERVICE_ROLE_KEY` | Texto obligatorio | Operaciones de Storage del servidor (URLs firmadas, metadatos). |
 | `AI_PROVIDER_MODE` | `live` o `fake` (`live`) | `fake` (CI y e2e) usa un proveedor simulado y límites en memoria. |
 | `GOOGLE_GENERATIVE_AI_API_KEY`, `GROQ_API_KEY`, `CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_API_TOKEN`, `OPENROUTER_API_KEY` | Opcionales | Claves de los cuatro proveedores de IA; en modo `live` se exige al menos una de Google, OpenRouter o el par de Cloudflare (que va completo o no va). |
@@ -1566,6 +1611,9 @@ CONSTRAINT "import_jobs_storage_path_key" UNIQUE("storage_path")
 
 -- Estado cerrado de ImportJob sin pgEnum de Postgres
 CONSTRAINT "import_jobs_status_check" CHECK ("import_jobs"."status" in ('queued', 'processing', 'done', 'failed'))
+-- Formato del documento e imágenes omitidas (0014)
+CONSTRAINT "import_jobs_format_check" CHECK ("import_jobs"."format" in ('pdf', 'docx', 'pptx'))
+CONSTRAINT "import_jobs_skipped_images_check" CHECK ("import_jobs"."skipped_images" >= 0)
 
 -- Fase 4 — un ítem por fuente, un dominio por página, una retroalimentación por sesión
 CONSTRAINT "study_items_kind_source_key" UNIQUE("kind","source_id")
@@ -1593,4 +1641,4 @@ Restricciones `CHECK` de las Fases 3 a 5 (texto completo en §2.4): `ai_generati
 
 Restricciones `CHECK` de la Fase 6 (texto completo en §2.4): `recall_questions_origin_check`, `recall_questions_prompt_not_blank`, `recall_questions_rubric_shape`; `recall_sessions_evaluation_status_check`, `recall_sessions_finished_after_start`; `recall_answers_self_rating_range`, `recall_answers_ai_score_range`, `recall_answers_combined_quality_range`, `recall_answers_evaluation_check`; `generation_fingerprints_technique_check`, `generation_fingerprints_fingerprint_format`.
 
-Entre las cinco tablas de las Fases 0 a 2, ninguna declara una restricción `CHECK` adicional a `import_jobs_status_check`, y ninguna columna de esas cinco tablas es nula salvo las explícitamente marcadas como opcionales en el esquema (`profiles.display_name`, `profiles.onboarding_completed_at`, `profiles.terms_accepted_version`/`terms_accepted_at` (migración `0008`), `notebooks.icon`/`color`/`archived_at`, `pages.archived_at`, `import_jobs.page_count`/`error`/`started_at`/`finished_at`). Las dos restricciones `UNIQUE` sobre `storage_path` son la base de la idempotencia de `registerPageAsset` (`onConflictDoUpdate`) y de `DrizzleImportJobRepository.create()` (que traduce su violación en `IMPORT_JOB_STORAGE_PATH_CONFLICT`).
+Entre las cinco tablas de las Fases 0 a 2, ninguna declara restricciones `CHECK` además de las de `import_jobs` (`import_jobs_status_check` y, desde `0014`, `import_jobs_format_check` e `import_jobs_skipped_images_check`), y ninguna columna de esas cinco tablas es nula salvo las explícitamente marcadas como opcionales en el esquema (`profiles.display_name`, `profiles.onboarding_completed_at`, `profiles.terms_accepted_version`/`terms_accepted_at` (migración `0008`), `notebooks.icon`/`color`/`archived_at`, `pages.archived_at`, `import_jobs.page_count`/`error`/`started_at`/`finished_at`). Las dos restricciones `UNIQUE` sobre `storage_path` son la base de la idempotencia de `registerPageAsset` (`onConflictDoUpdate`) y de `DrizzleImportJobRepository.create()` (que traduce su violación en `IMPORT_JOB_STORAGE_PATH_CONFLICT`).

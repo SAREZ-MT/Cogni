@@ -50,16 +50,16 @@ export function makeMinimalPdf(text = "Hello World"): Uint8Array {
 
 // A structurally valid single-page PDF whose content stream draws nothing
 // (no text operators at all) — a real PDF a parser opens successfully,
-// distinct from "not a PDF" (looksLikePdf) and from a parser failure
-// (PDF_FILE_ERROR.UNREADABLE).
+// distinct from "not a PDF" (detectDocumentFormat, domain/document-format.ts)
+// and from a parser failure (DOCUMENT_FILE_ERROR.UNREADABLE).
 export function makeNoTextPdf(): Uint8Array {
   return buildPdf(pageObjects(""));
 }
 
 // Bytes that start with the PDF magic number but are otherwise garbage:
-// looksLikePdf() (domain/pdf-file.ts) passes this, but no real parser can
-// open it — the shape unpdf-text-extractor.test.ts uses to prove
-// PDF_FILE_ERROR.UNREADABLE.
+// detectDocumentFormat() (domain/document-format.ts) reads this as a PDF,
+// but no real parser can open it — the shape pdf-document-extractor.test.ts
+// uses to prove DOCUMENT_FILE_ERROR.UNREADABLE.
 export function makeCorruptPdfBytes(): Uint8Array {
   return encoder.encode("%PDF-1.4\nthis is not a real PDF body at all");
 }

@@ -53,6 +53,7 @@ export {
   requestImageUploadSchema,
   type SidebarNotebook,
   type SidebarPage,
+  type StoreImportedAssetInput,
   savePage,
   savePageSchema,
   setNotebookAppearance,

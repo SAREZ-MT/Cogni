@@ -14,11 +14,15 @@ const findActiveNotebook = vi.fn();
 const createPage = vi.fn();
 const findPageNotebookId = vi.fn();
 const writeImportedContent = vi.fn();
+const storeImportedAsset = vi.fn();
+const deleteImportedAssets = vi.fn();
 const createNotebooksServerApi = vi.fn((_input?: unknown) => ({
   findActiveNotebook,
   createPage,
   findPageNotebookId,
   writeImportedContent,
+  storeImportedAsset,
+  deleteImportedAssets,
 }));
 
 vi.mock("@/modules/notebooks", () => ({
@@ -96,5 +100,33 @@ describe("NotebooksPagesAdapter", () => {
       content: IMPORTED_DOC,
       expectedVersion: 1,
     });
+  });
+
+  it("delegates storeImportedAsset", async () => {
+    storeImportedAsset.mockResolvedValueOnce(ok({ assetId: "asset-1" }));
+    const adapter = new NotebooksPagesAdapter(FAKE_DB);
+    const bytes = new Uint8Array([1, 2, 3]);
+
+    const result = await adapter.storeImportedAsset(OWNER_ID, {
+      pageId: "page-1",
+      bytes,
+      mime: "image/png",
+    });
+
+    expect(result).toEqual(ok({ assetId: "asset-1" }));
+    expect(storeImportedAsset).toHaveBeenCalledWith(OWNER_ID, {
+      pageId: "page-1",
+      bytes,
+      mime: "image/png",
+    });
+  });
+
+  it("delegates deleteImportedAssets", async () => {
+    deleteImportedAssets.mockResolvedValueOnce(undefined);
+    const adapter = new NotebooksPagesAdapter(FAKE_DB);
+
+    await adapter.deleteImportedAssets(OWNER_ID, ["asset-1"]);
+
+    expect(deleteImportedAssets).toHaveBeenCalledWith(OWNER_ID, ["asset-1"]);
   });
 });
