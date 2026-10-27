@@ -2,7 +2,7 @@
 // `cross-module-via-index`: no cross-module import may reach past this
 // file). Client-importable: the five Server Actions below carry Next's
 // "use server" directive (actions.ts), so importing them here never pulls
-// `infrastructure` — Drizzle, the Supabase client or `unpdf` — into a
+// `infrastructure` — Drizzle, the Supabase client or the parsers — into a
 // client bundle. Everything else exported is a pure type or constant from
 // `domain`/`application`, or a "use client" UI component.
 export {

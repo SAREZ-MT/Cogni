@@ -87,20 +87,17 @@ module.exports = {
       to: { path: "^src/modules/(flashcards|exams|active-recall)/" },
     },
     {
-      name: "unpdf-only-in-ingestion-infra",
+      name: "no-in-process-pdfjs",
       comment:
-        "unpdf may only be imported from ingestion/infrastructure (pdf-document-extractor.ts, until document-import T8 removes it); every other layer and module must stay decoupled from the PDF parsing library. Unanchored (not `^node_modules/unpdf`): pnpm resolves it to a nested node_modules/.pnpm/unpdf@.../node_modules/unpdf/... path.",
+        "document-import T8: PDFs are read by officeparser alone (ingestion/infrastructure/pdf-document-extractor.ts), whose pdf.js runs in a separate process. No module may import another pdf.js (unpdf, pdfjs-dist): loading one in the server process publishes `globalThis.pdfjsWorker`, which officeparser then takes for a caller-preloaded worker, so every later PDF parse fails on the version mismatch or runs in-process. Unanchored (not `^node_modules/unpdf`): pnpm resolves packages to a nested node_modules/.pnpm/<name>@.../node_modules/<name>/... path.",
       severity: "error",
-      from: {
-        path: "^src/",
-        pathNot: "^src/modules/ingestion/infrastructure/",
-      },
-      to: { path: "node_modules/unpdf" },
+      from: { path: "^src/" },
+      to: { path: "node_modules/(unpdf|pdfjs-dist)/" },
     },
     {
       name: "mammoth-only-in-ingestion-infra",
       comment:
-        "mammoth (DOCX block structure, document-import T6) may only be imported from ingestion/infrastructure (docx-document-extractor.ts); every other layer and module stays decoupled from the parsing library. Unanchored for the same pnpm nested node_modules reason as unpdf.",
+        "mammoth (DOCX block structure, document-import T6) may only be imported from ingestion/infrastructure (docx-document-extractor.ts); every other layer and module stays decoupled from the parsing library. Unanchored for the same pnpm nested node_modules reason as no-in-process-pdfjs.",
       severity: "error",
       from: {
         path: "^src/",
@@ -111,7 +108,7 @@ module.exports = {
     {
       name: "officeparser-only-in-ingestion-infra",
       comment:
-        "officeparser (DOCX colours/lists/equations since document-import T6; PPTX/PDF in T7/T8) may only be imported from ingestion/infrastructure; every other layer and module stays decoupled from the parsing library. Unanchored for the same pnpm nested node_modules reason as unpdf.",
+        "officeparser (DOCX colours/lists/equations since document-import T6, PPTX since T7, PDF since T8) may only be imported from ingestion/infrastructure; every other layer and module stays decoupled from the parsing library. Unanchored for the same pnpm nested node_modules reason as no-in-process-pdfjs.",
       severity: "error",
       from: {
         path: "^src/",
@@ -122,7 +119,7 @@ module.exports = {
     {
       name: "ai-sdk-only-in-ai-infra",
       comment:
-        "The AI SDK and its provider packages may only be imported from ai/infrastructure (documento-maestro §8.1); every other layer and module goes through ai.application. Unanchored for the same pnpm nested node_modules reason as unpdf.",
+        "The AI SDK and its provider packages may only be imported from ai/infrastructure (documento-maestro §8.1); every other layer and module goes through ai.application. Unanchored for the same pnpm nested node_modules reason as no-in-process-pdfjs.",
       severity: "error",
       from: {
         path: "^src/",

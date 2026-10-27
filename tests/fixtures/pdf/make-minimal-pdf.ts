@@ -1,10 +1,10 @@
 // Hand-built, valid PDF 1.4 documents for unit tests that need real bytes a
-// PDF parser (unpdf/pdf.js) can open, without checking in a binary fixture
+// PDF parser (officeparser/pdf.js) can open, without checking in a binary fixture
 // or depending on a PDF-writing library. Every object offset is computed
 // from the actual bytes written so far, so the xref table is exact.
 //
 // Reusable wherever a small real PDF is needed (ingestion/infrastructure's
-// unpdf-text-extractor.test.ts; T12's e2e fixtures can build on the same
+// pdf-document-extractor.test.ts; the e2e fixtures can build on the same
 // approach for a larger sample).
 
 const encoder = new TextEncoder();

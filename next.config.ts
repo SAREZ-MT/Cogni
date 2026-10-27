@@ -4,10 +4,12 @@ import { supabaseImageRemotePatterns } from "./src/shared/config/image-remote-pa
 import { securityHeaders } from "./src/shared/config/security-headers";
 
 const nextConfig: NextConfig = {
-  // document-import T6: officeparser (DOCX enrichment, later PPTX/PDF) is
-  // loaded with Node's own require instead of being bundled: Turbopack
-  // breaks its ESM wrapper (T0 spike). Its optional @napi-rs/canvas is
-  // never required on the DOCX path.
+  // document-import T6: officeparser (DOCX enrichment, PPTX since T7, PDF
+  // since T8) is loaded with Node's own require instead of being bundled:
+  // Turbopack breaks its ESM wrapper (T0 spike). Its optional
+  // @napi-rs/canvas is never required. On the PDF path it starts pdf.js in
+  // a separate Node process from pdfjs-dist's legacy/build/pdf.worker.mjs,
+  // which the build traces into the page route's output (T8).
   serverExternalPackages: ["officeparser"],
   images: {
     // Derived without clientEnv(): this file must stay loadable when the
