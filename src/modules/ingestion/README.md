@@ -18,7 +18,7 @@ Follows the same hexagonal shape as `notebooks`
 (`domain/application/infrastructure/ui`), enforced by
 `.dependency-cruiser.cjs` (`domain-is-pure`, `application-no-infra-or-ui`,
 `ui-never-touches-infra`, `cross-module-via-index`, plus this module's own
-`unpdf-only-in-ingestion-infra`, `mammoth-only-in-ingestion-infra` and
+`no-in-process-pdfjs`, `mammoth-only-in-ingestion-infra` and
 `officeparser-only-in-ingestion-infra`).
 
 - `domain/`: pure TypeScript — the `ImportJob` entity and its lifecycle
@@ -31,8 +31,8 @@ Follows the same hexagonal shape as `notebooks`
   entries include `[Content_Types].xml` plus `word/document.xml` or
   `ppt/presentation.xml`; OLE2 → `legacy`; read in pure TypeScript from
   the ZIP central directory, or the local headers of a truncated archive),
-  the `textToBlocks` heuristic that turns extracted PDF text into
-  TipTap-shaped blocks, the `ImportedDoc` type (`imported-doc.ts`, every block of the
+  the `textToBlocks` heuristic that turns plain PDF text into
+  TipTap-shaped blocks (the PDF fallback since T8), the `ImportedDoc` type (`imported-doc.ts`, every block of the
   content catalogue in `src/shared/kernel/tiptap-catalogue.ts`; notebooks'
   `writeImportedContent` rejects anything outside it) with its recursive
   `hasTextContent` predicate, the time budgets (`import-budget.ts`), the
@@ -49,11 +49,12 @@ Follows the same hexagonal shape as `notebooks`
   `processImportJob`, `getImportJobStatus`, `getActiveImports`), each
   `Result`-returning and testable with the in-memory fakes under
   `application/testing/`. Never imports `infrastructure` or `ui`.
-- `infrastructure/`: the only layer allowed to import `unpdf`, `mammoth`,
+- `infrastructure/`: the only layer allowed to import `mammoth`,
   `officeparser`, the Supabase client and `@/modules/notebooks`. `SupabasePdfStorageGateway` wraps the
   private `page-pdfs` bucket, `FormatRoutingDocumentExtractor`
   (`createDocumentExtractor()`) dispatches to one `DocumentExtractor` per
-  format — `PdfDocumentExtractor` wraps `unpdf` plus `textToBlocks`,
+  format — `PdfDocumentExtractor` maps officeparser's PDF AST, with
+  `textToBlocks` as fallback (see "PDF"),
   `DocxDocumentExtractor` merges mammoth and officeparser (see "DOCX"),
   `PptxDocumentExtractor` maps officeparser's slides (see "PPTX") —
   `NotebooksPagesAdapter` wraps `createNotebooksServerApi` to implement
@@ -67,7 +68,7 @@ Follows the same hexagonal shape as `notebooks`
 - `index.ts`: the public API. Only the five Server Actions, pure
   types/constants from `domain`/`application` are re-exported; nothing from
   `infrastructure` ever crosses this barrel, so importing this module from
-  a Client Component never pulls Drizzle, the Supabase client or `unpdf`
+  a Client Component never pulls Drizzle, the Supabase client or a parser
   into the client bundle.
 - `ui/`: the menu item, progress card, providers and page view.
   `ActiveImportsProvider`/`useIsImporting` (T13a) track the sidebar's
@@ -136,7 +137,7 @@ RETURNING`).
 ExtractedImage[]; skippedImages }` and `ExtractedImage` is `{ key, bytes,
 mime, alt }`. An image node in `content` points at its image with
 `attrs.pendingId === key` (the DOCX adapter emits images since T6, the
-PPTX adapter since T7).
+PPTX adapter since T7, the PDF adapter since T8).
 `skippedImages` counts images found in the source but not kept because
 their format is not png/jpeg/gif/webp. Errors: `DOCUMENT_UNSUPPORTED_FORMAT`
 when no adapter handles the format, `DOCUMENT_UNREADABLE` for a corrupt,
@@ -337,6 +338,103 @@ Errors: a package the guard refuses, a ZIP without
 `DOCUMENT_LIMIT_EXCEEDED`. `large-40s.pptx` extracts in about 0.05 s
 locally.
 
+## PDF
+
+`PdfDocumentExtractor` (T8; unpdf + `textToBlocks` until then) runs
+officeparser 8.2 alone, page geometry on, and maps its AST page by page
+(`pdf-ast-mapper.ts`). officeparser reads a tagged PDF's structure tree
+(headings, lists, tables, footnotes, reading order) and rebuilds what it
+can from the geometry of an untagged page (headings by font size, lists,
+columns, paragraphs), with each run's font, size, link and box. pdf.js runs
+in a separate Node process that officeparser keeps for the next parse
+(`separateProcess`), under a 1 GiB heap: a hostile content stream ends that
+process (`PDF_PROCESS_FAILED`), not the server, and the abort signal ends
+it at once. OCR stays off (T12 undecided).
+
+Which output is used (fallback rule):
+
+1. officeparser's blocks when the AST holds at least one heading, list or
+   table anywhere. A `PDF_STRUCT_TREE_UNRELIABLE` warning does not change
+   this: officeparser then rebuilt the structure from geometry, as for an
+   untagged page, which beats the text heuristics (`untagged.pdf` golden
+   test).
+2. Otherwise (plain paragraphs only) `textToBlocks` over each page's text —
+   a line per baseline, a blank line between officeparser's paragraphs —
+   which still finds uppercase or numbered headings and `- `/`1)` lists in
+   plain text; the page's images go after its text. This keeps the
+   behaviour of plain-text PDFs from before T8 (`pdf-document-extractor.test.ts`,
+   the 30-page e2e). There is one path with or without images (T8b):
+   `textToBlocks` reads every page on its own (no cross-page rule), so
+   converting page by page is byte-identical to one call over the whole
+   document.
+
+| PDF construct | Block |
+|---|---|
+| Heading (tag `H1`–`H6`, or font size on an untagged page) | `heading` at its level (1–6), without the bold of its runs |
+| Bold / italic font | `bold` / `italic` |
+| Monospace font run (Courier, Consolas, Menlo, JetBrains Mono, … "Mono" as a word of its own — "DejaVuSansMono", not Monotype Corsiva —, subset prefix ignored) | `code` mark (alone) |
+| Link annotation | `link` for http/https/mailto; other schemes keep the text, drop the mark |
+| List items (flat `indentation` + `itemIndex`) | nested `bulletList`/`orderedList`; ordered `start` = first item's `itemIndex` + 1 |
+| Table (tagged) | `table`; header cells → `tableHeader`; no spans; short rows padded with empty cells; `colwidth: null` |
+| Paragraph whose runs are all monospace | one `codeBlock` per run of consecutive such paragraphs, a line per baseline, `language: null` |
+| Image (png/jpeg/gif/webp by magic bytes) | `image` (`pendingId`, `alt: null`) under `IMAGE_LIMITS` |
+| Footnote (tagged `Note`) | paragraphs at the end of its page |
+| Running header/footer band | dropped (`ignoreHeadersAndFooters`) |
+| Two columns | read in officeparser's order (left column, then right) |
+
+What a PDF loses: underline, strike, colour, highlight and
+sub/superscripts (a smaller run read out of order — officeparser sorts by
+baseline, so a raised superscript comes before its line — is dropped; one
+in order keeps its text without a mark, "H2O"; a paragraph holding only a
+short smaller run is dropped); table spans; blockquotes; horizontal rules;
+image alt text; leading indentation in code. A word broken at its own
+hyphen across lines ("two-" / "column") is joined without it
+("twocolumn"): officeparser's `mergeHyphenatedWords` drops a line-end
+hyphen before a lowercase continuation; it stays on because syllable
+hyphenation is far more common. On untagged pages officeparser may miss a
+heading level, turn bullets and tables into paragraphs and misplace a line
+around a column break (`expected/tagged.pdf.md`).
+
+Pages: `totalPages` is the PDF's page count; `pagesWithoutText` the pages
+whose blocks hold no text (a page officeparser emits no node for counts as
+one). If officeparser reports no page count, a document whose last read
+page reached the cap is refused as over it (fail closed, T8b). Errors: any
+officeparser failure (corrupt — `corrupt.pdf` — encrypted, truncated) →
+`DOCUMENT_UNREADABLE` (`invalid_document`), never a document without
+text; `PDF_PROCESS_FAILED`, an officeparser limit error or a
+`PDF_CONTENT_LIMIT_EXCEEDED` warning → `DOCUMENT_LIMIT_EXCEEDED`
+(`pdf-document-extractor.limits.test.ts`, officeparser stubbed); a scanned
+page → no text → `no_text_layer`.
+`large-30p.pdf` extracts in about 0.2 s locally (pdf.js process start
+included).
+
+unpdf was removed in T8: it loads its own pdf.js (6.4) into the server
+process and publishes its worker as `globalThis.pdfjsWorker`, which
+officeparser (pdf.js 6.2) then takes for a caller-preloaded worker — every
+later PDF parse fails on the version mismatch or runs in-process. No module
+may import unpdf or pdfjs-dist (`no-in-process-pdfjs`). The build traces
+`pdfjs-dist/legacy/build/pdf.worker.mjs` into the page route's output
+(`officeparser` stays in `serverExternalPackages`); `next start` was seen
+running the pdf.js child process.
+
+Degraded mode (T8b): if the process cannot start (a runtime that cannot
+run Node as a child), officeparser warns `PDF_SEPARATE_PROCESS_UNAVAILABLE`
+before reading anything. The adapter aborts that parse at once — its
+result is never used — and parses again with pdf.js in the server process
+(`separateProcess: false`) under `PDF_IN_PROCESS_LIMITS`: 50 pages,
+20,000 characters per page, 250,000 in total, and officeparser's
+`maxTextItems` 5,000, `maxOperators` 50,000, `maxAnnotations` 2,000
+(nothing bounds pdf.js's memory or CPU there, and the abort stops it only
+between time slices). A document over them → `DOCUMENT_LIMIT_EXCEEDED`.
+Every such parse is reported, never silently: a server log and a Sentry
+warning (`reportPdfInProcessParse` in `import-telemetry-adapter.ts`) with
+the reason code and caps only — no file name, owner or text. The golden
+tests assert the real fixtures never take this path.
+
+Tests run under jsdom (vitest.config.ts), where officeparser takes itself
+for a browser; the PDF test files opt into `// @vitest-environment node`
+(vitest.setup.ts skips its DOM stubs there).
+
 ## Límites y seguridad
 
 Import hardening from the 2026-10-26 security audit (T9b). Every cap is a
@@ -398,12 +496,21 @@ bound the worst case without that.
 - `processImportJob` races `extractor.extract` against what is left of
   `PROCESSING_BUDGET_MS`; when the budget wins the job fails as
   `timeout` and the extractor's `AbortSignal` is aborted. Adapters check
-  the signal between their steps (each PDF page; before mammoth, before
-  officeparser, before mapping).
-- PDF (`PDF_LIMITS`, `pdf-document-extractor.ts`): more than 300 pages
-  (`numPages`, read before any page) is refused; pages are read one at a
-  time (unpdf's `extractText` reads all of them concurrently); a page
-  with more than 100,000 characters, or 2,000,000 in total, is refused.
+  the signal between their steps (before and after the PDF parse, which
+  also gets it; before mammoth, before officeparser, before mapping).
+- PDF (`PDF_LIMITS`, `pdf-document-extractor.ts`): officeparser reads at
+  most 300 pages (`pageRange`) and a document with more is refused once
+  its page count is known (up to 300 pages are parsed before the refusal:
+  officeparser cannot stop at the count alone); a page with more than
+  100,000 characters, or 2,000,000 in total, is refused after the parse.
+  officeparser's own content limits bound the parse: `maxTextItems`,
+  `maxOperators`, `maxAnnotations` (defaults), 5 s + 20 ms/KB of CPU in its
+  pdf.js process (`maxTimeMs`) and a 1 GiB heap there
+  (`processMemoryMb`); a partly read document
+  (`PDF_CONTENT_LIMIT_EXCEEDED`) or an out-of-memory process
+  (`PDF_PROCESS_FAILED`) is `DOCUMENT_LIMIT_EXCEEDED`. The signal is
+  handed to officeparser, which checks it between pages and ends the pdf.js
+  process at once.
 - DOCX: the OOXML caps above bound the XML mammoth and officeparser
   parse (size, elements, nesting); tables nested more than
   `MAX_TABLE_NESTING` (16) levels are refused by the mapper.
@@ -411,8 +518,9 @@ bound the worst case without that.
   officeparser and handed to it as `abortSignal` (it checks it per
   slide).
 
-Residual risk: parsing itself is synchronous (pdf.js per page, xmldom
-for a whole part), so the race cannot interrupt it; a single page or part
+Residual risk: OOXML parsing is synchronous (xmldom for a whole part), so
+the race cannot interrupt it (a PDF's pdf.js runs in its own process, which
+the abort ends; only the mapping after it runs here); a single page or part
 within the caps can still run past the budget, after which the result is
 discarded. The platform's `maxDuration` (120 s) remains the hard ceiling,
 and `getImportJobStatus`'s abandoned-job rule still resolves a job the
@@ -460,7 +568,7 @@ Text the user never sees must not reach the AI (imported content feeds
 
 ### Images
 
-The DOCX and PPTX mappers (`IMAGE_LIMITS`, `domain/image-mime.ts`) read embedded
+The DOCX, PPTX and PDF mappers (`IMAGE_LIMITS`, `domain/image-mime.ts`) read embedded
 images one at a time, never more than 100 per document; an image over
 10 MiB (refused by `OoxmlPackage` from its declared size, before
 inflating, and checked again once read) is skipped and counted — the rest
@@ -468,7 +576,11 @@ of the document still imports (regression tests in
 `docx-document-extractor.limits.test.ts` and
 `pptx-document-extractor.variants.test.ts`) — and once the images
 read reach 40 MiB in total the rest are not read. Every image not kept
-counts in `skippedImages`.
+counts in `skippedImages`. PDF images differ: officeparser decodes every
+page image itself (at most 40 megapixels each) and hands them over as PNG
+in base64; the mapper decodes one at a time, never one whose encoded size
+is already over 10 MiB, under the same caps. Residual risk: officeparser
+holds all of a document's images in memory at once before the caps apply.
 
 ### File names and import status
 
@@ -541,7 +653,8 @@ Functions) — without it, the Hobby plan's ceiling is lower and
   (against the in-memory fakes), `infrastructure` adapters (against mocked
   clients, or real parsers for the document extractors: the DOCX and PPTX
   golden tests read `tests/fixtures/documents/files/all-constructs.docx`
-  and `all-constructs.pptx`) and
+  and `all-constructs.pptx`, the PDF golden tests `tagged.pdf`,
+  `untagged.pdf`, `corrupt.pdf`, `scanned.pdf` and `large-30p.pdf`) and
   `actions.ts` (against mocked adapters + session, matching
   `notebooks/actions.test.ts`'s pattern). No `DATABASE_URL` or
   `SUPABASE_PDF_BUCKET` needed.

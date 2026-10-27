@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import { makeNoTextPdf, makeTextPdf } from "../fixtures/pdf/make-minimal-pdf";
 import {
   expect,
@@ -180,4 +180,144 @@ test.describe("pdf import acceptance", () => {
     await page.keyboard.type("una pagina vacia pero usable");
     await expect(editable).toContainText("una pagina vacia pero usable");
   });
+
+  // document-import T8: a tagged PDF (tests/fixtures/documents/files/
+  // tagged.pdf, expected blocks in expected/tagged.pdf.md) goes through
+  // officeparser's structure tree and must render every mapped block in
+  // the real editor, before and after a reload.
+  test("imports a tagged PDF with its structure and keeps it after a reload", async ({
+    page,
+    freshUser,
+  }) => {
+    test.setTimeout(180_000);
+    await signIn(page, freshUser);
+
+    const title = "Cuaderno PDF etiquetado e2e";
+    await createNotebook(page, title);
+    await openPdfImport(page, title);
+    await page
+      .getByTestId("document-import-input")
+      .setInputFiles(`${DOCUMENT_FIXTURES}/tagged.pdf`);
+
+    await expect(page).toHaveURL(/\/notebooks\/[^/]+\/pages\/[^/]+$/, {
+      timeout: 30_000,
+    });
+    await waitForImportState(page, "done", 120_000);
+
+    await expectTaggedStructure(editableOf(page));
+
+    await page.goto(new URL(page.url()).pathname);
+    await expectTaggedStructure(editableOf(page));
+  });
+
+  test("a corrupt PDF fails as an invalid document and leaves a usable empty page", async ({
+    page,
+    freshUser,
+  }) => {
+    test.setTimeout(120_000);
+    await signIn(page, freshUser);
+
+    const title = "Cuaderno PDF dañado e2e";
+    await createNotebook(page, title);
+    await openPdfImport(page, title);
+    // The first 600 bytes of tagged.pdf + garbage: starts with %PDF- but
+    // is unreadable (T1 review follow-up: invalid, not "no text").
+    await page
+      .getByTestId("document-import-input")
+      .setInputFiles(`${DOCUMENT_FIXTURES}/corrupt.pdf`);
+
+    await expect(page).toHaveURL(/\/notebooks\/[^/]+\/pages\/[^/]+$/, {
+      timeout: 30_000,
+    });
+    await waitForImportState(page, "failed", 60_000);
+    await expect(formAlert(page)).toHaveText(INVALID_DOCUMENT_MESSAGE);
+
+    const editable = editableOf(page);
+    await expect(editable).toBeVisible();
+    await expect(editable).toHaveText("");
+    await editable.click();
+    // ≥50 ms between a click and typing (Playwright click-then-type race).
+    await page.waitForTimeout(50);
+    await page.keyboard.type("una pagina vacia pero usable");
+    await expect(editable).toContainText("una pagina vacia pero usable");
+  });
 });
+
+const DOCUMENT_FIXTURES = "tests/fixtures/documents/files";
+
+// processImportJob's failure message for a file the extractor cannot read
+// (domain/import-failure.ts, `invalid_document`), quoted verbatim.
+const INVALID_DOCUMENT_MESSAGE =
+  "Este archivo no es un documento válido o está protegido. Revisa que no tenga contraseña e inténtalo de nuevo.";
+
+function editableOf(page: Page): Locator {
+  return page.getByTestId("editor-mount").locator('[contenteditable="true"]');
+}
+
+async function expectTaggedStructure(editable: Locator) {
+  // Headings 1–3 from the structure tree.
+  await expect(editable.locator("h1")).toHaveText(["Fixture Heading One"]);
+  await expect(editable.locator("h2")).toHaveText(["Heading Two"]);
+  await expect(editable.locator("h3")).toHaveText(["Heading Three"]);
+
+  // Inline marks and links; the javascript: link keeps only its text.
+  const marks = editable.locator("p", { hasText: "Plain, " });
+  await expect(marks.locator("strong")).toHaveText("bold");
+  await expect(marks.locator("em")).toHaveText("italic");
+  await expect(marks.locator("code")).toHaveText("inlineMono");
+  await expect(
+    editable.locator('a[href="https://example.com/docs"]'),
+  ).toHaveText("safe link");
+  await expect(editable.locator('a[href^="javascript:" i]')).toHaveCount(0);
+  await expect(marks).toContainText("evil link");
+
+  // Bullets three levels deep and the ordered list starting at 3.
+  await expect(
+    editable.locator("ul ul ul > li", { hasText: "Bullet A.1.a" }),
+  ).toBeVisible();
+  const ordered = editable.locator('ol[start="3"]');
+  await expect(ordered).toHaveCount(1);
+  await expect(ordered.locator(":scope > li").first()).toContainText(
+    "Number three",
+  );
+  await expect(ordered.locator("ol > li")).toHaveText(["Number sub a"]);
+
+  // Table: header row as th; spans are lost, so short rows are padded.
+  const table = editable.locator("table");
+  await expect(table.locator("th")).toHaveText(["H1", "H2", "H3"]);
+  await expect(table.locator("td")).toHaveCount(9);
+  await expect(table.locator("td", { hasText: "Colspan 2" })).toHaveCount(1);
+
+  // The Courier lines as one code block.
+  await expect(editable.locator("pre code")).toHaveText(
+    "function add(a, b) {\nreturn a + b;\n}",
+  );
+
+  // The PNG, stored in page-assets.
+  const images = editable.getByTestId("image-node-img");
+  await expect(images).toHaveCount(1, { timeout: 30_000 });
+  await expect(images).toHaveAttribute("src", /^https:\/\//);
+  await expect
+    .poll(() =>
+      images.evaluate((element) => (element as HTMLImageElement).naturalWidth),
+    )
+    .toBeGreaterThan(0);
+
+  // The two columns read left then right, then the closing paragraph.
+  const paragraphs = editable.locator("p");
+  const texts = await paragraphs.allTextContents();
+  const index = (prefix: string) =>
+    texts.findIndex((text) => text.startsWith(prefix));
+  // Every paragraph must be found: findIndex's -1 would make the order
+  // comparisons below pass vacuously.
+  const leftFirst = index("LEFTCOL first");
+  const rightFirst = index("RIGHTCOL first");
+  const rightSecond = index("RIGHTCOL second");
+  const closing = index("After horizontal rule.");
+  for (const found of [leftFirst, rightFirst, rightSecond, closing]) {
+    expect(found).toBeGreaterThanOrEqual(0);
+  }
+  expect(leftFirst).toBeLessThan(rightFirst);
+  expect(rightFirst).toBeLessThan(rightSecond);
+  expect(rightSecond).toBeLessThan(closing);
+}

@@ -2,8 +2,9 @@
 
 | Campo | Valor |
 |---|---|
-| Versión del documento | 1.7.1 |
+| Versión del documento | 1.7.2 |
 | Fecha | 2026-09-14 (actualizado 2026-10-26) |
+| Cambios de la versión 1.7.2 | ADR 0009, T8: el PDF se importa con officeparser (títulos, formato en línea, enlaces, listas, tablas, bloques de código e imágenes desde el árbol de estructura o la geometría de la página), con `textToBlocks` como respaldo para documentos de solo párrafos; `unpdf` se retira. Notas en §3.2, §4.1 y §13 (Fase 2). |
 | Cambios de la versión 1.7.1 | ADR 0009, T7: la importación de PowerPoint (`.pptx`) queda implementada de punta a punta con officeparser (títulos de diapositiva, cuerpo, listas, tablas, imágenes y notas del orador como bloque de detalles) y el selector la ofrece. Notas en §3.2, §4.1, §4.2 y §13 (Fase 2). |
 | Cambios de la versión 1.7.0 | ADR 0009: importación multiformato (PDF y Word `.docx` de punta a punta; PowerPoint `.pptx` detectado y planificado; `.doc`/`.ppt` sin soporte) con mammoth y officeparser para Word y `unpdf` para PDF por ahora; catálogo estricto de contenido Tiptap validado al importar y registrado completo en el editor; imágenes importadas como `PageAsset`; límites de seguridad de la importación; evento `pdf_imported` renombrado a `document_imported`. Sigue sin OCR. Campos nuevos de `ImportJob` (`format`, `skipped_images`, migración `0014`). Notas en §3.2, §4.1, §4.2, §5.2, §6.1, §8.1, §9, §10.3 y §13 (Fase 2). |
 | Cambios de la versión 1.6.0 | ADR 0008: decisiones de implementación de la Fase 7 ("Hoy" como pestaña de `/calendario`; el calendario muestra solo el próximo vencimiento de cada ítem y lo vencido en hoy; días en la zona horaria del perfil, elegida en `/configuracion` o detectada en el primer uso; tendencia desde `review_logs`; definiciones de tasa de acierto, racha y repasos completados; calibración solo con recordación activa; números del dashboard sin fuente resueltos por el usuario). Sin entidades ni migraciones nuevas. Notas en §3.5, §3.6, §5.2, §6.1 y §7.4; §13 (Fase 7 implementada). |
@@ -100,7 +101,7 @@ Notas de implementación de la Fase 6 (ADR 0007):
 - Menú de comandos con `/` para insertar cualquier bloque.
 - Autoguardado con debounce y actualización optimista.
 - El contenido se persiste como JSON de Tiptap; además se materializa un campo `plain_text` por página para la capa de IA.
-- Importación de documentos (ADR 0009): PDF, Word (`.docx`) y PowerPoint (`.pptx`) se convierten en bloques editables dentro de una página nueva. Word conserva su estructura (títulos, formato y colores, listas, tablas con celdas combinadas, código, citas, casillas, ecuaciones e imágenes); PowerPoint se importa diapositiva por diapositiva (título como encabezado, cuerpo, listas, tablas, imágenes y notas del orador en un bloque de detalles "Notas del orador"); el PDF se importa como texto con títulos y listas por heurística. Los formatos antiguos `.doc` y `.ppt` no se admiten. Sin OCR.
+- Importación de documentos (ADR 0009): PDF, Word (`.docx`) y PowerPoint (`.pptx`) se convierten en bloques editables dentro de una página nueva. Word conserva su estructura (títulos, formato y colores, listas, tablas con celdas combinadas, código, citas, casillas, ecuaciones e imágenes); PowerPoint se importa diapositiva por diapositiva (título como encabezado, cuerpo, listas, tablas, imágenes y notas del orador en un bloque de detalles "Notas del orador"); el PDF se importa con officeparser (títulos, negrita, cursiva, código, enlaces, listas, tablas con fila de encabezado, bloques de código e imágenes, desde las etiquetas del PDF o la geometría de la página) y, si solo tiene párrafos, como texto con títulos y listas por heurística. Los formatos antiguos `.doc` y `.ppt` no se admiten. Sin OCR.
 - Todo bloque importado pertenece al catálogo de contenido de Tiptap (`src/shared/kernel/tiptap-catalogue.ts`), que el servidor valida al importar y que el editor registra completo.
 
 ### 3.3 Las tres técnicas
@@ -217,7 +218,7 @@ Regla de versiones: en la Fase 0 se instala **la última versión estable** de c
 | ORM | Drizzle ORM + drizzle-kit | Acceso a Postgres y migraciones versionadas | 0 | Ninguna |
 | Lint y formato | Biome | Una sola herramienta | 0 | Ninguna |
 | Gráficos | shadcn/ui charts (Recharts) | Dashboard | 0 | Ninguna |
-| Extracción de documentos | mammoth + officeparser (Word); officeparser (PowerPoint); unpdf (PDF) | Estructura de Word con mammoth y, con officeparser, colores, numeración y ecuaciones; diapositivas de PowerPoint con officeparser; texto de PDF con unpdf hasta que officeparser lo reemplace (ADR 0009) | 0 | Ninguna; officeparser va en `serverExternalPackages` |
+| Extracción de documentos | mammoth + officeparser (Word); officeparser (PowerPoint y PDF) | Estructura de Word con mammoth y, con officeparser, colores, numeración y ecuaciones; diapositivas de PowerPoint y estructura de PDF con officeparser, cuyo pdf.js corre en un proceso aparte (ADR 0009) | 0 | Ninguna; officeparser va en `serverExternalPackages` |
 
 ### 4.2 Infraestructura y servicios
 
@@ -731,7 +732,7 @@ Hecho cuando: un usuario toma apuntes completos de una clase sin salir de Cogni 
 Entregables: subida a Storage, `ImportJob`, procesamiento síncrono con unpdf en una Server Action acotada por `maxDuration`, conversión de texto a bloques (títulos por heurística, párrafos, listas), estado de progreso en UI, manejo de PDF sin texto.
 Hecho cuando: un PDF de 30 páginas con capa de texto termina como página editable en menos de 60 segundos.
 
-> **Ampliada el 2026-10-26 (ADR 0009, rama `feat/document-import`).** La importación admite Word (`.docx`) además de PDF, con mammoth y officeparser, imágenes importadas y un catálogo estricto de contenido. PowerPoint (`.pptx`) se sumó el mismo día con officeparser (T7). El paso del PDF a officeparser y la decisión sobre OCR quedan pendientes; el PDF conserva `unpdf` y `textToBlocks` mientras tanto.
+> **Ampliada el 2026-10-26 (ADR 0009, rama `feat/document-import`).** La importación admite Word (`.docx`) además de PDF, con mammoth y officeparser, imágenes importadas y un catálogo estricto de contenido. PowerPoint (`.pptx`) se sumó el mismo día con officeparser (T7), y el PDF pasó también a officeparser (T8), con `textToBlocks` solo como respaldo para documentos de solo párrafos; `unpdf` se retiró. La decisión sobre OCR queda pendiente.
 
 ### Fase 3 — Capa de IA
 

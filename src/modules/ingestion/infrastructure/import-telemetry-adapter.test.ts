@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Analytics } from "@/shared/observability/analytics";
 import type { ImportJob } from "../domain/import-job";
-import { ImportTelemetryAdapter } from "./import-telemetry-adapter";
+import {
+  ImportTelemetryAdapter,
+  reportPdfInProcessParse,
+} from "./import-telemetry-adapter";
 
 const { captureException, captureMessage } = vi.hoisted(() => ({
   captureException: vi.fn(),
@@ -210,5 +213,42 @@ describe("ImportTelemetryAdapter", () => {
         cause: new Error("x"),
       }),
     ).resolves.toBeUndefined();
+  });
+});
+
+// document-import T8b: the PDF adapter's degraded mode (pdf.js in the
+// server process) is reported on every such parse, never silently.
+describe("reportPdfInProcessParse", () => {
+  const event = {
+    reason: "PDF_SEPARATE_PROCESS_UNAVAILABLE" as const,
+    maxPages: 50,
+    maxPageChars: 20_000,
+    maxTotalChars: 250_000,
+  };
+
+  it("reports the degraded parse to Sentry at warning level with its codes and caps only", () => {
+    captureMessage.mockClear();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    reportPdfInProcessParse(event);
+    reportPdfInProcessParse(event);
+
+    expect(captureMessage).toHaveBeenCalledTimes(2);
+    expect(captureMessage).toHaveBeenCalledWith(
+      "pdf parsed in the server process: PDF_SEPARATE_PROCESS_UNAVAILABLE",
+      { level: "warning", extra: event },
+    );
+    expect(warn).toHaveBeenCalledTimes(2);
+    warn.mockRestore();
+  });
+
+  it("never throws when Sentry reporting itself throws", () => {
+    captureMessage.mockImplementationOnce(() => {
+      throw new Error("sentry down");
+    });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    expect(() => reportPdfInProcessParse(event)).not.toThrow();
+    warn.mockRestore();
   });
 });

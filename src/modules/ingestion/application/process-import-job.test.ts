@@ -655,7 +655,7 @@ describe("processImportJob use case", () => {
       mime: "application/pdf",
       bytes: PDF_BYTES,
     });
-    const thrown = new Error("unpdf blew up");
+    const thrown = new Error("the parser blew up");
     vi.spyOn(deps.extractor, "extract").mockRejectedValueOnce(thrown);
 
     const result = await processImportJob(

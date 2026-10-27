@@ -1,3 +1,7 @@
+// @vitest-environment node
+// officeparser takes a jsdom window for a browser and runs pdf.js the
+// browser way (no DOMMatrix); these tests need its Node path, as on the
+// server.
 import { describe, expect, it } from "vitest";
 import {
   makeCorruptPdfBytes,
@@ -8,15 +12,14 @@ import {
 import { textToBlocks } from "../domain/text-to-blocks";
 import { PdfDocumentExtractor } from "./pdf-document-extractor";
 
-// design.md, "unpdf" (exact pin, 1.9.1): PdfDocumentExtractor (T5 of document-import,
-// formerly UnpdfTextExtractor) wraps getDocumentProxy +
-// extractText({ mergePages: false }) from `unpdf` and converts the page
-// texts with `textToBlocks`, exactly as processImportJob did before the
-// port became format-aware (T8 replaces it). Real PDF bytes, built by
-// tests/fixtures/pdf/make-minimal-pdf.ts, so this proves the adapter
-// against the actual parsing library instead of a mock.
+// PdfDocumentExtractor on PDFs built by tests/fixtures/pdf/make-minimal-pdf.ts
+// (real bytes, real officeparser run, nothing mocked). These PDFs hold
+// plain paragraphs only, so they take the textToBlocks fallback
+// (document-import T8): their output must stay what the unpdf + textToBlocks
+// pipeline produced before T8. The structured path and the T1 fixtures are
+// covered by pdf-document-extractor.golden.test.ts.
 describe("PdfDocumentExtractor", () => {
-  it("converts the extracted page text with textToBlocks (behaviour-identical to the pre-port pipeline)", async () => {
+  it("converts a plain-text page with textToBlocks (behaviour-identical to the pre-T8 pipeline)", async () => {
     const extractor = new PdfDocumentExtractor();
 
     const result = await extractor.extract(
@@ -113,9 +116,10 @@ describe("PdfDocumentExtractor", () => {
     expect(() => makeTextPdf([])).toThrow();
   });
 
-  // document-import T9b (audit: no page cap, parsing outside the budget).
+  // document-import T9b (audit: no page cap, parsing outside the budget);
+  // T8 moved the caps onto officeparser's AST.
   describe("limits", () => {
-    it("refuses a PDF over the page cap before extracting any page", async () => {
+    it("refuses a PDF over the page cap (officeparser reads at most the cap)", async () => {
       const result = await new PdfDocumentExtractor({ maxPages: 3 }).extract(
         makeTextPdf(["uno", "dos", "tres", "cuatro"]),
         "pdf",

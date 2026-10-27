@@ -87,3 +87,29 @@ export class ImportTelemetryAdapter implements ImportTelemetry {
     }
   }
 }
+
+// document-import T8b: PdfDocumentExtractor's degraded mode — officeparser
+// could not start its pdf.js process, so the PDF is parsed in the server
+// process under stricter caps. Reported on every such parse (a server log
+// and Sentry at warning level), with codes and caps only: no file name,
+// no owner, no text. Never throws.
+export function reportPdfInProcessParse(event: {
+  reason: string;
+  maxPages: number;
+  maxPageChars: number;
+  maxTotalChars: number;
+}): void {
+  try {
+    console.warn("[ingestion] pdf parsed in the server process", event);
+  } catch {
+    // A logging failure must never interrupt processing.
+  }
+  try {
+    Sentry.captureMessage(`pdf parsed in the server process: ${event.reason}`, {
+      level: "warning",
+      extra: { ...event },
+    });
+  } catch {
+    // Sentry reporting must never fail the caller.
+  }
+}
