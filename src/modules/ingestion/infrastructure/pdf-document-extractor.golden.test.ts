@@ -583,7 +583,6 @@ describe("PdfDocumentExtractor budget", () => {
       expect(kill).toHaveBeenCalled();
       // Pages already announced before the kill may still arrive, never
       // the rest of the document.
-      console.log("PAGES", pages.count());
       expect(pages.count()).toBeLessThan(15);
     } finally {
       kill.mockRestore();
