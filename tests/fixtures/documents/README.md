@@ -13,9 +13,18 @@ pnpm fixtures:documents
 The generator (`generate.ts` + `lib/`) is deterministic: two runs produce
 byte-identical files, so a regeneration that changes a binary is a real
 change worth reviewing. `lib/determinism.ts` freezes the clock, `Math.random`
-and `crypto.getRandomValues` while `docx`/`pptxgenjs` run, and rewrites the
-`/CreationDate` and `/ModDate` that Chromium stamps into each PDF. Every file
-carries the fixed date 2026-01-01T00:00:00Z.
+and `crypto.getRandomValues` while `docx`/`pptxgenjs` run (including `Date()`
+called without `new`), and rewrites the `/CreationDate` and `/ModDate` that
+Chromium stamps into each PDF. Every file carries the fixed date
+2026-01-01T00:00:00Z. None of the generator libraries calls `node:crypto`
+(`randomBytes`, `randomFillSync`, `randomUUID`), so it is not patched.
+
+`pnpm test` checks this: `src/modules/ingestion/infrastructure/document-fixtures.determinism.test.ts`
+regenerates every fixture that needs no Chromium (`lib/ooxml-fixtures.ts`:
+the DOCX and PPTX files, `corrupt.docx`, `garbage.bin`, `legacy.doc`) into a
+temp directory in well under a second and fails with "fixtures drifted from
+the generator; run pnpm fixtures:documents" when a hash differs from the
+committed file. The Chromium PDFs are not checked (see Known limits).
 
 ## Files
 
