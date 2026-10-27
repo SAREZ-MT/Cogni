@@ -308,9 +308,16 @@ async function expectTaggedStructure(editable: Locator) {
   const texts = await paragraphs.allTextContents();
   const index = (prefix: string) =>
     texts.findIndex((text) => text.startsWith(prefix));
-  expect(index("LEFTCOL first")).toBeGreaterThan(-1);
-  expect(index("LEFTCOL first")).toBeLessThan(index("RIGHTCOL first"));
-  expect(index("RIGHTCOL second")).toBeLessThan(
-    index("After horizontal rule."),
-  );
+  // Every paragraph must be found: findIndex's -1 would make the order
+  // comparisons below pass vacuously.
+  const leftFirst = index("LEFTCOL first");
+  const rightFirst = index("RIGHTCOL first");
+  const rightSecond = index("RIGHTCOL second");
+  const closing = index("After horizontal rule.");
+  for (const found of [leftFirst, rightFirst, rightSecond, closing]) {
+    expect(found).toBeGreaterThanOrEqual(0);
+  }
+  expect(leftFirst).toBeLessThan(rightFirst);
+  expect(rightFirst).toBeLessThan(rightSecond);
+  expect(rightSecond).toBeLessThan(closing);
 }
