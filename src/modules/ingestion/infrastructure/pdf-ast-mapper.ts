@@ -92,8 +92,14 @@ const MAX_LIST_LEVEL = 8;
 
 const STRUCTURE_TYPES = new Set(["heading", "list", "table"]);
 
-const MONOSPACE_PDF_FONT =
-  /courier|consol|menlo|monaco|mono|inconsolata|lucida ?console|lucida ?sans ?typewriter|source ?code|fira ?code|cascadia/i;
+// Known monospace families (case-insensitive), and "Mono" as a word of
+// its own: a CamelCase or spaced suffix ("DejaVuSansMono", "Roboto Mono",
+// "SFMono-Regular") or the whole name. "Mono" followed by a lowercase
+// letter is part of another word — Monotype Corsiva, Monoline — and is not
+// monospace (T8b).
+const MONOSPACE_PDF_FAMILY =
+  /courier|consolas|menlo|monaco|inconsolata|lucida ?console|lucida ?sans ?typewriter|source ?code|fira ?code|jetbrains ?mono|cascadia|monospace/i;
+const MONO_WORD = /Mono(?![a-z])|(?:^|[^A-Za-z])mono(?![a-z])|MONO(?![A-Z])/;
 
 function stringOf(value: unknown): string | null {
   return typeof value === "string" ? value : null;
@@ -114,7 +120,8 @@ function sizeOf(node: PdfNode): number | null {
 // ("ABCDEF+CourierNewPS-BoldMT").
 export function isMonospacePdfFont(font: string | null): boolean {
   if (!font) return false;
-  return MONOSPACE_PDF_FONT.test(font.replace(/^[A-Z]{6}\+/, ""));
+  const name = font.replace(/^[A-Z]{6}\+/, "");
+  return MONOSPACE_PDF_FAMILY.test(name) || MONO_WORD.test(name);
 }
 
 function isMonospaceRun(node: PdfNode): boolean {

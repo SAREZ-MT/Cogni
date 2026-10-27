@@ -369,7 +369,7 @@ Which output is used (fallback rule):
 |---|---|
 | Heading (tag `H1`–`H6`, or font size on an untagged page) | `heading` at its level (1–6), without the bold of its runs |
 | Bold / italic font | `bold` / `italic` |
-| Monospace font run (Courier, Consolas, Menlo, … any "Mono", subset prefix ignored) | `code` mark (alone) |
+| Monospace font run (Courier, Consolas, Menlo, JetBrains Mono, … "Mono" as a word of its own — "DejaVuSansMono", not Monotype Corsiva —, subset prefix ignored) | `code` mark (alone) |
 | Link annotation | `link` for http/https/mailto; other schemes keep the text, drop the mark |
 | List items (flat `indentation` + `itemIndex`) | nested `bulletList`/`orderedList`; ordered `start` = first item's `itemIndex` + 1 |
 | Table (tagged) | `table`; header cells → `tableHeader`; no spans; short rows padded with empty cells; `colwidth: null` |

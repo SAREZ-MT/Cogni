@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ImportedBlock } from "../domain/imported-doc";
 import {
   hasPdfStructure,
+  isMonospacePdfFont,
   mapPdfPageImages,
   mapPdfPages,
   type PdfNode,
@@ -170,6 +171,47 @@ describe("mapPdfPages: headings and paragraphs", () => {
         { text: " b" },
       ],
     });
+  });
+
+  // T8b: "mono" anywhere in the name also matched Monotype faces.
+  it.each([
+    "Courier",
+    "ABCDEF+CourierNewPS-BoldMT",
+    "Consolas",
+    "Menlo-Regular",
+    "Monaco",
+    "Inconsolata",
+    "LucidaConsole",
+    "Lucida Console",
+    "LucidaSansTypewriter",
+    "DejaVuSansMono",
+    "DejaVu Sans Mono",
+    "RobotoMono-Regular",
+    "SFMono-Regular",
+    "UbuntuMono-Bold",
+    "NotoSansMono",
+    "PTMono",
+    "SourceCodePro-Regular",
+    "FiraCode-Retina",
+    "JetBrainsMono-Bold",
+    "CascadiaCode",
+    "Monospace",
+    "mono",
+  ])("treats %s as monospace", (font) => {
+    expect(isMonospacePdfFont(font)).toBe(true);
+  });
+
+  it.each([
+    "MonotypeCorsiva",
+    "Monotype Corsiva",
+    "ABCDEF+MonotypeSorts",
+    "Helvetica",
+    "TimesNewRomanPSMT",
+    "Harmonia",
+    "Monoline",
+    "Arial",
+  ])("does not treat %s as monospace", (font) => {
+    expect(isMonospacePdfFont(font)).toBe(false);
   });
 
   it("drops a smaller-size run that officeparser placed out of reading order (a raised superscript)", () => {
