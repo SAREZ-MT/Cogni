@@ -2,8 +2,9 @@
 
 | Campo | Valor |
 |---|---|
-| Versión del documento | 1.7.0 |
+| Versión del documento | 1.7.1 |
 | Fecha | 2026-09-14 (actualizado 2026-10-26) |
+| Cambios de la versión 1.7.1 | ADR 0009, T7: la importación de PowerPoint (`.pptx`) queda implementada de punta a punta con officeparser (títulos de diapositiva, cuerpo, listas, tablas, imágenes y notas del orador como bloque de detalles) y el selector la ofrece. Notas en §3.2, §4.1, §4.2 y §13 (Fase 2). |
 | Cambios de la versión 1.7.0 | ADR 0009: importación multiformato (PDF y Word `.docx` de punta a punta; PowerPoint `.pptx` detectado y planificado; `.doc`/`.ppt` sin soporte) con mammoth y officeparser para Word y `unpdf` para PDF por ahora; catálogo estricto de contenido Tiptap validado al importar y registrado completo en el editor; imágenes importadas como `PageAsset`; límites de seguridad de la importación; evento `pdf_imported` renombrado a `document_imported`. Sigue sin OCR. Campos nuevos de `ImportJob` (`format`, `skipped_images`, migración `0014`). Notas en §3.2, §4.1, §4.2, §5.2, §6.1, §8.1, §9, §10.3 y §13 (Fase 2). |
 | Cambios de la versión 1.6.0 | ADR 0008: decisiones de implementación de la Fase 7 ("Hoy" como pestaña de `/calendario`; el calendario muestra solo el próximo vencimiento de cada ítem y lo vencido en hoy; días en la zona horaria del perfil, elegida en `/configuracion` o detectada en el primer uso; tendencia desde `review_logs`; definiciones de tasa de acierto, racha y repasos completados; calibración solo con recordación activa; números del dashboard sin fuente resueltos por el usuario). Sin entidades ni migraciones nuevas. Notas en §3.5, §3.6, §5.2, §6.1 y §7.4; §13 (Fase 7 implementada). |
 | Cambios de la versión 1.5.0 | ADR 0007: decisiones de implementación de la Fase 6 (evaluación asíncrona con `after()`, reclamo y sondeo acotado, "Reintentar"; respuesta fallida sin SM-2 y respuesta saltada sin modelo; límite de 60 evaluaciones por usuario por día con clave propia; sin resumen de IA de la sesión; sesión fija de 10 preguntas; generación incremental por huellas de párrafo en las tres técnicas; panel de técnicas al estilo NotebookLM Studio, "Crear examen" y hub de recordación activa). Nueva entidad `GenerationFingerprint`. Notas en §3.1, §3.3, §6.1, §7.4, §8.2, §8.3, §8.4 y §8.5; §13 (Fase 6 implementada). |
@@ -99,7 +100,7 @@ Notas de implementación de la Fase 6 (ADR 0007):
 - Menú de comandos con `/` para insertar cualquier bloque.
 - Autoguardado con debounce y actualización optimista.
 - El contenido se persiste como JSON de Tiptap; además se materializa un campo `plain_text` por página para la capa de IA.
-- Importación de documentos (ADR 0009): PDF y Word (`.docx`) se convierten en bloques editables dentro de una página nueva. Word conserva su estructura (títulos, formato y colores, listas, tablas con celdas combinadas, código, citas, casillas, ecuaciones e imágenes); el PDF se importa como texto con títulos y listas por heurística. PowerPoint (`.pptx`) está planificado y aún no se ofrece; los formatos antiguos `.doc` y `.ppt` no se admiten. Sin OCR.
+- Importación de documentos (ADR 0009): PDF, Word (`.docx`) y PowerPoint (`.pptx`) se convierten en bloques editables dentro de una página nueva. Word conserva su estructura (títulos, formato y colores, listas, tablas con celdas combinadas, código, citas, casillas, ecuaciones e imágenes); PowerPoint se importa diapositiva por diapositiva (título como encabezado, cuerpo, listas, tablas, imágenes y notas del orador en un bloque de detalles "Notas del orador"); el PDF se importa como texto con títulos y listas por heurística. Los formatos antiguos `.doc` y `.ppt` no se admiten. Sin OCR.
 - Todo bloque importado pertenece al catálogo de contenido de Tiptap (`src/shared/kernel/tiptap-catalogue.ts`), que el servidor valida al importar y que el editor registra completo.
 
 ### 3.3 Las tres técnicas
@@ -216,7 +217,7 @@ Regla de versiones: en la Fase 0 se instala **la última versión estable** de c
 | ORM | Drizzle ORM + drizzle-kit | Acceso a Postgres y migraciones versionadas | 0 | Ninguna |
 | Lint y formato | Biome | Una sola herramienta | 0 | Ninguna |
 | Gráficos | shadcn/ui charts (Recharts) | Dashboard | 0 | Ninguna |
-| Extracción de documentos | mammoth + officeparser (Word); unpdf (PDF) | Estructura de Word con mammoth y, con officeparser, colores, numeración y ecuaciones; texto de PDF con unpdf hasta que officeparser lo reemplace; officeparser leerá también PowerPoint (ADR 0009) | 0 | Ninguna; officeparser va en `serverExternalPackages` |
+| Extracción de documentos | mammoth + officeparser (Word); officeparser (PowerPoint); unpdf (PDF) | Estructura de Word con mammoth y, con officeparser, colores, numeración y ecuaciones; diapositivas de PowerPoint con officeparser; texto de PDF con unpdf hasta que officeparser lo reemplace (ADR 0009) | 0 | Ninguna; officeparser va en `serverExternalPackages` |
 
 ### 4.2 Infraestructura y servicios
 
@@ -278,7 +279,7 @@ Restricción conocida: los modelos Pro de Gemini no están en el tier gratuito. 
 | `identity` | Perfil de usuario, sesión, preferencias | Supabase Auth |
 | `notebooks` | Cuadernos, páginas, contenido, `plain_text` | `identity` |
 | `editor` | Extensiones Tiptap, bloques, menú `/`, resaltados, autoguardado | `notebooks` (por puerto de guardado) |
-| `ingestion` | Subida de documentos (PDF y Word; PowerPoint planificado), extracción, conversión a bloques del catálogo e imágenes importadas | `notebooks`, Storage |
+| `ingestion` | Subida de documentos (PDF, Word y PowerPoint), extracción, conversión a bloques del catálogo e imágenes importadas | `notebooks`, Storage |
 | `ai` | Registro de proveedores, rotación por cuota, salida estructurada, prompts versionados, rate limiting | Upstash, proveedores |
 | `study-engine` | Estado SM-2 por ítem, nivel de dominio por página, cálculo de vencimientos | Nadie del dominio de estudio |
 | `flashcards` | Tarjetas, sesiones, retroalimentación | `study-engine`, `ai`, `notebooks` |
@@ -730,7 +731,7 @@ Hecho cuando: un usuario toma apuntes completos de una clase sin salir de Cogni 
 Entregables: subida a Storage, `ImportJob`, procesamiento síncrono con unpdf en una Server Action acotada por `maxDuration`, conversión de texto a bloques (títulos por heurística, párrafos, listas), estado de progreso en UI, manejo de PDF sin texto.
 Hecho cuando: un PDF de 30 páginas con capa de texto termina como página editable en menos de 60 segundos.
 
-> **Ampliada el 2026-10-26 (ADR 0009, rama `feat/document-import`).** La importación admite Word (`.docx`) además de PDF, con mammoth y officeparser, imágenes importadas y un catálogo estricto de contenido. PowerPoint (`.pptx`), el paso del PDF a officeparser y la decisión sobre OCR quedan pendientes. El PDF conserva `unpdf` y `textToBlocks` mientras tanto.
+> **Ampliada el 2026-10-26 (ADR 0009, rama `feat/document-import`).** La importación admite Word (`.docx`) además de PDF, con mammoth y officeparser, imágenes importadas y un catálogo estricto de contenido. PowerPoint (`.pptx`) se sumó el mismo día con officeparser (T7). El paso del PDF a officeparser y la decisión sobre OCR quedan pendientes; el PDF conserva `unpdf` y `textToBlocks` mientras tanto.
 
 ### Fase 3 — Capa de IA
 

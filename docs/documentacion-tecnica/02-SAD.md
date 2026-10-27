@@ -13,7 +13,7 @@
 
 - Las Fases 0 a 7 están implementadas y los 11 módulos de `src/modules/` son reales; ninguno es un esqueleto.
   - Fase 0 (Cimientos) y Fase 1 (Cuadernos y editor): desplegadas en producción (`identity`, `notebooks`, `editor`).
-  - Fase 2 (Importación de PDF): implementada bajo Organic Driven Development (ODD) el 2026-09-23 (`src/modules/ingestion`). Ampliada el 2026-10-26 (rama `feat/document-import`) a Word (`.docx`) con mammoth y officeparser, imágenes importadas y un catálogo estricto de contenido; PowerPoint (`.pptx`) está planificado. Decisiones en `docs/adr/0009-importacion-multiformato-y-catalogo-de-contenido.md`.
+  - Fase 2 (Importación de PDF): implementada bajo Organic Driven Development (ODD) el 2026-09-23 (`src/modules/ingestion`). Ampliada el 2026-10-26 (rama `feat/document-import`) a Word (`.docx`) con mammoth y officeparser y a PowerPoint (`.pptx`) con officeparser, imágenes importadas y un catálogo estricto de contenido. Decisiones en `docs/adr/0009-importacion-multiformato-y-catalogo-de-contenido.md`.
   - Fase 3 (Capa de IA, PR #63–#69) y aceptación de términos de uso (PR #70): `src/modules/ai` e `identity`; decisiones en `docs/adr/0004-capa-de-ia-con-proveedores-gratuitos.md`.
   - Fase 4 (Motor de repetición y flashcards, PR #71–#77): `src/modules/study-engine` y `src/modules/flashcards`; decisiones en `docs/adr/0005-motor-de-repeticion-y-flashcards.md`.
   - Fase 5 (Exámenes, PR #78–#86): `src/modules/exams`; decisiones en `docs/adr/0006-examenes-y-repeticion-con-variantes.md`.
@@ -80,7 +80,7 @@ Este documento describe la arquitectura de software de Cogni usando el modelo C4
 
 | Origen | Destino | Protocolo / mecanismo | Dirección | Descripción |
 |---|---|---|---|---|
-| Estudiante | Cogni | HTTPS (navegador) | Estudiante → Cogni | Navega la aplicación, escribe apuntes, importa documentos (PDF y Word). |
+| Estudiante | Cogni | HTTPS (navegador) | Estudiante → Cogni | Navega la aplicación, escribe apuntes, importa documentos (PDF, Word y PowerPoint). |
 | Cogni | Supabase Auth | HTTPS, `@supabase/ssr` (cookies de sesión) | Cogni → Supabase | Registro, inicio de sesión, verificación de correo, recuperación de contraseña. |
 | Estudiante (navegador) | Google | Redirección HTTP + consentimiento OAuth | Estudiante → Google → Cogni (`/auth/callback`) | Inicio de sesión con Google (RF-ID-02). |
 | Cogni | Supabase Postgres | Drizzle ORM sobre `postgres.js` (TCP, *transaction pooler*, `max: 1`) | Cogni → Supabase | Lectura/escritura de las 20 tablas del esquema (cuadernos, páginas, adjuntos, importaciones, generaciones de IA, material de estudio, estado SM-2, sesiones y respuestas). |
@@ -145,7 +145,7 @@ La aplicación web Cogni (el contenedor Next.js) se descompone en el proxy, el �
 | `identity` | Registro, inicio de sesión (correo y Google), recuperación de contraseña, perfil del estudiante, aceptación de términos de uso y zona horaria. | Supabase Auth, `@supabase/ssr` | Implementado |
 | `notebooks` | Cuadernos, páginas, `plain_text` materializado, adjuntos de imagen; sus Server Actions satisfacen la forma del `SavePagePort` del editor (la ruta de página compone el puerto) y `server-api.ts` sirve a otros módulos. | Drizzle ORM, Supabase Storage | Implementado |
 | `editor` | Autoguardado, estado de conflicto de versión y el editor de bloques Tiptap (menú `/`, barra contextual, resaltado); declara su propio `SavePagePort`. | Tiptap 3, TanStack Query | Implementado |
-| `ingestion` | Importación de un documento PDF o Word a una página editable (PowerPoint planificado), con `ImportJob` como máquina de estados, imágenes importadas y límites por usuario. | `mammoth`, `officeparser`, `unpdf`, Supabase Storage, `src/shared/rate-limit` | Implementado (PDF y Word) |
+| `ingestion` | Importación de un documento PDF, Word o PowerPoint a una página editable, con `ImportJob` como máquina de estados, imágenes importadas y límites por usuario. | `mammoth`, `officeparser`, `unpdf`, Supabase Storage, `src/shared/rate-limit` | Implementado (PDF, Word y PowerPoint) |
 | `ai` | Registro de proveedores de IA, rotación por cuota y salud, *circuit breaker*, límites diarios por estudiante, salida estructurada validada con Zod, prompts versionados y auditoría de cada intento (`ai_generations`). | Vercel AI SDK 7, Upstash Redis | Implementado (Fase 3) |
 | `study-engine` | Estado SM-2 por ítem (`StudyItem`), historial (`ReviewLog`), nivel de dominio por página (`PageMastery`), sesiones de flashcards y retroalimentación de sesión; registra los repasos de exámenes y recordación activa. | Drizzle ORM | Implementado (Fase 4; ver §5.2) |
 | `flashcards` | Mazo de tarjetas por página, generación incremental con IA, tarjetas manuales y retroalimentación de la sesión de repaso. | Drizzle ORM | Implementado (Fase 4; ver §10.2) |
@@ -191,6 +191,7 @@ Esta vista se limita a dos módulos, ambos con código suficientemente cargado d
 | `FormatRoutingDocumentExtractor` | Adaptador (`infrastructure/`) | Implementa `DocumentExtractor` eligiendo el adaptador del formato (`createDocumentExtractor()`). |
 | `PdfDocumentExtractor` | Adaptador (`infrastructure/`) | Lee el PDF con `unpdf` página por página (`PDF_LIMITS`) y aplica `textToBlocks`. |
 | `DocxDocumentExtractor` | Adaptador (`infrastructure/`) | Lee el Word con mammoth (estructura) y officeparser (colores, numeración, ecuaciones), uno después del otro, sobre un `OoxmlPackage` que infla cada parte con tope de salida. |
+| `PptxDocumentExtractor` | Adaptador (`infrastructure/`) | Lee el PowerPoint con officeparser sobre el mismo `OoxmlPackage`; del XML de las diapositivas (`domain/pptx-xml.ts`) toma el orden, las diapositivas y formas ocultas, las viñetas heredadas del patrón y las celdas combinadas de las tablas; `pptx-slide-mapper.ts` emite por diapositiva título, cuerpo y notas del orador ("Notas del orador"). |
 | `NotebooksPagesAdapter` | Adaptador (`infrastructure/`) | Implementa `NotebookPagesPort` envolviendo `createNotebooksServerApi` de `notebooks` (incluidos `storeImportedAsset` y `deleteImportedAssets`). |
 | `DrizzleImportJobRepository` | Adaptador (`infrastructure/`) | Implementa `ImportJobRepository` sobre la tabla `import_jobs`. |
 | `ImportTelemetryAdapter` | Adaptador (`infrastructure/`) | Reporta a Sentry y registra el evento `document_imported` en PostHog. |
@@ -567,7 +568,7 @@ Las 14 reglas reales de `.dependency-cruiser.cjs`, todas con `severity: "error"`
 9. **`study-engine-knows-no-technique`** — `study-engine` es agnóstico de técnica; no puede importar `flashcards`, `exams` ni `active-recall`, que le hablan a través de su API pública.
 10. **`unpdf-only-in-ingestion-infra`** — `unpdf` solo puede importarse desde `ingestion/infrastructure` (`pdf-document-extractor.ts`, hasta que T8 lo retire).
 11. **`mammoth-only-in-ingestion-infra`** — mammoth (estructura de Word) solo puede importarse desde `ingestion/infrastructure` (`docx-document-extractor.ts`).
-12. **`officeparser-only-in-ingestion-infra`** — officeparser (colores, numeración y ecuaciones de Word; PowerPoint y PDF planificados) solo puede importarse desde `ingestion/infrastructure`.
+12. **`officeparser-only-in-ingestion-infra`** — officeparser (colores, numeración y ecuaciones de Word; PowerPoint completo; PDF planificado) solo puede importarse desde `ingestion/infrastructure`.
 13. **`ai-sdk-only-in-ai-infra`** — el Vercel AI SDK y sus paquetes de proveedor (`ai`, `@ai-sdk/*`, `@openrouter/*`) solo pueden importarse desde `ai/infrastructure`; el resto pasa por `ai.application`.
 14. **`upstash-only-in-ai-infra`** — los paquetes de Upstash solo pueden importarse desde `ai/infrastructure` y desde el limitador compartido `src/shared/rate-limit`; el dominio y la aplicación dependen de puertos.
 
@@ -638,7 +639,7 @@ Ver `04-ADR.md`, ADR-006.
 | Criterio | Evaluación |
 |---|---|
 | Costo | Gratuitos, de código abierto y sin dependencias nativas ni servicios externos: toda la extracción corre dentro de la función de Vercel (`docs/adr/0009`). |
-| Cobertura funcional | `unpdf` extrae el texto de un PDF página por página, que `textToBlocks` convierte en títulos, párrafos y listas (RF-IN-06). mammoth 1.13 lee la estructura de un Word (títulos, listas anidadas, tablas con celdas combinadas, código, citas, casillas, saltos de página e imágenes) y officeparser 8.2 aporta colores, sombreado, número inicial de las listas y ecuaciones OMML como LaTeX. officeparser leerá también PowerPoint (T7) y reemplazará a `unpdf` en PDF (T8). |
+| Cobertura funcional | `unpdf` extrae el texto de un PDF página por página, que `textToBlocks` convierte en títulos, párrafos y listas (RF-IN-06). mammoth 1.13 lee la estructura de un Word (títulos, listas anidadas, tablas con celdas combinadas, código, citas, casillas, saltos de página e imágenes) y officeparser 8.2 aporta colores, sombreado, número inicial de las listas y ecuaciones OMML como LaTeX. officeparser lee también PowerPoint (T7): títulos, cuerpo con formato, listas por nivel, tablas, imágenes, ecuaciones y notas del orador; las celdas combinadas, las diapositivas ocultas y las viñetas heredadas del patrón se leen del XML de la diapositiva porque officeparser no las informa. Reemplazará a `unpdf` en PDF (T8). |
 | Aislamiento arquitectónico | Confinados a `ingestion/infrastructure` por las reglas `unpdf-only-in-ingestion-infra`, `mammoth-only-in-ingestion-infra` y `officeparser-only-in-ingestion-infra`. officeparser va en `serverExternalPackages` de `next.config.ts` porque Turbopack rompe su envoltorio ESM al empaquetarlo. Ningún motor descomprime el ZIP por su cuenta: `OoxmlPackage` infla cada parte con tope de salida. |
 | Riesgo | Ninguno hace OCR; un PDF sin capa de texto se rechaza explícitamente (`no_text_layer`), una limitación de producto aceptada (decisión sobre OCR pendiente, T12). El análisis es síncrono: una página o una parte dentro de los límites puede pasar del presupuesto interno, con `maxDuration = 120` como techo. Los formatos antiguos `.doc`/`.ppt` no se leen. |
 

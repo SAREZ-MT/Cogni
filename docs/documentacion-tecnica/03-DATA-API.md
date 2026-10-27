@@ -13,7 +13,7 @@
 
 - Las Fases 0 a 7 están implementadas y los 11 módulos de `src/modules/` son reales; ninguno es un esqueleto.
   - Fase 0 (Cimientos) y Fase 1 (Cuadernos y editor): desplegadas en producción; tablas `profiles`, `notebooks`, `pages` y `page_assets` (migraciones `0000`–`0004`).
-  - Fase 2 (Importación de PDF): implementada bajo Organic Driven Development (ODD) el 2026-09-23; tabla `import_jobs` y bucket `page-pdfs` (migraciones `0005`–`0006`). Ampliada el 2026-10-26 (rama `feat/document-import`, `docs/adr/0009`) a Word (`.docx`), con PowerPoint (`.pptx`) planificado: migración `0014` (columnas `import_jobs.format` y `skipped_images`, tipos MIME de DOCX y PPTX en `page-pdfs`) e imágenes importadas registradas en `page_assets`.
+  - Fase 2 (Importación de PDF): implementada bajo Organic Driven Development (ODD) el 2026-09-23; tabla `import_jobs` y bucket `page-pdfs` (migraciones `0005`–`0006`). Ampliada el 2026-10-26 (rama `feat/document-import`, `docs/adr/0009`) a Word (`.docx`) y PowerPoint (`.pptx`): migración `0014` (columnas `import_jobs.format` y `skipped_images`, tipos MIME de DOCX y PPTX en `page-pdfs`) e imágenes importadas registradas en `page_assets`.
   - Fase 3 (Capa de IA, PR #63–#69) y aceptación de términos de uso (PR #70): tablas `ai_generations` y `flashcards` (migración `0007`) y columnas de términos en `profiles` (migración `0008`); decisiones en `docs/adr/0004-capa-de-ia-con-proveedores-gratuitos.md`.
   - Fase 4 (Motor de repetición y flashcards, PR #71–#77): tablas `study_items`, `review_logs`, `page_mastery`, `flashcard_sessions` y `session_feedback`, y `flashcards.archived_at` (migración `0009`); decisiones en `docs/adr/0005-motor-de-repeticion-y-flashcards.md`.
   - Fase 5 (Exámenes, PR #78–#86): tablas `exam_questions`, `exam_page_state`, `exam_sessions` y `exam_answers` (migraciones `0010`–`0011`); decisiones en `docs/adr/0006-examenes-y-repeticion-con-variantes.md`.
@@ -1130,7 +1130,7 @@ Los demás conjuntos cerrados siguen el mismo patrón (`text` + `CHECK`):
 | `recall_sessions.evaluation_status` | `pending`, `done`, `partial` | Evaluación en curso; todas las respuestas evaluadas; alguna respuesta `failed`. |
 | `recall_answers.evaluation_status` | `pending`, `done`, `failed` | Sin evaluar o reclamada; evaluada (modelo o saltada); falló en todos los proveedores o por el límite diario. |
 | `generation_fingerprints.technique` | `flashcards`, `exam`, `recall` | Técnica que ya envió el párrafo a la IA. |
-| `import_jobs.format` | `pdf`, `docx`, `pptx` | Formato del documento importado, tomado de la extensión de la ruta (`0014`; `pptx` se acepta en datos, pero su importación está planificada). |
+| `import_jobs.format` | `pdf`, `docx`, `pptx` | Formato del documento importado, tomado de la extensión de la ruta (`0014`). |
 
 ### 2.6 Relaciones y borrado en cascada
 
@@ -1355,7 +1355,7 @@ Ejemplo de retorno no trivial (`getHomeOverview`):
 
 ### 4.3 `ingestion`
 
-Corresponden a CU-05 (Importar documento) y a los requisitos RF-IN-01 a RF-IN-11 (componente `ingestion`, `02-SAD.md` §4.1), además de RNF-P-01 y RNF-P-02 (presupuesto de tiempo y tamaño máximo del documento). Las acciones conservan sus nombres de la era PDF, pero aceptan PDF y Word (`.docx`); `mime` debe ser `application/pdf` o el tipo de DOCX (o de PPTX, que el servidor acepta y la interfaz aún no ofrece). Server Actions (`"use server"`, `src/modules/ingestion/actions.ts`). Las cinco están envueltas en `withBoundary()`: cualquier excepción no prevista se reporta a Sentry y se convierte en `INGESTION_UNEXPECTED` en vez de propagarse al cliente. `processPdfImport` es la única de duración larga, acotada por `maxDuration = 120` en `src/app/(app)/notebooks/[notebookId]/pages/[pageId]/page.tsx`.
+Corresponden a CU-05 (Importar documento) y a los requisitos RF-IN-01 a RF-IN-11 (componente `ingestion`, `02-SAD.md` §4.1), además de RNF-P-01 y RNF-P-02 (presupuesto de tiempo y tamaño máximo del documento). Las acciones conservan sus nombres de la era PDF, pero aceptan PDF, Word (`.docx`) y PowerPoint (`.pptx`); `mime` debe ser `application/pdf` o el tipo de DOCX o de PPTX. Server Actions (`"use server"`, `src/modules/ingestion/actions.ts`). Las cinco están envueltas en `withBoundary()`: cualquier excepción no prevista se reporta a Sentry y se convierte en `INGESTION_UNEXPECTED` en vez de propagarse al cliente. `processPdfImport` es la única de duración larga, acotada por `maxDuration = 120` en `src/app/(app)/notebooks/[notebookId]/pages/[pageId]/page.tsx`.
 
 | Acción | Parámetros | Retorno | Auth | Errores |
 |---|---|---|---|---|
@@ -1372,9 +1372,9 @@ Corresponden a CU-05 (Importar documento) y a los requisitos RF-IN-01 a RF-IN-11
 | `download` | No se pudo descargar el objeto. | "No pudimos leer el archivo que subiste. Vuelve a importarlo." |
 | `invalid_document` | El documento está dañado, cifrado o truncado, supera 20 MiB o el extractor falla. | "Este archivo no es un documento válido o está protegido. Revisa que no tenga contraseña e inténtalo de nuevo." |
 | `invalid_document` (límite superado, `DOCUMENT_LIMIT_EXCEEDED`) | El documento supera un límite de importación (ZIP, XML, páginas o caracteres del PDF). | "Este documento es demasiado grande o complejo para importarlo. Divídelo en partes más pequeñas e inténtalo de nuevo." |
-| `unsupported_format` | Formato antiguo (`.doc`/`.ppt`), bytes desconocidos, bytes que no son el formato declarado o formato sin adaptador (PPTX). | "Solo puedes importar archivos PDF o Word (.docx)." (derivado de `IMPORTABLE_FORMATS`) |
+| `unsupported_format` | Formato antiguo (`.doc`/`.ppt`), bytes desconocidos, bytes que no son el formato declarado o formato sin adaptador. | "Solo puedes importar archivos PDF, Word (.docx) o PowerPoint (.pptx)." (derivado de `IMPORTABLE_FORMATS`) |
 | `no_text_layer` | Un PDF sin texto seleccionable (escaneado). | "Este PDF no tiene texto seleccionable y Cogni no hace OCR. Prueba con un PDF que tenga texto." |
-| `empty_document` | Un Word sin texto (también un PowerPoint, cuando exista su adaptador). | "El documento no tiene texto que podamos importar." |
+| `empty_document` | Un Word o un PowerPoint sin texto (en un PowerPoint, ni en las diapositivas ni en las notas). | "El documento no tiene texto que podamos importar." |
 | `persistence` | La página cambió durante la importación. | "La página cambió durante la importación, así que no reemplazamos su contenido. Vuelve a importar el documento." |
 | `persistence` (página no disponible) | La página destino se archivó o ya no existe. | "La página de destino ya no está disponible. Vuelve a importar el documento." |
 | `timeout` | Se agotó el presupuesto de procesamiento. | "La importación tardó demasiado. Inténtalo de nuevo con un documento más pequeño o en unos minutos." |
