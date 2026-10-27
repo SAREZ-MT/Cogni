@@ -10,6 +10,7 @@ import { FakePdfStorageGateway } from "../application/testing/fake-pdf-storage-g
 import { FixedClock } from "../application/testing/fixed-clock";
 import { InMemoryImportJobRepository } from "../application/testing/in-memory-import-job-repository";
 import type { ExtractedDocument } from "../domain/document-extractor";
+import { detectDocumentFormat } from "../domain/document-format";
 import { createImportJob } from "../domain/import-job";
 import type {
   ImportedBlock,
@@ -292,6 +293,22 @@ describe("PptxDocumentExtractor errors", () => {
       bytes.subarray(0, Math.floor(bytes.length / 2)),
       "pptx",
     );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("DOCUMENT_UNREADABLE");
+  });
+
+  // The e2e corrupt-deck case (tests/e2e/pptx-import.spec.ts) uploads this
+  // cut: it must still be detected as pptx (from its local file headers)
+  // so the extractor, not detection, rejects it as invalid_document.
+  it("detects the 60 % cut of all-constructs.pptx as pptx and fails it as DOCUMENT_UNREADABLE", async () => {
+    const bytes = fixture("all-constructs.pptx");
+    const cut = bytes.subarray(0, Math.floor(bytes.length * 0.6));
+
+    expect(
+      detectDocumentFormat(cut),
+      "the e2e corrupt deck would be refused as unsupported, not invalid",
+    ).toBe("pptx");
+    const result = await new PptxDocumentExtractor().extract(cut, "pptx");
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe("DOCUMENT_UNREADABLE");
   });
