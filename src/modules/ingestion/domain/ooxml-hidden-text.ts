@@ -1,3 +1,5 @@
+import { attribute, type Tag, tags } from "./xml-tags";
+
 // document-import T9b (security audit 2026-10-26, AI-bound invisible text):
 // text Word hides (`w:vanish`, `w:specVanish`) is never shown to the user,
 // but mammoth 1.13 ignores both properties and would import it — and
@@ -22,66 +24,6 @@ const WORD_NAMESPACES = new Set([
 ]);
 const OFF_VALUES = new Set(["0", "false", "off"]);
 
-type Tag = {
-  kind: "open" | "close" | "empty";
-  name: string;
-  attrs: string;
-  start: number;
-  end: number;
-};
-
-// Every element tag in order; comments, CDATA, declarations and
-// processing instructions are skipped. Stops at an unterminated tag.
-function* tags(xml: string): Generator<Tag> {
-  let index = 0;
-  const length = xml.length;
-  while (index < length) {
-    const open = xml.indexOf("<", index);
-    if (open === -1) return;
-    const next = xml[open + 1];
-    if (next === "!" || next === "?") {
-      const terminator = xml.startsWith("<!--", open)
-        ? "-->"
-        : xml.startsWith("<![CDATA[", open)
-          ? "]]>"
-          : next === "?"
-            ? "?>"
-            : ">";
-      const close = xml.indexOf(terminator, open + 2);
-      if (close === -1) return;
-      index = close + terminator.length;
-      continue;
-    }
-    let cursor = open + 1;
-    let quote = "";
-    while (cursor < length) {
-      const char = xml[cursor];
-      if (quote) {
-        if (char === quote) quote = "";
-      } else if (char === '"' || char === "'") {
-        quote = char;
-      } else if (char === ">") {
-        break;
-      }
-      cursor++;
-    }
-    if (cursor >= length) return;
-    const closing = next === "/";
-    const body = xml.slice(closing ? open + 2 : open + 1, cursor);
-    const selfClosing = !closing && body.endsWith("/");
-    const inner = selfClosing ? body.slice(0, -1) : body;
-    const nameEnd = inner.search(/[\s/]|$/);
-    yield {
-      kind: closing ? "close" : selfClosing ? "empty" : "open",
-      name: inner.slice(0, nameEnd),
-      attrs: inner.slice(nameEnd),
-      start: open,
-      end: cursor + 1,
-    };
-    index = cursor + 1;
-  }
-}
-
 function wordPrefixes(xml: string): Set<string> {
   const prefixes = new Set<string>();
   for (const match of xml.matchAll(
@@ -99,13 +41,6 @@ function localName(name: string, prefixes: Set<string>): string | null {
   const colon = name.indexOf(":");
   const prefix = colon === -1 ? "" : name.slice(0, colon);
   return prefixes.has(prefix) ? name.slice(colon + 1) : null;
-}
-
-function attribute(attrs: string, local: string): string | null {
-  const match = new RegExp(
-    `(?:^|\\s)(?:[\\w.-]+:)?${local}\\s*=\\s*(["'])(.*?)\\1`,
-  ).exec(attrs);
-  return match ? match[2] : null;
 }
 
 function isOn(attrs: string): boolean {

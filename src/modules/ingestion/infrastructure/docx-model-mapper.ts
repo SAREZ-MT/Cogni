@@ -1,13 +1,21 @@
 import type { ExtractedImage } from "../domain/document-extractor";
-import { sniffImageMime } from "../domain/image-mime";
+import {
+  IMAGE_LIMITS,
+  type ImageLimits,
+  sniffImageMime,
+} from "../domain/image-mime";
+import {
+  itemContent,
+  ListBuilder,
+  MAX_ALT_LENGTH,
+  mergeTexts,
+  trimInlines,
+} from "../domain/imported-blocks";
 import type {
   ImportedBlock,
-  ImportedBulletList,
   ImportedDoc,
   ImportedInline,
-  ImportedListItem,
   ImportedMark,
-  ImportedOrderedList,
   ImportedParagraph,
   ImportedTableCell,
   ImportedTableRow,
@@ -16,7 +24,9 @@ import type {
 } from "../domain/imported-doc";
 import {
   docxHighlightToPalette,
+  dominantColor,
   isMonospaceFont,
+  NEUTRAL_COLORS,
   normalizeHexColor,
   safeLinkHref,
 } from "../domain/imported-marks";
@@ -66,20 +76,11 @@ export type MappedDocx = {
   pageBreaks: number;
 };
 
-const MAX_ALT_LENGTH = 2000;
 // document-import T9b: tables nested deeper than this fail the import
 // (OoxmlLimitError → DOCUMENT_LIMIT_EXCEEDED) instead of recursing on;
 // real documents rarely nest more than two or three. The XML nesting cap
 // (OOXML_LIMITS.maxXmlDepth) already bounds every other recursion here.
 export const MAX_TABLE_NESTING = 16;
-// A colour carried by at least this share of the body text is the
-// document's base colour (set by the Normal style, which officeparser
-// folds into every run), not an emphasis: it is not imported.
-const DOMINANT_COLOR_SHARE = 0.5;
-// Pure black/white text or shading would vanish in one of the editor
-// themes; they are the default look, not formatting worth keeping.
-const NEUTRAL_COLORS = new Set(["#000000", "#ffffff"]);
-
 const TITLE_STYLE = /^title$/i;
 const HEADING_STYLE = /^(heading|t[ií]tulo)\s*([1-9])$/i;
 const CODE_STYLE =
@@ -202,13 +203,6 @@ function runContext(run: MammothNode, parent: RunContext): RunContext {
   };
 }
 
-function sameMarks(
-  a: ImportedMark[] | undefined,
-  b: ImportedMark[] | undefined,
-) {
-  return JSON.stringify(a ?? []) === JSON.stringify(b ?? []);
-}
-
 class DocxMapper {
   private readonly enrichments: Map<MammothNode, ParagraphEnrichment | null>;
   private readonly imageBytes: Map<MammothNode, Uint8Array>;
@@ -265,13 +259,7 @@ class DocxMapper {
         );
       }
     }
-    const dominant = (map: Map<string, number>) => {
-      for (const [color, size] of map) {
-        if (total > 0 && size / total >= DOMINANT_COLOR_SHARE) return color;
-      }
-      return null;
-    };
-    return [dominant(colors), dominant(backgrounds)];
+    return [dominantColor(colors, total), dominantColor(backgrounds, total)];
   }
 
   // Headings, quotes and code take their colour from their style.
@@ -711,15 +699,6 @@ function paragraphOf(content: ImportedInline[]): ImportedParagraph {
   return { type: "paragraph", content };
 }
 
-// A list or task item must start with a paragraph.
-function itemContent(
-  blocks: ImportedBlock[],
-): [ImportedParagraph, ...ImportedBlock[]] {
-  const [first, ...rest] = blocks;
-  if (first?.type === "paragraph") return [first, ...rest];
-  return [{ type: "paragraph" }, ...blocks];
-}
-
 function codeLine(pieces: Piece[]): string {
   return pieces
     .map((piece) => {
@@ -744,115 +723,9 @@ function stripCheckboxGlyph(pieces: Piece[]): Piece[] {
   return out;
 }
 
-function mergeTexts(inlines: ImportedInline[]): ImportedInline[] {
-  const out: ImportedInline[] = [];
-  for (const inline of inlines) {
-    const last = out.at(-1);
-    if (
-      inline.type === "text" &&
-      last?.type === "text" &&
-      sameMarks(last.marks, inline.marks)
-    ) {
-      out[out.length - 1] = { ...last, text: last.text + inline.text };
-    } else if (inline.type !== "text" || inline.text.length > 0) {
-      out.push(inline);
-    }
-  }
-  return out;
-}
-
-// Drops leading/trailing hard breaks and a content that is only
-// whitespace, so no empty paragraph survives.
-function trimInlines(inlines: ImportedInline[]): ImportedInline[] {
-  let start = 0;
-  let end = inlines.length;
-  while (start < end && inlines[start].type === "hardBreak") start++;
-  while (end > start && inlines[end - 1].type === "hardBreak") end--;
-  const content = inlines.slice(start, end);
-  const meaningful = content.some(
-    (inline) => inline.type !== "text" || inline.text.trim().length > 0,
-  );
-  return meaningful ? content : [];
-}
-
-// Builds nested bullet/ordered lists from flat (level, ordered) items.
-class ListBuilder {
-  private readonly roots: Array<ImportedBulletList | ImportedOrderedList> = [];
-  private stack: Array<{
-    list: ImportedBulletList | ImportedOrderedList;
-    level: number;
-    listId: string | null;
-  }> = [];
-
-  add(
-    level: number,
-    ordered: boolean,
-    listId: string | null,
-    start: () => number,
-    content: ImportedListItem["content"],
-  ) {
-    while (this.stack.length > 0 && (this.stack.at(-1)?.level ?? 0) > level) {
-      this.stack.pop();
-    }
-    const top = this.stack.at(-1);
-    const isOrdered = (list: ImportedBulletList | ImportedOrderedList) =>
-      list.type === "orderedList";
-    if (
-      top &&
-      top.level === level &&
-      (isOrdered(top.list) !== ordered ||
-        (this.stack.length === 1 &&
-          listId !== null &&
-          top.listId !== null &&
-          listId !== top.listId))
-    ) {
-      this.stack.pop();
-    }
-    const item: ImportedListItem = { type: "listItem", content };
-    const current = this.stack.at(-1);
-    if (current && current.level === level) {
-      current.list.content.push(item);
-      return;
-    }
-    const list = newList(ordered, start(), item);
-    if (current) {
-      // Nested under the parent's last item.
-      const parentItem = current.list.content.at(-1);
-      parentItem?.content.push(list);
-    } else {
-      this.roots.push(list);
-    }
-    this.stack.push({ list, level, listId });
-  }
-
-  finish(): ImportedBlock[] {
-    return this.roots;
-  }
-}
-
-function newList(
-  ordered: boolean,
-  start: number,
-  item: ImportedListItem,
-): ImportedBulletList | ImportedOrderedList {
-  if (!ordered) return { type: "bulletList", content: [item] };
-  return start !== 1
-    ? { type: "orderedList", attrs: { start }, content: [item] }
-    : { type: "orderedList", content: [item] };
-}
-
-// document-import T9b (audit: images all buffered): limits on the images
-// one document may bring. Over them an image is skipped (counted in
-// `skippedImages`), never the document.
-const MiB = 1024 * 1024;
-export const IMAGE_LIMITS = {
-  maxImages: 100,
-  // Also enforced before inflating by OoxmlPackage (OOXML_LIMITS).
-  maxImageBytes: 10 * MiB,
-  maxTotalBytes: 40 * MiB,
-};
-
-export type ImageLimits = typeof IMAGE_LIMITS;
+// IMAGE_LIMITS moved to domain/image-mime.ts (T7: the PPTX mapper shares
+// them); re-exported for this mapper's callers and tests.
+export { IMAGE_LIMITS, type ImageLimits };
 
 // Reads the images' bytes up front (mammoth's reads are async) so the
 // mapping itself stays synchronous — one image at a time (T9b), so only

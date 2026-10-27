@@ -21,6 +21,7 @@ import {
   type MammothZipFile,
   OoxmlLimitError,
   type OoxmlPackage,
+  officeparserLimitCode,
   openOoxmlPackage,
 } from "./ooxml-package";
 
@@ -94,25 +95,6 @@ async function readMammothModel(file: MammothZipFile): Promise<MammothNode> {
   });
   if (!model) throw new Error("mammoth returned no document");
   return model;
-}
-
-// officeparser's own decompression-limit errors (`err.officeIssue.code`,
-// officeparser/dist/types.js OfficeErrorType).
-const OFFICEPARSER_LIMIT_CODES: ReadonlySet<string> = new Set([
-  "ZIP_ENTRY_COUNT_LIMIT_EXCEEDED",
-  "ZIP_ENTRY_INVALID_SIZE",
-  "ZIP_SIZE_LIMIT_EXCEEDED",
-  "XML_ELEMENT_LIMIT_EXCEEDED",
-  "MAX_NESTING_DEPTH_EXCEEDED",
-  "OUTPUT_TOO_LARGE",
-]);
-
-function officeparserLimitCode(error: unknown): string | null {
-  const code = (error as { officeIssue?: { code?: unknown } } | null)
-    ?.officeIssue?.code;
-  return typeof code === "string" && OFFICEPARSER_LIMIT_CODES.has(code)
-    ? code
-    : null;
 }
 
 // The enrichment is optional — officeparser failing for any other reason

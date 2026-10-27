@@ -33,3 +33,16 @@ export function sniffImageMime(bytes: Uint8Array): ImportableImageMime | null {
   if (hasAt(bytes, RIFF) && hasAt(bytes, WEBP, 8)) return "image/webp";
   return null;
 }
+
+// document-import T9b (audit: images all buffered): limits on the images
+// one DOCX or PPTX may bring. Over them an image is skipped (counted in
+// `skippedImages`), never the document.
+const MiB = 1024 * 1024;
+export const IMAGE_LIMITS = {
+  maxImages: 100,
+  // Also enforced before inflating by OoxmlPackage (OOXML_LIMITS).
+  maxImageBytes: 10 * MiB,
+  maxTotalBytes: 40 * MiB,
+};
+
+export type ImageLimits = typeof IMAGE_LIMITS;
