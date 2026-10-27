@@ -88,7 +88,7 @@ export function PageEditor({ notebookId, ...editorProps }: PageEditorProps) {
       keywords: ["importar", "pdf", "word", "docx", "import", "documento"],
       icon: FileUp,
       group: "Contenido",
-      description: "Importa un PDF o un Word en esta página",
+      description: "Importa un PDF, un Word o un PowerPoint en esta página",
       run: (editor, range) => {
         editor.chain().focus().deleteRange(range).run();
         start({ notebookId });

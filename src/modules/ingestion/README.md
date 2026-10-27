@@ -86,9 +86,8 @@ renamed from `Pdf*` to `Document*`; since T11b the app shell uses the
 
 - Entry points: the notebook menu's "Importar documento"
   (`ImportDocumentMenuItem`) and the editor's `/` item "Importar
-  documento" — "Importa un PDF o un Word en esta página"
-  (`page-editor.tsx`; its description still omits PowerPoint, pending
-  outside this module). Both open `DocumentImportProvider`'s single hidden
+  documento" — "Importa un PDF, un Word o un PowerPoint en esta página"
+  (`page-editor.tsx`). Both open `DocumentImportProvider`'s single hidden
   input (`data-testid="document-import-input"`).
 - Formats (`ui/import-formats.ts`): `DOCUMENT_FORMATS` minus
   `NOT_YET_IMPORTABLE_IN_UI` (empty since T7; a future format waits there

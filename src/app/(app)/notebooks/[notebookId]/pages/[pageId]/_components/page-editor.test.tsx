@@ -133,7 +133,7 @@ describe("PageEditor", () => {
       expect(extraSlashItems[0]).toMatchObject({
         id: "import-document",
         label: "Importar documento",
-        description: "Importa un PDF o un Word en esta página",
+        description: "Importa un PDF, un Word o un PowerPoint en esta página",
         group: "Contenido",
       });
       expect(extraSlashItems[0].keywords).toEqual(
