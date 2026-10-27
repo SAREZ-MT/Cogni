@@ -363,7 +363,10 @@ Which output is used (fallback rule):
    which still finds uppercase or numbered headings and `- `/`1)` lists in
    plain text; the page's images go after its text. This keeps the
    behaviour of plain-text PDFs from before T8 (`pdf-document-extractor.test.ts`,
-   the 30-page e2e).
+   the 30-page e2e). There is one path with or without images (T8b):
+   `textToBlocks` reads every page on its own (no cross-page rule), so
+   converting page by page is byte-identical to one call over the whole
+   document.
 
 | PDF construct | Block |
 |---|---|
@@ -394,9 +397,14 @@ around a column break (`expected/tagged.pdf.md`).
 
 Pages: `totalPages` is the PDF's page count; `pagesWithoutText` the pages
 whose blocks hold no text (a page officeparser emits no node for counts as
-one). Errors: any officeparser failure (corrupt — `corrupt.pdf` —
-encrypted, truncated) → `DOCUMENT_UNREADABLE` (`invalid_document`), never
-a document without text; a scanned page → no text → `no_text_layer`.
+one). If officeparser reports no page count, a document whose last read
+page reached the cap is refused as over it (fail closed, T8b). Errors: any
+officeparser failure (corrupt — `corrupt.pdf` — encrypted, truncated) →
+`DOCUMENT_UNREADABLE` (`invalid_document`), never a document without
+text; `PDF_PROCESS_FAILED`, an officeparser limit error or a
+`PDF_CONTENT_LIMIT_EXCEEDED` warning → `DOCUMENT_LIMIT_EXCEEDED`
+(`pdf-document-extractor.limits.test.ts`, officeparser stubbed); a scanned
+page → no text → `no_text_layer`.
 `large-30p.pdf` extracts in about 0.2 s locally (pdf.js process start
 included).
 
@@ -407,10 +415,21 @@ later PDF parse fails on the version mismatch or runs in-process. No module
 may import unpdf or pdfjs-dist (`no-in-process-pdfjs`). The build traces
 `pdfjs-dist/legacy/build/pdf.worker.mjs` into the page route's output
 (`officeparser` stays in `serverExternalPackages`); `next start` was seen
-running the pdf.js child process. If the process cannot start (a runtime
-that cannot run Node as a child), officeparser parses in the server process
-and the adapter logs `[ingestion] officeparser could not start its pdf.js
-process` once.
+running the pdf.js child process.
+
+Degraded mode (T8b): if the process cannot start (a runtime that cannot
+run Node as a child), officeparser warns `PDF_SEPARATE_PROCESS_UNAVAILABLE`
+before reading anything. The adapter aborts that parse at once — its
+result is never used — and parses again with pdf.js in the server process
+(`separateProcess: false`) under `PDF_IN_PROCESS_LIMITS`: 50 pages,
+20,000 characters per page, 250,000 in total, and officeparser's
+`maxTextItems` 5,000, `maxOperators` 50,000, `maxAnnotations` 2,000
+(nothing bounds pdf.js's memory or CPU there, and the abort stops it only
+between time slices). A document over them → `DOCUMENT_LIMIT_EXCEEDED`.
+Every such parse is reported, never silently: a server log and a Sentry
+warning (`reportPdfInProcessParse` in `import-telemetry-adapter.ts`) with
+the reason code and caps only — no file name, owner or text. The golden
+tests assert the real fixtures never take this path.
 
 Tests run under jsdom (vitest.config.ts), where officeparser takes itself
 for a browser; the PDF test files set its `isBrowser` flag back to false,
