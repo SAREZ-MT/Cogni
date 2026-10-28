@@ -33,8 +33,8 @@
   --lp-editor-text: #4b4560;
   --lp-card-kicker: #6b6380;
 
-  /* Hero scene: near-black night ground (tryprofound-style reveal). */
-  --lp-night: #000000;
+  /* Hero scene: near-black violet night ground, the login's tone. */
+  --lp-night: #0b0717;
   --lp-night-ink: #edf0f5;
   --lp-night-ink-2: #a3aab8;
   --lp-night-ink-3: #6f7686;
@@ -159,14 +159,39 @@
   color: var(--lp-night-ink);
 }
 
-/* Darkens the web behind the text so the lines never fight the words. */
+/* Layered violet nebula behind the web (the login showcase's haze). */
+.lp-rise-nebula {
+  background:
+    radial-gradient(45% 35% at 62% 40%, rgb(124 58 237 / 0.22), transparent 70%),
+    radial-gradient(
+      35% 30% at 30% 62%,
+      rgb(167 139 250 / 0.12),
+      transparent 70%
+    ),
+    radial-gradient(30% 25% at 80% 75%, rgb(190 24 93 / 0.08), transparent 70%),
+    var(--lp-night);
+}
+
+/* Vignette at the edges, plus a soft darkening behind the text so the
+   lines never fight the words (keeps the copy well above AA). */
 .lp-rise-veil {
-  background: radial-gradient(
-    ellipse 46% 38% at 50% 54%,
-    rgb(0 0 0 / 0.82),
-    rgb(0 0 0 / 0.5) 55%,
-    rgb(0 0 0 / 0) 100%
-  );
+  background:
+    radial-gradient(
+      ellipse 46% 38% at 50% 54%,
+      rgb(11 7 23 / 0.8),
+      rgb(11 7 23 / 0.45) 55%,
+      rgb(11 7 23 / 0) 100%
+    ),
+    radial-gradient(
+      120% 80% at 50% 45%,
+      transparent 40%,
+      rgb(6 4 14 / 0.7) 100%
+    );
+}
+
+/* Passed and latched: the pin shrinks to one viewport (hero.tsx). */
+.lp-rise-track[data-collapsed] {
+  height: auto;
 }
 
 .lp-rise-title {
@@ -244,8 +269,10 @@
   .lp-press:active {
     transform: none;
   }
-  /* Overrides the scroll-linked inline transform of the pillar bands. */
-  .lp-band-ground {
+  /* Overrides the scroll-linked inline transforms of the pillar bands and
+     the video slot. */
+  .lp-band-ground,
+  .lp-video-grow {
     /* biome-ignore lint/complexity/noImportantStyles: only !important beats the inline style Motion writes */
     transform: none !important;
   }

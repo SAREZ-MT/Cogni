@@ -1,6 +1,8 @@
 // Scroll timeline of the hero scene. Every value is a pure function of the
 // pinned track's scroll progress (0 at the top of the track, 1 when the pin
-// releases), so scrolling back up plays the scene in reverse.
+// releases). Before the scene completes, scrolling up plays it in reverse;
+// once it completes it latches (latchProgress) and stays complete until the
+// page reloads.
 
 export const HERO_SENTENCE =
   "Cogni es tu plataforma de estudio, donde aprender y recordar por fin van de la mano.";
@@ -59,4 +61,27 @@ export function outroProgress(progress: number) {
 /** 0 → 1 growth of the background network; full when the sentence is. */
 export function networkGrowth(progress: number) {
   return span(progress, 0, NETWORK_END);
+}
+
+/**
+ * One-way latch over the raw scroll progress. It follows the scroll both
+ * ways while the scene plays, and freezes at 1 for good once the subtitle
+ * and actions are fully shown.
+ */
+export function latchProgress(latched: number, raw: number) {
+  if (latched >= 1 || raw >= OUTRO_END) return 1;
+  return clamp01(raw);
+}
+
+/**
+ * Scroll position that keeps the page visually still when a passed pin
+ * track collapses from `trackHeight` to one `viewport`: everything below it
+ * moves up by the removed scroll distance.
+ */
+export function collapsedScrollY(
+  scrollY: number,
+  trackHeight: number,
+  viewport: number,
+) {
+  return scrollY - Math.max(0, trackHeight - viewport);
 }

@@ -189,3 +189,27 @@ export function linkReach(link: NetworkLink, g: number) {
 export function iconAlpha(icon: NetworkIcon, g: number) {
   return span(g, icon.born, ICON_FADE);
 }
+
+/** Largest ambient offset of a node on each axis, in CSS pixels. */
+export const DRIFT_PX = 7;
+
+// Stable per-node noise from its position, so the drift never changes the
+// seeded layout above.
+function hash(x: number, y: number, salt: number) {
+  const v = Math.sin(x * 127.1 + y * 311.7 + salt * 74.7) * 43758.5453;
+  return v - Math.floor(v);
+}
+
+/**
+ * Ambient drift of a node at time `t` (ms): a slow Lissajous wander, wider
+ * for near nodes so depth reads as parallax. Lines and icons follow it.
+ */
+export function nodeDrift(node: NetworkNode, t: number) {
+  const phase = hash(node.x, node.y, 1) * Math.PI * 2;
+  const speed = 0.00018 + hash(node.x, node.y, 2) * 0.00022;
+  const amplitude = DRIFT_PX * (0.4 + 0.6 * node.z);
+  return {
+    dx: Math.sin(t * speed + phase) * amplitude,
+    dy: Math.cos(t * speed * 0.8 + phase * 1.7) * amplitude,
+  };
+}

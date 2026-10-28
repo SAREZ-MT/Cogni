@@ -1,12 +1,7 @@
 "use client";
 
 import { Clapperboard, Play } from "lucide-react";
-import {
-  motion,
-  useReducedMotion,
-  useScroll,
-  useTransform,
-} from "motion/react";
+import { motion, useScroll, useTransform } from "motion/react";
 import { useRef } from "react";
 import { Reveal } from "./reveal";
 
@@ -20,13 +15,13 @@ const STEPS = [
 // then it says so plainly; nothing here imitates real footage.
 export function HowItWorks() {
   const slot = useRef<HTMLDivElement>(null);
-  const reduceMotion = useReducedMotion();
   const { scrollYProgress } = useScroll({
     target: slot,
     offset: ["start end", "center center"],
   });
   // Scroll-linked growth, transform only (radius stays fixed: animating it
-  // would repaint the large slot on every scroll frame).
+  // would repaint the large slot on every scroll frame). Reduced motion is
+  // held in CSS (.lp-video-grow), so server and client render the same style.
   const transform = useTransform(
     scrollYProgress,
     [0, 1],
@@ -57,8 +52,8 @@ export function HowItWorks() {
           ref={slot}
           role="img"
           aria-label="Video de Cogni, próximamente"
-          className="lp-video-slot flex aspect-video w-full flex-col items-center justify-center gap-[22px] rounded-[20px] border border-(--lp-violet) md:rounded-[32px]"
-          style={reduceMotion ? undefined : { transform }}
+          className="lp-video-slot lp-video-grow flex aspect-video w-full flex-col items-center justify-center gap-[22px] rounded-[20px] border border-(--lp-violet) md:rounded-[32px]"
+          style={{ transform }}
         >
           <span className="flex size-20 items-center justify-center rounded-full border border-white/20 bg-(--lp-paper) md:size-28">
             <Play className="ml-1 size-8 fill-(--lp-violet) text-(--lp-violet) md:size-10" />

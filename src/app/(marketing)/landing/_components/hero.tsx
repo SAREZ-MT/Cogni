@@ -4,15 +4,19 @@ import { ArrowRight } from "lucide-react";
 import {
   type MotionValue,
   motion,
+  useMotionValue,
+  useMotionValueEvent,
   useScroll,
   useTransform,
 } from "motion/react";
 import Link from "next/link";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { HeroNetwork } from "./hero-network-canvas";
 import {
+  collapsedScrollY,
   HERO_LINES,
   HERO_SENTENCE,
+  latchProgress,
   outroProgress,
   settleProgress,
   wordProgress,
@@ -23,8 +27,11 @@ import {
 // a smaller size as the reveal begins. The sentence below sharpens word by
 // word, the knowledge web grows behind it, and the subtitle and actions
 // arrive when the sentence completes. Everything is a function of the
-// track's scroll progress, so scrolling up plays it backwards.
-// Reduced motion (landing.css): no pin, every element in its final state.
+// track's scroll progress: scrolling up plays it backwards while it runs,
+// but once it completes it latches (one way, until reload), and when the
+// visitor scrolls past, the pin collapses to one viewport with a same-frame
+// scroll compensation, so scrolling back up never crawls through a frozen
+// pin. Reduced motion (landing.css): no pin, every element in its final state.
 
 const SETTLED_SCALE = 0.6;
 const RISE_PX = 56;
@@ -37,19 +44,49 @@ export function Hero() {
     target: trackRef,
     offset: ["start start", "end end"],
   });
+  // The scene reads this latched value, never the raw scroll progress.
+  const progress = useMotionValue(0);
+  const collapsed = useRef(false);
 
-  const headline = useTransform(scrollYProgress, (p) => {
+  const collapsePin = () => {
+    const track = trackRef.current;
+    const stage = track?.firstElementChild;
+    if (collapsed.current || !track || !(stage instanceof HTMLElement)) return;
+    const trackHeight = track.offsetHeight;
+    const viewport = stage.offsetHeight;
+    // Only once the pin has released: the stage sits at the track's end.
+    if (trackHeight <= viewport) return;
+    if (track.getBoundingClientRect().bottom > viewport + 1) return;
+    collapsed.current = true;
+    const top = collapsedScrollY(window.scrollY, trackHeight, viewport);
+    track.dataset.collapsed = "";
+    window.scrollTo({ top, behavior: "instant" });
+  };
+
+  const follow = (raw: number) => {
+    const next = latchProgress(progress.get(), raw);
+    if (next !== progress.get()) progress.set(next);
+    if (next >= 1 && raw >= 1) collapsePin();
+  };
+  useMotionValueEvent(scrollYProgress, "change", follow);
+  // A reload restored below the hero starts complete and collapsed.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs once on mount with the measured progress
+  useEffect(() => {
+    follow(scrollYProgress.get());
+  }, []);
+
+  const headline = useTransform(progress, (p) => {
     const s = settleProgress(p);
     const eased = 1 - (1 - s) ** 3;
     return `scale(${1 - (1 - SETTLED_SCALE) * eased})`;
   });
   // The text block rises slowly through the whole pin, as in a camera move.
   const block = useTransform(
-    scrollYProgress,
+    progress,
     (p) =>
       `translateY(${(RISE_PX * (1 - Math.min(p / 0.93, 1))).toFixed(1)}px)`,
   );
-  const outro = useTransform(scrollYProgress, outroProgress);
+  const outro = useTransform(progress, outroProgress);
   const outroLift = useTransform(
     outro,
     (o) => `translateY(${(14 * (1 - o)).toFixed(1)}px)`,
@@ -63,10 +100,8 @@ export function Hero() {
     >
       <div ref={trackRef} className="lp-rise-track">
         <div className="lp-rise-stage sticky top-0 flex h-dvh items-center justify-center overflow-hidden">
-          <HeroNetwork
-            progress={scrollYProgress}
-            className="absolute inset-0"
-          />
+          <div aria-hidden="true" className="lp-rise-nebula absolute inset-0" />
+          <HeroNetwork progress={progress} className="absolute inset-0" />
           <div aria-hidden="true" className="lp-rise-veil absolute inset-0" />
 
           <motion.div
@@ -97,7 +132,7 @@ export function Hero() {
                         key={`${word}-${index}`}
                         word={word}
                         index={index}
-                        progress={scrollYProgress}
+                        progress={progress}
                       />
                     );
                   })}

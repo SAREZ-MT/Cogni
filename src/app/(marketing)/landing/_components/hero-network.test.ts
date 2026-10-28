@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { buildNetwork, iconAlpha, linkReach, nodeAlpha } from "./hero-network";
+import {
+  buildNetwork,
+  DRIFT_PX,
+  iconAlpha,
+  linkReach,
+  nodeAlpha,
+  nodeDrift,
+} from "./hero-network";
 
 describe("hero network layout", () => {
   it("is deterministic for the same seed and size", () => {
@@ -77,5 +84,30 @@ describe("hero network growth", () => {
         }
       }
     }
+  });
+});
+
+describe("hero network ambient drift", () => {
+  const { nodes } = buildNetwork("desktop");
+
+  it("keeps every node within a few pixels of its place", () => {
+    for (const t of [0, 1500, 9000, 60000]) {
+      for (const node of nodes) {
+        const { dx, dy } = nodeDrift(node, t);
+        expect(Math.hypot(dx, dy)).toBeLessThanOrEqual(DRIFT_PX * Math.SQRT2);
+      }
+    }
+  });
+
+  it("moves the nodes over time, each on its own path", () => {
+    const moved = nodes.filter((node) => {
+      const a = nodeDrift(node, 0);
+      const b = nodeDrift(node, 2000);
+      return Math.hypot(a.dx - b.dx, a.dy - b.dy) > 0.5;
+    });
+    expect(moved.length).toBeGreaterThan(nodes.length * 0.8);
+    const first = nodeDrift(nodes[0], 2000);
+    const second = nodeDrift(nodes[1], 2000);
+    expect(first).not.toEqual(second);
   });
 });

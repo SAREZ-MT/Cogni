@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  collapsedScrollY,
   HERO_LINES,
   HERO_SENTENCE,
   HERO_WORDS,
+  latchProgress,
   networkGrowth,
   outroProgress,
   revealedWordCount,
@@ -83,5 +85,40 @@ describe("outro, settle and network", () => {
     }
     expect(networkGrowth(0)).toBe(0);
     expect(networkGrowth(1)).toBe(1);
+  });
+});
+
+describe("one-way latch", () => {
+  it("follows the scroll both ways until the scene completes", () => {
+    let latched = 0;
+    for (const raw of [0.2, 0.5, 0.3, 0.6])
+      latched = latchProgress(latched, raw);
+    expect(latched).toBe(0.6);
+  });
+
+  it("freezes at 1 once the subtitle and actions are fully shown", () => {
+    let latched = latchProgress(0.5, 0.95);
+    expect(latched).toBe(1);
+    for (const raw of [0.9, 0.4, 0, 1]) {
+      latched = latchProgress(latched, raw);
+      expect(latched).toBe(1);
+    }
+  });
+
+  it("latches only once the outro is complete", () => {
+    expect(latchProgress(0, 0.9)).toBe(0.9);
+    expect(outroProgress(latchProgress(0, 0.94))).toBe(1);
+  });
+});
+
+describe("pin collapse", () => {
+  it("keeps the same visual position when the pin shrinks to one viewport", () => {
+    // Track 3240px tall at viewport 900: the pin spans 2340px of scroll.
+    expect(collapsedScrollY(5000, 3240, 900)).toBe(5000 - 2340);
+  });
+
+  it("does nothing when there is no pin to remove", () => {
+    expect(collapsedScrollY(1200, 900, 900)).toBe(1200);
+    expect(collapsedScrollY(1200, 700, 900)).toBe(1200);
   });
 });
