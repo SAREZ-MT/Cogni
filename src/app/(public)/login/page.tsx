@@ -2,11 +2,13 @@ import {
   AUTH_COPY,
   GoogleButton,
   SignInForm,
-  TermsNotice,
+  SignUpConsentNotice,
 } from "@/modules/identity/ui";
 import { TextDivider } from "@/shared/ui/text-divider";
 import { TextLink } from "@/shared/ui/text-link";
 import { AuthStack } from "../_components/auth-stack";
+
+const CONSENT_NOTICE_ID = "sign-up-consent";
 
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   const { error } = await searchParams;
@@ -33,8 +35,9 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
       <SignInForm />
       <div className="flex flex-col gap-4">
         <TextDivider>o</TextDivider>
-        <GoogleButton />
-        <TermsNotice />
+        {/* Google can create an account from here too: the notice covers it. */}
+        <GoogleButton describedBy={CONSENT_NOTICE_ID} />
+        <SignUpConsentNotice variant="login" id={CONSENT_NOTICE_ID} />
       </div>
       <p className="text-center text-sm">
         <TextLink href="/forgot-password">¿Olvidaste tu contraseña?</TextLink>

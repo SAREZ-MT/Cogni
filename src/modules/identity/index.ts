@@ -6,10 +6,16 @@ import { systemClock } from "@/shared/kernel/clock";
 import {
   ensureProfileResilient,
   getTimeZoneSetting,
+  type RecordedSignUpConsent,
+  recordSignUpConsent,
   type TimeZoneSetting,
 } from "./application";
 import type { Profile } from "./domain";
-import { DEFAULT_TIMEZONE } from "./domain";
+import {
+  consentFromCookie,
+  consentFromMetadata,
+  DEFAULT_TIMEZONE,
+} from "./domain";
 import {
   createSupabaseServerClient,
   DrizzleProfileRepository,
@@ -27,11 +33,12 @@ export {
   hasAcceptedCurrentTerms,
   hasChosenTimeZone,
   isGoogleAuthFlow,
+  TERMS_CONSENT_COOKIE,
   TERMS_PATH,
   TERMS_VERSION,
   termsRedirectFor,
 } from "./domain";
-export type { Profile, SessionUser, TimeZoneSetting };
+export type { Profile, RecordedSignUpConsent, SessionUser, TimeZoneSetting };
 
 // The shell's time-zone read with an explicit failure state: a failed read
 // still carries the UTC display fallback (the calendar keeps working), but
@@ -96,10 +103,58 @@ export async function getCurrentTimeZoneSetting(): Promise<CurrentTimeZoneSettin
 // Returns the userId from the response instead of the boolean the caller
 // used to get, so a Google sign-in callback can emit `user_signed_in`
 // without a second auth query (same discipline as `signInAction`).
-export async function exchangeCodeForSession(
-  code: string,
-): Promise<{ ok: boolean; userId: string | null }> {
+// It also returns the account's creation time and metadata, which carry
+// the sign-up consent proof the callback records.
+export async function exchangeCodeForSession(code: string): Promise<{
+  ok: boolean;
+  userId: string | null;
+  createdAt: Date | null;
+  userMetadata: unknown;
+}> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.auth.exchangeCodeForSession(code);
-  return { ok: !error, userId: data.user?.id ?? null };
+  const createdAt = data.user?.created_at
+    ? new Date(data.user.created_at)
+    : null;
+  return {
+    ok: !error,
+    userId: data.user?.id ?? null,
+    createdAt:
+      createdAt && !Number.isNaN(createdAt.getTime()) ? createdAt : null,
+    userMetadata: data.user?.user_metadata ?? null,
+  };
+}
+
+// /auth/callback, right after a successful exchange: copies the sign-up
+// consent into the profile (creating it) the first time. The Google intent
+// cookie is tried before the email metadata; either only counts for an
+// account created right after the consent (domain/terms-consent.ts). Never throws:
+// a failure is reported to Sentry and the (app) gate asks instead.
+export async function recordSignUpConsentForUser(input: {
+  userId: string;
+  accountCreatedAt: Date | null;
+  userMetadata: unknown;
+  cookieHeader: string | null;
+}): Promise<RecordedSignUpConsent> {
+  try {
+    const result = await recordSignUpConsent(
+      {
+        ownerId: input.userId,
+        consents: [
+          consentFromCookie(input.cookieHeader),
+          consentFromMetadata(input.userMetadata),
+        ],
+        accountCreatedAt: input.accountCreatedAt,
+      },
+      { profiles: new DrizzleProfileRepository(getDb()), clock: systemClock },
+    );
+    if (!result.ok) {
+      Sentry.captureException(result.error);
+      return { stamped: false };
+    }
+    return result.value;
+  } catch (error) {
+    Sentry.captureException(error);
+    return { stamped: false };
+  }
 }

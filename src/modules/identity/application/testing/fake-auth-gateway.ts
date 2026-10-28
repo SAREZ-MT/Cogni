@@ -22,6 +22,7 @@ export class FakeAuthGateway implements AuthGateway {
     email: string;
     password: string;
     emailRedirectTo: string;
+    userMetadata: Record<string, string>;
   }): Promise<Result<SignUpResult, DomainError>> {
     this.calls.push({ method: "signUp", input });
     if (this.users.some((user) => user.email === input.email)) {

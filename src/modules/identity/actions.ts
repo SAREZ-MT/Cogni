@@ -23,6 +23,12 @@ import {
   AUTH_FLOW_COOKIE_MAX_AGE_SECONDS,
   GOOGLE_AUTH_FLOW,
 } from "./domain/auth-flow";
+import { TERMS_VERSION } from "./domain/terms";
+import {
+  consentCookieValue,
+  TERMS_CONSENT_COOKIE,
+  TERMS_CONSENT_COOKIE_MAX_AGE_SECONDS,
+} from "./domain/terms-consent";
 import { PROFILE_ERROR } from "./domain/time-zone";
 import {
   createSupabaseServerClient,
@@ -58,15 +64,16 @@ function analytics() {
 }
 
 // An email flow (verification or password reset) clears any Google flow
-// marker left by an abandoned Google attempt, so a later failed email link
-// is not reported as a cancelled Google sign-in. Same name and path as the
-// setter in signInWithGoogleAction (cookies().delete() would use path "/"
-// and miss a cookie scoped to the callback path).
+// marker and consent-intent cookie left by an abandoned Google attempt, so
+// a later failed email link is not reported as a cancelled Google sign-in
+// and a stale Google consent never reaches the callback. Same names and
+// path as the setters in signInWithGoogleAction (cookies().delete() would
+// use path "/" and miss a cookie scoped to the callback path).
 async function clearGoogleFlowCookie(): Promise<void> {
-  (await cookies()).set(AUTH_FLOW_COOKIE, "", {
-    path: AUTH_CALLBACK_PATH,
-    maxAge: 0,
-  });
+  const store = await cookies();
+  for (const name of [AUTH_FLOW_COOKIE, TERMS_CONSENT_COOKIE]) {
+    store.set(name, "", { path: AUTH_CALLBACK_PATH, maxAge: 0 });
+  }
 }
 
 export async function signUpAction(
@@ -77,6 +84,7 @@ export async function signUpAction(
   const result = await signUp(Object.fromEntries(formData), {
     auth: await gateway(),
     siteUrl: siteUrl(),
+    clock: systemClock,
   });
   if (!result.ok)
     return { status: "error", message: messageForCode(result.error.code) };
@@ -84,8 +92,20 @@ export async function signUpAction(
     return { status: "error", message: AUTH_COPY.alreadyRegistered };
   }
   // Deferred past the response: analytics never delays or fails auth.
+  // The consent was given here (sign-in-wrap notice), so this is its one
+  // terms_accepted event; the callback that later stamps the profile from
+  // the metadata does not emit another.
   const userId = result.value.userId;
-  if (userId) after(() => analytics().track("user_signed_up", userId));
+  if (userId) {
+    after(() => {
+      const events = analytics();
+      events.track("user_signed_up", userId);
+      events.track("terms_accepted", userId, {
+        version: TERMS_VERSION,
+        source: "signup",
+      });
+    });
+  }
   return { status: "success", message: AUTH_COPY.verificationSent };
 }
 
@@ -156,18 +176,32 @@ export async function signInWithGoogleAction(): Promise<void> {
     redirectTo: `${siteUrl()}${AUTH_CALLBACK_PATH}`,
   });
   if (!result.ok) redirect("/login?error=google");
-  (await cookies()).set(AUTH_FLOW_COOKIE, GOOGLE_AUTH_FLOW, {
+  const store = await cookies();
+  const callbackCookie = {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: AUTH_CALLBACK_PATH,
+  } as const;
+  store.set(AUTH_FLOW_COOKIE, GOOGLE_AUTH_FLOW, {
+    ...callbackCookie,
     maxAge: AUTH_FLOW_COOKIE_MAX_AGE_SECONDS,
+  });
+  // Clicking "Continuar con Google" next to the sign-in-wrap notice is the
+  // acceptance for an account created in this round trip: the server time
+  // and terms version travel to /auth/callback, which stamps a brand-new
+  // profile only (domain/terms-consent.ts).
+  store.set(TERMS_CONSENT_COOKIE, consentCookieValue(systemClock.now()), {
+    ...callbackCookie,
+    maxAge: TERMS_CONSENT_COOKIE_MAX_AGE_SECONDS,
   });
   redirect(result.value.url);
 }
 
-// Terms gate form: `accept` is the checkbox ("on" when ticked), `next` the
-// path the gate interrupted. Needs a session; anonymous callers go to login.
+// Terms gate form (fallback for existing accounts and version bumps; new
+// accounts accept at sign-up): `accept` is the checkbox ("on" when ticked),
+// `next` the path the gate interrupted. Needs a session; anonymous callers
+// go to login.
 export async function acceptTermsAction(
   _previous: AuthFormState,
   formData: FormData,
@@ -190,7 +224,9 @@ export async function acceptTermsAction(
     return { status: "error", message: messageForCode(result.error.code) };
 
   const version = result.value.termsAcceptedVersion;
-  after(() => analytics().track("terms_accepted", user.id, { version }));
+  after(() =>
+    analytics().track("terms_accepted", user.id, { version, source: "gate" }),
+  );
   const next = formData.get("next");
   return redirect(safeNext(typeof next === "string" ? next : null));
 }

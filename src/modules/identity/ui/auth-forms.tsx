@@ -41,7 +41,8 @@ export function SignInForm() {
   );
 }
 
-export function SignUpForm() {
+// `describedBy` points the submit at the sign-up consent notice.
+export function SignUpForm({ describedBy }: { describedBy?: string } = {}) {
   const [state, action, pending] = useActionState(
     signUpAction,
     IDLE_FORM_STATE,
@@ -66,7 +67,12 @@ export function SignUpForm() {
         hint="Mínimo 8 caracteres"
         required
       />
-      <SubmitButton size="lg" className="w-full" pending={pending}>
+      <SubmitButton
+        size="lg"
+        className="w-full"
+        pending={pending}
+        aria-describedby={describedBy}
+      >
         Crear cuenta
       </SubmitButton>
     </form>

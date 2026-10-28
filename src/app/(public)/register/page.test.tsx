@@ -1,18 +1,43 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import RegisterPage from "./page";
 
+vi.mock("@/modules/identity/actions", () => ({
+  signUpAction: vi.fn(),
+  signInWithGoogleAction: vi.fn(),
+}));
+
 describe("RegisterPage", () => {
-  it("says the terms are accepted right after creating the account, with a link to them", () => {
+  it("shows the consent notice between the sign-up button and the Google button", () => {
+    render(<RegisterPage />);
+
+    const submit = screen.getByRole("button", { name: "Crear cuenta" });
+    const notice = screen.getByTestId("sign-up-consent-notice");
+    const google = screen.getByRole("button", { name: "Continuar con Google" });
+
+    expect(notice).toHaveTextContent(
+      /^Al crear tu cuenta o continuar con Google, aceptas los Términos y condiciones/,
+    );
+    expect(
+      submit.compareDocumentPosition(notice) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      notice.compareDocumentPosition(google) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    // Both account-creating buttons point screen readers at the notice.
+    expect(submit).toHaveAttribute("aria-describedby", notice.id);
+    expect(google).toHaveAttribute("aria-describedby", notice.id);
+  });
+
+  it("links the full terms and privacy policy", () => {
     render(<RegisterPage />);
 
     expect(
-      screen.getByText(/Al crear tu cuenta aceptarás los/),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/en el siguiente paso/)).toBeInTheDocument();
+      screen.getByRole("link", { name: "Términos y condiciones" }),
+    ).toHaveAttribute("href", "/legal/terminos");
     expect(
-      screen.getByRole("link", { name: "términos de uso" }),
-    ).toHaveAttribute("href", "/terminos");
+      screen.getByRole("link", { name: "Política de privacidad" }),
+    ).toHaveAttribute("href", "/legal/privacidad");
   });
 
   it("tells the password rule before the form is sent", () => {
