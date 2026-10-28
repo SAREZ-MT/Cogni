@@ -20,25 +20,38 @@ import {
 // EnsureProfile use case, never by a database trigger (design.md).
 // RLS is on with no policies: only the server connection (which bypasses
 // RLS) reaches the table, so PostgREST with the publishable key sees nothing.
-export const profiles = pgTable("profiles", {
-  id: uuid("id").primaryKey(),
-  displayName: text("display_name"),
-  locale: text("locale").notNull().default("es"),
-  timezone: text("timezone").notNull().default("UTC"),
-  onboardingCompletedAt: timestamp("onboarding_completed_at", {
-    withTimezone: true,
-  }),
-  // Terms-of-use acceptance: version string (a date) + instant. Both null
-  // until the user accepts; a new TERMS_VERSION re-asks everyone.
-  termsAcceptedVersion: text("terms_accepted_version"),
-  termsAcceptedAt: timestamp("terms_accepted_at", { withTimezone: true }),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-}).enableRLS();
+export const profiles = pgTable(
+  "profiles",
+  {
+    id: uuid("id").primaryKey(),
+    displayName: text("display_name"),
+    locale: text("locale").notNull().default("es"),
+    timezone: text("timezone").notNull().default("UTC"),
+    onboardingCompletedAt: timestamp("onboarding_completed_at", {
+      withTimezone: true,
+    }),
+    // Terms-of-use acceptance: version string (a date) + instant. Both null
+    // until the user accepts; a new TERMS_VERSION re-asks everyone.
+    termsAcceptedVersion: text("terms_accepted_version"),
+    termsAcceptedAt: timestamp("terms_accepted_at", { withTimezone: true }),
+    // How it was accepted (0015): "email" / "google" = the sign-up notice,
+    // stamped from the server-side proof; "gate" = the /terminos form. Null
+    // for acceptances recorded before 0015.
+    termsAcceptedMethod: text("terms_accepted_method"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    check(
+      "profiles_terms_accepted_method_check",
+      sql`${table.termsAcceptedMethod} is null or ${table.termsAcceptedMethod} in ('email', 'google', 'gate')`,
+    ),
+  ],
+).enableRLS();
 
 export type ProfileRow = typeof profiles.$inferSelect;
 

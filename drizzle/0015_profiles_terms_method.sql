@@ -1,0 +1,2 @@
+ALTER TABLE "profiles" ADD COLUMN "terms_accepted_method" text;--> statement-breakpoint
+ALTER TABLE "profiles" ADD CONSTRAINT "profiles_terms_accepted_method_check" CHECK ("profiles"."terms_accepted_method" is null or "profiles"."terms_accepted_method" in ('email', 'google', 'gate'));
