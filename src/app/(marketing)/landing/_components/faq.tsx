@@ -1,41 +1,65 @@
 "use client";
 
 import { Plus } from "lucide-react";
+import Link from "next/link";
 import { useId, useState } from "react";
 import { AsciiTexture } from "./ascii-texture";
 import { Reveal } from "./reveal";
 
-// Approved v2 copy (docs/landing/propuesta-contenido.md §9): five questions,
-// only what the sections above do not already explain.
-export const FAQ_ITEMS = [
+// Questions taken from what visitors ask on other study platforms
+// (StudyFetch, Knowt, RemNote, Brilliant, Gemini Notebook, Anki; sources in
+// odd/tasks/landing-v1.md, "Polish pass"), answered for Cogni and checked
+// against src/modules. The privacy answer follows
+// src/content/legal/politica-de-tratamiento-de-datos.md.
+export type FaqItem = {
+  readonly question: string;
+  readonly answer: string;
+  readonly link?: { readonly href: string; readonly label: string };
+};
+
+export const FAQ_ITEMS: readonly FaqItem[] = [
   {
-    question: "¿La IA se inventa cosas?",
+    question: "¿Qué archivos puedo importar?",
+    answer:
+      "PDF, Word (.docx) y PowerPoint (.pptx) de hasta 20 MB. No se importan PDF escaneados, porque Cogni no hace OCR, ni los formatos antiguos .doc y .ppt. También puedes escribir tus apuntes directo en el editor.",
+  },
+  {
+    question: "¿Cómo crea Cogni las tarjetas y las preguntas?",
+    answer:
+      "Desde una página de tus apuntes eliges qué técnica generar: flashcards, preguntas de recuperación activa o un examen. La IA trabaja solo con el texto de esa página y lo escribe todo en español.",
+  },
+  {
+    question: "¿Puedo confiar en lo que genera la IA?",
     answer:
       "Tiene instrucciones de usar solo el texto de tu página y evalúa solo contra la rúbrica y tu apunte. Si un proveedor falla, Cogni te lo dice en vez de inventar un resultado. Y si algo no te convence, puedes editar o retirar preguntas de examen o marcar «No estoy de acuerdo» en una evaluación.",
   },
   {
-    question: "¿Puedo importar cualquier archivo?",
+    question: "¿Sirve para cualquier materia?",
     answer:
-      "PDF, Word y PowerPoint de hasta 20 MB, sí. No se importan PDF escaneados, porque Cogni no hace OCR, ni los formatos antiguos .doc y .ppt. Siempre puedes escribir directo en el editor.",
+      "Sí. Cogni no trae contenido propio: genera a partir de lo que escribes o importas, así que sirve para lo que estés estudiando.",
   },
   {
-    // TODO(legal): pending legal review; the final wording follows the
-    // privacy policy (propuesta-contenido.md §8.1, "FAQ: privacidad").
+    question: "¿Cómo sabe Cogni qué repasar cada día?",
+    answer:
+      "Cada tarjeta y cada pregunta tiene su próxima fecha de repaso, calculada con SM-2 según cómo respondes. La vista Hoy reúne lo que te toca, por técnica, y tienes todo el día para hacerlo.",
+  },
+  {
+    question: "¿Cómo sé si estoy aprendiendo?",
+    answer:
+      "Ves tu dominio por página, tus repasos completados y tu racha. Al cerrar una sesión de flashcards o un examen, Cogni te muestra tus fortalezas y tus oportunidades de mejora.",
+  },
+  {
     question: "¿Qué pasa con mis apuntes?",
     answer:
-      "Tus cuadernos son solo tuyos. Para generar y evaluar, el texto pasa por proveedores de IA en su nivel gratuito, que pueden usarlo para mejorar sus servicios; por eso te pedimos no incluir datos sensibles. Puedes pedir que eliminemos tu cuenta y tus datos.",
+      "Tus cuadernos son solo tuyos. No vendemos tus datos, no hacemos publicidad con ellos y no entrenamos modelos propios. Para generar y evaluar, el texto pasa por proveedores de IA en Estados Unidos; algunos, en su nivel gratuito, pueden usarlo para mejorar sus servicios, por eso te pedimos no incluir datos sensibles. Puedes revocar tu autorización y pedir que eliminemos tu cuenta y tus datos.",
+    link: { href: "/legal/privacidad", label: "Lee la Política de privacidad" },
   },
   {
     question: "¿Funciona en el celular?",
     answer:
       "Funciona en el navegador web, también en el del celular, pero está pensado sobre todo para usarlo en la computadora. No hay app nativa para celular.",
   },
-  {
-    question: "¿Por qué no muestran cuánto tiempo estudié?",
-    answer:
-      "Porque más horas no es lo mismo que recordar más. Cogni cuenta repasos completados y tu dominio por página.",
-  },
-] as const;
+];
 
 // "Preguntas frecuentes" on the lilac ground: the headline holds the left
 // column over a faint field of letters, the questions are a disclosure
@@ -136,6 +160,18 @@ export function Faq() {
                     <div className="overflow-hidden">
                       <p className="max-w-[68ch] pb-6 pr-10 text-(--lp-ink-3) text-[16px] leading-[1.6]">
                         {item.answer}
+                        {item.link ? (
+                          <>
+                            {" "}
+                            <Link
+                              href={item.link.href}
+                              className="rounded-sm font-medium text-(--lp-violet-deep) underline decoration-1 underline-offset-4"
+                            >
+                              {item.link.label}
+                            </Link>
+                            .
+                          </>
+                        ) : null}
                       </p>
                     </div>
                   </section>
