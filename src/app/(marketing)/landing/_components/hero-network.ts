@@ -32,13 +32,27 @@ export type NetworkIcon = {
   glyph: number;
   hue: number;
   size: number;
+  // Depth-of-field pulse: its own slow cycle in and out of focus.
+  focusPhase: number;
+  focusPeriod: number;
 };
+// A group of nodes around icons that breathes on its own rhythm.
+export type NetworkCluster = {
+  x: number;
+  y: number;
+  phase: number;
+  period: number;
+};
+// Which cluster a node follows, and how strongly (0: calm, not in one).
+export type ClusterMembership = { cluster: number; weight: number };
 
 export type Network = {
   nodes: NetworkNode[];
   links: NetworkLink[];
   icons: NetworkIcon[];
   stars: NetworkStar[];
+  clusters: NetworkCluster[];
+  membership: ClusterMembership[];
 };
 
 type Spec = {
@@ -66,7 +80,7 @@ const SPECS: Record<NetworkSize, Spec> = {
     clusters: 9,
     clusterNodes: 7,
     stars: 170,
-    icons: 46,
+    icons: 60,
     textZone: [0.24, 0.2],
   },
   mobile: {
@@ -78,7 +92,7 @@ const SPECS: Record<NetworkSize, Spec> = {
     clusters: 4,
     clusterNodes: 5,
     stars: 80,
-    icons: 18,
+    icons: 20,
     textZone: [0.44, 0.24],
   },
 };
@@ -91,6 +105,9 @@ const LINK_DRAW = 0.12;
 const ICON_FADE = 0.1;
 const NEIGHBOURS = 4;
 const LONG_LINK_SHARE = 0.14;
+// Icons closer than this join one cluster; nodes within reach follow it.
+const CLUSTER_MERGE = 0.15;
+const CLUSTER_REACH = 0.2;
 const EXTRA_NEIGHBOURS = 6;
 const MEDIUM_LINK_SHARE = 0.3;
 // Star colours: the icon hues plus white (index HUE_COUNT).
@@ -108,6 +125,38 @@ function mulberry32(seed: number) {
 
 function span(g: number, start: number, length: number) {
   return Math.min(1, Math.max(0, (g - start) / length));
+}
+
+/**
+ * Farthest-point sampling: each pick is the candidate farthest from every
+ * earlier pick, so icons cover the whole scene instead of clumping. Distances
+ * are aspect-corrected; the first pick is the pool's first (seeded) entry.
+ */
+export function spreadEvenly<T extends { node: { x: number; y: number } }>(
+  pool: T[],
+  count: number,
+  aspect: number,
+): T[] {
+  if (pool.length <= count) return pool;
+  const picked: T[] = [pool[0]];
+  const nearest = pool.map(() => Number.POSITIVE_INFINITY);
+  let last = pool[0];
+  while (picked.length < count) {
+    let best = -1;
+    let bestDistance = -1;
+    for (let i = 0; i < pool.length; i++) {
+      const dx = (pool[i].node.x - last.node.x) * aspect;
+      const dy = pool[i].node.y - last.node.y;
+      nearest[i] = Math.min(nearest[i], dx * dx + dy * dy);
+      if (nearest[i] > bestDistance) {
+        bestDistance = nearest[i];
+        best = i;
+      }
+    }
+    last = pool[best];
+    picked.push(last);
+  }
+  return picked;
 }
 
 export function buildNetwork(size: NetworkSize): Network {
@@ -176,17 +225,22 @@ export function buildNetwork(size: NetworkSize): Network {
     }
   });
 
-  // Icons: nodes outside the text block, chosen at random.
+  // Icons: nodes outside the text block, spread evenly across the scene.
   const [zoneX, zoneY] = spec.textZone;
-  const candidates = nodes
+  const pool = nodes
     .map((node, index) => ({ node, index, order: random() }))
     .filter(
       ({ node }) =>
         Math.abs(node.x - 0.5) >= zoneX || Math.abs(node.y - 0.5) >= zoneY,
     )
-    .filter(({ node }) => node.x > 0.02 && node.x < 0.98 && node.y > 0.04)
-    .sort((p, q) => p.order - q.order)
-    .slice(0, spec.icons);
+    .filter(({ node }) => node.x > 0.02 && node.x < 0.98 && node.y > 0.09)
+    // Keep icons off the CTA row below the copy.
+    .filter(
+      ({ node }) =>
+        !(Math.abs(node.x - 0.5) < 0.22 && node.y > 0.7 && node.y < 0.88),
+    )
+    .sort((p, q) => p.order - q.order);
+  const candidates = spreadEvenly(pool, spec.icons, spec.aspect);
 
   const glyphOffset = Math.floor(random() * GLYPH_COUNT);
   const icons: NetworkIcon[] = candidates.map(({ node, index }, k) => ({
@@ -196,6 +250,8 @@ export function buildNetwork(size: NetworkSize): Network {
     hue: Math.floor(random() * HUE_COUNT),
     // Near nodes are larger: depth by size, as well as by blur.
     size: Math.round(13 + node.z * 11),
+    focusPhase: 0,
+    focusPeriod: 0,
   }));
 
   // Denser web, drawn from its own random stream so the approved layout
@@ -252,7 +308,48 @@ export function buildNetwork(size: NetworkSize): Network {
     };
   });
 
-  return { nodes, links, icons, stars };
+  // Clusters: icons that gather (greedy merge), each with its own rhythm,
+  // from a separate stream so the approved layout stays untouched.
+  const rhythm = mulberry32(size === "desktop" ? 4049 : 4050);
+  const groups: { x: number; y: number; n: number }[] = [];
+  for (const icon of icons) {
+    const { x, y } = nodes[icon.node];
+    const near = groups.find(
+      (g) => Math.hypot((g.x - x) * spec.aspect, g.y - y) < CLUSTER_MERGE,
+    );
+    if (near) {
+      near.x = (near.x * near.n + x) / (near.n + 1);
+      near.y = (near.y * near.n + y) / (near.n + 1);
+      near.n += 1;
+    } else {
+      groups.push({ x, y, n: 1 });
+    }
+  }
+  const clusters: NetworkCluster[] = groups.map((g) => ({
+    x: g.x,
+    y: g.y,
+    phase: rhythm() * Math.PI * 2,
+    period: 6000 + rhythm() * 4000,
+  }));
+  const membership: ClusterMembership[] = nodes.map((node) => {
+    let best = -1;
+    let bestDistance = Number.POSITIVE_INFINITY;
+    clusters.forEach((c, k) => {
+      const d = Math.hypot((node.x - c.x) * spec.aspect, node.y - c.y);
+      if (d < bestDistance) {
+        bestDistance = d;
+        best = k;
+      }
+    });
+    const reach = Math.max(0, 1 - bestDistance / CLUSTER_REACH);
+    return { cluster: Math.max(best, 0), weight: reach * reach };
+  });
+  for (const icon of icons) {
+    icon.focusPhase = rhythm() * Math.PI * 2;
+    icon.focusPeriod = 4000 + rhythm() * 5000;
+  }
+
+  return { nodes, links, icons, stars, clusters, membership };
 }
 
 /** Opacity of a dot at growth `g`. */
@@ -271,7 +368,7 @@ export function iconAlpha(icon: NetworkIcon, g: number) {
 }
 
 /** Largest ambient offset of a node on each axis, in CSS pixels. */
-export const DRIFT_PX = 14;
+export const DRIFT_PX = 12;
 
 // Stable per-node noise from its position, so the drift never changes the
 // seeded layout above.
@@ -306,4 +403,39 @@ export function starLight(star: NetworkStar, t: number) {
     alpha: star.base * (0.3 + 0.7 * wave),
     size: star.size * (0.85 + 0.35 * wave),
   };
+}
+
+/** Peak local scale of a cluster's breathing around its own centre. */
+export const CLUSTER_AMPLITUDE = 0.3;
+
+/**
+ * Local breathing (scene units) of node `index` at time `t` (ms): its
+ * cluster expands and contracts around its own centre, out of step with
+ * the others; nodes outside every cluster stay still.
+ */
+export function clusterOffset(network: Network, index: number, t: number) {
+  const { weight, cluster } = network.membership[index];
+  if (weight === 0) return { dx: 0, dy: 0 };
+  const c = network.clusters[cluster];
+  const node = network.nodes[index];
+  const k =
+    CLUSTER_AMPLITUDE *
+    weight *
+    Math.sin((t / c.period) * Math.PI * 2 + c.phase);
+  return { dx: (node.x - c.x) * k, dy: (node.y - c.y) * k };
+}
+
+/** Largest blur of the icon focus pulse, in CSS pixels. */
+export const FOCUS_BLUR_PX = 2.6;
+
+/**
+ * Depth-of-field pulse of an icon at time `t` (ms): out of focus for part
+ * of its own cycle (about a third of the icons at any moment), with a
+ * slight dim, then sharp again. Eased at both ends.
+ */
+export function iconFocus(icon: NetworkIcon, t: number) {
+  const wave = Math.sin((t / icon.focusPeriod) * Math.PI * 2 + icon.focusPhase);
+  const s = Math.min(1, Math.max(0, (wave - 0.2) / 0.8));
+  const level = s * s * (3 - 2 * s);
+  return { blur: FOCUS_BLUR_PX * level, opacity: 1 - 0.22 * level };
 }

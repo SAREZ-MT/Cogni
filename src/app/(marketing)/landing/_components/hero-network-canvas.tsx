@@ -28,9 +28,11 @@ import type { MotionValue } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   buildNetwork,
+  clusterOffset,
   GLYPH_COUNT,
   HUE_COUNT,
   iconAlpha,
+  iconFocus,
   linkAlpha,
   linkReach,
   type NetworkSize,
@@ -44,7 +46,10 @@ import { networkGrowth } from "./hero-timeline";
 // how much of it exists (dots, then lines, then icons); an ambient loop
 // keeps it alive on top of that, like the login constellation: nodes
 // wander, lines stretch with them, signals in the icon hues travel along
-// edges and make the node they reach pulse, and unlinked stars twinkle.
+// edges and make the node they reach pulse, clusters of nodes around the
+// icons breathe around their own centres out of step (as on
+// tryprofound.com: local motion, never a global zoom), icons drift in and
+// out of focus like a shifting depth of field, and unlinked stars twinkle.
 // A mouse carries a soft light that brightens the web under it.
 //
 // Canvas 2D, not WebGL: the study icons are DOM SVGs that must sit exactly
@@ -90,13 +95,13 @@ const LINE_RGB = "222, 216, 246";
 const LINE_ALPHA = 0.22;
 const DOT_ALPHA = 0.75;
 const ALPHA_BUCKETS = 8;
-const SIGNAL_EVERY_MS = 360;
-const SIGNAL_MS = 1700;
+const SIGNAL_EVERY_MS = 600;
+const SIGNAL_MS = 3400;
 const MAX_SIGNALS = 16;
 const MAX_HOPS = 2;
 const PULSE_MS = 1600;
 // Cursor light: radius in CSS px, position lerp and fade per frame.
-const LIGHT_RADIUS = 170;
+const LIGHT_RADIUS = 200;
 const LIGHT_FOLLOW = 0.2;
 const LIGHT_FADE = 0.08;
 const WHITE: Rgb = [255, 255, 255];
@@ -142,12 +147,18 @@ function glowSprite([r, g, b]: Rgb) {
   return sprite;
 }
 
+// Study icons on the web. Switched off for now (user test, 2026-10-27);
+// set to true to bring them back.
+export const SHOW_ICONS = true;
+
 export function HeroNetwork({
   progress,
   className,
+  showIcons = SHOW_ICONS,
 }: {
   progress: MotionValue<number>;
   className?: string;
+  showIcons?: boolean;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -178,7 +189,9 @@ export function HeroNetwork({
     } catch {
       context = null;
     }
-    const { nodes, links, icons } = network;
+    const { nodes, links } = network;
+    // With icons off, their nodes are plain dots and no icon code runs.
+    const icons = showIcons ? network.icons : [];
     const ratio = Math.min(window.devicePixelRatio || 1, MAX_DPR);
     const styles = getComputedStyle(host);
     const hues = Array.from({ length: HUE_COUNT }, (_, i) =>
@@ -218,7 +231,7 @@ export function HeroNetwork({
     const signals: Signal[] = [];
     const pulses = new Map<number, { start: number; hue: number }>();
     const light = { x: 0, y: 0, tx: 0, ty: 0, on: false, level: 0 };
-    const iconLit = new Float32Array(icons.length);
+    const iconFilter: string[] = icons.map(() => "");
     let width = 0;
     let height = 0;
     let frame = 0;
@@ -296,19 +309,28 @@ export function HeroNetwork({
         const { dx, dy } = reduced
           ? { dx: 0, dy: 0 }
           : nodeDrift(node, elapsed);
-        px[i] = node.x * width + dx;
-        py[i] = node.y * height + dy;
+        // Local breathing: the node's cluster expands and contracts.
+        const local = reduced
+          ? { dx: 0, dy: 0 }
+          : clusterOffset(network, i, elapsed);
+        px[i] = (node.x + local.dx) * width + dx;
+        py[i] = (node.y + local.dy) * height + dy;
       });
       if (!reduced) advanceSignals(g);
 
-      // Icons ride their node (drift, signal pulse) and glow under the light.
+      // Icons ride their node (drift, cluster, signal pulse), drift in and
+      // out of focus, and glow a little under the light.
       icons.forEach((icon, k) => {
         const element = iconRefs.current[k];
         if (!element) return;
+        const focus = reduced
+          ? { blur: 0, opacity: 1 }
+          : iconFocus(icon, elapsed);
         const a = iconAlpha(icon, g);
-        if (a !== shownAlpha[k]) {
-          shownAlpha[k] = a;
-          element.style.opacity = String(a);
+        const shown = Math.round(a * focus.opacity * 1000) / 1000;
+        if (shown !== shownAlpha[k]) {
+          shownAlpha[k] = shown;
+          element.style.opacity = String(shown);
         }
         const node = nodes[icon.node];
         const ox = (px[icon.node] - node.x * width).toFixed(2);
@@ -325,14 +347,18 @@ export function HeroNetwork({
               2 *
             light.level
           : 0;
-        if (
-          Math.abs(reachLight - iconLit[k]) > 0.02 ||
-          (!reachLight && iconLit[k])
-        ) {
-          iconLit[k] = reachLight;
-          element.style.filter = reachLight
-            ? `brightness(${(1 + 0.7 * reachLight).toFixed(3)})`
-            : "";
+        // Rounded so the filter string only changes when it visibly would.
+        const blur = Math.round(focus.blur * 10) / 10;
+        const lit = Math.round(reachLight * 50) / 50;
+        const filter = [
+          blur > 0 ? `blur(${blur}px)` : "",
+          lit > 0 ? `brightness(${(1 + 0.15 * lit).toFixed(2)})` : "",
+        ]
+          .filter(Boolean)
+          .join(" ");
+        if (filter !== iconFilter[k]) {
+          iconFilter[k] = filter;
+          element.style.filter = filter;
         }
       });
 
@@ -455,13 +481,14 @@ export function HeroNetwork({
         const c = litSize / 2;
         const mask = litContext.createRadialGradient(c, c, 0, c, c, c);
         mask.addColorStop(0, "rgba(0, 0, 0, 1)");
-        mask.addColorStop(0.45, "rgba(0, 0, 0, 0.55)");
+        mask.addColorStop(0.35, "rgba(0, 0, 0, 0.6)");
+        mask.addColorStop(0.7, "rgba(0, 0, 0, 0.2)");
         mask.addColorStop(1, "rgba(0, 0, 0, 0)");
         litContext.fillStyle = mask;
         litContext.globalAlpha = 1;
         litContext.fillRect(0, 0, litSize, litSize);
         context.globalCompositeOperation = "lighter";
-        context.globalAlpha = 0.6 * light.level;
+        context.globalAlpha = 0.12 * light.level;
         context.drawImage(
           lit,
           light.x - half,
@@ -477,7 +504,7 @@ export function HeroNetwork({
           light.y,
           half,
         );
-        haze.addColorStop(0, "rgba(196, 181, 253, 0.07)");
+        haze.addColorStop(0, "rgba(196, 181, 253, 0.015)");
         haze.addColorStop(1, "rgba(196, 181, 253, 0)");
         context.globalAlpha = light.level;
         context.fillStyle = haze;
@@ -610,12 +637,12 @@ export function HeroNetwork({
       canvas.width = 0;
       canvas.height = 0;
     };
-  }, [network, progress]);
+  }, [network, progress, showIcons]);
 
   return (
     <div ref={hostRef} aria-hidden="true" className={className}>
       <canvas ref={canvasRef} className="absolute inset-0 size-full" />
-      {network.icons.map((icon, k) => {
+      {(showIcons ? network.icons : []).map((icon, k) => {
         const node = network.nodes[icon.node];
         const Glyph = GLYPHS[icon.glyph];
         const depth = node.z < 0.3 ? "far" : node.z > 0.75 ? "near" : "mid";

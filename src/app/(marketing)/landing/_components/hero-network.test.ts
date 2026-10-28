@@ -1,13 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
   buildNetwork,
+  CLUSTER_AMPLITUDE,
+  clusterOffset,
   DRIFT_PX,
+  FOCUS_BLUR_PX,
   iconAlpha,
+  iconFocus,
   linkAlpha,
   linkReach,
   nodeAlpha,
   nodeDrift,
   STAR_HUES,
+  spreadEvenly,
   starLight,
 } from "./hero-network";
 
@@ -22,6 +27,40 @@ describe("hero network layout", () => {
     expect(mobile.nodes.length).toBeLessThan(desktop.nodes.length);
     expect(mobile.icons.length).toBeLessThan(desktop.icons.length);
     expect(desktop.icons.length).toBeGreaterThanOrEqual(24);
+  });
+
+  it("spreads icons so every region of the scene holds at least one", () => {
+    const { nodes, icons } = buildNetwork("desktop");
+    // A 4×3 grid over the scene, skipping the two central cells under the copy.
+    const cells = new Set(
+      icons.map(({ node }) => {
+        const { x, y } = nodes[node];
+        return `${Math.min(3, Math.floor(x * 4))}:${Math.min(2, Math.floor(y * 3))}`;
+      }),
+    );
+    for (const cell of [
+      "0:0",
+      "1:0",
+      "2:0",
+      "3:0",
+      "0:1",
+      "3:1",
+      "0:2",
+      "1:2",
+      "2:2",
+      "3:2",
+    ]) {
+      expect(cells.has(cell)).toBe(true);
+    }
+  });
+
+  it("picks the farthest candidate first when spreading", () => {
+    const pool = [
+      { node: { x: 0, y: 0 } },
+      { node: { x: 0.05, y: 0.05 } },
+      { node: { x: 1, y: 1 } },
+    ];
+    expect(spreadEvenly(pool, 2, 1)).toEqual([pool[0], pool[2]]);
   });
 
   it("links only existing, distinct nodes", () => {
@@ -179,5 +218,94 @@ describe("hero stars", () => {
       return group.reduce((sum, star) => sum + star.base, 0) / group.length;
     };
     expect(brightness(true)).toBeLessThan(brightness(false) * 0.6);
+  });
+});
+
+describe("hero network cluster breathing", () => {
+  const network = buildNetwork("desktop");
+  const { nodes, icons, clusters, membership } = network;
+
+  it("centres its clusters where the icons gather", () => {
+    expect(clusters.length).toBeGreaterThanOrEqual(4);
+    for (const cluster of clusters) {
+      const nearby = icons.filter((icon) => {
+        const node = nodes[icon.node];
+        return Math.hypot((node.x - cluster.x) * 1.6, node.y - cluster.y) < 0.2;
+      });
+      expect(nearby.length).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  it("keeps sparse areas calm: some nodes belong to no cluster", () => {
+    const calm = membership.filter((m) => m.weight === 0);
+    expect(calm.length).toBeGreaterThan(nodes.length * 0.1);
+    for (const [i, m] of membership.entries()) {
+      if (m.weight > 0) continue;
+      expect(clusterOffset(network, i, 3000)).toEqual({ dx: 0, dy: 0 });
+    }
+  });
+
+  it("moves cluster members by a few percent around their own centre", () => {
+    for (const t of [0, 1700, 4200, 9000]) {
+      for (const [i, m] of membership.entries()) {
+        if (m.weight === 0) continue;
+        const { dx, dy } = clusterOffset(network, i, t);
+        const c = clusters[m.cluster];
+        const r = Math.hypot(nodes[i].x - c.x, nodes[i].y - c.y);
+        expect(Math.hypot(dx, dy)).toBeLessThanOrEqual(
+          r * CLUSTER_AMPLITUDE + 1e-9,
+        );
+      }
+    }
+  });
+
+  it("breathes each cluster on its own rhythm", () => {
+    const periods = new Set(clusters.map((c) => Math.round(c.period)));
+    const phases = new Set(clusters.map((c) => c.phase.toFixed(3)));
+    expect(periods.size).toBeGreaterThan(1);
+    expect(phases.size).toBe(clusters.length);
+    for (const c of clusters) {
+      expect(c.period).toBeGreaterThanOrEqual(6000);
+      expect(c.period).toBeLessThanOrEqual(10000);
+    }
+  });
+});
+
+describe("hero icon focus pulse", () => {
+  const { icons } = buildNetwork("desktop");
+
+  it("blurs up to about 3px and dims a little, never more", () => {
+    expect(FOCUS_BLUR_PX).toBeGreaterThanOrEqual(2);
+    expect(FOCUS_BLUR_PX).toBeLessThanOrEqual(3);
+    for (const icon of icons) {
+      for (const t of [0, 1300, 5200, 8800]) {
+        const { blur, opacity } = iconFocus(icon, t);
+        expect(blur).toBeGreaterThanOrEqual(0);
+        expect(blur).toBeLessThanOrEqual(FOCUS_BLUR_PX);
+        expect(opacity).toBeGreaterThanOrEqual(0.7);
+        expect(opacity).toBeLessThanOrEqual(1);
+      }
+    }
+  });
+
+  it("keeps roughly a third to a half of the icons out of focus at a time", () => {
+    const shares = [0, 2500, 5000, 7500, 10000, 12500].map(
+      (t) =>
+        icons.filter((icon) => iconFocus(icon, t).blur > 0.3).length /
+        icons.length,
+    );
+    const average = shares.reduce((a, b) => a + b, 0) / shares.length;
+    expect(average).toBeGreaterThanOrEqual(0.25);
+    expect(average).toBeLessThanOrEqual(0.55);
+  });
+
+  it("gives each icon its own 4 to 9 second cycle", () => {
+    for (const icon of icons) {
+      expect(icon.focusPeriod).toBeGreaterThanOrEqual(4000);
+      expect(icon.focusPeriod).toBeLessThanOrEqual(9000);
+    }
+    expect(new Set(icons.map((i) => i.focusPhase.toFixed(3))).size).toBe(
+      icons.length,
+    );
   });
 });

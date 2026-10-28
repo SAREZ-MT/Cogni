@@ -77,9 +77,20 @@ describe("Hero", () => {
 });
 
 describe("HeroNetwork", () => {
+  it("renders no study icons while they are switched off", () => {
+    mockReducedMotion(false);
+    const { container } = render(
+      <HeroNetwork progress={motionValue(1)} showIcons={false} />,
+    );
+    expect(container.querySelectorAll("[data-net-icon]")).toHaveLength(0);
+    expect(container.querySelector("canvas")).not.toBeNull();
+  });
+
   it("starts empty while the scroll has not begun", () => {
     mockReducedMotion(false);
-    const { container } = render(<HeroNetwork progress={motionValue(0)} />);
+    const { container } = render(
+      <HeroNetwork progress={motionValue(0)} showIcons />,
+    );
     const icons = container.querySelectorAll<HTMLElement>("[data-net-icon]");
     expect(icons.length).toBeGreaterThan(0);
     for (const icon of icons) expect(icon.style.opacity).toBe("0");
@@ -87,7 +98,9 @@ describe("HeroNetwork", () => {
 
   it("shows the complete, static network under reduced motion", () => {
     mockReducedMotion(true);
-    const { container } = render(<HeroNetwork progress={motionValue(0)} />);
+    const { container } = render(
+      <HeroNetwork progress={motionValue(0)} showIcons />,
+    );
     const icons = container.querySelectorAll<HTMLElement>("[data-net-icon]");
     for (const icon of icons) expect(icon.style.opacity).toBe("1");
   });
