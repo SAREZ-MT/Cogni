@@ -79,16 +79,19 @@ export const TECHNIQUES: readonly Technique[] = [
 ];
 
 const COUNT = TECHNIQUES.length;
-// The intro frame plus one frame per technique (.lp-hrail is 500% wide).
-const PANELS = COUNT + 1;
+// Width of the intro frame, in frames: narrower than the screen so the
+// first technique already shows beside the headline. Mirrors --lp-hintro
+// in landing.css, which sizes the rail and its frames.
+const INTRO = 0.66;
 
 const step = (index: number) => String(index + 1).padStart(2, "0");
 
 // "Una técnica para cada momento", a lilac zone after the cream paper and
-// the page's one horizontal scene. On desktop the section is five screens
-// tall and pins a full-screen frame; scrolling down slides a track of five
-// frames to the left, linearly (translateX only, one motion value): the
-// intro, then one central panel per technique with its illustration and its
+// the page's one horizontal scene. On desktop the section pins a
+// full-screen frame for about 70vh of scroll per frame travelled; scrolling
+// slides the rail to the left, linearly (translateX only, one motion
+// value): a compact intro with the first technique already peeking in,
+// then one full panel per technique with its illustration and its
 // explanation on alternating sides. Native vertical scroll drives it, so
 // nothing is hijacked: the keyboard and wheel scroll as always, and the
 // frame clips (overflow: clip) so focus or a screen reader can never shift
@@ -111,11 +114,13 @@ export function Techniques({
     target: track,
     offset: ["start start", "end end"],
   });
-  const x = useTransform(scrollYProgress, (value) => trackShift(value, PANELS));
+  const x = useTransform(scrollYProgress, (value) =>
+    trackShift(value, INTRO, COUNT),
+  );
   // React only hears about the nearest technique changing, never a frame.
   const [active, setActive] = useState(-1);
   useMotionValueEvent(scrollYProgress, "change", (value) =>
-    setActive(activeTechnique(value, COUNT)),
+    setActive(activeTechnique(value, INTRO, COUNT)),
   );
 
   return (
@@ -137,8 +142,8 @@ export function Techniques({
           </div>
 
           <motion.div className="lp-hrail" style={{ x }}>
-            <div className="lp-hpanel flex items-center px-5 pt-28 pb-16 md:px-10 md:pb-24 xl:px-20">
-              <div className="mx-auto w-full max-w-[1280px]">
+            <div className="lp-hpanel lp-hintro flex items-center px-5 pt-16 pb-6 md:pt-20 md:pr-0 md:pb-16 md:pl-[5vw]">
+              <div className="w-full">
                 <Reveal>
                   <p className="flex items-center gap-3 font-(family-name:--lp-font-mono) text-(--lp-violet-deep) text-[16px] uppercase tracking-[0.14em] md:text-[20px]">
                     <span
@@ -164,7 +169,7 @@ export function Techniques({
                 </Reveal>
                 <Reveal
                   delay={0.14}
-                  className="mt-8 flex flex-col gap-8 md:mt-12 md:flex-row md:items-end md:justify-between"
+                  className="mt-6 flex flex-col gap-8 md:mt-10 md:flex-row md:items-end md:justify-between"
                 >
                   <p className="max-w-[34ch] text-(--lp-ink-2) text-[18px] leading-[1.55] md:text-[20px]">
                     Todas salen de tus propias páginas y comparten un mismo plan
@@ -189,11 +194,17 @@ export function Techniques({
                   aria-labelledby={headingId}
                   data-tone={technique.tone}
                   data-visual={visual}
-                  className="lp-hpanel flex items-center px-5 py-16 md:px-10 md:pt-28 md:pb-24 xl:px-20"
+                  className="lp-hpanel flex items-center px-5 py-10 md:px-[4vw] md:pt-20 md:pb-16"
                 >
-                  <div className="mx-auto grid w-full max-w-[1200px] items-center gap-10 md:grid-cols-2 md:gap-16 xl:gap-24">
+                  <div
+                    className={`grid w-full items-center gap-8 md:gap-[5vw] ${
+                      visual === "right"
+                        ? "md:grid-cols-[1fr_1.15fr]"
+                        : "md:grid-cols-[1.15fr_1fr]"
+                    }`}
+                  >
                     <div
-                      className={`mx-auto w-full max-w-[min(560px,62vh)] ${
+                      className={`mx-auto w-full max-w-[min(680px,70vh)] ${
                         visual === "right" ? "md:order-2" : ""
                       }`}
                     >
@@ -209,14 +220,14 @@ export function Techniques({
                       </span>
                       <h3
                         id={headingId}
-                        className="mt-5 font-(family-name:--lp-font-head) font-semibold text-(--lp-ink) text-[clamp(40px,4.6vw,68px)] leading-[0.98] tracking-[-0.035em] text-balance"
+                        className="mt-5 font-(family-name:--lp-font-head) font-semibold text-(--lp-ink) text-[clamp(40px,5vw,76px)] leading-[0.98] tracking-[-0.035em] text-balance"
                       >
                         {technique.name}
                       </h3>
-                      <p className="mt-6 max-w-[36ch] text-(--lp-ink-2) text-[18px] leading-[1.55] md:text-[20px]">
+                      <p className="mt-5 max-w-[40ch] text-(--lp-ink-2) text-[18px] leading-[1.55] md:text-[21px]">
                         {technique.benefit}
                       </p>
-                      <ul className="mt-8 flex max-w-[44ch] flex-col">
+                      <ul className="mt-7 flex max-w-[46ch] flex-col">
                         {technique.points.map((point) => (
                           <li
                             key={point}

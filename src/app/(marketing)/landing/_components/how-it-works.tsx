@@ -65,7 +65,7 @@ export function HowItWorks({ image }: { image?: HeadlineImage }) {
         id="como-funciona"
         aria-labelledby="como-funciona-title"
         data-nav-theme="light"
-        className="lp-on-paper relative scroll-mt-20 bg-(--lp-paper) px-5 pt-2 pb-20 md:px-10 md:pb-24 xl:px-20 xl:pb-28"
+        className="lp-on-paper relative scroll-mt-20 bg-(--lp-paper) px-5 pt-2 pb-10 md:px-10 md:pb-12 xl:px-20 xl:pb-14"
       >
         <div className="mx-auto max-w-[1280px]">
           <motion.p

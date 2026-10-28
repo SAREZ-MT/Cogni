@@ -205,7 +205,7 @@
 .lp-dusk-out {
   --ascii-ink: var(--lp-violet-800);
   --ascii-alpha: 0.08;
-  height: clamp(220px, 34vh, 340px);
+  height: clamp(110px, 14vh, 140px);
   background: linear-gradient(
     in oklab to bottom,
     var(--lp-paper) 0%,
@@ -215,7 +215,7 @@
 }
 /* Lilac back into the paper below the section, the same ramp reversed. */
 .lp-tech-out {
-  height: clamp(160px, 24vh, 260px);
+  height: clamp(80px, 10vh, 100px);
   background: linear-gradient(
     in oklab to bottom,
     var(--lp-lilac) 0%,
@@ -228,7 +228,10 @@
     height: 52vh;
   }
   .lp-dusk-out {
-    height: 26vh;
+    height: 12vh;
+  }
+  .lp-tech-out {
+    height: 8vh;
   }
 }
 
@@ -384,15 +387,20 @@
 
 /*
  * Techniques (techniques.tsx): a pinned horizontal track on desktop. The
- * section is one screen per frame tall (PANELS = 5); the frame sticks and
- * the rail, five frames wide, slides left as it scrolls. overflow: clip
+ * section is one screen plus 70vh per frame travelled tall; the frame
+ * sticks and the rail (a narrower intro, then four technique frames)
+ * slides left as it scrolls. overflow: clip
  * (not hidden) so focus or find-in-page can never scroll it sideways.
  */
 .lp-tech {
   background: var(--lp-lilac);
 }
+/* One screen for the frame plus 70vh of scroll per frame travelled: the
+   rail travels 3 technique frames plus the intro (INTRO in
+   techniques.tsx), so --lp-hintro must match it. */
 .lp-htrack {
-  height: 500vh;
+  --lp-hintro: 0.66;
+  height: calc(100vh + (3 + var(--lp-hintro)) * 70vh);
 }
 .lp-hframe {
   position: sticky;
@@ -403,13 +411,16 @@
 .lp-hrail {
   position: relative;
   display: flex;
-  width: 500%;
+  width: calc((4 + var(--lp-hintro)) * 100%);
   height: 100%;
 }
 .lp-hpanel {
-  width: 20%;
+  width: calc(100% / (4 + var(--lp-hintro)));
   height: 100%;
   flex-shrink: 0;
+}
+.lp-hpanel.lp-hintro {
+  width: calc(100% * var(--lp-hintro) / (4 + var(--lp-hintro)));
 }
 /* Letters held still in the frame while the panels pass over them. */
 .lp-hfield {
@@ -638,7 +649,8 @@
     /* biome-ignore lint/complexity/noImportantStyles: only !important beats the inline transform Motion writes */
     transform: none !important;
   }
-  .lp-hpanel {
+  .lp-hpanel,
+  .lp-hpanel.lp-hintro {
     width: 100%;
     height: auto;
   }
