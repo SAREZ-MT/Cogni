@@ -21,7 +21,7 @@
 
 ## 2. Aceptación de estos términos
 
-2.1. Para usar Cogni debes leer y aceptar estos términos marcando la casilla correspondiente. La casilla nunca viene marcada por defecto.
+2.1. Para usar Cogni debes leer y aceptar estos términos. Los aceptas al pulsar «Crear cuenta» o «Continuar con Google», junto al aviso que enlaza a estos términos y a la Política de privacidad. Guardamos como prueba la versión aceptada, la fecha y el método de registro. Si estos términos cambian, te pediremos aceptarlos de nuevo antes de seguir usando Cogni.
 
 2.2. Guardamos la versión de los términos que aceptaste y la fecha de aceptación como prueba, de acuerdo con el artículo 48 de la Ley 1480 de 2011 y la Ley 527 de 1999.
 

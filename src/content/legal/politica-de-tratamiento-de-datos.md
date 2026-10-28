@@ -88,7 +88,7 @@ Cogni es solo para personas de 18 años o más. No tratamos a sabiendas datos de
 
 ## 8. Autorización
 
-8.1. Te pedimos tu autorización previa, expresa e informada mediante una casilla que nunca viene marcada por defecto, antes de que uses las funciones de Cogni. Antes de marcarla puedes leer esta política y el [Aviso de privacidad](/legal/privacidad#aviso-de-privacidad).
+8.1. Te pedimos tu autorización previa, expresa e informada en el momento del registro, antes de crear tu cuenta. La das al pulsar «Crear cuenta» o «Continuar con Google», junto al aviso que enlaza a esta política y al [Aviso de privacidad](/legal/privacidad#aviso-de-privacidad). Esa acción es una conducta inequívoca; tu silencio nunca se toma como autorización. Conservamos la prueba de tu autorización: versión, fecha y método.
 
 8.2. La autorización incluye, de forma expresa, el envío de tu contenido a los proveedores de IA ubicados en Estados Unidos descritos en la sección 10, algunos de los cuales pueden usarlo para mejorar sus servicios.
 
