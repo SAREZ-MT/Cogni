@@ -9,8 +9,9 @@ import { buildSecurityHeaders } from "@/shared/config/security-headers";
 const AUTH_PATHS = new Set(["/login", "/register", "/forgot-password"]);
 // Always reachable, signed in or not: the terms of use are read before
 // signing up and are where the (app) gate sends accounts that still have to
-// accept them. Unlike AUTH_PATHS, signed-in users are not bounced from here.
-const OPEN_PATHS = new Set(["/terminos"]);
+// accept them. The marketing landing is the public face of Cogni. Unlike
+// AUTH_PATHS, signed-in users are not bounced from here.
+const OPEN_PATHS = new Set(["/terminos", "/landing"]);
 
 function bareHost(host: string): string {
   return host.replace(/^www\./, "");

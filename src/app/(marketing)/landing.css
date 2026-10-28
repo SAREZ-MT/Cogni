@@ -1,0 +1,124 @@
+/*
+ * Landing-local identity (docs/landing/descripcion.md: the landing does not
+ * use the app design system). Hex values live only here, scoped to .lp, and
+ * components consume them through var(--lp-*) utilities. Values come from
+ * the Pencil frame "Landing · Prototipo v1" (docs/landing/cogni-landing.pen).
+ */
+.lp {
+  --lp-ground: #1a1033;
+  --lp-ground-deep: #140b2b;
+  --lp-violet: #7c3aed;
+  --lp-violet-deep: #6d28d9;
+  --lp-violet-400: #a78bfa;
+  --lp-violet-300: #c4b5fd;
+  --lp-violet-100: #ede9fe;
+  --lp-paper: #fbf8f3;
+  --lp-paper-2: #f3eee6;
+  --lp-yellow: #fcd34d;
+  --lp-mint: #6ee7b7;
+  --lp-rose: #fb7185;
+
+  /* Text on the dark ground (all AA or better on --lp-ground). */
+  --lp-on-dark: #f5f3ff;
+  --lp-on-dark-2: #cfc8e6;
+  --lp-on-dark-3: #9d94bc;
+
+  /* Text on the paper ground. */
+  --lp-ink: #1a1033;
+  --lp-ink-2: #3a3350;
+  --lp-ink-3: #5b5470;
+
+  /* The editor fragment in the hero. */
+  --lp-editor: #faf8ff;
+  --lp-editor-line: #ece8f3;
+  --lp-editor-dot: #ddd8e6;
+  --lp-editor-tab: #f0ecf6;
+  --lp-editor-text: #4b4560;
+  --lp-card-kicker: #6b6380;
+  --lp-hl-flash: #fde68a;
+  --lp-hl-exam: #ddd6fe;
+  --lp-hl-recall: #a7f3d0;
+
+  --lp-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+
+  --lp-font-display: var(--font-instrument-serif), Georgia, serif;
+  --lp-font-sans: var(--font-manrope), system-ui, sans-serif;
+  --lp-font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+  --lp-font-hand: var(--font-caveat), cursive;
+
+  background: var(--lp-paper);
+  color: var(--lp-ink);
+  font-family: var(--lp-font-sans);
+}
+
+.lp-hero {
+  background:
+    radial-gradient(
+      110% 130% at 78% 35%,
+      rgb(124 58 237 / 0.4),
+      rgb(26 16 51 / 0) 70%
+    ),
+    var(--lp-ground);
+}
+
+.lp-video-slot {
+  background:
+    radial-gradient(
+      120% 120% at 50% 45%,
+      rgb(124 58 237 / 0.35),
+      rgb(26 16 51 / 0) 70%
+    ),
+    var(--lp-ground);
+}
+
+.lp-shadow-float {
+  box-shadow: 0 30px 60px rgb(10 5 26 / 0.5);
+}
+
+.lp-shadow-card {
+  box-shadow: 0 8px 24px rgb(76 29 149 / 0.08);
+}
+
+.lp :focus-visible {
+  outline: 2px solid var(--lp-violet-300);
+  outline-offset: 3px;
+}
+
+.lp-on-paper :focus-visible {
+  outline-color: var(--lp-violet);
+}
+
+/* Press feedback for every pressable element on the landing. */
+.lp-press {
+  transition: transform 160ms var(--lp-ease-out);
+}
+.lp-press:active {
+  transform: scale(0.97);
+}
+
+/*
+ * Hero typing pre-state. The typed copy is decorative (aria-hidden); the
+ * real h1 never has a hidden pre-state. With reduced motion the final state
+ * shows from the first paint.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .lp-ch {
+    opacity: 0;
+  }
+  .lp-mark {
+    transform: scaleX(0);
+  }
+  .lp-ai-chip {
+    opacity: 0;
+  }
+}
+
+.lp-mark {
+  transform-origin: 0 50%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-press:active {
+    transform: none;
+  }
+}
