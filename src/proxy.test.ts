@@ -63,4 +63,21 @@ describe("proxy redirects for anonymous visitors", () => {
 
     expect(response.headers.get("location")).toBeNull();
   });
+
+  it.each([
+    "/ciencia",
+    "/creditos",
+  ])("lets an anonymous visitor read the public page %s", async (pathname) => {
+    const response = await proxy(anonymousRequest(pathname));
+
+    expect(response.headers.get("location")).toBeNull();
+  });
+
+  it("matches open pages exactly, not by prefix", async () => {
+    const response = await proxy(anonymousRequest("/ciencia-privada"));
+
+    expect(response.headers.get("location")).toBe(
+      "http://localhost:3000/login",
+    );
+  });
 });

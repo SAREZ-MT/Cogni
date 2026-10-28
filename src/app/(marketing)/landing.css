@@ -93,6 +93,9 @@
      generas-tus-técnicas chip ink and the sticky note of the usual way. */
   --lp-amber-700: #b45309;
   --lp-yellow-200: #fde68a;
+  /* Public pages (/ciencia, /creditos, /legal): the soft lilac step of
+     the alternating science blocks and the pending-data highlight. */
+  --lp-lilac-soft: #f6f2fc;
 
   --lp-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
 
@@ -812,6 +815,79 @@
 }
 .lp-accent-yellow {
   color: var(--lp-yellow);
+}
+
+/*
+ * /ciencia (science-concepts.tsx): each idea takes one platform colour for
+ * its dot, its ink and the ground of its visual.
+ */
+.lp-sci[data-tone="yellow"] {
+  --sci-dot: var(--lp-amber-500);
+  --sci-ink: var(--lp-amber-800);
+  --sci-soft: var(--lp-yellow-100);
+}
+.lp-sci[data-tone="violet"] {
+  --sci-dot: var(--lp-violet);
+  --sci-ink: var(--lp-violet-800);
+  --sci-soft: var(--lp-violet-100);
+}
+.lp-sci[data-tone="mint"] {
+  --sci-dot: var(--lp-green-500);
+  --sci-ink: var(--lp-green-700);
+  --sci-soft: var(--lp-mint-100);
+}
+.lp-sci[data-tone="rose"] {
+  --sci-dot: var(--lp-rose);
+  --sci-ink: var(--lp-rose-700);
+  --sci-soft: var(--lp-rose-100);
+}
+.lp-sci[data-tone="companion"] {
+  --sci-dot: var(--lp-violet-400);
+  --sci-ink: var(--lp-violet-800);
+  --sci-soft: var(--lp-violet-100);
+}
+.lp-sci[data-tone="green"] {
+  --sci-dot: var(--lp-net-2);
+  --sci-ink: var(--lp-green-700);
+  --sci-soft: var(--lp-mint-100);
+}
+.lp-sci-dot {
+  background: var(--sci-dot);
+}
+.lp-sci-step,
+.lp-sci-ink {
+  color: var(--sci-ink);
+}
+.lp-sci-visual {
+  background: var(--sci-soft);
+}
+/* Secondary action on the night: an outline that fills on hover. */
+.lp-cta-ghost {
+  color: #ffffff;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.35);
+  transition:
+    background-color 160ms var(--lp-ease-out),
+    transform 160ms var(--lp-ease-out);
+}
+@media (hover: hover) {
+  .lp-cta-ghost:hover {
+    background: rgb(255 255 255 / 0.08);
+  }
+}
+/* /creditos rows. */
+.lp-credit + .lp-credit {
+  border-top: 1px solid var(--lp-line);
+}
+/* A visible "[PENDIENTE: …]": missing data or an open decision. */
+.lp-pending {
+  padding: 0.05em 0.35em;
+  border-radius: 0.3em;
+  color: var(--lp-amber-800);
+  background: var(--lp-yellow-200);
+  box-shadow: inset 0 0 0 1px rgb(146 64 14 / 0.25);
+  font-weight: 600;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
 }
 
 /* Shared footer (_components/site-footer.tsx). */
