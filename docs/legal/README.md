@@ -3,12 +3,12 @@
 - **Versión del conjunto:** 1.0 (borrador para revisión)
 - **Fecha de corte de la investigación:** 28 de octubre de 2026
 - **Responsable:** [PENDIENTE: nombre completo]
-- **Rama:** `docs/legal-framework` (feature ODD `legal-framework`, `odd/tasks/legal-framework.md`)
+- **Rama:** `docs/legal-framework` (feature ODD `legal-framework`, `odd/tasks/legal-framework.md`); publicación en la aplicación: `feat/legal-consent` (`odd/tasks/legal-consent.md`)
 
 > **En resumen**
 >
-> - Esta carpeta contiene el capítulo "Marco legal" de la tesis, los documentos públicos que enlazará el pie de página de Cogni, el modelo de términos institucionales y la matriz de cumplimiento.
-> - Todos están redactados según el estado real de la plataforma al 28 de octubre de 2026. Nada se ha publicado todavía en la aplicación.
+> - Esta carpeta contiene el capítulo "Marco legal" de la tesis, el modelo de términos institucionales y la matriz de cumplimiento. Los documentos públicos viven en `src/content/legal/`, que es la fuente autorizada de las páginas `/legal/*` (sección 2).
+> - Todos están redactados según el estado real de la plataforma al 28 de octubre de 2026. Las páginas públicas y el aviso de aceptación en el registro ya están en código, marcados como borrador; todavía no se han desplegado.
 > - Antes del lanzamiento hay que completar los datos marcados como `[PENDIENTE: …]`, resolver las brechas de prioridad alta de la matriz y **pedir la revisión de un abogado**. Estos documentos no constituyen asesoría jurídica.
 
 ## 1. Índice
@@ -16,7 +16,7 @@
 | Documento | Propósito | Público | Pie de página | Estado |
 |---|---|---|---|---|
 | [marco-legal.md](marco-legal.md) | Capítulo de tesis: normas aplicables y de referencia, análisis y conclusiones, con citas APA 7 | Jurado y lectores de la tesis | No | Revisado; puntos pendientes de verificación marcados |
-| [terminos-y-condiciones.md](../../src/content/legal/terminos-y-condiciones.md) | Contrato de uso con las personas usuarias | Público | Sí | Borrador; reemplaza el texto de `terms-copy.ts` cuando se implemente |
+| [terminos-y-condiciones.md](../../src/content/legal/terminos-y-condiciones.md) | Contrato de uso con las personas usuarias | Público | Sí | Borrador; publicado en código en `/legal/terminos` |
 | [politica-de-tratamiento-de-datos.md](../../src/content/legal/politica-de-tratamiento-de-datos.md) | Política exigida por la Ley 1581 de 2012 y el DUR 1074 de 2015 | Público | Sí | Borrador |
 | [aviso-de-privacidad.md](../../src/content/legal/aviso-de-privacidad.md) | Aviso breve para mostrar junto a la autorización en el registro | Público | Sí (y en el registro) | Borrador |
 | [politica-de-cookies.md](../../src/content/legal/politica-de-cookies.md) | Cookies y almacenamiento reales, categorías y cómo desactivarlos | Público | Sí | Borrador |
@@ -27,9 +27,41 @@
 | [terminos-institucionales.md](terminos-institucionales.md) | Modelo para universidades y organizaciones, con anexo de tratamiento de datos | Instituciones | No (a solicitud) | Modelo para negociación |
 | [matriz-de-cumplimiento.md](matriz-de-cumplimiento.md) | Requisito, norma, estado, brecha, acción y prioridad, con seguimientos de código y operación | Interno | No | Vigente a la fecha de corte |
 
-Enlaces sugeridos para el pie de página: Términos y condiciones · Política de datos personales · Aviso de privacidad · Cookies · Uso aceptable e IA · Integridad académica · Derechos de autor · Subencargados.
+Enlaces sugeridos para el pie de página: Términos y condiciones (`/legal/terminos`) · Política de privacidad (`/legal/privacidad`) · Cookies (`/legal/privacidad#cookies`) · Uso aceptable e IA (`/legal/uso-aceptable`) · Derechos de autor (`/legal/derechos-de-autor`). La lista de subencargados no va en el pie de página: es una sección de la política de privacidad.
 
-## 2. Decisiones que reflejan estos documentos
+## 2. Publicación y consentimiento
+
+### 2.1 Fuente autorizada
+
+Los ocho documentos públicos están en `src/content/legal/*.md`. Esos archivos son la **fuente autorizada**: las páginas de la aplicación los leen y los muestran tal cual. Se movieron desde esta carpeta el 28 de octubre de 2026 sin cambiar su redacción; solo cambiaron los enlaces internos, que ahora apuntan a las rutas y anclas de abajo. Para cambiar un documento:
+
+1. Edita el archivo en `src/content/legal/`.
+2. Si cambia el sentido de los términos o de la política, sube `TERMS_VERSION` en `src/modules/identity/domain/terms.ts`, para que cada cuenta acepte de nuevo.
+3. Conserva la versión anterior en el historial de git.
+
+### 2.2 Páginas
+
+| Ruta | Contenido | Anclas |
+|---|---|---|
+| `/legal/terminos` | Términos y condiciones | Una por cláusula |
+| `/legal/privacidad` | Política de tratamiento de datos; después de su sección 10, la lista de subencargados; al final, el aviso de privacidad y la política de cookies | `#subencargados`, `#aviso-de-privacidad`, `#cookies` |
+| `/legal/uso-aceptable` | Política de uso aceptable y de IA y, al final, el código de integridad académica | `#integridad-academica` |
+| `/legal/derechos-de-autor` | Política de derechos de autor | Una por sección |
+
+Cada página muestra la versión, la fecha de vigencia, el aviso "Borrador — pendiente de completar datos y de revisión legal", un índice lateral de secciones y enlaces a las demás páginas. Cada `[PENDIENTE: …]` aparece resaltado. Las páginas son públicas, con o sin sesión.
+
+### 2.3 Patrón de consentimiento
+
+- **Aviso junto al botón (*sign-in-wrap*), sin casilla** (decisión del usuario del 28 de octubre de 2026). En `/register`, entre "Crear cuenta" y "Continuar con Google": "Al crear tu cuenta o continuar con Google, aceptas los Términos y condiciones, autorizas el tratamiento de tus datos según la Política de privacidad y confirmas que eres mayor de 18 años." En `/login`, después de "Continuar con Google", la misma frase empieza por "Si continúas con Google y aún no tienes cuenta, aceptas…".
+- **Prueba en el servidor, antes de que exista la cuenta.**
+  - Registro por correo: la versión y la hora del servidor viajan como metadatos de la cuenta en Supabase.
+  - Google: una cookie *httpOnly* de 10 minutos guarda la versión y la hora antes de redirigir.
+  - En `/auth/callback` se copian al perfil (`terms_accepted_version`, `terms_accepted_at`, `terms_accepted_method`) solo si la cuenta se acaba de crear y el perfil no tiene una aceptación. La hora guardada es la del consentimiento, no la del primer ingreso.
+- **Respaldo.** La página `/terminos` sigue pidiendo la aceptación con una casilla a las cuentas sin aceptación registrada y a todas las cuentas cuando sube `TERMS_VERSION` (pasó a `2026-10-28`). En ese caso el método guardado es `gate`.
+- **Riesgo.** Es una conducta inequívoca (Decreto 1074 de 2015, art. 2.2.2.25.2.4), pero no hay jurisprudencia verificada sobre esta modalidad, y las cláusulas 2.1 de los términos y 8.1 de la política todavía describen una casilla. Ver la fila D21 de la [matriz](matriz-de-cumplimiento.md).
+- **Alternativa no elegida.** Una tabla de consentimientos de solo inserción (una fila por aceptación, con resumen del texto y agente de usuario) daría una prueba más completa. Se eligió una columna para mantener el cambio pequeño; queda en la fila D4 de la matriz.
+
+## 3. Decisiones que reflejan estos documentos
 
 - Solo personas de 18 años o más; sin menores ni consentimiento parental (decisión del 28 de octubre de 2026).
 - Servicio dirigido a personas en Colombia; no disponible en el Espacio Económico Europeo, el Reino Unido ni Suiza.
@@ -39,7 +71,7 @@ Enlaces sugeridos para el pie de página: Términos y condiciones · Política d
 - La IA es formativa; se advierte que puede equivocarse y que algunos proveedores gratuitos usan el contenido.
 - Donde la plataforma aún no hace algo que la ley exige (eliminación en la aplicación, borrado de archivos, banner de cookies), los documentos públicos declaran el derecho y el canal por correo, y la brecha queda en la matriz.
 
-## 3. Datos pendientes (`[PENDIENTE: …]`)
+## 4. Datos pendientes (`[PENDIENTE: …]`)
 
 **Identidad del Responsable (bloquean la publicación):**
 
@@ -76,7 +108,7 @@ Enlaces sugeridos para el pie de página: Términos y condiciones · Política d
 - `[PENDIENTE: plazo de traslado de solicitudes]`
 - `[PENDIENTE: plazo de devolución o eliminación]`
 
-## 4. Puntos pendientes de verificación
+## 5. Puntos pendientes de verificación
 
 Están marcados como **(pendiente de verificación)** en [marco-legal.md](marco-legal.md):
 
@@ -106,7 +138,7 @@ Están marcados como **(pendiente de verificación)** en [marco-legal.md](marco-
 24. Ausencia de normas del Ministerio de Educación sobre plataformas educativas con IA.
 25. Anexo de la Resolución 1519 de 2020 del MinTIC y adopción de WCAG 2.2 como ISO/IEC 40500:2025.
 
-## 5. Recomendación
+## 6. Recomendación
 
 Antes del lanzamiento público:
 
