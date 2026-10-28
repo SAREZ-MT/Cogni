@@ -7,7 +7,25 @@
 export type NetworkSize = "desktop" | "mobile";
 
 export type NetworkNode = { x: number; y: number; z: number; born: number };
-export type NetworkLink = { a: number; b: number; born: number };
+export type NetworkLink = {
+  a: number;
+  b: number;
+  born: number;
+  // Length in scene units (aspect-corrected), for the alpha falloff.
+  length: number;
+};
+// A free-floating star: no links, it only twinkles.
+export type NetworkStar = {
+  x: number;
+  y: number;
+  z: number;
+  size: number;
+  hue: number;
+  // Resting brightness (0–1), lower near the copy.
+  base: number;
+  phase: number;
+  speed: number;
+};
 export type NetworkIcon = {
   node: number;
   born: number;
@@ -20,6 +38,7 @@ export type Network = {
   nodes: NetworkNode[];
   links: NetworkLink[];
   icons: NetworkIcon[];
+  stars: NetworkStar[];
 };
 
 type Spec = {
@@ -34,6 +53,7 @@ type Spec = {
   icons: number;
   // Half-width and half-height of the text block, where no icon may sit.
   textZone: [number, number];
+  stars: number;
 };
 
 const SPECS: Record<NetworkSize, Spec> = {
@@ -45,6 +65,7 @@ const SPECS: Record<NetworkSize, Spec> = {
     radius: 0.2,
     clusters: 9,
     clusterNodes: 7,
+    stars: 170,
     icons: 46,
     textZone: [0.24, 0.2],
   },
@@ -56,6 +77,7 @@ const SPECS: Record<NetworkSize, Spec> = {
     radius: 0.17,
     clusters: 4,
     clusterNodes: 5,
+    stars: 80,
     icons: 18,
     textZone: [0.44, 0.24],
   },
@@ -69,6 +91,10 @@ const LINK_DRAW = 0.12;
 const ICON_FADE = 0.1;
 const NEIGHBOURS = 4;
 const LONG_LINK_SHARE = 0.14;
+const EXTRA_NEIGHBOURS = 6;
+const MEDIUM_LINK_SHARE = 0.3;
+// Star colours: the icon hues plus white (index HUE_COUNT).
+export const STAR_HUES = 9;
 
 function mulberry32(seed: number) {
   let a = seed;
@@ -133,7 +159,7 @@ export function buildNetwork(size: NetworkSize): Network {
     // A line starts after both of its ends exist.
     const after = Math.max(nodes[a].born, nodes[b].born) + 0.05;
     const born = Math.min(after + random() * 0.32, 1 - LINK_DRAW);
-    links.push({ a, b, born: Math.max(born, after) });
+    links.push({ a, b, born: Math.max(born, after), length: distance(a, b) });
   };
 
   nodes.forEach((_, i) => {
@@ -172,7 +198,61 @@ export function buildNetwork(size: NetworkSize): Network {
     size: Math.round(13 + node.z * 11),
   }));
 
-  return { nodes, links, icons };
+  // Denser web, drawn from its own random stream so the approved layout
+  // (nodes, first links, icons) stays exactly as it was: two more nearest
+  // neighbours, some medium-range links and a few more long threads.
+  const extra = mulberry32(size === "desktop" ? 7027 : 7028);
+  const linkExtra = (a: number, b: number) => {
+    const key = a < b ? `${a}:${b}` : `${b}:${a}`;
+    if (a === b || pairs.has(key)) return;
+    pairs.add(key);
+    const after = Math.max(nodes[a].born, nodes[b].born) + 0.05;
+    const born = Math.min(after + extra() * 0.32, 1 - LINK_DRAW);
+    links.push({ a, b, born: Math.max(born, after), length: distance(a, b) });
+  };
+  nodes.forEach((_, i) => {
+    const ranked = nodes
+      .map((__, j) => [distance(i, j), j] as const)
+      .filter(([, j]) => j !== i)
+      .sort((p, q) => p[0] - q[0]);
+    for (const [d, j] of ranked.slice(0, EXTRA_NEIGHBOURS)) {
+      if (d < spec.radius * 1.15) linkExtra(i, j);
+    }
+    if (extra() < MEDIUM_LINK_SHARE) {
+      const medium = ranked.filter(
+        ([d]) => d > spec.radius && d < spec.radius * 2,
+      );
+      if (medium.length) {
+        linkExtra(i, medium[Math.floor(extra() * medium.length)][1]);
+      }
+    }
+    if (extra() < LONG_LINK_SHARE) {
+      const far = Math.floor(extra() * nodes.length);
+      if (distance(i, far) > spec.radius * 1.8) linkExtra(i, far);
+    }
+  });
+
+  // Stars: scattered, unlinked, dimmer over the copy.
+  const twinkle = mulberry32(size === "desktop" ? 9091 : 9092);
+  const stars: NetworkStar[] = Array.from({ length: spec.stars }, () => {
+    const x = twinkle();
+    const y = twinkle();
+    const z = twinkle();
+    const overCopy =
+      Math.abs(x - 0.5) < zoneX && Math.abs(y - 0.5) < zoneY ? 0.3 : 1;
+    return {
+      x,
+      y,
+      z,
+      size: 0.6 + z * 1.2,
+      hue: Math.floor(twinkle() * STAR_HUES),
+      base: (0.35 + 0.65 * z) * overCopy,
+      phase: twinkle() * Math.PI * 2,
+      speed: 0.0006 + twinkle() * 0.0016,
+    };
+  });
+
+  return { nodes, links, icons, stars };
 }
 
 /** Opacity of a dot at growth `g`. */
@@ -191,7 +271,7 @@ export function iconAlpha(icon: NetworkIcon, g: number) {
 }
 
 /** Largest ambient offset of a node on each axis, in CSS pixels. */
-export const DRIFT_PX = 7;
+export const DRIFT_PX = 14;
 
 // Stable per-node noise from its position, so the drift never changes the
 // seeded layout above.
@@ -206,10 +286,24 @@ function hash(x: number, y: number, salt: number) {
  */
 export function nodeDrift(node: NetworkNode, t: number) {
   const phase = hash(node.x, node.y, 1) * Math.PI * 2;
-  const speed = 0.00018 + hash(node.x, node.y, 2) * 0.00022;
+  const speed = 0.00028 + hash(node.x, node.y, 2) * 0.0003;
   const amplitude = DRIFT_PX * (0.4 + 0.6 * node.z);
   return {
     dx: Math.sin(t * speed + phase) * amplitude,
     dy: Math.cos(t * speed * 0.8 + phase * 1.7) * amplitude,
+  };
+}
+
+/** Opacity factor of a line from its length: long threads read fainter. */
+export function linkAlpha(link: NetworkLink) {
+  return Math.min(1, Math.max(0.22, 1.12 - link.length * 2.4));
+}
+
+/** A star's twinkle at time `t` (ms): opacity and a slight size pulse. */
+export function starLight(star: NetworkStar, t: number) {
+  const wave = 0.5 + 0.5 * Math.sin(t * star.speed + star.phase);
+  return {
+    alpha: star.base * (0.3 + 0.7 * wave),
+    size: star.size * (0.85 + 0.35 * wave),
   };
 }

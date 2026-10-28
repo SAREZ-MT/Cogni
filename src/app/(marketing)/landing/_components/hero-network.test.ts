@@ -3,9 +3,12 @@ import {
   buildNetwork,
   DRIFT_PX,
   iconAlpha,
+  linkAlpha,
   linkReach,
   nodeAlpha,
   nodeDrift,
+  STAR_HUES,
+  starLight,
 } from "./hero-network";
 
 describe("hero network layout", () => {
@@ -109,5 +112,72 @@ describe("hero network ambient drift", () => {
     const first = nodeDrift(nodes[0], 2000);
     const second = nodeDrift(nodes[1], 2000);
     expect(first).not.toEqual(second);
+  });
+});
+
+describe("hero network density", () => {
+  const { nodes, links } = buildNetwork("desktop");
+
+  it("is a rich web: well over five links per three nodes", () => {
+    expect(links.length / nodes.length).toBeGreaterThanOrEqual(2.6);
+  });
+
+  it("dims long lines more than short ones", () => {
+    const sorted = [...links].sort((a, b) => a.length - b.length);
+    const short = sorted[0];
+    const long = sorted[sorted.length - 1];
+    expect(linkAlpha(long)).toBeLessThan(linkAlpha(short));
+    for (const link of links) {
+      expect(linkAlpha(link)).toBeGreaterThan(0);
+      expect(linkAlpha(link)).toBeLessThanOrEqual(1);
+    }
+  });
+});
+
+describe("hero stars", () => {
+  const desktop = buildNetwork("desktop").stars;
+  const mobile = buildNetwork("mobile").stars;
+
+  it("scatters 120 to 200 stars on desktop and fewer on phones", () => {
+    expect(desktop.length).toBeGreaterThanOrEqual(120);
+    expect(desktop.length).toBeLessThanOrEqual(200);
+    expect(mobile.length).toBeLessThan(desktop.length);
+  });
+
+  it("uses tiny varied sizes and the soft palette plus white", () => {
+    for (const star of desktop) {
+      expect(star.size).toBeGreaterThanOrEqual(0.6);
+      expect(star.size).toBeLessThanOrEqual(1.8);
+      expect(star.hue).toBeGreaterThanOrEqual(0);
+      expect(star.hue).toBeLessThan(STAR_HUES);
+    }
+  });
+
+  it("twinkles each star on its own rhythm, within bounds", () => {
+    const changed = desktop.filter(
+      (star) =>
+        Math.abs(starLight(star, 0).alpha - starLight(star, 1800).alpha) > 0.02,
+    );
+    expect(changed.length).toBeGreaterThan(desktop.length * 0.6);
+    for (const star of desktop) {
+      for (const t of [0, 900, 5000]) {
+        const { alpha, size } = starLight(star, t);
+        expect(alpha).toBeGreaterThan(0);
+        expect(alpha).toBeLessThanOrEqual(1);
+        expect(size).toBeLessThanOrEqual(star.size * 1.25);
+      }
+    }
+  });
+
+  it("keeps stars dimmer near the copy", () => {
+    const brightness = (inside: boolean) => {
+      const group = desktop.filter((star) => {
+        const near =
+          Math.abs(star.x - 0.5) < 0.24 && Math.abs(star.y - 0.5) < 0.2;
+        return near === inside;
+      });
+      return group.reduce((sum, star) => sum + star.base, 0) / group.length;
+    };
+    expect(brightness(true)).toBeLessThan(brightness(false) * 0.6);
   });
 });

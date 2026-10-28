@@ -31,10 +31,12 @@ import {
   GLYPH_COUNT,
   HUE_COUNT,
   iconAlpha,
+  linkAlpha,
   linkReach,
   type NetworkSize,
   nodeAlpha,
   nodeDrift,
+  starLight,
 } from "./hero-network";
 import { networkGrowth } from "./hero-timeline";
 
@@ -42,7 +44,8 @@ import { networkGrowth } from "./hero-timeline";
 // how much of it exists (dots, then lines, then icons); an ambient loop
 // keeps it alive on top of that, like the login constellation: nodes
 // wander, lines stretch with them, signals in the icon hues travel along
-// edges and make the node they reach pulse, and the pointer adds parallax.
+// edges and make the node they reach pulse, and unlinked stars twinkle.
+// A mouse carries a soft light that brightens the web under it.
 //
 // Canvas 2D, not WebGL: the study icons are DOM SVGs that must sit exactly
 // on their nodes every frame, which is trivial in the same 2D pixel space
@@ -87,12 +90,16 @@ const LINE_RGB = "222, 216, 246";
 const LINE_ALPHA = 0.22;
 const DOT_ALPHA = 0.75;
 const ALPHA_BUCKETS = 8;
-const SIGNAL_EVERY_MS = 480;
+const SIGNAL_EVERY_MS = 360;
 const SIGNAL_MS = 1700;
-const MAX_SIGNALS = 12;
+const MAX_SIGNALS = 16;
 const MAX_HOPS = 2;
 const PULSE_MS = 1600;
-const PARALLAX_PX = 10;
+// Cursor light: radius in CSS px, position lerp and fade per frame.
+const LIGHT_RADIUS = 170;
+const LIGHT_FOLLOW = 0.2;
+const LIGHT_FADE = 0.08;
+const WHITE: Rgb = [255, 255, 255];
 const SPRITE_PX = 64;
 
 type Rgb = [number, number, number];
@@ -178,6 +185,22 @@ export function HeroNetwork({
       parseHex(styles.getPropertyValue(`--lp-net-${i}`)),
     );
     const sprites = context ? hues.map(glowSprite) : [];
+    const starSprites = context ? [...hues, WHITE].map(glowSprite) : [];
+    // The lit copy of the web under the cursor is drawn here, masked by a
+    // radial falloff, then added onto the main canvas.
+    const lit = document.createElement("canvas");
+    const litSize = Math.ceil(LIGHT_RADIUS * 2 * ratio);
+    lit.width = litSize;
+    lit.height = litSize;
+    let litContext: CanvasRenderingContext2D | null = null;
+    try {
+      litContext = context ? lit.getContext("2d") : null;
+    } catch {
+      litContext = null;
+    }
+    const finePointer = window.matchMedia(
+      "(hover: hover) and (pointer: fine)",
+    ).matches;
     const iconAt = new Map(icons.map((icon, k) => [icon.node, k]));
     const nodeHue = nodes.map((_, i) => {
       const k = iconAt.get(i);
@@ -194,8 +217,8 @@ export function HeroNetwork({
     const shownAlpha = new Float32Array(icons.length).fill(-1);
     const signals: Signal[] = [];
     const pulses = new Map<number, { start: number; hue: number }>();
-    const pointer = { x: 0, y: 0 };
-    const parallax = { x: 0, y: 0 };
+    const light = { x: 0, y: 0, tx: 0, ty: 0, on: false, level: 0 };
+    const iconLit = new Float32Array(icons.length);
     let width = 0;
     let height = 0;
     let frame = 0;
@@ -261,19 +284,24 @@ export function HeroNetwork({
 
     const paint = () => {
       const g = reduced ? 1 : networkGrowth(progress.get());
-      parallax.x += (pointer.x - parallax.x) * 0.04;
-      parallax.y += (pointer.y - parallax.y) * 0.04;
+      if (light.level < 0.01 && light.on) {
+        light.x = light.tx;
+        light.y = light.ty;
+      }
+      light.x += (light.tx - light.x) * LIGHT_FOLLOW;
+      light.y += (light.ty - light.y) * LIGHT_FOLLOW;
+      light.level += ((light.on ? 1 : 0) - light.level) * LIGHT_FADE;
+      if (light.level < 0.002) light.level = 0;
       nodes.forEach((node, i) => {
         const { dx, dy } = reduced
           ? { dx: 0, dy: 0 }
           : nodeDrift(node, elapsed);
-        const depth = PARALLAX_PX * node.z;
-        px[i] = node.x * width + dx - parallax.x * depth;
-        py[i] = node.y * height + dy - parallax.y * depth;
+        px[i] = node.x * width + dx;
+        py[i] = node.y * height + dy;
       });
       if (!reduced) advanceSignals(g);
 
-      // Icons ride their node: drift, parallax and the pulse of a signal.
+      // Icons ride their node (drift, signal pulse) and glow under the light.
       icons.forEach((icon, k) => {
         const element = iconRefs.current[k];
         if (!element) return;
@@ -287,12 +315,52 @@ export function HeroNetwork({
         const oy = (py[icon.node] - node.y * height).toFixed(2);
         const scale = (0.55 + 0.45 * a) * (1 + 0.28 * pulseLevel(icon.node));
         element.style.transform = `translate(-50%, -50%) translate(${ox}px, ${oy}px) scale(${scale.toFixed(3)})`;
+        const reachLight = light.level
+          ? Math.max(
+              0,
+              1 -
+                Math.hypot(px[icon.node] - light.x, py[icon.node] - light.y) /
+                  LIGHT_RADIUS,
+            ) **
+              2 *
+            light.level
+          : 0;
+        if (
+          Math.abs(reachLight - iconLit[k]) > 0.02 ||
+          (!reachLight && iconLit[k])
+        ) {
+          iconLit[k] = reachLight;
+          element.style.filter = reachLight
+            ? `brightness(${(1 + 0.7 * reachLight).toFixed(3)})`
+            : "";
+        }
       });
 
       if (!context || !width || !height) return;
       context.setTransform(ratio, 0, 0, ratio, 0, 0);
       context.globalCompositeOperation = "source-over";
       context.clearRect(0, 0, width, height);
+
+      // Stars: unlinked, twinkling; one static frame under reduced motion.
+      for (const star of network.stars) {
+        const { alpha, size: starSize } = reduced
+          ? { alpha: star.base * 0.65, size: star.size }
+          : starLight(star, elapsed);
+        const spriteSize = starSize * 5;
+        context.globalAlpha = alpha;
+        context.drawImage(
+          starSprites[star.hue],
+          star.x * width - spriteSize / 2,
+          star.y * height - spriteSize / 2,
+          spriteSize,
+          spriteSize,
+        );
+      }
+      const lighting = Boolean(litContext) && light.level > 0;
+      const litPath = new Path2D();
+      const near = (x: number, y: number) =>
+        Math.abs(x - light.x) < LIGHT_RADIUS &&
+        Math.abs(y - light.y) < LIGHT_RADIUS;
 
       // Lines, batched by alpha into a few paths.
       const linePaths = Array.from(
@@ -304,18 +372,21 @@ export function HeroNetwork({
         const reach = linkReach(link, g);
         if (reach <= 0) continue;
         const depth = Math.min(nodes[link.a].z, nodes[link.b].z);
-        const level = (0.45 + 0.55 * depth) * reach ** 0.5;
+        const level = (0.45 + 0.55 * depth) * linkAlpha(link) * reach ** 0.5;
         const bucket = Math.min(
           ALPHA_BUCKETS - 1,
           Math.floor(level * ALPHA_BUCKETS),
         );
         const path = linePaths[bucket];
         used[bucket] = true;
+        const ex = px[link.a] + (px[link.b] - px[link.a]) * reach;
+        const ey = py[link.a] + (py[link.b] - py[link.a]) * reach;
         path.moveTo(px[link.a], py[link.a]);
-        path.lineTo(
-          px[link.a] + (px[link.b] - px[link.a]) * reach,
-          py[link.a] + (py[link.b] - py[link.a]) * reach,
-        );
+        path.lineTo(ex, ey);
+        if (lighting && (near(px[link.a], py[link.a]) || near(ex, ey))) {
+          litPath.moveTo(px[link.a], py[link.a]);
+          litPath.lineTo(ex, ey);
+        }
       }
       context.lineWidth = 0.7;
       context.strokeStyle = `rgb(${LINE_RGB})`;
@@ -346,6 +417,10 @@ export function HeroNetwork({
         dotPaths[bucket].moveTo(px[i] + radius, py[i]);
         dotPaths[bucket].arc(px[i], py[i], radius, 0, Math.PI * 2);
         used[bucket] = true;
+        if (lighting && near(px[i], py[i])) {
+          litPath.moveTo(px[i] + radius + 0.4, py[i]);
+          litPath.arc(px[i], py[i], radius + 0.4, 0, Math.PI * 2);
+        }
       });
       context.fillStyle = `rgb(${LINE_RGB})`;
       dotPaths.forEach((path, bucket) => {
@@ -353,6 +428,61 @@ export function HeroNetwork({
         context.globalAlpha = (DOT_ALPHA * (bucket + 1)) / ALPHA_BUCKETS;
         context.fill(path);
       });
+
+      // Cursor light: the web under it, brighter, behind a radial falloff,
+      // plus a faint violet-white haze. Additive, so never a hard disc.
+      if (lighting && litContext) {
+        const half = LIGHT_RADIUS;
+        litContext.setTransform(1, 0, 0, 1, 0, 0);
+        litContext.globalCompositeOperation = "source-over";
+        litContext.clearRect(0, 0, litSize, litSize);
+        litContext.setTransform(
+          ratio,
+          0,
+          0,
+          ratio,
+          (half - light.x) * ratio,
+          (half - light.y) * ratio,
+        );
+        litContext.strokeStyle = "rgb(255, 255, 255)";
+        litContext.fillStyle = "rgb(255, 255, 255)";
+        litContext.lineWidth = 0.9;
+        litContext.globalAlpha = 0.75;
+        litContext.stroke(litPath);
+        litContext.fill(litPath);
+        litContext.setTransform(1, 0, 0, 1, 0, 0);
+        litContext.globalCompositeOperation = "destination-in";
+        const c = litSize / 2;
+        const mask = litContext.createRadialGradient(c, c, 0, c, c, c);
+        mask.addColorStop(0, "rgba(0, 0, 0, 1)");
+        mask.addColorStop(0.45, "rgba(0, 0, 0, 0.55)");
+        mask.addColorStop(1, "rgba(0, 0, 0, 0)");
+        litContext.fillStyle = mask;
+        litContext.globalAlpha = 1;
+        litContext.fillRect(0, 0, litSize, litSize);
+        context.globalCompositeOperation = "lighter";
+        context.globalAlpha = 0.6 * light.level;
+        context.drawImage(
+          lit,
+          light.x - half,
+          light.y - half,
+          half * 2,
+          half * 2,
+        );
+        const haze = context.createRadialGradient(
+          light.x,
+          light.y,
+          0,
+          light.x,
+          light.y,
+          half,
+        );
+        haze.addColorStop(0, "rgba(196, 181, 253, 0.07)");
+        haze.addColorStop(1, "rgba(196, 181, 253, 0)");
+        context.globalAlpha = light.level;
+        context.fillStyle = haze;
+        context.fillRect(light.x - half, light.y - half, half * 2, half * 2);
+      }
 
       // Light: signals with a coloured trail, and pulses on arrival.
       context.globalCompositeOperation = "lighter";
@@ -444,12 +574,25 @@ export function HeroNetwork({
     });
     watcher.observe(host);
     document.addEventListener("visibilitychange", sync);
+    // Mouse only: touch and reduced motion never get the light.
     const onPointer = (event: PointerEvent) => {
-      pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
-      pointer.y = (event.clientY / window.innerHeight) * 2 - 1;
+      if (event.pointerType !== "mouse") return;
+      const rect = host.getBoundingClientRect();
+      light.tx = event.clientX - rect.left;
+      light.ty = event.clientY - rect.top;
+      light.on =
+        light.tx >= 0 &&
+        light.ty >= 0 &&
+        light.tx <= rect.width &&
+        light.ty <= rect.height;
     };
-    if (!reduced) {
+    const onLeave = () => {
+      light.on = false;
+    };
+    const lightEnabled = finePointer && !reduced;
+    if (lightEnabled) {
       window.addEventListener("pointermove", onPointer, { passive: true });
+      document.documentElement.addEventListener("pointerleave", onLeave);
     }
     // Reduced motion paints the single static frame above and never loops.
     start();
@@ -460,6 +603,9 @@ export function HeroNetwork({
       watcher.disconnect();
       document.removeEventListener("visibilitychange", sync);
       window.removeEventListener("pointermove", onPointer);
+      document.documentElement.removeEventListener("pointerleave", onLeave);
+      lit.width = 0;
+      lit.height = 0;
       // Release the backing store right away instead of waiting for GC.
       canvas.width = 0;
       canvas.height = 0;
