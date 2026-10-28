@@ -5,26 +5,17 @@ import {
   Gauge,
   Globe,
   Layers,
-  Lightbulb,
   ListChecks,
   ListTodo,
   NotebookTabs,
   SquarePen,
-  ThumbsUp,
   TrendingDown,
-  TrendingUp,
   Upload,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { type BandTone, PillarBand } from "./pillar-band";
 import { PillarBlock, type PillarPoint, PillarVisual } from "./pillar-block";
-import {
-  CompanionDemo,
-  CurveDemo,
-  ImportDemo,
-  ProgressDemo,
-  TodayDemo,
-} from "./pillar-demos";
+import { CurveDemo, ImportDemo, ProgressDemo, TodayDemo } from "./pillar-demos";
 
 type Pillar = {
   id: string;
@@ -147,50 +138,17 @@ const PILLARS: readonly Pillar[] = [
     visual: <TodayDemo />,
   },
   {
-    id: "pilar-acompanante",
+    id: "pilar-progreso",
     number: "04",
-    eyebrow: "Pilar 04 · Tu acompañante de estudio",
-    statement: "Cada sesión cierra con",
-    emphasis: "un siguiente paso.",
+    eyebrow: "Pilar 04 · Tu progreso",
+    statement: "Mira crecer",
+    emphasis: "lo que dominas.",
+    // The rose band the study companion had as pillar 04 (user, 2026-10-28).
     tone: {
       ...INK_BAND,
       ground: "bg-(--lp-rose)",
       eyebrow: "text-(--lp-rose-950)",
       number: "text-(--lp-rose-950)",
-    },
-    heading: "Un acompañante que te dice qué hiciste bien y qué sigue.",
-    points: [
-      {
-        icon: ThumbsUp,
-        title: "Primero, tus fortalezas",
-        text: "Al terminar un examen, un mazo o una ronda de recuperación activa, ves lo que ya dominas.",
-      },
-      {
-        icon: Lightbulb,
-        title: "Luego, oportunidades de mejora",
-        text: "Pasos concretos sobre qué repasar, sin juicios ni etiquetas.",
-      },
-      {
-        icon: TrendingUp,
-        title: "Tu dominio, en movimiento",
-        text: "Cada sesión actualiza tu dominio por página.",
-      },
-    ],
-    iconTone: "bg-(--lp-rose-100) text-(--lp-rose-700)",
-    visual: <CompanionDemo />,
-  },
-  {
-    id: "pilar-progreso",
-    number: "05",
-    eyebrow: "Pilar 05 · Tu progreso",
-    statement: "Mira crecer",
-    emphasis: "lo que dominas.",
-    tone: {
-      ground: "bg-(--lp-violet-200)",
-      eyebrow: "text-(--lp-violet-800)",
-      text: "text-(--lp-ink)",
-      emphasis: "text-(--lp-violet-800)",
-      number: "text-(--lp-violet-800)",
     },
     heading: "Tu progreso, en tres números que importan.",
     points: [
@@ -210,13 +168,14 @@ const PILLARS: readonly Pillar[] = [
         text: "Cuánto dominas tus páginas en flashcards, recuperación activa y exámenes.",
       },
     ],
-    iconTone: "bg-(--lp-violet-100) text-(--lp-violet-deep)",
+    iconTone: "bg-(--lp-rose-100) text-(--lp-rose-700)",
     visual: <ProgressDemo />,
   },
 ];
 
-// Pillars 01–05: a colour band with one short statement, then the feature
-// block. Visuals alternate sides, starting on the right.
+// Pillars 01–04: a colour band with one short statement, then the feature
+// block. Visuals alternate sides, starting on the right. The study
+// companion, once pillar 04, now closes the Técnicas scroll.
 export function Pillars() {
   return (
     <div className="lp-on-paper bg-(--lp-paper)">

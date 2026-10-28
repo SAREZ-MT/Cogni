@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowRight } from "@phosphor-icons/react/dist/csr/ArrowRight";
-import { Check } from "lucide-react";
+import { Check, CornerDownRight } from "lucide-react";
 import {
   motion,
   useMotionValueEvent,
@@ -22,7 +22,9 @@ type Technique = {
   name: string;
   benefit: string;
   // Short points taken from the copy and the example screens, no new claims.
-  points: string[];
+  points: { title?: string; text: string }[];
+  // A line that ties the panel to the ones before it.
+  lead?: string;
   // Platform technique colour: flashcards yellow, recall mint, exams red,
   // the AI review violet.
   tone: Tone;
@@ -35,9 +37,9 @@ export const TECHNIQUES: readonly Technique[] = [
     benefit:
       "Una pregunta de un lado, la respuesta del otro. Repasas justo las tarjetas que más te cuestan.",
     points: [
-      "Pregunta en el anverso, respuesta en el reverso.",
-      "Calificas cada tarjeta: No la sé, Difícil, Bien o Fácil.",
-      "Tu respuesta decide cuándo vuelve la tarjeta.",
+      { text: "Pregunta en el anverso, respuesta en el reverso." },
+      { text: "Calificas cada tarjeta: No la sé, Difícil, Bien o Fácil." },
+      { text: "Tu respuesta decide cuándo vuelve la tarjeta." },
     ],
     tone: "yellow",
   },
@@ -47,9 +49,9 @@ export const TECHNIQUES: readonly Technique[] = [
     benefit:
       "Explicas una idea con tus palabras, sin mirar el apunte. Así sabes qué entendiste de verdad.",
     points: [
-      "Una pregunta abierta sobre el concepto clave.",
-      "Respondes con tus palabras, sin mirar tu apunte.",
-      "La envías cuando terminas de explicarla.",
+      { text: "Una pregunta abierta sobre el concepto clave." },
+      { text: "Respondes con tus palabras, sin mirar tu apunte." },
+      { text: "La envías cuando terminas de explicarla." },
     ],
     tone: "mint",
   },
@@ -59,20 +61,32 @@ export const TECHNIQUES: readonly Technique[] = [
     benefit:
       "Preguntas de opción múltiple sobre tus páginas, para comprobar lo que dominas antes de la prueba.",
     points: [
-      "Opción múltiple sobre tus propias páginas.",
-      "Avanzas pregunta a pregunta, con tu progreso a la vista.",
+      { text: "Opción múltiple sobre tus propias páginas." },
+      { text: "Avanzas pregunta a pregunta, con tu progreso a la vista." },
     ],
     tone: "red",
   },
   {
-    key: "ai",
-    name: "La IA prepara, tú decides",
-    benefit:
-      "Cogni prepara el material desde tu apunte. Tú lo revisas, lo editas y decides qué se queda.",
+    // Moved here from the former pillar 04: after any technique, the
+    // companion closes the session. Violet, Cogni's own colour: it is Cogni
+    // speaking about every technique at once, so it takes none of theirs.
+    key: "companion",
+    name: "Tu acompañante de estudio",
+    lead: "Cada sesión cierra con un siguiente paso.",
+    benefit: "Un acompañante que te dice qué hiciste bien y qué sigue.",
     points: [
-      "La IA deja un borrador listo desde tu apunte.",
-      "Editas lo que quieras cambiar.",
-      "Apruebas lo que se queda.",
+      {
+        title: "Primero, tus fortalezas",
+        text: "Al terminar un examen, un mazo o una ronda de recuperación activa, ves lo que ya dominas.",
+      },
+      {
+        title: "Luego, oportunidades de mejora",
+        text: "Pasos concretos sobre qué repasar, sin juicios ni etiquetas.",
+      },
+      {
+        title: "Tu dominio, en movimiento",
+        text: "Cada sesión actualiza tu dominio por página.",
+      },
     ],
     tone: "violet",
   },
@@ -218,9 +232,18 @@ export function Techniques({
                         <span aria-hidden="true" className="lp-tech-dot" />
                         {step(index)} / {step(COUNT - 1)}
                       </span>
+                      {technique.lead ? (
+                        <p className="lp-tech-lead mt-5 flex items-center gap-2 font-medium text-[15px] md:text-[17px]">
+                          <CornerDownRight
+                            aria-hidden="true"
+                            className="size-4 shrink-0"
+                          />
+                          {technique.lead}
+                        </p>
+                      ) : null}
                       <h3
                         id={headingId}
-                        className="mt-5 font-(family-name:--lp-font-head) font-semibold text-(--lp-ink) text-[clamp(40px,5vw,76px)] leading-[0.98] tracking-[-0.035em] text-balance"
+                        className={`${technique.lead ? "mt-3" : "mt-5"} font-(family-name:--lp-font-head) font-semibold text-(--lp-ink) text-[clamp(40px,5vw,76px)] leading-[0.98] tracking-[-0.035em] text-balance`}
                       >
                         {technique.name}
                       </h3>
@@ -230,7 +253,7 @@ export function Techniques({
                       <ul className="mt-7 flex max-w-[46ch] flex-col">
                         {technique.points.map((point) => (
                           <li
-                            key={point}
+                            key={point.text}
                             className="lp-tech-point flex items-start gap-3 py-3.5 text-(--lp-ink) text-[16px] leading-[1.45] md:text-[17px]"
                           >
                             <span
@@ -239,7 +262,18 @@ export function Techniques({
                             >
                               <Check strokeWidth={2.5} className="size-3" />
                             </span>
-                            {point}
+                            {point.title ? (
+                              <span className="flex flex-col gap-0.5">
+                                <span className="font-semibold">
+                                  {point.title}
+                                </span>
+                                <span className="text-(--lp-ink-2) text-[15px] md:text-[16px]">
+                                  {point.text}
+                                </span>
+                              </span>
+                            ) : (
+                              point.text
+                            )}
                           </li>
                         ))}
                       </ul>

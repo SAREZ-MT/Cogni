@@ -1,19 +1,14 @@
-import {
-  Brain,
-  FileCheck,
-  Layers,
-  type LucideIcon,
-  Sparkles,
-} from "lucide-react";
+import { Brain, FileCheck, Layers, type LucideIcon } from "lucide-react";
 import Image from "next/image";
+import { CompanionDemo } from "./companion-demo";
 import type { HeadlineImage } from "./headline-object";
 
-export type TechniqueKey = "flashcards" | "recall" | "exams" | "ai";
+export type TechniqueKey = "flashcards" | "recall" | "exams" | "companion";
 
 // What the front card of each placeholder prints: the same generic example
 // content the app shows (never a real subject), and the platform icon.
 const FRONT: Record<
-  TechniqueKey,
+  Exclude<TechniqueKey, "companion">,
   { icon: LucideIcon; kicker: string; text: string }
 > = {
   flashcards: {
@@ -31,11 +26,6 @@ const FRONT: Record<
     kicker: "Pregunta 3 de 10",
     text: "¿Qué idea resume mejor el concepto clave?",
   },
-  ai: {
-    icon: Sparkles,
-    kicker: "Borrador de la IA",
-    text: "¿Qué es el concepto clave?",
-  },
 };
 
 // The large visual of a technique panel. It takes its tone from the
@@ -47,10 +37,12 @@ const FRONT: Record<
 // technique colour, a fine darker border, white cards, one platform icon in
 // a tile), square, transparent or light ground, about 1200×1200, and save
 // them as public/landing/technique-flashcards.webp, technique-recall.webp,
-// technique-exams.webp and technique-ai.webp. Pass them to <Techniques
-// art={{ flashcards: { src, alt }, … }} />. Until then this placeholder
-// draws the same idea from shapes: two tinted covers fanned behind a white
-// card that prints the technique's example question.
+// technique-exams.webp and technique-companion.webp (the study companion:
+// a session summary with strengths and improvement opportunities). Pass
+// them to <Techniques art={{ flashcards: { src, alt }, … }} />. Until then
+// this placeholder draws the same idea from shapes: two tinted covers
+// fanned behind a white card that prints the technique's example question,
+// or, for the companion, its session summary itself.
 export function TechniqueArt({
   technique,
   image,
@@ -68,6 +60,17 @@ export function TechniqueArt({
           sizes="(min-width: 768px) 560px, 90vw"
           className="object-contain"
         />
+      </div>
+    );
+  }
+  if (technique === "companion") {
+    return (
+      <div className="lp-art lp-art-stage relative flex w-full items-center justify-center p-[7%] md:aspect-square">
+        <span aria-hidden="true" className="lp-art-cover lp-art-cover-back" />
+        <span aria-hidden="true" className="lp-art-cover lp-art-cover-mid" />
+        <div className="relative w-full max-w-[460px] rotate-[-1.5deg]">
+          <CompanionDemo />
+        </div>
       </div>
     );
   }

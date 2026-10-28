@@ -6,7 +6,6 @@
  */
 .lp {
   --lp-ground: #1a1033;
-  --lp-ground-deep: #140b2b;
   --lp-violet: #7c3aed;
   --lp-violet-deep: #6d28d9;
   --lp-violet-400: #a78bfa;
@@ -19,7 +18,6 @@
   --lp-rose: #fb7185;
 
   /* Text on the dark ground (all AA or better on --lp-ground). */
-  --lp-on-dark: #f5f3ff;
   --lp-on-dark-2: #cfc8e6;
   --lp-on-dark-3: #9d94bc;
 
@@ -28,9 +26,8 @@
   --lp-ink-2: #3a3350;
   --lp-ink-3: #5b5470;
 
-  /* Editor-like fragments in the techniques and pillar demos. */
+  /* Editor-like fragments in the pillar demos. */
   --lp-editor-line: #ece8f3;
-  --lp-editor-text: #4b4560;
   --lp-card-kicker: #6b6380;
 
   /* Hero scene: near-black violet night ground, the login's tone. */
@@ -67,11 +64,9 @@
   --lp-net-7: #c084fc;
 
   /* Techniques deck and pillars (Pencil frame v1, sections Técnicas and
-     Pilares 01–05). */
+     Pilares 01–04). */
   --lp-violet-200: #ddd6fe;
   --lp-violet-800: #5b21b6;
-  --lp-on-dark-tab: #d9d2ee;
-  --lp-on-dark-side: #b9b0d6;
   --lp-ground-raise: #2a1d4d;
   --lp-muted: #8a8399;
   --lp-line: #e7e1f2;
@@ -467,6 +462,8 @@
   --tech-ink: var(--lp-red-700);
   --tech-edge: var(--lp-red);
 }
+/* Violet, Cogni's own colour, is the study companion's: it speaks about
+   every technique, so it takes none of theirs. */
 [data-tone="violet"] {
   --tech: var(--lp-violet-400);
   --tech-soft: var(--lp-violet-100);
@@ -474,8 +471,16 @@
   --tech-edge: var(--lp-violet);
 }
 
-.lp-tech-step {
+.lp-tech-step,
+.lp-tech-lead {
   color: var(--tech-ink);
+}
+/* The companion's session card, lifted like the placeholder's front card. */
+.lp-companion {
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--tech-edge) 30%, transparent),
+    0 1px 2px rgb(0 0 0 / 0.06),
+    0 24px 48px -24px rgb(26 16 51 / 0.4);
 }
 .lp-tech-dot {
   width: 8px;

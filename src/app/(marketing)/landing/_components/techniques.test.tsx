@@ -20,7 +20,7 @@ const NAMES = [
   "Flashcards",
   "Recuperación activa",
   "Exámenes",
-  "La IA prepara, tú decides",
+  "Tu acompañante de estudio",
 ];
 
 function panel(name: string) {
@@ -73,7 +73,9 @@ describe("Techniques", () => {
       expect(points.length).toBeGreaterThanOrEqual(2);
       expect(points.length).toBeLessThanOrEqual(3);
       expect(points.map((point) => point.textContent)).toEqual(
-        technique.points,
+        technique.points.map((point) =>
+          point.title ? `${point.title}${point.text}` : point.text,
+        ),
       );
     }
   });
@@ -94,11 +96,41 @@ describe("Techniques", () => {
     ]);
   });
 
+  it("drops the AI review panel", () => {
+    render(<Techniques />);
+    expect(document.body).not.toHaveTextContent("La IA prepara");
+  });
+
+  it("closes with the study companion, carried over from its pillar", () => {
+    render(<Techniques />);
+    const region = panel("Tu acompañante de estudio");
+    expect(region).toHaveTextContent(
+      "Cada sesión cierra con un siguiente paso.",
+    );
+    expect(region).toHaveTextContent(
+      "Un acompañante que te dice qué hiciste bien y qué sigue.",
+    );
+    const points = within(region).getAllByRole("listitem");
+    expect(points.map((point) => point.textContent)).toEqual([
+      "Primero, tus fortalezasAl terminar un examen, un mazo o una ronda de recuperación activa, ves lo que ya dominas.",
+      "Luego, oportunidades de mejoraPasos concretos sobre qué repasar, sin juicios ni etiquetas.",
+      "Tu dominio, en movimientoCada sesión actualiza tu dominio por página.",
+    ]);
+    // Its visual is the companion's session summary.
+    expect(region).toHaveTextContent("Así te fue en esta sesión");
+    expect(region).toHaveTextContent("Fortalezas");
+    expect(region).toHaveTextContent("Oportunidades de mejora");
+  });
+
   it("renders a supplied illustration in a technique's visual slot", () => {
     render(
       <Techniques
         art={{
           recall: { src: "/landing/technique-recall.webp", alt: "Ilustración" },
+          companion: {
+            src: "/landing/technique-companion.webp",
+            alt: "Acompañante",
+          },
         }}
       />,
     );
@@ -109,6 +141,11 @@ describe("Techniques", () => {
     expect(
       within(panel("Flashcards")).queryByRole("img"),
     ).not.toBeInTheDocument();
+    const companion = within(panel("Tu acompañante de estudio")).getByRole(
+      "img",
+      { name: "Acompañante" },
+    );
+    expect(companion.getAttribute("src")).toContain("technique-companion");
   });
 
   it("shows a decorative 01–04 progress indicator", () => {

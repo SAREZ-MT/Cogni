@@ -2,7 +2,6 @@
 
 import {
   CalendarDays,
-  CircleCheck,
   FileText,
   Flame,
   Heading1,
@@ -12,22 +11,16 @@ import {
   Quote,
   Sparkles,
 } from "lucide-react";
-import { motion, useInView, useReducedMotion } from "motion/react";
-import { type RefObject, useRef } from "react";
+import { motion } from "motion/react";
+import { useRef } from "react";
+import { usePlayOnce } from "./play-once";
 
-// One micro-demo per pillar. Each plays once, the first time 40% of its
-// visual is on screen, and never loops. With reduced motion every demo
-// renders its final state straight away. The mocks are decorative: the
-// pillar copy next to them carries the meaning.
+// One micro-demo per pillar. Each plays once (usePlayOnce), and with
+// reduced motion renders its final state straight away. The mocks are
+// decorative: the pillar copy next to them carries the meaning.
 
 const EASE_OUT = [0.22, 1, 0.36, 1] as const;
 const POP = { type: "spring", visualDuration: 0.4, bounce: 0.25 } as const;
-
-function usePlayOnce(ref: RefObject<HTMLElement | null>) {
-  const inView = useInView(ref, { once: true, amount: 0.4 });
-  const reduceMotion = useReducedMotion();
-  return inView || Boolean(reduceMotion);
-}
 
 /* ------------------------------------------------------------------ 01 */
 
@@ -515,124 +508,6 @@ export function TodayDemo() {
 
 /* ------------------------------------------------------------------ 04 */
 
-const STRENGTHS = [
-  "Dominas las definiciones de Tu apunte.",
-  "Respondiste con seguridad las preguntas de relación entre ideas.",
-] as const;
-const NEXT_STEPS = [
-  "Vuelve a la sección del concepto clave antes del próximo repaso.",
-  "Prueba explicarlo con tus palabras: Cogni ya te dejó la pregunta lista.",
-] as const;
-
-const WORD_STEP = 0.04;
-const WORDS_TOTAL = [...STRENGTHS, ...NEXT_STEPS].join(" ").split(" ").length;
-
-// Companion: the feedback writes itself word by word, then the mastery
-// gain pops in.
-export function CompanionDemo() {
-  const root = useRef<HTMLDivElement>(null);
-  const play = usePlayOnce(root);
-  let wordIndex = 0;
-
-  const words = (sentence: string) =>
-    sentence.split(" ").map((word) => {
-      const delay = 0.2 + wordIndex * WORD_STEP;
-      wordIndex += 1;
-      return (
-        <motion.span
-          key={`${word}-${delay}`}
-          className="inline-block"
-          initial={{ opacity: 0 }}
-          animate={play ? { opacity: 1 } : undefined}
-          transition={{ duration: 0.2, delay }}
-        >
-          {word}&nbsp;
-        </motion.span>
-      );
-    });
-
-  const list = (items: readonly string[], dot: string) => (
-    <ul className="flex flex-col gap-1.5">
-      {items.map((item) => (
-        <li
-          key={item}
-          className="flex gap-2 text-(--lp-ink-2) text-sm leading-normal"
-        >
-          <span className={`mt-[7px] size-1.5 shrink-0 rounded-full ${dot}`} />
-          <span>{words(item)}</span>
-        </li>
-      ))}
-    </ul>
-  );
-
-  return (
-    <div ref={root} aria-hidden="true" className="relative p-4 sm:p-8">
-      <div className="absolute inset-0 rotate-[-3deg] rounded-[32px] bg-(--lp-rose-100)" />
-      <div className="lp-shadow-window relative flex flex-col gap-4 rounded-[22px] border border-(--lp-line) bg-white p-6">
-        <div className="flex items-center gap-3">
-          <span className="flex size-10 items-center justify-center rounded-full bg-(--lp-violet) text-white">
-            <Sparkles className="size-5" />
-          </span>
-          <div className="flex flex-col">
-            <span className="font-extrabold text-(--lp-ink) text-lg">
-              Así te fue en esta sesión
-            </span>
-            <span className="text-(--lp-card-kicker) text-[13px]">
-              Examen · Tu apunte · 10 preguntas
-            </span>
-          </div>
-        </div>
-        <div className="flex flex-col gap-2 rounded-2xl bg-(--lp-mint-50) p-4">
-          <span className="flex items-center gap-1.5 font-extrabold text-(--lp-green-700) text-sm">
-            <CircleCheck className="size-4" />
-            Fortalezas
-          </span>
-          {list(STRENGTHS, "bg-(--lp-green-500)")}
-        </div>
-        <div className="flex flex-col gap-2 rounded-2xl bg-(--lp-yellow-100) p-4">
-          <span className="flex items-center gap-1.5 font-extrabold text-(--lp-amber-800) text-sm">
-            <Sparkles className="size-4" />
-            Oportunidades de mejora
-          </span>
-          {list(NEXT_STEPS, "bg-(--lp-amber-500)")}
-        </div>
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center justify-between">
-            <span className="font-bold text-(--lp-ink) text-[13px]">
-              Dominio de Tu apunte
-            </span>
-            <span className="flex items-center gap-2 text-[13px]">
-              <span className="text-(--lp-muted)">52 %</span>
-              <span className="font-extrabold text-(--lp-violet) text-[15px]">
-                68 %
-              </span>
-              <motion.span
-                className="rounded-full bg-(--lp-mint-100) px-2 py-0.5 font-extrabold text-(--lp-green-700) text-[12px]"
-                initial={{ opacity: 0, transform: "scale(0.8)" }}
-                animate={
-                  play ? { opacity: 1, transform: "scale(1)" } : undefined
-                }
-                transition={{
-                  ...POP,
-                  delay: 0.3 + WORDS_TOTAL * WORD_STEP,
-                }}
-              >
-                +16
-              </motion.span>
-            </span>
-          </div>
-          <div className="relative h-2 overflow-hidden rounded-full bg-(--lp-soft)">
-            <span className="absolute inset-y-0 left-0 w-[68%] rounded-full bg-(--lp-violet-300)" />
-            <span className="absolute inset-y-0 left-0 w-[52%] rounded-full bg-(--lp-violet)" />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ 05 */
-
 const WEEK_BARS = [
   { day: "L", value: 0.3 },
   { day: "M", value: 0.45 },
@@ -649,7 +524,8 @@ const MASTERY = [
   { label: "Exámenes", value: 70, tone: "bg-(--lp-rose)" },
 ] as const;
 
-// Progress: the week's completed reviews grow from the baseline.
+// Progress: the week's completed reviews grow from the baseline. Accents
+// follow the pillar's rose band; today's bar stays yellow.
 export function ProgressDemo() {
   const root = useRef<HTMLDivElement>(null);
   const play = usePlayOnce(root);
@@ -660,8 +536,8 @@ export function ProgressDemo() {
       aria-hidden="true"
       className="grid gap-4 sm:grid-cols-[1.15fr_1fr]"
     >
-      <div className="lp-shadow-float flex flex-col gap-4 rounded-[24px] bg-(--lp-ground) p-6">
-        <p className="font-bold text-(--lp-violet-300) text-sm">
+      <div className="lp-shadow-float flex flex-col gap-4 rounded-[24px] bg-(--lp-rose-950) p-6">
+        <p className="font-bold text-(--lp-rose-100) text-sm">
           Repasos completados
         </p>
         <p className="font-(family-name:--lp-font-display) text-(--lp-paper) text-[88px] leading-[0.85]">
@@ -682,7 +558,7 @@ export function ProgressDemo() {
                 className={`w-full origin-bottom rounded-md ${
                   index === WEEK_BARS.length - 1
                     ? "bg-(--lp-yellow)"
-                    : "bg-(--lp-violet)"
+                    : "bg-(--lp-rose)"
                 }`}
                 style={{ height: `${bar.value * 100}%` }}
                 initial={{ transform: "scaleY(0)" }}
@@ -693,7 +569,7 @@ export function ProgressDemo() {
                   delay: 0.1 + index * 0.05,
                 }}
               />
-              <span className="text-(--lp-on-dark-3) text-[11px]">
+              <span className="text-(--lp-rose-100)/75 text-[11px]">
                 {bar.day}
               </span>
             </div>
@@ -715,7 +591,7 @@ export function ProgressDemo() {
               <span
                 // biome-ignore lint/suspicious/noArrayIndexKey: fixed week
                 key={day}
-                className={`h-5 rounded-md ${day < 6 ? "bg-(--lp-violet)" : "bg-(--lp-soft)"}`}
+                className={`h-5 rounded-md ${day < 6 ? "bg-(--lp-rose)" : "bg-(--lp-rose-100)"}`}
               />
             ))}
           </div>
