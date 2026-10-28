@@ -1,61 +1,174 @@
-import { ArrowRight, Play } from "lucide-react";
-import Link from "next/link";
-import { HeroEditor } from "./hero-editor";
+"use client";
 
-// Hero E, "El titular se escribe solo". The headline, subtitle and actions
-// are static server-rendered text, visible from the first paint; only the
-// editor fragment on the right is animated (and decorative).
+import { ArrowRight } from "lucide-react";
+import {
+  type MotionValue,
+  motion,
+  useScroll,
+  useTransform,
+} from "motion/react";
+import Link from "next/link";
+import { useRef } from "react";
+import { HeroNetwork } from "./hero-network-canvas";
+import {
+  HERO_LINES,
+  HERO_SENTENCE,
+  outroProgress,
+  settleProgress,
+  wordProgress,
+} from "./hero-timeline";
+
+// A pinned, scroll-scrubbed scene. The h1 is static, server-rendered text
+// visible from the first paint (it is the LCP element); it only settles to
+// a smaller size as the reveal begins. The sentence below sharpens word by
+// word, the knowledge web grows behind it, and the subtitle and actions
+// arrive when the sentence completes. Everything is a function of the
+// track's scroll progress, so scrolling up plays it backwards.
+// Reduced motion (landing.css): no pin, every element in its final state.
+
+const SETTLED_SCALE = 0.6;
+const RISE_PX = 56;
+const WORD_BLUR_PX = 9;
+const WORD_DIM = 0.2;
+
 export function Hero() {
+  const trackRef = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll({
+    target: trackRef,
+    offset: ["start start", "end end"],
+  });
+
+  const headline = useTransform(scrollYProgress, (p) => {
+    const s = settleProgress(p);
+    const eased = 1 - (1 - s) ** 3;
+    return `scale(${1 - (1 - SETTLED_SCALE) * eased})`;
+  });
+  // The text block rises slowly through the whole pin, as in a camera move.
+  const block = useTransform(
+    scrollYProgress,
+    (p) =>
+      `translateY(${(RISE_PX * (1 - Math.min(p / 0.93, 1))).toFixed(1)}px)`,
+  );
+  const outro = useTransform(scrollYProgress, outroProgress);
+  const outroLift = useTransform(
+    outro,
+    (o) => `translateY(${(14 * (1 - o)).toFixed(1)}px)`,
+  );
+  const outroPointer = useTransform(outro, (o) => (o > 0.5 ? "auto" : "none"));
+
   return (
     <section
       aria-labelledby="hero-title"
-      className="lp-hero overflow-hidden px-4 pt-[120px] pb-20 md:px-10 xl:px-20 xl:pt-[142px] xl:pb-24"
+      className="lp-rise relative bg-(--lp-night) text-(--lp-night-ink)"
     >
-      <div className="mx-auto flex max-w-[1280px] flex-col gap-16 xl:flex-row xl:items-center xl:gap-10">
-        <div className="flex max-w-[560px] flex-col gap-7 xl:w-[560px] xl:shrink-0">
-          <p className="inline-flex w-fit items-center gap-2.5 rounded-full border border-white/15 bg-white/5 px-3.5 py-2 font-bold text-(--lp-on-dark) text-sm">
-            <span
-              aria-hidden="true"
-              className="size-2 rounded-full bg-(--lp-mint)"
-            />
-            Tus apuntes, convertidos en un plan para no olvidar
-          </p>
-          <h1
-            id="hero-title"
-            className="font-(family-name:--lp-font-display) text-(--lp-paper) text-[clamp(56px,7vw,96px)] leading-none tracking-[-0.02em]"
+      <div ref={trackRef} className="lp-rise-track">
+        <div className="lp-rise-stage sticky top-0 flex h-dvh items-center justify-center overflow-hidden">
+          <HeroNetwork
+            progress={scrollYProgress}
+            className="absolute inset-0"
+          />
+          <div aria-hidden="true" className="lp-rise-veil absolute inset-0" />
+
+          <motion.div
+            className="lp-rise-block relative z-10 flex w-full max-w-[1080px] flex-col items-center px-5 pt-16 text-center"
+            style={{ transform: block }}
           >
-            Recuerda lo que{" "}
-            <span className="inline-block rounded-lg bg-(--lp-yellow) pr-3.5 pb-1 pl-2.5 text-(--lp-ink)">
-              estudias.
-            </span>
-          </h1>
-          <p className="max-w-[560px] text-(--lp-on-dark-2) text-lg leading-[1.55] md:text-[19px]">
-            Cogni convierte tus apuntes en flashcards, exámenes y preguntas de
-            recuperación activa, y te dice qué repasar cada día para que no se
-            te olvide.
-          </p>
-          <div className="flex flex-wrap gap-3.5">
-            <Link
-              href="/register"
-              className="lp-press inline-flex items-center gap-2.5 rounded-full bg-(--lp-yellow) px-[30px] py-[17px] font-extrabold text-(--lp-ink) text-[17px]"
+            <motion.h1
+              id="hero-title"
+              className="lp-rise-title mb-5 font-(family-name:--lp-font-display) text-[clamp(52px,6.6vw,96px)] leading-[0.95] tracking-[-0.02em] md:mb-7 md:whitespace-nowrap"
+              style={{ transform: headline }}
             >
-              Empieza gratis
-              <ArrowRight aria-hidden="true" className="size-[18px]" />
-            </Link>
-            <a
-              href="#como-funciona"
-              className="lp-press inline-flex items-center gap-2.5 rounded-full border border-white/25 px-[26px] py-4 font-bold text-(--lp-on-dark) text-[17px] hover:bg-white/5"
+              Recuerda lo que{" "}
+              <em className="text-(--lp-violet-300) italic">estudias.</em>
+            </motion.h1>
+
+            <p className="sr-only">{HERO_SENTENCE}</p>
+            <p
+              aria-hidden="true"
+              className="lp-rise-sentence max-w-[22ch] text-balance font-medium text-[clamp(30px,3.6vw,50px)] leading-[1.16] tracking-[-0.024em] md:max-w-none"
             >
-              <Play aria-hidden="true" className="size-4" />
-              Ver cómo funciona
-            </a>
-          </div>
-          <p className="text-(--lp-on-dark-3) text-sm">
-            Gratis · Para mayores de 18 años · Importa PDF, Word y PowerPoint
-          </p>
+              {HERO_LINES.map((line, lineIndex) => (
+                <span key={line.join(" ")} className="md:block">
+                  {line.map((word, wordIndex) => {
+                    const index =
+                      HERO_LINES.slice(0, lineIndex).flat().length + wordIndex;
+                    return (
+                      <RevealWord
+                        key={`${word}-${index}`}
+                        word={word}
+                        index={index}
+                        progress={scrollYProgress}
+                      />
+                    );
+                  })}
+                </span>
+              ))}
+            </p>
+
+            <motion.div
+              className="lp-rise-outro mt-9 flex flex-col items-center gap-7"
+              style={{
+                opacity: outro,
+                transform: outroLift,
+                pointerEvents: outroPointer,
+              }}
+            >
+              <p className="max-w-[580px] text-balance text-(--lp-night-ink-2) text-[17px] leading-[1.6] md:text-lg">
+                Cogni convierte tus apuntes en flashcards, exámenes y preguntas
+                de recuperación activa, y te dice qué repasar cada día para que
+                no se te olvide.
+              </p>
+              <div
+                data-part="hero-actions"
+                className="flex flex-wrap justify-center gap-3"
+              >
+                <Link
+                  href="/register"
+                  className="lp-press lp-cta-primary inline-flex items-center gap-2 rounded-full px-6 py-3.5 font-bold text-[16px]"
+                >
+                  Empieza gratis
+                  <ArrowRight aria-hidden="true" className="size-4" />
+                </Link>
+                <a
+                  href="#como-funciona"
+                  className="lp-press inline-flex items-center rounded-full border border-white/15 px-6 py-3.5 font-semibold text-(--lp-night-ink) text-[16px] transition-colors duration-150 hover:bg-white/[0.06]"
+                >
+                  Ver cómo funciona
+                </a>
+              </div>
+            </motion.div>
+          </motion.div>
         </div>
-        <HeroEditor />
       </div>
     </section>
+  );
+}
+
+// One word of the sentence: blurred and dim until its turn, then sharp.
+function RevealWord({
+  word,
+  index,
+  progress,
+}: {
+  word: string;
+  index: number;
+  progress: MotionValue<number>;
+}) {
+  const reveal = useTransform(progress, (p) => wordProgress(p, index));
+  const opacity = useTransform(reveal, (r) => WORD_DIM + (1 - WORD_DIM) * r);
+  const filter = useTransform(
+    reveal,
+    (r) => `blur(${(WORD_BLUR_PX * (1 - r)).toFixed(2)}px)`,
+  );
+  return (
+    <>
+      <motion.span
+        data-word=""
+        className="lp-rise-word inline-block"
+        style={{ opacity, filter }}
+      >
+        {word}
+      </motion.span>{" "}
+    </>
   );
 }

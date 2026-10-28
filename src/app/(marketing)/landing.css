@@ -28,16 +28,27 @@
   --lp-ink-2: #3a3350;
   --lp-ink-3: #5b5470;
 
-  /* The editor fragment in the hero. */
-  --lp-editor: #faf8ff;
+  /* Editor-like fragments in the techniques and pillar demos. */
   --lp-editor-line: #ece8f3;
-  --lp-editor-dot: #ddd8e6;
-  --lp-editor-tab: #f0ecf6;
   --lp-editor-text: #4b4560;
   --lp-card-kicker: #6b6380;
-  --lp-hl-flash: #fde68a;
-  --lp-hl-exam: #ddd6fe;
-  --lp-hl-recall: #a7f3d0;
+
+  /* Hero scene: near-black night ground (tryprofound-style reveal). */
+  --lp-night: #000000;
+  --lp-night-ink: #edf0f5;
+  --lp-night-ink-2: #a3aab8;
+  --lp-night-ink-3: #6f7686;
+
+  /* Study icons of the hero network: soft, saturated hues that read on
+     black, Cogni violet among them. */
+  --lp-net-0: #7c3aed;
+  --lp-net-1: #60a5fa;
+  --lp-net-2: #34d399;
+  --lp-net-3: #fbbf24;
+  --lp-net-4: #fb7185;
+  --lp-net-5: #fb923c;
+  --lp-net-6: #22d3ee;
+  --lp-net-7: #c084fc;
 
   /* Techniques deck and pillars (Pencil frame v1, sections Técnicas and
      Pilares 01–05). */
@@ -77,16 +88,6 @@
   background: var(--lp-paper);
   color: var(--lp-ink);
   font-family: var(--lp-font-sans);
-}
-
-.lp-hero {
-  background:
-    radial-gradient(
-      110% 130% at 78% 35%,
-      rgb(124 58 237 / 0.4),
-      rgb(26 16 51 / 0) 70%
-    ),
-    var(--lp-ground);
 }
 
 .lp-video-slot {
@@ -141,24 +142,102 @@
 }
 
 /*
- * Hero typing pre-state. The typed copy is decorative (aria-hidden); the
- * real h1 never has a hidden pre-state. With reduced motion the final state
- * shows from the first paint.
+ * Hero scene. The track is the scroll distance of the pin; the stage stays
+ * stuck to the viewport while it scrolls past.
  */
-@media (prefers-reduced-motion: no-preference) {
-  .lp-ch {
-    opacity: 0;
-  }
-  .lp-mark {
-    transform: scaleX(0);
-  }
-  .lp-ai-chip {
-    opacity: 0;
+.lp-rise-track {
+  height: 360vh;
+}
+@media (max-width: 767px) {
+  .lp-rise-track {
+    height: 240vh;
   }
 }
 
-.lp-mark {
-  transform-origin: 0 50%;
+.lp-rise ::selection {
+  background: rgb(124 58 237 / 0.55);
+  color: var(--lp-night-ink);
+}
+
+/* Darkens the web behind the text so the lines never fight the words. */
+.lp-rise-veil {
+  background: radial-gradient(
+    ellipse 46% 38% at 50% 54%,
+    rgb(0 0 0 / 0.82),
+    rgb(0 0 0 / 0.5) 55%,
+    rgb(0 0 0 / 0) 100%
+  );
+}
+
+.lp-rise-title {
+  transform-origin: 50% 100%;
+}
+
+.lp-cta-primary {
+  background: var(--lp-violet);
+  color: #ffffff;
+  box-shadow:
+    0 0 0 1px rgb(196 181 253 / 0.25) inset,
+    0 10px 30px -8px rgb(124 58 237 / 0.6);
+  transition:
+    background-color 160ms var(--lp-ease-out),
+    transform 160ms var(--lp-ease-out);
+}
+.lp-cta-primary:hover {
+  background: var(--lp-violet-deep);
+}
+
+/* Keyboard users reach the actions without scrolling through the pin. */
+.lp-rise-outro:focus-within {
+  /* biome-ignore lint/complexity/noImportantStyles: only !important beats the inline style Motion writes */
+  opacity: 1 !important;
+  /* biome-ignore lint/complexity/noImportantStyles: same as above */
+  transform: none !important;
+  /* biome-ignore lint/complexity/noImportantStyles: same as above */
+  pointer-events: auto !important;
+}
+
+/* Network icons: one hue each, a soft glow, and depth blur on far nodes. */
+.lp-net-icon {
+  position: absolute;
+  line-height: 0;
+  will-change: opacity, transform;
+}
+.lp-net-glyph {
+  filter: drop-shadow(
+    0 0 6px color-mix(in srgb, currentColor 55%, transparent)
+  );
+}
+.lp-net-far {
+  opacity: 0.5;
+  filter: blur(1.6px);
+}
+.lp-net-mid {
+  opacity: 0.85;
+}
+.lp-net-hue-0 {
+  color: var(--lp-net-0);
+}
+.lp-net-hue-1 {
+  color: var(--lp-net-1);
+}
+.lp-net-hue-2 {
+  color: var(--lp-net-2);
+}
+.lp-net-hue-3 {
+  color: var(--lp-net-3);
+}
+.lp-net-hue-4 {
+  color: var(--lp-net-4);
+}
+.lp-net-hue-5 {
+  color: var(--lp-net-5);
+}
+.lp-net-hue-6 {
+  color: var(--lp-net-6);
+}
+.lp-net-hue-7 {
+  color: var(--lp-net-7);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -169,5 +248,33 @@
   .lp-band-ground {
     /* biome-ignore lint/complexity/noImportantStyles: only !important beats the inline style Motion writes */
     transform: none !important;
+  }
+  /* Hero: no pin, no scrub; the full sharp sentence and actions show. */
+  .lp-rise-track {
+    height: auto;
+  }
+  .lp-rise-stage {
+    position: relative;
+    height: auto;
+    min-height: 100dvh;
+    padding-block: 120px 96px;
+  }
+  .lp-rise-block,
+  .lp-rise-title,
+  .lp-rise-outro,
+  .lp-rise-word {
+    /* biome-ignore lint/complexity/noImportantStyles: overrides the scroll-linked inline styles */
+    opacity: 1 !important;
+    /* biome-ignore lint/complexity/noImportantStyles: same as above */
+    filter: none !important;
+    /* biome-ignore lint/complexity/noImportantStyles: same as above */
+    transform: none !important;
+    /* biome-ignore lint/complexity/noImportantStyles: same as above */
+    pointer-events: auto !important;
+  }
+  /* The headline shows at its settled size: no scroll moves it there. */
+  .lp-rise-title {
+    /* biome-ignore lint/complexity/noImportantStyles: overrides the scroll-linked inline transform */
+    transform: scale(0.6) !important;
   }
 }
