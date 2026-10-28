@@ -1,4 +1,4 @@
-import { Caveat, Instrument_Serif, Manrope } from "next/font/google";
+import { Caveat, Instrument_Serif, Inter, Manrope } from "next/font/google";
 import type { ReactNode } from "react";
 import { LandingMotionConfig } from "./landing/_components/landing-motion-config";
 import "./landing.css";
@@ -18,6 +18,15 @@ const manrope = Manrope({
   subsets: ["latin"],
 });
 
+// Section headlines (Dovetail-style display sans). Inter's optical-size
+// axis switches to its tight display cut at headline sizes, which Manrope's
+// wide geometric forms cannot match at 100px.
+const inter = Inter({
+  variable: "--font-inter",
+  subsets: ["latin"],
+  axes: ["opsz"],
+});
+
 // Only used for small annotations further down the page.
 const caveat = Caveat({
   variable: "--font-caveat",
@@ -28,7 +37,7 @@ const caveat = Caveat({
 export default function MarketingLayout({ children }: { children: ReactNode }) {
   return (
     <div
-      className={`lp ${instrumentSerif.variable} ${manrope.variable} ${caveat.variable} min-h-dvh`}
+      className={`lp ${instrumentSerif.variable} ${manrope.variable} ${inter.variable} ${caveat.variable} min-h-dvh`}
     >
       <LandingMotionConfig>{children}</LandingMotionConfig>
     </div>

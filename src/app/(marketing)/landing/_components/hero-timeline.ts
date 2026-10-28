@@ -85,3 +85,31 @@ export function collapsedScrollY(
 ) {
   return scrollY - Math.max(0, trackHeight - viewport);
 }
+
+/**
+ * Quiet time after the last scroll event before the pin may collapse. The
+ * collapse jumps the scroll position instantly, which would cancel a
+ * scroll still in flight (a smooth anchor jump from the nav, a fling) and
+ * strand the visitor midway; waiting until the scroll settles avoids it.
+ */
+export const PIN_SETTLE_MS = 180;
+
+export function shouldCollapsePin(state: {
+  collapsed: boolean;
+  /** Latched scene progress. */
+  progress: number;
+  /** Raw scroll progress of the track. */
+  raw: number;
+  /** The stage sits at the end of the track: the pin has let go. */
+  pinReleased: boolean;
+  /** Milliseconds since the last scroll event. */
+  idleMs: number;
+}) {
+  return (
+    !state.collapsed &&
+    state.progress >= 1 &&
+    state.raw >= 1 &&
+    state.pinReleased &&
+    state.idleMs >= PIN_SETTLE_MS
+  );
+}

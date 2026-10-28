@@ -7,8 +7,10 @@ import {
   latchProgress,
   networkGrowth,
   outroProgress,
+  PIN_SETTLE_MS,
   revealedWordCount,
   settleProgress,
+  shouldCollapsePin,
   wordProgress,
 } from "./hero-timeline";
 
@@ -120,5 +122,36 @@ describe("pin collapse", () => {
   it("does nothing when there is no pin to remove", () => {
     expect(collapsedScrollY(1200, 900, 900)).toBe(1200);
     expect(collapsedScrollY(1200, 700, 900)).toBe(1200);
+  });
+});
+
+describe("pin collapse safety", () => {
+  const ready = {
+    collapsed: false,
+    progress: 1,
+    raw: 1,
+    pinReleased: true,
+    idleMs: PIN_SETTLE_MS,
+  };
+
+  it("collapses once the scene is complete, released and the scroll has settled", () => {
+    expect(shouldCollapsePin(ready)).toBe(true);
+  });
+
+  it("waits while a scroll is still moving, such as a smooth anchor jump", () => {
+    expect(shouldCollapsePin({ ...ready, idleMs: 16 })).toBe(false);
+    expect(shouldCollapsePin({ ...ready, idleMs: PIN_SETTLE_MS - 1 })).toBe(
+      false,
+    );
+  });
+
+  it("never collapses before the pin has released or the scene has latched", () => {
+    expect(shouldCollapsePin({ ...ready, pinReleased: false })).toBe(false);
+    expect(shouldCollapsePin({ ...ready, progress: 0.9 })).toBe(false);
+    expect(shouldCollapsePin({ ...ready, raw: 0.99 })).toBe(false);
+  });
+
+  it("collapses only once", () => {
+    expect(shouldCollapsePin({ ...ready, collapsed: true })).toBe(false);
   });
 });

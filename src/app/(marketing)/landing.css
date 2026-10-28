@@ -84,20 +84,255 @@
   --lp-font-sans: var(--font-manrope), system-ui, sans-serif;
   --lp-font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
   --lp-font-hand: var(--font-caveat), cursive;
+  --lp-font-head: var(--font-inter), var(--lp-font-sans);
+
+  /* Character texture (ascii-texture.tsx) and the headline object. */
+  --ascii-ink: var(--lp-violet-300);
+  --ascii-ink-paper: var(--lp-violet-800);
+  --ascii-alpha: 0.18;
+  --ascii-alpha-paper: 0.09;
+  --hobj-dark: var(--lp-violet-800);
+  --hobj-mid: var(--lp-violet);
+  --hobj-light: var(--lp-violet-300);
 
   background: var(--lp-paper);
   color: var(--lp-ink);
   font-family: var(--lp-font-sans);
 }
 
-.lp-video-slot {
+/*
+ * Fixed nav. Its colours are custom properties switched by data-theme
+ * (landing-nav.tsx) and cross-faded per property; the backdrop blur only
+ * toggles with data-solid and is never animated.
+ */
+.lp-nav {
+  --nav-ink: var(--lp-night-ink);
+  --nav-ink-2: var(--lp-night-ink-2);
+  --nav-surface: rgb(11 7 23 / 0.72);
+  --nav-line: rgb(255 255 255 / 0.08);
+}
+.lp-nav[data-theme="light"] {
+  --nav-ink: var(--lp-ink);
+  --nav-ink-2: var(--lp-ink-3);
+  --nav-surface: rgb(251 248 243 / 0.9);
+  --nav-line: rgb(26 16 51 / 0.08);
+}
+.lp-nav-bar {
+  background-color: transparent;
+  border-color: transparent;
+  transition:
+    background-color 320ms var(--lp-ease-out),
+    border-color 320ms var(--lp-ease-out);
+}
+.lp-nav[data-solid] .lp-nav-bar {
+  background-color: var(--nav-surface);
+  border-color: var(--nav-line);
+  backdrop-filter: blur(14px) saturate(1.4);
+}
+.lp-nav-ink,
+.lp-nav-link {
+  transition: color 320ms var(--lp-ease-out);
+}
+.lp-nav-ink {
+  color: var(--nav-ink);
+}
+.lp-nav-link {
+  color: var(--nav-ink-2);
+}
+.lp-nav-link:hover {
+  color: var(--nav-ink);
+}
+.lp-nav[data-theme="light"] :focus-visible {
+  outline-color: var(--lp-violet);
+}
+
+/*
+ * Dusk band: the hero's night carried down into the paper. The gradient
+ * passes through the brand violet instead of a grey midpoint, with a low
+ * dawn glow; the character texture on top dithers away as it goes.
+ */
+.lp-dusk {
+  height: clamp(380px, 64vh, 640px);
+  margin-top: -1px;
   background:
     radial-gradient(
-      120% 120% at 50% 45%,
-      rgb(124 58 237 / 0.35),
-      rgb(26 16 51 / 0) 70%
+      70% 40% at 50% 60%,
+      rgb(167 139 250 / 0.2),
+      rgb(167 139 250 / 0) 70%
     ),
-    var(--lp-ground);
+    linear-gradient(
+      in oklab to bottom,
+      var(--lp-night) 0%,
+      var(--lp-ground) 26%,
+      color-mix(in oklab, var(--lp-violet-800) 36%, var(--lp-ground)) 42%,
+      color-mix(in oklab, var(--lp-violet-400) 50%, var(--lp-violet-800)) 56%,
+      color-mix(in oklab, var(--lp-violet-300) 60%, var(--lp-paper)) 70%,
+      color-mix(in oklab, var(--lp-violet-100) 45%, var(--lp-paper)) 84%,
+      var(--lp-paper) 100%
+    );
+}
+/* Carries the hero's side vignette into the band and fades it out going
+   down, so the hero's darker corners blend instead of ending on a seam. */
+.lp-dusk::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    to right,
+    rgb(6 4 14 / 0.6),
+    rgb(6 4 14 / 0) 22%,
+    rgb(6 4 14 / 0) 78%,
+    rgb(6 4 14 / 0.6)
+  );
+  mask-image: linear-gradient(to bottom, #000 0%, transparent 60%);
+}
+.lp-dusk-out {
+  height: clamp(240px, 40vh, 400px);
+  background: linear-gradient(
+    in oklab to bottom,
+    var(--lp-paper) 0%,
+    color-mix(in oklab, var(--lp-violet-100) 40%, var(--lp-paper)) 26%,
+    color-mix(in oklab, var(--lp-violet-800) 30%, var(--lp-ground-deep)) 68%,
+    var(--lp-ground-deep) 100%
+  );
+}
+@media (max-width: 767px) {
+  .lp-dusk {
+    height: 52vh;
+  }
+  .lp-dusk-out {
+    height: 30vh;
+  }
+}
+
+/* Section headline: Inter display at poster size, one serif italic word. */
+.lp-headline {
+  font-family: var(--lp-font-head);
+  font-weight: 600;
+  font-size: clamp(44px, 7vw, 104px);
+  line-height: 1;
+  letter-spacing: -0.038em;
+  text-wrap: balance;
+}
+.lp-headline-accent {
+  font-family: var(--lp-font-display);
+  font-style: italic;
+  font-weight: 400;
+  /* The serif's smaller x-height, matched to the sans. */
+  font-size: 1.1em;
+  line-height: 0;
+  letter-spacing: -0.01em;
+  color: var(--lp-violet);
+}
+
+/*
+ * Inline headline object: square, about 1.35 cap heights, dipping a little
+ * below the baseline as an object resting on the line.
+ */
+.lp-hobj {
+  position: relative;
+  display: inline-block;
+  width: 0.98em;
+  height: 0.98em;
+  margin-inline: 0.02em;
+  vertical-align: -0.16em;
+}
+.lp-hobj-placeholder {
+  overflow: hidden;
+  border-radius: 0.22em;
+  box-shadow:
+    0 0 0 1px rgb(91 33 182 / 0.18) inset,
+    0 0.12em 0.3em -0.08em rgb(76 29 149 / 0.35);
+  transform: rotate(-6deg);
+  animation: lp-hobj-float 7s ease-in-out infinite;
+}
+.lp-hobj-dither {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  background: var(--lp-violet);
+}
+.lp-hobj-glyph {
+  position: absolute;
+  inset: 21%;
+  width: 58%;
+  height: 58%;
+  color: var(--lp-paper);
+  filter: drop-shadow(0 0.02em 0.03em rgb(46 16 101 / 0.5));
+}
+@keyframes lp-hobj-float {
+  0%,
+  100% {
+    transform: rotate(-6deg) translateY(0);
+  }
+  50% {
+    transform: rotate(-3deg) translateY(-0.05em);
+  }
+}
+
+/* Video placeholder: a night window on the paper, fine inner border. */
+.lp-video-slot {
+  --ascii-alpha: 0.16;
+  background:
+    radial-gradient(
+      60% 70% at 50% 50%,
+      rgb(124 58 237 / 0.3),
+      rgb(124 58 237 / 0) 70%
+    ),
+    var(--lp-night);
+  box-shadow:
+    0 0 0 1px rgb(26 16 51 / 0.1),
+    0 40px 80px -40px rgb(26 16 51 / 0.55);
+}
+.lp-video-slot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08);
+  pointer-events: none;
+}
+.lp-video-play {
+  background: var(--lp-violet);
+  color: #ffffff;
+  box-shadow:
+    inset 0 0 0 1px rgb(196 181 253 / 0.45),
+    0 18px 40px -12px rgb(124 58 237 / 0.75);
+}
+.lp-video-play::before {
+  content: "";
+  position: absolute;
+  inset: -14px;
+  border-radius: inherit;
+  border: 1px solid rgb(196 181 253 / 0.35);
+  animation: lp-play-ring 2.8s var(--lp-ease-out) infinite;
+}
+@keyframes lp-play-ring {
+  0% {
+    opacity: 0.9;
+    transform: scale(0.86);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.35);
+  }
+}
+
+/* Steps: a hairline with a short violet lead, number, then the step. */
+.lp-step {
+  border-top: 1px solid rgb(26 16 51 / 0.12);
+}
+.lp-step::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: 0;
+  width: 44px;
+  height: 1px;
+  background: var(--lp-violet);
 }
 
 .lp-shadow-float {
@@ -122,6 +357,14 @@
 }
 .lp-scroll-x::-webkit-scrollbar {
   display: none;
+}
+
+/* In-page anchors glide; the hero waits for the glide to end before it
+   collapses its pin (shouldCollapsePin), so the jump is never cut short. */
+@media (prefers-reduced-motion: no-preference) {
+  html:has(.lp) {
+    scroll-behavior: smooth;
+  }
 }
 
 .lp :focus-visible {
@@ -182,11 +425,16 @@
       rgb(11 7 23 / 0.45) 55%,
       rgb(11 7 23 / 0) 100%
     ),
-    radial-gradient(
-      120% 80% at 50% 45%,
-      transparent 40%,
-      rgb(6 4 14 / 0.7) 100%
-    );
+    /* Sides and top only: a bottom vignette read as a black seam above the
+       dusk band, so the hero's lower edge keeps the plain night ground. */
+    linear-gradient(
+      to right,
+      rgb(6 4 14 / 0.6),
+      rgb(6 4 14 / 0) 22%,
+      rgb(6 4 14 / 0) 78%,
+      rgb(6 4 14 / 0.6)
+    ),
+    linear-gradient(to bottom, rgb(6 4 14 / 0.55), rgb(6 4 14 / 0) 30%);
 }
 
 /* Passed and latched: the pin shrinks to one viewport (hero.tsx). */
@@ -268,6 +516,15 @@
 @media (prefers-reduced-motion: reduce) {
   .lp-press:active {
     transform: none;
+  }
+  .lp-nav-bar,
+  .lp-nav-ink,
+  .lp-nav-link {
+    transition: none;
+  }
+  .lp-hobj-placeholder,
+  .lp-video-play::before {
+    animation: none;
   }
   /* Overrides the scroll-linked inline transforms of the pillar bands and
      the video slot. */

@@ -1,27 +1,42 @@
 "use client";
 
-import { Clapperboard, Play } from "lucide-react";
+import { Play } from "@phosphor-icons/react/dist/csr/Play";
 import { motion, useScroll, useTransform } from "motion/react";
 import { useRef } from "react";
-import { Reveal } from "./reveal";
+import { AsciiTexture } from "./ascii-texture";
+import { type HeadlineImage, HeadlineObject } from "./headline-object";
 
-const STEPS = [
+export const HOW_IT_WORKS_STEPS = [
   "Sube tu apunte",
   "Cogni prepara tus técnicas",
   "Repasa cuando toca",
 ] as const;
 
-// "Así funciona Cogni": the slot the product video will fill later. Until
-// then it says so plainly; nothing here imitates real footage.
-export function HowItWorks() {
+const EASE_OUT = [0.22, 1, 0.36, 1] as const;
+const RISE = {
+  initial: { opacity: 0, transform: "translateY(24px)" },
+  whileInView: { opacity: 1, transform: "translateY(0px)" },
+  viewport: { once: true, amount: 0.4 },
+} as const;
+
+// "Así funciona Cogni", the first paper section. A tall dusk band carries
+// the hero's violet night down into the paper (a gradient plus a character
+// texture that dithers away), so the page reads as one continuous scene.
+// Then a huge sans headline with one serif italic keyword and a 3D object
+// set between its words, the slot the product video will fill (it says so
+// plainly; nothing imitates real footage), and the three steps.
+//
+// "repaso" is the italic keyword: it is where the sentence lands and what
+// Cogni is for, the same role "estudias." plays in the hero.
+export function HowItWorks({ image }: { image?: HeadlineImage }) {
   const slot = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({
     target: slot,
     offset: ["start end", "center center"],
   });
-  // Scroll-linked growth, transform only (radius stays fixed: animating it
-  // would repaint the large slot on every scroll frame). Reduced motion is
-  // held in CSS (.lp-video-grow), so server and client render the same style.
+  // Scroll-linked growth, transform only (the radius stays fixed: animating
+  // it would repaint the large slot every frame). Reduced motion is held in
+  // CSS (.lp-video-grow), so server and client render the same style.
   const transform = useTransform(
     scrollYProgress,
     [0, 1],
@@ -29,56 +44,120 @@ export function HowItWorks() {
   );
 
   return (
-    <section
-      id="como-funciona"
-      aria-labelledby="como-funciona-title"
-      className="lp-on-paper scroll-mt-20 bg-(--lp-paper) px-4 py-24 md:px-10 xl:px-40 xl:py-[120px]"
-    >
-      <div className="mx-auto flex max-w-[1120px] flex-col items-center gap-12">
-        <Reveal className="flex flex-col items-center gap-3.5 text-center">
-          <p className="font-extrabold text-(--lp-violet) text-[13px] uppercase tracking-[0.15em]">
-            Así funciona Cogni
-          </p>
-          <h2
-            id="como-funciona-title"
-            className="font-(family-name:--lp-font-display) text-(--lp-ink) text-[clamp(44px,5vw,68px)] leading-[1.05] tracking-[-0.02em]"
+    <>
+      <div aria-hidden="true" className="lp-dusk relative">
+        <span
+          data-nav-theme="dark"
+          className="absolute inset-x-0 top-0 h-1/2"
+        />
+        <span
+          data-nav-theme="light"
+          className="absolute inset-x-0 bottom-0 h-1/2"
+        />
+        <AsciiTexture
+          variant="dissolve"
+          seed={3}
+          className="absolute inset-0 size-full font-(family-name:--lp-font-mono)"
+        />
+      </div>
+
+      <section
+        id="como-funciona"
+        aria-labelledby="como-funciona-title"
+        data-nav-theme="light"
+        className="lp-on-paper relative scroll-mt-20 bg-(--lp-paper) px-5 pt-2 pb-20 md:px-10 md:pb-24 xl:px-20 xl:pb-28"
+      >
+        <div className="mx-auto max-w-[1280px]">
+          <motion.p
+            {...RISE}
+            transition={{ duration: 0.5, ease: EASE_OUT }}
+            className="flex items-center gap-3 font-(family-name:--lp-font-mono) text-(--lp-violet-deep) text-[16px] uppercase tracking-[0.14em] md:text-[20px]"
           >
-            Del apunte al repaso,{" "}
-            <em className="text-(--lp-violet)">en un minuto.</em>
-          </h2>
-        </Reveal>
+            <span
+              aria-hidden="true"
+              className="size-2 bg-(--lp-violet) md:size-2.5"
+            />
+            Así funciona Cogni
+          </motion.p>
+          <motion.h2
+            {...RISE}
+            transition={{ duration: 0.6, ease: EASE_OUT, delay: 0.08 }}
+            id="como-funciona-title"
+            className="lp-headline mt-6 text-(--lp-ink) md:mt-8"
+          >
+            Del{" "}
+            <span className="whitespace-nowrap">
+              apunte <HeadlineObject image={image} />
+            </span>{" "}
+            al <em className="lp-headline-accent">repaso</em>,{" "}
+            <br className="hidden md:inline" />
+            en un minuto.
+          </motion.h2>
 
-        <motion.div
-          ref={slot}
-          role="img"
-          aria-label="Video de Cogni, próximamente"
-          className="lp-video-slot lp-video-grow flex aspect-video w-full flex-col items-center justify-center gap-[22px] rounded-[20px] border border-(--lp-violet) md:rounded-[32px]"
-          style={{ transform }}
-        >
-          <span className="flex size-20 items-center justify-center rounded-full border border-white/20 bg-(--lp-paper) md:size-28">
-            <Play className="ml-1 size-8 fill-(--lp-violet) text-(--lp-violet) md:size-10" />
-          </span>
-          <span className="inline-flex items-center gap-2 rounded-full bg-(--lp-yellow) px-4 py-[9px] font-extrabold text-(--lp-ink) text-sm">
-            <Clapperboard className="size-4" />
-            Video próximamente
-          </span>
-        </motion.div>
+          <motion.div
+            ref={slot}
+            role="img"
+            aria-label="Video de Cogni, próximamente"
+            className="lp-video-slot lp-video-grow relative mt-14 flex aspect-[4/3] w-full items-center justify-center overflow-hidden rounded-[20px] sm:aspect-video md:mt-20 md:rounded-[28px]"
+            style={{ transform }}
+          >
+            <AsciiTexture
+              variant="field"
+              seed={11}
+              className="absolute inset-0 size-full font-(family-name:--lp-font-mono)"
+            />
+            <span className="lp-video-play relative flex size-20 items-center justify-center rounded-full md:size-[104px]">
+              <Play weight="fill" className="ml-1 size-7 md:size-9" />
+            </span>
+            <span className="absolute inset-x-0 bottom-5 flex items-center justify-center gap-2 font-(family-name:--lp-font-mono) text-(--lp-on-dark-2) text-[11px] uppercase tracking-[0.16em] md:bottom-8 md:text-[12px]">
+              <span
+                aria-hidden="true"
+                className="size-1.5 rounded-full bg-(--lp-violet-400)"
+              />
+              Video próximamente
+            </span>
+          </motion.div>
 
-        <Reveal>
-          <ol className="flex flex-col items-center gap-4 md:flex-row md:gap-10">
-            {STEPS.map((step, index) => (
-              <li key={step} className="flex items-center gap-2.5">
-                <span className="font-(family-name:--lp-font-display) text-(--lp-violet) text-2xl">
+          <ol className="mt-14 grid gap-9 md:mt-20 md:grid-cols-3 md:gap-10">
+            {HOW_IT_WORKS_STEPS.map((step, index) => (
+              <motion.li
+                key={step}
+                {...RISE}
+                transition={{
+                  duration: 0.5,
+                  ease: EASE_OUT,
+                  delay: 0.08 * index,
+                }}
+                className="lp-step relative pt-5"
+              >
+                <span className="font-(family-name:--lp-font-mono) text-(--lp-violet) text-[13px]">
                   {String(index + 1).padStart(2, "0")}
                 </span>
-                <span className="font-bold text-(--lp-ink-2) text-base">
+                <span className="mt-3 block font-(family-name:--lp-font-head) font-medium text-(--lp-ink) text-[22px] leading-[1.2] tracking-[-0.02em] md:text-[26px]">
                   {step}
                 </span>
-              </li>
+              </motion.li>
             ))}
           </ol>
-        </Reveal>
+        </div>
+      </section>
+
+      <div aria-hidden="true" className="lp-dusk-out relative">
+        <span
+          data-nav-theme="light"
+          className="absolute inset-x-0 top-0 h-1/2"
+        />
+        <span
+          data-nav-theme="dark"
+          className="absolute inset-x-0 bottom-0 h-1/2"
+        />
+        <AsciiTexture
+          variant="dissolve"
+          flip
+          seed={5}
+          className="absolute inset-0 size-full font-(family-name:--lp-font-mono)"
+        />
       </div>
-    </section>
+    </>
   );
 }

@@ -19,13 +19,24 @@ export default function LandingPage() {
     <>
       <LandingNav />
       <main>
-        <Hero />
+        {/* data-nav-theme: the ground under the fixed nav (landing-nav.tsx). */}
+        <div data-nav-theme="dark">
+          <Hero />
+        </div>
         <HowItWorks />
-        <Techniques />
-        <Pillars />
+        <div data-nav-theme="dark">
+          <Techniques />
+        </div>
+        <div data-nav-theme="light">
+          <Pillars />
+        </div>
         {/* T3: science, curve, comparison, receipt, FAQ, closing, footer. */}
-        <section id="ciencia" className="scroll-mt-20" />
-        <section id="preguntas" className="scroll-mt-20" />
+        <section id="ciencia" data-nav-theme="light" className="scroll-mt-20" />
+        <section
+          id="preguntas"
+          data-nav-theme="light"
+          className="scroll-mt-20"
+        />
       </main>
     </>
   );

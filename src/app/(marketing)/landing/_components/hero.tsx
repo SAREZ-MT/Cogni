@@ -18,7 +18,9 @@ import {
   HERO_SENTENCE,
   latchProgress,
   outroProgress,
+  PIN_SETTLE_MS,
   settleProgress,
+  shouldCollapsePin,
   wordProgress,
 } from "./hero-timeline";
 
@@ -29,9 +31,9 @@ import {
 // arrive when the sentence completes. Everything is a function of the
 // track's scroll progress: scrolling up plays it backwards while it runs,
 // but once it completes it latches (one way, until reload), and when the
-// visitor scrolls past, the pin collapses to one viewport with a same-frame
-// scroll compensation, so scrolling back up never crawls through a frozen
-// pin. Reduced motion (landing.css): no pin, every element in its final state.
+// visitor scrolls past and the scroll settles, the pin collapses to one
+// viewport with a same-frame scroll compensation, so scrolling back up
+// never crawls through a frozen pin. Reduced motion (landing.css): no pin, every element in its final state.
 
 const SETTLED_SCALE = 0.6;
 const RISE_PX = 56;
@@ -40,39 +42,72 @@ const WORD_DIM = 0.2;
 
 export function Hero() {
   const trackRef = useRef<HTMLDivElement>(null);
-  const { scrollYProgress } = useScroll({
+  const { scrollY, scrollYProgress } = useScroll({
     target: trackRef,
     offset: ["start start", "end end"],
   });
   // The scene reads this latched value, never the raw scroll progress.
   const progress = useMotionValue(0);
   const collapsed = useRef(false);
+  const lastScrollAt = useRef(0);
+  const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // The collapse runs only once the scroll has settled (shouldCollapsePin):
+  // an instant scrollTo mid-flight would cancel a smooth anchor jump.
   const collapsePin = () => {
+    settleTimer.current = null;
     const track = trackRef.current;
     const stage = track?.firstElementChild;
-    if (collapsed.current || !track || !(stage instanceof HTMLElement)) return;
+    if (!track || !(stage instanceof HTMLElement)) return;
     const trackHeight = track.offsetHeight;
     const viewport = stage.offsetHeight;
-    // Only once the pin has released: the stage sits at the track's end.
-    if (trackHeight <= viewport) return;
-    if (track.getBoundingClientRect().bottom > viewport + 1) return;
+    const pinReleased =
+      trackHeight > viewport &&
+      track.getBoundingClientRect().bottom <= viewport + 1;
+    const idleMs = performance.now() - lastScrollAt.current;
+    const ready = shouldCollapsePin({
+      collapsed: collapsed.current,
+      progress: progress.get(),
+      raw: scrollYProgress.get(),
+      pinReleased,
+      idleMs,
+    });
+    if (!ready) {
+      // Timers and the frame clock can disagree by a fraction of a ms.
+      if (idleMs < PIN_SETTLE_MS) scheduleCollapse();
+      return;
+    }
     collapsed.current = true;
     const top = collapsedScrollY(window.scrollY, trackHeight, viewport);
     track.dataset.collapsed = "";
     window.scrollTo({ top, behavior: "instant" });
   };
 
+  const scheduleCollapse = () => {
+    if (collapsed.current) return;
+    if (settleTimer.current) clearTimeout(settleTimer.current);
+    settleTimer.current = setTimeout(collapsePin, PIN_SETTLE_MS);
+  };
+
   const follow = (raw: number) => {
     const next = latchProgress(progress.get(), raw);
     if (next !== progress.get()) progress.set(next);
-    if (next >= 1 && raw >= 1) collapsePin();
   };
   useMotionValueEvent(scrollYProgress, "change", follow);
+  // Every scroll event restarts the settle wait; past the track the raw
+  // progress is clamped at 1 and stops reporting, the page scroll does not.
+  useMotionValueEvent(scrollY, "change", () => {
+    lastScrollAt.current = performance.now();
+    if (progress.get() >= 1) scheduleCollapse();
+  });
   // A reload restored below the hero starts complete and collapsed.
   // biome-ignore lint/correctness/useExhaustiveDependencies: runs once on mount with the measured progress
   useEffect(() => {
     follow(scrollYProgress.get());
+    if (progress.get() >= 1) scheduleCollapse();
+    return () => {
+      if (settleTimer.current) clearTimeout(settleTimer.current);
+    };
   }, []);
 
   const headline = useTransform(progress, (p) => {
