@@ -12,6 +12,18 @@ import { Reveal } from "../../landing/_components/reveal";
 
 type Tone = "yellow" | "violet" | "mint" | "rose" | "companion" | "green";
 
+// One APA 7 reference: `italic` is the part APA sets in italics (the
+// journal and volume, or the book title); `before` and `after` surround it.
+// No DOIs or URLs: only fields checked against the publisher or an index.
+export type Reference = {
+  readonly before: string;
+  readonly italic: string;
+  readonly after: string;
+};
+
+export const referenceText = (reference: Reference) =>
+  `${reference.before}${reference.italic}${reference.after}`;
+
 export type Concept = {
   id: string;
   name: string;
@@ -19,7 +31,7 @@ export type Concept = {
   term: string;
   idea: string;
   inCogni: string;
-  source: string;
+  references: readonly Reference[];
   tone: Tone;
   visual: ReactNode;
 };
@@ -258,17 +270,23 @@ function ElaborationVisual() {
 
 // The six ideas of /ciencia (docs/landing/propuesta-contenido.md §10.1 and
 // the Pencil frame "Página · La ciencia detrás de Cogni"), in plain words,
-// each with what Cogni does with it and its source.
+// each with what Cogni does with it and the full references it rests on.
 export const CONCEPTS: readonly Concept[] = [
   {
     id: "practicar-recordando",
     name: "Practicar recordando",
     term: "Efecto de la prueba",
-    idea: "Intentar recordar fortalece la memoria más que volver a leer. En un experimento, una semana después, quienes se pusieron a prueba tres veces recordaron el 61 % del texto; quienes lo leyeron cuatro veces, el 40 %. Y quienes releyeron creían que recordarían mejor.",
+    idea: "Intentar recordar fortalece la memoria más que volver a leer. En un experimento, una semana después, quienes se pusieron a prueba tres veces recordaron el 61 % del texto; quienes lo leyeron cuatro veces, el 40 %. Y quienes releyeron creían que recordarían mejor.",
     inCogni:
       "Las tres técnicas te piden recordar antes de ver la respuesta. Ninguna te pide releer.",
-    source:
-      "Roediger, H. L., y Karpicke, J. D. (2006). Psychological Science, 17(3), 249–255.",
+    references: [
+      {
+        before:
+          "Roediger, H. L., III, y Karpicke, J. D. (2006). Test-enhanced learning: Taking memory tests improves long-term retention. ",
+        italic: "Psychological Science, 17",
+        after: "(3), 249–255.",
+      },
+    ],
     tone: "yellow",
     visual: <TestingVisual />,
   },
@@ -279,8 +297,20 @@ export const CONCEPTS: readonly Concept[] = [
     idea: "Repartir el estudio en varios días retiene más que concentrarlo en uno. Y el mejor espacio entre repasos crece cuanto más lejos está la prueba.",
     inCogni:
       "El algoritmo SM-2 pone cada fecha: si respondes bien, vuelve mañana, en 6 días y en unas dos semanas. Si te cuesta, vuelve pronto.",
-    source:
-      "Cepeda et al. (2006). Psychological Bulletin, 132(3), 354–380 · Cepeda et al. (2008). Psychological Science, 19(11), 1095–1102.",
+    references: [
+      {
+        before:
+          "Cepeda, N. J., Pashler, H., Vul, E., Wixted, J. T., y Rohrer, D. (2006). Distributed practice in verbal recall tasks: A review and quantitative synthesis. ",
+        italic: "Psychological Bulletin, 132",
+        after: "(3), 354–380.",
+      },
+      {
+        before:
+          "Cepeda, N. J., Vul, E., Rohrer, D., Wixted, J. T., y Pashler, H. (2008). Spacing effects in learning: A temporal ridgeline of optimal retention. ",
+        italic: "Psychological Science, 19",
+        after: "(11), 1095–1102.",
+      },
+    ],
     tone: "violet",
     visual: <SpacingVisual />,
   },
@@ -291,8 +321,20 @@ export const CONCEPTS: readonly Concept[] = [
     idea: "Sin repaso, lo nuevo se olvida rápido al principio y después más despacio. Ebbinghaus lo midió como el esfuerzo que ahorras al reaprender, no como un porcentaje recordado: por eso aquí solo importa la forma.",
     inCogni:
       "El primer repaso llega al día siguiente, justo donde la caída es más rápida.",
-    source:
-      "Ebbinghaus, H. (1885). Über das Gedächtnis · Murre, J. M. J., y Dros, J. (2015). PLOS ONE, 10(7), e0120644.",
+    references: [
+      {
+        before: "Ebbinghaus, H. (1885). ",
+        italic:
+          "Über das Gedächtnis: Untersuchungen zur experimentellen Psychologie",
+        after: ". Duncker & Humblot.",
+      },
+      {
+        before:
+          "Murre, J. M. J., y Dros, J. (2015). Replication and analysis of Ebbinghaus' forgetting curve. ",
+        italic: "PLOS ONE, 10",
+        after: "(7), e0120644.",
+      },
+    ],
     tone: "mint",
     visual: <ForgettingVisual />,
   },
@@ -303,8 +345,14 @@ export const CONCEPTS: readonly Concept[] = [
     idea: "Quien cree saber más de lo que sabe deja de estudiar antes de tiempo. Comparar tu respuesta con las ideas clave de la respuesta correcta afina esa sensación.",
     inCogni:
       "En recuperación activa, tu autoevaluación se compara con la evaluación según la rúbrica, y Cogni te avisa si te sentiste más o menos seguro de lo que mostraste.",
-    source:
-      "Dunlosky, J., y Rawson, K. A. (2012). Learning and Instruction, 22(4), 271–280.",
+    references: [
+      {
+        before:
+          "Dunlosky, J., y Rawson, K. A. (2012). Overconfidence produces underachievement: Inaccurate self evaluations undermine students' learning and retention. ",
+        italic: "Learning and Instruction, 22",
+        after: "(4), 271–280.",
+      },
+    ],
     tone: "rose",
     visual: <CalibrationVisual />,
   },
@@ -315,8 +363,20 @@ export const CONCEPTS: readonly Concept[] = [
     idea: "La retroalimentación ayuda más cuando dice dónde estás y qué sigue, no solo si acertaste. Y retiene mejor cuando llega después del intento.",
     inCogni:
       "Al cerrar un mazo o un examen ves primero tus fortalezas y luego oportunidades de mejora, con un siguiente paso.",
-    source:
-      "Hattie, J., y Timperley, H. (2007). Review of Educational Research, 77(1), 81–112 · Bjork, E. L., y Bjork, R. A. (2011).",
+    references: [
+      {
+        before: "Hattie, J., y Timperley, H. (2007). The power of feedback. ",
+        italic: "Review of Educational Research, 77",
+        after: "(1), 81–112.",
+      },
+      {
+        before:
+          "Bjork, E. L., y Bjork, R. A. (2011). Making things hard on yourself, but in a good way: Creating desirable difficulties to enhance learning. En M. A. Gernsbacher, R. W. Pew, L. M. Hough y J. R. Pomerantz (Eds.), ",
+        italic:
+          "Psychology and the real world: Essays illustrating fundamental contributions to society",
+        after: " (pp. 56–64). Worth Publishers.",
+      },
+    ],
     tone: "companion",
     visual: <FeedbackVisual />,
   },
@@ -327,8 +387,20 @@ export const CONCEPTS: readonly Concept[] = [
     idea: "Explicar una idea con tus propias palabras obliga a conectarla con lo que ya sabes, y eso mejora la comprensión.",
     inCogni:
       "Las preguntas abiertas traen una rúbrica: ves qué conceptos clave incluiste y cuáles conviene sumar.",
-    source:
-      "Chi, M. T. H., et al. (1994). Cognitive Science, 18(3), 439–477 · Dunlosky et al. (2013). PSPI, 14(1), 4–58.",
+    references: [
+      {
+        before:
+          "Chi, M. T. H., de Leeuw, N., Chiu, M.-H., y LaVancher, C. (1994). Eliciting self-explanations improves understanding. ",
+        italic: "Cognitive Science, 18",
+        after: "(3), 439–477.",
+      },
+      {
+        before:
+          "Dunlosky, J., Rawson, K. A., Marsh, E. J., Nathan, M. J., y Willingham, D. T. (2013). Improving students' learning with effective learning techniques: Promising directions from cognitive and educational psychology. ",
+        italic: "Psychological Science in the Public Interest, 14",
+        after: "(1), 4–58.",
+      },
+    ],
     tone: "green",
     visual: <ElaborationVisual />,
   },
@@ -361,7 +433,7 @@ export function ConceptIndex() {
 const IN_COGNI_ICON: LucideIcon = GraduationCap;
 
 // Six alternating blocks on paper and soft lilac: the visual on one side,
-// the idea, an "Así lo usa Cogni" box and the source on the other. The
+// the idea, an "Así lo usa Cogni" box and its APA 7 references on the other. The
 // visuals' bars and curve fill in on view, the page's one signature motion.
 export function ScienceConcepts() {
   return (
@@ -402,6 +474,21 @@ export function ScienceConcepts() {
                 <p className="mt-5 max-w-[60ch] text-(--lp-ink-2) text-[17px] leading-[1.6] md:text-[18px]">
                   {concept.idea}
                 </p>
+                <ul
+                  aria-label="Referencias"
+                  className="lp-sci-refs mt-5 flex flex-col gap-2 max-w-[60ch] border-(--lp-grid-strong) border-l-2 pl-3"
+                >
+                  {concept.references.map((reference) => (
+                    <li
+                      key={referenceText(reference)}
+                      className="text-(--lp-ink-3) text-[13px] leading-[1.5]"
+                    >
+                      {reference.before}
+                      <i>{reference.italic}</i>
+                      {reference.after}
+                    </li>
+                  ))}
+                </ul>
                 <div className="mt-6 flex gap-3 rounded-2xl bg-white p-[18px]">
                   <IN_COGNI_ICON
                     aria-hidden="true"
@@ -416,9 +503,6 @@ export function ScienceConcepts() {
                     </span>
                   </div>
                 </div>
-                <p className="mt-5 font-(family-name:--lp-font-mono) text-(--lp-muted) text-[11px] leading-[1.55]">
-                  {concept.source}
-                </p>
               </Reveal>
             </div>
           </section>

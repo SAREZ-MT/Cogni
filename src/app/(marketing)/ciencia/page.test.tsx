@@ -1,6 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { CONCEPTS } from "./_components/science-concepts";
+import { CONCEPTS, referenceText } from "./_components/science-concepts";
 import SciencePage, { metadata } from "./page";
 
 vi.mock("next/navigation", () => ({ usePathname: () => "/ciencia" }));
@@ -34,7 +34,7 @@ describe("/ciencia", () => {
     ).toHaveAttribute("href", "/landing");
   });
 
-  it("indexes the six ideas and gives each a section with Cogni's use and a source", () => {
+  it("indexes the six ideas and gives each a section with Cogni's use and its references", () => {
     render(<SciencePage />);
     expect(CONCEPTS).toHaveLength(6);
     const index = screen.getByRole("navigation", { name: "Las seis ideas" });
@@ -48,8 +48,32 @@ describe("/ciencia", () => {
       expect(section).toHaveAttribute("id", concept.id);
       expect(section).toHaveTextContent("Así lo usa Cogni");
       expect(section).toHaveTextContent(concept.inCogni);
-      expect(section).toHaveTextContent(concept.source);
+      const references = within(section).getByRole("list", {
+        name: "Referencias",
+      });
+      expect(
+        within(references)
+          .getAllByRole("listitem")
+          .map((item) => item.textContent),
+      ).toEqual(concept.references.map(referenceText));
     }
+  });
+
+  it("cites every source in full APA 7, with no pending markers", () => {
+    render(<SciencePage />);
+    const references = CONCEPTS.flatMap((concept) => concept.references);
+    expect(references).toHaveLength(10);
+    for (const reference of references) {
+      // Authors, (year), title, then the italic journal or book.
+      expect(referenceText(reference)).toMatch(
+        /^[^()]+ \((18|19|20)\d{2}\)\. .+\./,
+      );
+      expect(reference.italic.length).toBeGreaterThan(0);
+    }
+    expect(document.body).not.toHaveTextContent(/PENDIENTE|\[R\]|DOI|et al\./);
+    expect(
+      screen.getAllByText("Psychological Science, 17", { selector: "i" }),
+    ).toHaveLength(1);
   });
 
   it("uses the engine's real intervals and phrases feedback as strengths and improvement opportunities", () => {
