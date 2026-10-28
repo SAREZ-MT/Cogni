@@ -694,6 +694,19 @@
   outline-color: var(--lp-violet);
 }
 
+/* Inline text link: the underline draws in on hover (pointer devices). */
+.lp-link {
+  text-decoration-line: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.25em;
+  text-decoration-color: transparent;
+  transition: text-decoration-color 200ms ease;
+}
+@media (hover: hover) {
+  .lp-link:hover {
+    text-decoration-color: currentColor;
+  }
+}
 /* Press feedback for every pressable element on the landing. */
 .lp-press {
   transition: transform 160ms var(--lp-ease-out);

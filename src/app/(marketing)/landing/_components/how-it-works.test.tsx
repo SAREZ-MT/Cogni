@@ -20,7 +20,7 @@ describe("HowItWorks", () => {
   it("keeps the anchor and names the section with the full headline", () => {
     render(<HowItWorks />);
     const section = screen.getByRole("region", {
-      name: "Del apunte al repaso, en un minuto.",
+      name: "Del apunte al repaso, sin armar nada a mano.",
     });
     expect(section).toHaveAttribute("id", "como-funciona");
     expect(section).toHaveAttribute("data-nav-theme", "light");
@@ -34,13 +34,13 @@ describe("HowItWorks", () => {
     expect(accents[0]).toHaveTextContent("repaso");
   });
 
-  it("lists the three steps in order with their numbers", () => {
+  it("lists the three steps in order with their numbers and v2 lines", () => {
     render(<HowItWorks />);
     const items = within(screen.getByRole("list")).getAllByRole("listitem");
     expect(items.map((item) => item.textContent)).toEqual([
-      "01Sube tu apunte",
-      "02Cogni prepara tus técnicas",
-      "03Repasa cuando toca",
+      "01Sube tu apunteImporta tu documento o escribe directo en el editor.",
+      "02Cogni prepara tus técnicasTú eliges qué técnica generar, y sale solo de lo que dice tu página.",
+      "03Repasa cuando tocaCada respuesta fija tu próximo repaso. Tú solo abres Hoy.",
     ]);
     expect(HOW_IT_WORKS_STEPS).toHaveLength(3);
   });

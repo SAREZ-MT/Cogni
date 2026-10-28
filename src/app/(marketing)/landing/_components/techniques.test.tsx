@@ -96,6 +96,30 @@ describe("Techniques", () => {
     ]);
   });
 
+  it("introduces the techniques with the v2 line and links to the science page", () => {
+    render(<Techniques />);
+    const section = panel("Una técnica para cada momento.");
+    expect(section).toHaveTextContent(
+      "Reconocer, recordar y explicar: tres formas de ponerte a prueba, de menos a más exigente.",
+    );
+    expect(
+      within(section).getByRole("link", {
+        name: "La ciencia detrás de cada técnica",
+      }),
+    ).toHaveAttribute("href", "/ciencia");
+  });
+
+  it("uses the app's real flashcard grades and the exam retake rule", () => {
+    render(<Techniques />);
+    expect(panel("Flashcards")).toHaveTextContent(
+      "Calificas con Otra vez, Difícil, Bien o Fácil.",
+    );
+    expect(panel("Flashcards")).not.toHaveTextContent("No la sé");
+    expect(panel("Exámenes")).toHaveTextContent(
+      "Con menos de 70 %, la página queda para repetir.",
+    );
+  });
+
   it("drops the AI review panel", () => {
     render(<Techniques />);
     expect(document.body).not.toHaveTextContent("La IA prepara");
@@ -108,13 +132,13 @@ describe("Techniques", () => {
       "Cada sesión cierra con un siguiente paso.",
     );
     expect(region).toHaveTextContent(
-      "Un acompañante que te dice qué hiciste bien y qué sigue.",
+      "Al terminar un mazo o un examen, sabes en qué vas bien y qué reforzar.",
     );
     const points = within(region).getAllByRole("listitem");
     expect(points.map((point) => point.textContent)).toEqual([
-      "Primero, tus fortalezasAl terminar un examen, un mazo o una ronda de recuperación activa, ves lo que ya dominas.",
-      "Luego, oportunidades de mejoraPasos concretos sobre qué repasar, sin juicios ni etiquetas.",
-      "Tu dominio, en movimientoCada sesión actualiza tu dominio por página.",
+      "Primero, tus fortalezasLo que ya dominas, dicho con claridad.",
+      "Luego, oportunidades de mejoraQué repasar y en qué parte de tu página, sin juicios ni etiquetas.",
+      "En el examen, cada concepto explicadoLo que conviene reforzar, explicado con el texto de tu página.",
     ]);
     // Its visual is the companion's session summary.
     expect(region).toHaveTextContent("Así te fue en esta sesión");

@@ -36,7 +36,9 @@ const INK_BAND = {
   emphasis: "text-(--lp-ink)",
 } as const;
 
-const PILLARS: readonly Pillar[] = [
+// Approved v2 copy (docs/landing/propuesta-contenido.md §9). Review
+// intervals follow the engine (sm2.ts): 1 day, 6 days, then round(I·EF).
+export const PILLARS: readonly Pillar[] = [
   {
     id: "pilar-apuntes",
     number: "01",
@@ -58,8 +60,8 @@ const PILLARS: readonly Pillar[] = [
       },
       {
         icon: SquarePen,
-        title: "Un editor tipo Notion",
-        text: "Escribe con / para insertar bloques, resalta y arrastra sin pensar en el formato.",
+        title: "Un editor de bloques",
+        text: "Escribe / para insertar títulos, listas, tablas o código, sin pensar en el formato.",
       },
       {
         icon: NotebookTabs,
@@ -88,17 +90,17 @@ const PILLARS: readonly Pillar[] = [
       {
         icon: TrendingDown,
         title: "Sin repasar, la memoria cae",
-        text: "Más de la mitad de lo nuevo se pierde en pocos días si no vuelves a verlo.",
+        text: "Lo nuevo se olvida sobre todo en los primeros días si no vuelves a verlo.",
       },
       {
         icon: CalendarClock,
-        title: "Repasas justo antes de olvidar",
-        text: "Cogni programa cada repaso en +1, +3, +7 y +16 días, y ajusta según tus respuestas.",
+        title: "Cada acierto aleja el repaso",
+        text: "Si respondes bien, vuelve mañana, en 6 días y en unas dos semanas. Si te cuesta, vuelve pronto.",
       },
       {
         icon: Layers,
         title: "Un solo motor para todo",
-        text: "Flashcards, recuperación activa y exámenes alimentan el mismo plan.",
+        text: "Las tres técnicas escriben en el mismo plan, no solo las tarjetas.",
       },
     ],
     iconTone: "bg-(--lp-violet-100) text-(--lp-violet-deep)",
@@ -121,12 +123,12 @@ const PILLARS: readonly Pillar[] = [
       {
         icon: CalendarCheck,
         title: "Días de repaso, ya marcados",
-        text: "Cada técnica cae en su día según la repetición espaciada.",
+        text: "Cada repaso ya tiene su día. Tú no creas ningún evento.",
       },
       {
         icon: ListChecks,
         title: "La vista Hoy",
-        text: "Una sola lista con lo que te toca. Ni más, ni menos.",
+        text: "Una sola lista con lo que vence, primero lo que más esperó.",
       },
       {
         icon: Globe,
@@ -150,7 +152,7 @@ const PILLARS: readonly Pillar[] = [
       eyebrow: "text-(--lp-rose-950)",
       number: "text-(--lp-rose-950)",
     },
-    heading: "Tu progreso, en tres números que importan.",
+    heading: "Tu progreso, medido en lo que recuerdas.",
     points: [
       {
         icon: ListTodo,
@@ -160,12 +162,12 @@ const PILLARS: readonly Pillar[] = [
       {
         icon: Flame,
         title: "Tu racha",
-        text: "Los días seguidos en que cumpliste tu vista Hoy.",
+        text: "Días seguidos con al menos un repaso.",
       },
       {
         icon: Gauge,
-        title: "Dominio por técnica",
-        text: "Cuánto dominas tus páginas en flashcards, recuperación activa y exámenes.",
+        title: "Dominio por página",
+        text: "Qué páginas están listas, tu acierto por técnica y tu calibración.",
       },
     ],
     iconTone: "bg-(--lp-rose-100) text-(--lp-rose-700)",

@@ -152,7 +152,9 @@ export function ImportDemo() {
 const W = 700;
 const H = 260;
 const DAYS = 20;
-const REVIEWS = [1, 3, 7, 16] as const;
+// Days of the reviews SM-2 sets when every answer is "Bien" (sm2.ts):
+// tomorrow, +6, then about two weeks.
+const REVIEWS = [1, 6, 15] as const;
 // Stability grows with each review, so every drop is gentler than the last.
 const STABILITY = [1.5, 3.5, 8, 18, 40] as const;
 
@@ -231,7 +233,7 @@ export function CurveDemo() {
         viewBox={`-44 -14 ${W + 58} ${H + 62}`}
         className="w-full overflow-visible"
         role="img"
-        aria-label="Sin repasar, el recuerdo baja a cerca de la mitad en un día y sigue cayendo. Con repasos en los días 1, 3, 7 y 16, vuelve al máximo cada vez y cae cada vez más despacio."
+        aria-label="Sin repasar, el recuerdo cae sobre todo en los primeros días. Con repasos en los días 1, 6 y 15, vuelve al máximo cada vez y cae cada vez más despacio."
       >
         {[0, 0.25, 0.5, 0.75, 1].map((tick) => (
           <g key={tick}>
@@ -336,8 +338,8 @@ export function CurveDemo() {
         </span>
       </div>
       <p className="text-(--lp-muted) text-[12px] leading-normal">
-        Ilustración basada en la curva del olvido (Ebbinghaus, 1885). Valores
-        aproximados, no son datos de Cogni.
+        Curva ilustrativa: marca los repasos que calcula el motor cuando
+        respondes «Bien».
       </p>
     </div>
   );
@@ -597,7 +599,7 @@ export function ProgressDemo() {
           </div>
         </div>
         <div className="lp-shadow-window flex flex-1 flex-col gap-3.5 rounded-[20px] border border-(--lp-line) bg-white p-5">
-          <span className="text-(--lp-ink-3) text-sm">Dominio por técnica</span>
+          <span className="text-(--lp-ink-3) text-sm">Acierto por técnica</span>
           {MASTERY.map((item) => (
             <div key={item.label} className="flex flex-col gap-1.5">
               <span className="flex justify-between font-bold text-(--lp-ink) text-[13px]">

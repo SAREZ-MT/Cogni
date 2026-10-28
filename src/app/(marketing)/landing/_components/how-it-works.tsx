@@ -6,10 +6,21 @@ import { useRef } from "react";
 import { AsciiTexture } from "./ascii-texture";
 import { type HeadlineImage, HeadlineObject } from "./headline-object";
 
+// Approved v2 copy (docs/landing/propuesta-contenido.md §9): each step
+// only connects to the section that explains it in full.
 export const HOW_IT_WORKS_STEPS = [
-  "Sube tu apunte",
-  "Cogni prepara tus técnicas",
-  "Repasa cuando toca",
+  {
+    title: "Sube tu apunte",
+    text: "Importa tu documento o escribe directo en el editor.",
+  },
+  {
+    title: "Cogni prepara tus técnicas",
+    text: "Tú eliges qué técnica generar, y sale solo de lo que dice tu página.",
+  },
+  {
+    title: "Repasa cuando toca",
+    text: "Cada respuesta fija tu próximo repaso. Tú solo abres Hoy.",
+  },
 ] as const;
 
 const EASE_OUT = [0.22, 1, 0.36, 1] as const;
@@ -91,7 +102,7 @@ export function HowItWorks({ image }: { image?: HeadlineImage }) {
             </span>{" "}
             al <em className="lp-headline-accent">repaso</em>,{" "}
             <br className="hidden md:inline" />
-            en un minuto.
+            sin armar nada a mano.
           </motion.h2>
 
           <motion.div
@@ -121,7 +132,7 @@ export function HowItWorks({ image }: { image?: HeadlineImage }) {
           <ol className="mt-14 grid gap-9 md:mt-20 md:grid-cols-3 md:gap-10">
             {HOW_IT_WORKS_STEPS.map((step, index) => (
               <motion.li
-                key={step}
+                key={step.title}
                 {...RISE}
                 transition={{
                   duration: 0.5,
@@ -134,8 +145,11 @@ export function HowItWorks({ image }: { image?: HeadlineImage }) {
                   {String(index + 1).padStart(2, "0")}
                 </span>
                 <span className="mt-3 block font-(family-name:--lp-font-head) font-medium text-(--lp-ink) text-[22px] leading-[1.2] tracking-[-0.02em] md:text-[26px]">
-                  {step}
+                  {step.title}
                 </span>
+                <p className="mt-3 max-w-[34ch] text-(--lp-ink-2) text-[16px] leading-[1.55] md:text-[17px]">
+                  {step.text}
+                </p>
               </motion.li>
             ))}
           </ol>

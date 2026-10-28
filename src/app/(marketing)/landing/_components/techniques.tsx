@@ -8,6 +8,7 @@ import {
   useScroll,
   useTransform,
 } from "motion/react";
+import Link from "next/link";
 import { useId, useRef, useState } from "react";
 import { AsciiTexture } from "./ascii-texture";
 import { type HeadlineImage, HeadlineObject } from "./headline-object";
@@ -30,16 +31,21 @@ type Technique = {
   tone: Tone;
 };
 
+// Approved v2 copy (docs/landing/propuesta-contenido.md §9). Each idea has
+// one home on the page: "only from your page" lives in the FAQ, spaced
+// repetition in pillar 02, the session summary in the companion.
 export const TECHNIQUES: readonly Technique[] = [
   {
     key: "flashcards",
     name: "Flashcards",
     benefit:
-      "Una pregunta de un lado, la respuesta del otro. Repasas justo las tarjetas que más te cuestan.",
+      "Las tarjetas ya vienen hechas desde tu apunte. Tú solo las respondes.",
     points: [
-      { text: "Pregunta en el anverso, respuesta en el reverso." },
-      { text: "Calificas cada tarjeta: No la sé, Difícil, Bien o Fácil." },
-      { text: "Tu respuesta decide cuándo vuelve la tarjeta." },
+      { text: "De 3 a 20 tarjetas por generación." },
+      { text: "Calificas con Otra vez, Difícil, Bien o Fácil." },
+      {
+        text: "Puedes sumar las tuyas a mano o archivar las que no te sirvan.",
+      },
     ],
     tone: "yellow",
   },
@@ -47,11 +53,15 @@ export const TECHNIQUES: readonly Technique[] = [
     key: "recall",
     name: "Recuperación activa",
     benefit:
-      "Explicas una idea con tus palabras, sin mirar el apunte. Así sabes qué entendiste de verdad.",
+      "Explicas una idea con tus palabras y ves qué conceptos clave incluiste y cuáles conviene sumar.",
     points: [
-      { text: "Una pregunta abierta sobre el concepto clave." },
-      { text: "Respondes con tus palabras, sin mirar tu apunte." },
-      { text: "La envías cuando terminas de explicarla." },
+      { text: "Cada pregunta trae una rúbrica con los conceptos clave." },
+      {
+        text: "Tu autoevaluación y la de la IA se combinan: ninguna nota manda sola.",
+      },
+      {
+        text: "Si te sentiste más seguro de lo que mostraste, Cogni te lo señala.",
+      },
     ],
     tone: "mint",
   },
@@ -59,10 +69,13 @@ export const TECHNIQUES: readonly Technique[] = [
     key: "exams",
     name: "Exámenes",
     benefit:
-      "Preguntas de opción múltiple sobre tus páginas, para comprobar lo que dominas antes de la prueba.",
+      "Un examen que nunca se repite igual: lo que fallaste vuelve con otra redacción, para que practiques la idea y no la pregunta.",
     points: [
-      { text: "Opción múltiple sobre tus propias páginas." },
-      { text: "Avanzas pregunta a pregunta, con tu progreso a la vista." },
+      { text: "De 10 a 30 preguntas de opción múltiple." },
+      { text: "Con menos de 70 %, la página queda para repetir." },
+      {
+        text: "Antes de repetir, «Repasar contenido» te lleva a los conceptos que conviene reforzar.",
+      },
     ],
     tone: "red",
   },
@@ -73,19 +86,20 @@ export const TECHNIQUES: readonly Technique[] = [
     key: "companion",
     name: "Tu acompañante de estudio",
     lead: "Cada sesión cierra con un siguiente paso.",
-    benefit: "Un acompañante que te dice qué hiciste bien y qué sigue.",
+    benefit:
+      "Al terminar un mazo o un examen, sabes en qué vas bien y qué reforzar.",
     points: [
       {
         title: "Primero, tus fortalezas",
-        text: "Al terminar un examen, un mazo o una ronda de recuperación activa, ves lo que ya dominas.",
+        text: "Lo que ya dominas, dicho con claridad.",
       },
       {
         title: "Luego, oportunidades de mejora",
-        text: "Pasos concretos sobre qué repasar, sin juicios ni etiquetas.",
+        text: "Qué repasar y en qué parte de tu página, sin juicios ni etiquetas.",
       },
       {
-        title: "Tu dominio, en movimiento",
-        text: "Cada sesión actualiza tu dominio por página.",
+        title: "En el examen, cada concepto explicado",
+        text: "Lo que conviene reforzar, explicado con el texto de tu página.",
       },
     ],
     tone: "violet",
@@ -185,10 +199,19 @@ export function Techniques({
                   delay={0.14}
                   className="mt-6 flex flex-col gap-8 md:mt-10 md:flex-row md:items-end md:justify-between"
                 >
-                  <p className="max-w-[34ch] text-(--lp-ink-2) text-[18px] leading-[1.55] md:text-[20px]">
-                    Todas salen de tus propias páginas y comparten un mismo plan
-                    de repaso.
-                  </p>
+                  <div className="flex max-w-[40ch] flex-col items-start gap-4">
+                    <p className="text-(--lp-ink-2) text-[18px] leading-[1.55] md:text-[20px]">
+                      Reconocer, recordar y explicar: tres formas de ponerte a
+                      prueba, de menos a más exigente.
+                    </p>
+                    <Link
+                      href="/ciencia"
+                      className="lp-link inline-flex items-center gap-2 rounded-md font-(family-name:--lp-font-head) font-medium text-(--lp-violet-deep) text-[16px] md:text-[17px]"
+                    >
+                      La ciencia detrás de cada técnica
+                      <ArrowRight aria-hidden="true" className="size-4" />
+                    </Link>
+                  </div>
                   <span
                     aria-hidden="true"
                     className="lp-hcue hidden size-14 items-center justify-center rounded-full md:flex"
