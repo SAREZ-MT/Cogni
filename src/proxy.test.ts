@@ -99,8 +99,12 @@ describe("proxy redirects for signed-in users", () => {
     return new NextRequest(new URL(pathname, "http://localhost:3000"));
   }
 
-  it("sends a signed-in user from the landing to Inicio", async () => {
-    const response = await proxy(signedInRequest("/"));
+  it.each([
+    "/",
+    "/ciencia",
+    "/creditos",
+  ])("sends a signed-in user from the marketing page %s to Inicio", async (pathname) => {
+    const response = await proxy(signedInRequest(pathname));
 
     expect(response.headers.get("location")).toBe(
       "http://localhost:3000/inicio",
@@ -119,8 +123,12 @@ describe("proxy redirects for signed-in users", () => {
     );
   });
 
-  it("lets a signed-in user read the other public pages", async () => {
-    const response = await proxy(signedInRequest("/ciencia"));
+  it.each([
+    "/legal/terminos",
+    "/legal/privacidad",
+    "/terminos",
+  ])("lets a signed-in user read the legal page %s", async (pathname) => {
+    const response = await proxy(signedInRequest(pathname));
 
     expect(response.headers.get("location")).toBeNull();
   });

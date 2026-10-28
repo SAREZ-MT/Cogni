@@ -13,8 +13,8 @@ const AUTH_PATHS = new Set(["/login", "/register", "/forgot-password"]);
 // sign-up notice and the footer. The marketing landing at the domain root
 // is the public face of Cogni, with its science and credits pages. Unlike
 // AUTH_PATHS, signed-in users are not bounced from here, except from the
-// landing itself (LANDING_PATH). Exact paths only: a new public page must be
-// added here.
+// marketing pages (MARKETING_PATHS). Exact paths only: a new public page must
+// be added here.
 const OPEN_PATHS = new Set([
   "/terminos",
   "/",
@@ -26,9 +26,10 @@ const OPEN_PATHS = new Set([
   "/legal/derechos-de-autor",
 ]);
 
-// The landing is for visitors; a signed-in user asking for the domain root
-// wants the app, whose home is Inicio.
-const LANDING_PATH = "/";
+// The landing and its science and credits pages are for visitors: a
+// signed-in user always goes to the app, whose home is Inicio, until they
+// sign out. The legal pages stay readable while signed in.
+const MARKETING_PATHS = new Set(["/", "/ciencia", "/creditos"]);
 const HOME_PATH = "/inicio";
 
 export function isOpenPath(pathname: string): boolean {
@@ -109,7 +110,7 @@ export async function proxy(request: NextRequest) {
     redirect.headers.set("Content-Security-Policy", csp);
     return redirect;
   }
-  if (user && (isAuthPath || pathname === LANDING_PATH)) {
+  if (user && (isAuthPath || MARKETING_PATHS.has(pathname))) {
     const redirect = withCookies(new URL(HOME_PATH, request.url), response);
     redirect.headers.set("Content-Security-Policy", csp);
     return redirect;
