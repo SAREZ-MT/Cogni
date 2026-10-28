@@ -10,7 +10,7 @@
 > - Las reglas de tu institución están por encima de este código. Si tu docente o tu universidad prohíben usar IA en una actividad, no la uses.
 > - El material que genera Cogni es para practicar. No lo entregues como trabajo propio cuando no esté permitido.
 
-Este código forma parte de los [Términos y condiciones](terminos-y-condiciones.md).
+Este código forma parte de los [Términos y condiciones](/legal/terminos).
 
 ## 1. Propósito
 
@@ -41,4 +41,4 @@ Al usar Cogni te comprometes a:
 
 ## 5. Incumplimientos
 
-Presentar contenido generado por IA como hecho solo por una persona para engañar está prohibido por la [Política de uso aceptable y de IA](politica-de-uso-aceptable-e-ia.md) y por las políticas de los proveedores de IA. Si recibimos un reporte fundado de uso de Cogni para fraude académico, podemos aplicar las medidas de esa política. Las sanciones académicas corresponden a tu institución.
+Presentar contenido generado por IA como hecho solo por una persona para engañar está prohibido por la [Política de uso aceptable y de IA](/legal/uso-aceptable) y por las políticas de los proveedores de IA. Si recibimos un reporte fundado de uso de Cogni para fraude académico, podemos aplicar las medidas de esa política. Las sanciones académicas corresponden a tu institución.

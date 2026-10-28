@@ -16,14 +16,14 @@
 | Documento | Propósito | Público | Pie de página | Estado |
 |---|---|---|---|---|
 | [marco-legal.md](marco-legal.md) | Capítulo de tesis: normas aplicables y de referencia, análisis y conclusiones, con citas APA 7 | Jurado y lectores de la tesis | No | Revisado; puntos pendientes de verificación marcados |
-| [terminos-y-condiciones.md](terminos-y-condiciones.md) | Contrato de uso con las personas usuarias | Público | Sí | Borrador; reemplaza el texto de `terms-copy.ts` cuando se implemente |
-| [politica-de-tratamiento-de-datos.md](politica-de-tratamiento-de-datos.md) | Política exigida por la Ley 1581 de 2012 y el DUR 1074 de 2015 | Público | Sí | Borrador |
-| [aviso-de-privacidad.md](aviso-de-privacidad.md) | Aviso breve para mostrar junto a la autorización en el registro | Público | Sí (y en el registro) | Borrador |
-| [politica-de-cookies.md](politica-de-cookies.md) | Cookies y almacenamiento reales, categorías y cómo desactivarlos | Público | Sí | Borrador |
-| [politica-de-uso-aceptable-e-ia.md](politica-de-uso-aceptable-e-ia.md) | Usos prohibidos, políticas de los proveedores de IA incorporadas, aviso de transparencia, riesgos y atribuciones | Público | Sí | Borrador |
-| [codigo-de-integridad-academica.md](codigo-de-integridad-academica.md) | Reglas de uso honesto de la IA para estudiar | Público | Sí | Borrador |
-| [politica-de-derechos-de-autor.md](politica-de-derechos-de-autor.md) | Notificación y retiro, contranotificación e infractores reiterados | Público | Sí | Borrador |
-| [subencargados.md](subencargados.md) | Proveedores que tratan datos, país, rol y estado de su contrato | Público | Sí | Borrador; con contratos pendientes |
+| [terminos-y-condiciones.md](../../src/content/legal/terminos-y-condiciones.md) | Contrato de uso con las personas usuarias | Público | Sí | Borrador; reemplaza el texto de `terms-copy.ts` cuando se implemente |
+| [politica-de-tratamiento-de-datos.md](../../src/content/legal/politica-de-tratamiento-de-datos.md) | Política exigida por la Ley 1581 de 2012 y el DUR 1074 de 2015 | Público | Sí | Borrador |
+| [aviso-de-privacidad.md](../../src/content/legal/aviso-de-privacidad.md) | Aviso breve para mostrar junto a la autorización en el registro | Público | Sí (y en el registro) | Borrador |
+| [politica-de-cookies.md](../../src/content/legal/politica-de-cookies.md) | Cookies y almacenamiento reales, categorías y cómo desactivarlos | Público | Sí | Borrador |
+| [politica-de-uso-aceptable-e-ia.md](../../src/content/legal/politica-de-uso-aceptable-e-ia.md) | Usos prohibidos, políticas de los proveedores de IA incorporadas, aviso de transparencia, riesgos y atribuciones | Público | Sí | Borrador |
+| [codigo-de-integridad-academica.md](../../src/content/legal/codigo-de-integridad-academica.md) | Reglas de uso honesto de la IA para estudiar | Público | Sí | Borrador |
+| [politica-de-derechos-de-autor.md](../../src/content/legal/politica-de-derechos-de-autor.md) | Notificación y retiro, contranotificación e infractores reiterados | Público | Sí | Borrador |
+| [subencargados.md](../../src/content/legal/subencargados.md) | Proveedores que tratan datos, país, rol y estado de su contrato | Público | Sí | Borrador; con contratos pendientes |
 | [terminos-institucionales.md](terminos-institucionales.md) | Modelo para universidades y organizaciones, con anexo de tratamiento de datos | Instituciones | No (a solicitud) | Modelo para negociación |
 | [matriz-de-cumplimiento.md](matriz-de-cumplimiento.md) | Requisito, norma, estado, brecha, acción y prioridad, con seguimientos de código y operación | Interno | No | Vigente a la fecha de corte |
 

@@ -11,7 +11,7 @@
 > - La IA puede equivocarse, omitir información o reflejar sesgos. Verifica siempre el material generado.
 > - Lo que envías a la IA puede ser usado por algunos proveedores para mejorar sus productos. No incluyas datos sensibles, confidenciales ni de otras personas.
 
-Esta política forma parte de los [Términos y condiciones](terminos-y-condiciones.md).
+Esta política forma parte de los [Términos y condiciones](/legal/terminos).
 
 ## 1. Usos prohibidos
 
@@ -24,7 +24,7 @@ No puedes usar Cogni para:
 5. generar o subir contenido sexual que involucre a menores de edad, o contenido sexual no consentido;
 6. obtener instrucciones para fabricar armas, explosivos o sustancias peligrosas, o para causar daño a personas o a sistemas;
 7. crear o difundir desinformación, fraudes o suplantaciones;
-8. presentar el contenido generado por IA como hecho solo por una persona con el fin de engañar, incluido el fraude académico (véase el [Código de integridad académica](codigo-de-integridad-academica.md));
+8. presentar el contenido generado por IA como hecho solo por una persona con el fin de engañar, incluido el fraude académico (véase el [Código de integridad académica](/legal/uso-aceptable#integridad-academica));
 9. usar el material generado como base única de decisiones médicas, legales, financieras o de otro tipo profesional, o de decisiones automatizadas que afecten derechos de otras personas;
 10. intentar acceder sin permiso a cuentas, datos o sistemas, incluidos los de Cogni y sus proveedores; eludir los límites de uso; o introducir software malicioso;
 11. extraer de forma automatizada el contenido o las respuestas de los modelos, o usarlos para desarrollar modelos que compitan con los de los proveedores;
@@ -72,7 +72,7 @@ Cogni intenta los proveedores en orden y pasa al siguiente si uno no está dispo
 | Cloudflare Workers AI | `@cf/meta/llama-3.3-70b-instruct-fp8-fast` | Generación de material | Declara que no lo usa para entrenar modelos y que no conserva entradas ni salidas tras la solicitud |
 | OpenRouter | Modelos gratuitos de terceros (la lista puede cambiar) | Generación de material | Algunos proveedores a los que enruta pueden guardarlo o entrenar con él |
 
-Todos operan principalmente en Estados Unidos. La lista completa de proveedores está en la [lista de subencargados](subencargados.md).
+Todos operan principalmente en Estados Unidos. La lista completa de proveedores está en la [lista de subencargados](/legal/privacidad#subencargados).
 
 ### 3.4 Riesgos conocidos
 
@@ -89,7 +89,7 @@ Contrasta siempre el material con tus fuentes. Si encuentras un error, no estudi
 
 ### 3.5 Privacidad
 
-Como algunos proveedores pueden usar tu contenido para sus propios fines, **no incluyas datos personales sensibles, información confidencial ni datos personales de otras personas** en tus notas, documentos o respuestas. Más detalles en la [Política de tratamiento de datos personales](politica-de-tratamiento-de-datos.md).
+Como algunos proveedores pueden usar tu contenido para sus propios fines, **no incluyas datos personales sensibles, información confidencial ni datos personales de otras personas** en tus notas, documentos o respuestas. Más detalles en la [Política de tratamiento de datos personales](/legal/privacidad).
 
 ## 4. Atribuciones
 
@@ -101,6 +101,6 @@ Cogni no está afiliado a estos proveedores ni cuenta con su patrocinio.
 
 ## 5. Incumplimientos
 
-Si incumples esta política, según la gravedad podemos retirar el contenido afectado, limitar funciones o suspender o terminar tu cuenta, conforme a la sección 13 de los [Términos y condiciones](terminos-y-condiciones.md). Salvo urgencia, te avisaremos antes, te explicaremos el motivo y podrás responder.
+Si incumples esta política, según la gravedad podemos retirar el contenido afectado, limitar funciones o suspender o terminar tu cuenta, conforme a la sección 13 de los [Términos y condiciones](/legal/terminos). Salvo urgencia, te avisaremos antes, te explicaremos el motivo y podrás responder.
 
 Para reportar un uso indebido escribe a [PENDIENTE: correo de privacidad].

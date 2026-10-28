@@ -18,7 +18,7 @@
 
 1.2. Cogni concede a la Institución el derecho de dar acceso a la plataforma a los usuarios que ella designe ("Usuarios autorizados"), durante el plazo y en las condiciones del documento de contratación.
 
-1.3. Los [Términos y condiciones](terminos-y-condiciones.md), la [Política de uso aceptable y de IA](politica-de-uso-aceptable-e-ia.md) y el [Código de integridad académica](codigo-de-integridad-academica.md) se aplican a cada Usuario autorizado. Si contradicen estos términos en la relación entre Cogni y la Institución, prevalecen estos términos.
+1.3. Los [Términos y condiciones](../../src/content/legal/terminos-y-condiciones.md), la [Política de uso aceptable y de IA](../../src/content/legal/politica-de-uso-aceptable-e-ia.md) y el [Código de integridad académica](../../src/content/legal/codigo-de-integridad-academica.md) se aplican a cada Usuario autorizado. Si contradicen estos términos en la relación entre Cogni y la Institución, prevalecen estos términos.
 
 1.4. Orden de prelación: (1) el documento de contratación firmado; (2) el Anexo A de tratamiento de datos; (3) estos términos; (4) los documentos públicos de Cogni.
 
@@ -34,7 +34,7 @@
 
 3.1. **Institución Responsable.** Cuando la Institución decide las finalidades del tratamiento de los datos de sus Usuarios autorizados (por ejemplo, porque asigna las cuentas, define cursos o grupos, o accede a reportes de progreso), la Institución es la **Responsable del tratamiento** y Cogni actúa como **Encargado**, conforme al Anexo A.
 
-3.2. **Cogni Responsable.** Cuando un Usuario autorizado usa Cogni por su cuenta, sin que la Institución decida sobre sus datos, Cogni es el Responsable y se aplica la [Política de tratamiento de datos personales](politica-de-tratamiento-de-datos.md).
+3.2. **Cogni Responsable.** Cuando un Usuario autorizado usa Cogni por su cuenta, sin que la Institución decida sobre sus datos, Cogni es el Responsable y se aplica la [Política de tratamiento de datos personales](../../src/content/legal/politica-de-tratamiento-de-datos.md).
 
 3.3. La Institución debe obtener y conservar la autorización de sus Usuarios autorizados para el tratamiento que realice Cogni por su cuenta, e informarles las finalidades, los derechos y los proveedores de IA que se usarán.
 
@@ -79,7 +79,7 @@ La Institución se obliga a:
 
 ## 8. Propiedad intelectual
 
-8.1. Cada Usuario autorizado conserva la titularidad de su contenido, según los [Términos y condiciones](terminos-y-condiciones.md).
+8.1. Cada Usuario autorizado conserva la titularidad de su contenido, según los [Términos y condiciones](../../src/content/legal/terminos-y-condiciones.md).
 
 8.2. La Institución conserva la titularidad de los materiales que aporte. Concede a Cogni una licencia limitada, no exclusiva y revocable solo para operar el servicio para la Institución durante el contrato.
 
@@ -146,7 +146,7 @@ Cogni tratará los datos conforme a los principios del artículo 4 de la Ley 158
 
 ### A.4 Seguridad
 
-Cogni mantendrá, como mínimo, las medidas descritas en la sección 11 de la [Política de tratamiento de datos personales](politica-de-tratamiento-de-datos.md): seguridad a nivel de fila, almacenamiento privado por usuario, conexiones cifradas, cabeceras de seguridad y registro de errores sin datos personales por defecto.
+Cogni mantendrá, como mínimo, las medidas descritas en la sección 11 de la [Política de tratamiento de datos personales](../../src/content/legal/politica-de-tratamiento-de-datos.md): seguridad a nivel de fila, almacenamiento privado por usuario, conexiones cifradas, cabeceras de seguridad y registro de errores sin datos personales por defecto.
 
 ### A.5 Confidencialidad
 
@@ -174,4 +174,4 @@ Cogni pondrá a disposición de la Institución la información razonable necesa
 
 ### Apéndice A-1. Subencargados autorizados para el uso institucional
 
-[PENDIENTE: completar al definir la configuración institucional.] La lista debe partir de la [lista de subencargados](subencargados.md) y excluir a los proveedores de IA que usan el contenido para fines propios.
+[PENDIENTE: completar al definir la configuración institucional.] La lista debe partir de la [lista de subencargados](../../src/content/legal/subencargados.md) y excluir a los proveedores de IA que usan el contenido para fines propios.

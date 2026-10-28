@@ -54,7 +54,7 @@ Esta política cumple la Constitución Política (art. 15), la Ley Estatutaria 1
 | Límites de uso | Contadores asociados a tu identificador interno, sin dirección IP, que expiran entre una hora y cuarenta y ocho horas | El servicio |
 | Analítica de producto | Eventos asociados a tu identificador interno: registro, inicio de sesión, documento importado (número de páginas, formato, duración), generación solicitada y aceptación de términos; identificador del dispositivo guardado en una cookie y en el almacenamiento local | El servicio y tu navegador |
 | Errores | Informes técnicos de errores de la aplicación, configurados para no incluir datos personales por defecto | El servicio |
-| Cookies | Las descritas en la [Política de cookies](politica-de-cookies.md) | Tu navegador |
+| Cookies | Las descritas en la [Política de cookies](/legal/privacidad#cookies) | Tu navegador |
 
 No te pedimos nombre real, documento de identidad, fecha de nacimiento, teléfono ni datos sensibles.
 
@@ -88,7 +88,7 @@ Cogni es solo para personas de 18 años o más. No tratamos a sabiendas datos de
 
 ## 8. Autorización
 
-8.1. Te pedimos tu autorización previa, expresa e informada mediante una casilla que nunca viene marcada por defecto, antes de que uses las funciones de Cogni. Antes de marcarla puedes leer esta política y el [Aviso de privacidad](aviso-de-privacidad.md).
+8.1. Te pedimos tu autorización previa, expresa e informada mediante una casilla que nunca viene marcada por defecto, antes de que uses las funciones de Cogni. Antes de marcarla puedes leer esta política y el [Aviso de privacidad](/legal/privacidad#aviso-de-privacidad).
 
 8.2. La autorización incluye, de forma expresa, el envío de tu contenido a los proveedores de IA ubicados en Estados Unidos descritos en la sección 10, algunos de los cuales pueden usarlo para mejorar sus servicios.
 
@@ -121,7 +121,7 @@ Como titular tienes derecho a:
 | Groq | Generación y evaluación con IA; declara no entrenar con tu contenido | Estados Unidos |
 | Cloudflare Workers AI | Generación con IA; declara no entrenar con tu contenido ni conservarlo tras la solicitud | Estados Unidos y otras regiones |
 
-La lista completa, con el estado de los contratos, está en la [lista de subencargados](subencargados.md).
+La lista completa, con el estado de los contratos, está en la [lista de subencargados](/legal/privacidad#subencargados).
 
 10.2. **Transferencias a proveedores que usan los datos para sus fines.** Los siguientes proveedores pueden usar el contenido que reciben para fines propios, por lo que el envío es una transferencia que autorizas de forma expresa (sección 8.2):
 

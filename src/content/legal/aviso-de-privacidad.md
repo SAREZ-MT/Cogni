@@ -45,4 +45,4 @@ Escribe a [PENDIENTE: correo de privacidad]. Respondemos consultas en un máximo
 
 ## 7. Dónde consultar la política completa
 
-La [Política de tratamiento de datos personales](politica-de-tratamiento-de-datos.md) está disponible en [PENDIENTE: dominio]. Te informaremos por este mismo medio cualquier cambio sustancial en ella antes de aplicarlo.
+La [Política de tratamiento de datos personales](/legal/privacidad) está disponible en [PENDIENTE: dominio]. Te informaremos por este mismo medio cualquier cambio sustancial en ella antes de aplicarlo.

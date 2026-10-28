@@ -11,7 +11,7 @@
 > - Si retiramos tu contenido por un aviso y crees que es un error, puedes responder con una contranotificación.
 > - Terminamos las cuentas de quienes infringen derechos de forma reiterada.
 
-Esta política forma parte de los [Términos y condiciones](terminos-y-condiciones.md) y se basa en la Ley 23 de 1982, la Decisión Andina 351 de 1993 y la Ley 1915 de 2018.
+Esta política forma parte de los [Términos y condiciones](/legal/terminos) y se basa en la Ley 23 de 1982, la Decisión Andina 351 de 1993 y la Ley 1915 de 2018.
 
 ## 1. Cómo funciona el contenido en Cogni
 

@@ -57,4 +57,4 @@ Las extensiones que bloquean rastreadores también pueden impedir la analítica.
 
 ## 7. Más información
 
-El tratamiento de los datos que se obtienen con las cookies se rige por la [Política de tratamiento de datos personales](politica-de-tratamiento-de-datos.md). Si cambiamos las cookies que usamos, actualizaremos esta política.
+El tratamiento de los datos que se obtienen con las cookies se rige por la [Política de tratamiento de datos personales](/legal/privacidad). Si cambiamos las cookies que usamos, actualizaremos esta política.

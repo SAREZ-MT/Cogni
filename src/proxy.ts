@@ -9,10 +9,25 @@ import { buildSecurityHeaders } from "@/shared/config/security-headers";
 const AUTH_PATHS = new Set(["/login", "/register", "/forgot-password"]);
 // Always reachable, signed in or not: the terms of use are read before
 // signing up and are where the (app) gate sends accounts that still have to
-// accept them. The marketing landing is the public face of Cogni, with its
-// science and credits pages. Unlike AUTH_PATHS, signed-in users are not
-// bounced from here.
-const OPEN_PATHS = new Set(["/terminos", "/landing", "/ciencia", "/creditos"]);
+// accept them, and the public legal pages (/legal/*) are linked from the
+// sign-up notice and the footer. The marketing landing is the public face of
+// Cogni, with its science and credits pages. Unlike AUTH_PATHS, signed-in
+// users are not bounced from here. Exact paths only: a new public page must
+// be added here.
+const OPEN_PATHS = new Set([
+  "/terminos",
+  "/landing",
+  "/ciencia",
+  "/creditos",
+  "/legal/terminos",
+  "/legal/privacidad",
+  "/legal/uso-aceptable",
+  "/legal/derechos-de-autor",
+]);
+
+export function isOpenPath(pathname: string): boolean {
+  return OPEN_PATHS.has(pathname);
+}
 
 function bareHost(host: string): string {
   return host.replace(/^www\./, "");
@@ -81,9 +96,9 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isAuthPath = AUTH_PATHS.has(pathname);
   const isCallback = pathname.startsWith("/auth/");
-  const isOpenPath = OPEN_PATHS.has(pathname);
+  const openPath = isOpenPath(pathname);
 
-  if (!user && !isAuthPath && !isCallback && !isOpenPath) {
+  if (!user && !isAuthPath && !isCallback && !openPath) {
     const redirect = withCookies(new URL("/login", request.url), response);
     redirect.headers.set("Content-Security-Policy", csp);
     return redirect;

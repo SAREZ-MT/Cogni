@@ -25,9 +25,9 @@
 
 2.2. Guardamos la versión de los términos que aceptaste y la fecha de aceptación como prueba, de acuerdo con el artículo 48 de la Ley 1480 de 2011 y la Ley 527 de 1999.
 
-2.3. El tratamiento de tus datos personales se rige por la [Política de tratamiento de datos personales](politica-de-tratamiento-de-datos.md), que tiene su propia autorización.
+2.3. El tratamiento de tus datos personales se rige por la [Política de tratamiento de datos personales](/legal/privacidad), que tiene su propia autorización.
 
-2.4. Estos términos incorporan la [Política de uso aceptable y de IA](politica-de-uso-aceptable-e-ia.md), el [Código de integridad académica](codigo-de-integridad-academica.md) y la [Política de derechos de autor](politica-de-derechos-de-autor.md).
+2.4. Estos términos incorporan la [Política de uso aceptable y de IA](/legal/uso-aceptable), el [Código de integridad académica](/legal/uso-aceptable#integridad-academica) y la [Política de derechos de autor](/legal/derechos-de-autor).
 
 ## 3. Requisitos para usar Cogni
 
@@ -85,7 +85,7 @@
 
 No enviamos tu correo, tu nombre ni tu identificador de cuenta en las instrucciones al modelo.
 
-7.2. **Proveedores.** Usamos, según disponibilidad, Groq, Google Gemini, Cloudflare Workers AI y OpenRouter, todos en su nivel gratuito. La lista actualizada, con el país y el uso que cada uno hace de los datos, está en la [lista de subencargados](subencargados.md) y en la [Política de uso aceptable y de IA](politica-de-uso-aceptable-e-ia.md).
+7.2. **Proveedores.** Usamos, según disponibilidad, Groq, Google Gemini, Cloudflare Workers AI y OpenRouter, todos en su nivel gratuito. La lista actualizada, con el país y el uso que cada uno hace de los datos, está en la [lista de subencargados](/legal/privacidad#subencargados) y en la [Política de uso aceptable y de IA](/legal/uso-aceptable).
 
 7.3. **Uso por los proveedores.** En el nivel gratuito, Google Gemini usa el contenido que recibe para prestar, mejorar y desarrollar sus productos, y personas de Google pueden revisarlo. Algunos proveedores a los que enruta OpenRouter pueden guardar o entrenar con el contenido. Groq y Cloudflare declaran que no lo usan para entrenar modelos.
 
@@ -95,13 +95,13 @@ No enviamos tu correo, tu nombre ni tu identificador de cuenta en las instruccio
 
 ## 8. Uso aceptable e integridad académica
 
-8.1. Debes usar Cogni conforme a la ley, a estos términos, a la [Política de uso aceptable y de IA](politica-de-uso-aceptable-e-ia.md) y a las políticas de los proveedores de IA que esa política incorpora.
+8.1. Debes usar Cogni conforme a la ley, a estos términos, a la [Política de uso aceptable y de IA](/legal/uso-aceptable) y a las políticas de los proveedores de IA que esa política incorpora.
 
-8.2. Cogni es para estudiar. No presentes el material generado como trabajo propio cuando las reglas de tu institución lo prohíban. Consulta el [Código de integridad académica](codigo-de-integridad-academica.md).
+8.2. Cogni es para estudiar. No presentes el material generado como trabajo propio cuando las reglas de tu institución lo prohíban. Consulta el [Código de integridad académica](/legal/uso-aceptable#integridad-academica).
 
 ## 9. Derechos de autor de terceros
 
-9.1. Respetamos los derechos de autor. Si crees que un contenido en Cogni infringe tus derechos, sigue el procedimiento de la [Política de derechos de autor](politica-de-derechos-de-autor.md).
+9.1. Respetamos los derechos de autor. Si crees que un contenido en Cogni infringe tus derechos, sigue el procedimiento de la [Política de derechos de autor](/legal/derechos-de-autor).
 
 9.2. Podemos retirar contenido infractor y terminar las cuentas de quienes infrinjan derechos de forma reiterada, según esa política.
 
@@ -135,7 +135,7 @@ No enviamos tu correo, tu nombre ni tu identificador de cuenta en las instruccio
 
 ## 13. Terminación
 
-13.1. **Por tu parte.** Puedes dejar de usar Cogni cuando quieras. Para eliminar tu cuenta y tus datos, escríbenos a [PENDIENTE: correo de privacidad] desde el correo de tu cuenta. La eliminamos, junto con tu contenido y los archivos que importaste, dentro de los plazos de la [Política de tratamiento de datos personales](politica-de-tratamiento-de-datos.md).
+13.1. **Por tu parte.** Puedes dejar de usar Cogni cuando quieras. Para eliminar tu cuenta y tus datos, escríbenos a [PENDIENTE: correo de privacidad] desde el correo de tu cuenta. La eliminamos, junto con tu contenido y los archivos que importaste, dentro de los plazos de la [Política de tratamiento de datos personales](/legal/privacidad).
 
 13.2. **Por nuestra parte.** Podemos suspender o terminar tu cuenta si incumples gravemente estos términos, la ley o la Política de uso aceptable y de IA, o si infringes derechos de autor de forma reiterada. Salvo en casos urgentes (por ejemplo, riesgo para otras personas, para el servicio o una orden de autoridad), te avisaremos antes, te explicaremos el motivo y te daremos la oportunidad de responder y de pedir una copia de tu contenido.
 
@@ -143,7 +143,7 @@ No enviamos tu correo, tu nombre ni tu identificador de cuenta en las instruccio
 
 ## 14. Datos personales
 
-El tratamiento de tus datos se rige por la [Política de tratamiento de datos personales](politica-de-tratamiento-de-datos.md), el [Aviso de privacidad](aviso-de-privacidad.md) y la [Política de cookies](politica-de-cookies.md).
+El tratamiento de tus datos se rige por la [Política de tratamiento de datos personales](/legal/privacidad), el [Aviso de privacidad](/legal/privacidad#aviso-de-privacidad) y la [Política de cookies](/legal/privacidad#cookies).
 
 ## 15. Cambios en estos términos
 
