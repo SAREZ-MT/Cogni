@@ -89,6 +89,11 @@
   --lp-blue-100: #dbeafe;
   --lp-orange-100: #ffedd5;
 
+  /* Comparación honesta (Pencil "Landing · Contenido propuesto v2"): the
+     generas-tus-técnicas chip ink and the sticky note of the usual way. */
+  --lp-amber-700: #b45309;
+  --lp-yellow-200: #fde68a;
+
   --lp-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
 
   --lp-font-display: var(--font-instrument-serif), Georgia, serif;
@@ -694,6 +699,144 @@
   outline-color: var(--lp-violet);
 }
 
+/*
+ * Comparación honesta (comparison.tsx): the usual way on a warm paper step,
+ * the Cogni way on white, its route rail drawn in the step tones.
+ */
+.lp-way-usual {
+  background: var(--lp-paper-2);
+}
+.lp-way-cogni {
+  box-shadow: 0 24px 50px rgb(76 29 149 / 0.08);
+}
+.lp-pile-file {
+  box-shadow: 0 6px 16px rgb(26 16 51 / 0.06);
+}
+.lp-pile-note {
+  color: var(--lp-amber-800);
+  background: var(--lp-yellow-200);
+  box-shadow: 0 10px 24px -10px rgb(146 64 14 / 0.35);
+}
+.lp-route-step[data-tone="violet"] {
+  --route-soft: var(--lp-violet-100);
+  --route-ink: var(--lp-violet);
+}
+.lp-route-step[data-tone="yellow"] {
+  --route-soft: var(--lp-yellow-100);
+  --route-ink: var(--lp-amber-700);
+}
+.lp-route-step[data-tone="mint"] {
+  --route-soft: var(--lp-mint-100);
+  --route-ink: var(--lp-green-700);
+}
+.lp-route-step[data-tone="companion"] {
+  --route-soft: var(--lp-violet-100);
+  --route-ink: var(--lp-violet-800);
+}
+.lp-route-step[data-tone="rose"] {
+  --route-soft: var(--lp-rose-100);
+  --route-ink: var(--lp-rose-700);
+}
+.lp-route-node,
+.lp-route-chip {
+  color: var(--route-ink);
+  background: var(--route-soft);
+}
+.lp-route-line {
+  background: var(--lp-violet-200);
+  transform-origin: 50% 0;
+}
+
+/*
+ * Preguntas frecuentes (faq.tsx): the paper eases into the lilac at the
+ * top edge so the seam never shows; answers open on a grid-row track.
+ */
+.lp-faq {
+  background: linear-gradient(
+    in oklab to bottom,
+    var(--lp-paper) 0,
+    var(--lp-lilac) 120px
+  );
+}
+.lp-faq-field {
+  --ascii-ink: var(--lp-violet-800);
+  --ascii-ink-paper: var(--lp-violet-800);
+  --ascii-alpha: 0.06;
+  position: absolute;
+  inset: -40px -20px;
+  pointer-events: none;
+  mask-image: radial-gradient(70% 60% at 30% 40%, #000 0%, transparent 100%);
+}
+.lp-headline-compact {
+  font-size: clamp(44px, 5.4vw, 80px);
+}
+.lp-faq-item {
+  border-bottom: 1px solid rgb(26 16 51 / 0.12);
+}
+.lp-faq-icon {
+  transition: transform 240ms var(--lp-ease-out);
+}
+.lp-faq-button[aria-expanded="true"] .lp-faq-icon {
+  transform: rotate(45deg);
+}
+.lp-faq-panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 280ms var(--lp-ease-out);
+}
+.lp-faq-panel[data-open] {
+  grid-template-rows: 1fr;
+}
+@media (hover: hover) {
+  .lp-faq-button:hover .lp-faq-icon {
+    background: var(--lp-violet-100);
+  }
+}
+
+/*
+ * Empieza hoy (closing.tsx): the lilac sinks back into the hero's night,
+ * the dusk band in reverse, so the page closes where it opened.
+ */
+.lp-closing {
+  --ascii-ink: var(--lp-violet-300);
+  --ascii-ink-paper: var(--lp-violet-800);
+  --ascii-alpha: 0.14;
+  background: linear-gradient(
+    in oklab to bottom,
+    var(--lp-lilac) 0%,
+    color-mix(in oklab, var(--lp-violet-400) 70%, var(--lp-violet-800)) 22%,
+    color-mix(in oklab, var(--lp-violet-800) 40%, var(--lp-ground)) 45%,
+    var(--lp-ground) 70%,
+    var(--lp-night) 100%
+  );
+}
+.lp-accent-yellow {
+  color: var(--lp-yellow);
+}
+
+/* Shared footer (_components/site-footer.tsx). */
+.lp-footer-title {
+  font-family: var(--lp-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--lp-night-ink-3);
+}
+.lp-footer-link {
+  color: var(--lp-night-ink-2);
+  transition:
+    color 200ms ease,
+    text-decoration-color 200ms ease;
+}
+@media (hover: hover) {
+  .lp-footer-link:hover {
+    color: var(--lp-night-ink);
+  }
+}
+.lp-footer-base {
+  border-top: 1px solid rgb(255 255 255 / 0.1);
+}
+
 /* Inline text link: the underline draws in on hover (pointer devices). */
 .lp-link {
   text-decoration-line: underline;
@@ -839,6 +982,15 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .lp-faq-icon,
+  .lp-faq-panel {
+    transition: none;
+  }
+  /* The closing headline shows sharp: no blur settles into it. */
+  .lp-closing h2 {
+    /* biome-ignore lint/complexity/noImportantStyles: only !important beats the inline style Motion writes */
+    filter: none !important;
+  }
   .lp-press:active {
     transform: none;
   }

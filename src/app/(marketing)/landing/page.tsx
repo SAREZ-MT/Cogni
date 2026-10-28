@@ -1,4 +1,8 @@
 import type { Metadata } from "next";
+import { SiteFooter } from "../_components/site-footer";
+import { Closing } from "./_components/closing";
+import { Comparison } from "./_components/comparison";
+import { Faq } from "./_components/faq";
 import { Hero } from "./_components/hero";
 import { HowItWorks } from "./_components/how-it-works";
 import { LandingNav } from "./_components/landing-nav";
@@ -11,9 +15,9 @@ export const metadata: Metadata = {
     "Cogni convierte tus apuntes en flashcards, exámenes y preguntas de recuperación activa, y te dice qué repasar cada día.",
 };
 
-// Public landing (proxy OPEN_PATHS). Sections follow the Pencil frame
-// "Landing · Prototipo v1"; the empty ones are filled by later tasks and
-// exist now so the nav anchors resolve.
+// Public landing (proxy OPEN_PATHS). Sections follow the Pencil frames
+// "Landing · Prototipo v1" and "Landing · Contenido propuesto v2" (the
+// comparison, the questions, the closing and the footer).
 export default function LandingPage() {
   return (
     <>
@@ -28,14 +32,11 @@ export default function LandingPage() {
         <div data-nav-theme="light">
           <Pillars />
         </div>
-        {/* T3: science, curve, comparison, receipt, FAQ, closing, footer. */}
-        <section id="ciencia" data-nav-theme="light" className="scroll-mt-20" />
-        <section
-          id="preguntas"
-          data-nav-theme="light"
-          className="scroll-mt-20"
-        />
+        <Comparison />
+        <Faq />
+        <Closing />
       </main>
+      <SiteFooter />
     </>
   );
 }

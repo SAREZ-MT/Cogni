@@ -10,11 +10,13 @@ import {
   resolveNavTheme,
 } from "./nav-theme";
 
-const LINKS = [
-  { href: "#como-funciona", label: "Cómo funciona" },
-  { href: "#tecnicas", label: "Técnicas" },
-  { href: "#ciencia", label: "Ciencia" },
-  { href: "#preguntas", label: "Preguntas" },
+// Written with the path so the same nav works on /ciencia, /creditos and
+// the legal pages; on /landing the browser keeps it an in-page jump.
+export const NAV_LINKS = [
+  { href: "/landing#como-funciona", label: "Cómo funciona" },
+  { href: "/landing#tecnicas", label: "Técnicas" },
+  { href: "/landing#comparacion", label: "Comparación" },
+  { href: "/landing#preguntas", label: "Preguntas" },
 ] as const;
 
 const SOLID_AFTER = 24;
@@ -96,7 +98,7 @@ export function LandingNav() {
             cogni
           </Link>
           <ul className="hidden items-center gap-9 lg:flex">
-            {LINKS.map((link) => (
+            {NAV_LINKS.map((link) => (
               <li key={link.href}>
                 <a
                   href={link.href}

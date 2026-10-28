@@ -186,6 +186,7 @@ export function Pillars() {
           key={pillar.id}
           id={pillar.id}
           aria-labelledby={`${pillar.id}-title`}
+          className="scroll-mt-16"
         >
           <PillarBand
             number={pillar.number}

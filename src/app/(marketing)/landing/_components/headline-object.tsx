@@ -1,6 +1,7 @@
 "use client";
 
 import { Cards } from "@phosphor-icons/react/dist/csr/Cards";
+import { Exam } from "@phosphor-icons/react/dist/csr/Exam";
 import { Notebook } from "@phosphor-icons/react/dist/csr/Notebook";
 import Image from "next/image";
 import { useEffect, useRef } from "react";
@@ -10,7 +11,7 @@ export type HeadlineImage = { src: string; alt: string };
 
 // The study object each section's placeholder stands for, kept as a name
 // so the prop stays serialisable.
-const GLYPHS = { notebook: Notebook, cards: Cards } as const;
+const GLYPHS = { notebook: Notebook, cards: Cards, exam: Exam } as const;
 export type HeadlineGlyph = keyof typeof GLYPHS;
 
 // The tile's colour, from the platform technique palette, so the objects
@@ -30,7 +31,8 @@ const DITHER_PX = 36;
 // TODO(higgsfield): generate each section's dithered or grainy 3D study
 // object with Higgsfield (square, transparent background, about 480×480)
 // and save it under public/landing/: how-it-works-object.webp (a notebook)
-// and techniques-object.webp (a fanned stack of cards). Then pass
+// techniques-object.webp (a fanned stack of cards) and
+// comparison-object.webp (an exam sheet). Then pass
 // image={{ src: "/landing/<name>.webp", alt: "" }} to the section. Until
 // then a dithered tile in the section's tone with the matching glyph holds
 // the exact size and position.
