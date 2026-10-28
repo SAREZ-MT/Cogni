@@ -2,7 +2,8 @@ import { expect, hasSupabaseEnv, signIn, test } from "./fixtures/auth";
 
 // landing-v1 T5: the landing is the domain root. An anonymous visitor on /
 // reads it; a signed-in visitor asking for / is sent to Inicio (/inicio) by
-// the proxy, and the old /landing address redirects permanently to /.
+// the proxy, and the old /landing address redirects permanently to /. A
+// signed-in visitor may still read /ciencia, whose nav offers "Ir a la app".
 test.describe("landing at the domain root", () => {
   test("an anonymous visitor on / sees the landing", async ({ page }) => {
     await page.goto("/");
@@ -34,6 +35,24 @@ test.describe("landing at the domain root", () => {
 
       await expect(page).toHaveURL("/inicio");
       await expect(page.getByTestId("content-area")).toBeVisible();
+    });
+
+    test("a signed-in visitor on /ciencia stays there with Ir a la app", async ({
+      page,
+      verifiedUser,
+    }) => {
+      await signIn(page, verifiedUser);
+
+      await page.goto("/ciencia");
+
+      await expect(page).toHaveURL("/ciencia");
+      const nav = page.getByRole("navigation", { name: "Principal" });
+      await expect(
+        nav.getByRole("link", { name: "Ir a la app" }),
+      ).toHaveAttribute("href", "/inicio");
+      await expect(
+        nav.getByRole("link", { name: "Cómo funciona" }),
+      ).toHaveCount(0);
     });
   });
 });

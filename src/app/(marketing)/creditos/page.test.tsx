@@ -1,7 +1,16 @@
 import { render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { CREDIT_GROUPS } from "./_components/credits-list";
 import CreditsPage, { metadata } from "./page";
+
+// The page reads the session to pick the nav; anonymous unless a test signs
+// a user in.
+const session = vi.hoisted(() => ({
+  user: null as { id: string; email: string | null } | null,
+}));
+vi.mock("@/modules/identity", () => ({
+  getCurrentUser: vi.fn(async () => session.user),
+}));
 
 globalThis.IntersectionObserver ??= class {
   observe() {}
@@ -13,20 +22,20 @@ globalThis.IntersectionObserver ??= class {
 } as unknown as typeof IntersectionObserver;
 
 describe("/creditos", () => {
-  it("has its own title and description", () => {
+  it("has its own title and description", async () => {
     expect(metadata.title).toBe("Créditos · Cogni");
     expect(metadata.description).toBeTruthy();
   });
 
-  it("opens with one h1 and a single serif italic keyword", () => {
-    render(<CreditsPage />);
+  it("opens with one h1 and a single serif italic keyword", async () => {
+    render(await CreditsPage());
     const heading = screen.getByRole("heading", { level: 1 });
     expect(heading).toHaveTextContent("Hecho con ayuda.");
     expect(heading.querySelectorAll("em")).toHaveLength(1);
   });
 
-  it("credits the illustrations, every landing font and both icon sets", () => {
-    render(<CreditsPage />);
+  it("credits the illustrations, every landing font and both icon sets", async () => {
+    render(await CreditsPage());
     expect(CREDIT_GROUPS.map((group) => group.title)).toEqual([
       "Ilustraciones",
       "Tipografías",
@@ -50,8 +59,8 @@ describe("/creditos", () => {
     expect(icons).toHaveTextContent("Licencia MIT");
   });
 
-  it("marks the open Magnific details as visibly pending", () => {
-    render(<CreditsPage />);
+  it("marks the open Magnific details as visibly pending", async () => {
+    render(await CreditsPage());
     const illustrations = screen.getByRole("region", { name: "Ilustraciones" });
     expect(illustrations).toHaveTextContent("Designed by Magnific");
     const pending = Array.from(
@@ -63,5 +72,28 @@ describe("/creditos", () => {
       "PENDIENTE: enlace a Magnific",
     ]);
     expect(within(illustrations).queryByRole("link")).toBeNull();
+  });
+
+  it("shows visitors the landing section links in the nav", async () => {
+    session.user = null;
+    render(await CreditsPage());
+    const nav = screen.getByRole("navigation", { name: "Principal" });
+    expect(
+      within(nav).getByRole("link", { name: "Cómo funciona" }),
+    ).toHaveAttribute("href", "/#como-funciona");
+    expect(within(nav).queryByRole("link", { name: "Ir a la app" })).toBeNull();
+  });
+
+  it("gives a signed-in user an Ir a la app button instead of the section links", async () => {
+    session.user = { id: "u1", email: "a@b.test" };
+    render(await CreditsPage());
+    const nav = screen.getByRole("navigation", { name: "Principal" });
+    expect(
+      within(nav).getByRole("link", { name: "Ir a la app" }),
+    ).toHaveAttribute("href", "/inicio");
+    expect(
+      within(nav).queryByRole("link", { name: "Cómo funciona" }),
+    ).toBeNull();
+    session.user = null;
   });
 });

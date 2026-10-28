@@ -24,12 +24,14 @@ const SOLID_AFTER = 24;
 const PROBE_Y = 32;
 
 // Plain bar fixed at the top at all times: wordmark, four in-page links,
-// one action. It is transparent over the very top of the hero and turns
+// one action. A signed-in user (/ciencia, /creditos) gets only "Ir a la app"
+// instead: the section links point at the landing, which the proxy sends a
+// signed-in user away from. It is transparent over the very top of the hero and turns
 // into a translucent surface after a little scroll. Its colour scheme
 // follows the section under it (data-nav-theme), light-on-dark over the
 // night scenes and dark-on-light over the paper ones; the colours cross-fade
 // in CSS (.lp-nav), instantly under reduced motion.
-export function LandingNav() {
+export function LandingNav({ signedIn = false }: { signedIn?: boolean }) {
   const { scrollY } = useScroll();
   const [solid, setSolid] = useState(false);
   const [theme, setTheme] = useState<NavTheme>("dark");
@@ -97,32 +99,43 @@ export function LandingNav() {
           >
             cogni
           </Link>
-          <ul className="hidden items-center gap-9 lg:flex">
-            {NAV_LINKS.map((link) => (
-              <li key={link.href}>
-                <a
-                  href={link.href}
-                  className="lp-nav-link rounded-md font-medium text-[14px]"
-                >
-                  {link.label}
-                </a>
-              </li>
-            ))}
-          </ul>
-          <div className="flex items-center gap-5">
+          {signedIn ? (
             <Link
-              href="/login"
-              className="lp-nav-ink hidden rounded-md font-medium text-[14px] sm:inline"
-            >
-              Iniciar sesión
-            </Link>
-            <Link
-              href="/register"
+              href="/inicio"
               className="lp-press lp-cta-primary rounded-full px-4 py-2 font-bold text-[14px]"
             >
-              Empieza gratis
+              Ir a la app
             </Link>
-          </div>
+          ) : (
+            <>
+              <ul className="hidden items-center gap-9 lg:flex">
+                {NAV_LINKS.map((link) => (
+                  <li key={link.href}>
+                    <a
+                      href={link.href}
+                      className="lp-nav-link rounded-md font-medium text-[14px]"
+                    >
+                      {link.label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+              <div className="flex items-center gap-5">
+                <Link
+                  href="/login"
+                  className="lp-nav-ink hidden rounded-md font-medium text-[14px] sm:inline"
+                >
+                  Iniciar sesión
+                </Link>
+                <Link
+                  href="/register"
+                  className="lp-press lp-cta-primary rounded-full px-4 py-2 font-bold text-[14px]"
+                >
+                  Empieza gratis
+                </Link>
+              </div>
+            </>
+          )}
         </div>
       </nav>
     </header>

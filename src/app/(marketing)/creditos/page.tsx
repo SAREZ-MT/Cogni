@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { getCurrentUser } from "@/modules/identity";
 import { PageHeader } from "../_components/page-header";
 import { SiteFooter } from "../_components/site-footer";
 import { LandingNav } from "../landing/_components/landing-nav";
@@ -13,10 +14,13 @@ export const metadata: Metadata = {
 // Public page (proxy OPEN_PATHS), Pencil frame "Página · Créditos"
 // (docs/landing/propuesta-contenido.md §10.2). "ayuda" is the italic
 // keyword: the page thanks the work it is built with.
-export default function CreditsPage() {
+// A signed-in user may read it too (the proxy only bounces them from /);
+// the nav then offers "Ir a la app" instead of the landing section links.
+export default async function CreditsPage() {
+  const signedIn = (await getCurrentUser()) !== null;
   return (
     <>
-      <LandingNav />
+      <LandingNav signedIn={signedIn} />
       <main>
         <PageHeader
           label="Créditos"

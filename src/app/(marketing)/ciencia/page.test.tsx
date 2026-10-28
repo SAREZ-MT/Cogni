@@ -5,6 +5,15 @@ import SciencePage, { metadata } from "./page";
 
 vi.mock("next/navigation", () => ({ usePathname: () => "/ciencia" }));
 
+// The page reads the session to pick the nav; anonymous unless a test signs
+// a user in.
+const session = vi.hoisted(() => ({
+  user: null as { id: string; email: string | null } | null,
+}));
+vi.mock("@/modules/identity", () => ({
+  getCurrentUser: vi.fn(async () => session.user),
+}));
+
 globalThis.IntersectionObserver ??= class {
   observe() {}
   unobserve() {}
@@ -15,13 +24,13 @@ globalThis.IntersectionObserver ??= class {
 } as unknown as typeof IntersectionObserver;
 
 describe("/ciencia", () => {
-  it("has its own title and description", () => {
+  it("has its own title and description", async () => {
     expect(metadata.title).toBe("La ciencia detrás de Cogni · Cogni");
     expect(metadata.description).toBeTruthy();
   });
 
-  it("opens with one h1 and a single serif italic keyword", () => {
-    render(<SciencePage />);
+  it("opens with one h1 and a single serif italic keyword", async () => {
+    render(await SciencePage());
     const heading = screen.getByRole("heading", { level: 1 });
     expect(heading).toHaveTextContent(
       "Seis ideas para recordar lo que estudias.",
@@ -34,8 +43,8 @@ describe("/ciencia", () => {
     ).toHaveAttribute("href", "/");
   });
 
-  it("indexes the six ideas and gives each a section with Cogni's use and its references", () => {
-    render(<SciencePage />);
+  it("indexes the six ideas and gives each a section with Cogni's use and its references", async () => {
+    render(await SciencePage());
     expect(CONCEPTS).toHaveLength(6);
     const index = screen.getByRole("navigation", { name: "Las seis ideas" });
     expect(
@@ -59,8 +68,8 @@ describe("/ciencia", () => {
     }
   });
 
-  it("cites every source in full APA 7, with no pending markers", () => {
-    render(<SciencePage />);
+  it("cites every source in full APA 7, with no pending markers", async () => {
+    render(await SciencePage());
     const references = CONCEPTS.flatMap((concept) => concept.references);
     expect(references).toHaveLength(10);
     for (const reference of references) {
@@ -76,8 +85,8 @@ describe("/ciencia", () => {
     ).toHaveLength(1);
   });
 
-  it("uses the engine's real intervals and phrases feedback as strengths and improvement opportunities", () => {
-    render(<SciencePage />);
+  it("uses the engine's real intervals and phrases feedback as strengths and improvement opportunities", async () => {
+    render(await SciencePage());
     expect(document.body).toHaveTextContent(
       "si respondes bien, vuelve mañana, en 6 días y en unas dos semanas",
     );
@@ -86,8 +95,8 @@ describe("/ciencia", () => {
     expect(document.body).not.toHaveTextContent(/tiempo de estudio/i);
   });
 
-  it("closes with the sign-up action and the shared footer", () => {
-    render(<SciencePage />);
+  it("closes with the sign-up action and the shared footer", async () => {
+    render(await SciencePage());
     expect(
       screen.getByRole("heading", { name: "Todo esto, en tus páginas." }),
     ).toBeInTheDocument();
@@ -98,5 +107,28 @@ describe("/ciencia", () => {
       screen.getByRole("link", { name: "Ver cómo funciona" }),
     ).toHaveAttribute("href", "/#como-funciona");
     expect(screen.getByRole("contentinfo")).toBeInTheDocument();
+  });
+
+  it("shows visitors the landing section links in the nav", async () => {
+    session.user = null;
+    render(await SciencePage());
+    const nav = screen.getByRole("navigation", { name: "Principal" });
+    expect(
+      within(nav).getByRole("link", { name: "Cómo funciona" }),
+    ).toHaveAttribute("href", "/#como-funciona");
+    expect(within(nav).queryByRole("link", { name: "Ir a la app" })).toBeNull();
+  });
+
+  it("gives a signed-in user an Ir a la app button instead of the section links", async () => {
+    session.user = { id: "u1", email: "a@b.test" };
+    render(await SciencePage());
+    const nav = screen.getByRole("navigation", { name: "Principal" });
+    expect(
+      within(nav).getByRole("link", { name: "Ir a la app" }),
+    ).toHaveAttribute("href", "/inicio");
+    expect(
+      within(nav).queryByRole("link", { name: "Cómo funciona" }),
+    ).toBeNull();
+    session.user = null;
   });
 });

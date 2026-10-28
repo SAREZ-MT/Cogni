@@ -99,16 +99,21 @@ describe("proxy redirects for signed-in users", () => {
     return new NextRequest(new URL(pathname, "http://localhost:3000"));
   }
 
-  it.each([
-    "/",
-    "/ciencia",
-    "/creditos",
-  ])("sends a signed-in user from the marketing page %s to Inicio", async (pathname) => {
-    const response = await proxy(signedInRequest(pathname));
+  it("sends a signed-in user from the landing (/) to Inicio", async () => {
+    const response = await proxy(signedInRequest("/"));
 
     expect(response.headers.get("location")).toBe(
       "http://localhost:3000/inicio",
     );
+  });
+
+  it.each([
+    "/ciencia",
+    "/creditos",
+  ])("lets a signed-in user read the marketing page %s", async (pathname) => {
+    const response = await proxy(signedInRequest(pathname));
+
+    expect(response.headers.get("location")).toBeNull();
   });
 
   it.each([

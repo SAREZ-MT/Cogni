@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { getCurrentUser } from "@/modules/identity";
 import { PageHeader } from "../_components/page-header";
 import { SiteFooter } from "../_components/site-footer";
 import { HeadlineObject } from "../landing/_components/headline-object";
@@ -17,10 +18,13 @@ export const metadata: Metadata = {
 // Brilliant-style read, the lilac head with an index, six ideas and a
 // close back into the night. "recordar" is the italic keyword: it is what
 // every idea on the page is for.
-export default function SciencePage() {
+// A signed-in user may read it too (the proxy only bounces them from /);
+// the nav then offers "Ir a la app" instead of the landing section links.
+export default async function SciencePage() {
+  const signedIn = (await getCurrentUser()) !== null;
   return (
     <>
-      <LandingNav />
+      <LandingNav signedIn={signedIn} />
       <main>
         <PageHeader
           back
