@@ -240,8 +240,8 @@ Regla de versiones: en la Fase 0 se instala **la última versión estable** de c
 |---|---|---|---|
 | Google AI Studio | `@ai-sdk/google` | `gemini-3.5-flash-lite` | Generación, prioridad 1 |
 | Cloudflare Workers AI | `@ai-sdk/openai-compatible` | `@cf/meta/llama-3.3-70b-instruct-fp8-fast` | Generación, prioridad 2 |
-| OpenRouter | `@openrouter/ai-sdk-provider` | `qwen/qwen3.8-27b:free` | Generación, prioridad 3 |
-| OpenRouter | `@openrouter/ai-sdk-provider` | `nvidia/nemotron-3-super-120b-a12b:free` | Generación, prioridad 4 |
+| OpenRouter | `@openrouter/ai-sdk-provider` | `nvidia/nemotron-3.5-super-vl:free` | Generación, prioridad 3 (reemplaza a `qwen/qwen3.8-27b:free`, retirado; 2026-10-28) |
+| OpenRouter | `@openrouter/ai-sdk-provider` | `dots-studio/dots-3-note-preview:free` | Generación, prioridad 4 (reemplaza a `nvidia/nemotron-3-super-120b-a12b:free`, retirado; 2026-10-28) |
 | Groq | `@ai-sdk/groq` | `openai/gpt-oss-120b` | Solo evaluación (no se usa en la generación de la Fase 3) |
 
 (actualizado en la Fase 3, ADR 0004) Mistral y Cerebras se descartaron porque exigen método de pago o tarjeta. Nunca se usan varios proyectos de Google por incumplimiento de sus términos de servicio. El detalle y las alternativas descartadas están en `docs/adr/0004-capa-de-ia-con-proveedores-gratuitos.md`.
