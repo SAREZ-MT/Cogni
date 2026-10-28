@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import type { ReactNode } from "react";
 import { BrandMark } from "@/shared/ui/brand-mark";
 import { AuthShowcase } from "./_components/auth-showcase";
@@ -6,7 +7,20 @@ import { AuthShowcase } from "./_components/auth-showcase";
 // product showcase (lazy Three.js constellation + glass product fragments)
 // between the brand and the tagline. Right: warm form panel. Below 768px
 // only the form renders, with the brand above it.
-export default function PublicLayout({ children }: { children: ReactNode }) {
+//
+// The proxy sends a nonce-based CSP with 'strict-dynamic'
+// (src/shared/config/security-headers.ts), and Next.js only stamps the
+// nonce on scripts while rendering a request. A prerendered /register,
+// /forgot-password or /reset-password carries nonce-less scripts that the
+// browser blocks under `next start`, so every auth page renders per request
+// (node_modules/next/dist/docs/01-app/02-guides/content-security-policy.md,
+// "Forcing dynamic rendering"), as the marketing layout already does.
+export default async function PublicLayout({
+  children,
+}: {
+  children: ReactNode;
+}) {
+  await connection();
   return (
     <div className="grid min-h-dvh grid-cols-1 md:grid-cols-2">
       <section
