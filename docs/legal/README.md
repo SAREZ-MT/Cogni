@@ -58,7 +58,7 @@ Cada página muestra la versión, la fecha de vigencia, el aviso "Borrador — p
   - Google: una cookie *httpOnly* de 10 minutos guarda la versión y la hora antes de redirigir.
   - En `/auth/callback` se copian al perfil (`terms_accepted_version`, `terms_accepted_at`, `terms_accepted_method`) solo si la cuenta se acaba de crear y el perfil no tiene una aceptación. La hora guardada es la del consentimiento, no la del primer ingreso.
 - **Respaldo.** La página `/terminos` sigue pidiendo la aceptación con una casilla a las cuentas sin aceptación registrada y a todas las cuentas cuando sube `TERMS_VERSION` (pasó a `2026-10-28`). En ese caso el método guardado es `gate`.
-- **Riesgo.** Es una conducta inequívoca (Decreto 1074 de 2015, art. 2.2.2.25.2.4), pero no hay jurisprudencia verificada sobre esta modalidad, y las cláusulas 2.1 de los términos y 8.1 de la política todavía describen una casilla. Ver la fila D21 de la [matriz](matriz-de-cumplimiento.md).
+- **Riesgo.** Es una conducta inequívoca (Decreto 1074 de 2015, art. 2.2.2.25.2.4), pero no hay jurisprudencia verificada sobre esta modalidad. Las cláusulas 2.1 de los términos y 8.1 de la política ya describen el aviso junto al botón: la aceptación y la autorización se dan al pulsar «Crear cuenta» o «Continuar con Google». Ver la fila D21 de la [matriz](matriz-de-cumplimiento.md).
 - **Alternativa no elegida.** Una tabla de consentimientos de solo inserción (una fila por aceptación, con resumen del texto y agente de usuario) daría una prueba más completa. Se eligió una columna para mantener el cambio pequeño; queda en la fila D4 de la matriz.
 
 ## 3. Decisiones que reflejan estos documentos
