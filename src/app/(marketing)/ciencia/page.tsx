@@ -71,7 +71,7 @@ export default function SciencePage() {
                 Empieza gratis
               </Link>
               <Link
-                href="/landing#como-funciona"
+                href="/#como-funciona"
                 className="lp-press lp-cta-ghost rounded-full px-[30px] py-4 font-(family-name:--lp-font-head) font-semibold text-[17px]"
               >
                 Ver cómo funciona

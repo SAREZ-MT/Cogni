@@ -29,7 +29,7 @@ export function PageHeader({
       <div className="mx-auto max-w-[1280px]">
         {back ? (
           <Link
-            href="/landing"
+            href="/"
             className="lp-link mb-8 inline-flex items-center gap-2 rounded-md font-(family-name:--lp-font-head) font-semibold text-(--lp-violet-deep) text-[14px]"
           >
             <ArrowLeft aria-hidden="true" className="size-3.5" />

@@ -83,12 +83,12 @@ export function SidebarTreeClient({
   }
 
   // Home's stats/grid/recent pages are server-rendered (src/app/(app)/
-  // page.tsx), so any mutation that changes them needs its own refresh to
+  // inicio/page.tsx), so any mutation that changes them needs its own refresh to
   // stay in sync — but only while the user is actually looking at Home:
   // refreshing from another route (e.g. mid-edit on a page) would re-render
   // that route's Server Component for no reason.
   function refreshHomeIfActive() {
-    if (pathname === "/") router.refresh();
+    if (pathname === "/inicio") router.refresh();
   }
 
   const createNotebook = useMutation({

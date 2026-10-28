@@ -99,7 +99,7 @@ describe("signInAction", () => {
 
     expect(getUser).not.toHaveBeenCalled();
     expect(track).toHaveBeenCalledWith("user_signed_in", "u-42");
-    expect(redirect).toHaveBeenCalledWith("/");
+    expect(redirect).toHaveBeenCalledWith("/inicio");
   });
 });
 
@@ -377,6 +377,6 @@ describe("acceptTermsAction", () => {
       formData({ accept: "on", next: "//evil.example" }),
     );
 
-    expect(redirect).toHaveBeenCalledWith("/");
+    expect(redirect).toHaveBeenCalledWith("/inicio");
   });
 });

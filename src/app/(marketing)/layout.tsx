@@ -37,7 +37,7 @@ const caveat = Caveat({
 
 // The proxy sends a nonce-based CSP with 'strict-dynamic'
 // (src/shared/config/security-headers.ts), and Next.js only stamps the
-// nonce on scripts while rendering a request. A prerendered /landing,
+// nonce on scripts while rendering a request. A prerendered landing (/),
 // /ciencia or /creditos carries nonce-less scripts that the browser blocks
 // under `next start`, so every marketing page renders per request
 // (node_modules/next/dist/docs/01-app/02-guides/content-security-policy.md,

@@ -12,7 +12,7 @@ type LogoProps = {
 export function Logo({ collapsed = false }: LogoProps) {
   return (
     <Link
-      href="/"
+      href="/inicio"
       aria-label={collapsed ? "Cogni" : undefined}
       className="flex items-center rounded-md outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
     >

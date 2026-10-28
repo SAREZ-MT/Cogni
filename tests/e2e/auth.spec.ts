@@ -15,7 +15,7 @@ test.describe("authentication", () => {
   test("sends an anonymous visitor from the shell to /login", async ({
     page,
   }) => {
-    await page.goto("/");
+    await page.goto("/inicio");
 
     await expect(page).toHaveURL("/login");
   });
@@ -87,13 +87,13 @@ test.describe("authentication", () => {
       ).toBeVisible();
 
       await page.goto("/login");
-      await expect(page).toHaveURL("/");
+      await expect(page).toHaveURL("/inicio");
 
       await page.getByRole("button", { name: "Menú de usuario" }).click();
       await page.getByRole("menuitem", { name: "Cerrar sesión" }).click();
       await expect(page).toHaveURL("/login");
 
-      await page.goto("/");
+      await page.goto("/inicio");
       await expect(page).toHaveURL("/login");
     } finally {
       await deleteUserByEmail(user.email);

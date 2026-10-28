@@ -124,7 +124,7 @@ test.describe("Calendario — Hoy", () => {
       // pages may become due at any moment, so the day's total (done +
       // still due) is checked against this test's one seeded page as a
       // lower bound.
-      await page.goto("/");
+      await page.goto("/inicio");
       const flashcardsCard = page.getByRole("link", {
         name: /^Flashcards: \d+ de \d+ repasos hechos hoy$/,
       });
@@ -187,7 +187,7 @@ test.describe("Calendario — Hoy", () => {
   test("the sidebar's Calendario entry opens the calendar", async ({
     page,
   }) => {
-    await page.goto("/");
+    await page.goto("/inicio");
 
     const sidebar = page.getByRole("navigation", { name: "Barra lateral" });
     const entry = sidebar.getByRole("link", { name: "Calendario" });

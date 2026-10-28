@@ -31,7 +31,7 @@ describe("/ciencia", () => {
     expect(accents[0]).toHaveTextContent("recordar");
     expect(
       screen.getByRole("link", { name: "Volver a Cogni" }),
-    ).toHaveAttribute("href", "/landing");
+    ).toHaveAttribute("href", "/");
   });
 
   it("indexes the six ideas and gives each a section with Cogni's use and its references", () => {
@@ -96,7 +96,7 @@ describe("/ciencia", () => {
     ).toHaveAttribute("href", "/register");
     expect(
       screen.getByRole("link", { name: "Ver cómo funciona" }),
-    ).toHaveAttribute("href", "/landing#como-funciona");
+    ).toHaveAttribute("href", "/#como-funciona");
     expect(screen.getByRole("contentinfo")).toBeInTheDocument();
   });
 });

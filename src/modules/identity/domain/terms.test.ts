@@ -71,8 +71,8 @@ describe("termsRedirectFor", () => {
     );
   });
 
-  it("falls back to the root when the current path is unknown or not a local path", () => {
-    const expected = `${TERMS_PATH}?next=%2F`;
+  it("falls back to Inicio when the current path is unknown or not a local path", () => {
+    const expected = `${TERMS_PATH}?next=%2Finicio`;
     expect(termsRedirectFor(freshProfile(), null)).toBe(expected);
     expect(termsRedirectFor(freshProfile(), "")).toBe(expected);
     expect(termsRedirectFor(freshProfile(), "https://evil.test")).toBe(

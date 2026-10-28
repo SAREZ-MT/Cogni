@@ -1,10 +1,10 @@
 import { expect, test } from "@playwright/test";
 
 // The marketing pages render per request so their scripts carry the CSP
-// nonce (src/app/(marketing)/layout.tsx). A prerendered /landing shipped
+// nonce (src/app/(marketing)/layout.tsx). A prerendered landing shipped
 // nonce-less scripts that 'strict-dynamic' blocks under `next start`.
 // Runs against the production server (playwright.config.ts webServer).
-for (const path of ["/landing", "/ciencia", "/creditos"]) {
+for (const path of ["/", "/ciencia", "/creditos"]) {
   test(`${path} stamps the response CSP nonce on every script`, async ({
     page,
   }) => {
@@ -22,7 +22,9 @@ for (const path of ["/landing", "/ciencia", "/creditos"]) {
   });
 }
 
-test("/landing hydrates without a script-src violation", async ({ page }) => {
+test("the landing at / hydrates without a script-src violation", async ({
+  page,
+}) => {
   const violations: string[] = [];
   await page.exposeFunction("__onCspViolation", (directive: string) => {
     violations.push(directive);
@@ -35,7 +37,7 @@ test("/landing hydrates without a script-src violation", async ({ page }) => {
     });
   });
 
-  await page.goto("/landing");
+  await page.goto("/");
   const question = page.getByRole("button", {
     name: "¿Funciona en el celular?",
   });

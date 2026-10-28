@@ -7,10 +7,10 @@ describe("SiteFooter", () => {
     render(<SiteFooter />);
     const nav = screen.getByRole("navigation", { name: "Pie de página" });
     for (const [name, href] of [
-      ["Cómo funciona", "/landing#como-funciona"],
-      ["Técnicas", "/landing#tecnicas"],
-      ["Comparación", "/landing#comparacion"],
-      ["Preguntas", "/landing#preguntas"],
+      ["Cómo funciona", "/#como-funciona"],
+      ["Técnicas", "/#tecnicas"],
+      ["Comparación", "/#comparacion"],
+      ["Preguntas", "/#preguntas"],
     ]) {
       expect(within(nav).getByRole("link", { name })).toHaveAttribute(
         "href",

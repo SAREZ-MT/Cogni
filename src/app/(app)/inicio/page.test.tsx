@@ -1,7 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Breadcrumb, BreadcrumbProvider } from "./_components/breadcrumb";
+import { Breadcrumb, BreadcrumbProvider } from "../_components/breadcrumb";
 
 const { getCurrentUser, getCurrentTimeZoneSetting } = vi.hoisted(() => ({
   getCurrentUser: vi.fn(),

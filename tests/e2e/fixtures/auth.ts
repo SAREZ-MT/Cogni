@@ -111,7 +111,7 @@ export async function signIn(
   options: SignInOptions = {},
 ): Promise<void> {
   await submitSignIn(page, user, options);
-  await expect(page).toHaveURL("/");
+  await expect(page).toHaveURL("/inicio");
 }
 
 // Worker-scoped verified user shared by every shell test in that worker,

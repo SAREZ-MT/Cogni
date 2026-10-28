@@ -5,10 +5,10 @@ type FooterLink = { href: string; label: string };
 // Landing anchors are written with the path so they also work from
 // /ciencia, /creditos and the legal pages.
 const PRODUCT: readonly FooterLink[] = [
-  { href: "/landing#como-funciona", label: "Cómo funciona" },
-  { href: "/landing#tecnicas", label: "Técnicas" },
-  { href: "/landing#comparacion", label: "Comparación" },
-  { href: "/landing#preguntas", label: "Preguntas" },
+  { href: "/#como-funciona", label: "Cómo funciona" },
+  { href: "/#tecnicas", label: "Técnicas" },
+  { href: "/#comparacion", label: "Comparación" },
+  { href: "/#preguntas", label: "Preguntas" },
 ];
 
 // The four public legal pages (feature legal-consent); each one is listed
@@ -34,7 +34,7 @@ export function SiteFooter() {
         <div className="flex flex-col gap-12 lg:flex-row lg:justify-between">
           <div className="flex flex-col gap-3">
             <Link
-              href="/landing"
+              href="/"
               className="w-fit rounded-md font-(family-name:--lp-font-head) font-bold text-(--lp-night-ink) text-[28px] tracking-[-0.03em]"
             >
               cogni

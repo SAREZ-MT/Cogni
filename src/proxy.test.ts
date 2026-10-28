@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { config, isOpenPath, proxy } from "./proxy";
 
-// The session refresh is Supabase's concern; here every request is
-// anonymous so the redirect rules are exercised on their own.
+// The session refresh is Supabase's concern; requests are anonymous unless
+// a test signs a user in, so the redirect rules are exercised on their own.
+const session = vi.hoisted(() => ({
+  user: null as { id: string; email: string } | null,
+}));
 vi.mock("@/modules/identity/proxy", () => ({
   updateSession: vi.fn(async () => ({
     response: NextResponse.next(),
-    user: null,
+    user: session.user,
   })),
 }));
 
@@ -51,17 +54,21 @@ describe("proxy redirects for anonymous visitors", () => {
   }
 
   it("sends an anonymous visitor on a private page to /login", async () => {
-    const response = await proxy(anonymousRequest("/"));
+    const response = await proxy(anonymousRequest("/inicio"));
 
     expect(response.headers.get("location")).toBe(
       "http://localhost:3000/login",
     );
   });
 
-  it("lets an anonymous visitor read the public landing", async () => {
-    const response = await proxy(anonymousRequest("/landing"));
+  it("lets an anonymous visitor read the public landing at the root", async () => {
+    const response = await proxy(anonymousRequest("/"));
 
     expect(response.headers.get("location")).toBeNull();
+  });
+
+  it("no longer treats /landing as an open page (next.config redirects it)", () => {
+    expect(isOpenPath("/landing")).toBe(false);
   });
 
   it.each([
@@ -79,6 +86,49 @@ describe("proxy redirects for anonymous visitors", () => {
     expect(response.headers.get("location")).toBe(
       "http://localhost:3000/login",
     );
+  });
+});
+
+describe("proxy redirects for signed-in users", () => {
+  afterEach(() => {
+    session.user = null;
+  });
+
+  function signedInRequest(pathname: string): NextRequest {
+    session.user = { id: "u1", email: "a@b.test" };
+    return new NextRequest(new URL(pathname, "http://localhost:3000"));
+  }
+
+  it("sends a signed-in user from the landing to Inicio", async () => {
+    const response = await proxy(signedInRequest("/"));
+
+    expect(response.headers.get("location")).toBe(
+      "http://localhost:3000/inicio",
+    );
+  });
+
+  it.each([
+    "/login",
+    "/register",
+    "/forgot-password",
+  ])("sends a signed-in user on %s to Inicio", async (pathname) => {
+    const response = await proxy(signedInRequest(pathname));
+
+    expect(response.headers.get("location")).toBe(
+      "http://localhost:3000/inicio",
+    );
+  });
+
+  it("lets a signed-in user read the other public pages", async () => {
+    const response = await proxy(signedInRequest("/ciencia"));
+
+    expect(response.headers.get("location")).toBeNull();
+  });
+
+  it("lets a signed-in user into the app", async () => {
+    const response = await proxy(signedInRequest("/inicio"));
+
+    expect(response.headers.get("location")).toBeNull();
   });
 });
 

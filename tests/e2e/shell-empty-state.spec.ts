@@ -25,7 +25,7 @@ test.describe("app shell", () => {
   test("renders canvas, content area, sidebar and topbar with the declared sizes", async ({
     page,
   }) => {
-    await page.goto("/");
+    await page.goto("/inicio");
 
     const body = page.locator("body");
     await expect(body).toHaveCSS("background-color", "rgb(232, 232, 232)");
@@ -58,7 +58,7 @@ test.describe("app shell", () => {
     // away from /login.
     await page.context().clearCookies();
     await signIn(page, freshUser);
-    await page.goto("/");
+    await page.goto("/inicio");
 
     const content = page.getByTestId("content-area");
     await expect(
@@ -147,7 +147,7 @@ test.describe("app shell", () => {
   // Calendario (Phase 7 T1), Configuración (Phase 7 T2a) and Dashboard
   // (Phase 7 T4). No disabled "pronto" row is left.
   test("sidebar lists every area as a live link", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/inicio");
 
     const sidebar = page.getByRole("navigation", { name: "Barra lateral" });
     await expect(
@@ -284,7 +284,7 @@ test.describe("app shell", () => {
   test("collapses the sidebar to 64px and keeps the choice after navigating", async ({
     page,
   }) => {
-    await page.goto("/");
+    await page.goto("/inicio");
 
     const sidebar = page.getByRole("navigation", { name: "Barra lateral" });
     await page.getByRole("button", { name: "Contraer barra lateral" }).click();
@@ -298,7 +298,7 @@ test.describe("app shell", () => {
   });
 
   test("exposes sign-out inside the user menu", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/inicio");
 
     await page.getByRole("button", { name: "Menú de usuario" }).click();
     await expect(

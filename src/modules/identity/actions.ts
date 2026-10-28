@@ -124,7 +124,7 @@ export async function signInAction(
   // refresco en middleware").
   const { userId } = result.value;
   after(() => analytics().track("user_signed_in", userId));
-  redirect("/");
+  redirect("/inicio");
 }
 
 export async function signOutAction(): Promise<
@@ -160,7 +160,7 @@ export async function updatePasswordAction(
   });
   if (!result.ok)
     return { status: "error", message: messageForCode(result.error.code) };
-  redirect("/");
+  redirect("/inicio");
 }
 
 // The callback URL stays exactly `${siteUrl()}/auth/callback`: Supabase

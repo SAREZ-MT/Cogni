@@ -14,17 +14,17 @@ import {
   type TechniqueOverview,
 } from "@/modules/scheduling";
 import { RevealGroup, RevealItem } from "@/shared/ui/reveal";
-import { displayNameFromEmail } from "./_components/account-name";
-import { SetBreadcrumb } from "./_components/breadcrumb";
-import { ContinueReading } from "./_components/home/continue-reading";
-import { longDateLabel } from "./_components/home/home-copy";
-import { HomeEmptyState } from "./_components/home/home-empty-state";
-import { HomeHero, type HomeStreak } from "./_components/home/home-hero";
-import { ReviewToday } from "./_components/home/review-today";
-import { streakWeekDays } from "./_components/home/streak-week-days";
-import { TechniqueCounts } from "./_components/home/technique-counts";
-import { WeakTopics } from "./_components/home/weak-topics";
-import { toReviewRows } from "./calendario/_lib/today-rows";
+import { displayNameFromEmail } from "../_components/account-name";
+import { SetBreadcrumb } from "../_components/breadcrumb";
+import { ContinueReading } from "../_components/home/continue-reading";
+import { longDateLabel } from "../_components/home/home-copy";
+import { HomeEmptyState } from "../_components/home/home-empty-state";
+import { HomeHero, type HomeStreak } from "../_components/home/home-hero";
+import { ReviewToday } from "../_components/home/review-today";
+import { streakWeekDays } from "../_components/home/streak-week-days";
+import { TechniqueCounts } from "../_components/home/technique-counts";
+import { WeakTopics } from "../_components/home/weak-topics";
+import { toReviewRows } from "../calendario/_lib/today-rows";
 
 type DueTodayResult = Awaited<ReturnType<typeof getDueToday>>;
 

@@ -69,8 +69,8 @@ test.describe("terms of use", () => {
       await submitSignIn(page, unacceptedUser);
       await expect(page).toHaveURL(/\/terminos\?next=/);
 
-      await page.goto("/");
-      await expect(page).toHaveURL(/\/terminos\?next=%2F$/);
+      await page.goto("/inicio");
+      await expect(page).toHaveURL(/\/terminos\?next=%2Finicio$/);
 
       // Submitting without ticking the box is refused by the server.
       await page.getByTestId("terms-accept-submit").click();
@@ -81,7 +81,7 @@ test.describe("terms of use", () => {
 
       await page.getByTestId("terms-accept-checkbox").check();
       await page.getByTestId("terms-accept-submit").click();
-      await expect(page).toHaveURL("/");
+      await expect(page).toHaveURL("/inicio");
 
       await page.goto("/terminos");
       await expect(page.getByTestId("terms-accepted-state")).toBeVisible();

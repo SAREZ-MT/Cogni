@@ -7,7 +7,7 @@ describe("Logo", () => {
     render(<Logo />);
 
     const link = screen.getByRole("link", { name: "Cogni" });
-    expect(link).toHaveAttribute("href", "/");
+    expect(link).toHaveAttribute("href", "/inicio");
     expect(link).not.toHaveAttribute("aria-label");
     expect(screen.getByText("Cogni")).toHaveClass("font-bold", "text-fg");
   });
