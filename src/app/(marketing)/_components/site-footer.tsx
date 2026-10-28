@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { LEGAL_DOCS, legalHref } from "./legal-docs";
 
 type FooterLink = { href: string; label: string };
 
@@ -12,8 +11,12 @@ const PRODUCT: readonly FooterLink[] = [
   { href: "/landing#preguntas", label: "Preguntas" },
 ];
 
-const LEGAL: readonly FooterLink[] = [
-  ...LEGAL_DOCS.map((doc) => ({ href: legalHref(doc.slug), label: doc.label })),
+// The /legal/* routes do not exist yet: the legal pages come from a
+// follow-up feature (moved out of landing-v1 by the user, 2026-10-28), and
+// /legal is not in the proxy OPEN_PATHS until then.
+export const LEGAL: readonly FooterLink[] = [
+  { href: "/legal/terminos", label: "Términos de uso" },
+  { href: "/legal/privacidad", label: "Privacidad" },
   { href: "/creditos", label: "Créditos" },
 ];
 
@@ -53,11 +56,7 @@ export function SiteFooter() {
                 La ciencia detrás de Cogni →
               </Link>
             </div>
-            <FooterColumn
-              title="Legal"
-              links={LEGAL}
-              className="col-span-2 sm:col-span-1"
-            />
+            <FooterColumn title="Legal" links={LEGAL} />
           </nav>
         </div>
         <div className="lp-footer-base mt-14 flex flex-col gap-2 pt-6 text-(--lp-night-ink-3) text-[13px] sm:flex-row sm:justify-between">

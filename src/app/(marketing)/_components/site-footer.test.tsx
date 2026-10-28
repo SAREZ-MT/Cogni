@@ -1,7 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { LEGAL_DOCS } from "./legal-docs";
-import { SiteFooter } from "./site-footer";
+import { LEGAL, SiteFooter } from "./site-footer";
 
 describe("SiteFooter", () => {
   it("links the landing sections with their paths so it works on every page", () => {
@@ -20,31 +19,19 @@ describe("SiteFooter", () => {
     }
   });
 
-  it("links the science page, the credits and every legal page", () => {
+  it("links the science page and a small legal group", () => {
     render(<SiteFooter />);
     expect(
       screen.getByRole("link", { name: "La ciencia detrás de Cogni →" }),
     ).toHaveAttribute("href", "/ciencia");
-    expect(screen.getByRole("link", { name: "Créditos" })).toHaveAttribute(
-      "href",
-      "/creditos",
-    );
-    expect(LEGAL_DOCS.map((doc) => doc.slug)).toEqual([
-      "terminos",
-      "datos-personales",
-      "aviso-de-privacidad",
-      "cookies",
-      "uso-aceptable",
-      "integridad-academica",
-      "derechos-de-autor",
-      "subencargados",
-    ]);
-    for (const doc of LEGAL_DOCS) {
-      expect(screen.getByRole("link", { name: doc.label })).toHaveAttribute(
-        "href",
-        `/legal/${doc.slug}`,
-      );
+    for (const [name, href] of [
+      ["Términos de uso", "/legal/terminos"],
+      ["Privacidad", "/legal/privacidad"],
+      ["Créditos", "/creditos"],
+    ]) {
+      expect(screen.getByRole("link", { name })).toHaveAttribute("href", href);
     }
+    expect(LEGAL).toHaveLength(3);
   });
 
   it("carries the academic notice on the dark ground", () => {
