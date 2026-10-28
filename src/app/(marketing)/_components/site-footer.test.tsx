@@ -25,8 +25,8 @@ describe("SiteFooter", () => {
       screen.getByRole("link", { name: "La ciencia detrás de Cogni →" }),
     ).toHaveAttribute("href", "/ciencia");
     for (const [name, href] of [
-      ["Términos de uso", "/legal/terminos"],
-      ["Privacidad", "/legal/privacidad"],
+      ["Términos y condiciones", "/legal/terminos"],
+      ["Política de privacidad", "/legal/privacidad"],
       ["Uso aceptable", "/legal/uso-aceptable"],
       ["Derechos de autor", "/legal/derechos-de-autor"],
       ["Créditos", "/creditos"],

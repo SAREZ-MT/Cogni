@@ -14,8 +14,8 @@ const PRODUCT: readonly FooterLink[] = [
 // The four public legal pages (feature legal-consent); each one is listed
 // in the proxy OPEN_PATHS so anonymous visitors can read it.
 export const LEGAL: readonly FooterLink[] = [
-  { href: "/legal/terminos", label: "Términos de uso" },
-  { href: "/legal/privacidad", label: "Privacidad" },
+  { href: "/legal/terminos", label: "Términos y condiciones" },
+  { href: "/legal/privacidad", label: "Política de privacidad" },
   { href: "/legal/uso-aceptable", label: "Uso aceptable" },
   { href: "/legal/derechos-de-autor", label: "Derechos de autor" },
   { href: "/creditos", label: "Créditos" },

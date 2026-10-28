@@ -1,4 +1,5 @@
 import { Caveat, Instrument_Serif, Inter, Manrope } from "next/font/google";
+import { connection } from "next/server";
 import type { ReactNode } from "react";
 import { LandingMotionConfig } from "./landing/_components/landing-motion-config";
 import "./landing.css";
@@ -34,7 +35,19 @@ const caveat = Caveat({
   preload: false,
 });
 
-export default function MarketingLayout({ children }: { children: ReactNode }) {
+// The proxy sends a nonce-based CSP with 'strict-dynamic'
+// (src/shared/config/security-headers.ts), and Next.js only stamps the
+// nonce on scripts while rendering a request. A prerendered /landing,
+// /ciencia or /creditos carries nonce-less scripts that the browser blocks
+// under `next start`, so every marketing page renders per request
+// (node_modules/next/dist/docs/01-app/02-guides/content-security-policy.md,
+// "Forcing dynamic rendering"), as the legal pages already do.
+export default async function MarketingLayout({
+  children,
+}: {
+  children: ReactNode;
+}) {
+  await connection();
   return (
     <div
       className={`lp ${instrumentSerif.variable} ${manrope.variable} ${inter.variable} ${caveat.variable} min-h-dvh`}
