@@ -1,31 +1,20 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen, within } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
+import { TECHNIQUES, Techniques } from "./techniques";
 
-const view = vi.hoisted(() => ({ inView: false, reduced: false }));
-
-// The deck's autoplay only runs while the section is in view and motion is
-// allowed; both inputs are controlled here so the timing is deterministic.
-vi.mock("motion/react", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("motion/react")>()),
-  useInView: () => view.inView,
-  useReducedMotion: () => view.reduced,
-}));
-
-import { Techniques } from "./techniques";
-
-// jsdom has no IntersectionObserver; the shared Reveal (whileInView) needs
-// one to mount. It never fires, which is all these tests need.
-class IntersectionObserverStub {
+globalThis.IntersectionObserver ??= class {
   observe() {}
   unobserve() {}
   disconnect() {}
   takeRecords() {
     return [];
   }
-}
-globalThis.IntersectionObserver ??=
-  IntersectionObserverStub as unknown as typeof IntersectionObserver;
+} as unknown as typeof IntersectionObserver;
+globalThis.ResizeObserver ??= class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+} as unknown as typeof ResizeObserver;
 
 const NAMES = [
   "Flashcards",
@@ -34,122 +23,102 @@ const NAMES = [
   "La IA prepara, tú decides",
 ];
 
-function panels() {
-  return Array.from(
-    document.querySelectorAll<HTMLElement>('[data-part="technique-card"]'),
-  );
+function panel(name: string) {
+  return screen.getByRole("region", { name });
 }
-
-function frontPanel() {
-  const live = panels().filter((panel) => !panel.hasAttribute("inert"));
-  expect(live).toHaveLength(1);
-  return live[0];
-}
-
-beforeEach(() => {
-  view.inView = false;
-  view.reduced = false;
-});
-
-afterEach(() => {
-  vi.useRealTimers();
-});
 
 describe("Techniques", () => {
-  it("renders the four techniques as tabs with the first one selected", () => {
+  it("is a light section named by its full headline", () => {
     render(<Techniques />);
-
-    const tabs = screen.getAllByRole("tab");
-    expect(tabs.map((tab) => tab.textContent)).toEqual(NAMES);
-    expect(screen.getByRole("tablist")).toBeInTheDocument();
-    expect(tabs[0]).toHaveAttribute("aria-selected", "true");
-    expect(tabs[0]).toHaveAttribute("tabindex", "0");
-    expect(tabs[1]).toHaveAttribute("aria-selected", "false");
-    expect(tabs[1]).toHaveAttribute("tabindex", "-1");
+    const section = panel("Una técnica para cada momento.");
+    expect(section).toHaveAttribute("id", "tecnicas");
+    expect(section).toHaveAttribute("data-nav-theme", "light");
   });
 
-  it("links each tab to its card and keeps only the front card out of inert", () => {
+  it("sets exactly one keyword of the headline in the serif italic", () => {
     render(<Techniques />);
-
-    const tabs = screen.getAllByRole("tab");
-    for (const tab of tabs) {
-      const panel = document.getElementById(
-        tab.getAttribute("aria-controls") ?? "",
-      );
-      expect(panel).not.toBeNull();
-      expect(panel).toHaveAttribute("role", "tabpanel");
-      expect(panel).toHaveAttribute("aria-labelledby", tab.id);
-    }
-    expect(panels()).toHaveLength(4);
-    expect(frontPanel()).toHaveAccessibleName("Flashcards");
+    const heading = screen.getByRole("heading", { level: 2 });
+    const accents = heading.querySelectorAll("em");
+    expect(accents).toHaveLength(1);
+    expect(accents[0]).toHaveTextContent("momento");
   });
 
-  it("brings the clicked technique to the front", async () => {
-    const user = userEvent.setup();
-    render(<Techniques />);
-
-    await user.click(screen.getByRole("tab", { name: "Exámenes" }));
-
-    expect(screen.getByRole("tab", { name: "Exámenes" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
-    expect(frontPanel()).toHaveAccessibleName("Exámenes");
-    expect(frontPanel()).toHaveTextContent("Opción A");
-  });
-
-  it("moves selection and focus with the arrow, Home and End keys", async () => {
-    const user = userEvent.setup();
-    render(<Techniques />);
-    const tabs = () => screen.getAllByRole("tab");
-
-    await user.click(tabs()[0]);
-    await user.keyboard("{ArrowRight}");
-    expect(tabs()[1]).toHaveFocus();
-    expect(tabs()[1]).toHaveAttribute("aria-selected", "true");
-
-    await user.keyboard("{ArrowLeft}{ArrowLeft}");
-    expect(tabs()[3]).toHaveFocus();
-    expect(frontPanel()).toHaveAccessibleName("La IA prepara, tú decides");
-
-    await user.keyboard("{Home}");
-    expect(tabs()[0]).toHaveFocus();
-    await user.keyboard("{End}");
-    expect(tabs()[3]).toHaveAttribute("aria-selected", "true");
-  });
-
-  it("autoplays every five seconds only while in view", () => {
-    vi.useFakeTimers();
-    view.inView = true;
-    render(<Techniques />);
-
-    act(() => vi.advanceTimersByTime(5000));
-    expect(frontPanel()).toHaveAccessibleName("Recuperación activa");
-    act(() => vi.advanceTimersByTime(5000));
-    expect(frontPanel()).toHaveAccessibleName("Exámenes");
-  });
-
-  it("does not autoplay out of view, on hover or with reduced motion", () => {
-    vi.useFakeTimers();
+  it("holds a mint cards object in the headline, or a supplied image", () => {
     const { unmount } = render(<Techniques />);
-    act(() => vi.advanceTimersByTime(12000));
-    expect(frontPanel()).toHaveAccessibleName("Flashcards");
+    const slot = screen
+      .getByRole("heading", { level: 2 })
+      .querySelector('[data-glyph="cards"]');
+    expect(slot).toHaveAttribute("data-tone", "mint");
     unmount();
 
-    view.inView = true;
-    render(<Techniques />);
-    fireEvent.pointerEnter(screen.getByTestId("technique-deck"));
-    act(() => vi.advanceTimersByTime(12000));
-    expect(frontPanel()).toHaveAccessibleName("Flashcards");
+    render(
+      <Techniques
+        image={{ src: "/landing/techniques-object.webp", alt: "" }}
+      />,
+    );
+    const img = screen.getByRole("heading", { level: 2 }).querySelector("img");
+    expect(img?.getAttribute("src")).toContain("techniques-object");
   });
 
-  it("does not autoplay under reduced motion", () => {
-    vi.useFakeTimers();
-    view.inView = true;
-    view.reduced = true;
+  it("gives every technique its own region with title, benefit and points", () => {
     render(<Techniques />);
+    expect(TECHNIQUES.map((technique) => technique.name)).toEqual(NAMES);
+    for (const technique of TECHNIQUES) {
+      const region = panel(technique.name);
+      expect(
+        within(region).getByRole("heading", { level: 3 }),
+      ).toHaveAccessibleName(technique.name);
+      expect(region).toHaveTextContent(technique.benefit);
+      const points = within(region).getAllByRole("listitem");
+      expect(points.length).toBeGreaterThanOrEqual(2);
+      expect(points.length).toBeLessThanOrEqual(3);
+      expect(points.map((point) => point.textContent)).toEqual(
+        technique.points,
+      );
+    }
+  });
 
-    act(() => vi.advanceTimersByTime(12000));
-    expect(frontPanel()).toHaveAccessibleName("Flashcards");
+  it("alternates the side of each technique's visual", () => {
+    render(<Techniques />);
+    const sides = NAMES.map((name) => panel(name).getAttribute("data-visual"));
+    expect(sides).toEqual(["left", "right", "left", "right"]);
+  });
+
+  it("uses the platform technique tones", () => {
+    render(<Techniques />);
+    expect(NAMES.map((name) => panel(name).getAttribute("data-tone"))).toEqual([
+      "yellow",
+      "mint",
+      "red",
+      "violet",
+    ]);
+  });
+
+  it("renders a supplied illustration in a technique's visual slot", () => {
+    render(
+      <Techniques
+        art={{
+          recall: { src: "/landing/technique-recall.webp", alt: "Ilustración" },
+        }}
+      />,
+    );
+    const img = within(panel("Recuperación activa")).getByRole("img", {
+      name: "Ilustración",
+    });
+    expect(img.getAttribute("src")).toContain("technique-recall");
+    expect(
+      within(panel("Flashcards")).queryByRole("img"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows a decorative 01–04 progress indicator", () => {
+    render(<Techniques />);
+    const indicator = document.querySelector('[data-part="tech-progress"]');
+    expect(indicator).toHaveAttribute("aria-hidden", "true");
+    expect(
+      Array.from(indicator?.querySelectorAll("[data-step]") ?? []).map(
+        (step) => step.textContent,
+      ),
+    ).toEqual(["01", "02", "03", "04"]);
   });
 });

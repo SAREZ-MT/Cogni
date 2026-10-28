@@ -24,9 +24,7 @@ export default function LandingPage() {
           <Hero />
         </div>
         <HowItWorks />
-        <div data-nav-theme="dark">
-          <Techniques />
-        </div>
+        <Techniques />
         <div data-nav-theme="light">
           <Pillars />
         </div>

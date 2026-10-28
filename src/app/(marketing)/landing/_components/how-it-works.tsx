@@ -87,7 +87,7 @@ export function HowItWorks({ image }: { image?: HeadlineImage }) {
           >
             Del{" "}
             <span className="whitespace-nowrap">
-              apunte <HeadlineObject image={image} />
+              apunte <HeadlineObject image={image} tone="yellow" />
             </span>{" "}
             al <em className="lp-headline-accent">repaso</em>,{" "}
             <br className="hidden md:inline" />

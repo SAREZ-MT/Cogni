@@ -38,6 +38,22 @@
   --lp-night-ink: #edf0f5;
   --lp-night-ink-2: #a3aab8;
   --lp-night-ink-3: #6f7686;
+  /* The night's side vignette, shared by the hero veil and the seams. */
+  --lp-night-sides: linear-gradient(
+    to right,
+    rgb(6 4 14 / 0.6),
+    rgb(6 4 14 / 0) 22%,
+    rgb(6 4 14 / 0) 78%,
+    rgb(6 4 14 / 0.6)
+  );
+
+  /* Techniques zone: a lilac ground, clearly not the cream paper, and the
+     platform's exam red (globals.css --color-technique-exam-accent). */
+  --lp-lilac: #ece5fa;
+  --lp-red: #ef4444;
+  --lp-red-100: #fee2e2;
+  --lp-red-400: #f87171;
+  --lp-red-700: #b91c1c;
 
   /* Study icons of the hero network: soft, saturated hues that read on
      black, Cogni violet among them. */
@@ -178,23 +194,33 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: linear-gradient(
-    to right,
-    rgb(6 4 14 / 0.6),
-    rgb(6 4 14 / 0) 22%,
-    rgb(6 4 14 / 0) 78%,
-    rgb(6 4 14 / 0.6)
-  );
+  background: var(--lp-night-sides);
   mask-image: linear-gradient(to bottom, #000 0%, transparent 60%);
 }
+/*
+ * Band from the cream paper into the lilac techniques zone: one soft
+ * oklab ramp, flat at both ends so neither seam shows, with the letter
+ * texture gathering toward the lilac in the paper's violet ink.
+ */
 .lp-dusk-out {
-  height: clamp(240px, 40vh, 400px);
+  --ascii-ink: var(--lp-violet-800);
+  --ascii-alpha: 0.08;
+  height: clamp(220px, 34vh, 340px);
   background: linear-gradient(
     in oklab to bottom,
     var(--lp-paper) 0%,
-    color-mix(in oklab, var(--lp-violet-100) 40%, var(--lp-paper)) 26%,
-    color-mix(in oklab, var(--lp-violet-800) 30%, var(--lp-ground-deep)) 68%,
-    var(--lp-ground-deep) 100%
+    color-mix(in oklab, var(--lp-lilac) 50%, var(--lp-paper)) 50%,
+    var(--lp-lilac) 100%
+  );
+}
+/* Lilac back into the paper below the section, the same ramp reversed. */
+.lp-tech-out {
+  height: clamp(160px, 24vh, 260px);
+  background: linear-gradient(
+    in oklab to bottom,
+    var(--lp-lilac) 0%,
+    color-mix(in oklab, var(--lp-lilac) 50%, var(--lp-paper)) 50%,
+    var(--lp-paper) 100%
   );
 }
 @media (max-width: 767px) {
@@ -202,11 +228,12 @@
     height: 52vh;
   }
   .lp-dusk-out {
-    height: 30vh;
+    height: 26vh;
   }
 }
 
 /* Section headline: Inter display at poster size, one serif italic word. */
+
 .lp-headline {
   font-family: var(--lp-font-head);
   font-weight: 600;
@@ -253,15 +280,35 @@
   width: 100%;
   height: 100%;
   image-rendering: pixelated;
-  background: var(--lp-violet);
+  background: var(--hobj-mid);
+}
+/* Tile tones (headline-object.tsx): three dither steps and a glyph ink
+   that keeps contrast on the lighter tiles. */
+.lp-hobj[data-tone="yellow"] {
+  --hobj-dark: var(--lp-amber-500);
+  --hobj-mid: var(--lp-yellow);
+  --hobj-light: var(--lp-yellow-100);
+  --hobj-glyph: var(--lp-amber-800);
+}
+.lp-hobj[data-tone="mint"] {
+  --hobj-dark: var(--lp-green-500);
+  --hobj-mid: var(--lp-mint);
+  --hobj-light: var(--lp-mint-50);
+  --hobj-glyph: var(--lp-mint-800);
+}
+.lp-hobj[data-tone="red"] {
+  --hobj-dark: var(--lp-red-700);
+  --hobj-mid: var(--lp-red);
+  --hobj-light: var(--lp-red-400);
+  --hobj-glyph: var(--lp-paper);
 }
 .lp-hobj-glyph {
   position: absolute;
   inset: 21%;
   width: 58%;
   height: 58%;
-  color: var(--lp-paper);
-  filter: drop-shadow(0 0.02em 0.03em rgb(46 16 101 / 0.5));
+  color: var(--hobj-glyph, var(--lp-paper));
+  filter: drop-shadow(0 0.02em 0.03em rgb(46 16 101 / 0.35));
 }
 @keyframes lp-hobj-float {
   0%,
@@ -335,6 +382,272 @@
   background: var(--lp-violet);
 }
 
+/*
+ * Techniques (techniques.tsx): a pinned horizontal track on desktop. The
+ * section is one screen per frame tall (PANELS = 5); the frame sticks and
+ * the rail, five frames wide, slides left as it scrolls. overflow: clip
+ * (not hidden) so focus or find-in-page can never scroll it sideways.
+ */
+.lp-tech {
+  background: var(--lp-lilac);
+}
+.lp-htrack {
+  height: 500vh;
+}
+.lp-hframe {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow: clip;
+}
+.lp-hrail {
+  position: relative;
+  display: flex;
+  width: 500%;
+  height: 100%;
+}
+.lp-hpanel {
+  width: 20%;
+  height: 100%;
+  flex-shrink: 0;
+}
+/* Letters held still in the frame while the panels pass over them. */
+.lp-hfield {
+  --ascii-ink: var(--lp-violet-800);
+  --ascii-ink-paper: var(--lp-violet-800);
+  --ascii-alpha: 0.07;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  mask-image: radial-gradient(80% 70% at 50% 55%, transparent 35%, #000 100%);
+}
+.lp-hcue {
+  color: var(--lp-violet-deep);
+  box-shadow: inset 0 0 0 1px rgb(91 33 182 / 0.22);
+  animation: lp-hcue 2.4s var(--lp-ease-out) infinite;
+}
+@keyframes lp-hcue {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(6px);
+  }
+}
+
+/* Technique tones: the platform colours, a pastel, an ink that passes AA
+   on the lilac and on white, and the cover edge. */
+[data-tone="yellow"] {
+  --tech: var(--lp-yellow);
+  --tech-soft: var(--lp-yellow-100);
+  --tech-ink: var(--lp-amber-800);
+  --tech-edge: var(--lp-amber-500);
+}
+[data-tone="mint"] {
+  --tech: var(--lp-mint);
+  --tech-soft: var(--lp-mint-100);
+  --tech-ink: var(--lp-mint-800);
+  --tech-edge: var(--lp-green-500);
+}
+[data-tone="red"] {
+  --tech: var(--lp-red-400);
+  --tech-soft: var(--lp-red-100);
+  --tech-ink: var(--lp-red-700);
+  --tech-edge: var(--lp-red);
+}
+[data-tone="violet"] {
+  --tech: var(--lp-violet-400);
+  --tech-soft: var(--lp-violet-100);
+  --tech-ink: var(--lp-violet-800);
+  --tech-edge: var(--lp-violet);
+}
+
+.lp-tech-step {
+  color: var(--tech-ink);
+}
+.lp-tech-dot {
+  width: 8px;
+  height: 8px;
+  background: var(--tech-edge);
+}
+.lp-tech-point {
+  border-top: 1px solid rgb(26 16 51 / 0.1);
+}
+.lp-tech-point:last-child {
+  border-bottom: 1px solid rgb(26 16 51 / 0.1);
+}
+.lp-tech-check {
+  color: var(--tech-ink);
+  background: var(--tech-soft);
+  box-shadow: inset 0 0 0 1px
+    color-mix(in oklab, var(--tech-edge) 45%, transparent);
+}
+
+/* Illustration placeholder, in the line of the platform's notebook fan:
+   160° gradient covers in the technique colour with a darker edge, fanned
+   behind one white card with an icon tile. Sizes follow the stage
+   (container units), so it scales as one drawing. */
+.lp-art-stage {
+  border-radius: 32px;
+  background:
+    radial-gradient(
+      60% 55% at 50% 55%,
+      color-mix(in oklab, var(--tech-soft) 85%, transparent),
+      transparent 75%
+    ),
+    rgb(255 255 255 / 0.35);
+  box-shadow: inset 0 0 0 1px rgb(91 33 182 / 0.1);
+}
+.lp-art-cover {
+  position: absolute;
+  top: 18%;
+  left: 21%;
+  width: 52%;
+  height: 64%;
+  border: 1px solid var(--tech-edge);
+  border-radius: 3cqw 5cqw 5cqw 3cqw;
+  background: linear-gradient(160deg, var(--tech-soft), var(--tech));
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.05),
+    0 4cqw 8cqw -4cqw rgb(26 16 51 / 0.3);
+}
+.lp-art-cover::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 5cqw;
+  border-radius: inherit;
+  background: rgb(0 0 0 / 0.07);
+}
+.lp-art-cover-back {
+  transform: translateX(-14%) rotate(-11deg);
+}
+.lp-art-cover-mid {
+  transform: translateX(16%) translateY(-3%) rotate(8deg);
+}
+.lp-art-ribbon {
+  position: absolute;
+  top: -1px;
+  right: 14%;
+  width: 6cqw;
+  height: 17cqw;
+  background: var(--lp-paper);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 82%, 0 100%);
+}
+.lp-art-card {
+  position: absolute;
+  top: 27%;
+  left: 24%;
+  width: 54%;
+  height: 54%;
+  display: flex;
+  flex-direction: column;
+  padding: 6cqw 5.5cqw;
+  border-radius: 4cqw;
+  background: #ffffff;
+  transform: rotate(-3deg);
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--tech-edge) 40%, transparent),
+    0 1px 2px rgb(0 0 0 / 0.06),
+    0 6cqw 12cqw -5cqw rgb(26 16 51 / 0.35);
+}
+.lp-art-tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 10cqw;
+  height: 10cqw;
+  border-radius: 2.6cqw;
+  color: var(--tech-ink);
+  background: var(--tech-soft);
+  box-shadow: inset 0 0 0 1px var(--tech-edge);
+}
+.lp-art-kicker {
+  margin-top: auto;
+  font-size: 2.3cqw;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--tech-ink);
+}
+.lp-art-text {
+  margin-top: 2cqw;
+  font-size: 3.9cqw;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: var(--lp-ink);
+}
+
+/* 01–04 progress at the foot of the frame: the nearest technique's line
+   fills in its colour. */
+.lp-hprogress {
+  position: absolute;
+  bottom: 32px;
+  left: 50%;
+  display: flex;
+  gap: 20px;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.lp-hprogress-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--lp-ink-3);
+  transition: color 240ms var(--lp-ease-out);
+}
+.lp-hprogress-step[data-active] {
+  color: var(--lp-ink);
+}
+.lp-hprogress-line {
+  position: relative;
+  width: 40px;
+  height: 2px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: rgb(26 16 51 / 0.12);
+}
+.lp-hprogress-line::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--tech-edge);
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+  transition: transform 320ms var(--lp-ease-out);
+}
+.lp-hprogress-step[data-active] .lp-hprogress-line::after {
+  transform: scaleX(1);
+}
+
+/* Phones and reduced motion: no pin, the frames stack and read in order. */
+@media (max-width: 767px), (prefers-reduced-motion: reduce) {
+  .lp-htrack {
+    height: auto;
+  }
+  .lp-hframe {
+    position: relative;
+    height: auto;
+    overflow: visible;
+  }
+  .lp-hrail {
+    flex-direction: column;
+    width: 100%;
+    height: auto;
+    /* biome-ignore lint/complexity/noImportantStyles: only !important beats the inline transform Motion writes */
+    transform: none !important;
+  }
+  .lp-hpanel {
+    width: 100%;
+    height: auto;
+  }
+  .lp-hprogress,
+  .lp-hfield {
+    display: none;
+  }
+}
+
 .lp-shadow-float {
   box-shadow: 0 30px 60px rgb(10 5 26 / 0.5);
 }
@@ -345,18 +658,6 @@
 
 .lp-shadow-window {
   box-shadow: 0 24px 50px rgb(76 29 149 / 0.1);
-}
-
-.lp-shadow-deck {
-  box-shadow: 0 30px 60px rgb(5 2 15 / 0.45);
-}
-
-/* The techniques tab row scrolls sideways on phones without a scrollbar. */
-.lp-scroll-x {
-  scrollbar-width: none;
-}
-.lp-scroll-x::-webkit-scrollbar {
-  display: none;
 }
 
 /* In-page anchors glide; the hero waits for the glide to end before it
@@ -427,13 +728,7 @@
     ),
     /* Sides and top only: a bottom vignette read as a black seam above the
        dusk band, so the hero's lower edge keeps the plain night ground. */
-    linear-gradient(
-      to right,
-      rgb(6 4 14 / 0.6),
-      rgb(6 4 14 / 0) 22%,
-      rgb(6 4 14 / 0) 78%,
-      rgb(6 4 14 / 0.6)
-    ),
+    var(--lp-night-sides),
     linear-gradient(to bottom, rgb(6 4 14 / 0.55), rgb(6 4 14 / 0) 30%);
 }
 
@@ -523,8 +818,13 @@
     transition: none;
   }
   .lp-hobj-placeholder,
-  .lp-video-play::before {
+  .lp-video-play::before,
+  .lp-hcue {
     animation: none;
+  }
+  .lp-hprogress-step,
+  .lp-hprogress-line::after {
+    transition: none;
   }
   /* Overrides the scroll-linked inline transforms of the pillar bands and
      the video slot. */

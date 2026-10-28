@@ -1,11 +1,23 @@
 "use client";
 
+import { Cards } from "@phosphor-icons/react/dist/csr/Cards";
 import { Notebook } from "@phosphor-icons/react/dist/csr/Notebook";
 import Image from "next/image";
 import { useEffect, useRef } from "react";
 import { bayerThreshold } from "./ascii-field";
 
 export type HeadlineImage = { src: string; alt: string };
+
+// The study object each section's placeholder stands for, kept as a name
+// so the prop stays serialisable.
+const GLYPHS = { notebook: Notebook, cards: Cards } as const;
+export type HeadlineGlyph = keyof typeof GLYPHS;
+
+// The tile's colour, from the platform technique palette, so the objects
+// alternate down the page instead of all repeating violet. Each tone sets
+// its three dither steps and a glyph ink that keeps contrast (.lp-hobj in
+// landing.css).
+export type HeadlineTone = "violet" | "yellow" | "mint" | "red";
 
 // Logical pixels of the dithered placeholder; CSS scales it up pixelated.
 const DITHER_PX = 36;
@@ -15,13 +27,22 @@ const DITHER_PX = 36;
 // cap height and a half tall, square, and dips slightly below the baseline
 // (.lp-hobj in landing.css).
 //
-// TODO(higgsfield): generate the dithered or grainy 3D study object with
-// Higgsfield and save it as public/landing/how-it-works-object.webp
-// (square, transparent background, about 480×480), then pass
-// image={{ src: "/landing/how-it-works-object.webp", alt: "" }} to the
-// section. Until then a dithered violet tile with a notebook glyph holds
+// TODO(higgsfield): generate each section's dithered or grainy 3D study
+// object with Higgsfield (square, transparent background, about 480×480)
+// and save it under public/landing/: how-it-works-object.webp (a notebook)
+// and techniques-object.webp (a fanned stack of cards). Then pass
+// image={{ src: "/landing/<name>.webp", alt: "" }} to the section. Until
+// then a dithered tile in the section's tone with the matching glyph holds
 // the exact size and position.
-export function HeadlineObject({ image }: { image?: HeadlineImage }) {
+export function HeadlineObject({
+  image,
+  glyph = "notebook",
+  tone = "violet",
+}: {
+  image?: HeadlineImage;
+  glyph?: HeadlineGlyph;
+  tone?: HeadlineTone;
+}) {
   if (image) {
     return (
       <span className="lp-hobj lp-hobj-image">
@@ -36,10 +57,16 @@ export function HeadlineObject({ image }: { image?: HeadlineImage }) {
       </span>
     );
   }
+  const Glyph = GLYPHS[glyph];
   return (
-    <span aria-hidden="true" className="lp-hobj lp-hobj-placeholder">
+    <span
+      aria-hidden="true"
+      data-glyph={glyph}
+      data-tone={tone}
+      className="lp-hobj lp-hobj-placeholder"
+    >
       <DitherTile />
-      <Notebook weight="duotone" className="lp-hobj-glyph" />
+      <Glyph weight="duotone" className="lp-hobj-glyph" />
     </span>
   );
 }

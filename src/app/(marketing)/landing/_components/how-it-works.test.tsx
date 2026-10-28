@@ -52,6 +52,14 @@ describe("HowItWorks", () => {
     ).toHaveTextContent("Video próximamente");
   });
 
+  it("tints its headline object yellow", () => {
+    render(<HowItWorks />);
+    const slot = screen
+      .getByRole("heading", { level: 2 })
+      .querySelector('[data-glyph="notebook"]');
+    expect(slot).toHaveAttribute("data-tone", "yellow");
+  });
+
   it("renders the headline object from a supplied image", () => {
     render(
       <HowItWorks
