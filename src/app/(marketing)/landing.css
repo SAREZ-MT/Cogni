@@ -39,6 +39,34 @@
   --lp-hl-exam: #ddd6fe;
   --lp-hl-recall: #a7f3d0;
 
+  /* Techniques deck and pillars (Pencil frame v1, sections Técnicas and
+     Pilares 01–05). */
+  --lp-violet-200: #ddd6fe;
+  --lp-violet-800: #5b21b6;
+  --lp-on-dark-tab: #d9d2ee;
+  --lp-on-dark-side: #b9b0d6;
+  --lp-ground-raise: #2a1d4d;
+  --lp-muted: #8a8399;
+  --lp-line: #e7e1f2;
+  --lp-soft: #f3f0fa;
+  --lp-sidebar: #f6f3fb;
+  --lp-grid: #f0ecf6;
+  --lp-grid-strong: #cfc6e4;
+  --lp-curve-off: #b8b0c9;
+  --lp-yellow-100: #fef3c7;
+  --lp-amber-500: #f59e0b;
+  --lp-amber-800: #92400e;
+  --lp-mint-50: #ecfdf5;
+  --lp-mint-100: #d1fae5;
+  --lp-green-500: #10b981;
+  --lp-green-700: #047857;
+  --lp-mint-800: #065f46;
+  --lp-rose-100: #ffe4e6;
+  --lp-rose-700: #be123c;
+  --lp-rose-950: #4c0519;
+  --lp-blue-100: #dbeafe;
+  --lp-orange-100: #ffedd5;
+
   --lp-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
 
   --lp-font-display: var(--font-instrument-serif), Georgia, serif;
@@ -77,6 +105,22 @@
 
 .lp-shadow-card {
   box-shadow: 0 8px 24px rgb(76 29 149 / 0.08);
+}
+
+.lp-shadow-window {
+  box-shadow: 0 24px 50px rgb(76 29 149 / 0.1);
+}
+
+.lp-shadow-deck {
+  box-shadow: 0 30px 60px rgb(5 2 15 / 0.45);
+}
+
+/* The techniques tab row scrolls sideways on phones without a scrollbar. */
+.lp-scroll-x {
+  scrollbar-width: none;
+}
+.lp-scroll-x::-webkit-scrollbar {
+  display: none;
 }
 
 .lp :focus-visible {
@@ -120,5 +164,10 @@
 @media (prefers-reduced-motion: reduce) {
   .lp-press:active {
     transform: none;
+  }
+  /* Overrides the scroll-linked inline transform of the pillar bands. */
+  .lp-band-ground {
+    /* biome-ignore lint/complexity/noImportantStyles: only !important beats the inline style Motion writes */
+    transform: none !important;
   }
 }
