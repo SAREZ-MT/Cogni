@@ -100,27 +100,30 @@ const ROWS: readonly RegistryRow[] = [
   },
   {
     entry: {
-      id: "openrouter-qwen",
-      model: "qwen/qwen3.8-27b:free",
+      id: "openrouter-nemotron",
+      model: "nvidia/nemotron-3.5-super-vl:free",
       capabilities: GENERATION_PURPOSES,
       rpm: 20,
       rpd: 50,
       priority: 3,
     },
     isConfigured: (env) => Boolean(env.OPENROUTER_API_KEY),
-    createModel: openRouterModel("qwen/qwen3.8-27b:free"),
+    createModel: openRouterModel("nvidia/nemotron-3.5-super-vl:free"),
   },
   {
+    // OpenRouter retires `:free` models without notice; both rows were
+    // checked against /api/v1/models/<id>/endpoints (structured outputs
+    // supported) on 2026-10-28.
     entry: {
-      id: "openrouter-nemotron",
-      model: "nvidia/nemotron-3-super-120b-a12b:free",
+      id: "openrouter-dots",
+      model: "dots-studio/dots-3-note-preview:free",
       capabilities: GENERATION_PURPOSES,
       rpm: 20,
       rpd: 50,
       priority: 4,
     },
     isConfigured: (env) => Boolean(env.OPENROUTER_API_KEY),
-    createModel: openRouterModel("nvidia/nemotron-3-super-120b-a12b:free"),
+    createModel: openRouterModel("dots-studio/dots-3-note-preview:free"),
   },
 ];
 

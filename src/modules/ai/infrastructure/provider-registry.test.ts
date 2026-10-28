@@ -48,8 +48,8 @@ describe("buildProviderEntries", () => {
     }).map((e) => e.id);
     expect(ids).toEqual([
       "gemini-flash-lite",
-      "openrouter-qwen",
       "openrouter-nemotron",
+      "openrouter-dots",
     ]);
   });
 
@@ -61,7 +61,7 @@ describe("buildProviderEntries", () => {
     expect(ids).toEqual([]);
   });
 
-  it("orders generation fallbacks Gemini, Cloudflare, Qwen, Nemotron", () => {
+  it("orders generation fallbacks Gemini, Cloudflare, Nemotron, Dots", () => {
     const entries = buildProviderEntries(all);
     const generation = entries
       .filter((e) => e.capabilities.includes("generate_flashcards"))
@@ -75,8 +75,8 @@ describe("buildProviderEntries", () => {
         30,
         300,
       ],
-      ["openrouter-qwen", "qwen/qwen3.8-27b:free", 20, 50],
-      ["openrouter-nemotron", "nvidia/nemotron-3-super-120b-a12b:free", 20, 50],
+      ["openrouter-nemotron", "nvidia/nemotron-3.5-super-vl:free", 20, 50],
+      ["openrouter-dots", "dots-studio/dots-3-note-preview:free", 20, 50],
     ]);
   });
 
