@@ -311,7 +311,7 @@ function ImageNodeView({
                   data-testid="image-node-img"
                   src={url}
                   alt={alt || caption || ""}
-                  className="max-w-full rounded-2xl"
+                  className="max-w-full rounded-(--radius-editor)"
                 />
               </div>
               {/* E2b scope D, "image node polish": a small floating control
@@ -320,7 +320,7 @@ function ImageNodeView({
                 role="toolbar"
                 aria-label="Opciones de imagen"
                 data-testid="image-node-controls"
-                className="absolute top-2 right-2 flex items-center gap-0.5 rounded-lg border border-border-default bg-card p-1 opacity-0 shadow-md transition-opacity focus-within:opacity-100 group-hover:opacity-100"
+                className="editor-surface absolute top-2 right-2 flex items-center gap-0.5 border border-border-default bg-card p-1 opacity-0 shadow-md transition-opacity focus-within:opacity-100 group-hover:opacity-100"
               >
                 {ALIGN_OPTIONS.map((option) => (
                   <button

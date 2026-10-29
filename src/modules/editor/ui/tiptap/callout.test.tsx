@@ -43,8 +43,13 @@ describe("Callout node", () => {
     const callout = await screen.findByTestId("callout");
     expect(callout).toHaveAttribute("data-kind", "warning");
     expect(callout.className).toContain("bg-pastel-orange");
-    expect(callout.className).toContain("text-pastel-orange-fg");
-    expect(screen.getByTestId("callout-icon")).toBeInTheDocument();
+    // H6-E2: a soft tint with normal ink text; only the icon keeps the
+    // kind's ink colour.
+    expect(callout.className).toContain("text-fg");
+    expect(callout.className).not.toContain("text-pastel-orange-fg");
+    expect(screen.getByTestId("callout-icon")).toHaveClass(
+      "text-pastel-orange-fg",
+    );
     expect(callout).toHaveTextContent("cuidado");
   });
 

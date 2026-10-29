@@ -31,10 +31,18 @@ export function isCalloutKind(value: unknown): value is CalloutKind {
 }
 
 // specs/editor/spec.md: "idea" → yellow, "note" → blue, "warning" → orange.
+// H6-E2 (Notion-like callout): a soft tint of the kind's pastel behind
+// normal ink text; only the icon carries the kind's ink colour.
 const CALLOUT_CLASSES: Record<CalloutKind, string> = {
-  idea: "bg-pastel-yellow text-pastel-yellow-fg",
-  note: "bg-pastel-blue text-pastel-blue-fg",
-  warning: "bg-pastel-orange text-pastel-orange-fg",
+  idea: "bg-pastel-yellow/60",
+  note: "bg-pastel-blue/60",
+  warning: "bg-pastel-orange/60",
+};
+
+const CALLOUT_ICON_CLASSES: Record<CalloutKind, string> = {
+  idea: "text-pastel-yellow-fg",
+  note: "text-pastel-blue-fg",
+  warning: "text-pastel-orange-fg",
 };
 
 const CALLOUT_ICONS: Record<CalloutKind, typeof Lightbulb> = {
@@ -53,11 +61,11 @@ function CalloutView({ node }: ReactNodeViewProps) {
     <NodeViewWrapper
       data-testid="callout"
       data-kind={kind}
-      className={`flex gap-2 rounded-2xl p-4 ${CALLOUT_CLASSES[kind]}`}
+      className={`my-1 flex gap-2.5 rounded-(--radius-editor) px-4 py-3 text-fg ${CALLOUT_CLASSES[kind]}`}
     >
       <Icon
         data-testid="callout-icon"
-        className="mt-0.5 size-5 shrink-0"
+        className={`mt-0.5 size-5 shrink-0 ${CALLOUT_ICON_CLASSES[kind]}`}
         strokeWidth={1.75}
       />
       <NodeViewContent className="flex-1" />

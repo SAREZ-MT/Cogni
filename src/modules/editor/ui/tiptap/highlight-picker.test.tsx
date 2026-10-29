@@ -46,7 +46,8 @@ describe("HighlightPickerControls", () => {
     const { className } = screen.getByTestId("highlight-picker");
     expect(className).toContain("bg-card");
     expect(className).toContain("border-border-default");
-    expect(className).toContain("rounded-xl");
+    // H6-E3: square editor corners come from the editor-surface rule.
+    expect(className).toContain("editor-surface");
     expect(className).toContain("shadow-md");
     expect(className).not.toContain("bg-popover");
     expect(className).not.toMatch(/(^|\s)border-border(\s|$)/);

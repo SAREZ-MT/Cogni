@@ -90,7 +90,7 @@ function TocView({ editor }: ReactNodeViewProps) {
     <NodeViewWrapper
       data-testid="toc-block"
       contentEditable={false}
-      className="flex flex-col gap-2 rounded-2xl border border-border-default bg-card p-4"
+      className="flex flex-col gap-2 rounded-(--radius-editor) border border-border-default bg-card p-4"
     >
       <div className="flex items-center gap-1.5 font-semibold text-fg-secondary text-xs uppercase tracking-wide">
         <ListTree aria-hidden="true" size={14} strokeWidth={1.75} />

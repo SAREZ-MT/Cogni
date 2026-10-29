@@ -387,7 +387,7 @@ export function BubbleToolbarControls({ editor }: BubbleToolbarControlsProps) {
         role="toolbar"
         aria-label="Formato de texto"
         data-testid="bubble-toolbar"
-        className="flex items-center gap-0.5 rounded-lg border border-border-default bg-card p-1 shadow-md"
+        className="editor-surface flex items-center gap-0.5 border border-border-default bg-card p-1 shadow-md"
       >
         {/* E2 scope B: "Convertir en" — same catalogue and commands as
             block-context-menu.tsx's own submenu, applied to whatever block
@@ -406,7 +406,7 @@ export function BubbleToolbarControls({ editor }: BubbleToolbarControlsProps) {
           </DropdownMenuTrigger>
           <DropdownMenuContent
             align="start"
-            className="min-w-48 rounded-xl p-1"
+            className="editor-surface min-w-48 p-1"
           >
             {BLOCK_KIND_ITEMS.map((kind) => (
               <DropdownMenuItem
@@ -499,7 +499,10 @@ export function BubbleToolbarControls({ editor }: BubbleToolbarControlsProps) {
               <Baseline aria-hidden="true" size={16} strokeWidth={1.75} />
             </button>
           </PopoverTrigger>
-          <PopoverContent align="start" className="w-auto gap-2 p-2">
+          <PopoverContent
+            align="start"
+            className="editor-surface w-auto gap-2 p-2"
+          >
             <p className="px-0.5 text-fg-muted text-xs font-medium">Texto</p>
             <div className="flex flex-wrap gap-1 px-0.5">
               {TEXT_COLOR_SWATCHES.map((swatch) => (
@@ -550,7 +553,7 @@ export function BubbleToolbarControls({ editor }: BubbleToolbarControlsProps) {
           </DropdownMenuTrigger>
           <DropdownMenuContent
             align="start"
-            className="min-w-40 rounded-xl p-1"
+            className="editor-surface min-w-40 p-1"
           >
             {ALIGN_OPTIONS.map((option) => (
               <DropdownMenuItem
@@ -682,7 +685,7 @@ export function LinkPopover({ editor }: LinkPopoverProps) {
       role="dialog"
       aria-label="Enlace"
       data-testid="link-popover"
-      className="border-border-default bg-card flex items-center gap-1 rounded-lg border p-1.5 shadow-md"
+      className="editor-surface border-border-default bg-card flex items-center gap-1 border p-1.5 shadow-md"
     >
       {editing ? (
         <input

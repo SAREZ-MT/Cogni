@@ -46,7 +46,7 @@ export function HighlightPickerControls({
       role="toolbar"
       aria-label="Resaltado"
       data-testid="highlight-picker"
-      className="flex items-center gap-1 rounded-xl border border-border-default bg-card p-1 shadow-md"
+      className="editor-surface flex items-center gap-1 border border-border-default bg-card p-1 shadow-md"
     >
       {HIGHLIGHT_PALETTE.map((color) => (
         <button

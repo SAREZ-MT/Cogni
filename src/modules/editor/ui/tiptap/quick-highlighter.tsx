@@ -61,7 +61,7 @@ export function QuickHighlighter({ editor }: QuickHighlighterProps) {
             aria-label={`Resaltar en ${PALETTE_LABELS[lastColor]}`}
             aria-pressed={activeColor === lastColor}
             data-testid="bubble-toolbar-highlight"
-            className="flex size-8 items-center justify-center rounded-[3px] outline-none transition-colors hover:bg-hover focus-visible:ring-2 focus-visible:ring-ring"
+            className="flex size-8 items-center justify-center rounded-sm outline-none transition-colors hover:bg-hover focus-visible:ring-2 focus-visible:ring-ring"
             onClick={() => {
               quickHighlight(editor);
               focusEditorView(editor);
@@ -69,7 +69,7 @@ export function QuickHighlighter({ editor }: QuickHighlighterProps) {
           >
             <span
               aria-hidden="true"
-              className={`flex size-6 items-center justify-center rounded-[3px] ${CHIP_CLASSES[lastColor]}`}
+              className={`flex size-6 items-center justify-center rounded-sm ${CHIP_CLASSES[lastColor]}`}
             >
               <Highlighter size={15} strokeWidth={1.75} />
             </span>
@@ -83,14 +83,14 @@ export function QuickHighlighter({ editor }: QuickHighlighterProps) {
             type="button"
             aria-label="Más colores de resaltado"
             data-testid="bubble-toolbar-highlight-more"
-            className="flex h-8 w-4 items-center justify-center rounded-[3px] text-fg-muted outline-none transition-colors hover:bg-hover focus-visible:ring-2 focus-visible:ring-ring"
+            className="flex h-8 w-4 items-center justify-center rounded-sm text-fg-muted outline-none transition-colors hover:bg-hover focus-visible:ring-2 focus-visible:ring-ring"
           >
             <ChevronDown aria-hidden="true" size={12} strokeWidth={1.75} />
           </button>
         </PopoverTrigger>
         <PopoverContent
           align="start"
-          className="w-auto gap-1.5 rounded-[3px] p-1.5"
+          className="editor-surface w-auto gap-1.5 p-1.5"
           // Picking a colour hands focus back to the text (focusEditorView);
           // Radix would otherwise move it to the chevron as the menu closes.
           onCloseAutoFocus={(event) => event.preventDefault()}
@@ -107,7 +107,7 @@ export function QuickHighlighter({ editor }: QuickHighlighterProps) {
                 aria-label={`Resaltar en ${PALETTE_LABELS[color]}`}
                 aria-pressed={activeColor === color}
                 title={PALETTE_LABELS[color]}
-                className={`flex size-7 items-center justify-center rounded-[3px] text-[13px] font-medium outline-none transition-shadow hover:ring-1 hover:ring-fg-muted focus-visible:ring-2 focus-visible:ring-ring aria-pressed:ring-2 aria-pressed:ring-fg ${CHIP_CLASSES[color]}`}
+                className={`flex size-7 items-center justify-center rounded-sm text-[13px] font-medium outline-none transition-shadow hover:ring-1 hover:ring-fg-muted focus-visible:ring-2 focus-visible:ring-ring aria-pressed:ring-2 aria-pressed:ring-fg ${CHIP_CLASSES[color]}`}
                 onClick={() => {
                   applyHighlight(editor, color);
                   focusEditorView(editor);
@@ -121,7 +121,7 @@ export function QuickHighlighter({ editor }: QuickHighlighterProps) {
           <button
             type="button"
             data-testid="bubble-toolbar-highlight-remove"
-            className="rounded-[3px] px-2 py-1 text-left text-[13px] text-fg-secondary outline-none transition-colors hover:bg-hover focus-visible:ring-2 focus-visible:ring-ring"
+            className="rounded-sm px-2 py-1 text-left text-[13px] text-fg-secondary outline-none transition-colors hover:bg-hover focus-visible:ring-2 focus-visible:ring-ring"
             onClick={() => {
               editor.chain().unsetHighlight().run();
               focusEditorView(editor);

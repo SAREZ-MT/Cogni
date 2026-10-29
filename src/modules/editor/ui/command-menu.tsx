@@ -170,7 +170,7 @@ export function CommandMenu({
   return (
     <Command
       data-testid="command-menu"
-      className="min-w-64 max-h-80 overflow-y-auto rounded-lg border border-border-default bg-card p-1 shadow-md"
+      className="editor-surface rounded-(--radius-editor)! min-w-64 max-h-80 overflow-y-auto border border-border-default bg-card p-1 shadow-md"
       // cmdk recomputes `data-selected` on its Item from this controlled
       // value, always overwriting a plain `data-selected` prop passed
       // straight to CommandItem — that was the bug (PR5b finding, flagged

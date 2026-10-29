@@ -84,7 +84,7 @@ export function ImageUploadNode({
       onDrop={handleDrop}
       onDragOver={handleDragOver}
       className={cn(
-        "flex flex-col items-center gap-3 rounded-2xl border-dashed text-center",
+        "flex flex-col items-center gap-3 rounded-(--radius-editor) border-dashed text-center",
         !uploading && "cursor-pointer",
       )}
     >
