@@ -10,6 +10,10 @@ import {
 import type { PageTextReader } from "@/modules/notebooks";
 import { createFixedClock } from "@/shared/kernel/clock";
 import { DomainError } from "@/shared/kernel/domain-error";
+import {
+  PAGE_TOO_SHORT_CODE,
+  PageTooShortError,
+} from "@/shared/kernel/generation-capacity";
 import { fingerprintParagraph } from "@/shared/kernel/page-paragraphs";
 import { err, ok, type Result } from "@/shared/kernel/result";
 import { RECALL_ERROR } from "../domain/errors";
@@ -26,7 +30,13 @@ const OWNER = "owner-1";
 const PAGE = "page-1";
 const NOW = new Date("2026-10-06T10:00:00.000Z");
 const RESET = new Date("2026-10-07T00:00:00.000Z");
-const TEXT = "La mitocondria produce ATP. El núcleo guarda el ADN.";
+// A paragraph of `n` distinct words tagged `tag`: since Phase 8 H14 a
+// generation needs 100 words of new paragraphs, and recall's 10 questions
+// about 150.
+function para(tag: string, n: number): string {
+  return Array.from({ length: n }, (_, i) => `${tag}${i}`).join(" ");
+}
+const TEXT = `La mitocondria produce ATP. El núcleo guarda el ADN. ${para("t", 141)}`;
 
 class StubLimiter implements GenerationRateLimiter {
   checks = 0;
@@ -455,7 +465,7 @@ describe("requestRecallGeneration", () => {
   });
 
   it("truncates the page text to the token cap and reports it", async () => {
-    const long = Array.from({ length: 50 }, (_, i) => `palabra${i}`).join(" ");
+    const long = Array.from({ length: 200 }, (_, i) => `palabra${i}`).join(" ");
     const { deps, ai } = makeDeps({ pages: stubPages(long), tokenCap: 10 });
 
     const result = await requestRecallGeneration({ pageId: PAGE }, deps, OWNER);
@@ -463,9 +473,9 @@ describe("requestRecallGeneration", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.truncated).toBe(true);
-    expect(result.value.wordsTotal).toBe(50);
-    expect(result.value.wordsUsed).toBeLessThan(50);
-    expect(ai.calls[0]?.prompt).not.toContain("palabra49");
+    expect(result.value.wordsTotal).toBe(200);
+    expect(result.value.wordsUsed).toBeLessThan(200);
+    expect(ai.calls[0]?.prompt).not.toContain("palabra199");
   });
 });
 
@@ -477,13 +487,14 @@ describe("requestRecallGeneration — incremental", () => {
   });
 
   it("stores the fingerprints of the sent paragraphs with the questions", async () => {
-    const { deps, uow } = makeDeps({ pages: stubPages("Uno dos\n\nTres") });
+    const [a, b] = [para("a", 80), para("b", 80)];
+    const { deps, uow } = makeDeps({ pages: stubPages(`${a}\n\n${b}`) });
 
     const result = await requestRecallGeneration({ pageId: PAGE }, deps, OWNER);
 
     expect(result.ok).toBe(true);
     expect((await uow.fingerprints.listByPage(PAGE, OWNER)).sort()).toEqual(
-      [fingerprintParagraph("uno dos"), fingerprintParagraph("tres")].sort(),
+      [fingerprintParagraph(a), fingerprintParagraph(b)].sort(),
     );
   });
 
@@ -505,8 +516,14 @@ describe("requestRecallGeneration — incremental", () => {
   });
 
   it("sends only the added and the edited paragraphs, in page order", async () => {
+    const [first, old, added, edited] = [
+      `Primero viejo ${para("v", 78)}`,
+      `Segundo viejo ${para("w", 78)}`,
+      `Nuevo inicio ${para("x", 78)}`,
+      `Segundo editado ${para("w", 78)}`,
+    ];
     const { deps, ai } = makeDeps({
-      pages: stubPages("Primero viejo\nSegundo viejo"),
+      pages: stubPages(`${first}\n${old}`),
     });
     await requestRecallGeneration({ pageId: PAGE }, deps, OWNER);
 
@@ -514,34 +531,35 @@ describe("requestRecallGeneration — incremental", () => {
       { pageId: PAGE },
       {
         ...deps,
-        pages: stubPages("Nuevo inicio\nPrimero viejo\nSegundo editado"),
+        pages: stubPages(`${added}\n${first}\n${edited}`),
       },
       OWNER,
     );
 
     expect(second.ok).toBe(true);
     const prompt = ai.calls[1]?.prompt ?? "";
-    expect(prompt).toContain("Nuevo inicio\nSegundo editado");
+    expect(prompt).toContain(`${added}\n${edited}`);
     expect(prompt).not.toContain("Primero viejo");
   });
 
   it("keeps the paragraphs a truncation cut new for the next generation", async () => {
+    const [a, d, g] = [para("a", 100), para("d", 100), para("g", 100)];
     const { deps, uow } = makeDeps({
-      pages: stubPages("a b c\nd e f\ng h i"),
-      tokenCap: 6, // 4 words: "a b c" whole, "d" of the second paragraph
+      pages: stubPages(`${a}\n${d}\n${g}`),
+      tokenCap: 160, // 120 words: the first paragraph whole, 20 of the second
     });
 
     const first = await requestRecallGeneration({ pageId: PAGE }, deps, OWNER);
 
     expect(first.ok && first.value.truncated).toBe(true);
     expect(await uow.fingerprints.listByPage(PAGE, OWNER)).toEqual([
-      fingerprintParagraph("a b c"),
+      fingerprintParagraph(a),
     ]);
   });
 
   it("uses a paragraph longer than the cap once: the next Generar has nothing new", async () => {
     const { deps, ai } = makeDeps({
-      pages: stubPages("a b c d e f"),
+      pages: stubPages(para("a", 200)),
       tokenCap: 4, // 3 words: only the start of the one paragraph fits
     });
     await requestRecallGeneration({ pageId: PAGE }, deps, OWNER);
@@ -574,5 +592,58 @@ describe("requestRecallGeneration — incremental", () => {
 
     expect(again.ok).toBe(true);
     expect(ai.calls[1]?.prompt).toContain(TEXT);
+  });
+});
+
+// Phase 8 H14 (user 2026-10-29): 100 words minimum and about 15 per
+// question, so recall's 10 questions need 150.
+describe("requestRecallGeneration — page content thresholds", () => {
+  beforeEach(() => {
+    ids = 0;
+  });
+
+  it("answers AI_PAGE_TOO_SHORT under 150 words, before the limit and the AI", async () => {
+    const { deps, limiter, ai } = makeDeps({
+      pages: stubPages(para("c", 149)),
+    });
+
+    const result = await requestRecallGeneration({ pageId: PAGE }, deps, OWNER);
+
+    expect(!result.ok && result.error).toBeInstanceOf(PageTooShortError);
+    expect(!result.ok && result.error).toMatchObject({
+      code: PAGE_TOO_SHORT_CODE,
+      words: 149,
+      minWords: 150,
+      maxItems: 9,
+    });
+    expect([limiter.checks, limiter.peeks]).toEqual([0, 0]);
+    expect(ai.calls).toHaveLength(0);
+  });
+
+  it("generates from 150 words", async () => {
+    const { deps } = makeDeps({ pages: stubPages(para("c", 150)) });
+
+    const result = await requestRecallGeneration({ pageId: PAGE }, deps, OWNER);
+
+    expect(result.ok && result.value.questions).toHaveLength(10);
+  });
+
+  it("marks only the share of the sent paragraphs the saved questions cover", async () => {
+    const [a, b] = [para("a", 75), para("b", 75)];
+    const { deps, uow } = makeDeps({
+      pages: stubPages(`${a}\n${b}`),
+      ai: makeAi({
+        questions: Array.from({ length: 5 }, (_, i) =>
+          rawQuestion(`¿Media ${i}?`),
+        ),
+      }),
+    });
+
+    const result = await requestRecallGeneration({ pageId: PAGE }, deps, OWNER);
+
+    expect(result.ok && result.value.questions).toHaveLength(5);
+    expect(await uow.fingerprints.listByPage(PAGE, OWNER)).toEqual([
+      fingerprintParagraph(a),
+    ]);
   });
 });
