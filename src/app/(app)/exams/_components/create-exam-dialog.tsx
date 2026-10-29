@@ -2,7 +2,7 @@
 
 import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useId, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import {
   EXAM_DEFAULT_QUESTIONS,
   EXAM_MAX_QUESTIONS,
@@ -21,14 +21,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/shared/ui/dialog";
-import { NativeSelect } from "@/shared/ui/native-select";
+import { EmptyStateCta } from "@/shared/ui/empty-state-cta";
+import { PagePicker, type PagePickerNotebook } from "@/shared/ui/page-picker";
+import { TechniqueCreateTile } from "@/shared/ui/technique-create-tile";
 
-export interface CreateExamNotebook {
-  id: string;
-  title: string;
-  // The notebook's active pages, in notebook order.
-  pages: readonly { id: string; title: string }[];
-}
+// A notebook with its active pages (Phase 8 H11: the shared PagePicker's
+// shape, which also feeds the flashcards and recall create dialogs).
+export type CreateExamNotebook = PagePickerNotebook;
 
 export interface CreateExamDialogProps {
   // null when the notebooks could not be read (a load error, never the
@@ -36,6 +35,10 @@ export interface CreateExamDialogProps {
   notebooks: readonly CreateExamNotebook[] | null;
   // Preselected notebook (the exams notebook view); the first one otherwise.
   initialNotebookId?: string;
+  // Phase 8 H11: "button" (default) is the header's "Crear examen"; "cta"
+  // the hub empty state's rose pill; "tile" the first, fixed tile of the
+  // hub's grid.
+  trigger?: "button" | "cta" | "tile";
 }
 
 type CreateMode = "ai" | "manual";
@@ -58,7 +61,6 @@ const EXAM_COUNT_STEP = 5;
 
 const LIMIT_REACHED = "Llegaste al límite de hoy. Vuelve mañana.";
 const GENERIC_FAILURE = "No pudimos generar las preguntas. Intenta de nuevo.";
-const LOAD_FAILURE = "No pudimos cargar tus cuadernos. Intenta de nuevo.";
 // Incremental generation (Phase 6 T5c): the page has no paragraph exams
 // has not used yet. Same copy as the techniques panel; a notice, not an
 // error (no AI call and no generation were spent).
@@ -83,11 +85,10 @@ const ERROR_COPY: Record<string, string> = {
 export function CreateExamDialog({
   notebooks: loadedNotebooks,
   initialNotebookId,
+  trigger = "button",
 }: CreateExamDialogProps) {
   const notebooks = loadedNotebooks ?? [];
   const router = useRouter();
-  const notebookFieldId = useId();
-  const pageFieldId = useId();
   const firstNotebookId =
     notebooks.find((n) => n.id === initialNotebookId)?.id ??
     notebooks[0]?.id ??
@@ -101,8 +102,6 @@ export function CreateExamDialog({
   const [notice, setNotice] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const notebook = notebooks.find((n) => n.id === notebookId);
-  const pages = notebook?.pages ?? [];
   const canSubmit = pageId !== "" && !pending;
 
   function changeOpen(next: boolean) {
@@ -157,10 +156,22 @@ export function CreateExamDialog({
   return (
     <Dialog open={open} onOpenChange={changeOpen}>
       <DialogTrigger asChild>
-        <Button type="button" data-testid="create-exam-button">
-          <Plus aria-hidden="true" size={16} strokeWidth={1.75} />
-          Crear examen
-        </Button>
+        {trigger === "cta" ? (
+          <EmptyStateCta tone="technique" data-testid="create-exam-cta">
+            Crear mi primer examen
+          </EmptyStateCta>
+        ) : trigger === "tile" ? (
+          <TechniqueCreateTile
+            label="Crear examen"
+            hint="Elige una página para el examen"
+            data-testid="create-exam-tile"
+          />
+        ) : (
+          <Button type="button" data-testid="create-exam-button">
+            <Plus aria-hidden="true" size={16} strokeWidth={1.75} />
+            Crear examen
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent data-testid="create-exam-dialog">
         <DialogHeader>
@@ -169,106 +180,57 @@ export function CreateExamDialog({
             Elige la página del examen y cómo crear sus preguntas.
           </DialogDescription>
         </DialogHeader>
-        {loadedNotebooks === null ? (
-          <p role="alert" className="text-destructive text-sm">
-            {LOAD_FAILURE}
-          </p>
-        ) : notebooks.length === 0 ? (
-          <p className="text-fg-muted text-sm">
-            Aún no tienes cuadernos. Crea uno para empezar.
-          </p>
-        ) : (
-          <div className="flex flex-col gap-3">
-            <div className="flex flex-col gap-1.5">
-              <label
-                htmlFor={notebookFieldId}
-                className="text-fg-secondary text-sm"
-              >
-                Cuaderno
-              </label>
-              <NativeSelect
-                id={notebookFieldId}
-                value={notebookId}
-                onChange={(event) => changeNotebook(event.target.value)}
-                disabled={pending}
-                data-testid="create-exam-notebook"
-              >
-                {notebooks.map((n) => (
-                  <option key={n.id} value={n.id}>
-                    {n.title}
-                  </option>
-                ))}
-              </NativeSelect>
-            </div>
-            {pages.length === 0 ? (
-              <p className="text-fg-muted text-sm">
-                Este cuaderno aún no tiene páginas.
-              </p>
-            ) : (
-              <div className="flex flex-col gap-1.5">
-                <label
-                  htmlFor={pageFieldId}
-                  className="text-fg-secondary text-sm"
-                >
-                  Página
-                </label>
-                <NativeSelect
-                  id={pageFieldId}
-                  value={pageId}
-                  onChange={(event) => {
-                    setPageId(event.target.value);
-                    setError(null);
-                    setNotice(null);
-                  }}
-                  disabled={pending}
-                  required
-                  data-testid="create-exam-page"
-                >
-                  <option value="" disabled>
-                    Elige una página
-                  </option>
-                  {pages.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.title}
-                    </option>
-                  ))}
-                </NativeSelect>
-              </div>
-            )}
-            <ChoiceGroup
-              aria-label="Cómo crear el examen"
-              options={MODES}
-              value={mode}
-              onChange={setMode}
-              testId="create-exam-mode"
-            />
-            {mode === "ai" && (
-              <CountStepper
-                label="Preguntas a generar"
-                value={count}
-                min={EXAM_MIN_QUESTIONS}
-                max={EXAM_MAX_QUESTIONS}
-                step={EXAM_COUNT_STEP}
-                onChange={setCount}
-                disabled={pending}
-                testId="exam-count"
+        <div className="flex flex-col gap-3">
+          <PagePicker
+            notebooks={loadedNotebooks}
+            notebookId={notebookId}
+            pageId={pageId}
+            onNotebookChange={changeNotebook}
+            onPageChange={(next) => {
+              setPageId(next);
+              setError(null);
+              setNotice(null);
+            }}
+            disabled={pending}
+            testIdPrefix="create-exam"
+          />
+          {notebooks.length > 0 && (
+            <>
+              <ChoiceGroup
+                aria-label="Cómo crear el examen"
+                options={MODES}
+                value={mode}
+                onChange={setMode}
+                testId="create-exam-mode"
               />
-            )}
-            {notice && (
-              <p
-                data-testid="create-exam-notice"
-                className="text-fg-muted text-sm"
-              >
-                {notice}
-              </p>
-            )}
-            {error && (
-              <p role="alert" className="text-destructive text-sm">
-                {error}
-              </p>
-            )}
-          </div>
-        )}
+              {mode === "ai" && (
+                <CountStepper
+                  label="Preguntas a generar"
+                  value={count}
+                  min={EXAM_MIN_QUESTIONS}
+                  max={EXAM_MAX_QUESTIONS}
+                  step={EXAM_COUNT_STEP}
+                  onChange={setCount}
+                  disabled={pending}
+                  testId="exam-count"
+                />
+              )}
+              {notice && (
+                <p
+                  data-testid="create-exam-notice"
+                  className="text-fg-muted text-sm"
+                >
+                  {notice}
+                </p>
+              )}
+              {error && (
+                <p role="alert" className="text-destructive text-sm">
+                  {error}
+                </p>
+              )}
+            </>
+          )}
+        </div>
         <DialogFooter>
           <Button
             type="button"

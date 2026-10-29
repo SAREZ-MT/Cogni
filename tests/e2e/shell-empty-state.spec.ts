@@ -142,10 +142,11 @@ test.describe("app shell", () => {
     ).toBeVisible();
   });
 
-  // Phase 8 H10 (user request 2026-10-29): a brand-new owner's technique
-  // hubs show the notebooks hub's illustrated empty state, each with its
-  // own fan and a CTA to the notebooks, where a page's techniques panel
-  // creates that technique. No AI is involved.
+  // Phase 8 H10/H11 (user request 2026-10-29): a brand-new owner's
+  // technique hubs show their illustrated empty state, each with its own
+  // art, technique theme and a CTA that opens the hub's create dialog;
+  // without notebooks that dialog links to the notebooks hub. No AI is
+  // involved.
   test("technique hubs show their illustrated empty states for a new owner", async ({
     page,
     freshUser,
@@ -159,16 +160,19 @@ test.describe("app shell", () => {
         path: "/flashcards",
         technique: "flashcards",
         heading: "Tus primeras flashcards te esperan",
+        cta: "Crear mis primeras flashcards",
       },
       {
         path: "/active-recall",
         technique: "recall",
         heading: "Practica explicando con tus palabras",
+        cta: "Generar mis primeras preguntas",
       },
       {
         path: "/exams",
         technique: "exams",
         heading: "Pon a prueba lo que sabes",
+        cta: "Crear mi primer examen",
       },
     ]) {
       await page.goto(hub.path);
@@ -184,14 +188,22 @@ test.describe("app shell", () => {
         ),
       ).toBeVisible();
       await expect(
-        empty.getByRole("link", { name: "Ir a mis cuadernos" }),
-      ).toHaveAttribute("href", "/notebooks");
+        page
+          .getByTestId("content-area")
+          .locator(`[data-technique-theme="${hub.technique}"]`)
+          .first(),
+      ).toBeVisible();
+      await expect(empty.getByRole("button", { name: hub.cta })).toBeVisible();
     }
 
-    // The exams CTA leads to the notebooks hub.
+    // The exams CTA's dialog leads to the notebooks hub.
     await page
       .getByTestId("content-area")
-      .getByRole("link", { name: "Ir a mis cuadernos" })
+      .getByRole("button", { name: "Crear mi primer examen" })
+      .click();
+    await page
+      .getByRole("dialog", { name: "Crear examen" })
+      .getByRole("link", { name: "Crear un cuaderno" })
       .click();
     await expect(page).toHaveURL("/notebooks");
   });

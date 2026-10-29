@@ -2,14 +2,21 @@ import { listDecksAction } from "@/modules/flashcards";
 import { COLOR_PALETTE, type NotebookColor } from "@/modules/notebooks";
 import { listDueTodayAction } from "@/modules/scheduling";
 import { DeckSummaryCard } from "@/shared/ui/deck-summary-card";
-import { EmptyStateCta } from "@/shared/ui/empty-state-cta";
 import { IllustratedEmptyState } from "@/shared/ui/illustrated-empty-state";
 import { SectionTitle } from "@/shared/ui/section-header";
 import { TechniqueEmptyArt } from "@/shared/ui/technique-empty-art";
 import { TechniqueHubHeader } from "@/shared/ui/technique-hub-header";
 import { SetBreadcrumb } from "../_components/breadcrumb";
+import { loadCreateExamNotebooks } from "../exams/_lib/create-exam-notebooks";
+import { CreateFromPageDialog } from "./_components/create-from-page-dialog";
 import { DueTodayList, type DueTodayRow } from "./_components/due-today-list";
 import { plural } from "./_lib/plural";
+import { readRemainingGenerations } from "./_lib/remaining-generations";
+
+// ADR 0003 (no queue): Next applies a Server Action's maxDuration from the
+// page segment hosting it, and this hub's create dialog generates
+// flashcards (Phase 8 H11) — the same budget as the notebook page route.
+export const maxDuration = 120;
 
 const DEFAULT_TONE: NotebookColor = "purple";
 
@@ -22,12 +29,21 @@ function toTone(color: string | null): NotebookColor {
 // review) above one summary card per notebook that holds at least one deck
 // (a deck = a page with cards, named by the page) with its card and due
 // counts. When the due list cannot load, the cards show card counts only
-// instead of a false "al día".
+// instead of a false "al día". Phase 8 H11: flashcards are created from
+// here too, through a "pick a page" dialog opened by the empty state's CTA
+// or the grid's first, fixed tile.
 export default async function FlashcardsHubPage() {
-  const [result, dueResult] = await Promise.all([
+  const [result, dueResult, createNotebooks, remaining] = await Promise.all([
     listDecksAction(),
     listDueTodayAction(),
+    loadCreateExamNotebooks(),
+    readRemainingGenerations(),
   ]);
+  const createProps = {
+    technique: "flashcards",
+    notebooks: createNotebooks,
+    remaining,
+  } as const;
   const decks = result.ok ? result.value : [];
 
   const dueToday: DueTodayRow[] | null = dueResult.ok
@@ -83,11 +99,11 @@ export default async function FlashcardsHubPage() {
       />
 
       {notebooks.length === 0 ? (
-        // Phase 8 H10 (user request 2026-10-29): the notebooks hub's
-        // empty-state line (H4-T1..T3) — fanned flashcards on the dotted
-        // paper, a cascade entrance, a gradient headline and the violet
-        // pill to the notebooks, where a page's techniques panel generates
-        // the cards. A failed read keeps the load error as the message.
+        // Phase 8 H10/H11: the illustrated empty state — the deck on the
+        // amber dotted paper, a cascade entrance, the technique-gradient
+        // headline and the amber CTA, which opens the "pick a page" dialog
+        // (AI or by hand). A failed read keeps the load error as the
+        // message.
         <IllustratedEmptyState
           entrance="cascade"
           paper
@@ -96,14 +112,10 @@ export default async function FlashcardsHubPage() {
           title="Tus primeras flashcards te esperan"
           description={
             result.ok
-              ? "Genera tarjetas desde cualquier página de tus cuadernos y repásalas aquí."
+              ? "Elige una página de tus cuadernos y crea tarjetas con IA o a mano para repasarlas aquí."
               : "No pudimos cargar tus mazos. Intenta de nuevo."
           }
-          action={
-            <EmptyStateCta href="/notebooks" tone="technique">
-              Ir a mis cuadernos
-            </EmptyStateCta>
-          }
+          action={<CreateFromPageDialog {...createProps} trigger="cta" />}
         />
       ) : (
         <>
@@ -111,6 +123,7 @@ export default async function FlashcardsHubPage() {
           <div>
             <SectionTitle>Mazos por cuaderno</SectionTitle>
             <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3.5">
+              <CreateFromPageDialog {...createProps} trigger="tile" />
               {notebooks.map((notebook) => (
                 <DeckSummaryCard
                   key={notebook.notebookId}

@@ -1,10 +1,18 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import { Button } from "@/shared/ui/button";
 import { cn } from "@/shared/ui/utils";
 
-export interface EmptyStateCtaProps {
-  href: string;
+// With `href` a link; without it (Phase 8 H11) a button, e.g. a dialog
+// trigger: `DialogTrigger asChild` passes its handlers and ref through.
+type EmptyStateCtaTarget =
+  | { href: string }
+  | ({ href?: undefined } & Omit<
+      ComponentProps<"button">,
+      "children" | "className"
+    >);
+
+export type EmptyStateCtaProps = EmptyStateCtaTarget & {
   children: ReactNode;
   // "brand" (default): the violet pill. "technique" (Phase 8 H11): the
   // technique's CTA colours from the surrounding `data-technique-theme`
@@ -12,7 +20,7 @@ export interface EmptyStateCtaProps {
   // recall emerald-700 and exams rose-700 with white ink).
   tone?: "brand" | "technique";
   className?: string;
-}
+};
 
 // Shared shape: a 48px pill that wraps instead of clipping when a narrow
 // column squeezes it.
@@ -28,27 +36,32 @@ export const EMPTY_STATE_CTA_TONE = {
     "technique-cta bg-(--theme-cta) text-(--theme-cta-fg) hover:bg-(--theme-cta-hover)",
 } as const;
 
-// The illustrated empty states' primary step as a link (Phase 8 H10): the
+// The illustrated empty states' primary step (Phase 8 H10): the
 // same violet pill with a soft violet shadow as the notebooks hub's
 // "Crear mi primer cuaderno" (H4-T1) and the empty notebook's "Nueva
-// página" (H5-T4), for a CTA that navigates instead of opening a dialog.
+// página" (H5-T4); a link, or a button since H11.
 export function EmptyStateCta({
-  href,
   children,
   tone = "brand",
   className,
+  ...target
 }: EmptyStateCtaProps) {
+  const classes = cn(
+    EMPTY_STATE_CTA_SHAPE,
+    EMPTY_STATE_CTA_TONE[tone],
+    className,
+  );
+  if (target.href !== undefined) {
+    return (
+      <Button asChild size="lg" className={classes}>
+        <Link href={target.href}>{children}</Link>
+      </Button>
+    );
+  }
+  const { href: _href, ...button } = target;
   return (
-    <Button
-      asChild
-      size="lg"
-      className={cn(
-        EMPTY_STATE_CTA_SHAPE,
-        EMPTY_STATE_CTA_TONE[tone],
-        className,
-      )}
-    >
-      <Link href={href}>{children}</Link>
+    <Button type="button" size="lg" className={classes} {...button}>
+      {children}
     </Button>
   );
 }

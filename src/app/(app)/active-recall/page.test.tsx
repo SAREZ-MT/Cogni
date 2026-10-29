@@ -1,4 +1,5 @@
 import { render, screen, within } from "@testing-library/react";
+import { createElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
@@ -7,6 +8,22 @@ const { listRecallHubAction } = vi.hoisted(() => ({
   listRecallHubAction: vi.fn(),
 }));
 vi.mock("@/modules/active-recall", () => ({ listRecallHubAction }));
+const {
+  getGenerationStatusAction,
+  CreateFromPageDialog,
+  loadCreateExamNotebooks,
+} = vi.hoisted(() => ({
+  getGenerationStatusAction: vi.fn(),
+  CreateFromPageDialog: vi.fn(),
+  loadCreateExamNotebooks: vi.fn(),
+}));
+vi.mock("@/modules/flashcards", () => ({ getGenerationStatusAction }));
+vi.mock("../flashcards/_components/create-from-page-dialog", () => ({
+  CreateFromPageDialog,
+}));
+vi.mock("../exams/_lib/create-exam-notebooks", () => ({
+  loadCreateExamNotebooks,
+}));
 
 import ActiveRecallHubPage from "./page";
 
@@ -70,6 +87,37 @@ describe("ActiveRecallHubPage", () => {
       ok: true,
       value: { pages: PAGES, averageMastery: 47 },
     });
+    getGenerationStatusAction.mockReset();
+    getGenerationStatusAction.mockResolvedValue({
+      ok: true,
+      value: { remainingToday: 2, resetAt: "2026-10-30T00:00:00.000Z" },
+    });
+    loadCreateExamNotebooks.mockReset();
+    loadCreateExamNotebooks.mockResolvedValue(null);
+    CreateFromPageDialog.mockReset();
+    CreateFromPageDialog.mockImplementation(((props: { trigger: string }) =>
+      createElement("div", {
+        "data-testid": `create-recall-${props.trigger}`,
+      })) as never);
+  });
+
+  // Phase 8 H11: with sessions listed, "Generar preguntas" opens from a
+  // tile fixed first in the grid (AI only: no manual recall questions).
+  it("puts the create tile first in the notebooks grid", async () => {
+    render(await ActiveRecallHubPage());
+
+    const tile = screen.getByTestId("create-recall-tile");
+    expect(tile.parentElement?.firstElementChild).toBe(tile);
+    expect(CreateFromPageDialog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        technique: "recall",
+        trigger: "tile",
+        remaining: 2,
+        notebooks: null,
+      }),
+      undefined,
+    );
+    expect(screen.queryByTestId("create-recall-cta")).toBeNull();
   });
 
   afterEach(() => {
@@ -253,7 +301,7 @@ describe("ActiveRecallHubPage", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByText(
-        "Genera preguntas abiertas desde una página de tus cuadernos y respóndelas aquí.",
+        "Elige una página de tus cuadernos: la IA crea preguntas abiertas y las respondes aquí.",
       ),
     ).toBeInTheDocument();
     expect(
@@ -266,9 +314,16 @@ describe("ActiveRecallHubPage", () => {
     expect(
       document.querySelector('[data-slot="illustrated-empty-state"]'),
     ).toHaveAttribute("data-technique-theme", "recall");
+    // Phase 8 H11: the CTA opens the "pick a page" dialog.
+    const empty = document.querySelector(
+      '[data-slot="illustrated-empty-state"]',
+    ) as HTMLElement;
     expect(
-      screen.getByRole("link", { name: "Ir a mis cuadernos" }),
-    ).toHaveAttribute("href", "/notebooks");
+      empty.querySelector('[data-testid="create-recall-cta"]'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Ir a mis cuadernos" }),
+    ).toBeNull();
     expect(screen.queryByRole("link", { name: /Nueva sesión/ })).toBeNull();
     expect(screen.getByText("0 sesiones · 0 cuadernos")).toBeInTheDocument();
   });

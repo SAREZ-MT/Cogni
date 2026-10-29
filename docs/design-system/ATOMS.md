@@ -420,8 +420,12 @@ shadow of H4-T1's "Crear mi primer cuaderno", `hover:bg-primary-700`.
 `tone="technique"` (H11): `bg-(--theme-cta) text-(--theme-cta-fg)
 hover:bg-(--theme-cta-hover)` plus `technique-cta` (1px inner edge and a
 coloured shadow), inside a `data-technique-theme`. Props: `href`,
-`children`, `tone?`, `className?`. The shape and tone class lists are
-exported (`EMPTY_STATE_CTA_SHAPE`, `EMPTY_STATE_CTA_TONE`).
+`children`, `tone?`, `className?`. Without `href` it is a `type="button"`
+that forwards button props (a `DialogTrigger asChild` target): the
+technique hubs' "Crear mis primeras flashcards", "Generar mis primeras
+preguntas" and "Crear mi primer examen" open their create dialogs. The
+shape and tone class lists are exported (`EMPTY_STATE_CTA_SHAPE`,
+`EMPTY_STATE_CTA_TONE`).
 
 Used by: `notebooks/[notebookId]/page.tsx` (the zero-pages
 `IllustratedEmptyState` `art`).
@@ -843,13 +847,45 @@ A single-choice list of bordered rows with radio semantics
 (`role="radiogroup"` + `role="radio"`/`aria-checked`), each with a label and
 an optional muted description. Unchecked rows use `OptionRow`'s default
 palette (`border-neutral-200/80 bg-card`), the checked row its selected
-palette (`border-rose-500 bg-pastel-pink/30`).
+palette: `tone="rose"` (default, `border-rose-500 bg-pastel-pink/30`) or
+`tone="amber"` (Phase 8 H11, `border-warning-500 bg-pastel-yellow/40`).
 
 - `options: { value, label, description? }[]`, `value`, `onChange`,
-  `aria-label`, `testId?` (each row gets `${testId}-${value}`), `className?`.
+  `aria-label`, `testId?` (each row gets `${testId}-${value}`), `tone?`,
+  `className?`.
 
 Used by: `exams/_components/create-exam-dialog.tsx` ("Generar con IA" /
-"Crear mis preguntas").
+"Crear mis preguntas") and `flashcards/_components/create-from-page-dialog.tsx`
+(amber; "Generar con IA" / "Crear a mano").
+
+## PagePicker (`page-picker.tsx`)
+
+Phase 8 H11: the "which page?" step of every create dialog that starts
+from a technique hub (all study content belongs to a page). Client
+component: a "Cuaderno" `NativeSelect`, then a "Página" one ("Elige una
+página" placeholder, required) with that notebook's pages. Never a dead
+end: no notebooks reads "Aún no tienes cuadernos. Crea uno para empezar."
+with a "Crear un cuaderno" link to `/notebooks`; a notebook without pages
+reads "Este cuaderno aún no tiene páginas." with "Crear una página" to
+`/notebooks/{id}`; `notebooks === null` is a load-error alert. Props:
+`notebooks` (`PagePickerNotebook[] | null`), `notebookId`, `pageId`,
+`onNotebookChange`, `onPageChange`, `disabled?`, `testIdPrefix`
+(`-notebook` / `-page`). Used by `CreateExamDialog` and
+`CreateFromPageDialog`; fed by `exams/_lib/create-exam-notebooks.ts`
+(`getSidebarTree`).
+
+## TechniqueCreateTile (`technique-create-tile.tsx`)
+
+Phase 8 H11: the first, fixed item of a technique hub's notebooks grid, in
+the "Nuevo cuaderno" / "Nueva página" create-tile language: `primary-50`
+fill, 2px dashed `primary-300` border, a 44px `primary-600` plus disc, a
+14px semibold `primary-700` label and a 12px hint. Shaped like
+`DeckSummaryCard` (18px radius, `h-full min-h-[156px]`); lifts 2px and
+deepens its tint on hover, presses to 0.98, still under reduced motion.
+A plain `<button>` (`type="button"` default) for `DialogTrigger asChild`.
+Props: `label` (also the accessible name), `hint?`, button props. Used by
+the `/flashcards` ("Crear flashcards"), `/active-recall` ("Generar
+preguntas") and `/exams` ("Crear examen") grids.
 
 ## ViewToggle (`view-toggle.tsx`)
 

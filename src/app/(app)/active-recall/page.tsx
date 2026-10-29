@@ -6,14 +6,21 @@ import {
 } from "@/modules/active-recall";
 import { COLOR_PALETTE, type NotebookColor } from "@/modules/notebooks";
 import { DeckSummaryCard } from "@/shared/ui/deck-summary-card";
-import { EmptyStateCta } from "@/shared/ui/empty-state-cta";
 import { IconTile } from "@/shared/ui/icon-tile";
 import { IllustratedEmptyState } from "@/shared/ui/illustrated-empty-state";
 import { Pill } from "@/shared/ui/pill";
 import { TechniqueEmptyArt } from "@/shared/ui/technique-empty-art";
 import { TechniqueHubHeader } from "@/shared/ui/technique-hub-header";
 import { SetBreadcrumb } from "../_components/breadcrumb";
+import { loadCreateExamNotebooks } from "../exams/_lib/create-exam-notebooks";
+import { CreateFromPageDialog } from "../flashcards/_components/create-from-page-dialog";
 import { plural } from "../flashcards/_lib/plural";
+import { readRemainingGenerations } from "../flashcards/_lib/remaining-generations";
+
+// ADR 0003 (no queue): Next applies a Server Action's maxDuration from the
+// page segment hosting it, and this hub's create dialog generates recall
+// questions (Phase 8 H11) — the recall session route's budget.
+export const maxDuration = 300;
 
 const DEFAULT_TONE: NotebookColor = "purple";
 
@@ -64,8 +71,21 @@ function latestPercentageOf(pages: readonly RecallHubPageView[]): number {
 // card badges its recall questions due today, and the quick start opens the first page with recall questions due today (the
 // first page otherwise). The layout is the design preview's (Phase 6 UI
 // freeze: the screens keep their look; the data adapts to them).
+//
+// Phase 8 H11: recall questions are generated from here too (AI only),
+// through a "pick a page" dialog opened by the empty state's CTA or the
+// grid's first, fixed tile.
 export default async function ActiveRecallHubPage() {
-  const result = await listRecallHubAction();
+  const [result, createNotebooks, remaining] = await Promise.all([
+    listRecallHubAction(),
+    loadCreateExamNotebooks(),
+    readRemainingGenerations(),
+  ]);
+  const createProps = {
+    technique: "recall",
+    notebooks: createNotebooks,
+    remaining,
+  } as const;
   const hub = result.ok ? result.value : { pages: [], averageMastery: null };
   const notebooksWithPages = groupByNotebook(hub.pages);
   const allPages = hub.pages;
@@ -139,12 +159,12 @@ export default async function ActiveRecallHubPage() {
       )}
 
       {notebooksWithPages.length === 0 ? (
-        // Phase 8 H10 (user request 2026-10-29, explicit go-ahead past the
-        // Phase 6 UI freeze for this empty state only): the notebooks hub's
-        // empty-state line — stacked prompt cards on the dotted paper, a
-        // cascade entrance, a gradient headline and the violet pill to the
-        // notebooks, where a page's techniques panel creates the questions.
-        // A failed read keeps the load error as the message.
+        // Phase 8 H10/H11 (explicit go-ahead past the Phase 6 UI freeze for
+        // this empty state only): the illustrated empty state — the open
+        // question and answer sheet on the emerald dotted paper, a cascade
+        // entrance, the technique-gradient headline and the emerald CTA,
+        // which opens the "pick a page" dialog (AI only). A failed read
+        // keeps the load error as the message.
         <IllustratedEmptyState
           entrance="cascade"
           paper
@@ -153,17 +173,14 @@ export default async function ActiveRecallHubPage() {
           title="Practica explicando con tus palabras"
           description={
             result.ok
-              ? "Genera preguntas abiertas desde una página de tus cuadernos y respóndelas aquí."
+              ? "Elige una página de tus cuadernos: la IA crea preguntas abiertas y las respondes aquí."
               : "No pudimos cargar tus sesiones. Intenta de nuevo."
           }
-          action={
-            <EmptyStateCta href="/notebooks" tone="technique">
-              Ir a mis cuadernos
-            </EmptyStateCta>
-          }
+          action={<CreateFromPageDialog {...createProps} trigger="cta" />}
         />
       ) : (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3.5">
+          <CreateFromPageDialog {...createProps} trigger="tile" />
           {notebooksWithPages.map(({ notebook, pages }) => {
             const sessionCount = pages.reduce(
               (sum, page) => sum + page.sessions.length,

@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it, vi } from "vitest";
 import { EmptyStateCta } from "./empty-state-cta";
 
 // Phase 8 H10: the violet pill of the illustrated empty states, as a link.
@@ -24,5 +25,24 @@ describe("EmptyStateCta", () => {
     const link = screen.getByRole("link", { name: "Ir" });
     expect(link).toHaveClass("rounded-pill", "technique-cta");
     expect(link).not.toHaveClass("bg-primary-600");
+  });
+
+  // Phase 8 H11: without `href` it is a button (a dialog trigger).
+  it("is a button that forwards its handlers when no href is given", async () => {
+    const onClick = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <EmptyStateCta tone="technique" onClick={onClick}>
+        Crear mi primer examen
+      </EmptyStateCta>,
+    );
+
+    const button = screen.getByRole("button", {
+      name: "Crear mi primer examen",
+    });
+    expect(button).toHaveAttribute("type", "button");
+    expect(button).toHaveClass("rounded-pill", "technique-cta");
+    await user.click(button);
+    expect(onClick).toHaveBeenCalledOnce();
   });
 });
