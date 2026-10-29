@@ -287,6 +287,24 @@ describe("ActiveRecallHubPage (flat since Phase 8 H17)", () => {
     ).toBeInTheDocument();
   });
 
+  // Phase 8 H18: the card practises; the menu's "Editar preguntas" opens
+  // the page's recall edit page, keeping the hub marker.
+  it("leads the menu's Editar preguntas to the page's edit page", async () => {
+    const user = (await import("@testing-library/user-event")).default.setup();
+    render(await ActiveRecallHubPage(hub()));
+
+    await user.click(
+      screen.getByRole("button", { name: "Acciones de Página practicada" }),
+    );
+
+    expect(
+      await screen.findByRole("menuitem", { name: /Editar preguntas/ }),
+    ).toHaveAttribute(
+      "href",
+      `/active-recall/${NB_A}/practicada/editar?desde=hub`,
+    );
+  });
+
   it("shows the empty state when no page has a session", async () => {
     listRecallHubAction.mockResolvedValue({
       ok: true,

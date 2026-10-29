@@ -1,4 +1,9 @@
-import { FileText, ListChecks, MessageCircleQuestion } from "lucide-react";
+import {
+  FileText,
+  ListChecks,
+  MessageCircleQuestion,
+  Pencil,
+} from "lucide-react";
 import Link from "next/link";
 import {
   listRecallHubAction,
@@ -126,6 +131,14 @@ export default async function ActiveRecallHubPage({
         emphasis={due > 0 ? "primary" : "soft"}
         menu={
           <>
+            <DropdownMenuItem asChild>
+              <Link
+                href={hubItemHref(`${sessionHref}/editar`, filter.selected)}
+              >
+                <Pencil aria-hidden="true" size={15} strokeWidth={1.75} />
+                Editar preguntas
+              </Link>
+            </DropdownMenuItem>
             <DropdownMenuItem asChild>
               <Link href={`/notebooks/${page.notebookId}/pages/${page.pageId}`}>
                 <FileText aria-hidden="true" size={15} strokeWidth={1.75} />
