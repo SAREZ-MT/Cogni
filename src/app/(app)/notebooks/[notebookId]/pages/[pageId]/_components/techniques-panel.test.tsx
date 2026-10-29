@@ -148,26 +148,33 @@ describe("TechniquesPanel", () => {
     expect(screen.getByTestId("generate-exam-questions")).toBeEnabled();
     const generate = screen.getAllByRole("button", { name: "Generar" });
     expect(generate).toHaveLength(3);
+    // H9-T1 (user, 2026-10-29): no description lines under the names.
+    for (const gone of [
+      "Tarjetas con repetición espaciada",
+      "Preguntas abiertas de memoria",
+      "Opción múltiple con retroalimentación",
+    ]) {
+      expect(screen.queryByText(gone)).not.toBeInTheDocument();
+    }
     expect(
       generate.filter((b) => (b as HTMLButtonElement).disabled),
     ).toHaveLength(0);
   });
 
-  it("colours each Generar with its technique: Flashcards yellow, Recordación activa green, Examen red", async () => {
+  it("colours each tile and its Generar with its technique: Flashcards yellow, Recordación activa green, Examen red", async () => {
     await renderPanel(false);
 
-    expect(screen.getByTestId("generate-flashcards")).toHaveClass(
-      "bg-pastel-yellow",
-      "text-pastel-yellow-fg",
-    );
-    expect(screen.getByTestId("generate-recall-questions")).toHaveClass(
-      "bg-pastel-mint",
-      "text-pastel-mint-fg",
-    );
-    expect(screen.getByTestId("generate-exam-questions")).toHaveClass(
-      "bg-pastel-pink",
-      "text-pastel-pink-fg",
-    );
+    for (const [testId, pair] of [
+      ["generate-flashcards", "pastel-yellow"],
+      ["generate-recall-questions", "pastel-mint"],
+      ["generate-exam-questions", "pastel-pink"],
+    ] as const) {
+      const button = screen.getByTestId(testId);
+      expect(button).toHaveClass(`text-${pair}-fg`);
+      expect(button.closest("[data-part=technique-card]")?.className).toContain(
+        `bg-${pair}/`,
+      );
+    }
   });
 
   it("shows every collapsed technique icon as available", async () => {
@@ -231,6 +238,13 @@ describe("TechniquesPanel", () => {
         "Te quedan 4 generaciones hoy",
       );
     }
+    // H9-T1: the remaining line sits under the name, above "Generar".
+    expect(
+      screen
+        .getByTestId("generation-remaining")
+        .compareDocumentPosition(screen.getByTestId("generate-flashcards")) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it("hides every remaining line when the status is unknown", async () => {
@@ -257,13 +271,21 @@ describe("TechniquesPanel", () => {
       );
     }
 
-    it("shows an empty state under its label when nothing was generated", async () => {
+    it("explains the section in its empty state when nothing was generated", async () => {
       await renderPanel(false);
 
       expect(screen.getByText("Generado en esta página")).toBeInTheDocument();
       expect(
-        screen.getByText("Aún no generaste nada en esta página"),
+        screen.getByText("Aquí verás todo lo que generes"),
       ).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          "Las flashcards, preguntas y exámenes que crees a partir de esta página aparecerán en esta sección para que los practiques.",
+        ),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText("Aún no generaste nada en esta página"),
+      ).not.toBeInTheDocument();
       expect(screen.queryByRole("link", { name: /Flashcards/ })).toBeNull();
     });
 
@@ -303,7 +325,7 @@ describe("TechniquesPanel", () => {
         "generated-item-exam",
       ]);
       expect(
-        screen.queryByText("Aún no generaste nada en esta página"),
+        screen.queryByText("Aquí verás todo lo que generes"),
       ).not.toBeInTheDocument();
     });
 

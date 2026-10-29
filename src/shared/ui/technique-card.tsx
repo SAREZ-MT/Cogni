@@ -50,20 +50,43 @@ export const TECHNIQUE_ACCENT_TEXT_CLASS: Record<TechniqueTone, string> = {
   rose: "text-technique-exam-accent",
 };
 
+// H9-T1 (user, 2026-10-29): the panel lacked presence, so the tile itself
+// now carries the technique colour — its pastel at half strength as the
+// surface and a border in the same hue (the -fg at 18%) — instead of a
+// white card with a pastel button. Each class is spelled out per tone so
+// Tailwind sees the literal names.
+const TONE_CARD_CLASS: Record<TechniqueTone, string> = {
+  yellow: "bg-pastel-yellow/55 border-pastel-yellow-fg/18",
+  green: "bg-pastel-mint/55 border-pastel-mint-fg/18",
+  rose: "bg-pastel-pink/55 border-pastel-pink-fg/18",
+};
+
+// On the tinted tile the icon sits on a white tile in the technique's -fg,
+// so it pops instead of blending into the surface.
+const TONE_ICON_CLASS: Record<TechniqueTone, string> = {
+  yellow: "text-pastel-yellow-fg",
+  green: "text-pastel-mint-fg",
+  rose: "text-pastel-pink-fg",
+};
+
+// "Generar" is a white button with the -fg label and a border in the same
+// hue: the tile's one clear action. Every -fg meets WCAG AA on white
+// (pastel-yellow-fg 7.1:1, pastel-mint-fg 7.7:1, pastel-pink-fg 7.6:1).
+// Hover fills it with the technique pastel; the label keeps its colour.
 const TONE_BUTTON_CLASS: Record<TechniqueTone, string> = {
-  yellow: `${TECHNIQUE_PAIR_CLASS.yellow} hover:bg-pastel-yellow`,
-  green: `${TECHNIQUE_PAIR_CLASS.green} hover:bg-pastel-mint`,
-  rose: `${TECHNIQUE_PAIR_CLASS.rose} hover:bg-pastel-pink`,
+  yellow:
+    "text-pastel-yellow-fg border-pastel-yellow-fg/25 hover:bg-pastel-yellow",
+  green: "text-pastel-mint-fg border-pastel-mint-fg/25 hover:bg-pastel-mint",
+  rose: "text-pastel-pink-fg border-pastel-pink-fg/25 hover:bg-pastel-pink",
 };
 
 const GENERATE_BUTTON_CLASS =
-  "w-full font-semibold text-[11.5px] hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60";
+  "h-8 w-full border bg-card font-semibold text-[12px] shadow-xs disabled:cursor-not-allowed disabled:opacity-60";
 
 export interface TechniqueCardProps {
   icon: LucideIcon;
   tone: TechniqueTone;
   name: string;
-  description: string;
   // No technique is built yet (design/shell-look, user decision
   // 2026-09-24): every card's "Generar" action stays disabled until a real
   // Server Action exists. Kept as a prop rather than hardcoded so a future
@@ -77,30 +100,31 @@ export interface TechniqueCardProps {
   // "Generando…".
   pending?: boolean;
   generateTestId?: string;
-  // Options of the action rendered between the description and the button
+  // One short line under the name (H9-T1: the remaining generations); the
+  // caller owns the copy. There is no description line any more.
+  meta?: ReactNode;
+  // Options of the action rendered between the header and the button
   // (e.g. Examen's question count); the caller owns them.
   controls?: ReactNode;
-  // Feedback under the button (remaining quota, notices, errors); the caller
-  // owns the copy.
+  // Feedback under the button (notices, errors); the caller owns the copy.
   children?: ReactNode;
   className?: string;
 }
 
-// Expanded technique card (design/shell-look, studyplatform StudyPanel.tsx
-// anatomy, simplified per user decision 2026-09-24): icon tile + name +
-// description, and a single full-width "Generar" action — no meta line, no
-// navigation, no "pronto" pill. The disabled button keeps the technique's
-// full tone color at `disabled:opacity-60` instead of going fully gray, so
-// the panel still "reads colourful and alive" while every action is inert.
+// Technique tile (H9-T1, user 2026-10-29; was the design/shell-look
+// studyplatform StudyPanel.tsx card): icon + name (+ the meta line) and a
+// single full-width "Generar" — no description, no navigation. The whole
+// tile is tinted in the technique colour so the panel reads colourful and
+// alive; a disabled button keeps that colour at `disabled:opacity-60`.
 export function TechniqueCard({
   icon: Icon,
   tone,
   name,
-  description,
   disabled,
   onGenerate,
   pending = false,
   generateTestId,
+  meta,
   controls,
   children,
   className,
@@ -110,20 +134,26 @@ export function TechniqueCard({
   return (
     <Card
       padding="none"
-      className={cn("flex flex-col gap-2.5 rounded-lg p-2.5", className)}
+      data-part="technique-card"
+      data-tone={tone}
+      className={cn(
+        "flex flex-col gap-2.5 rounded-lg p-3 shadow-none",
+        TONE_CARD_CLASS[tone],
+        className,
+      )}
     >
-      <div className="flex items-start gap-2.5">
+      <div className="flex items-center gap-2.5">
         <IconTile
-          tone={TONE_TILE[tone]}
           size="30"
           radius="md"
           data-part="technique-icon"
+          className={cn("bg-card shadow-xs", TONE_ICON_CLASS[tone])}
         >
           <Icon aria-hidden="true" size={16} strokeWidth={1.75} />
         </IconTile>
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold text-fg">{name}</p>
-          <p className="mt-0.5 text-[10.5px] text-fg-muted">{description}</p>
+          <p className="font-bold text-[13px] text-fg leading-tight">{name}</p>
+          {meta}
         </div>
       </div>
       {controls}
@@ -143,6 +173,50 @@ export function TechniqueCard({
       </Button>
       {children}
     </Card>
+  );
+}
+
+// Empty-state glyph of the panel's "Generado en esta página" (H9-T1): three
+// small tiles fanned like a stack of study material, one per technique
+// colour (Examen at the back, Flashcards in front). Purely decorative.
+const STACK_LAYERS: readonly {
+  tone: TechniqueTone;
+  className: string;
+}[] = [
+  {
+    tone: "rose",
+    className:
+      "bg-pastel-pink border-pastel-pink-fg/25 -translate-x-3.5 translate-y-0.5 -rotate-[14deg]",
+  },
+  {
+    tone: "green",
+    className:
+      "bg-pastel-mint border-pastel-mint-fg/25 translate-x-3.5 translate-y-0.5 rotate-[14deg]",
+  },
+  {
+    tone: "yellow",
+    className: "bg-pastel-yellow border-pastel-yellow-fg/25 -translate-y-1",
+  },
+];
+
+export function TechniqueStack({ className }: { className?: string }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={cn("relative inline-block h-9 w-16", className)}
+    >
+      {STACK_LAYERS.map((layer) => (
+        <span
+          key={layer.tone}
+          data-part="technique-layer"
+          data-tone={layer.tone}
+          className={cn(
+            "absolute inset-x-4 inset-y-0.5 rounded-md border shadow-xs",
+            layer.className,
+          )}
+        />
+      ))}
+    </span>
   );
 }
 

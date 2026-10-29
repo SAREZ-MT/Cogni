@@ -1,6 +1,6 @@
 "use client";
 
-import { Layers, PanelRightClose, PanelRightOpen } from "lucide-react";
+import { PanelRightClose, PanelRightOpen, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -21,12 +21,15 @@ import {
   listFlashcardsAction,
 } from "@/modules/flashcards";
 import { EmptyState } from "@/shared/ui/empty-state";
-import { IconTile } from "@/shared/ui/icon-tile";
 import { PanelToggleButton } from "@/shared/ui/panel-toggle-button";
 import { SavedStudySection } from "@/shared/ui/saved-study-section";
 import { SidePanel } from "@/shared/ui/side-panel";
 import type { StudyItemRowProps } from "@/shared/ui/study-item-row";
-import { TechniqueCard, TechniqueIconStrip } from "@/shared/ui/technique-card";
+import {
+  TechniqueCard,
+  TechniqueIconStrip,
+  TechniqueStack,
+} from "@/shared/ui/technique-card";
 import {
   TECHNIQUES_PANEL_COLLAPSED,
   TECHNIQUES_PANEL_COOKIE,
@@ -182,33 +185,43 @@ function generatedRow(
   };
 }
 
-// The feedback lines under every technique card, identical for the three
-// (remaining generations, notice, error); `prefix` namespaces the test ids.
-function CardFeedback({
+// The remaining-generations line under every technique's name (H9-T1:
+// the tile's meta line), identical for the three; `prefix` namespaces the
+// test id.
+function RemainingLine({
   prefix,
   remaining,
+}: {
+  prefix: string;
+  remaining: number | null;
+}) {
+  if (remaining === null) return null;
+  return (
+    <p
+      data-testid={`${prefix}generation-remaining`}
+      className="mt-0.5 text-[10.5px] text-fg-secondary leading-snug"
+    >
+      {remainingCopy(remaining)}
+    </p>
+  );
+}
+
+// The feedback lines under every technique's "Generar" (notice, error).
+function CardFeedback({
+  prefix,
   notice,
   error,
 }: {
   prefix: string;
-  remaining: number | null;
   notice: string | null;
   error: string | null;
 }) {
   return (
     <>
-      {remaining !== null && (
-        <p
-          data-testid={`${prefix}generation-remaining`}
-          className="text-[10.5px] text-fg-muted"
-        >
-          {remainingCopy(remaining)}
-        </p>
-      )}
       {notice && (
         <p
           data-testid={`${prefix}generation-notice`}
-          className="text-[10.5px] text-fg-muted"
+          className="text-[10.5px] text-fg-secondary"
         >
           {notice}
         </p>
@@ -505,13 +518,21 @@ export function TechniquesPanel({
           toggleButton
         ) : (
           <>
-            <div>
-              <p className="font-semibold text-[12.5px] text-fg">
-                Técnicas de estudio
-              </p>
-              <p className="mt-0.5 text-[10px] text-fg-muted">
-                Genera contenido de estudio con IA
-              </p>
+            <div className="flex min-w-0 items-center gap-2">
+              <Sparkles
+                aria-hidden="true"
+                size={14}
+                strokeWidth={2}
+                className="shrink-0 text-primary-600"
+              />
+              <div className="min-w-0">
+                <p className="font-bold text-[13px] text-fg leading-tight">
+                  Técnicas de estudio
+                </p>
+                <p className="mt-0.5 text-[10.5px] text-fg-muted leading-tight">
+                  Genera contenido de estudio con IA
+                </p>
+              </div>
             </div>
             {toggleButton}
           </>
@@ -531,7 +552,7 @@ export function TechniquesPanel({
         </div>
       }
     >
-      <div className="flex flex-col gap-[7px] p-2.5 pb-3.5">
+      <div className="flex flex-col gap-2 p-3 pb-4">
         {TECHNIQUES.map((t) => {
           const card =
             t.id === "flashcards"
@@ -566,15 +587,16 @@ export function TechniquesPanel({
               icon={t.icon}
               tone={t.tone}
               name={t.name}
-              description={t.description}
               onGenerate={card.onGenerate}
               pending={card.pending}
               disabled={limitReached}
               generateTestId={card.testId}
+              meta={
+                <RemainingLine prefix={card.prefix} remaining={remaining} />
+              }
             >
               <CardFeedback
                 prefix={card.prefix}
-                remaining={remaining}
                 notice={card.notice}
                 error={card.error}
               />
@@ -595,21 +617,17 @@ export function TechniquesPanel({
         <SavedStudySection
           label="Generado en esta página"
           items={generatedRows}
-          className="mt-1"
+          className="mt-2"
           empty={
             <EmptyState
               variant="tinted"
-              icon={
-                <IconTile size="30" tone="warning" radius="md">
-                  <Layers aria-hidden="true" size={16} strokeWidth={1.75} />
-                </IconTile>
-              }
-              title="Aún no generaste nada en esta página"
+              icon={<TechniqueStack />}
+              title="Aquí verás todo lo que generes"
               titleAs="p"
-              titleClassName="text-xs"
-              description="Pulsa Generar en una técnica para crear tu material de estudio."
-              descriptionClassName="text-[10.5px]"
-              className="px-3 py-4"
+              titleClassName="font-semibold text-[12px]"
+              description="Las flashcards, preguntas y exámenes que crees a partir de esta página aparecerán en esta sección para que los practiques."
+              descriptionClassName="text-[10.5px] leading-relaxed"
+              className="px-4 py-5"
             />
           }
         />

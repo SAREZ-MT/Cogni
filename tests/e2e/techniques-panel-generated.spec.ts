@@ -62,7 +62,7 @@ test.describe("techniques panel generated list", () => {
     const panel = page.getByTestId("techniques-panel");
     await expect(panel.getByText("Técnicas de estudio")).toBeVisible();
     await expect(
-      panel.getByText("Aún no generaste nada en esta página"),
+      panel.getByText("Aquí verás todo lo que generes"),
     ).toBeVisible();
     await shot(page, "panel-empty");
 

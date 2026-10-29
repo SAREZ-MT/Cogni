@@ -7,28 +7,50 @@ import {
   TECHNIQUE_ACCENT_TEXT_CLASS,
   TechniqueCard,
   TechniqueIconStrip,
+  TechniqueStack,
 } from "./technique-card";
 
 describe("TechniqueCard", () => {
-  function renderCard(props: { disabled?: boolean } = {}) {
+  function renderCard(
+    props: Partial<React.ComponentProps<typeof TechniqueCard>> = {},
+  ) {
     return render(
       <TechniqueCard
         icon={Layers}
         tone="yellow"
         name="Flashcards"
-        description="Tarjetas con repetición espaciada"
         {...props}
       />,
     );
   }
 
-  it("shows the name and description", () => {
-    renderCard();
+  // H9-T1 (user, 2026-10-29): a tile is only icon + name + Generar + the
+  // remaining generations; there is no description line.
+  it("shows only the icon, the name and the action: no description line", () => {
+    const { container } = renderCard();
 
     expect(screen.getByText("Flashcards")).toBeInTheDocument();
     expect(
-      screen.getByText("Tarjetas con repetición espaciada"),
-    ).toBeInTheDocument();
+      container.querySelector("[data-part=technique-icon]"),
+    ).not.toBeNull();
+    expect(container.querySelectorAll("p")).toHaveLength(1);
+  });
+
+  it("renders the meta line (remaining generations) under the name, above the button", () => {
+    renderCard({
+      onGenerate: () => {},
+      meta: <span>Te quedan 4 generaciones hoy</span>,
+    });
+
+    const name = screen.getByText("Flashcards");
+    const meta = screen.getByText("Te quedan 4 generaciones hoy");
+    const button = screen.getByRole("button", { name: "Generar" });
+    expect(
+      name.compareDocumentPosition(meta) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      meta.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it("offers a single 'Generar' action that is disabled and flagged as coming soon by default", () => {
@@ -58,7 +80,6 @@ describe("TechniqueCard", () => {
           icon={Layers}
           tone="yellow"
           name="Flashcards"
-          description="d"
           onGenerate={() => {}}
           {...props}
         />,
@@ -139,33 +160,37 @@ describe("TechniqueCard", () => {
 });
 
 describe("TechniqueCard technique colours", () => {
-  // Phase 6 T5b v2 (user, 2026-10-06): every "Generar" has the same shape,
-  // size, icon and type; only its soft pastel pair changes — Flashcards
-  // pastel-yellow, Recordación activa pastel-mint, Examen pastel-pink (each
-  // -fg meets WCAG AA on its pastel). The icon tile uses the same pair.
-  const SHARED = ["w-full", "text-[11.5px]", "font-semibold"];
+  // H9-T1 (user, 2026-10-29): the tile itself carries the technique colour
+  // (pastel surface + a border in the same hue), the icon sits on a white
+  // tile in the technique's -fg, and Generar is a white button with the
+  // -fg label so it reads as the tile's one action. Every -fg meets WCAG
+  // AA on white and on its pastel.
+  const SHARED = ["w-full", "text-[12px]", "font-semibold", "bg-card"];
   it.each([
-    ["yellow", ["bg-pastel-yellow", "text-pastel-yellow-fg"]],
-    ["green", ["bg-pastel-mint", "text-pastel-mint-fg"]],
-    ["rose", ["bg-pastel-pink", "text-pastel-pink-fg"]],
-  ] as const)("colours a %s card's Generar and icon tile with its pastel pair", (tone, pair) => {
+    ["yellow", "pastel-yellow"],
+    ["green", "pastel-mint"],
+    ["rose", "pastel-pink"],
+  ] as const)("colours a %s tile, its icon and its Generar with the %s pair", (tone, pair) => {
     const { container } = render(
       <TechniqueCard
         icon={Layers}
         tone={tone}
         name="n"
-        description="d"
         onGenerate={() => {}}
       />,
     );
 
+    const card = container.querySelector("[data-part=technique-card]");
+    expect(card).toHaveAttribute("data-tone", tone);
+    expect(card?.className).toContain(`bg-${pair}/`);
+    expect(card?.className).toContain(`border-${pair}-fg/`);
     const button = screen.getByRole("button", { name: "Generar" });
-    expect(button).toHaveClass(...SHARED, ...pair, "hover:brightness-95");
+    expect(button).toHaveClass(...SHARED, `text-${pair}-fg`);
     expect(button.className).not.toMatch(
       /text-white|bg-(warning|success|rose)-\d/,
     );
     const tile = container.querySelector("[data-part=technique-icon]");
-    expect(tile).toHaveClass(...pair);
+    expect(tile).toHaveClass("bg-card", `text-${pair}-fg`);
   });
 
   it("gives the three Generar buttons the same classes apart from the colour pair", () => {
@@ -175,7 +200,6 @@ describe("TechniqueCard technique colours", () => {
           icon={Layers}
           tone={tone}
           name={tone}
-          description="d"
           onGenerate={() => {}}
         />,
       );
@@ -190,6 +214,21 @@ describe("TechniqueCard technique colours", () => {
 
     expect(classesOf("green")).toEqual(classesOf("yellow"));
     expect(classesOf("rose")).toEqual(classesOf("yellow"));
+  });
+});
+
+describe("TechniqueStack", () => {
+  it("draws one decorative layer per technique colour, hidden from assistive tech", () => {
+    const { container } = render(<TechniqueStack />);
+
+    const stack = container.firstElementChild;
+    expect(stack).toHaveAttribute("aria-hidden", "true");
+    const layers = container.querySelectorAll("[data-part=technique-layer]");
+    expect([...layers].map((l) => l.getAttribute("data-tone"))).toEqual([
+      "rose",
+      "green",
+      "yellow",
+    ]);
   });
 });
 

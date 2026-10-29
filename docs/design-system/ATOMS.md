@@ -598,40 +598,45 @@ its collapsed icon strip (design/shell-look, studyplatform `StudyPanel.tsx`
 anatomy; simplified per user decision 2026-09-24 — a card has **only** a
 "Generar" action, no navigation).
 
-- `TechniqueCard` props: `icon`, `tone`, `name`, `description`, `disabled?`
-  (default `true` — no technique is built yet), `className?`. `href`,
-  `meta`, and `actionLabel` were removed: no card links anywhere anymore,
-  there's no meta line, and the action's label is a fixed "Generar".
+- `TechniqueCard` props: `icon`, `tone`, `name`, `meta?`, `disabled?`
+  (default `true` — no technique is built yet), `className?`. `href`, the
+  old stats line and `actionLabel` were removed long ago; H9-T1
+  (user, 2026-10-29) also removed `description` — users already know each
+  technique, so a tile is only icon + name + "Generar" + remaining
+  generations. `meta` is that one short line under the name (the panel
+  passes "Te quedan N generaciones hoy"); the caller owns its copy.
 - Wired variant (Phase 3, Flashcards): pass `onGenerate` and the card becomes
   live — the button is enabled by default (`disabled` can still force it
   off, e.g. quota exhausted, without the "Disponible pronto" title, which is
   reserved for unwired cards), `pending` disables it, sets `aria-busy` and
   swaps the label to "Generando…", `generateTestId` tags the button and
-  `children` render under it inside the card (the caller owns quota/notice/
+  `children` render under it inside the card (the caller owns notice/
   error copy). Without `onGenerate` the card behaves exactly as before.
-- Anatomy: icon tile (`IconTile` size `"30"` — closest existing token to the
-  reference's 32px — radius `"md"`) + name + description, then one
-  full-width `Button` reading "Generar" with a leading `Sparkles` icon
-  (12px, strokeWidth 2). The three buttons share every class
-  (`w-full font-semibold text-[11.5px] hover:brightness-95`) except the
-  technique's **soft pastel pair** (Phase 6 T5b, user decision 2026-10-06 —
-  solid fills were too strong): yellow `bg-pastel-yellow` +
-  `text-pastel-yellow-fg` (6.4:1), green `bg-pastel-mint` +
-  `text-pastel-mint-fg` (6.8:1; chosen over `pastel-green-fg`, 4.6:1) and
-  rose `bg-pastel-pink` + `text-pastel-pink-fg` (5.9:1) — every label meets
-  WCAG AA at 11.5px; hover darkens the same pair (`brightness-95`), kept
-  at `disabled:opacity-60` + `disabled:cursor-not-allowed` (explicit
-  `disabled:` variants so they replace, not stack with, Button's own
-  `disabled:opacity-50`) instead of going fully gray, so the panel still
-  "reads colourful and alive" while every action is inert. Disabled cards
-  also get `aria-disabled` and `title="Disponible pronto"`.
+- Anatomy (H9-T1): the **tile itself is tinted** in the technique colour —
+  `bg-pastel-*/55` with a `border-pastel-*-fg/18` border, no shadow,
+  `rounded-lg p-3`, tagged `data-part="technique-card"` + `data-tone` — so
+  the panel has presence. Header row: a white icon tile (`IconTile` size
+  `"30"`, radius `"md"`, `bg-card shadow-xs` with the glyph in the
+  technique's `-fg`) + the name (13px bold) over `meta`. Then one
+  full-width 32px "Generar" with a leading `Sparkles` (12px, strokeWidth 2):
+  a **white** button (`bg-card border shadow-xs`, 12px semibold) whose label
+  is the technique's `-fg` (pastel-yellow-fg 7.1:1, pastel-mint-fg 7.7:1,
+  pastel-pink-fg 7.6:1 on white) and whose border is the `-fg` at 25%;
+  hover fills it with the technique pastel. The three buttons share every
+  class except those colour classes. Disabled keeps the colour at
+  `disabled:opacity-60` + `disabled:cursor-not-allowed`; disabled unwired
+  cards also get `aria-disabled` and `title="Disponible pronto"`.
+- `TechniqueStack` (H9-T1): the decorative glyph of the panel's
+  "Generado en esta página" empty state — three small pastel tiles (pink,
+  mint, yellow, each `data-part="technique-layer"` + `data-tone`) fanned
+  like a stack of study material, `aria-hidden`. Props: `className?`.
 - `TechniqueIconStrip`: the collapsed-state 36x36 tinted tile (`IconTile`
   size `"36"` radius `"input"`) with a native `title` tooltip; `opacity-35`
   when `available` is false (default).
 - `TechniqueTone`: `"yellow" | "green" | "rose"` (Flashcards / Recordación
-  activa / Examen) — mapped onto the **existing** pastel `IconTile` tones
-  `yellow` / `mint` / `pink`, the same pairs as the button, for the icon tile
-  (tagged `data-part="technique-icon"`). No new token was needed.
+  activa / Examen) — mapped onto the **existing** pastel pairs `yellow` /
+  `mint` / `pink` (the collapsed strip's `IconTile` tones; the expanded
+  tile's surface, icon glyph and button label). No new token was needed.
 - `TECHNIQUE_PAIR_CLASS` (Phase 7 T1): the pastel pair per `TechniqueTone`
   (`bg-pastel-yellow text-pastel-yellow-fg`, `bg-pastel-mint
   text-pastel-mint-fg`, `bg-pastel-pink text-pastel-pink-fg`), exported so
@@ -649,7 +654,7 @@ anatomy; simplified per user decision 2026-09-24 — a card has **only** a
   SVG strokes drawn with `currentColor` (`TechniqueRing`).
 
 - `controls?` (Phase 5 T5): options of the action rendered between the
-  description and the button. No card passes it since Phase 6 T5b v2:
+  header and the button. No card passes it since Phase 6 T5b v2:
   Examen's question count moved into `ExamGenerateDialog` (page route
   component composing `Dialog` + `CountStepper` + `Button`), so the three
   cards look the same.
@@ -663,7 +668,11 @@ content on the page (NotebookLM Studio model). Cards only generate — no
 practice button or deck/exam link inside a card; Examen's "Preguntas" link
 was removed too (manual questions live in Exámenes → cuaderno → página).
 `SavedStudySection` keys rows by tone + href + label, so rows sharing a label
-need distinct hrefs.
+need distinct hrefs. Its empty state (H9-T1) explains the section instead of
+asking for an action: `EmptyState` `tinted` with `TechniqueStack` as the icon,
+"Aquí verás todo lo que generes" + "Las flashcards, preguntas y exámenes que
+crees a partir de esta página aparecerán en esta sección para que los
+practiques."
 
 ## StudyItemRow (`study-item-row.tsx`)
 

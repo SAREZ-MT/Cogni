@@ -7,11 +7,11 @@ export interface TechniqueDefinition {
   name: string;
   icon: LucideIcon;
   tone: TechniqueTone;
-  description: string;
 }
 
 // Study-technique content for the "Técnicas de estudio" panel: icon +
-// name + description per technique, and its colour (Phase 6 T5b, user
+// name per technique (H9-T1, user 2026-10-29: no description line — users
+// already know each technique), and its colour (Phase 6 T5b, user
 // decision 2026-10-06: Flashcards yellow, Recordación activa green, Examen
 // red), shared by the card's "Generar", its collapsed icon and its row in
 // the panel's generated list.
@@ -24,20 +24,17 @@ export const TECHNIQUES: readonly TechniqueDefinition[] = [
     name: "Flashcards",
     icon: Layers,
     tone: "yellow",
-    description: "Tarjetas con repetición espaciada",
   },
   {
     id: "active-recall",
     name: "Recordación activa",
     icon: Brain,
     tone: "green",
-    description: "Preguntas abiertas de memoria",
   },
   {
     id: "exam",
     name: "Examen",
     icon: ClipboardList,
     tone: "rose",
-    description: "Opción múltiple con retroalimentación",
   },
 ] as const;
