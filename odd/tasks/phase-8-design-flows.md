@@ -353,6 +353,24 @@ Slice-artefact advisories (CalendarNav/TodayList callers "not migrated") are res
     (pre-existing 240px sidebar: narrow fallback), `after-grid-hover-1440.png`,
     `after-tile-hover-1440.png`.
   - Commit: `02d064a`.
+  - Follow-up (user "más grandes" 2026-10-28): grid min 210 → 290px (3 per
+    row at 1440, 2 at 1024, 1 at 390 with the pre-existing sidebar); a
+    280px container step scales the cover type (title 20px, meta 13px) and
+    the create tile (56px disc, 18px label). Screenshots re-taken
+    (`after-grid-1440.png`, `after-grid-1024.png`, `after-grid-390.png`,
+    `after-tile-hover-1440.png`).
+  - Follow-up (user "un poco menos, 5 por fila" 2026-10-28, supersedes 3
+    per row): `auto-fill` replaced by explicit container-query columns on
+    the grid (`@container/grid`: 1 → 2 @300 → 3 @540 → 4 @680 → 5 @960,
+    never more): 5 at 1440 (~203px covers), 5 larger at 1920 (~290px, the
+    280px type step applies), 4 at 1024, 1 at 390 (pre-existing sidebar).
+    Container queries rather than viewport breakpoints because the
+    sidebar eats the viewport. RED: page grid test failed on the
+    `auto-fill` grid → GREEN. Screenshots `after-grid-1440.png`,
+    `after-grid-1920.png`, `after-grid-1024.png`, `after-grid-390.png`.
+    Checks: vitest scoped 129 files / 947 tests pass; tsc clean; biome
+    clean; e2e notebooks-acceptance + shell-empty-state 21/21 pass.
+    Commit: `4400843`.
   - Decision (user 2026-10-28, closed): the bottom-row date stays the
     last update (`formatTimeAgo(updatedAt)`); `HomeNotebookSummary` has no
     `createdAt` and no backend change is made.
