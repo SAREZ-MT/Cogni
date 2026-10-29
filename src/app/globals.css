@@ -116,6 +116,20 @@
   --color-technique-flashcards-accent: #fcd34d;
   --color-technique-recall-accent: #6ee7b7;
   --color-technique-exam-accent: #ef4444;
+  /* "Generar" outlines (Phase 8 H9-T3, user 2026-10-29): a UI-component
+     border ≥ 3:1 on the technique tile (measured on the faded tile:
+     flashcards 4.76:1, recall 3.54:1, exam 4.25:1). warning-600 is only
+     2.86:1 on pastel-yellow, hence amber-700 for Flashcards. */
+  --color-technique-flashcards-outline: #b45309;
+  --color-technique-recall-outline: var(--color-success-600);
+  --color-technique-exam-outline: var(--color-rose-600);
+  /* Pixel tile (PixelTile, H9-T3): the landing's pixel-motif dither
+     colours (landing.css .lp-ptile), app-side. Only the rose tile needs
+     colours the app had no token for. */
+  --color-pixel-rose-dark: #be123c;
+  --color-pixel-rose-light: #fecdd3;
+  --color-pixel-rose-shadow: #881337;
+  --color-pixel-paper: #fbf8f3;
 
   /* Semantic status: *-50 stays the near-white tint, *-100 is the stronger
      pastel tint used for metric/stat icon tiles and badges (design pass 2,
@@ -877,6 +891,38 @@
      rather than fork the extension config. */
   .editor-content .column-resize-handle {
     display: none;
+  }
+
+  /* PixelTile (src/shared/ui/pixel-tile.tsx, H9-T3): the dither reads
+     --pt-dark / --pt-mid / --pt-light per tone, the glyph --pt-ink with a
+     1px offset shadow in --pt-shadow (landing .lp-ptile recipe). */
+  .pixel-tile {
+    box-shadow: 0 5px 10px -6px var(--pt-dark);
+  }
+  .pixel-tile[data-tone="yellow"] {
+    --pt-dark: var(--color-warning-500);
+    --pt-mid: var(--color-technique-flashcards-accent);
+    --pt-light: var(--color-pastel-yellow);
+    --pt-ink: var(--color-pastel-yellow-fg);
+    --pt-shadow: var(--color-pastel-yellow);
+  }
+  .pixel-tile[data-tone="green"] {
+    --pt-dark: var(--color-success-500);
+    --pt-mid: var(--color-technique-recall-accent);
+    --pt-light: var(--color-success-50);
+    --pt-ink: var(--color-pastel-mint-fg);
+    --pt-shadow: var(--color-success-50);
+  }
+  .pixel-tile[data-tone="rose"] {
+    --pt-dark: var(--color-pixel-rose-dark);
+    --pt-mid: var(--color-rose-400);
+    --pt-light: var(--color-pixel-rose-light);
+    --pt-ink: var(--color-pixel-paper);
+    --pt-shadow: var(--color-pixel-rose-shadow);
+  }
+  .pixel-tile-glyph {
+    color: var(--pt-ink);
+    filter: drop-shadow(1px 1px 0 var(--pt-shadow));
   }
 }
 

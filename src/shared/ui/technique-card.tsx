@@ -3,7 +3,7 @@ import { Sparkles } from "lucide-react";
 import type { ReactNode } from "react";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
-import { IconTile } from "@/shared/ui/icon-tile";
+import { PixelTile } from "@/shared/ui/pixel-tile";
 import { cn } from "@/shared/ui/utils";
 
 // Study-technique colour vocabulary (Phase 6 T5b, user decisions
@@ -11,12 +11,6 @@ import { cn } from "@/shared/ui/utils";
 // the design system's soft pastel pairs (solid fills were too strong). The
 // icon tile and the "Generar" button share the technique's pair.
 export type TechniqueTone = "yellow" | "green" | "rose";
-
-const TONE_TILE: Record<TechniqueTone, "yellow" | "mint" | "pink"> = {
-  yellow: "yellow",
-  green: "mint",
-  rose: "pink",
-};
 
 // Pastel "Generar" fill per technique; everything else about the button is
 // shared (GENERATE_BUTTON_CLASS). Each -fg meets WCAG AA for the 11.5px
@@ -60,24 +54,21 @@ export const TECHNIQUE_GLOW_CLASS: Record<TechniqueTone, string> = {
   rose: "technique-glow-pink",
 };
 
-// The same faded look with all three technique pastels, one per corner,
-// for surfaces that stand for every technique at once (the panel's
-// "Generado en esta página" empty state, H9-T2). Kept faint: a hint.
-export const TECHNIQUE_TRIO_GLOW_CLASS =
-  "bg-card bg-[radial-gradient(95%_120%_at_0%_0%,color-mix(in_oklch,var(--color-pastel-yellow)_60%,transparent),transparent_62%),radial-gradient(80%_110%_at_100%_0%,color-mix(in_oklch,var(--color-pastel-mint)_50%,transparent),transparent_60%),radial-gradient(95%_120%_at_100%_100%,color-mix(in_oklch,var(--color-pastel-pink)_50%,transparent),transparent_62%)]";
-
-// "Generar" in the technique's pastel pair (each -fg meets WCAG AA on its
-// pastel: yellow 6.4:1, mint 6.8:1, pink 5.9:1); on the white-to-pastel
-// card it reads as the tile's one clear action. Hover darkens the same
-// pair (brightness-95) instead of switching colour.
+// "Generar" (H9-T3, user 2026-10-29): outlined, no fill — the label in
+// the technique's dark ink (measured on the faded tile: yellow 6.72:1,
+// mint 7.21:1, pink 6.65:1) and a border in its outline token (UI
+// component ≥ 3:1: 4.76:1, 3.54:1, 4.25:1). Hover fills it with the
+// technique pastel; the ink stays ≥ 5.8:1 on it.
 const TONE_BUTTON_CLASS: Record<TechniqueTone, string> = {
-  yellow: `${TECHNIQUE_PAIR_CLASS.yellow} hover:bg-pastel-yellow`,
-  green: `${TECHNIQUE_PAIR_CLASS.green} hover:bg-pastel-mint`,
-  rose: `${TECHNIQUE_PAIR_CLASS.rose} hover:bg-pastel-pink`,
+  yellow:
+    "text-pastel-yellow-fg border-technique-flashcards-outline hover:bg-pastel-yellow",
+  green:
+    "text-pastel-mint-fg border-technique-recall-outline hover:bg-pastel-mint",
+  rose: "text-pastel-pink-fg border-technique-exam-outline hover:bg-pastel-pink",
 };
 
 const GENERATE_BUTTON_CLASS =
-  "h-9 w-full rounded-md font-semibold text-[13px] hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60";
+  "h-9 w-full rounded-md border-[1.5px] bg-transparent font-semibold text-[13px] disabled:cursor-not-allowed disabled:opacity-60";
 
 export interface TechniqueCardProps {
   icon: LucideIcon;
@@ -130,20 +121,18 @@ export function TechniqueCard({
       data-part="technique-card"
       data-tone={tone}
       className={cn(
-        "flex flex-col gap-3 rounded-xl bg-card px-3.5 pt-3.5 pb-3",
+        "flex flex-col gap-3 rounded-lg bg-card px-3.5 pt-3.5 pb-3",
         TECHNIQUE_GLOW_CLASS[tone],
         className,
       )}
     >
       <div className="flex items-center gap-3">
-        <IconTile
-          tone={TONE_TILE[tone]}
-          size="36"
-          radius="md"
+        <PixelTile
+          tone={tone}
+          icon={Icon}
+          size={36}
           data-part="technique-icon"
-        >
-          <Icon aria-hidden="true" size={19} strokeWidth={1.9} />
-        </IconTile>
+        />
         <p className="min-w-0 flex-1 truncate font-semibold text-[15px] text-fg leading-tight tracking-[-0.01em]">
           {name}
         </p>
@@ -168,50 +157,6 @@ export function TechniqueCard({
   );
 }
 
-// Empty-state glyph of the panel's "Generado en esta página" (H9-T1): three
-// small tiles fanned like a stack of study material, one per technique
-// colour (Examen at the back, Flashcards in front). Purely decorative.
-const STACK_LAYERS: readonly {
-  tone: TechniqueTone;
-  className: string;
-}[] = [
-  {
-    tone: "rose",
-    className:
-      "bg-pastel-pink border-pastel-pink-fg/25 -translate-x-3.5 translate-y-0.5 -rotate-[14deg]",
-  },
-  {
-    tone: "green",
-    className:
-      "bg-pastel-mint border-pastel-mint-fg/25 translate-x-3.5 translate-y-0.5 rotate-[14deg]",
-  },
-  {
-    tone: "yellow",
-    className: "bg-pastel-yellow border-pastel-yellow-fg/25 -translate-y-1",
-  },
-];
-
-export function TechniqueStack({ className }: { className?: string }) {
-  return (
-    <span
-      aria-hidden="true"
-      className={cn("relative inline-block h-9 w-16", className)}
-    >
-      {STACK_LAYERS.map((layer) => (
-        <span
-          key={layer.tone}
-          data-part="technique-layer"
-          data-tone={layer.tone}
-          className={cn(
-            "absolute inset-x-4 inset-y-0.5 rounded-md border shadow-xs",
-            layer.className,
-          )}
-        />
-      ))}
-    </span>
-  );
-}
-
 export interface TechniqueIconStripProps {
   icon: LucideIcon;
   tone: TechniqueTone;
@@ -220,23 +165,21 @@ export interface TechniqueIconStripProps {
 }
 
 // Collapsed-state icon (design/shell-look, studyplatform StudyPanel.tsx
-// `IconStrip`; 40px since H9-T2 so it reads when collapsed): a tinted tile with a native `title` tooltip, dimmed
-// when the technique isn't available yet.
+// `IconStrip`; H9-T3: a 48px pixel tile) with a native `title` tooltip,
+// dimmed when the technique isn't available yet.
 export function TechniqueIconStrip({
-  icon: Icon,
+  icon,
   tone,
   title,
   available = false,
 }: TechniqueIconStripProps) {
   return (
-    <IconTile
-      tone={TONE_TILE[tone]}
-      size="40"
-      radius="input"
+    <PixelTile
+      tone={tone}
+      icon={icon}
+      size={48}
       title={title}
-      className={cn("shadow-xs", !available && "opacity-35")}
-    >
-      <Icon aria-hidden="true" size={20} strokeWidth={1.9} />
-    </IconTile>
+      className={cn(!available && "opacity-35")}
+    />
   );
 }

@@ -557,8 +557,12 @@ zero-visual-change (same classes/DOM, only the icon and aria attributes now
 come in as props).
 
 - `icon`: any `LucideIcon`. `size`/`strokeWidth`: default `15`/`1.75`
-  (Sidebar's size); the techniques panel passes `size={12}` to match its
-  smaller reference chrome.
+  (Sidebar's size). The techniques panel (H9-T3, user 2026-10-29) sizes it
+  through `className` to match the technique icons: `size-9 rounded-[9px]`
+  with a 16px icon in the expanded header (the tiles' 36px icons) and
+  `size-12 rounded-lg` with a 20px icon when collapsed, centred in the same
+  column as the rail's 48px tiles; neutral chrome, `title` = its
+  `aria-label`.
 - Forwards `onClick`, `aria-expanded`, `aria-label`, `data-testid`, etc. via
   `React.ComponentProps<"button">` (minus `children`/`type`, which the atom
   owns).
@@ -612,40 +616,38 @@ anatomy; simplified per user decision 2026-09-24 — a card has **only** a
   `children` render under it inside the card (the caller owns the
   remaining-generations, notice and error copy). Without `onGenerate` the
   card behaves exactly as before.
-- Anatomy (H9-T2, user 2026-10-29): Home's "Tu progreso de hoy" look
-  (`TechniqueCountCard`) — a white bordered `rounded-xl` card
-  (`px-3.5 pt-3.5 pb-3`, `shadow-xs`) with the technique's pastel fading in
-  from the icon corner (`TECHNIQUE_GLOW_CLASS` → globals.css
-  `technique-glow-yellow|mint|pink`), tagged `data-part="technique-card"` +
-  `data-tone`. Row 1: the pastel icon tile (`IconTile` size `"36"`, radius
-  `"md"`, glyph 19px stroke 1.9, `data-part="technique-icon"`) and the name
-  as a one-line 15px semibold title (`truncate`) vertically centred with it.
-  Row 2: one full-width 36px "Generar" (`rounded-md`, 13px semibold,
-  leading `Sparkles` 12px) in the technique's pastel pair — yellow
-  `bg-pastel-yellow`/`text-pastel-yellow-fg` (6.4:1), mint (6.8:1), pink
-  (5.9:1) — hover `brightness-95`; the three buttons share every class
-  except the pair. Then `children` (the panel puts "Te quedan N
-  generaciones hoy" there, centred 11px). Disabled keeps the colour at
-  `disabled:opacity-60` + `disabled:cursor-not-allowed`; disabled unwired
-  cards also get `aria-disabled` and `title="Disponible pronto"`. (H9-T1's
-  flat pastel surface with a white button was rejected by the user.)
+- Anatomy (H9-T2, refined in H9-T3, user 2026-10-29): Home's "Tu progreso
+  de hoy" look (`TechniqueCountCard`) — a white bordered `rounded-lg`
+  (12px, was 16 in H9-T2) card (`px-3.5 pt-3.5 pb-3`, `shadow-xs`) with the
+  technique's pastel fading in from the icon corner (`TECHNIQUE_GLOW_CLASS`
+  → globals.css `technique-glow-yellow|mint|pink`), tagged
+  `data-part="technique-card"` + `data-tone`. Row 1: a 36px `PixelTile`
+  (`data-part="technique-icon"`) and the name as a one-line 15px semibold
+  title (`truncate`) vertically centred with it. Row 2: one full-width 36px
+  **outlined** "Generar" (`rounded-md`, `border-[1.5px]`, `bg-transparent`,
+  13px semibold, leading `Sparkles` 12px): the label in the technique's
+  dark ink (`text-pastel-*-fg`; measured on the faded tile yellow 6.72:1,
+  mint 7.21:1, pink 6.65:1) and the border in its outline token
+  (`border-technique-flashcards|recall|exam-outline` = `#b45309` /
+  success-600 / rose-600; UI component 4.76:1 / 3.54:1 / 4.25:1). Hover
+  fills it with the technique pastel (`hover:bg-pastel-*`, ink ≥ 5.88:1).
+  The three buttons share every class except the colour ones. Then
+  `children` (the panel puts "Te quedan N generaciones hoy" there, centred
+  11px). Disabled keeps the colour at `disabled:opacity-60` +
+  `disabled:cursor-not-allowed`; disabled unwired cards also get
+  `aria-disabled` and `title="Disponible pronto"`. (Rejected: H9-T1's flat
+  pastel surface with a white button; H9-T2's filled pastel button.)
 - `TECHNIQUE_GLOW_CLASS`: the faded glow per `TechniqueTone`, same
-  utilities as `TechniqueCountCard`. `TECHNIQUE_TRIO_GLOW_CLASS`: the same
-  faded look with all three pastels (yellow top-left, mint top-right, pink
-  bottom-right, 50–60% strength over `bg-card`) for surfaces that stand for
-  every technique — the panel's "Generado en esta página" empty state.
-- `TechniqueStack` (H9-T1): the decorative glyph of that empty state —
-  three small pastel tiles (pink, mint, yellow, each
-  `data-part="technique-layer"` + `data-tone`) fanned like a stack of study
-  material, `aria-hidden`. Props: `className?`.
-- `TechniqueIconStrip`: the collapsed-state tinted tile (`IconTile`
-  size `"40"` since H9-T2 — was 36 — radius `"input"`, glyph 20px) with a
-  native `title` tooltip; the panel's collapsed width is 56; `opacity-35`
-  when `available` is false (default).
+  utilities as `TechniqueCountCard`. (H9-T2's `TECHNIQUE_TRIO_GLOW_CLASS`
+  and H9-T1's `TechniqueStack` were removed in H9-T3: the empty state is
+  plain now.)
+- `TechniqueIconStrip`: the collapsed-state 48px `PixelTile` (H9-T3; was a
+  40px `IconTile`) with a native `title` tooltip; the panel's collapsed
+  width is 64; `opacity-35` when `available` is false (default).
 - `TechniqueTone`: `"yellow" | "green" | "rose"` (Flashcards / Recordación
-  activa / Examen) — mapped onto the **existing** pastel pairs `yellow` /
-  `mint` / `pink` (the collapsed strip's `IconTile` tones; the expanded
-  tile's surface, icon glyph and button label). No new token was needed.
+  activa / Examen) — mapped onto the pastel pairs `yellow` / `mint` /
+  `pink` (the glow, the button ink and hover fill) and onto `PixelTile`'s
+  tones of the same names.
 - `TECHNIQUE_PAIR_CLASS` (Phase 7 T1): the pastel pair per `TechniqueTone`
   (`bg-pastel-yellow text-pastel-yellow-fg`, `bg-pastel-mint
   text-pastel-mint-fg`, `bg-pastel-pink text-pastel-pink-fg`), exported so
@@ -677,11 +679,34 @@ content on the page (NotebookLM Studio model). Cards only generate — no
 practice button or deck/exam link inside a card; Examen's "Preguntas" link
 was removed too (manual questions live in Exámenes → cuaderno → página).
 `SavedStudySection` keys rows by tone + href + label, so rows sharing a label
-need distinct hrefs. Its empty state (H9-T1) explains the section instead of
-asking for an action: `EmptyState` `tinted` restyled as a white
-`rounded-xl` card with `TECHNIQUE_TRIO_GLOW_CLASS` (H9-T2), `TechniqueStack`
-as the icon, "Aquí verás todo lo que generes" + "Empieza con una técnica de
-arriba." The panel is 280px wide since H9-T2 (was 264).
+need distinct hrefs. Its empty state (H9-T3) is a plain neutral card:
+`EmptyState` `tinted` restyled as `rounded-lg border-border-subtle bg-card`,
+no icon, no colour or gradient, "Aquí verás todo lo que generes" +
+"Empieza con una técnica de arriba." The panel is 280px wide since H9-T2
+(was 264).
+
+## PixelTile (`pixel-tile.tsx`)
+
+The landing's pixel motif (`landing/_components/pixel-tile.tsx`), ported
+app-side in H9-T3 (user 2026-10-29) so the app never imports from
+`src/app/(marketing)`: a square in a technique colour filled with a coarse
+4×4 Bayer dither (dark / mid / light, light in the top left), at 2 CSS px
+per cell, under a crisp Lucide glyph (stroke 2.1) with a 1px offset shadow.
+
+- Props: `tone` (`"yellow" | "green" | "rose"`), `icon` (`LucideIcon`),
+  `size` (`36` → 9px radius, 19px glyph; `48` → `rounded-lg`, 24px glyph),
+  `title?` (native tooltip), `className?`, `data-part?`. Always
+  `aria-hidden`; tagged `data-slot="pixel-tile"` + `data-tone`.
+- Colours: globals.css `.pixel-tile[data-tone]` sets `--pt-dark/-mid/-light/
+  -ink/-shadow` — yellow warning-500 / flashcards-accent / pastel-yellow,
+  ink pastel-yellow-fg; green success-500 / recall-accent / success-50, ink
+  pastel-mint-fg; rose `--color-pixel-rose-dark` #be123c / rose-400 /
+  `--color-pixel-rose-light` #fecdd3, ink `--color-pixel-paper` with a
+  `--color-pixel-rose-shadow` shadow (the landing's values). The tile casts
+  a soft `0 5px 10px -6px` shadow in its dark tone.
+- `ditherLevel(grid, col, row)` is exported (pure, tested). Dither paths
+  are computed once per grid size.
+- Used by: `TechniqueCard` (36), `TechniqueIconStrip` (48).
 
 ## StudyItemRow (`study-item-row.tsx`)
 

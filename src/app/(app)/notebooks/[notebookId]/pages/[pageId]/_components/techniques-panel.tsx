@@ -25,13 +25,7 @@ import { PanelToggleButton } from "@/shared/ui/panel-toggle-button";
 import { SavedStudySection } from "@/shared/ui/saved-study-section";
 import { SidePanel } from "@/shared/ui/side-panel";
 import type { StudyItemRowProps } from "@/shared/ui/study-item-row";
-import {
-  TECHNIQUE_TRIO_GLOW_CLASS,
-  TechniqueCard,
-  TechniqueIconStrip,
-  TechniqueStack,
-} from "@/shared/ui/technique-card";
-import { cn } from "@/shared/ui/utils";
+import { TechniqueCard, TechniqueIconStrip } from "@/shared/ui/technique-card";
 import {
   TECHNIQUES_PANEL_COLLAPSED,
   TECHNIQUES_PANEL_COOKIE,
@@ -485,15 +479,21 @@ export function TechniquesPanel({
     ];
   });
 
+  // H9-T3 (user 2026-10-29): the toggle matches the technique icons for
+  // symmetry — 36px like the tiles' icons when expanded, 48px like the
+  // rail's tiles when collapsed — neutral, its name doubling as tooltip.
+  const toggleLabel = collapsed
+    ? "Expandir panel de técnicas"
+    : "Colapsar panel de técnicas";
   const toggleButton = (
     <PanelToggleButton
       icon={collapsed ? PanelRightClose : PanelRightOpen}
-      size={12}
+      size={collapsed ? 20 : 16}
       onClick={toggle}
       aria-expanded={!collapsed}
-      aria-label={
-        collapsed ? "Expandir panel de técnicas" : "Colapsar panel de técnicas"
-      }
+      aria-label={toggleLabel}
+      title={toggleLabel}
+      className={collapsed ? "size-12 rounded-lg" : "size-9 rounded-[9px]"}
       data-testid="techniques-panel-toggle"
     />
   );
@@ -504,7 +504,7 @@ export function TechniquesPanel({
       // 280 since H9-T2 (user 2026-10-29: larger tiles and title); at 1440
       // the editor column keeps ample room.
       width={280}
-      collapsedWidth={56}
+      collapsedWidth={64}
       side="right"
       className="hidden lg:flex"
       aria-label="Técnicas de estudio"
@@ -535,7 +535,7 @@ export function TechniquesPanel({
         )
       }
       collapsedContent={
-        <div className="flex flex-col items-center gap-2 py-3">
+        <div className="flex flex-col items-center gap-2.5 py-3">
           {TECHNIQUES.map((t) => (
             <TechniqueIconStrip
               key={t.id}
@@ -615,16 +615,13 @@ export function TechniquesPanel({
           empty={
             <EmptyState
               variant="tinted"
-              icon={<TechniqueStack />}
+              icon={null}
               title="Aquí verás todo lo que generes"
               titleAs="p"
               titleClassName="font-semibold text-[12.5px]"
               description="Empieza con una técnica de arriba."
               descriptionClassName="text-[11px] text-fg-secondary"
-              className={cn(
-                "rounded-xl border-border-subtle px-4 py-5 shadow-xs",
-                TECHNIQUE_TRIO_GLOW_CLASS,
-              )}
+              className="gap-1 rounded-lg border-border-subtle bg-card px-4 py-4"
             />
           }
         />

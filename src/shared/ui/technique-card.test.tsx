@@ -7,7 +7,6 @@ import {
   TECHNIQUE_ACCENT_TEXT_CLASS,
   TechniqueCard,
   TechniqueIconStrip,
-  TechniqueStack,
 } from "./technique-card";
 
 describe("TechniqueCard", () => {
@@ -159,16 +158,23 @@ describe("TechniqueCard", () => {
 });
 
 describe("TechniqueCard technique colours", () => {
-  // H9-T2 (user, 2026-10-29): the Home "Tu progreso de hoy" look — a white
-  // card with the technique's pastel fading in from the icon corner
-  // (globals.css technique-glow-*), the pastel icon tile, and a "Generar"
-  // in the technique's pastel pair.
-  const SHARED = ["w-full", "h-9", "text-[13px]", "font-semibold"];
+  // H9-T3 (user, 2026-10-29): Home's faded glow on a 12px-radius card, a
+  // 36px dithered pixel tile for the icon, and an outlined "Generar": the
+  // label in the technique's dark ink (≥ 6.6:1 on the tile) and a border in
+  // the technique's outline token (≥ 3.5:1), filled with the pastel on hover.
+  const SHARED = [
+    "w-full",
+    "h-9",
+    "text-[13px]",
+    "font-semibold",
+    "border-[1.5px]",
+    "bg-transparent",
+  ];
   it.each([
-    ["yellow", "pastel-yellow"],
-    ["green", "pastel-mint"],
-    ["rose", "pastel-pink"],
-  ] as const)("colours a %s tile, its icon and its Generar with the %s pair", (tone, pair) => {
+    ["yellow", "pastel-yellow", "flashcards"],
+    ["green", "pastel-mint", "recall"],
+    ["rose", "pastel-pink", "exam"],
+  ] as const)("colours a %s tile, its icon and its Generar with the %s pair", (tone, pair, key) => {
     const { container } = render(
       <TechniqueCard
         icon={Layers}
@@ -182,15 +188,21 @@ describe("TechniqueCard technique colours", () => {
     expect(card).toHaveAttribute("data-tone", tone);
     expect(card).toHaveClass(
       "bg-card",
+      "rounded-lg",
       `technique-glow-${pair.replace("pastel-", "")}`,
     );
     const button = screen.getByRole("button", { name: "Generar" });
-    expect(button).toHaveClass(...SHARED, `bg-${pair}`, `text-${pair}-fg`);
-    expect(button.className).not.toMatch(
-      /text-white|bg-(warning|success|rose)-\d/,
+    expect(button).toHaveClass(
+      ...SHARED,
+      `text-${pair}-fg`,
+      `border-technique-${key}-outline`,
+      `hover:bg-${pair}`,
     );
+    expect(button.className).not.toMatch(/(^| )bg-pastel-/);
     const tile = container.querySelector("[data-part=technique-icon]");
-    expect(tile).toHaveClass("size-9", `bg-${pair}`, `text-${pair}-fg`);
+    expect(tile).toHaveAttribute("data-slot", "pixel-tile");
+    expect(tile).toHaveAttribute("data-tone", tone);
+    expect(tile).toHaveStyle({ width: "36px" });
   });
 
   it("gives the three Generar buttons the same classes apart from the colour pair", () => {
@@ -206,7 +218,7 @@ describe("TechniqueCard technique colours", () => {
       const classes = screen
         .getByRole("button", { name: "Generar" })
         .className.split(" ")
-        .filter((c) => !/pastel-/.test(c))
+        .filter((c) => !/pastel-|technique-/.test(c))
         .sort();
       unmount();
       return classes;
@@ -214,21 +226,6 @@ describe("TechniqueCard technique colours", () => {
 
     expect(classesOf("green")).toEqual(classesOf("yellow"));
     expect(classesOf("rose")).toEqual(classesOf("yellow"));
-  });
-});
-
-describe("TechniqueStack", () => {
-  it("draws one decorative layer per technique colour, hidden from assistive tech", () => {
-    const { container } = render(<TechniqueStack />);
-
-    const stack = container.firstElementChild;
-    expect(stack).toHaveAttribute("aria-hidden", "true");
-    const layers = container.querySelectorAll("[data-part=technique-layer]");
-    expect([...layers].map((l) => l.getAttribute("data-tone"))).toEqual([
-      "rose",
-      "green",
-      "yellow",
-    ]);
   });
 });
 
@@ -245,10 +242,13 @@ describe("TechniqueIconStrip", () => {
     expect(screen.getByTitle("Recordación activa")).toBeInTheDocument();
   });
 
-  it("uses the technique's pastel tile, at 40px so it reads when collapsed (H9-T2)", () => {
+  it("is a 48px pixel tile in the technique colour (H9-T3)", () => {
     render(<TechniqueIconStrip icon={Layers} tone="yellow" title="t" />);
 
-    expect(screen.getByTitle("t")).toHaveClass("bg-pastel-yellow", "size-10");
+    const tile = screen.getByTitle("t");
+    expect(tile).toHaveAttribute("data-slot", "pixel-tile");
+    expect(tile).toHaveAttribute("data-tone", "yellow");
+    expect(tile).toHaveStyle({ width: "48px", height: "48px" });
   });
 
   it("is dimmed unless the technique is available", () => {

@@ -172,11 +172,36 @@ describe("TechniquesPanel", () => {
     ] as const) {
       const button = screen.getByTestId(testId);
       expect(button).toHaveClass(`text-${pair}-fg`);
-      expect(button).toHaveClass(`bg-${pair}`);
+      expect(button).toHaveClass("bg-transparent", `hover:bg-${pair}`);
       expect(button.closest("[data-part=technique-card]")).toHaveClass(
         `technique-glow-${pair.replace("pastel-", "")}`,
       );
     }
+  });
+
+  // H9-T3 (user, 2026-10-29): the toggle matches the technique icons —
+  // 36px in the expanded header (the tile icons), 48px when collapsed (the
+  // rail tiles) — neutral, with its accessible name as the tooltip.
+  it("sizes the toggle like the technique icons in both states", async () => {
+    await renderPanel(false);
+    const expanded = screen.getByTestId("techniques-panel-toggle");
+    expect(expanded).toHaveClass("size-9");
+    expect(expanded).toHaveAttribute("title", "Colapsar panel de técnicas");
+    expect(expanded).toHaveAttribute(
+      "aria-label",
+      "Colapsar panel de técnicas",
+    );
+    await userEvent.click(expanded);
+
+    const collapsedToggle = screen.getByTestId("techniques-panel-toggle");
+    expect(collapsedToggle).toHaveClass("size-12");
+    expect(collapsedToggle).toHaveAttribute(
+      "title",
+      "Expandir panel de técnicas",
+    );
+    expect(screen.getByTestId("techniques-panel")).toHaveStyle({
+      width: "64px",
+    });
   });
 
   it("shows every collapsed technique icon as available", async () => {
@@ -283,6 +308,13 @@ describe("TechniquesPanel", () => {
       expect(
         screen.getByText("Empieza con una técnica de arriba."),
       ).toBeInTheDocument();
+      // H9-T3: a plain neutral card — no technique colours, no gradient.
+      const empty = screen
+        .getByText("Aquí verás todo lo que generes")
+        .closest("div");
+      expect(empty?.className).not.toMatch(/gradient|glow|pastel/);
+      expect(empty).toHaveClass("bg-card", "border-border-subtle");
+      expect(document.querySelector("[data-part=technique-layer]")).toBeNull();
       expect(
         screen.queryByText("Aún no generaste nada en esta página"),
       ).not.toBeInTheDocument();
