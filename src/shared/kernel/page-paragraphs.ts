@@ -90,3 +90,23 @@ export function paragraphsWithinWords(
   }
   return kept;
 }
+
+// The sent paragraphs a generation counts as used once `accepted` of the
+// `requested` items came back (Phase 8 H14): all of them when every item
+// came back; otherwise the share of the sent words the accepted items
+// cover, from the start (paragraphsWithinWords, so the first one counts as
+// soon as any item came back). The rest stays new for the next "Generar",
+// instead of being marked used by a generation that returned few items.
+export function consumedParagraphs(
+  sent: readonly PageParagraph[],
+  accepted: number,
+  requested: number,
+): PageParagraph[] {
+  if (accepted <= 0) return [];
+  if (requested <= 0 || accepted >= requested) return [...sent];
+  const words = sent.reduce((sum, p) => sum + p.words, 0);
+  return paragraphsWithinWords(
+    sent,
+    Math.round((words * accepted) / requested),
+  );
+}

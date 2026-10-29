@@ -12,6 +12,11 @@ import {
   type DomainError,
   toActionError,
 } from "@/shared/kernel/domain-error";
+import {
+  PAGE_TOO_SHORT_CODE,
+  PageTooShortError,
+  pageTooShortDetails,
+} from "@/shared/kernel/generation-capacity";
 import { createId } from "@/shared/kernel/id";
 import { err, ok, type Result } from "@/shared/kernel/result";
 import {
@@ -91,6 +96,11 @@ export interface GenerationStatusView {
 // generation is available again.
 export interface GenerationActionError extends ActionError {
   readonly resetAt?: string;
+  // AI_PAGE_TOO_SHORT (Phase 8 H14): the new paragraphs' words, the words
+  // the request needs and the items those words carry.
+  readonly words?: number;
+  readonly minWords?: number;
+  readonly maxItems?: number;
 }
 
 const pageInput = z.object({ pageId: z.uuid() });
@@ -154,7 +164,9 @@ function statusFor(
 ): "limit" | "empty" | "no_new_content" | "failed" {
   if (error.code === AI_ERROR.DAILY_LIMIT_REACHED) return "limit";
   if (error.code === FLASHCARD_ERROR.NO_NEW_CONTENT) return "no_new_content";
-  if (error.code === AI_ERROR.PAGE_EMPTY) return "empty";
+  // A page too short to generate from (H14) is tracked as empty.
+  if (error.code === AI_ERROR.PAGE_EMPTY || error.code === PAGE_TOO_SHORT_CODE)
+    return "empty";
   return "failed";
 }
 
@@ -193,6 +205,9 @@ export async function generateFlashcardsAction(
         truncated: false,
       });
       const error: GenerationActionError = toActionError(result.error);
+      if (result.error instanceof PageTooShortError) {
+        return err({ ...error, ...pageTooShortDetails(result.error) });
+      }
       return err(
         result.error instanceof DailyLimitReachedError
           ? { ...error, resetAt: result.error.resetAt.toISOString() }

@@ -42,6 +42,7 @@ vi.mock("@/shared/observability/analytics", () => ({
 }));
 
 const RESET = new Date("2026-10-05T00:00:00.000Z");
+const LONG_TEXT = Array.from({ length: 150 }, (_, i) => `w${i}`).join(" ");
 const generation: AiGeneration = {
   id: "gen-1",
   ownerId: "o1",
@@ -137,7 +138,8 @@ describe("flashcards Server Actions", () => {
       ),
       limit: { allowed: true, remaining: 4, resetAt: RESET },
       checks: 0,
-      pageText: { title: "Tema", plainText: "uno dos tres" },
+      // 150 words: since Phase 8 H14 a generation needs 100.
+      pageText: { title: "Tema", plainText: LONG_TEXT },
       generate: async () =>
         ok({
           object: { cards: [{ front: "P", back: "R" }] },
@@ -186,8 +188,8 @@ describe("flashcards Server Actions", () => {
       expect(result.value).toMatchObject({
         remainingToday: 4,
         truncated: false,
-        wordsUsed: 3,
-        wordsTotal: 3,
+        wordsUsed: 150,
+        wordsTotal: 150,
       });
       expect(result.value.cards).toHaveLength(1);
       expect(result.value.cards[0]).toMatchObject({
@@ -235,6 +237,28 @@ describe("flashcards Server Actions", () => {
       const result = await generateFlashcardsAction({ pageId: PAGE });
 
       expect(!result.ok && result.error.code).toBe(AI_ERROR.PAGE_EMPTY);
+      expect(track).toHaveBeenCalledWith(
+        "generation_requested",
+        OWNER,
+        expect.objectContaining({ status: "empty" }),
+      );
+    });
+
+    // Phase 8 H14: a short page is refused with its counts, before the
+    // limiter, and tracked as empty.
+    it("maps a short page to AI_PAGE_TOO_SHORT with its word counts", async () => {
+      current.pageText = { title: "T", plainText: "pocas palabras aquí" };
+      const { generateFlashcardsAction } = await actions();
+
+      const result = await generateFlashcardsAction({ pageId: PAGE });
+
+      expect(!result.ok && result.error).toMatchObject({
+        code: "AI_PAGE_TOO_SHORT",
+        words: 3,
+        minWords: 100,
+        maxItems: 0,
+      });
+      expect(current.checks).toBe(0);
       expect(track).toHaveBeenCalledWith(
         "generation_requested",
         OWNER,
