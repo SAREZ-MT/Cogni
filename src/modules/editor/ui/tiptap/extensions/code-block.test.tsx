@@ -1,4 +1,5 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { FakeSavePagePort } from "../../../application/testing/fake-save-page-port";
 import type { TiptapDoc } from "../../../domain/save-page-port";
@@ -39,10 +40,12 @@ describe("code block", () => {
     const codeBlock = await screen.findByTestId("code-block");
     expect(codeBlock.querySelector(".hljs-keyword")).not.toBeNull();
 
-    const select = screen.getByTestId(
-      "code-block-language",
-    ) as HTMLSelectElement;
-    expect(select.value).toBe("typescript");
+    // H6-E4: a discreet button (not a native select) names the language.
+    const picker = screen.getByTestId("code-block-language");
+    expect(picker.tagName).toBe("BUTTON");
+    expect(picker).toHaveAttribute("data-language", "typescript");
+    expect(picker).toHaveTextContent("TypeScript");
+    expect(picker).toHaveAccessibleName("Lenguaje: TypeScript");
   });
 
   it("updates the persisted language attribute when the selector changes", async () => {
@@ -59,16 +62,42 @@ describe("code block", () => {
       />,
     );
 
-    const select = (await screen.findByTestId(
-      "code-block-language",
-    )) as HTMLSelectElement;
-    await act(async () => {
-      fireEvent.change(select, { target: { value: "python" } });
-    });
-
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("code-block-language"));
+    const menu = await screen.findByRole("menu", { name: /^Lenguaje/ });
     expect(
-      (screen.getByTestId("code-block-language") as HTMLSelectElement).value,
-    ).toBe("python");
+      screen.getByRole("menuitemradio", { name: "JavaScript" }),
+    ).toHaveAttribute("aria-checked", "true");
+    await user.click(screen.getByRole("menuitemradio", { name: "Python" }));
+
+    expect(menu).not.toBeInTheDocument();
+    expect(screen.getByTestId("code-block-language")).toHaveAttribute(
+      "data-language",
+      "python",
+    );
+  });
+
+  it("opens the language menu from the keyboard", async () => {
+    const port = new FakeSavePagePort({
+      content: docWithCodeBlock("javascript"),
+      version: 1,
+    });
+    render(
+      <Editor
+        pageId="page-1"
+        initialContent={docWithCodeBlock("javascript")}
+        initialVersion={1}
+        port={port}
+      />,
+    );
+
+    const picker = await screen.findByTestId("code-block-language");
+    act(() => picker.focus());
+    const user = userEvent.setup();
+    await user.keyboard("{Enter}");
+    expect(
+      await screen.findByRole("menu", { name: /^Lenguaje/ }),
+    ).toBeInTheDocument();
   });
 
   it("renders a code block without a language as plain text", async () => {
@@ -85,10 +114,9 @@ describe("code block", () => {
       />,
     );
 
-    const select = (await screen.findByTestId(
-      "code-block-language",
-    )) as HTMLSelectElement;
-    expect(select.value).toBe("");
+    const picker = await screen.findByTestId("code-block-language");
+    expect(picker).toHaveAttribute("data-language", "");
+    expect(picker).toHaveTextContent("Texto sin formato");
     // No auto-detection: the picker says "Texto sin formato", so the code
     // must carry no syntax colours either.
     const codeBlock = screen.getByTestId("code-block");
