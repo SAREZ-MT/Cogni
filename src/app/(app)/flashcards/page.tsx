@@ -112,7 +112,7 @@ export default async function FlashcardsHubPage() {
           title="Tus primeras flashcards te esperan"
           description={
             result.ok
-              ? "Elige una página de tus cuadernos y crea tarjetas con IA o a mano para repasarlas aquí."
+              ? "Elige una página de tus cuadernos y la IA crea tarjetas para repasarlas aquí."
               : "No pudimos cargar tus mazos. Intenta de nuevo."
           }
           action={<CreateFromPageDialog {...createProps} trigger="cta" />}

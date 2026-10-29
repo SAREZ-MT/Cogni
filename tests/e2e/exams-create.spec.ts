@@ -56,7 +56,7 @@ test.describe("Crear examen", () => {
     await expect(page.getByText("Pon a prueba lo que sabes")).toBeVisible();
     await expect(
       page.getByText(
-        "Elige una página y crea un examen con IA o con tus propias preguntas.",
+        "Elige una página y la IA crea un examen de opción múltiple desde su texto.",
       ),
     ).toBeVisible();
     // Only "Crear examen" in the header: the "Nuevo examen" quick start is gone.
@@ -72,9 +72,8 @@ test.describe("Crear examen", () => {
     await create
       .getByRole("combobox", { name: "Página" })
       .selectOption({ label: "Sin título" });
-    await expect(
-      create.getByRole("radio", { name: /Generar con IA/ }),
-    ).toBeChecked();
+    // AI only (Phase 8 H12): no manual path in the dialog.
+    await expect(create.getByRole("radio")).toHaveCount(0);
     await expect(create.getByTestId("exam-count-value")).toHaveText("10");
     await shot(page, "exams-create-modal");
     await create.getByTestId("create-exam-submit").click();

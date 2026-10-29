@@ -74,7 +74,7 @@ describe("CreateFromPageDialog — flashcards", () => {
     generateRecallQuestionsAction.mockReset();
   });
 
-  it("opens from the empty-state CTA and offers both paths once a page is chosen", async () => {
+  it("opens from the empty-state CTA and only offers to generate with AI once a page is chosen", async () => {
     const { user, dialog } = await open();
 
     expect(
@@ -82,17 +82,6 @@ describe("CreateFromPageDialog — flashcards", () => {
     ).toBeInTheDocument();
     const submit = within(dialog).getByTestId("create-flashcards-submit");
     expect(submit).toBeDisabled();
-    const modes = within(dialog).getByRole("radiogroup", {
-      name: "Cómo crear las flashcards",
-    });
-    expect(
-      within(modes)
-        .getAllByRole("radio")
-        .map((r) => r.textContent),
-    ).toEqual([
-      expect.stringContaining("Generar con IA"),
-      expect.stringContaining("Crear a mano"),
-    ]);
     expect(
       within(dialog).getByText("Te quedan 5 generaciones hoy"),
     ).toBeInTheDocument();
@@ -100,6 +89,20 @@ describe("CreateFromPageDialog — flashcards", () => {
     await pickPage(user, dialog);
     expect(submit).toBeEnabled();
     expect(submit).toHaveTextContent("Generar");
+  });
+
+  // Phase 8 H12 (user 2026-10-29): the hub dialogs are AI only; "Nueva
+  // tarjeta" on an existing deck stays the manual path.
+  it("never offers to create the cards by hand", async () => {
+    const { user, dialog } = await open({ trigger: "tile" });
+    await pickPage(user, dialog, "p-1");
+
+    expect(within(dialog).queryByRole("radiogroup")).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("radio")).not.toBeInTheDocument();
+    expect(within(dialog).queryByText(/Crear a mano/)).not.toBeInTheDocument();
+    expect(
+      within(dialog).getByTestId("create-flashcards-submit"),
+    ).toHaveTextContent("Generar");
   });
 
   it("generates with AI for the chosen page and opens its deck", async () => {
@@ -114,24 +117,6 @@ describe("CreateFromPageDialog — flashcards", () => {
 
     expect(generateFlashcardsAction).toHaveBeenCalledWith({ pageId: "p-2" });
     expect(push).toHaveBeenCalledWith("/flashcards/nb-bio/p-2");
-  });
-
-  it("creates by hand on the page's deck, with the new-card dialog open", async () => {
-    const { user, dialog } = await open({ trigger: "tile" });
-    await pickPage(user, dialog, "p-1");
-
-    await user.click(
-      within(dialog).getByTestId("create-flashcards-mode-manual"),
-    );
-    const submit = within(dialog).getByTestId("create-flashcards-submit");
-    expect(submit).toHaveTextContent("Continuar");
-    expect(
-      within(dialog).queryByText("Te quedan 5 generaciones hoy"),
-    ).not.toBeInTheDocument();
-    await user.click(submit);
-
-    expect(generateFlashcardsAction).not.toHaveBeenCalled();
-    expect(push).toHaveBeenCalledWith("/flashcards/nb-bio/p-1?nueva=1");
   });
 
   it("explains an empty page and offers to open it", async () => {
@@ -169,19 +154,16 @@ describe("CreateFromPageDialog — flashcards", () => {
     expect(within(dialog).queryByRole("alert")).not.toBeInTheDocument();
   });
 
-  it("blocks AI generation once the daily limit is reached, but not creating by hand", async () => {
+  it("blocks generation once the daily limit is reached", async () => {
     const { user, dialog } = await open({ remaining: 0 });
     await pickPage(user, dialog);
 
     expect(
       within(dialog).getByText("Llegaste al límite de hoy. Vuelve mañana."),
     ).toBeInTheDocument();
-    const submit = within(dialog).getByTestId("create-flashcards-submit");
-    expect(submit).toBeDisabled();
-    await user.click(
-      within(dialog).getByTestId("create-flashcards-mode-manual"),
-    );
-    expect(submit).toBeEnabled();
+    expect(
+      within(dialog).getByTestId("create-flashcards-submit"),
+    ).toBeDisabled();
   });
 
   it("drops to zero remaining when the action reports the limit", async () => {

@@ -211,7 +211,7 @@ describe("ExamsHubPage (real data)", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByText(
-        "Elige una página y crea un examen con IA o con tus propias preguntas.",
+        "Elige una página y la IA crea un examen de opción múltiple desde su texto.",
       ),
     ).toBeInTheDocument();
     expect(

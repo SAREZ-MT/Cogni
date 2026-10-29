@@ -12,7 +12,8 @@ import {
 // its content from a "pick a page" dialog, opened by the empty state's CTA
 // or, once the hub lists something, by the grid's first, fixed tile. No AI
 // is called here (the reused dev server may run live AI): the AI paths are
-// only opened, and flashcards' "Crear a mano" creates the first card.
+// only opened. Phase 8 H12: the dialogs are AI only, so the first card is
+// written on the page's deck ("Nueva tarjeta").
 
 const HUBS = [
   {
@@ -77,7 +78,7 @@ test.describe("technique hubs: create from the section", () => {
       await page.keyboard.press("Escape");
     }
 
-    // With a page: the paths per technique (opened, never generated).
+    // With a page: AI only in every technique (opened, never generated).
     await openNotebook(page, title);
     await createPageAndOpen(page);
 
@@ -85,12 +86,8 @@ test.describe("technique hubs: create from the section", () => {
     await flashcards
       .getByRole("combobox", { name: "Página" })
       .selectOption({ label: "Sin título" });
-    await expect(
-      flashcards.getByRole("radio", { name: /Generar con IA/ }),
-    ).toBeChecked();
-    await expect(
-      flashcards.getByRole("radio", { name: /Crear a mano/ }),
-    ).toBeVisible();
+    await expect(flashcards.getByRole("radio")).toHaveCount(0);
+    await expect(flashcards.getByText(/Crear a mano/)).toHaveCount(0);
     await expect(
       flashcards.getByTestId("create-flashcards-remaining"),
     ).toHaveText(/generaci|límite/);
@@ -103,8 +100,7 @@ test.describe("technique hubs: create from the section", () => {
     await recall
       .getByRole("combobox", { name: "Página" })
       .selectOption({ label: "Sin título" });
-    // AI only: there is no manual recall path.
-    await expect(recall.getByRole("radiogroup")).toHaveCount(0);
+    await expect(recall.getByRole("radio")).toHaveCount(0);
     await expect(recall.getByTestId("create-recall-submit")).toHaveText(
       "Generar",
     );
@@ -114,13 +110,16 @@ test.describe("technique hubs: create from the section", () => {
     await exams
       .getByRole("combobox", { name: "Página" })
       .selectOption({ label: "Sin título" });
+    await expect(exams.getByRole("radio")).toHaveCount(0);
+    await expect(exams.getByText(/Crear mis preguntas/)).toHaveCount(0);
     await expect(
-      exams.getByRole("radio", { name: /Crear mis preguntas/ }),
+      exams.getByRole("group", { name: "Preguntas a generar" }),
     ).toBeVisible();
+    await expect(exams.getByTestId("create-exam-submit")).toHaveText("Generar");
     await page.keyboard.press("Escape");
   });
 
-  test("Crear a mano starts a page's deck with its first card, then the hub offers the create tile first", async ({
+  test("a first card written on the page's deck makes the hub offer the create tile first", async ({
     page,
   }) => {
     test.setTimeout(120_000);
@@ -130,18 +129,10 @@ test.describe("technique hubs: create from the section", () => {
     await createPageAndOpen(page);
     const pageId = new URL(page.url()).pathname.split("/")[4] ?? "";
 
-    const dialog = await openFromCta(page, HUBS[0]);
-    await dialog
-      .getByRole("combobox", { name: "Cuaderno" })
-      .selectOption({ label: title });
-    await dialog
-      .getByRole("combobox", { name: "Página" })
-      .selectOption({ label: "Sin título" });
-    await dialog.getByRole("radio", { name: /Crear a mano/ }).click();
-    await dialog.getByTestId("create-flashcards-submit").click();
-
-    // The deck route opens "Nueva tarjeta" at once and drops ?nueva=1.
-    await expect(page).toHaveURL(`/flashcards/${notebookId}/${pageId}`);
+    // The deck route renders for a page with no cards; its "Nueva tarjeta"
+    // starts the deck.
+    await page.goto(`/flashcards/${notebookId}/${pageId}`);
+    await page.getByTestId("new-flashcard-button").first().click();
     const card = page.getByRole("dialog", { name: "Nueva tarjeta" });
     await expect(card).toBeVisible();
     await card.getByLabel("Anverso").fill("¿Qué idea resume el tema?");

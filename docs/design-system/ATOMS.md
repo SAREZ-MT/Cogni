@@ -841,23 +841,6 @@ time-zone select (`identity/ui/time-zone-form.tsx`, Phase 7 T2a), which
 passes `<optgroup>` children per region and widens it with `className`
 (`h-10 sm:w-[280px]`, the Profile Settings form-input size). No atom change.
 
-## ChoiceGroup (`choice-group.tsx`)
-
-A single-choice list of bordered rows with radio semantics
-(`role="radiogroup"` + `role="radio"`/`aria-checked`), each with a label and
-an optional muted description. Unchecked rows use `OptionRow`'s default
-palette (`border-neutral-200/80 bg-card`), the checked row its selected
-palette: `tone="rose"` (default, `border-rose-500 bg-pastel-pink/30`) or
-`tone="amber"` (Phase 8 H11, `border-warning-500 bg-pastel-yellow/40`).
-
-- `options: { value, label, description? }[]`, `value`, `onChange`,
-  `aria-label`, `testId?` (each row gets `${testId}-${value}`), `tone?`,
-  `className?`.
-
-Used by: `exams/_components/create-exam-dialog.tsx` ("Generar con IA" /
-"Crear mis preguntas") and `flashcards/_components/create-from-page-dialog.tsx`
-(amber; "Generar con IA" / "Crear a mano").
-
 ## PagePicker (`page-picker.tsx`)
 
 Phase 8 H11: the "which page?" step of every create dialog that starts

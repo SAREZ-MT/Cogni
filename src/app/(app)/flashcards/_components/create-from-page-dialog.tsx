@@ -6,7 +6,6 @@ import { useState, useTransition } from "react";
 import { generateRecallQuestionsAction } from "@/modules/active-recall";
 import { generateFlashcardsAction } from "@/modules/flashcards";
 import { Button } from "@/shared/ui/button";
-import { ChoiceGroup } from "@/shared/ui/choice-group";
 import {
   Dialog,
   DialogContent,
@@ -21,7 +20,6 @@ import { PagePicker, type PagePickerNotebook } from "@/shared/ui/page-picker";
 import { TechniqueCreateTile } from "@/shared/ui/technique-create-tile";
 
 type Technique = "flashcards" | "recall";
-type Mode = "ai" | "manual";
 
 export interface CreateFromPageDialogProps {
   technique: Technique;
@@ -47,7 +45,8 @@ const NO_NEW_CONTENT_CODES = new Set([
 const CONFIG = {
   flashcards: {
     title: "Crear flashcards",
-    description: "Elige la página de tus tarjetas y cómo crearlas.",
+    description:
+      "Elige la página: la IA crea tarjetas de pregunta y respuesta desde su texto.",
     cta: "Crear mis primeras flashcards",
     tileHint: "Elige una página de tus cuadernos",
     genericFailure: "No pudimos generar las tarjetas. Intenta de nuevo.",
@@ -71,19 +70,6 @@ const CONFIG = {
   },
 } as const;
 
-const FLASHCARD_MODES = [
-  {
-    value: "ai",
-    label: "Generar con IA",
-    description: "La IA crea tarjetas desde el texto de la página.",
-  },
-  {
-    value: "manual",
-    label: "Crear a mano",
-    description: "Escribe tú la pregunta y la respuesta de cada tarjeta.",
-  },
-] as const;
-
 function remainingCopy(remaining: number): string {
   if (remaining <= 0) return LIMIT_REACHED;
   return remaining === 1
@@ -94,14 +80,11 @@ function remainingCopy(remaining: number): string {
 // Creating from a technique hub (Phase 8 H11, user-approved flow
 // 2026-10-29). Every flashcard and recall question belongs to a page
 // (`page_id` is required), so the dialog first asks for a notebook and a
-// page (`PagePicker`), then offers the technique's paths, reusing the
-// techniques panel's Server Actions:
-// - Flashcards: "Generar con IA" (generateFlashcardsAction, then the page's
-//   deck) or "Crear a mano" (the page's deck with `?nueva=1`, which opens
-//   "Nueva tarjeta" at once — the deck route renders for a page with no
-//   cards, so the first card starts the deck).
-// - Recordación activa: "Generar con IA" only (documento-maestro: recall
-//   questions are AI-generated), then the page's session.
+// page (`PagePicker`), then generates with AI, reusing the techniques
+// panel's Server Actions (generateFlashcardsAction, then the page's deck;
+// generateRecallQuestionsAction, then the page's session). AI only (user
+// decision 2026-10-29, Phase 8 H12): writing cards by hand stays on an
+// existing deck's "Nueva tarjeta".
 // The remaining generations show under the AI path and block it at 0; an
 // empty page reads the panel's error and links to the page.
 export function CreateFromPageDialog({
@@ -116,7 +99,6 @@ export function CreateFromPageDialog({
   const [open, setOpen] = useState(false);
   const [notebookId, setNotebookId] = useState(firstNotebookId);
   const [pageId, setPageId] = useState("");
-  const [mode, setMode] = useState<Mode>("ai");
   const [remaining, setRemaining] = useState(initialRemaining);
   const [error, setError] = useState<string | null>(null);
   const [emptyPage, setEmptyPage] = useState(false);
@@ -125,8 +107,7 @@ export function CreateFromPageDialog({
 
   const prefix = `create-${technique}`;
   const limitReached = remaining !== null && remaining <= 0;
-  const canSubmit =
-    pageId !== "" && !pending && (mode === "manual" || !limitReached);
+  const canSubmit = pageId !== "" && !pending && !limitReached;
 
   function clearFeedback() {
     setError(null);
@@ -141,7 +122,6 @@ export function CreateFromPageDialog({
     if (next) {
       setNotebookId(firstNotebookId);
       setPageId("");
-      setMode("ai");
     }
   }
 
@@ -158,10 +138,6 @@ export function CreateFromPageDialog({
   function submit() {
     if (!canSubmit) return;
     clearFeedback();
-    if (technique === "flashcards" && mode === "manual") {
-      router.push(`/flashcards/${notebookId}/${pageId}?nueva=1`);
-      return;
-    }
     startTransition(async () => {
       try {
         if (technique === "flashcards") {
@@ -193,7 +169,6 @@ export function CreateFromPageDialog({
         data-testid={`${prefix}-tile`}
       />
     );
-  const showsAi = technique === "recall" || mode === "ai";
 
   return (
     <Dialog open={open} onOpenChange={changeOpen}>
@@ -222,20 +197,7 @@ export function CreateFromPageDialog({
           />
           {notebooks !== null && notebooks.length > 0 && (
             <>
-              {technique === "flashcards" && (
-                <ChoiceGroup
-                  aria-label="Cómo crear las flashcards"
-                  options={FLASHCARD_MODES}
-                  value={mode}
-                  onChange={(next) => {
-                    setMode(next);
-                    clearFeedback();
-                  }}
-                  tone="amber"
-                  testId={`${prefix}-mode`}
-                />
-              )}
-              {showsAi && remaining !== null && (
+              {remaining !== null && (
                 <p
                   data-testid={`${prefix}-remaining`}
                   className="text-fg-secondary text-xs"
@@ -284,7 +246,7 @@ export function CreateFromPageDialog({
             disabled={!canSubmit}
             data-testid={`${prefix}-submit`}
           >
-            {pending ? "Generando…" : showsAi ? "Generar" : "Continuar"}
+            {pending ? "Generando…" : "Generar"}
           </Button>
         </DialogFooter>
       </DialogContent>

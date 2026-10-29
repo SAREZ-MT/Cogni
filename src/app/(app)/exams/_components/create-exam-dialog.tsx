@@ -10,7 +10,6 @@ import {
   generateExamQuestionsAction,
 } from "@/modules/exams";
 import { Button } from "@/shared/ui/button";
-import { ChoiceGroup } from "@/shared/ui/choice-group";
 import { CountStepper } from "@/shared/ui/count-stepper";
 import {
   Dialog,
@@ -41,21 +40,6 @@ export interface CreateExamDialogProps {
   trigger?: "button" | "cta" | "tile";
 }
 
-type CreateMode = "ai" | "manual";
-
-const MODES = [
-  {
-    value: "ai",
-    label: "Generar con IA",
-    description: "La IA crea preguntas de opción múltiple desde la página.",
-  },
-  {
-    value: "manual",
-    label: "Crear mis preguntas",
-    description: "Escribe tus propias preguntas para la página.",
-  },
-] as const;
-
 // Same steps as the techniques panel's exam count (10–30 in steps of 5).
 const EXAM_COUNT_STEP = 5;
 
@@ -79,9 +63,10 @@ const ERROR_COPY: Record<string, string> = {
 // "Crear examen" (Phase 6 T5b, user decision 2026-10-07): the exams hub's
 // and notebook view's entry to start an exam for a page. The student picks
 // a notebook and a page (mandatory: an exam belongs to a page for SM-2),
-// then either generates the questions with AI (same action, limits and
-// error copy as the techniques panel; on success the notebook's exams open)
-// or writes them on the page's questions screen.
+// then generates the questions with AI (same action, limits and error copy
+// as the techniques panel; on success the notebook's exams open). AI only
+// (user decision 2026-10-29, Phase 8 H12): writing questions by hand stays
+// on the page's questions screen ("Nueva pregunta").
 export function CreateExamDialog({
   notebooks: loadedNotebooks,
   initialNotebookId,
@@ -96,7 +81,6 @@ export function CreateExamDialog({
   const [open, setOpen] = useState(false);
   const [notebookId, setNotebookId] = useState(firstNotebookId);
   const [pageId, setPageId] = useState("");
-  const [mode, setMode] = useState<CreateMode>("ai");
   const [count, setCount] = useState(EXAM_DEFAULT_QUESTIONS);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -127,10 +111,6 @@ export function CreateExamDialog({
     if (!canSubmit) return;
     setError(null);
     setNotice(null);
-    if (mode === "manual") {
-      router.push(`/exams/${notebookId}/${pageId}/preguntas`);
-      return;
-    }
     startTransition(async () => {
       let result: Awaited<ReturnType<typeof generateExamQuestionsAction>>;
       try {
@@ -177,7 +157,8 @@ export function CreateExamDialog({
         <DialogHeader>
           <DialogTitle>Crear examen</DialogTitle>
           <DialogDescription>
-            Elige la página del examen y cómo crear sus preguntas.
+            Elige la página: la IA crea preguntas de opción múltiple desde su
+            texto.
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-3">
@@ -196,25 +177,16 @@ export function CreateExamDialog({
           />
           {notebooks.length > 0 && (
             <>
-              <ChoiceGroup
-                aria-label="Cómo crear el examen"
-                options={MODES}
-                value={mode}
-                onChange={setMode}
-                testId="create-exam-mode"
+              <CountStepper
+                label="Preguntas a generar"
+                value={count}
+                min={EXAM_MIN_QUESTIONS}
+                max={EXAM_MAX_QUESTIONS}
+                step={EXAM_COUNT_STEP}
+                onChange={setCount}
+                disabled={pending}
+                testId="exam-count"
               />
-              {mode === "ai" && (
-                <CountStepper
-                  label="Preguntas a generar"
-                  value={count}
-                  min={EXAM_MIN_QUESTIONS}
-                  max={EXAM_MAX_QUESTIONS}
-                  step={EXAM_COUNT_STEP}
-                  onChange={setCount}
-                  disabled={pending}
-                  testId="exam-count"
-                />
-              )}
               {notice && (
                 <p
                   data-testid="create-exam-notice"
@@ -246,7 +218,7 @@ export function CreateExamDialog({
             disabled={!canSubmit}
             data-testid="create-exam-submit"
           >
-            {pending ? "Generando…" : mode === "ai" ? "Generar" : "Continuar"}
+            {pending ? "Generando…" : "Generar"}
           </Button>
         </DialogFooter>
       </DialogContent>

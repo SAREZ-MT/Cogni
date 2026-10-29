@@ -170,7 +170,7 @@ export default async function ExamsHubPage() {
           title="Pon a prueba lo que sabes"
           description={
             result.ok
-              ? "Elige una página y crea un examen con IA o con tus propias preguntas."
+              ? "Elige una página y la IA crea un examen de opción múltiple desde su texto."
               : "No pudimos cargar tus exámenes. Intenta de nuevo."
           }
           action={

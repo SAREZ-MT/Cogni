@@ -265,7 +265,7 @@ describe("FlashcardsHubPage (real data)", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByText(
-        "Elige una página de tus cuadernos y crea tarjetas con IA o a mano para repasarlas aquí.",
+        "Elige una página de tus cuadernos y la IA crea tarjetas para repasarlas aquí.",
       ),
     ).toBeInTheDocument();
     expect(

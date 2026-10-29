@@ -7,8 +7,8 @@ import {
 } from "./helpers/notebooks";
 
 // Phase 5 T4 manual exam questions (documento-maestro §3.3 "creadas
-// manualmente"): Exámenes → "Crear examen" → "Crear mis preguntas" opens a
-// page's questions screen on real data; a question is created, edited in place and
+// manualmente"): a page's questions screen on real data; a question is
+// created, edited in place and
 // retired after a confirmation, and every change survives a reload.
 
 // Optional: a directory to drop the screenshots in (visual check).
@@ -33,20 +33,9 @@ test.describe("manual exam questions", () => {
     await createNotebookWithOpenPage(page, notebookTitle);
     const [, , notebookId, , pageId] = new URL(page.url()).pathname.split("/");
 
-    // Entry point: Exámenes → "Crear examen" → notebook + page → "Crear mis
-    // preguntas" opens the page's questions screen (Phase 6 T5b).
-    await page.goto("/exams");
-    await page.getByTestId("create-exam-button").click();
-    const create = page.getByRole("dialog", { name: "Crear examen" });
-    await create
-      .getByRole("combobox", { name: "Cuaderno" })
-      .selectOption({ label: notebookTitle });
-    await create
-      .getByRole("combobox", { name: "Página" })
-      .selectOption({ label: "Sin título" });
-    await create.getByRole("radio", { name: /Crear mis preguntas/ }).click();
-    await shot(page, "exams-create-modal-manual");
-    await create.getByTestId("create-exam-submit").click();
+    // Phase 8 H12: "Crear examen" is AI only, so the screen of a page
+    // without questions is opened by its URL.
+    await page.goto(`/exams/${notebookId}/${pageId}/preguntas`);
     await expect(page).toHaveURL(`/exams/${notebookId}/${pageId}/preguntas`);
     await expect(
       page.getByText("Esta página aún no tiene preguntas"),

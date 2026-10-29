@@ -118,12 +118,9 @@ describe("CreateExamDialog", () => {
     ).toHaveValue("");
   });
 
-  it("generates with AI by default: count 10–30 in steps of 5, then opens the notebook's exams", async () => {
+  it("generates with AI: count 10–30 in steps of 5, then opens the notebook's exams", async () => {
     generateExamQuestionsAction.mockResolvedValue(generated(15));
     const { user, dialog } = await open();
-    expect(
-      within(dialog).getByRole("radio", { name: /Generar con IA/ }),
-    ).toBeChecked();
     await user.selectOptions(
       within(dialog).getByRole("combobox", { name: "Página" }),
       "p-ribo",
@@ -206,23 +203,25 @@ describe("CreateExamDialog", () => {
     );
   });
 
-  it("'Crear mis preguntas' hides the count and opens the page's questions screen", async () => {
+  // Phase 8 H12 (user 2026-10-29): the create dialog is AI only; "Nueva
+  // pregunta" on the page's questions screen stays the manual path.
+  it("never offers to write the questions by hand", async () => {
     const { user, dialog } = await open();
-    await user.click(
-      within(dialog).getByRole("radio", { name: /Crear mis preguntas/ }),
-    );
-    expect(
-      within(dialog).queryByRole("group", { name: "Preguntas a generar" }),
-    ).not.toBeInTheDocument();
     await user.selectOptions(
       within(dialog).getByRole("combobox", { name: "Página" }),
       "p-mito",
     );
 
-    await user.click(within(dialog).getByTestId("create-exam-submit"));
-
-    expect(push).toHaveBeenCalledWith("/exams/nb-bio/p-mito/preguntas");
-    expect(generateExamQuestionsAction).not.toHaveBeenCalled();
+    expect(within(dialog).queryByRole("radiogroup")).not.toBeInTheDocument();
+    expect(
+      within(dialog).queryByText(/Crear mis preguntas/),
+    ).not.toBeInTheDocument();
+    expect(
+      within(dialog).getByRole("group", { name: "Preguntas a generar" }),
+    ).toBeInTheDocument();
+    expect(within(dialog).getByTestId("create-exam-submit")).toHaveTextContent(
+      "Generar",
+    );
   });
 
   it("explains a notebook without pages and keeps the submit disabled", async () => {

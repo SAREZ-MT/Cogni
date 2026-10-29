@@ -202,18 +202,16 @@ describe("FlashcardsSessionPage", () => {
       expect(notFound).not.toHaveBeenCalled();
     });
 
-    // Phase 8 H11: a technique hub's "Crear a mano" lands here with
-    // ?nueva=1, which opens "Nueva tarjeta" at once for the first card.
-    it("opens Nueva tarjeta at once with ?nueva=1", async () => {
+    // Phase 8 H12: the hubs no longer create cards by hand, so the H11
+    // `?nueva=1` auto-open is gone; "Nueva tarjeta" opens on click only.
+    it("keeps Nueva tarjeta closed even with ?nueva=1", async () => {
       listFlashcardsAction.mockResolvedValue({ ok: true, value: [] });
 
       render(
         await FlashcardsSessionPage(props(NOTEBOOK, PAGE, { nueva: "1" })),
       );
 
-      expect(
-        screen.getByRole("dialog", { name: "Nueva tarjeta" }),
-      ).toBeInTheDocument();
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     });
 
     it("answers 404 when the cards cannot be loaded", async () => {

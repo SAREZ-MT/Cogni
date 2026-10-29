@@ -34,15 +34,13 @@ interface FlashcardsSessionPageProps {
 //   "Repasos de hoy" with `?repasar=1`, that session starts at once. A page that
 //   is unknown, archived or not the caller's 404s. A page without cards has
 //   no deck yet (a deck is never empty): it shows an empty state whose
-//   "Nueva tarjeta" creates the first card and with it the deck. Opened
-//   with `?nueva=1` (a technique hub's "Crear a mano", Phase 8 H11), that
-//   dialog opens at once.
+//   "Nueva tarjeta" creates the first card and with it the deck.
 export default async function FlashcardsSessionPage({
   params,
   searchParams,
 }: FlashcardsSessionPageProps) {
   const { notebookId, pageId } = await params;
-  const { repasar, nueva } = await searchParams;
+  const { repasar } = await searchParams;
 
   if (designPreviewsEnabled()) {
     const sampleNotebook = getSampleNotebook(notebookId);
@@ -100,9 +98,7 @@ export default async function FlashcardsSessionPage({
         }
         canReview={cards.value.length > 0}
         autoStart={repasar === "1"}
-        actions={
-          <NewFlashcardDialog pageId={page.id} initialOpen={nueva === "1"} />
-        }
+        actions={<NewFlashcardDialog pageId={page.id} />}
       >
         {cards.value.length === 0 ? (
           <EmptyState
