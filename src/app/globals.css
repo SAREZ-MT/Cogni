@@ -516,8 +516,8 @@
       color-mix(in oklch, var(--highlighter) 45%, transparent) 100%
     );
     background-repeat: no-repeat;
-    background-size: 100% 78%;
-    background-position: 0 62%;
+    background-size: 100% 84%;
+    background-position: 0 70%;
     border-radius: 0.7em 0.25em 0.6em 0.3em / 0.35em 0.6em 0.3em 0.55em;
     margin-inline: -0.12em;
     padding-inline: 0.22em;
@@ -644,7 +644,7 @@
     transition: background-color 150ms cubic-bezier(0.4, 0, 0.2, 1);
   }
   .editor-content .tiptap-mathematics-render--editable:hover {
-    background-color: var(--color-hover);
+    background-color: var(--color-code-block);
   }
   .editor-content [data-type="block-math"].tiptap-mathematics-render--editable {
     padding-block: 0.25rem;
