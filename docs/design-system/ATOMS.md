@@ -974,6 +974,66 @@ technique-hub.ts`), which also filters the items on the server.
 3", "AL DÍA 4" in the flashcards hub): an `<h2>` 12px semibold uppercase
 muted label with the count in `--theme-ink`.
 
+## ItemEditor (`item-editor.tsx`, `item-draft.ts`)
+
+Phase 8 H18 (user 2026-10-29): the one edit page layout of the three
+techniques (deck, recall questions of a page, exam questions of a page),
+rendered inside the technique's `data-technique-theme`. Generic over the
+item value `T`: `items {id, value}[]`, `itemLabel` ("Tarjeta",
+"Pregunta"), `addLabel`, `lastItemMessage`, `emptyValue()`, `validate(value)
+→ {field: message}`, `renderFields({value, onChange, errors, idPrefix})`
+and `onSave(operations) → {ok, items} | {ok: false, message}`. Each item is
+a `Card padding="md"` in an `<ol>` (`data-testid="item-editor-entry"`,
+`data-state` stored / edited / new / deleted): a 13px semibold "{label}
+{n}" heading, a "Nueva" pill in `--theme-soft` or a neutral "Editada"
+pill, and a 36px ghost trash button ("Eliminar {label} {n}"); a new or
+edited card gets a `--theme-soft-edge` border. A deleted item collapses to
+its struck-through heading on a dashed `neutral-50` card with "Se
+eliminará al guardar" and an outline "Deshacer". Below the list a 48px
+dashed button ("Añadir …", `--theme-dash` border, `--theme-tint` fill,
+`--theme-ink` text) adds an entry and focuses its first field. Errors show
+only after a save attempt, inline under their field, plus a `FormMessage`
+("Revisa los campos marcados antes de guardar."); a draft that deletes
+every item shows `lastItemMessage` without calling the server. A sticky
+action bar (`Card padding="sm"`, `shadow-card-hover`, `bottom-4`) says
+"Sin cambios" / "N cambios sin guardar" with "Descartar cambios" (outline)
+and "Guardar" (`technique`; "Guardando…"). After a save the page stays,
+reset to the saved items, with a success `StatusBanner` ("Cambios
+guardados"). `item-draft.ts` holds the pure draft (`draftFrom`,
+`updateDraftEntry`, `addDraftEntry`, `removeDraftEntry`,
+`restoreDraftEntry`, `draftOperations` → `{updates, creates, deletes}`,
+`draftChangeCount`): an edit put back to the stored value is no change, a
+new entry removed before saving disappears, a deleted entry's edits are
+dropped. Used by `flashcards/_components/deck-editor.tsx`,
+`active-recall/_components/recall-questions-editor.tsx` and
+`exams/_components/exam-questions-editor.tsx`.
+
+## ItemEditorHeader (`item-editor-header.tsx`)
+
+Phase 8 H18: the head of the edit pages: `BackLink` to the hub, then a
+`SectionHeader` with the technique's 48px `PixelTile`, the eyebrow ("Editar
+mazo", "Editar preguntas"), the page title (`text-xl`), a description list
+(counts · "Los cambios se aplican al guardar") and an optional actions slot
+(an outline "Repasar" / "Practicar" / "Hacer examen" link).
+
+## ItemField (`item-field.tsx`)
+
+Phase 8 H18: one labelled field of an edit page entry: `FieldLabel`, the
+control, then the inline error (`text-destructive`, 12px, id from
+`errorId(id)`) or a muted hint. `invalidProps(id, error)` gives the control
+its `aria-invalid` and `aria-describedby` while the error shows.
+
+## UnsavedChangesGuard (`unsaved-changes-guard.tsx`)
+
+Phase 8 H18: while `when` is true, a reload, a closed tab or an external
+address get the browser's own `beforeunload` prompt, and an in-app link
+(same origin, same tab, no modifier key, not only a hash) is held in the
+document's capture phase and confirmed in an app `Dialog` ("¿Salir sin
+guardar?" · "Tienes cambios sin guardar. Si sales ahora, se pierden." ·
+outline "Seguir editando" · destructive "Salir sin guardar", which then
+`router.push`es). Never a native `confirm`. The browser's back button is
+not intercepted.
+
 ## NotebookDot (`notebook-dot.ts`)
 
 Phase 8 H17: `NOTEBOOK_DOT`, a notebook colour as a small dot (the 400

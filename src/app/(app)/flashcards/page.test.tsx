@@ -319,6 +319,26 @@ describe("FlashcardsHubPage (real data, flat since Phase 8 H17)", () => {
     ).toBeInTheDocument();
   });
 
+  // Phase 8 H18: the card practises; the menu's "Editar tarjetas" opens the
+  // deck's edit page and "Ver tarjetas" is gone.
+  it("leads the menu's Editar tarjetas to the deck's edit page", async () => {
+    listDecksAction.mockResolvedValue({
+      ok: true,
+      value: [deck("p1", NB_A, "Cuaderno A", 4)],
+    });
+    const user = (await import("@testing-library/user-event")).default.setup();
+
+    render(await FlashcardsHubPage(hub()));
+    await user.click(
+      screen.getByRole("button", { name: "Acciones de Página p1" }),
+    );
+
+    expect(
+      await screen.findByRole("menuitem", { name: /Editar tarjetas/ }),
+    ).toHaveAttribute("href", `/flashcards/${NB_A}/p1/editar?desde=hub`);
+    expect(screen.queryByRole("menuitem", { name: /Ver tarjetas/ })).toBeNull();
+  });
+
   it("shows the empty state when there are no decks", async () => {
     listDecksAction.mockResolvedValue({ ok: true, value: [] });
 
