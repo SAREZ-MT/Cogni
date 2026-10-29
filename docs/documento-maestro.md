@@ -156,7 +156,7 @@ Notas de implementación de la Fase 6 (ADR 0007):
 Desde el 2026-10-29 los tres centros (`/flashcards`, `/active-recall`, `/exams`) ya no tienen nivel de cuaderno: cada uno lista directamente cada ítem generado, uno por página (un mazo, una página con preguntas de recordación, una página con examen). Esto reemplaza lo dicho arriba sobre "Repasos de hoy", el hub de recordación activa y la vista por cuaderno de exámenes.
 
 - **Tarjeta por ítem.** Cada ítem es una tarjeta con la etiqueta de su cuaderno (con su color), el título de la página (dos líneas como máximo), una métrica, un estado y una acción. La acción va llena solo cuando hay algo pendiente; si no, va suave.
-  - Flashcards: "N tarjetas"; "N para hoy" o "Al día · repaso mañana / en N días" (días del calendario en la zona horaria del estudiante); "Repasar" abre el repaso del mazo de inmediato. El menú ofrece "Editar tarjetas" (la página de edición, H18; "Ver tarjetas" se quitó), "Abrir página" y "Eliminar mazo", que pide confirmación en un diálogo propio y archiva todas las tarjetas del mazo (borrado lógico, §6.1).
+  - Flashcards: "N tarjetas"; "N para hoy" o "Al día · repaso mañana / en N días" (días del calendario en la zona horaria del estudiante); "Repasar" abre el repaso del mazo de inmediato. El menú ofrece "Editar tarjetas" (la página de edición, H18; "Ver tarjetas" se quitó), "Abrir página" y "Eliminar mazo", que pide confirmación en un diálogo propio y borra el mazo completo (borrado real desde H19, ver "Eliminar de verdad" más abajo).
   - Recordación activa: "N preguntas"; "N sesiones · dominio X %" con su barra (dominio de página del motor, §7.3), con "N para repasar" si hay preguntas vencidas hoy, o "Sin sesiones terminadas"; "Practicar" abre la sesión. El menú ofrece "Editar preguntas" (H18), "Abrir página" y "Ver último resultado".
   - Exámenes: "N preguntas"; "Mejor nota X % · último Y %" con la barra de la mejor nota, "Sin intentos", o, con una repetición pendiente, "Repetir cuando estés listo", el último intento y "Repetir examen". "Hacer examen" abre la ruta del examen de la página, cuya pantalla de inicio elige N (10 a 30), ofrece la repetición pendiente o retoma un examen abierto. El menú ofrece "Editar preguntas" (H18, antes "Ver preguntas") y "Abrir página".
 - **Agrupación y orden.** Primero lo pendiente (tarjetas para hoy, preguntas vencidas, examen por repetir), luego lo nunca practicado (sin sesiones ni intentos) y luego lo más reciente. Flashcards separa los grupos "Para hoy" y "Al día"; los otros dos centros usan una sola cuadrícula.
@@ -185,7 +185,14 @@ Desde el 2026-10-29 los tres centros (`/flashcards`, `/active-recall`, `/exams`)
   - Todo queda como borrador local hasta "Guardar", que lo aplica en una sola Server Action y en una transacción, a través de los casos de uso existentes y de los nuevos casos de uso de borrado. "Descartar cambios" vuelve a lo guardado. Los errores se muestran debajo de cada campo.
   - Al guardar, la página se queda con lo guardado y el aviso "Cambios guardados" (igual en las tres técnicas).
   - Salir con cambios sin guardar pide confirmación: el navegador avisa al recargar o cerrar, y un enlace de la aplicación abre un diálogo propio ("¿Salir sin guardar?"), nunca un `confirm` nativo.
-  - Un mazo o una página con preguntas conserva al menos un ítem. Borrar el conjunto completo (mazo, preguntas de la página, examen, página o cuaderno) queda para H19.
+  - Un mazo o una página con preguntas conserva al menos un ítem en la página de edición. El conjunto completo se borra desde su tarjeta (H19).
+
+**Eliminar de verdad (Fase 8, H19).** "Eliminar" en el menú de una tarjeta de cuaderno (Cuadernos y barra lateral), de página (vista del cuaderno y barra lateral) y de las tarjetas de los centros de técnica ("Eliminar mazo", "Eliminar repaso", "Eliminar examen") es un **borrado real**; ya no existe "Archivar".
+  - Antes de confirmar, un diálogo propio (nunca un `confirm` nativo) lee del servidor lo que se borrará, por ejemplo "Se eliminarán 4 páginas, 2 mazos, 1 repaso activo y 1 examen.", y recuerda que no se puede deshacer. El botón destructivo se habilita cuando llegan los números.
+  - Un cuaderno se borra con todas sus páginas; una página, con sus apuntes, imágenes, documentos importados y el material de las tres técnicas; un conjunto de técnica, con todos sus ítems de esa página. Con cada ítem se borran su `StudyItem`, su historial de repasos, las sesiones, respuestas y retroalimentación con IA, el estado de examen de la página y las huellas de generación, para que ninguna métrica siga contando lo borrado. Al borrar un conjunto, el dominio de la página se recalcula en la misma transacción con lo que queda (sin ítems, la página deja de tener dominio).
+  - Las imágenes y los documentos importados se borran de Storage con su API después de confirmar la transacción; si Storage falla, se registra y el borrado sigue siendo un éxito. Las filas de `ai_generations` quedan sin página (cuentan para el límite diario).
+  - Después de borrar, la pantalla se queda donde estaba sin la tarjeta; si la ruta abierta mostraba lo borrado, se vuelve al cuaderno (página borrada) o a Cuadernos (cuaderno borrado).
+  - Las columnas `archived_at` siguen en el esquema y las lecturas siguen ocultando filas archivadas antes de H19.
 
 ### 3.4 El motor de repetición espaciada (transversal)
 
@@ -412,7 +419,7 @@ Usuario califica una tarjeta
 
 ### 6.1 Entidades principales
 
-Convenciones comunes a todas las entidades de usuario: `id` (UUID v7), `owner_id`, `created_at`, `updated_at`. Se omiten de la tabla para no repetirlos. El borrado es lógico (`archived_at`) en todo lo que el usuario crea a mano.
+Convenciones comunes a todas las entidades de usuario: `id` (UUID v7), `owner_id`, `created_at`, `updated_at`. Se omiten de la tabla para no repetirlos. Desde la Fase 8 (H19) el borrado desde la interfaz es real (§3.3, "Eliminar de verdad"); `archived_at` se conserva para las filas archivadas antes.
 
 | Entidad | Módulo | Campos clave |
 |---|---|---|
@@ -474,7 +481,7 @@ Nota de implementación de la Fase 7 (ADR 0008): `Profile.timezone` ya se usa. S
 - El servidor se conecta con la cadena de conexión de Supabase (pooler) y omite RLS; la autorización es explícita en `application`.
 - RLS permanece activo en Storage y en cualquier acceso desde el cliente con `supabase-js`.
 - `content` de página es JSON de Tiptap. `plain_text` se recalcula en cada guardado y es lo que consume la IA.
-- Borrado lógico (`archived_at`) para cuadernos y páginas. Borrado físico solo por job de limpieza.
+- Cuadernos y páginas se borran de verdad desde la interfaz (Fase 8, H19), con todo lo que cuelga de ellos; `archived_at` queda para las filas archivadas antes.
 
 ---
 

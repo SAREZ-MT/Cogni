@@ -8,9 +8,10 @@ import { expect } from "../fixtures/auth";
 //   the empty state's "Crear mi primer cuaderno") opens the "Crear
 //   cuaderno" dialog;
 // - each notebook is a card ("article") with an "Acciones de {título}" kebab
-//   (Renombrar, Cambiar apariencia, Archivar);
-// - pages are created ("Nueva página") and archived ("Archivar página
-//   {título}") on /notebooks/[notebookId], and open from its page cards.
+//   (Renombrar, Cambiar apariencia, Eliminar);
+// - pages are created ("Nueva página") and deleted ("Eliminar página
+//   {título}", Phase 8 H19) on /notebooks/[notebookId], and open from its
+//   page cards.
 
 // Server Actions POST to the current pathname; `page.waitForLoadState
 // ("networkidle")` is unreliable here (background beacons/tunnels keep the
