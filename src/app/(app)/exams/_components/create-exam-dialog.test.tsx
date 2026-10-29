@@ -17,6 +17,7 @@ vi.mock("@/modules/exams", () => ({
   generateExamQuestionsAction,
 }));
 
+import { chooseOption } from "@/shared/ui/select.testing";
 import {
   CreateExamDialog,
   type CreateExamNotebook,
@@ -74,56 +75,81 @@ describe("CreateExamDialog", () => {
   });
 
   it("opens from the 'Crear examen' button with the first notebook and no page chosen", async () => {
-    const { dialog } = await open();
+    const { user, dialog } = await open();
 
     expect(
       within(dialog).getByRole("combobox", { name: "Cuaderno" }),
-    ).toHaveValue("nb-bio");
+    ).toHaveTextContent("Biología");
     const page = within(dialog).getByRole("combobox", { name: "Página" });
-    expect(page).toHaveValue("");
-    expect(
-      within(page)
-        .getAllByRole("option")
-        .map((o) => o.textContent),
-    ).toEqual(["Elige una página", "Mitocondria", "Ribosomas"]);
+    expect(page).toHaveTextContent("Elige una página");
+    page.focus();
+    await user.keyboard("{Enter}");
+    expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual([
+      "Mitocondria",
+      "Ribosomas",
+    ]);
+    await user.keyboard("{Escape}");
     // A page is mandatory: the exam belongs to a page (SM-2).
     expect(within(dialog).getByTestId("create-exam-submit")).toBeDisabled();
   });
 
+  // Phase 8 H12: the exams theme (rose) and its pixel tile.
+  it("wears the exams theme: pixel tile and rose Generar", async () => {
+    const { dialog } = await open();
+
+    expect(dialog).toHaveAttribute("data-technique-theme", "exams");
+    expect(dialog.querySelector('[data-slot="pixel-tile"]')).toHaveAttribute(
+      "data-tone",
+      "rose",
+    );
+    expect(within(dialog).getByTestId("create-exam-submit")).toHaveAttribute(
+      "data-variant",
+      "technique",
+    );
+    expect(
+      within(dialog).getByRole("group", { name: "Preguntas a generar" }),
+    ).toHaveAttribute("data-size", "field");
+  });
+
   it("preselects the given notebook", async () => {
-    const { dialog } = await open({ initialNotebookId: "nb-calc" });
+    const { user, dialog } = await open({ initialNotebookId: "nb-calc" });
 
     expect(
       within(dialog).getByRole("combobox", { name: "Cuaderno" }),
-    ).toHaveValue("nb-calc");
+    ).toHaveTextContent("Cálculo");
+    within(dialog).getByRole("combobox", { name: "Página" }).focus();
+    await user.keyboard("{Enter}");
     expect(
-      within(dialog).getByRole("option", { name: "Derivadas" }),
+      screen.getByRole("option", { name: "Derivadas" }),
     ).toBeInTheDocument();
   });
 
   it("clears the page when the notebook changes", async () => {
     const { user, dialog } = await open();
-    await user.selectOptions(
+    await chooseOption(
+      user,
       within(dialog).getByRole("combobox", { name: "Página" }),
-      "p-ribo",
+      "Ribosomas",
     );
 
-    await user.selectOptions(
+    await chooseOption(
+      user,
       within(dialog).getByRole("combobox", { name: "Cuaderno" }),
-      "nb-calc",
+      "Cálculo",
     );
 
     expect(
       within(dialog).getByRole("combobox", { name: "Página" }),
-    ).toHaveValue("");
+    ).toHaveTextContent("Elige una página");
   });
 
   it("generates with AI: count 10–30 in steps of 5, then opens the notebook's exams", async () => {
     generateExamQuestionsAction.mockResolvedValue(generated(15));
     const { user, dialog } = await open();
-    await user.selectOptions(
+    await chooseOption(
+      user,
       within(dialog).getByRole("combobox", { name: "Página" }),
-      "p-ribo",
+      "Ribosomas",
     );
     await user.click(
       within(dialog).getByRole("button", { name: "Más preguntas a generar" }),
@@ -150,9 +176,10 @@ describe("CreateExamDialog", () => {
       }),
     );
     const { user, dialog } = await open();
-    await user.selectOptions(
+    await chooseOption(
+      user,
       within(dialog).getByRole("combobox", { name: "Página" }),
-      "p-mito",
+      "Mitocondria",
     );
 
     await user.click(within(dialog).getByTestId("create-exam-submit"));
@@ -177,9 +204,10 @@ describe("CreateExamDialog", () => {
       error: { code, message: "x" },
     });
     const { user, dialog } = await open();
-    await user.selectOptions(
+    await chooseOption(
+      user,
       within(dialog).getByRole("combobox", { name: "Página" }),
-      "p-mito",
+      "Mitocondria",
     );
 
     await user.click(within(dialog).getByTestId("create-exam-submit"));
@@ -191,9 +219,10 @@ describe("CreateExamDialog", () => {
   it("reports a rejected generation instead of throwing", async () => {
     generateExamQuestionsAction.mockRejectedValue(new Error("offline"));
     const { user, dialog } = await open();
-    await user.selectOptions(
+    await chooseOption(
+      user,
       within(dialog).getByRole("combobox", { name: "Página" }),
-      "p-mito",
+      "Mitocondria",
     );
 
     await user.click(within(dialog).getByTestId("create-exam-submit"));
@@ -207,9 +236,10 @@ describe("CreateExamDialog", () => {
   // pregunta" on the page's questions screen stays the manual path.
   it("never offers to write the questions by hand", async () => {
     const { user, dialog } = await open();
-    await user.selectOptions(
+    await chooseOption(
+      user,
       within(dialog).getByRole("combobox", { name: "Página" }),
-      "p-mito",
+      "Mitocondria",
     );
 
     expect(within(dialog).queryByRole("radiogroup")).not.toBeInTheDocument();
@@ -280,9 +310,10 @@ describe("CreateExamDialog", () => {
       error: { code: "EXAMS_NO_NEW_CONTENT", message: "x" },
     });
     const { user, dialog } = await open();
-    await user.selectOptions(
+    await chooseOption(
+      user,
       within(dialog).getByRole("combobox", { name: "Página" }),
-      "p-mito",
+      "Mitocondria",
     );
 
     await user.click(within(dialog).getByTestId("create-exam-submit"));
@@ -301,11 +332,11 @@ describe("CreateExamDialog", () => {
     });
     const { user, dialog } = await open();
     const page = within(dialog).getByRole("combobox", { name: "Página" });
-    await user.selectOptions(page, "p-mito");
+    await chooseOption(user, page, "Mitocondria");
     await user.click(within(dialog).getByTestId("create-exam-submit"));
     await within(dialog).findByTestId("create-exam-notice");
 
-    await user.selectOptions(page, "p-ribo");
+    await chooseOption(user, page, "Ribosomas");
 
     expect(
       within(dialog).queryByTestId("create-exam-notice"),

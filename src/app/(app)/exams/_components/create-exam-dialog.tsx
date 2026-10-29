@@ -21,8 +21,11 @@ import {
   DialogTrigger,
 } from "@/shared/ui/dialog";
 import { EmptyStateCta } from "@/shared/ui/empty-state-cta";
+import { FormMessage } from "@/shared/ui/form-message";
 import { PagePicker, type PagePickerNotebook } from "@/shared/ui/page-picker";
+import { PixelTile } from "@/shared/ui/pixel-tile";
 import { TechniqueCreateTile } from "@/shared/ui/technique-create-tile";
+import { TECHNIQUE_THEME } from "@/shared/ui/technique-theme";
 
 // A notebook with its active pages (Phase 8 H11: the shared PagePicker's
 // shape, which also feeds the flashcards and recall create dialogs).
@@ -153,15 +156,26 @@ export function CreateExamDialog({
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent data-testid="create-exam-dialog">
-        <DialogHeader>
+      <DialogContent
+        data-testid="create-exam-dialog"
+        data-technique-theme="exams"
+      >
+        <DialogHeader
+          icon={
+            <PixelTile
+              tone={TECHNIQUE_THEME.exams.tone}
+              icon={TECHNIQUE_THEME.exams.icon}
+              size={48}
+            />
+          }
+        >
           <DialogTitle>Crear examen</DialogTitle>
           <DialogDescription>
             Elige la página: la IA crea preguntas de opción múltiple desde su
             texto.
           </DialogDescription>
         </DialogHeader>
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-4">
           <PagePicker
             notebooks={loadedNotebooks}
             notebookId={notebookId}
@@ -186,20 +200,15 @@ export function CreateExamDialog({
                 onChange={setCount}
                 disabled={pending}
                 testId="exam-count"
+                size="field"
+                hint={`Entre ${EXAM_MIN_QUESTIONS} y ${EXAM_MAX_QUESTIONS}, de ${EXAM_COUNT_STEP} en ${EXAM_COUNT_STEP}`}
               />
               {notice && (
-                <p
-                  data-testid="create-exam-notice"
-                  className="text-fg-muted text-sm"
-                >
+                <FormMessage tone="info" data-testid="create-exam-notice">
                   {notice}
-                </p>
+                </FormMessage>
               )}
-              {error && (
-                <p role="alert" className="text-destructive text-sm">
-                  {error}
-                </p>
-              )}
+              {error && <FormMessage>{error}</FormMessage>}
             </>
           )}
         </div>
@@ -214,6 +223,7 @@ export function CreateExamDialog({
           </Button>
           <Button
             type="button"
+            variant="technique"
             onClick={submit}
             disabled={!canSubmit}
             data-testid="create-exam-submit"

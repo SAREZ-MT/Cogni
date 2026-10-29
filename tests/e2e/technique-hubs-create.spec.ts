@@ -7,6 +7,7 @@ import {
   createPageAndOpen,
   openNotebook,
 } from "./helpers/notebooks";
+import { chooseOption } from "./helpers/select";
 
 // Phase 8 H11 (user-approved flow, 2026-10-29): every technique hub creates
 // its content from a "pick a page" dialog, opened by the empty state's CTA
@@ -83,9 +84,7 @@ test.describe("technique hubs: create from the section", () => {
     await createPageAndOpen(page);
 
     const flashcards = await openFromCta(page, HUBS[0]);
-    await flashcards
-      .getByRole("combobox", { name: "Página" })
-      .selectOption({ label: "Sin título" });
+    await chooseOption(flashcards, "Página", "Sin título");
     await expect(flashcards.getByRole("radio")).toHaveCount(0);
     await expect(flashcards.getByText(/Crear a mano/)).toHaveCount(0);
     await expect(
@@ -97,9 +96,7 @@ test.describe("technique hubs: create from the section", () => {
     await page.keyboard.press("Escape");
 
     const recall = await openFromCta(page, HUBS[1]);
-    await recall
-      .getByRole("combobox", { name: "Página" })
-      .selectOption({ label: "Sin título" });
+    await chooseOption(recall, "Página", "Sin título");
     await expect(recall.getByRole("radio")).toHaveCount(0);
     await expect(recall.getByTestId("create-recall-submit")).toHaveText(
       "Generar",
@@ -107,9 +104,7 @@ test.describe("technique hubs: create from the section", () => {
     await page.keyboard.press("Escape");
 
     const exams = await openFromCta(page, HUBS[2]);
-    await exams
-      .getByRole("combobox", { name: "Página" })
-      .selectOption({ label: "Sin título" });
+    await chooseOption(exams, "Página", "Sin título");
     await expect(exams.getByRole("radio")).toHaveCount(0);
     await expect(exams.getByText(/Crear mis preguntas/)).toHaveCount(0);
     await expect(

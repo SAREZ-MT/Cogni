@@ -9,6 +9,14 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default: "bg-primary text-primary-foreground hover:bg-primary/80",
+        // Phase 8 H12: the violet primary action of the dialogs.
+        brand:
+          "bg-primary-600 text-white shadow-[0_6px_16px_-8px_rgb(109_40_217/0.6)] hover:bg-primary-700 focus-visible:ring-primary-400/50",
+        // Phase 8 H12: a technique dialog's primary action, in the colours
+        // of the enclosing `data-technique-theme` (amber with dark ink for
+        // flashcards, emerald or rose with white for recall and exams).
+        technique:
+          "bg-(--theme-cta) text-(--theme-cta-fg) shadow-[inset_0_0_0_1px_var(--theme-cta-edge),0_6px_16px_-8px_var(--theme-cta-shadow)] hover:bg-(--theme-cta-hover)",
         outline:
           "border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50",
         secondary:

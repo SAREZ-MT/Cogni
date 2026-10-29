@@ -61,7 +61,7 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl border border-border-default bg-card p-4 text-fg text-sm shadow-lg duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          "fixed top-1/2 left-1/2 z-50 grid max-h-[calc(100dvh-2rem)] w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-5 overflow-y-auto rounded-2xl border border-border-default bg-card p-6 text-fg text-sm shadow-lg duration-150 outline-none sm:max-w-md data-open:animate-in data-open:fade-in-0 data-open:zoom-in-[0.97] data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-[0.97]",
           className,
         )}
         {...props}
@@ -71,11 +71,11 @@ function DialogContent({
           <DialogPrimitive.Close data-slot="dialog-close" asChild>
             <Button
               variant="ghost"
-              className="absolute top-2 right-2"
+              className="absolute top-4 right-4 text-fg-muted hover:text-fg"
               size="icon-sm"
             >
               <XIcon />
-              <span className="sr-only">Close</span>
+              <span className="sr-only">Cerrar</span>
             </Button>
           </DialogPrimitive.Close>
         )}
@@ -84,13 +84,36 @@ function DialogContent({
   );
 }
 
-function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
+// Phase 8 H12: `icon` (a PixelTile or IconTile) sits beside the title and
+// description; the header keeps clear of the close button either way.
+function DialogHeader({
+  className,
+  icon,
+  children,
+  ...props
+}: React.ComponentProps<"div"> & { icon?: React.ReactNode }) {
+  if (!icon) {
+    return (
+      <div
+        data-slot="dialog-header"
+        className={cn("flex flex-col gap-1.5 pr-8", className)}
+        {...props}
+      >
+        {children}
+      </div>
+    );
+  }
   return (
     <div
       data-slot="dialog-header"
-      className={cn("flex flex-col gap-2", className)}
+      className={cn("flex items-start gap-3.5 pr-8", className)}
       {...props}
-    />
+    >
+      <span data-slot="dialog-header-icon" className="shrink-0">
+        {icon}
+      </span>
+      <div className="flex min-w-0 flex-col gap-1.5 pt-0.5">{children}</div>
+    </div>
   );
 }
 
@@ -106,7 +129,7 @@ function DialogFooter({
     <div
       data-slot="dialog-footer"
       className={cn(
-        "-mx-4 -mb-4 flex flex-col-reverse gap-2 rounded-b-xl border-t bg-muted/50 p-4 sm:flex-row sm:justify-end",
+        "-mx-6 -mb-6 flex flex-col-reverse gap-2.5 border-border-default border-t bg-neutral-50/80 px-6 py-4 sm:flex-row sm:justify-end",
         className,
       )}
       {...props}
@@ -114,7 +137,7 @@ function DialogFooter({
       {children}
       {showCloseButton && (
         <DialogPrimitive.Close asChild>
-          <Button variant="outline">Close</Button>
+          <Button variant="outline">Cerrar</Button>
         </DialogPrimitive.Close>
       )}
     </div>
@@ -128,7 +151,10 @@ function DialogTitle({
   return (
     <DialogPrimitive.Title
       data-slot="dialog-title"
-      className={cn("text-base leading-none font-medium", className)}
+      className={cn(
+        "font-semibold text-fg text-lg leading-tight tracking-[-0.01em]",
+        className,
+      )}
       {...props}
     />
   );
@@ -142,7 +168,7 @@ function DialogDescription({
     <DialogPrimitive.Description
       data-slot="dialog-description"
       className={cn(
-        "text-sm text-muted-foreground *:[a]:underline *:[a]:underline-offset-3 *:[a]:hover:text-foreground",
+        "text-[13.5px] text-fg-muted leading-relaxed *:[a]:underline *:[a]:underline-offset-3 *:[a]:hover:text-foreground",
         className,
       )}
       {...props}

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { Page } from "@playwright/test";
 import { expect, hasSupabaseEnv, signIn, test } from "./fixtures/auth";
 import { createNotebookWithOpenPage } from "./helpers/notebooks";
+import { chooseOption } from "./helpers/select";
 
 // Phase 6 T5b "Crear examen" (user decision 2026-10-07): from the exams
 // hub the student picks a notebook and a page, generates the exam with AI
@@ -65,13 +66,9 @@ test.describe("Crear examen", () => {
     await page.getByTestId("create-exam-button").click();
 
     const create = page.getByRole("dialog", { name: "Crear examen" });
-    await create
-      .getByRole("combobox", { name: "Cuaderno" })
-      .selectOption({ label: notebookTitle });
+    await chooseOption(create, "Cuaderno", notebookTitle);
     await expect(create.getByTestId("create-exam-submit")).toBeDisabled();
-    await create
-      .getByRole("combobox", { name: "Página" })
-      .selectOption({ label: "Sin título" });
+    await chooseOption(create, "Página", "Sin título");
     // AI only (Phase 8 H12): no manual path in the dialog.
     await expect(create.getByRole("radio")).toHaveCount(0);
     await expect(create.getByTestId("exam-count-value")).toHaveText("10");

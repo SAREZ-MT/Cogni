@@ -2,7 +2,14 @@
 
 import Link from "next/link";
 import { useId } from "react";
-import { NativeSelect } from "@/shared/ui/native-select";
+import { FieldLabel } from "@/shared/ui/field-label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/shared/ui/select";
 
 export interface PagePickerNotebook {
   id: string;
@@ -33,8 +40,8 @@ const LINK =
 // The "which page?" step of every create dialog that starts from a
 // technique hub (Phase 8 H11; first in "Crear examen", Phase 6 T5b): all
 // study content belongs to a page, so the student picks a notebook, then
-// one of its pages. Native selects (keyboard, screen readers and mobile
-// pickers for free). Never a dead end: without notebooks it links to
+// one of its pages, with the styled `Select` atom (Phase 8 H12; Radix
+// gives the keyboard and screen-reader support). Never a dead end: without notebooks it links to
 // /notebooks ("Crear un cuaderno"), and a notebook without pages links to
 // that notebook ("Crear una página"); a failed read is a load error.
 export function PagePicker({
@@ -58,7 +65,7 @@ export function PagePicker({
   }
   if (notebooks.length === 0) {
     return (
-      <p className="text-fg-muted text-sm">
+      <p className="rounded-xl bg-neutral-50 px-3.5 py-3 text-fg-muted text-sm">
         <span>Aún no tienes cuadernos. Crea uno para empezar.</span>{" "}
         <Link href="/notebooks" className={LINK}>
           Crear un cuaderno
@@ -71,27 +78,31 @@ export function PagePicker({
   const pages = notebook?.pages ?? [];
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-1.5">
-        <label htmlFor={notebookFieldId} className="text-fg-secondary text-sm">
-          Cuaderno
-        </label>
-        <NativeSelect
-          id={notebookFieldId}
+        <FieldLabel htmlFor={notebookFieldId}>Cuaderno</FieldLabel>
+        <Select
           value={notebookId}
-          onChange={(event) => onNotebookChange(event.target.value)}
+          onValueChange={onNotebookChange}
           disabled={disabled}
-          data-testid={`${testIdPrefix}-notebook`}
         >
-          {notebooks.map((n) => (
-            <option key={n.id} value={n.id}>
-              {n.title}
-            </option>
-          ))}
-        </NativeSelect>
+          <SelectTrigger
+            id={notebookFieldId}
+            data-testid={`${testIdPrefix}-notebook`}
+          >
+            <SelectValue placeholder="Elige un cuaderno" />
+          </SelectTrigger>
+          <SelectContent>
+            {notebooks.map((n) => (
+              <SelectItem key={n.id} value={n.id}>
+                {n.title}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
       {pages.length === 0 ? (
-        <p className="text-fg-muted text-sm">
+        <p className="rounded-xl bg-neutral-50 px-3.5 py-3 text-fg-muted text-sm">
           <span>Este cuaderno aún no tiene páginas.</span>{" "}
           <Link href={`/notebooks/${notebookId}`} className={LINK}>
             Crear una página
@@ -99,26 +110,27 @@ export function PagePicker({
         </p>
       ) : (
         <div className="flex flex-col gap-1.5">
-          <label htmlFor={pageFieldId} className="text-fg-secondary text-sm">
-            Página
-          </label>
-          <NativeSelect
-            id={pageFieldId}
+          <FieldLabel htmlFor={pageFieldId}>Página</FieldLabel>
+          <Select
             value={pageId}
-            onChange={(event) => onPageChange(event.target.value)}
+            onValueChange={onPageChange}
             disabled={disabled}
             required
-            data-testid={`${testIdPrefix}-page`}
           >
-            <option value="" disabled>
-              Elige una página
-            </option>
-            {pages.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.title}
-              </option>
-            ))}
-          </NativeSelect>
+            <SelectTrigger
+              id={pageFieldId}
+              data-testid={`${testIdPrefix}-page`}
+            >
+              <SelectValue placeholder="Elige una página" />
+            </SelectTrigger>
+            <SelectContent>
+              {pages.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.title}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       )}
     </div>

@@ -14,6 +14,7 @@ const { generateRecallQuestionsAction } = vi.hoisted(() => ({
 vi.mock("@/modules/active-recall", () => ({ generateRecallQuestionsAction }));
 
 import type { PagePickerNotebook } from "@/shared/ui/page-picker";
+import { chooseOption } from "@/shared/ui/select.testing";
 import { CreateFromPageDialog } from "./create-from-page-dialog";
 
 const NOTEBOOKS: PagePickerNotebook[] = [
@@ -56,11 +57,12 @@ async function open(props: Partial<Props> = {}) {
 async function pickPage(
   user: ReturnType<typeof userEvent.setup>,
   dialog: HTMLElement,
-  pageId = "p-2",
+  pageTitle = "Tema 2",
 ) {
-  await user.selectOptions(
+  await chooseOption(
+    user,
     within(dialog).getByRole("combobox", { name: "Página" }),
-    pageId,
+    pageTitle,
   );
 }
 
@@ -91,11 +93,29 @@ describe("CreateFromPageDialog — flashcards", () => {
     expect(submit).toHaveTextContent("Generar");
   });
 
+  // Phase 8 H12: the technique's theme, pixel tile and primary colour.
+  it("wears the flashcards theme: pixel tile, amber Generar, outline Cancelar", async () => {
+    const { dialog } = await open();
+
+    expect(dialog).toHaveAttribute("data-technique-theme", "flashcards");
+    expect(
+      dialog.querySelector(
+        '[data-slot="dialog-header-icon"] [data-slot="pixel-tile"]',
+      ),
+    ).toHaveAttribute("data-tone", "yellow");
+    expect(
+      within(dialog).getByTestId("create-flashcards-submit"),
+    ).toHaveAttribute("data-variant", "technique");
+    expect(
+      within(dialog).getByRole("button", { name: "Cancelar" }),
+    ).toHaveAttribute("data-variant", "outline");
+  });
+
   // Phase 8 H12 (user 2026-10-29): the hub dialogs are AI only; "Nueva
   // tarjeta" on an existing deck stays the manual path.
   it("never offers to create the cards by hand", async () => {
     const { user, dialog } = await open({ trigger: "tile" });
-    await pickPage(user, dialog, "p-1");
+    await pickPage(user, dialog, "Tema 1");
 
     expect(within(dialog).queryByRole("radiogroup")).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("radio")).not.toBeInTheDocument();
@@ -198,9 +218,10 @@ describe("CreateFromPageDialog — flashcards", () => {
   it("offers to create a page in a notebook without pages", async () => {
     const { user, dialog } = await open();
 
-    await user.selectOptions(
+    await chooseOption(
+      user,
       within(dialog).getByRole("combobox", { name: "Cuaderno" }),
-      "nb-empty",
+      "Vacío",
     );
 
     expect(
@@ -225,6 +246,15 @@ describe("CreateFromPageDialog — active recall", () => {
     expect(
       within(dialog).getByRole("heading", { name: "Generar preguntas" }),
     ).toBeInTheDocument();
+    expect(dialog).toHaveAttribute("data-technique-theme", "recall");
+    expect(dialog.querySelector('[data-slot="pixel-tile"]')).toHaveAttribute(
+      "data-tone",
+      "green",
+    );
+    expect(within(dialog).getByTestId("create-recall-submit")).toHaveAttribute(
+      "data-variant",
+      "technique",
+    );
     expect(within(dialog).queryByRole("radiogroup")).not.toBeInTheDocument();
     expect(within(dialog).queryByText("Crear a mano")).not.toBeInTheDocument();
     expect(
@@ -241,7 +271,7 @@ describe("CreateFromPageDialog — active recall", () => {
       technique: "recall",
       trigger: "tile",
     });
-    await pickPage(user, dialog, "p-1");
+    await pickPage(user, dialog, "Tema 1");
 
     await user.click(within(dialog).getByTestId("create-recall-submit"));
 

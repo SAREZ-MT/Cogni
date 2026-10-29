@@ -16,8 +16,12 @@ import {
   DialogTrigger,
 } from "@/shared/ui/dialog";
 import { EmptyStateCta } from "@/shared/ui/empty-state-cta";
+import { FormMessage } from "@/shared/ui/form-message";
+import { GenerationsLeft } from "@/shared/ui/generations-left";
 import { PagePicker, type PagePickerNotebook } from "@/shared/ui/page-picker";
+import { PixelTile } from "@/shared/ui/pixel-tile";
 import { TechniqueCreateTile } from "@/shared/ui/technique-create-tile";
+import { TECHNIQUE_THEME } from "@/shared/ui/technique-theme";
 
 type Technique = "flashcards" | "recall";
 
@@ -44,6 +48,7 @@ const NO_NEW_CONTENT_CODES = new Set([
 // panel it reuses (same error copy as the panel's cards).
 const CONFIG = {
   flashcards: {
+    theme: "flashcards",
     title: "Crear flashcards",
     description:
       "Elige la página: la IA crea tarjetas de pregunta y respuesta desde su texto.",
@@ -57,6 +62,7 @@ const CONFIG = {
     } as Record<string, string>,
   },
   recall: {
+    theme: "recall",
     title: "Generar preguntas",
     description:
       "Elige la página: la IA crea preguntas abiertas desde su texto para que las respondas de memoria.",
@@ -170,15 +176,22 @@ export function CreateFromPageDialog({
       />
     );
 
+  const theme = TECHNIQUE_THEME[config.theme];
+
   return (
     <Dialog open={open} onOpenChange={changeOpen}>
       <DialogTrigger asChild>{triggerNode}</DialogTrigger>
-      <DialogContent data-testid={`${prefix}-dialog`}>
-        <DialogHeader>
+      <DialogContent
+        data-testid={`${prefix}-dialog`}
+        data-technique-theme={config.theme}
+      >
+        <DialogHeader
+          icon={<PixelTile tone={theme.tone} icon={theme.icon} size={48} />}
+        >
           <DialogTitle>{config.title}</DialogTitle>
           <DialogDescription>{config.description}</DialogDescription>
         </DialogHeader>
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-4">
           <PagePicker
             notebooks={notebooks}
             notebookId={notebookId}
@@ -198,35 +211,30 @@ export function CreateFromPageDialog({
           {notebooks !== null && notebooks.length > 0 && (
             <>
               {remaining !== null && (
-                <p
+                <GenerationsLeft
+                  remaining={remaining}
                   data-testid={`${prefix}-remaining`}
-                  className="text-fg-secondary text-xs"
                 >
                   {remainingCopy(remaining)}
-                </p>
+                </GenerationsLeft>
               )}
               {notice && (
-                <p
-                  data-testid={`${prefix}-notice`}
-                  className="text-fg-muted text-sm"
-                >
+                <FormMessage tone="info" data-testid={`${prefix}-notice`}>
                   {notice}
-                </p>
+                </FormMessage>
               )}
               {error && (
-                <div className="flex flex-col gap-1">
-                  <p role="alert" className="text-destructive text-sm">
-                    {error}
-                  </p>
+                <FormMessage>
+                  <p>{error}</p>
                   {emptyPage && (
                     <Link
                       href={`/notebooks/${notebookId}/pages/${pageId}`}
-                      className="self-start font-semibold text-primary-700 text-sm underline-offset-2 hover:underline"
+                      className="font-semibold text-primary-700 underline-offset-2 hover:underline"
                     >
                       Abrir la página
                     </Link>
                   )}
-                </div>
+                </FormMessage>
               )}
             </>
           )}
@@ -242,6 +250,7 @@ export function CreateFromPageDialog({
           </Button>
           <Button
             type="button"
+            variant="technique"
             onClick={submit}
             disabled={!canSubmit}
             data-testid={`${prefix}-submit`}

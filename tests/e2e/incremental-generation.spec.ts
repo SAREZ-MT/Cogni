@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { Locator, Page } from "@playwright/test";
 import { expect, hasSupabaseEnv, signIn, test } from "./fixtures/auth";
 import { createNotebookWithOpenPage } from "./helpers/notebooks";
+import { chooseOption } from "./helpers/select";
 
 // Phase 6 T5c (user decision 2026-10-06): "Generar" only sends the page
 // paragraphs a technique has not used yet. Unchanged page: no AI call, no
@@ -183,12 +184,8 @@ test.describe("incremental generation", () => {
     await page.goto("/exams");
     await page.getByTestId("create-exam-button").click();
     const create = page.getByRole("dialog", { name: "Crear examen" });
-    await create
-      .getByRole("combobox", { name: "Cuaderno" })
-      .selectOption({ label: notebookTitle });
-    await create
-      .getByRole("combobox", { name: "Página" })
-      .selectOption({ label: "Sin título" });
+    await chooseOption(create, "Cuaderno", notebookTitle);
+    await chooseOption(create, "Página", "Sin título");
     await create.getByTestId("create-exam-submit").click();
     await expect(create.getByTestId("create-exam-notice")).toHaveText(
       NOTHING_NEW,

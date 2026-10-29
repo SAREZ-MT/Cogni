@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { PagePicker, type PagePickerNotebook } from "./page-picker";
+import { chooseOption } from "./select.testing";
 
 const NOTEBOOKS: PagePickerNotebook[] = [
   {
@@ -38,25 +39,41 @@ function renderPicker(
 // the flashcards / active recall create dialogs (all content belongs to a
 // page).
 describe("PagePicker", () => {
-  it("picks a notebook, then a page of that notebook", async () => {
+  it("picks a notebook, then a page of that notebook, with styled selects", async () => {
     const user = userEvent.setup();
     const { onNotebookChange, onPageChange } = renderPicker();
 
+    const notebook = screen.getByRole("combobox", { name: "Cuaderno" });
+    expect(notebook).toHaveTextContent("Biología");
     const page = screen.getByRole("combobox", { name: "Página" });
-    expect(page).toHaveValue("");
+    expect(page).toHaveTextContent("Elige una página");
+    // Phase 8 H12: the Select atom, not a native <select>.
+    expect(page.tagName).toBe("BUTTON");
+    expect(page).toHaveAttribute("data-slot", "select-trigger");
+
+    page.focus();
+    await user.keyboard("{Enter}");
     expect(
-      [...page.querySelectorAll("option")].map((o) => o.textContent),
-    ).toEqual(["Elige una página", "Tema 1", "Tema 2"]);
-    await user.selectOptions(page, "p-2");
+      screen.getAllByRole("option").map((option) => option.textContent),
+    ).toEqual(["Tema 1", "Tema 2"]);
+    await user.click(screen.getByRole("option", { name: "Tema 2" }));
     expect(onPageChange).toHaveBeenCalledWith("p-2");
 
-    await user.selectOptions(
-      screen.getByRole("combobox", { name: "Cuaderno" }),
-      "nb-empty",
-    );
+    await chooseOption(user, notebook, "Vacío");
     expect(onNotebookChange).toHaveBeenCalledWith("nb-empty");
     expect(screen.getByTestId("pick-notebook")).toBeInTheDocument();
     expect(screen.getByTestId("pick-page")).toBeInTheDocument();
+  });
+
+  it("is operable from the keyboard alone", async () => {
+    const user = userEvent.setup();
+    const { onPageChange } = renderPicker();
+
+    screen.getByRole("combobox", { name: "Página" }).focus();
+    await user.keyboard("{ArrowDown}");
+    await user.keyboard("{ArrowDown}{Enter}");
+
+    expect(onPageChange).toHaveBeenCalledWith("p-2");
   });
 
   it("offers to create a notebook when there are none", () => {

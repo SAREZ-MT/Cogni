@@ -629,6 +629,14 @@ would relocate duplication rather than remove it, and reusing `Button` with
 enough overrides to stay pixel-exact would be more fragile than the plain
 element. Left as native elements; not part of this pass's scope.
 
+Phase 8 H12 adds two variants for the dialogs' primary action: `brand`
+(`bg-primary-600 text-white`, a soft violet shadow, `hover:bg-primary-700`)
+and `technique` (`bg-(--theme-cta) text-(--theme-cta-fg)`, an inset
+`--theme-cta-edge` line and a `--theme-cta-shadow` drop,
+`hover:bg-(--theme-cta-hover)`), which needs an enclosing
+`data-technique-theme`: amber with dark ink for flashcards, emerald or rose
+with white for recall and exams. Covered by `button.test.tsx`.
+
 ## PanelToggleButton (`panel-toggle-button.tsx`)
 
 The 26x26 bordered collapse/expand button (`rounded-md`, `border-neutral-200/70`,
@@ -836,17 +844,62 @@ lists (Phase 6 T5b, "Crear examen" notebook and page pickers). Native on
 purpose: keyboard, screen readers and mobile pickers work without a custom
 listbox. Forwards every `<select>` prop; `className` merges.
 
-Used by: `exams/_components/create-exam-dialog.tsx`; the Configuración
-time-zone select (`identity/ui/time-zone-form.tsx`, Phase 7 T2a), which
+Used by: the Configuración time-zone select
+(`identity/ui/time-zone-form.tsx`, Phase 7 T2a), which
 passes `<optgroup>` children per region and widens it with `className`
 (`h-10 sm:w-[280px]`, the Profile Settings form-input size). No atom change.
+Since Phase 8 H12 the dialogs use `Select` instead (below).
+
+## Select (`select.tsx`)
+
+Phase 8 H12 (user 2026-10-29): the app's styled single-choice select, on
+Radix Select (`radix-ui`, already installed; nothing added). `Select`
+(Root), `SelectTrigger` (44px field, `rounded-input`, `border-input`,
+`bg-card`, chevron that turns while open, violet focus ring, placeholder in
+`text-fg-placeholder` via `data-placeholder`), `SelectValue`
+(`placeholder`), `SelectContent` (portal, `position="popper"`, 6px offset,
+at least the trigger's width, `rounded-xl` card surface, `shadow-lg`, short
+fade/zoom) and `SelectItem` (40px rows, `rounded-lg`, neutral highlight,
+a neutral-ink check on the chosen one; the listbox is portalled, outside any
+technique theme). `value=""` shows the placeholder. Keyboard from
+Radix: Enter / Space / arrows open, arrows and type-ahead move, Enter picks,
+Escape closes and returns focus. The trigger is a `role="combobox"` button
+named by a `<label htmlFor>` on its `id`. Tests: `select.testing.ts`
+`chooseOption(user, combobox, name)` (jsdom); e2e
+`tests/e2e/helpers/select.ts` `chooseOption(scope, label, option)`.
+
+Used by: `PagePicker`.
+
+## FieldLabel (`field-label.tsx`)
+
+Phase 8 H12: a dialog form field's label, `font-medium text-[13px]
+text-fg-secondary`, with `htmlFor`. Used by `PagePicker` and every form
+dialog (notebook title, Nueva tarjeta, the question form).
+
+## FormMessage (`form-message.tsx`)
+
+Phase 8 H12: a dialog's feedback box, `rounded-xl` with a 1px border.
+`tone="error"` (default): `role="alert"`, `bg-error-50 border-error-100
+text-destructive`; `tone="info"`: a neutral note (`bg-neutral-50`). Children
+may include a follow-up link ("Abrir la página"). Used by the create and
+generate dialogs, Nueva tarjeta, the question form and the archive/retire
+confirms.
+
+## GenerationsLeft (`generations-left.tsx`)
+
+Phase 8 H12: the generate dialogs' daily AI budget line, a Lucide
+`Sparkles` (13px) and the caller's copy in `text-xs text-fg-muted`;
+`remaining <= 0` switches to `text-warning-700` and sets `data-reached`.
+Used by `CreateFromPageDialog`.
 
 ## PagePicker (`page-picker.tsx`)
 
 Phase 8 H11: the "which page?" step of every create dialog that starts
 from a technique hub (all study content belongs to a page). Client
-component: a "Cuaderno" `NativeSelect`, then a "Página" one ("Elige una
-página" placeholder, required) with that notebook's pages. Never a dead
+component: a "Cuaderno" `Select` (Phase 8 H12; a `NativeSelect` before),
+then a "Página" one ("Elige una página" placeholder, required) with that
+notebook's pages, each under a `FieldLabel`. The two dead-end notes sit in a
+soft `bg-neutral-50` box. Never a dead
 end: no notebooks reads "Aún no tienes cuadernos. Crea uno para empezar."
 with a "Crear un cuaderno" link to `/notebooks`; a notebook without pages
 reads "Este cuaderno aún no tiene páginas." with "Crear una página" to
@@ -941,6 +994,19 @@ produced no CSS and every dialog rendered transparent (the same defect the
 DropdownMenu fix handled). Radius stays at the atom's `rounded-xl` (12px);
 the design-system modal mockups use 24px — a known gap, not yet aligned.
 Covered by `dialog.test.tsx` (asserts the `bg-card` surface).
+
+Phase 8 H12 (user 2026-10-29), one polished shell for every form dialog:
+`DialogContent` is `rounded-2xl` (20px) with `p-6`, `gap-5`, `sm:max-w-md`
+by default, a 0.97 zoom-in and `max-h` with scrolling; its close button
+sits at `top-4 right-4` and is labelled "Cerrar". `DialogHeader` takes an
+optional `icon` (a 48px `PixelTile` in the technique dialogs) beside the
+title and description, and keeps `pr-8` clear of the close button.
+`DialogTitle` is 18px semibold, `DialogDescription` 13.5px muted relaxed.
+`DialogFooter` is a separated band (`border-t`, `bg-neutral-50/80`,
+`px-6 py-4`, bleeding to the edges). Technique dialogs tag `DialogContent`
+with `data-technique-theme` so `Button variant="technique"` takes its
+colours; every other dialog's primary is `variant="brand"`
+(violet), the cancel an `outline`, never the dark default.
 
 ## Flashcards design preview (2026-09-24)
 
@@ -1892,6 +1958,12 @@ for T6's exam length selector (same range).
   bound or when `disabled`.
 
 Used by: `techniques-panel.tsx` (Examen card `controls`).
+
+- Phase 8 H12: `size="field"` (default `"compact"`) for dialogs: a bordered
+  `rounded-xl` row (`px-4 py-3`) with a 13px label and an optional `hint`
+  under it ("Entre 10 y 30, de 5 en 5"), `icon-sm` buttons and a 16px
+  value; the group carries `data-size`. Used by `CreateExamDialog` and
+  `ExamGenerateDialog`.
 
 ## TechniqueChip (`technique-chip.tsx`)
 
