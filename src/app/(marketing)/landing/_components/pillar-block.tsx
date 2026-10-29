@@ -1,9 +1,13 @@
-import type { LucideIcon } from "lucide-react";
+import type { Icon } from "@phosphor-icons/react/dist/lib/types";
 import Image from "next/image";
 import type { ReactNode } from "react";
 import { Reveal } from "./reveal";
 
-export type PillarPoint = { icon: LucideIcon; title: string; text: string };
+// Phosphor glyphs, drawn in the fill weight inside a tinted tile.
+export type PillarPoint = { icon: Icon; title: string; text: string };
+
+// The pillar's hue for its feature icons (landing.css .lp-ficon).
+export type IconTone = "yellow" | "violet" | "mint" | "rose";
 
 export type PillarImage = { src: string; alt: string };
 
@@ -18,8 +22,7 @@ export function PillarBlock({
 }: {
   heading: string;
   points: readonly PillarPoint[];
-  // Icon tile background and icon colour.
-  iconTone: string;
+  iconTone: IconTone;
   visualSide: "left" | "right";
   visual: ReactNode;
 }) {
@@ -36,11 +39,12 @@ export function PillarBlock({
             <li key={title} className="flex gap-4">
               <span
                 aria-hidden="true"
-                className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${iconTone}`}
+                data-tone={iconTone}
+                className="lp-ficon flex size-11 shrink-0 items-center justify-center rounded-[13px]"
               >
-                <Icon className="size-5" />
+                <Icon weight="fill" className="size-[22px]" />
               </span>
-              <span className="flex flex-col gap-1">
+              <span className="flex flex-col gap-1 pt-0.5">
                 <span className="font-extrabold text-(--lp-ink) text-[17px]">
                   {title}
                 </span>

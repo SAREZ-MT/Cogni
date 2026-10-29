@@ -1,18 +1,16 @@
 "use client";
 
-import {
-  CalendarDays,
-  FileText,
-  Flame,
-  Heading1,
-  List,
-  Plus,
-  Presentation,
-  Quote,
-  Sparkles,
-} from "lucide-react";
+import { CaretRight } from "@phosphor-icons/react/dist/csr/CaretRight";
+import { FileText } from "@phosphor-icons/react/dist/csr/FileText";
+import { ListBullets } from "@phosphor-icons/react/dist/csr/ListBullets";
+import { Notebook } from "@phosphor-icons/react/dist/csr/Notebook";
+import { Plus } from "@phosphor-icons/react/dist/csr/Plus";
+import { Quotes } from "@phosphor-icons/react/dist/csr/Quotes";
+import { TextHOne } from "@phosphor-icons/react/dist/csr/TextHOne";
+import { CalendarDays, Flame, Sparkles } from "lucide-react";
 import { motion } from "motion/react";
 import { useRef } from "react";
+import { FileBadge, type FileKind } from "./file-badge";
 import { usePlayOnce } from "./play-once";
 
 // One micro-demo per pillar. Each plays once (usePlayOnce), and with
@@ -26,120 +24,120 @@ const POP = { type: "spring", visualDuration: 0.4, bounce: 0.25 } as const;
 
 const PAGES = ["Tema 1 · Tu apunte", "Tema 2", "Tema 3", "Tema 4"] as const;
 const SLASH = [
-  { icon: Heading1, label: "Encabezado" },
-  { icon: List, label: "Lista" },
-  { icon: Quote, label: "Cita" },
+  { icon: TextHOne, label: "Encabezado" },
+  { icon: ListBullets, label: "Lista" },
+  { icon: Quotes, label: "Cita" },
 ] as const;
-const FORMATS = [
-  { label: "PDF", tone: "bg-(--lp-rose-100)", icon: FileText, from: 108 },
-  { label: "Word", tone: "bg-(--lp-blue-100)", icon: FileText, from: 0 },
-  {
-    label: "PowerPoint",
-    tone: "bg-(--lp-orange-100)",
-    icon: Presentation,
-    from: -92,
-  },
-] as const;
+// The three importable formats, fanned like a hand of files.
+const FORMATS: readonly { kind: FileKind; tilt: string }[] = [
+  { kind: "pdf", tilt: "-rotate-6" },
+  { kind: "docx", tilt: "rotate-0 -translate-y-1.5" },
+  { kind: "pptx", tilt: "rotate-6" },
+];
 
-// Import: one file chip drops in, then splits into the three formats.
+// Import: the notebook window, then the three file types drop into its
+// corner one after another.
 export function ImportDemo() {
   const root = useRef<HTMLDivElement>(null);
   const play = usePlayOnce(root);
 
   return (
-    <div ref={root} aria-hidden="true" className="relative pb-10">
-      <div className="lp-shadow-window flex h-[440px] overflow-hidden rounded-[22px] border border-(--lp-line) bg-white">
-        <div className="hidden w-[210px] shrink-0 flex-col gap-1.5 bg-(--lp-sidebar) p-3.5 sm:flex">
-          <p className="px-2 pt-1 pb-2 font-bold text-(--lp-muted) text-[11px] uppercase tracking-[0.12em]">
-            Tu cuaderno
-          </p>
-          {PAGES.map((page, index) => (
-            <span
-              key={page}
-              className={`flex items-center gap-2 rounded-[9px] px-2.5 py-2 text-[13px] ${
-                index === 0
-                  ? "bg-white font-bold text-(--lp-ink) shadow-sm"
-                  : "text-(--lp-ink-3)"
-              }`}
-            >
-              <FileText className="size-3.5 shrink-0" />
-              {page}
-            </span>
-          ))}
-          <span className="flex items-center gap-2 px-2.5 py-2 text-(--lp-muted) text-[13px]">
-            <Plus className="size-3.5" />
-            Nueva página
+    <div ref={root} aria-hidden="true" data-ui="" className="relative pb-12">
+      <div className="lp-shadow-window flex h-[440px] flex-col overflow-hidden rounded-[22px] border border-(--lp-line) bg-white">
+        <div className="flex h-11 shrink-0 items-center gap-2 border-(--lp-line) border-b px-4 text-[13px]">
+          <span className="flex gap-1.5 pr-2">
+            <span className="size-2.5 rounded-full bg-(--lp-grid-strong)" />
+            <span className="size-2.5 rounded-full bg-(--lp-grid-strong)" />
+            <span className="size-2.5 rounded-full bg-(--lp-grid-strong)" />
           </span>
+          <Notebook weight="duotone" className="size-4 text-(--lp-violet)" />
+          <span className="text-(--lp-ink-3)">Tu cuaderno</span>
+          <CaretRight weight="bold" className="size-3 text-(--lp-muted)" />
+          <span className="font-bold text-(--lp-ink)">Tu apunte</span>
         </div>
-        <div className="flex flex-1 flex-col gap-4 p-7 sm:p-9">
-          <p className="font-extrabold text-(--lp-ink) text-[26px] tracking-[-0.01em]">
-            Tu apunte
-          </p>
-          <span className="h-2 w-[80%] rounded-full bg-(--lp-editor-line)" />
-          <span className="h-2 w-[66%] rounded-full bg-(--lp-editor-line)" />
-          <span className="h-2 w-[72%] rounded-full bg-(--lp-editor-line)" />
-          <div className="lp-shadow-card mt-2 flex w-[240px] flex-col gap-0.5 rounded-[14px] border border-(--lp-line) bg-white p-2">
-            <p className="px-2 py-1.5 font-(family-name:--lp-font-mono) text-(--lp-muted) text-[12px]">
-              / insertar bloque
+        <div className="flex min-h-0 flex-1">
+          <div className="hidden w-[210px] shrink-0 flex-col gap-1 border-(--lp-line) border-r bg-(--lp-sidebar) p-3 sm:flex">
+            <p className="px-2 pt-1.5 pb-2 font-bold text-(--lp-muted) text-[11px] uppercase tracking-[0.12em]">
+              Tu cuaderno
             </p>
-            {SLASH.map(({ icon: Icon, label }, index) => (
+            {PAGES.map((page, index) => (
               <span
-                key={label}
-                className={`flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-(--lp-ink) text-[13px] ${
-                  index === 0 ? "bg-(--lp-soft)" : ""
+                key={page}
+                className={`relative flex items-center gap-2 rounded-[9px] px-2.5 py-2 text-[13px] ${
+                  index === 0
+                    ? "lp-shadow-card bg-white font-bold text-(--lp-ink)"
+                    : "text-(--lp-ink-3)"
                 }`}
               >
-                <Icon className="size-4 text-(--lp-ink-3)" />
-                {label}
+                <FileText
+                  weight={index === 0 ? "duotone" : "regular"}
+                  className={`size-4 shrink-0 ${index === 0 ? "text-(--lp-violet)" : ""}`}
+                />
+                {page}
               </span>
             ))}
+            <span className="flex items-center gap-2 px-2.5 py-2 text-(--lp-muted) text-[13px]">
+              <Plus weight="bold" className="size-3.5" />
+              Nueva página
+            </span>
+          </div>
+          <div className="flex flex-1 flex-col gap-3.5 p-7 sm:p-9">
+            <span className="flex items-center gap-3">
+              <FileBadge kind="pdf" size="sm" />
+              <span className="font-extrabold text-(--lp-ink) text-[26px] tracking-[-0.01em]">
+                Tu apunte
+              </span>
+            </span>
+            <span className="mt-1 h-2 w-[82%] rounded-full bg-(--lp-editor-line)" />
+            <span className="h-2 w-[68%] rounded-full bg-(--lp-editor-line)" />
+            <span className="h-2 w-[74%] rounded-full bg-(--lp-editor-line)" />
+            <span className="flex w-[62%] items-center gap-2">
+              <span className="h-2 flex-[2] rounded-full bg-(--lp-editor-line)" />
+              <span className="h-2 flex-[1.4] rounded-full bg-(--lp-yellow-200)" />
+              <span className="h-2 flex-1 rounded-full bg-(--lp-editor-line)" />
+            </span>
+            <div className="lp-shadow-card mt-3 flex w-[248px] flex-col gap-0.5 rounded-[14px] border border-(--lp-line) bg-white p-1.5">
+              <p className="px-2 py-1.5 font-(family-name:--lp-font-mono) text-(--lp-muted) text-[12px]">
+                / insertar bloque
+              </p>
+              {SLASH.map(({ icon: Icon, label }, index) => (
+                <span
+                  key={label}
+                  className={`flex items-center gap-2.5 rounded-[10px] px-1.5 py-1.5 text-(--lp-ink) text-[13px] ${
+                    index === 0 ? "bg-(--lp-soft) font-bold" : ""
+                  }`}
+                >
+                  <span
+                    className={`flex size-7 items-center justify-center rounded-lg border border-(--lp-line) bg-white ${
+                      index === 0
+                        ? "text-(--lp-violet-deep)"
+                        : "text-(--lp-ink-3)"
+                    }`}
+                  >
+                    <Icon weight="bold" className="size-4" />
+                  </span>
+                  {label}
+                </span>
+              ))}
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="absolute right-4 bottom-0 flex items-center gap-2 sm:right-8">
-        <motion.span
-          className="absolute inset-x-0 mx-auto flex w-fit items-center gap-2 rounded-[10px] border border-(--lp-ink)/8 bg-white px-3 py-2 font-bold text-(--lp-ink) text-[13px] shadow-sm"
-          initial={{ opacity: 0, transform: "translateY(-48px)" }}
-          animate={
-            play
-              ? {
-                  opacity: [0, 1, 1, 0],
-                  transform: [
-                    "translateY(-48px)",
-                    "translateY(0px)",
-                    "translateY(0px)",
-                    "translateY(0px)",
-                  ],
-                }
-              : undefined
-          }
-          transition={{
-            duration: 0.9,
-            times: [0, 0.4, 0.75, 1],
-            ease: EASE_OUT,
-          }}
-        >
-          <FileText className="size-3.5" />
-          Tu apunte
-        </motion.span>
-        {FORMATS.map(({ label, tone, icon: Icon, from }, index) => (
+      <div className="lp-shadow-window absolute right-4 bottom-0 flex items-end gap-3 rounded-[18px] border border-(--lp-line) bg-white px-5 pt-4 pb-3.5 sm:right-8">
+        {FORMATS.map(({ kind, tilt }, index) => (
           <motion.span
-            key={label}
-            className={`flex items-center gap-1.5 rounded-[10px] border border-(--lp-ink)/8 px-3 py-2 font-bold text-(--lp-ink) text-[13px] ${tone}`}
-            initial={{
-              opacity: 0,
-              transform: `translateX(${from}px) scale(0.9)`,
-            }}
+            key={kind}
+            className={`block ${tilt}`}
+            initial={{ opacity: 0, transform: "translateY(-28px) scale(0.92)" }}
             animate={
               play
-                ? { opacity: 1, transform: "translateX(0px) scale(1)" }
+                ? { opacity: 1, transform: "translateY(0px) scale(1)" }
                 : undefined
             }
-            transition={{ ...POP, delay: 0.7 + index * 0.08 }}
+            transition={{ ...POP, delay: 0.25 + index * 0.1 }}
           >
-            <Icon className="size-3.5" />
-            {label}
+            <FileBadge kind={kind} size="lg" />
           </motion.span>
         ))}
       </div>

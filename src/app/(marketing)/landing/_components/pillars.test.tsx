@@ -66,6 +66,37 @@ describe("Pillars", () => {
     expect(document.body).not.toHaveTextContent("Dominio por técnica");
   });
 
+  it("draws every point icon as a filled tile in its pillar's hue", () => {
+    render(<Pillars />);
+    const tones = Object.fromEntries(
+      PILLARS.map((pillar) => {
+        const section = document.getElementById(pillar.id) as HTMLElement;
+        const tiles = [...section.querySelectorAll<HTMLElement>(".lp-ficon")];
+        expect(tiles).toHaveLength(3);
+        return [
+          pillar.id,
+          [...new Set(tiles.map((tile) => tile.dataset.tone))],
+        ];
+      }),
+    );
+    expect(tones).toEqual({
+      "pilar-apuntes": ["yellow"],
+      "pilar-repeticion": ["violet"],
+      "pilar-hoy": ["mint"],
+      "pilar-progreso": ["rose"],
+    });
+  });
+
+  it("shows only the PDF, DOCX and PPTX file types in the import demo", () => {
+    render(<Pillars />);
+    const section = document.getElementById("pilar-apuntes") as HTMLElement;
+    const kinds = [...section.querySelectorAll<HTMLElement>(".lp-fbadge")].map(
+      (badge) => badge.dataset.kind,
+    );
+    expect(new Set(kinds)).toEqual(new Set(["pdf", "docx", "pptx"]));
+    expect(section).not.toHaveTextContent(/png|jpe?g|\.doc\b|\.ppt\b/i);
+  });
+
   it("never mentions study time", () => {
     render(<Pillars />);
     expect(document.body).not.toHaveTextContent(/tiempo de estudio|horas/i);

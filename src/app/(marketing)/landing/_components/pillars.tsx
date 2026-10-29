@@ -1,20 +1,23 @@
-import {
-  CalendarCheck,
-  CalendarClock,
-  Flame,
-  Gauge,
-  Globe,
-  Layers,
-  ListChecks,
-  ListTodo,
-  NotebookTabs,
-  SquarePen,
-  TrendingDown,
-  Upload,
-} from "lucide-react";
+import { CalendarCheck } from "@phosphor-icons/react/dist/ssr/CalendarCheck";
+import { CheckCircle } from "@phosphor-icons/react/dist/ssr/CheckCircle";
+import { ClockClockwise } from "@phosphor-icons/react/dist/ssr/ClockClockwise";
+import { FileArrowUp } from "@phosphor-icons/react/dist/ssr/FileArrowUp";
+import { Fire } from "@phosphor-icons/react/dist/ssr/Fire";
+import { Gauge } from "@phosphor-icons/react/dist/ssr/Gauge";
+import { GlobeHemisphereWest } from "@phosphor-icons/react/dist/ssr/GlobeHemisphereWest";
+import { ListChecks } from "@phosphor-icons/react/dist/ssr/ListChecks";
+import { Notebook } from "@phosphor-icons/react/dist/ssr/Notebook";
+import { PencilSimpleLine } from "@phosphor-icons/react/dist/ssr/PencilSimpleLine";
+import { StackSimple } from "@phosphor-icons/react/dist/ssr/StackSimple";
+import { TrendDown } from "@phosphor-icons/react/dist/ssr/TrendDown";
 import type { ReactNode } from "react";
 import { type BandTone, PillarBand } from "./pillar-band";
-import { PillarBlock, type PillarPoint, PillarVisual } from "./pillar-block";
+import {
+  type IconTone,
+  PillarBlock,
+  type PillarPoint,
+  PillarVisual,
+} from "./pillar-block";
 import { CurveDemo, ImportDemo, ProgressDemo, TodayDemo } from "./pillar-demos";
 
 type Pillar = {
@@ -27,7 +30,8 @@ type Pillar = {
   tone: BandTone;
   heading: string;
   points: readonly PillarPoint[];
-  iconTone: string;
+  // The pillar's hue for its feature icons.
+  iconTone: IconTone;
   visual: ReactNode;
 };
 
@@ -54,22 +58,22 @@ export const PILLARS: readonly Pillar[] = [
     heading: "Tus apuntes viven en cuadernos, como en clase.",
     points: [
       {
-        icon: Upload,
+        icon: FileArrowUp,
         title: "Importa lo que ya tienes",
         text: "PDF, Word y PowerPoint se convierten en páginas que puedes editar.",
       },
       {
-        icon: SquarePen,
+        icon: PencilSimpleLine,
         title: "Un editor de bloques",
         text: "Escribe / para insertar títulos, listas, tablas o código, sin pensar en el formato.",
       },
       {
-        icon: NotebookTabs,
+        icon: Notebook,
         title: "Un cuaderno por materia",
         text: "Y una página por tema. Así encuentras todo donde lo dejaste.",
       },
     ],
-    iconTone: "bg-(--lp-violet-100) text-(--lp-violet-deep)",
+    iconTone: "yellow",
     visual: <ImportDemo />,
   },
   {
@@ -88,22 +92,22 @@ export const PILLARS: readonly Pillar[] = [
     heading: "La curva del olvido, puesta de tu lado.",
     points: [
       {
-        icon: TrendingDown,
+        icon: TrendDown,
         title: "Sin repasar, la memoria cae",
         text: "Lo nuevo se olvida sobre todo en los primeros días si no vuelves a verlo.",
       },
       {
-        icon: CalendarClock,
+        icon: ClockClockwise,
         title: "Cada acierto aleja el repaso",
         text: "Si respondes bien, vuelve mañana, en 6 días y en unas dos semanas. Si te cuesta, vuelve pronto.",
       },
       {
-        icon: Layers,
+        icon: StackSimple,
         title: "Un solo motor para todo",
         text: "Las tres técnicas escriben en el mismo plan, no solo las tarjetas.",
       },
     ],
-    iconTone: "bg-(--lp-violet-100) text-(--lp-violet-deep)",
+    iconTone: "violet",
     visual: <CurveDemo />,
   },
   {
@@ -131,12 +135,12 @@ export const PILLARS: readonly Pillar[] = [
         text: "Una sola lista con lo que vence, primero lo que más esperó.",
       },
       {
-        icon: Globe,
+        icon: GlobeHemisphereWest,
         title: "En tu zona horaria",
         text: "Tu día empieza y termina cuando empieza y termina para ti.",
       },
     ],
-    iconTone: "bg-(--lp-mint-100) text-(--lp-green-700)",
+    iconTone: "mint",
     visual: <TodayDemo />,
   },
   {
@@ -155,12 +159,12 @@ export const PILLARS: readonly Pillar[] = [
     heading: "Tu progreso, medido en lo que recuerdas.",
     points: [
       {
-        icon: ListTodo,
+        icon: CheckCircle,
         title: "Repasos completados",
         text: "Cuenta lo que hiciste, comparado con la semana pasada.",
       },
       {
-        icon: Flame,
+        icon: Fire,
         title: "Tu racha",
         text: "Días seguidos con al menos un repaso.",
       },
@@ -170,7 +174,7 @@ export const PILLARS: readonly Pillar[] = [
         text: "Qué páginas están listas, tu acierto por técnica y tu calibración.",
       },
     ],
-    iconTone: "bg-(--lp-rose-100) text-(--lp-rose-700)",
+    iconTone: "rose",
     visual: <ProgressDemo />,
   },
 ];

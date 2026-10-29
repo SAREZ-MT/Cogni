@@ -97,6 +97,23 @@
      the alternating science blocks and the pending-data highlight. */
   --lp-lilac-soft: #f6f2fc;
 
+  /* Visual polish P7: the feature-icon tiles of the pillars (one hue per
+     pillar), the file-type badges (PDF red, DOCX blue, PPTX orange) and the
+     sticky notes of the usual way. Badge inks keep white tags at AA. */
+  --lp-yellow-50: #fffbeb;
+  --lp-mint-200: #a7f3d0;
+  --lp-rose-50: #fff1f2;
+  --lp-rose-200: #fecdd3;
+  --lp-red-50: #fef2f2;
+  --lp-red-200: #fecaca;
+  --lp-blue-50: #eff6ff;
+  --lp-blue-200: #bfdbfe;
+  --lp-blue-700: #1d4ed8;
+  --lp-orange-50: #fff7ed;
+  --lp-orange-200: #fed7aa;
+  --lp-orange-700: #c2410c;
+  --lp-file-edge: #c9c2d8;
+
   --lp-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
 
   --lp-font-display: var(--font-instrument-serif), Georgia, serif;
@@ -748,6 +765,102 @@
 .lp-route-line {
   background: var(--lp-violet-200);
   transform-origin: 50% 0;
+}
+
+/*
+ * Feature icons of the pillar points (pillar-block.tsx): a tinted tile with
+ * a ring in the pillar hue, a top highlight and a soft tinted drop under a
+ * filled Phosphor glyph (Untitled UI featured icons, Linear and Raycast
+ * feature lists).
+ */
+.lp-ficon {
+  color: var(--fi-ink);
+  background: var(--fi-soft);
+  box-shadow:
+    inset 0 0 0 1px var(--fi-ring),
+    inset 0 1px 0 rgb(255 255 255 / 0.85),
+    0 1px 2px rgb(26 16 51 / 0.06),
+    0 8px 16px -8px var(--fi-drop);
+}
+.lp-ficon[data-tone="yellow"] {
+  --fi-soft: var(--lp-yellow-100);
+  --fi-ring: var(--lp-yellow-200);
+  --fi-ink: var(--lp-amber-700);
+  --fi-drop: rgb(180 83 9 / 0.45);
+}
+.lp-ficon[data-tone="violet"] {
+  --fi-soft: var(--lp-violet-100);
+  --fi-ring: var(--lp-violet-200);
+  --fi-ink: var(--lp-violet-deep);
+  --fi-drop: rgb(109 40 217 / 0.45);
+}
+.lp-ficon[data-tone="mint"] {
+  --fi-soft: var(--lp-mint-100);
+  --fi-ring: var(--lp-mint-200);
+  --fi-ink: var(--lp-green-700);
+  --fi-drop: rgb(4 120 87 / 0.4);
+}
+.lp-ficon[data-tone="rose"] {
+  --fi-soft: var(--lp-rose-100);
+  --fi-ring: var(--lp-rose-200);
+  --fi-ink: var(--lp-rose-700);
+  --fi-drop: rgb(190 18 60 / 0.4);
+}
+
+/*
+ * File-type badges (file-badge.tsx): a white page with a coloured
+ * extension tag; the only formats are PDF, DOCX and PPTX.
+ */
+.lp-fbadge {
+  --fb-size: 40px;
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  width: var(--fb-size);
+  height: var(--fb-size);
+}
+.lp-fbadge[data-size="sm"] {
+  --fb-size: 28px;
+}
+.lp-fbadge[data-size="lg"] {
+  --fb-size: 52px;
+}
+.lp-fbadge[data-kind="pdf"] {
+  --fb-ink: var(--lp-red-700);
+}
+.lp-fbadge[data-kind="docx"] {
+  --fb-ink: var(--lp-blue-700);
+}
+.lp-fbadge[data-kind="pptx"] {
+  --fb-ink: var(--lp-orange-700);
+}
+.lp-fbadge-paper,
+.lp-fbadge-edge {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.lp-fbadge-paper {
+  color: white;
+  filter: drop-shadow(0 1px 1.5px rgb(26 16 51 / 0.08));
+}
+.lp-fbadge-edge {
+  color: var(--lp-file-edge);
+}
+.lp-fbadge-tag {
+  position: absolute;
+  left: 2%;
+  bottom: 22%;
+  padding: 0.12em 0.32em;
+  border-radius: 0.22em;
+  color: white;
+  background: var(--fb-ink);
+  font-family: var(--lp-font-sans);
+  font-size: calc(var(--fb-size) * 0.24);
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
 }
 
 /*
