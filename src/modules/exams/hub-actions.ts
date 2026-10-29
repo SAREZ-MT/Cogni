@@ -22,9 +22,14 @@ import { DrizzleExamHubReader } from "./infrastructure";
 // Server Action of the exams hub and notebook view (documento-maestro
 // §3.3, Phase 5 T9). Same boundary as session-actions.ts.
 
-export type ExamHubPageView = Omit<ExamHubEntry, "lastFinishedAt"> & {
+export type ExamHubPageView = Omit<
+  ExamHubEntry,
+  "lastFinishedAt" | "latestQuestionAt"
+> & {
   // ISO instant of the last finished exam; null when never examined.
   lastFinishedAt: string | null;
+  // ISO instant of the newest active question.
+  latestQuestionAt: string | null;
 };
 
 // Exam questions due today from scheduling's "Repasos de hoy", and the
@@ -89,6 +94,7 @@ export async function listExamHubAction(): Promise<
       result.value.map((page) => ({
         ...page,
         lastFinishedAt: page.lastFinishedAt?.toISOString() ?? null,
+        latestQuestionAt: page.latestQuestionAt?.toISOString() ?? null,
       })),
     );
   });

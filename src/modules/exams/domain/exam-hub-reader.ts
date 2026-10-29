@@ -24,6 +24,11 @@ export interface ExamHubPage {
   readonly attempts: number;
   // The page's most recently finished session; null when never finished.
   readonly lastSession: ExamHubLastSession | null;
+  // The best finished exam's whole percent, rounded down (Phase 8 H17:
+  // "Mejor nota"); null when never finished.
+  readonly bestScore: number | null;
+  // When the newest active question was created (the hub's recency).
+  readonly latestQuestionAt: Date | null;
   readonly retakePending: boolean;
   // Roots failed in the page's last failed exam (ExamPageState), in the
   // state's order; empty when the page has no state.

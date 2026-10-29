@@ -14,6 +14,8 @@ function hubPage(overrides: Partial<ExamHubPage> = {}): ExamHubPage {
     activeQuestionCount: 10,
     attempts: 0,
     lastSession: null,
+    bestScore: null,
+    latestQuestionAt: new Date("2026-10-01T10:00:00.000Z"),
     retakePending: false,
     failedRootIds: [],
     ...overrides,
@@ -79,6 +81,8 @@ describe("listExamHub", () => {
         retakePending: false,
         dueToday: 0,
         failedDueNow: false,
+        bestScore: null,
+        latestQuestionAt: new Date("2026-10-01T10:00:00.000Z"),
       },
     ]);
   });
@@ -89,6 +93,7 @@ describe("listExamHub", () => {
       hubPage({
         attempts: 3,
         lastSession: { finishedAt, total: 30, correct: 20, passed: false },
+        bestScore: 80,
         retakePending: true,
       }),
     ]);
@@ -98,6 +103,7 @@ describe("listExamHub", () => {
     expect(result.ok && result.value[0]).toMatchObject({
       attempts: 3,
       lastScore: 66,
+      bestScore: 80,
       passed: false,
       lastFinishedAt: finishedAt,
       retakePending: true,

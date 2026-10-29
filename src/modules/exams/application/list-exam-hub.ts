@@ -38,6 +38,11 @@ export interface ExamHubEntry {
   // (the retake banner's "ya están para repasar"); false when the page has
   // no failed questions, null when unknown.
   failedDueNow: boolean | null;
+  // The best finished exam's whole percent; null when never examined
+  // (Phase 8 H17: "Mejor nota").
+  bestScore: number | null;
+  // When the newest active question was created (the hub's recency).
+  latestQuestionAt: Date | null;
 }
 
 // The exams hub and notebook view (documento-maestro §3.3): every page of
@@ -80,6 +85,8 @@ export async function listExamHub(
       retakePending: page.retakePending,
       dueToday: due === null ? null : (due.get(page.pageId) ?? 0),
       failedDueNow: failedDueNow(page),
+      bestScore: page.bestScore,
+      latestQuestionAt: page.latestQuestionAt,
     })),
   );
 }

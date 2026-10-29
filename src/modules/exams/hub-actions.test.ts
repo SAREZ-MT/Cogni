@@ -78,6 +78,8 @@ function hubPage(overrides: Partial<ExamHubPage> = {}): ExamHubPage {
     activeQuestionCount: 12,
     attempts: 2,
     lastSession: { finishedAt: FINISHED, total: 10, correct: 6, passed: false },
+    bestScore: 70,
+    latestQuestionAt: new Date("2026-10-01T10:00:00.000Z"),
     retakePending: true,
     failedRootIds: ["root-failed"],
     ...overrides,
@@ -148,6 +150,8 @@ describe("listExamHubAction", () => {
           retakePending: true,
           dueToday: 3,
           failedDueNow: false,
+          bestScore: 70,
+          latestQuestionAt: "2026-10-01T10:00:00.000Z",
         },
         expect.objectContaining({
           pageId: "page-2",
