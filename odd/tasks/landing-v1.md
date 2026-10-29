@@ -90,3 +90,12 @@ Branch `feat/landing-polish` from `feat/legal-consent` 3f316e9. Route: one deleg
   - Commit 1e729c9 `feat(brand): show the 7 v2 Glass mark in the shared BrandMark atom`: `BrandGlyph`/`BrandMark` render the paper or ink glass via `next/image` (`unoptimized`), the favicon build at 20px (`size="sm"`, sidebar), the outlined wordmark (decorative) plus a visually hidden "Cogni"; md = 28px mark. Props API unchanged. `docs/design-system/ATOMS.md`, `docs/design-system/assets/logo.svg` (new lockup) and `logo.md` (usage rules).
   - Commit fae0692 `feat(landing): put the glass mark before the cogni wordmark in nav and footer`: nav mark 28px (17% over the 24px wordmark), paper and ink glass stacked and cross-faded with `data-theme` (`.lp-nav-mark`, instant under reduced motion); footer ink glass at 33px. Link names stay "cogni".
   - Checks: `pnpm typecheck` exit 0; biome clean on the changed files; vitest `src/shared/ui`, `(app)/_components`, `(marketing)`, `(public)`, no-inline-hex: 131 files / 864 tests passed; curl 200 for `/`, `/login`, `/register`, `/icon.svg` (image/svg+xml), `/apple-icon.png` (image/png), `/favicon.ico`; the head links `favicon.ico` (48x48), `icon.svg` (any) and `apple-icon.png` (180x180). Screenshots in the scratchpad `logo-impl/` (nav-top, nav-light, footer, login, register, register-brand-crop, login-mobile). The app sidebar needs a session and was not captured. Full e2e not run (user request).
+
+### RDD, landing close (2026-10-28)
+- 7707635..292d8fb exceeded the reviewer budget as one candidate, so it was reviewed in slices. All were granted, approved and acknowledged:
+  - 7707635..308af67 (P7 visual polish): advisory R3-001.
+  - 308af67..819ba74 (pixel tiles, pillar copy, "Empieza ya", Pilares link): advisory R3-cta-copy-e2e-unverified.
+  - 819ba74..a33dcb6 (logo assets): 3 suggestions.
+  - a33dcb6..292d8fb (BrandMark, nav and footer, docs): 2 suggestions.
+- The reviewed boundary is now 292d8fb. The user declared the landing finished on 2026-10-28. The footer wordmark stays in Inter (user decision).
+- Pending before any PR: the full e2e suite (not yet run, per the user), the web manifest (needs a proxy open path), and a visual check of the sidebar mark.
