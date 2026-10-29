@@ -399,6 +399,14 @@ exam}-*` tokens; `text-gradient-brand`, `empty-state-glow` and
 utilities turn amber (CTA amber-300 with amber-900 ink), emerald
 (emerald-700, white ink) or rose (rose-700, white ink) inside a theme.
 
+Phase 8 H17 adds the item-card tokens (`--color-technique-*-soft`,
+`-soft-edge`, `-soft-fg`, `-fill`, `-tint`, `-dash`, read as
+`--theme-soft`/`-soft-edge`/`-soft-fg`/`-fill`/`-tint`/`-dash`): the soft
+action and status pill (amber-100 / amber-300 / amber-800, emerald-100 /
+emerald-300 / emerald-800, rose-100 / rose-300 / rose-800), the progress
+fill (amber-500, emerald-500, rose-500), the card's corner tint and the
+create tile's dashes.
+
 ## TechniqueHubHeader (`technique-hub-header.tsx`)
 
 Phase 8 H11: the page head of the three technique hubs, empty or not.
@@ -911,20 +919,64 @@ reads "Este cuaderno aún no tiene páginas." with "Crear una página" to
 
 ## TechniqueCreateTile (`technique-create-tile.tsx`)
 
-Phase 8 H11: the first, fixed item of a technique hub's notebooks grid, in
-the "Nuevo cuaderno" / "Nueva página" create-tile language: `primary-50`
-fill, 2px dashed `primary-300` border, a 44px `primary-600` plus disc, a
-14px semibold `primary-700` label and a 12px hint. Shaped like
-`DeckSummaryCard` (18px radius, `h-full min-h-[156px]`); lifts 2px and
-deepens its tint on hover, presses to 0.98, still under reduced motion.
-A plain `<button>` (`type="button"` default) for `DialogTrigger asChild`.
-Props: `label` (also the accessible name), `hint?`, button props. Used by
-the `/flashcards` ("Crear flashcards"), `/active-recall` ("Generar
-preguntas"), `/exams` and, since Phase 8 H13, `/exams/[notebookId]`
-("Crear examen", the notebook preselected) grids. H13 removed the exams
-header's "Crear examen" button: on the exams screens the tile and the
-empty state's CTA (`data-technique-theme="exams"` around it on the
-notebook view) are the create controls.
+Phase 8 H11: the first, fixed item of a technique hub's grid, in the
+"Nuevo cuaderno" / "Nueva página" create-tile language. Since H17
+(user-approved flat hubs, 2026-10-29) it is themed by its `technique`
+(`data-technique-theme` on the tile): `--theme-tint` fill, 2px dashed
+`--theme-dash` border, a 44px plus disc in the technique CTA's colours, a
+14px semibold `--theme-ink-deep` label and a 12px `--theme-ink` hint.
+Shaped like `TechniqueItemCard` (18px radius, `h-full min-h-[212px]`; under
+520px a left-aligned row); lifts 2px on hover, presses to 0.98, still
+under reduced motion. A plain `<button>` (`type="button"` default) for
+`DialogTrigger asChild`. Props: `technique`, `label` (also the accessible
+name), `hint?`, button props. Used by the `/flashcards` ("Crear
+flashcards"), `/active-recall` ("Generar preguntas") and `/exams` ("Crear
+examen") grids. H13 removed the exams header's "Crear examen" button: the
+tile and the empty state's CTA are the create controls.
+
+## TechniqueItemCard (`technique-item-card.tsx`)
+
+Phase 8 H17 (user-approved flat hubs, 2026-10-29): one generated item of a
+technique hub (a deck, a recall page, an exam page), themed by
+`technique` (`data-technique-theme` on the `<article>`,
+`data-slot="technique-item-card"`). A `Card` (18px radius, at least 212px
+tall, `py-3.5 pr-3.5 pl-4`) with a radial `--theme-tint` in its top right
+corner; top row the notebook label (a `Pill` in the notebook's pastel with
+its `NOTEBOOK_DOT`, truncated) and the kebab (`DropdownMenu`, "Acciones
+de {title}", above the stretched link); the title (16px semibold, clamped
+to 2 lines with `min-h-11`, full text in `title`); the metric (15px Lucide
+icon in `--theme-ink`, bold tabular value, unit); the status line; an
+optional 6px `ProgressBar` in `--theme-fill`; and the 38px action at the
+bottom. The action is the card's link, stretched over the card
+(`after:absolute after:inset-0`, like `PageSheetCard`), named
+"{label}: {title}". `emphasis="primary"` fills it with the technique CTA
+(something is due: cards for today, recall due, an exam to retake);
+`"soft"` (default) uses `--theme-soft` / `--theme-soft-fg`. Hover: rises
+2px (`-translate-y-0.5`), `shadow-card-hover` and a `--theme-soft-edge`
+border; under reduced motion only the shadow and border. Props:
+`technique`, `href`, `notebook {title, tone}`, `title`, `metric {icon,
+value, unit}`, `status`, `progress?`, `action {label, icon?}`,
+`emphasis?`, `menu?` (DropdownMenuItems). Status helpers:
+`TechniqueItemPill` (soft pill with a `--theme-fill` dot: "3 para hoy",
+"2 para repasar", "Repetir cuando estés listo") and `TechniqueItemCheck`
+(`success-600` tick: "Al día"). Never shows study time.
+
+## TechniqueHubFilter (`technique-hub-filter.tsx`)
+
+Phase 8 H17: the notebook filter under `TechniqueHubHeader`. A `<nav
+aria-label="Filtrar por cuaderno">` of 34px pill links ("Todos n", then
+one per notebook with its `NOTEBOOK_DOT` and count) pointing at
+`?cuaderno=<id>`; the active chip has `aria-current="page"` and the
+technique's soft colours. Scrolls sideways (hidden scrollbar) instead of
+wrapping. The chips come from `notebookFilter` (`shared/navigation/
+technique-hub.ts`), which also filters the items on the server.
+
+## NotebookDot (`notebook-dot.ts`)
+
+Phase 8 H17: `NOTEBOOK_DOT`, a notebook colour as a small dot (the 400
+stop of `NotebookCoverCard`'s gradient: pink-400, emerald-400, amber-400,
+primary-500, orange-400, blue-400, teal-400), `toNotebookTone` (unknown or
+missing colours are violet) and `notebookDotClass`.
 
 ## ViewToggle (`view-toggle.tsx`)
 

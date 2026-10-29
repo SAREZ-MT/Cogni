@@ -180,6 +180,7 @@ export function CreateExamDialog({
           </EmptyStateCta>
         ) : (
           <TechniqueCreateTile
+            technique="exams"
             label="Crear examen"
             hint="Elige una página para el examen"
             data-testid="create-exam-tile"

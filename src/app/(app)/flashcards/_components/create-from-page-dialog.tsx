@@ -186,6 +186,7 @@ export function CreateFromPageDialog({
       </EmptyStateCta>
     ) : (
       <TechniqueCreateTile
+        technique={config.theme}
         label={config.title}
         hint={config.tileHint}
         data-testid={`${prefix}-tile`}
