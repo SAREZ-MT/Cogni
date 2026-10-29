@@ -13,8 +13,15 @@ import type { PageTextReader } from "@/modules/notebooks";
 import { newStudyItem } from "@/modules/study-engine";
 import type { Clock } from "@/shared/kernel/clock";
 import { DomainError } from "@/shared/kernel/domain-error";
+import {
+  MIN_GENERATION_WORDS,
+  maxItemsForWords,
+  PageTooShortError,
+  requiredWordsFor,
+} from "@/shared/kernel/generation-capacity";
 import type { GenerationFingerprintRepository } from "@/shared/kernel/generation-fingerprints";
 import {
+  consumedParagraphs,
   joinParagraphs,
   paragraphsWithinWords,
   selectNewParagraphs,
@@ -159,6 +166,16 @@ export async function requestExamGeneration(
     );
   }
 
+  // Phase 8 H14 (user 2026-10-29): at least 100 words of new paragraphs and
+  // about 15 per question, checked before the limiter (a short page never
+  // costs a generation).
+  const words = newParagraphs.reduce((sum, p) => sum + p.words, 0);
+  if (words < MIN_GENERATION_WORDS || count > maxItemsForWords(words)) {
+    return err(
+      new PageTooShortError({ words, minWords: requiredWordsFor(count) }),
+    );
+  }
+
   const limit = await deps.limiter.check(ownerId);
   if (!limit.allowed) return err(new ExamDailyLimitReachedError(limit.resetAt));
 
@@ -267,7 +284,11 @@ export async function requestExamGeneration(
       await fingerprints.addMany({
         ownerId,
         pageId: input.pageId,
-        fingerprints: sent.map((p) => p.fingerprint),
+        // Only the share of the sent paragraphs the saved questions cover
+        // (H14): a short answer leaves the rest new for the next Generar.
+        fingerprints: consumedParagraphs(sent, fresh.length, count).map(
+          (p) => p.fingerprint,
+        ),
         now,
       });
       return ok(fresh);
