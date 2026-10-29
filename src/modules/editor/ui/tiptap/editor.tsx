@@ -12,6 +12,7 @@ import { SaveStatus } from "../save-status";
 import { BlockHandle } from "./block-handle";
 import { collectBlockIds, isBlockIdOnlyChange } from "./block-ids";
 import { BubbleToolbar } from "./bubble-toolbar";
+import { withEditableStart } from "./editable-start";
 import { createEditorExtensions } from "./extensions";
 import type { SlashCommandItem } from "./slash-command-items";
 import { TableToolbar } from "./table-toolbar";
@@ -111,7 +112,10 @@ export function Editor({
       mentionPort: mentionPort ?? null,
       extraSlashItems: extraSlashItems ?? [],
     }),
-    content: initialContent as unknown as Record<string, unknown>,
+    content: withEditableStart(initialContent) as unknown as Record<
+      string,
+      unknown
+    >,
     immediatelyRender: false,
     onUpdate: ({ editor: current, transaction }) => {
       // Opening a page is not editing it: the transaction UniqueID
@@ -136,9 +140,12 @@ export function Editor({
     if (!editor) return;
     if (appliedReconcileVersionRef.current === reconcileVersion) return;
     appliedReconcileVersionRef.current = reconcileVersion;
-    editor.commands.setContent(content as unknown as Record<string, unknown>, {
-      emitUpdate: false,
-    });
+    editor.commands.setContent(
+      withEditableStart(content) as unknown as Record<string, unknown>,
+      {
+        emitUpdate: false,
+      },
+    );
   }, [reconcileVersion, content, editor]);
 
   // specs/editor/spec.md's autosave requirement is debounce-driven; Mod+S
