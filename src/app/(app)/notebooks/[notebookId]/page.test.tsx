@@ -70,19 +70,49 @@ describe("notebook detail route", () => {
     );
   });
 
-  it("keeps the 'Nueva página' action", async () => {
+  // Phase 8 H5-T2 (user 2026-10-29): one create control, first in the grid
+  // or the list, like the hub; the header has none.
+  it("has no create button in the header", async () => {
+    const { container } = await renderRoute();
+
+    const header = container
+      .querySelector("h1")
+      ?.closest(".justify-between") as HTMLElement;
+    expect(within(header).queryByRole("button")).toBeNull();
+  });
+
+  it.each([
+    ["grid", undefined],
+    ["list", "list"],
+  ] as const)("puts a single 'Nueva página' create control first in the %s view", async (_name, view) => {
+    await renderRoute(view);
+
+    const creates = screen.getAllByRole("button", { name: "Nueva página" });
+    expect(creates).toHaveLength(1);
+    expect(creates[0]).toHaveAttribute("type", "submit");
+    expect(creates[0].closest("form")).not.toBeNull();
+    const firstPageLink = screen.getByRole("link", { name: /Mitosis/ });
+    expect(
+      creates[0].compareDocumentPosition(firstPageLink) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("makes the grid's first item the sheet-shaped create tile", async () => {
     await renderRoute();
 
+    const items = within(screen.getByRole("list")).getAllByRole("listitem");
+    expect(items).toHaveLength(3);
     expect(
-      screen.getByRole("button", { name: "Nueva página" }),
-    ).toBeInTheDocument();
+      within(items[0]).getByRole("button", { name: "Nueva página" }),
+    ).toHaveAttribute("data-slot", "page-sheet-create-tile");
   });
 
   it("renders pages as a card grid by default, each linking to its page with an archive action", async () => {
     await renderRoute();
 
     const list = screen.getByRole("list");
-    const items = within(list).getAllByRole("listitem");
+    const items = within(list).getAllByRole("listitem").slice(1);
     expect(items).toHaveLength(2);
     expect(
       within(items[0]).getByRole("link", { name: /Mitosis/ }),
@@ -115,7 +145,9 @@ describe("notebook detail route", () => {
   it("presents each page as a paper sheet with its update date", async () => {
     await renderRoute();
 
-    const items = within(screen.getByRole("list")).getAllByRole("listitem");
+    const items = within(screen.getByRole("list"))
+      .getAllByRole("listitem")
+      .slice(1);
     for (const item of items) {
       expect(within(item).getByRole("article")).toHaveAttribute(
         "data-slot",
@@ -162,7 +194,8 @@ describe("notebook detail route", () => {
   it("falls back to the grid for an unknown view value", async () => {
     await renderRoute("kanban");
 
-    expect(screen.getAllByRole("listitem")).toHaveLength(2);
+    // The create tile plus the two pages.
+    expect(screen.getAllByRole("listitem")).toHaveLength(3);
   });
 
   it("builds the toggle links from the notebook id", async () => {

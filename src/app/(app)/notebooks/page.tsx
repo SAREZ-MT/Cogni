@@ -87,6 +87,10 @@ export default async function NotebooksPage() {
         // phone; wider screens grow the covers, never add columns.
         <div className="@container/grid">
           <div className="grid grid-cols-1 gap-x-6 gap-y-8 @[300px]/grid:grid-cols-2 @[540px]/grid:grid-cols-3 @[680px]/grid:grid-cols-4 @[960px]/grid:grid-cols-5">
+            {/* H5-T2 (user 2026-10-29): the create tile is always the
+                first item, before every cover, so many notebooks never
+                push it down. */}
+            <CreateNotebookTrigger variant="tile" />
             {notebooks.map((notebook) => (
               <NotebookCoverCard
                 key={notebook.id}
@@ -98,7 +102,6 @@ export default async function NotebooksPage() {
                 actions={<NotebookCardActions notebook={notebook} />}
               />
             ))}
-            <CreateNotebookTrigger variant="tile" />
           </div>
         </div>
       )}

@@ -119,6 +119,31 @@ describe("notebooks hub route", () => {
     expect(creates[0]).toHaveAttribute("data-variant", "tile");
   });
 
+  // Phase 8 H5-T2 (user 2026-10-29): the create tile is the grid's first
+  // item, so many notebooks never push it down.
+  it("puts the create tile first in the grid, before every notebook cover", async () => {
+    getHomeOverview.mockResolvedValue({
+      notebooks: Array.from({ length: 6 }, (_, index) => ({
+        id: `nb${index}`,
+        title: `Cuaderno ${index}`,
+        color: null,
+        icon: null,
+        pageCount: 0,
+        updatedAt: new Date("2026-10-01T00:00:00.000Z"),
+      })),
+    });
+    await renderRoute();
+
+    const create = screen.getByRole("button", { name: "Nuevo cuaderno" });
+    const firstCover = screen.getAllByRole("article")[0];
+    const grid = firstCover.parentElement as HTMLElement;
+    expect(grid.firstElementChild?.contains(create)).toBe(true);
+    expect(
+      create.compareDocumentPosition(firstCover) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
   it("shows the illustrated empty state with its steps and the create CTA", async () => {
     const { container } = await renderRoute();
 

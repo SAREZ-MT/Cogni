@@ -11,11 +11,15 @@ import { EmptyState } from "@/shared/ui/empty-state";
 import { IconTile } from "@/shared/ui/icon-tile";
 import { PageSheet } from "@/shared/ui/page-sheet";
 import { PageSheetCard } from "@/shared/ui/page-sheet-card";
+import { PageSheetCreateTile } from "@/shared/ui/page-sheet-create-tile";
+import { PageStripCreateRow } from "@/shared/ui/page-strip";
 import { SectionHeader } from "@/shared/ui/section-header";
 import { ViewToggle } from "@/shared/ui/view-toggle";
 import { SetBreadcrumb } from "../../_components/breadcrumb";
 import { formatUpdatedAt } from "../../_components/format";
 import { PageListRow } from "../../_components/page-list-row";
+
+const CREATE_HINT = "Escribe o importa un apunte";
 
 interface NotebookPageProps {
   params: Promise<{ notebookId: string }>;
@@ -75,17 +79,6 @@ export default async function NotebookPage({
                 ? "1 página"
                 : `${pages.length} páginas`,
           ]}
-          actions={
-            <form action={createPage}>
-              <button
-                type="submit"
-                className="flex h-10 items-center gap-1.5 rounded-input bg-neutral-900 px-4 text-[13.5px] text-white transition-all hover:bg-neutral-800"
-              >
-                <Plus aria-hidden="true" size={16} strokeWidth={1.75} />
-                Nueva página
-              </button>
-            </form>
-          }
         />
       </div>
 
@@ -102,6 +95,19 @@ export default async function NotebookPage({
           titleClassName="text-base"
           description="Cada página puede contener notas, imágenes, listas y más con autoguardado en segundos."
           descriptionClassName="max-w-sm"
+          action={
+            // The only create control while the notebook is empty (the
+            // header lost its button in H5-T2); step 2 redesigns this state.
+            <form action={createPage}>
+              <button
+                type="submit"
+                className="flex h-10 items-center gap-1.5 rounded-input bg-neutral-900 px-4 text-[13.5px] text-white transition-all hover:bg-neutral-800"
+              >
+                <Plus aria-hidden="true" size={16} strokeWidth={1.75} />
+                Nueva página
+              </button>
+            </form>
+          }
         />
       ) : (
         <>
@@ -114,9 +120,19 @@ export default async function NotebookPage({
             // Phase 8 H5-T1 (user request 2026-10-29): each page is a paper
             // sheet in the hub covers' family, on the hub's grid — columns
             // follow the grid's own width (the sidebar eats the viewport)
-            // and cap at five.
+            // and cap at five. H5-T2 (user 2026-10-29): the create tile is
+            // always the first item, so many pages never push it down.
             <div className="@container/grid">
               <ul className="grid grid-cols-1 gap-x-6 gap-y-8 @[300px]/grid:grid-cols-2 @[540px]/grid:grid-cols-3 @[680px]/grid:grid-cols-4 @[960px]/grid:grid-cols-5">
+                <li>
+                  <form action={createPage} className="contents">
+                    <PageSheetCreateTile
+                      type="submit"
+                      label="Nueva página"
+                      hint={CREATE_HINT}
+                    />
+                  </form>
+                </li>
                 {pages.map((page) => (
                   <li key={page.id}>
                     <PageSheetCard
@@ -137,15 +153,25 @@ export default async function NotebookPage({
               </ul>
             </div>
           ) : (
-            <Card>
-              {pages.map((page) => (
-                <PageListRow
-                  key={page.id}
-                  page={page}
-                  notebookId={notebook.id}
+            <div className="flex flex-col gap-2">
+              {/* H5-T2: the list's first row creates a page too. */}
+              <form action={createPage}>
+                <PageStripCreateRow
+                  type="submit"
+                  label="Nueva página"
+                  hint={CREATE_HINT}
                 />
-              ))}
-            </Card>
+              </form>
+              <Card>
+                {pages.map((page) => (
+                  <PageListRow
+                    key={page.id}
+                    page={page}
+                    notebookId={notebook.id}
+                  />
+                ))}
+              </Card>
+            </div>
           )}
         </>
       )}

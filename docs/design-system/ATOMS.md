@@ -45,7 +45,8 @@ The pastel/semantic square behind notebook, stat and empty-state icons.
 
 Used by: `home/stat-card.tsx`,
 `home/ready-to-review.tsx`, `home/weak-topics.tsx`, `app/(app)/page.tsx`,
-`notebooks/[notebookId]/page.tsx` (the zero-pages empty state only; its
+`notebooks/[notebookId]/page.tsx` (the zero-pages empty state only, which
+also holds the page's create button while it has no pages; its
 header badge is a `PageSheet` since Phase 8 H5-T1),
 `modules/notebooks/ui/create-notebook-trigger.tsx`.
 
@@ -291,7 +292,8 @@ the covers, never add columns; `NotebookCardActions` as `actions`,
 decision 2026-10-28).
 
 The grid's `CreateNotebookTrigger` `tile` (notebooks module, H4-T5 redesign
-2026-10-28) shares the book proportion: a cover-sized face (cell − 8px)
+2026-10-28; always the grid's FIRST item since Phase 8 H5-T2, user
+2026-10-29, so many notebooks never push it down) shares the book proportion: a cover-sized face (cell − 8px)
 with the same radius, `primary-50` fill and a 2px dashed `primary-300`
 border, a 48px `primary-600` plus disc (white `Plus`, soft violet
 shadow), "Nuevo cuaderno" in `primary-700` semibold and the hint "Crea un
@@ -360,6 +362,38 @@ Used by: `notebooks/[notebookId]/page.tsx` (the grid view, on the hub's
 more; `formatUpdatedAt(updatedAt)` as `dateLabel`, "Actualizada" as
 `datePrefix`, `ArchivePageButton` as `actions`, the notebook's colour as
 `tone`).
+
+## PageSheetCreateTile (`page-sheet-create-tile.tsx`)
+
+Phase 8 H5-T2 (user request 2026-10-29): the notebook page's create
+control, always the FIRST item of the sheet grid. A `button`
+(`data-slot="page-sheet-create-tile"`, accessible name = `label`) the size
+of a `PageSheetCard` (`aspect-[4/5]`, a face the cell minus the 8px stack,
+10px radius) in the hub create tile's violet language: `primary-50` fill,
+2px dashed `primary-300` border, a `primary-600` plus disc with a soft
+violet shadow, the label in `primary-700` semibold and the hint in
+`primary-600/80` (hidden below 150px). Hover lifts 4px and deepens to
+`primary-100` / `primary-400`, press 0.98, none under reduced motion; the
+same 150px / 280px container steps as the hub tile.
+
+- Props: `label`, `hint?`, plus any `button` attribute (`type` defaults to
+  `"button"`; the page passes `"submit"` inside its create form).
+
+Used by: `notebooks/[notebookId]/page.tsx` (grid view, "Nueva página" /
+"Escribe o importa un apunte", inside the same `createPage` server-action
+form the header button used; the header has no create button since H5-T2).
+
+## PageStripCreateRow (`page-strip.tsx`)
+
+Phase 8 H5-T2: the list view's first row, the strip version of
+`PageSheetCreateTile` — a 56px-tall `button`
+(`data-slot="page-strip-create-row"`, 10px radius) with the same violet
+fill, dashed border and plus disc (28px), the label and, from 360px wide,
+the hint beside it. Hover lifts 1px and deepens its tint, press 0.99, none
+under reduced motion. Props: `label`, `hint?`, plus `button` attributes.
+
+Used by: `notebooks/[notebookId]/page.tsx` (list view, same form and copy as
+the grid tile).
 
 ## StudyBackdrop (`study-backdrop.tsx`)
 
