@@ -3,7 +3,6 @@
 export {
   type ArchiveView,
   archiveFlashcardAction,
-  createFlashcardAction,
   type DeckView,
   type FlashcardView,
   type GenerationActionError,

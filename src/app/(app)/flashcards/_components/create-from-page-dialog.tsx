@@ -89,8 +89,8 @@ function remainingCopy(remaining: number): string {
 // page (`PagePicker`), then generates with AI, reusing the techniques
 // panel's Server Actions (generateFlashcardsAction, then the page's deck;
 // generateRecallQuestionsAction, then the page's session). AI only (user
-// decision 2026-10-29, Phase 8 H12): writing cards by hand stays on an
-// existing deck's "Nueva tarjeta".
+// decision 2026-10-29, Phase 8 H12; H13 removed the deck's "Nueva tarjeta"
+// too, so no card is written by hand anywhere).
 // The remaining generations show under the AI path and block it at 0; an
 // empty page reads the panel's error and links to the page.
 export function CreateFromPageDialog({

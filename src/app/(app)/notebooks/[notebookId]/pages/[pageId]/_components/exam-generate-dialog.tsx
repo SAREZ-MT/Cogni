@@ -28,7 +28,7 @@ export interface ExamGenerateDialogProps {
 // Examen's "Generar" (Phase 6 T5b v2, user decision 2026-10-06): the
 // question count moved out of the card into this dialog so the three
 // technique cards look the same. Composes the Dialog, CountStepper and
-// Button atoms like the app's other dialogs (NewFlashcardDialog).
+// Button atoms like the app's other dialogs (QuestionFormDialog).
 export function ExamGenerateDialog({
   open,
   onOpenChange,

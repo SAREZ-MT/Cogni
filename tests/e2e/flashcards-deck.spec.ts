@@ -1,38 +1,19 @@
 import { randomUUID } from "node:crypto";
 import type { Page } from "@playwright/test";
 import { expect, hasSupabaseEnv, signIn, test } from "./fixtures/auth";
+import { seedFlashcards } from "./helpers/flashcards";
 import {
   clickAndWaitForAction,
   createNotebookWithOpenPage,
 } from "./helpers/notebooks";
 
-// Phase 4 manual flashcards (documento-maestro §3.3 "creadas manualmente"):
-// "Nueva tarjeta" lives on the page's deck, the first card starts the deck,
-// and archiving refuses the deck's last card (a deck is never empty).
+// A page's deck (Phase 4, documento-maestro §3.3): cards are created by AI
+// only (Phase 8 H13, user 2026-10-29), so the deck offers no "Nueva
+// tarjeta" and its cards are seeded straight into the database; archiving
+// refuses the deck's last card (a deck is never empty).
 
-// Optional: a directory to drop the dialog screenshot in (visual check).
+// Optional: a directory to drop the deck screenshot in (visual check).
 const SCREENSHOT_DIR = process.env.E2E_SCREENSHOT_DIR;
-
-async function addCard(page: Page, front: string, back: string) {
-  await page.getByTestId("new-flashcard-button").click();
-  const dialog = page.getByRole("dialog", { name: "Nueva tarjeta" });
-  await expect(dialog).toBeVisible();
-  await dialog.getByLabel("Anverso").fill(front);
-  await dialog.getByLabel("Reverso").fill(back);
-  if (SCREENSHOT_DIR) {
-    // Let the dialog's open animation settle before capturing it.
-    await page.waitForTimeout(400);
-    await page.screenshot({
-      path: `${SCREENSHOT_DIR}/new-flashcard-dialog.png`,
-    });
-  }
-  await clickAndWaitForAction(
-    page,
-    dialog.getByRole("button", { name: "Guardar tarjeta" }),
-    '"front"',
-  );
-  await expect(dialog).toBeHidden();
-}
 
 async function archiveCard(page: Page, front: string) {
   await page
@@ -50,43 +31,54 @@ async function archiveCard(page: Page, front: string) {
   return dialog;
 }
 
-test.describe("manual flashcards", () => {
+test.describe("flashcard deck", () => {
   test.skip(!hasSupabaseEnv, "Supabase env (cogni-dev) is not configured");
 
   test.beforeEach(async ({ page, verifiedUser }) => {
     await signIn(page, verifiedUser);
   });
 
-  test("creates cards on a page deck and never archives its last card", async ({
+  test("offers no manual creation and never archives a deck's last card", async ({
     page,
   }) => {
     await createNotebookWithOpenPage(
       page,
-      `Cuaderno manual ${randomUUID().slice(0, 8)}`,
+      `Cuaderno mazo ${randomUUID().slice(0, 8)}`,
     );
     const [, , notebookId, , pageId] = new URL(page.url()).pathname.split("/");
 
-    // A page without cards has no deck yet: the deck route offers the first.
+    // A page without cards has no deck yet: the deck route sends it back to
+    // the page's techniques panel to generate one.
     await page.goto(`/flashcards/${notebookId}/${pageId}`);
     await expect(
       page.getByText("Esta página aún no tiene tarjetas"),
     ).toBeVisible();
+    await expect(page.getByText("Nueva tarjeta")).toHaveCount(0);
+    await expect(
+      page.getByRole("link", { name: "Generar desde la página" }),
+    ).toHaveAttribute("href", `/notebooks/${notebookId}/pages/${pageId}`);
 
-    await addCard(page, "¿Qué produce la mitocondria?", "ATP");
+    await seedFlashcards(pageId, [
+      { front: "¿Qué produce la mitocondria?", back: "ATP" },
+    ]);
+    await page.reload();
     await expect(page.getByTestId("flip-card")).toHaveCount(1);
-    await expect(page.getByText("¿Qué produce la mitocondria?")).toBeVisible();
     await expect(page.getByText("1 tarjeta", { exact: true })).toBeVisible();
+    await expect(page.getByText("Nueva tarjeta")).toHaveCount(0);
 
     // The only card cannot be archived: the deck would be empty.
     const refusal = await archiveCard(page, "¿Qué produce la mitocondria?");
     await expect(refusal.getByRole("alert")).toHaveText(
-      "Un mazo siempre conserva al menos una tarjeta. Agrega otra antes de archivar esta.",
+      "Un mazo siempre conserva al menos una tarjeta. Genera más desde la página antes de archivar esta.",
     );
     await refusal.getByRole("button", { name: "Cancelar" }).click();
     await expect(page.getByTestId("flip-card")).toHaveCount(1);
 
     // With two cards, archiving one is allowed and it leaves the deck.
-    await addCard(page, "¿Dónde ocurre el ciclo de Krebs?", "En la matriz");
+    await seedFlashcards(pageId, [
+      { front: "¿Dónde ocurre el ciclo de Krebs?", back: "En la matriz" },
+    ]);
+    await page.reload();
     await expect(page.getByTestId("flip-card")).toHaveCount(2);
     if (SCREENSHOT_DIR) {
       await page.screenshot({

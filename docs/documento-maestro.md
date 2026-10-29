@@ -108,7 +108,7 @@ Notas de implementación de la Fase 6 (ADR 0007):
 
 #### Flashcards
 
-- Anverso y reverso, generadas por IA desde la página o creadas manualmente.
+- Anverso y reverso, generadas por IA desde la página. La creación es solo con IA por decisión del usuario del 2026-10-29 (Fase 8, H13): no hay "Nueva tarjeta". Las tarjetas creadas a mano antes de esa fecha (`origin = manual`) se siguen mostrando, repasando y archivando.
 - Sesión de repaso: se muestran los ítems vencidos de la página (o de todas las páginas, en la vista "Repasos de hoy").
 - Calificación por el estudiante en escala SM-2 simplificada de 4 botones: Otra vez (q=1), Difícil (q=3), Bien (q=4), Fácil (q=5).
 - Retroalimentación con IA al final de la sesión: resumen de qué se recordó bien y qué conviene reforzar.

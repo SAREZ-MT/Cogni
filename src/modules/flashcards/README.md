@@ -10,7 +10,8 @@ sessions are scheduled by `study-engine`; this module adds the card text.
 - `domain/`
   - `flashcard.ts` `Flashcard` entity (`archivedAt` is the logical delete),
     `createFlashcard` (trims, rejects an empty front or back with
-    `FLASHCARD_EMPTY`) and `MAX_FLASHCARD_SIDE_LENGTH` (1000, manual cards).
+    `FLASHCARD_EMPTY`) and `MAX_FLASHCARD_SIDE_LENGTH` (1000, hand-written
+    cards of `createManualFlashcard`).
   - `flashcard-repository.ts` `FlashcardRepository` port: `insertMany`,
     `findById`, `listByPage`, `countByPage`, `nextPosition`,
     `countByOwnerGroupedByPage`, `archive`, `lockDeck`. Every read except
@@ -23,7 +24,11 @@ sessions are scheduled by `study-engine`; this module adds the card text.
   - `createManualFlashcard` checks the page through `PageTextReader`, enforces
     the trimmed side limit (`FLASHCARD_TOO_LONG`), and adds the card at the end
     of the deck with its due study item. A page without cards has no deck; its
-    first card starts it.
+    first card starts it. Since Phase 8 H13 (user decision 2026-10-29) cards
+    are created by AI only: no Server Action or screen calls it any more; it
+    stays because the database tests of `DrizzleDeckUnitOfWork` drive the
+    deck lock and positions through it. Existing `origin = "manual"` cards
+    keep being listed, reviewed and archived.
   - `archiveFlashcard` archives the card and suspends its study item. The
     deck's last active card is refused with `FLASHCARD_LAST_CARD` (a deck is
     never empty); the deck is locked before counting.
@@ -62,8 +67,8 @@ sessions are scheduled by `study-engine`; this module adds the card text.
   on the page row).
 - `actions.ts` (`"use server"`): `generateFlashcardsAction`,
   `listFlashcardsAction`, `listDecksAction`, `getGenerationStatusAction`,
-  `createFlashcardAction`, `archiveFlashcardAction` (both revalidate the
-  `/flashcards` layout). They
+  `archiveFlashcardAction` (revalidates the `/flashcards` layout). There is no
+  manual creation action (AI only since Phase 8 H13). They
   validate session and input, return `Result<T, ActionError>`, report failures
   to Sentry and emit the `generation_requested` event. `maxDuration` is declared
   on the page route that hosts the action.
@@ -95,7 +100,9 @@ that exercises real providers.
 `FlashcardPlayer` with the four SM-2 buttons, `SessionFeedbackPanel` at the
 end) and starts once when opened with `?repasar=1`; `/flashcards` shows
 "Repasos de hoy" (`DueTodayList`, from the `scheduling` module) and the due
-count of every deck; `NewFlashcardDialog` adds manual cards.
+count of every deck. Cards are created by AI only (Phase 8 H13): the deck
+has no "Nueva tarjeta", and an empty deck links to its page, whose
+techniques panel generates cards.
 
 ## Next phase
 

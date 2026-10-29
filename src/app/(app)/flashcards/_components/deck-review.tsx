@@ -47,7 +47,7 @@ export interface DeckReviewProps {
   description: string;
   // A page without cards has no deck to review.
   canReview: boolean;
-  // Header actions next to "Repasar" ("Nueva tarjeta").
+  // Header actions next to "Repasar" (none on the deck route since H13).
   actions?: ReactNode;
   // The deck itself (the review list or its empty state).
   children: ReactNode;

@@ -874,7 +874,7 @@ Used by: `PagePicker`.
 
 Phase 8 H12: a dialog form field's label, `font-medium text-[13px]
 text-fg-secondary`, with `htmlFor`. Used by `PagePicker` and every form
-dialog (notebook title, Nueva tarjeta, the question form).
+dialog (notebook title, the question form).
 
 ## FormMessage (`form-message.tsx`)
 
@@ -882,8 +882,7 @@ Phase 8 H12: a dialog's feedback box, `rounded-xl` with a 1px border.
 `tone="error"` (default): `role="alert"`, `bg-error-50 border-error-100
 text-destructive`; `tone="info"`: a neutral note (`bg-neutral-50`). Children
 may include a follow-up link ("Abrir la página"). Used by the create and
-generate dialogs, Nueva tarjeta, the question form and the archive/retire
-confirms.
+generate dialogs, the question form and the archive/retire confirms.
 
 ## GenerationsLeft (`generations-left.tsx`)
 
@@ -986,7 +985,8 @@ assert the chrome so the unregistered tokens cannot come back.
 ## Dialog (`dialog.tsx`)
 
 Radix dialog atom used by every modal form (`CreateNotebookDialog`,
-`QuestionFormDialog`, `NewFlashcardDialog`). Since 2026-10-04 (Phase 4 T3)
+`QuestionFormDialog`; `NewFlashcardDialog` until Phase 8 H13 removed manual
+card creation). Since 2026-10-04 (Phase 4 T3)
 `DialogContent` uses the card surface — `bg-card`, `border-border-default`,
 `text-fg`, `shadow-lg` — instead of `bg-popover` / `text-popover-foreground`.
 `--color-popover` is not registered in `globals.css`, so the old classes
@@ -1013,8 +1013,8 @@ description, a `FieldLabel` + 44px `Input` and a `brand` primary;
 `ChangeAppearanceDialog` a description and 40px swatches with
 `aria-pressed` and a check on the current colour; `NewPageDialog` drops its
 own padding and title overrides for the shell's; `NewFlashcardDialog`
-wears the flashcards theme (amber `PixelTile`, `technique` save);
-`QuestionFormDialog` and `ExamGenerateDialog` / `CreateExamDialog` the
+wore the flashcards theme (amber `PixelTile`, `technique` save) until H13
+deleted it (cards are created by AI only); `QuestionFormDialog` and `ExamGenerateDialog` / `CreateExamDialog` the
 exams theme; the archive and retire confirms keep `destructive` and show
 errors as `FormMessage`.
 
@@ -1701,8 +1701,8 @@ pregunta" and every row's "Editar"; it re-syncs its local form state from
 - Since Phase 5 T4: a sync `onSubmit` closes at once (as before); an async
   one keeps the dialog open while it runs (save button disabled, reading
   "Guardando…"), then closes on `null`/`undefined` or shows the returned
-  Spanish message as a `role="alert"` line (`text-destructive text-sm`,
-  same as `NewFlashcardDialog`) above the footer and stays open. Re-opening
+  Spanish message as a `role="alert"` line (`text-destructive text-sm`)
+  above the footer and stays open. Re-opening
   clears the error.
 - Since the T4 review fixes: while an async save runs, "Cancelar" is
   disabled and Escape, the overlay and the close button do not dismiss the
@@ -1710,9 +1710,7 @@ pregunta" and every row's "Editar"; it re-syncs its local form state from
   transition starts a new session: if the caller closes the dialog anyway,
   the reopened form starts enabled ("Guardando…" never leaks into it) and
   the old save's outcome is ignored — it never closes or shows its error in
-  the new session. `NewFlashcardDialog` still lets "Cancelar" run during a
-  save and carries the Phase 4 stale-transition advisory; align it with
-  this behaviour when that dialog is next touched.
+  the new session.
 
 Used by: `exams/_components/exam-questions-view.tsx`.
 

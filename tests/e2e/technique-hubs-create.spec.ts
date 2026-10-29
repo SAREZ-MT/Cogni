@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import type { Page } from "@playwright/test";
 import { expect, hasSupabaseEnv, signIn, test } from "./fixtures/auth";
+import { seedFlashcards } from "./helpers/flashcards";
 import {
-  clickAndWaitForAction,
   createNotebook,
   createPageAndOpen,
   openNotebook,
@@ -13,8 +13,8 @@ import { chooseOption } from "./helpers/select";
 // its content from a "pick a page" dialog, opened by the empty state's CTA
 // or, once the hub lists something, by the grid's first, fixed tile. No AI
 // is called here (the reused dev server may run live AI): the AI paths are
-// only opened. Phase 8 H12: the dialogs are AI only, so the first card is
-// written on the page's deck ("Nueva tarjeta").
+// only opened. Phase 8 H12/H13: creation is AI only everywhere, so the first
+// card is seeded straight into the database.
 
 const HUBS = [
   {
@@ -114,7 +114,7 @@ test.describe("technique hubs: create from the section", () => {
     await page.keyboard.press("Escape");
   });
 
-  test("a first card written on the page's deck makes the hub offer the create tile first", async ({
+  test("a first card on the page's deck makes the hub offer the create tile first", async ({
     page,
   }) => {
     test.setTimeout(120_000);
@@ -124,19 +124,20 @@ test.describe("technique hubs: create from the section", () => {
     await createPageAndOpen(page);
     const pageId = new URL(page.url()).pathname.split("/")[4] ?? "";
 
-    // The deck route renders for a page with no cards; its "Nueva tarjeta"
-    // starts the deck.
+    // The deck route renders for a page with no cards, with no manual
+    // creation; a seeded card starts the deck.
     await page.goto(`/flashcards/${notebookId}/${pageId}`);
-    await page.getByTestId("new-flashcard-button").first().click();
-    const card = page.getByRole("dialog", { name: "Nueva tarjeta" });
-    await expect(card).toBeVisible();
-    await card.getByLabel("Anverso").fill("¿Qué idea resume el tema?");
-    await card.getByLabel("Reverso").fill("La que conecta sus partes.");
-    await clickAndWaitForAction(
-      page,
-      card.getByRole("button", { name: "Guardar tarjeta" }),
-    );
-    await expect(card).toBeHidden();
+    await expect(page.getByText("Nueva tarjeta")).toHaveCount(0);
+    await expect(
+      page.getByRole("link", { name: "Generar desde la página" }),
+    ).toHaveAttribute("href", `/notebooks/${notebookId}/pages/${pageId}`);
+    await seedFlashcards(pageId, [
+      {
+        front: "¿Qué idea resume el tema?",
+        back: "La que conecta sus partes.",
+      },
+    ]);
+    await page.reload();
     await expect(page.getByText("¿Qué idea resume el tema?")).toBeVisible();
 
     await page.goto("/flashcards");

@@ -5,7 +5,9 @@ import {
   AiGenerationFailedError,
   type GenerationRateLimit,
 } from "@/modules/ai";
+import { newStudyItem } from "@/modules/study-engine";
 import { DomainError } from "@/shared/kernel/domain-error";
+import { createId } from "@/shared/kernel/id";
 import { err, ok } from "@/shared/kernel/result";
 import {
   InMemoryGenerationFingerprintStore,
@@ -13,6 +15,7 @@ import {
 } from "@/shared/kernel/testing/in-memory-generation-fingerprints";
 import { InMemoryDeckStudyItems } from "./application/testing/in-memory-deck-unit-of-work";
 import { InMemoryFlashcardRepository } from "./application/testing/in-memory-flashcard-repository";
+import { createFlashcard } from "./domain/flashcard";
 
 // Session, composition roots and analytics are mocked so this proves the
 // Server Action boundary (session, Zod validation, ActionError mapping,
@@ -410,84 +413,39 @@ describe("flashcards Server Actions", () => {
     });
   });
 
-  describe("createFlashcardAction", () => {
-    const input = { pageId: PAGE, front: " ¿Qué es X? ", back: "Y " };
-
-    it("rejects an unauthenticated caller before doing anything", async () => {
-      getCurrentUser.mockResolvedValue(null);
-      const { createFlashcardAction } = await actions();
-
-      const result = await createFlashcardAction(input);
-
-      expect(!result.ok && result.error.code).toBe(
-        "FLASHCARDS_SESSION_REQUIRED",
-      );
-      expect(await current.flashcards.countByPage(PAGE, OWNER)).toBe(0);
-    });
-
-    it.each([
-      ["a non-uuid page id", { ...input, pageId: "x" }],
-      ["a missing side", { pageId: PAGE, front: "X" }],
-      ["a non-string side", { ...input, back: 3 }],
-    ])("rejects %s as invalid input", async (_label, bad) => {
-      const { createFlashcardAction } = await actions();
-      const result = await createFlashcardAction(bad);
-      expect(!result.ok && result.error.code).toBe("FLASHCARDS_INVALID_INPUT");
-    });
-
-    it("creates the card and its study item, returns a plain view and revalidates", async () => {
-      const { createFlashcardAction } = await actions();
-
-      const result = await createFlashcardAction(input);
-
-      expect(result.ok).toBe(true);
-      if (!result.ok) return;
-      expect(result.value).toEqual({
-        id: expect.any(String),
-        pageId: PAGE,
-        front: "¿Qué es X?",
-        back: "Y",
-        position: 0,
-      });
-      expect(current.studyItems.all().map((item) => item.sourceId)).toEqual([
-        result.value.id,
-      ]);
-      expect(revalidatePath).toHaveBeenCalledWith("/flashcards", "layout");
-    });
-
-    it("maps a domain refusal to its ActionError code without revalidating", async () => {
-      const { createFlashcardAction } = await actions();
-
-      const result = await createFlashcardAction({ ...input, back: "   " });
-
-      expect(!result.ok && result.error.code).toBe("FLASHCARD_EMPTY");
-      expect(revalidatePath).not.toHaveBeenCalled();
-    });
-
-    it("maps an unknown page to PAGE_NOT_FOUND", async () => {
-      current.pageText = null;
-      const { createFlashcardAction } = await actions();
-
-      const result = await createFlashcardAction(input);
-
-      expect(!result.ok && result.error.code).toBe("PAGE_NOT_FOUND");
-    });
-  });
-
   describe("archiveFlashcardAction", () => {
+    // Cards are created by AI only (Phase 8 H13): the deck is seeded straight
+    // into the fakes, each card with its study item.
     async function seedDeck(count: number): Promise<string[]> {
-      const { createFlashcardAction } = await actions();
       const ids: string[] = [];
       for (let i = 0; i < count; i += 1) {
-        const created = await createFlashcardAction({
-          pageId: PAGE,
-          front: `P${i}`,
-          back: `R${i}`,
-        });
-        if (!created.ok) throw new Error(created.error.code);
-        ids.push(created.value.id);
+        const card = createFlashcard(
+          {
+            id: createId(),
+            ownerId: OWNER,
+            pageId: PAGE,
+            generationId: null,
+            front: `P${i}`,
+            back: `R${i}`,
+            origin: "ai",
+            position: i,
+          },
+          RESET,
+        );
+        if (!card.ok) throw new Error(card.error.code);
+        await current.flashcards.insertMany([card.value]);
+        await current.studyItems.save(
+          newStudyItem({
+            id: createId(),
+            ownerId: OWNER,
+            pageId: PAGE,
+            kind: "flashcard",
+            sourceId: card.value.id,
+            now: RESET,
+          }),
+        );
+        ids.push(card.value.id);
       }
-      revalidatePath.mockClear();
       return ids;
     }
 

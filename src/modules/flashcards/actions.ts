@@ -26,7 +26,6 @@ import {
 } from "./action-support";
 import {
   archiveFlashcard as archiveFlashcardUseCase,
-  createManualFlashcard as createManualFlashcardUseCase,
   DailyLimitReachedError,
   getGenerationStatus as getGenerationStatusUseCase,
   listDecks as listDecksUseCase,
@@ -36,7 +35,7 @@ import {
   requestGeneration as requestGenerationUseCase,
 } from "./application";
 import { FLASHCARD_ERROR } from "./domain/errors";
-import { type Flashcard, MAX_FLASHCARD_SIDE_LENGTH } from "./domain/flashcard";
+import type { Flashcard } from "./domain/flashcard";
 import {
   DrizzleDeckUnitOfWork,
   DrizzleFlashcardFingerprints,
@@ -100,11 +99,6 @@ const generateInput = z.object({
   count: z.number().int().min(MIN_CARD_COUNT).max(MAX_CARD_COUNT).optional(),
 });
 
-// The raw sides are only bounded here (twice the limit leaves room for
-// surrounding whitespace); createManualFlashcard applies the real limit to
-// the trimmed text and answers FLASHCARD_TOO_LONG.
-const side = z.string().max(MAX_FLASHCARD_SIDE_LENGTH * 2);
-const createInput = z.object({ pageId: z.uuid(), front: side, back: side });
 const archiveInput = z.object({ flashcardId: z.uuid() });
 
 // Adapters are built per call, like ingestion/actions.ts: serverless
@@ -275,27 +269,6 @@ export async function listDecksAction(): Promise<
     const result = await listDecksUseCase({ flashcards }, ownerId.value);
     if (!result.ok) return err(toActionError(result.error));
     return ok(result.value.map((deck) => ({ ...deck })));
-  });
-}
-
-export async function createFlashcardAction(
-  input: unknown,
-): Promise<Result<FlashcardView, ActionError>> {
-  return withBoundary(async () => {
-    const ownerId = await requireOwnerId();
-    if (!ownerId.ok) return ownerId;
-    const parsed = parseInput(createInput, input);
-    if (!parsed.ok) return parsed;
-
-    const { pages, deck } = deps();
-    const result = await createManualFlashcardUseCase(
-      parsed.value,
-      { pages, deck, clock: systemClock, ids: { next: createId } },
-      ownerId.value,
-    );
-    if (!result.ok) return err(toActionError(result.error));
-    revalidateDecks();
-    return ok(toView(result.value));
   });
 }
 

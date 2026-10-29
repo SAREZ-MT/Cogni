@@ -22,7 +22,7 @@ const GENERIC_FAILURE = "No pudimos archivar la tarjeta. Intenta de nuevo.";
 // falls back to GENERIC_FAILURE.
 const ERROR_COPY: Record<string, string> = {
   FLASHCARD_LAST_CARD:
-    "Un mazo siempre conserva al menos una tarjeta. Agrega otra antes de archivar esta.",
+    "Un mazo siempre conserva al menos una tarjeta. Genera más desde la página antes de archivar esta.",
   FLASHCARD_NOT_FOUND: "Esta tarjeta ya no está en el mazo.",
   FLASHCARDS_SESSION_REQUIRED: "Tu sesión expiró. Inicia sesión de nuevo.",
 };

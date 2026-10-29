@@ -19,7 +19,6 @@ const { listFlashcardsAction } = vi.hoisted(() => ({
 }));
 vi.mock("@/modules/flashcards", () => ({
   listFlashcardsAction,
-  createFlashcardAction: vi.fn(),
   archiveFlashcardAction: vi.fn(),
   startFlashcardSessionAction: vi.fn(),
   gradeFlashcardAction: vi.fn(),
@@ -132,12 +131,12 @@ describe("FlashcardsSessionPage", () => {
       ).rejects.toThrow("NEXT_NOT_FOUND");
     });
 
-    it("offers Nueva tarjeta on the page deck and an archive action per card", async () => {
+    // Phase 8 H13 (user, 2026-10-29): cards are created by AI only; the deck
+    // keeps archiving the cards it already holds.
+    it("offers no manual card creation, only an archive action per card", async () => {
       render(await FlashcardsSessionPage(props(NOTEBOOK, PAGE)));
 
-      expect(
-        screen.getByRole("button", { name: "Nueva tarjeta" }),
-      ).toBeInTheDocument();
+      expect(screen.queryByText("Nueva tarjeta")).not.toBeInTheDocument();
       expect(
         screen.getAllByRole("button", { name: "Archivar tarjeta" }),
       ).toHaveLength(2);
@@ -181,7 +180,7 @@ describe("FlashcardsSessionPage", () => {
       ).toBeInTheDocument();
     });
 
-    it("lets a page without cards start its deck with the first card", async () => {
+    it("sends a page without cards to its techniques panel to generate them", async () => {
       listFlashcardsAction.mockResolvedValue({ ok: true, value: [] });
 
       render(await FlashcardsSessionPage(props(NOTEBOOK, PAGE)));
@@ -196,15 +195,16 @@ describe("FlashcardsSessionPage", () => {
       expect(
         screen.queryByRole("button", { name: /Repasar/ }),
       ).not.toBeInTheDocument();
+      expect(screen.queryByText("Nueva tarjeta")).not.toBeInTheDocument();
       expect(
-        screen.getAllByRole("button", { name: "Nueva tarjeta" }).length,
-      ).toBeGreaterThan(0);
+        screen.getByRole("link", { name: "Generar desde la página" }),
+      ).toHaveAttribute("href", `/notebooks/${NOTEBOOK}/pages/${PAGE}`);
       expect(notFound).not.toHaveBeenCalled();
     });
 
-    // Phase 8 H12: the hubs no longer create cards by hand, so the H11
-    // `?nueva=1` auto-open is gone; "Nueva tarjeta" opens on click only.
-    it("keeps Nueva tarjeta closed even with ?nueva=1", async () => {
+    // Phase 8 H12 removed the H11 `?nueva=1` auto-open; H13 removed manual
+    // creation altogether, so the flag opens nothing.
+    it("opens no dialog with ?nueva=1", async () => {
       listFlashcardsAction.mockResolvedValue({ ok: true, value: [] });
 
       render(

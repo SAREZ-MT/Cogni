@@ -44,7 +44,7 @@ function setup(canReview = true) {
       deckLabel="Mitocondria"
       description="2 tarjetas"
       canReview={canReview}
-      actions={<button type="button">Nueva tarjeta</button>}
+      actions={<button type="button">Otra acción</button>}
     >
       <p>lista del mazo</p>
     </DeckReview>,
@@ -82,7 +82,7 @@ describe("DeckReview", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("2 tarjetas")).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Nueva tarjeta" }),
+      screen.getByRole("button", { name: "Otra acción" }),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Repasar/ })).toBeInTheDocument();
     expect(screen.getByText("lista del mazo")).toBeInTheDocument();
