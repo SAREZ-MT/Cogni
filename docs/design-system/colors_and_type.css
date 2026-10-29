@@ -50,6 +50,19 @@
   --color-pastel-mint:    #D1FAE5;
   --color-pastel-mint-fg: #065F46;
 
+  /* Page editor only (H7): highlighter-pen marks, callouts, code blocks */
+  --color-highlighter-yellow: #FDE047;
+  --color-highlighter-green:  #86EFAC;
+  --color-highlighter-blue:   #7DD3FC;
+  --color-highlighter-pink:   #F9A8D4;
+  --color-highlighter-orange: #FDBA74;
+  --color-highlighter-purple: #C4B5FD;
+  --color-highlighter-mint:   #6EE7B7;
+  --color-callout-idea:       #FDE68A;  --color-callout-idea-fg:    #854D0E;
+  --color-callout-note:       #DDD6FE;  --color-callout-note-fg:    #5B21B6;
+  --color-callout-warning:    #FECDD3;  --color-callout-warning-fg: #9F1239;
+  --color-code-block:         #F3F3F3;
+
   /* Semantic */
   --color-success-50:  #ECFDF5;
   --color-success-100: #D1FAE5;
@@ -177,6 +190,7 @@
 
   /* ========== BORDERS & RADIUS ========== */
   --radius-editor: 3px;   /* page editor surfaces and blocks only */
+  --radius-table:  8px;   /* page editor tables: their own, softer frame */
   --radius-sm:    6px;
   --radius-md:    8px;
   --radius-lg:    12px;
