@@ -327,9 +327,7 @@ describe("CreateFromPageDialog — page content thresholds", () => {
   }
 
   it("lets flashcards use a 120-word page", async () => {
-    expect(await pageOption("flashcards")).not.toHaveAttribute(
-      "aria-disabled",
-    );
+    expect(await pageOption("flashcards")).not.toHaveAttribute("aria-disabled");
   });
 
   it("disables a 120-word page for recall, which needs 150", async () => {

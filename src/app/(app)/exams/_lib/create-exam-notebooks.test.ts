@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { getPagePickerTree } = vi.hoisted(() => ({ getPagePickerTree: vi.fn() }));
+const { getPagePickerTree } = vi.hoisted(() => ({
+  getPagePickerTree: vi.fn(),
+}));
 vi.mock("@/modules/notebooks", () => ({ getPagePickerTree }));
 const { captureException } = vi.hoisted(() => ({ captureException: vi.fn() }));
 vi.mock("@sentry/nextjs", () => ({ captureException }));
