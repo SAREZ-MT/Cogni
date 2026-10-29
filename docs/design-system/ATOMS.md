@@ -239,8 +239,59 @@ clip-path) near the top-right.
   depth `0 1px 2px` contact + a violet-tinted `0 10px 20px -10px` ambient.
   No icon or "+" on it (user correction 2026-10-20).
 
-Used by: `notebook-fan.tsx` (all three books, `lg`), `notebooks/page.tsx`
-(the header badge, `sm`, through `SectionHeader`'s `icon`).
+Used by: `notebook-fan.tsx` (all three books, `lg`), `notebook-cover-card.tsx`
+(`lg`), `notebooks/page.tsx` (the header badge, `sm`, through
+`SectionHeader`'s `icon`).
+
+## NotebookCoverCard (`notebook-cover-card.tsx`)
+
+Phase 8 H4-T5 (user request 2026-10-28, layout corrections the same day):
+one notebook of the notebooks hub grid, drawn as the empty state's closed
+notebook instead of a flat card. An `article` (`data-slot=
+"notebook-cover-card"`, `data-tone`) in book proportion (`aspect-[4/5]`,
+fills its grid cell) holding a large `NotebookCover` (decorative,
+`aria-hidden`) and, laid over the cover face (100% − the 8px page edge,
+left padding clearing the spine), the readable content:
+
+- Top-left: the page count as plain meta text ("1 página" / "12 páginas",
+  `data-part="page-count"`), 11px medium in the tone's meta colour. No
+  icon, glyph, badge or tile (user correction 2026-10-28).
+- Middle: the title, the stretched `Link` to the notebook (its
+  `after:inset-0` covers the whole book, so the accessible name is the
+  full title), centred, 15px semibold, `text-balance`, `line-clamp-3`.
+  Focus ring on the stretched overlay (`ring-3 ring-ring/50`).
+- Bottom row: only the date label (same meta style) and the `actions`
+  slot (`relative z-10`, above the stretched link, outside it).
+- Props: `href`, `title`, `pageCount`, `dateLabel?`, `tone?`
+  (`NotebookCoverTone`, the notebooks pastel keys; null → `purple`),
+  `actions?`, `className?`.
+- Tones, in the fan's language (200 → 400 gradient, darker border, white
+  ribbon, `neutral-900` title, `black/55` meta): pink `pink-*`, green the
+  fan's emerald/`success-500`, yellow the fan's amber/`warning-500`, orange
+  `orange-*`, blue `blue-*`, mint `teal-*`; purple is the fan's violet
+  "new notebook" (`primary-500` → `primary-700`, flashcards-yellow ribbon,
+  white title, `white/75` meta).
+- Motion: on hover the book lifts 4px and tilts −0.6deg (200ms,
+  `cubic-bezier(0.23,1,0.32,1)`, transform only), presses to 0.98; under
+  `prefers-reduced-motion` it never moves.
+- Below 150px wide (container query on the book: the sidebar may eat the
+  column) only a smaller 11px title and the actions remain.
+
+Used by: `notebooks/page.tsx` (grid view, columns
+`minmax(min(100%,210px),1fr)`: 4 per row at 1440 and 3 at 1024 with the
+sidebar open; `NotebookCardActions` as `actions`,
+`formatTimeAgo(updatedAt)` as `dateLabel`, the last update by user
+decision 2026-10-28).
+
+The grid's `CreateNotebookTrigger` `tile` (notebooks module, H4-T5 redesign
+2026-10-28) shares the book proportion: a cover-sized face (cell − 8px)
+with the same radius, `primary-50` fill and a 2px dashed `primary-300`
+border, a 48px `primary-600` plus disc (white `Plus`, soft violet
+shadow), "Nuevo cuaderno" in `primary-700` semibold and the hint "Crea un
+cuaderno para una materia" (`primary-600/80`). Hover lifts 4px and
+deepens to `primary-100` / `primary-400`, press 0.98, none under reduced
+motion; below 150px the hint hides and the disc shrinks to 32px. Accessible
+name stays "Nuevo cuaderno".
 
 ## StudyBackdrop (`study-backdrop.tsx`)
 

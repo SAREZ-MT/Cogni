@@ -1,14 +1,19 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/modules/identity";
-import { CreateNotebookTrigger, getHomeOverview } from "@/modules/notebooks";
+import {
+  CreateNotebookTrigger,
+  getHomeOverview,
+  NotebookCardActions,
+} from "@/modules/notebooks";
 import { Card } from "@/shared/ui/card";
 import { IllustratedEmptyState } from "@/shared/ui/illustrated-empty-state";
 import { NotebookCover } from "@/shared/ui/notebook-cover";
+import { NotebookCoverCard } from "@/shared/ui/notebook-cover-card";
 import { NotebookFan } from "@/shared/ui/notebook-fan";
 import { SectionHeader } from "@/shared/ui/section-header";
 import { ViewToggle } from "@/shared/ui/view-toggle";
 import { SetBreadcrumb } from "../_components/breadcrumb";
-import { NotebookCard } from "../_components/notebook-card";
+import { formatTimeAgo } from "../_components/format";
 import { NotebookListRow } from "../_components/notebook-list-row";
 
 interface NotebooksPageProps {
@@ -89,9 +94,20 @@ export default async function NotebooksPage({
           <ViewToggle value={view} hrefFor={(v) => `/notebooks?view=${v}`} />
 
           {view === "grid" ? (
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4">
+            // Phase 8 H4-T5 (user request 2026-10-28): each notebook is a
+            // closed notebook like the empty state's fan, its colour and
+            // icon on the cover, the title in the middle.
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,210px),1fr))] gap-x-6 gap-y-8">
               {notebooks.map((notebook) => (
-                <NotebookCard key={notebook.id} notebook={notebook} now={now} />
+                <NotebookCoverCard
+                  key={notebook.id}
+                  href={`/notebooks/${notebook.id}`}
+                  title={notebook.title}
+                  pageCount={notebook.pageCount}
+                  dateLabel={formatTimeAgo(notebook.updatedAt, now)}
+                  tone={notebook.color}
+                  actions={<NotebookCardActions notebook={notebook} />}
+                />
               ))}
               <CreateNotebookTrigger variant="tile" />
             </div>

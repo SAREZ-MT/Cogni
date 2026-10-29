@@ -85,6 +85,35 @@ describe("CreateNotebookTrigger", () => {
     expect(tile.parentElement).toHaveClass("items-stretch");
   });
 
+  // Phase 8 H4-T5 (user 2026-10-28): the tile is a violet-tinted cover in
+  // the grid's book shape, with a violet plus disc, a violet label and a
+  // hint, lifting on hover like the notebook covers.
+  it("renders the tile as an inviting violet notebook-shaped cover", () => {
+    render(<CreateNotebookTrigger variant="tile" />, { wrapper: Wrapper });
+
+    const tile = screen.getByRole("button", { name: "Nuevo cuaderno" });
+    expect(tile).toHaveClass("aspect-[4/5]", "group/new");
+    const face = tile.querySelector<HTMLElement>('[data-part="face"]');
+    expect(face).toHaveClass(
+      "border-dashed",
+      "border-primary-300",
+      "bg-primary-50",
+      "group-hover/new:-translate-y-1",
+      "motion-reduce:transform-none",
+    );
+    expect(tile.querySelector('[data-part="plus"]')).toHaveClass(
+      "rounded-full",
+      "bg-primary-600",
+    );
+    expect(screen.getByText("Nuevo cuaderno")).toHaveClass(
+      "font-semibold",
+      "text-primary-700",
+    );
+    expect(
+      screen.getByText("Crea un cuaderno para una materia"),
+    ).toBeInTheDocument();
+  });
+
   // H2-T3: Home's empty state reuses this trigger with its own label and the
   // product tour's data-tour anchor.
   it("renders the hero variant with a custom label and a tour anchor", () => {

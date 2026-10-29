@@ -81,14 +81,12 @@ test.describe("notebooks acceptance", () => {
 
     // Cambiar color: the starting color is random, so pick a target that
     // differs from the current one (otherwise the check proves nothing). The
-    // card's tile must switch without a reload, and the dialog must highlight
-    // the new color after one (it was persisted, not just updated on screen).
-    const tile = notebookCard(page, "Cuaderno renombrado")
-      .locator("span")
-      .first();
-    const currentColor = (await tile.getAttribute("class"))?.match(
-      /bg-pastel-(\w+)/,
-    )?.[1];
+    // card's cover tone must switch without a reload (since Phase 8 H4-T5
+    // the card is a notebook cover carrying `data-tone`), and the dialog must
+    // highlight the new color after one (it was persisted, not just updated
+    // on screen).
+    const card = notebookCard(page, "Cuaderno renombrado");
+    const currentColor = await card.getAttribute("data-tone");
     const targetColor = currentColor === "purple" ? "mint" : "purple";
     await page
       .getByRole("button", { name: "Acciones de Cuaderno renombrado" })
@@ -101,7 +99,7 @@ test.describe("notebooks acceptance", () => {
         .getByRole("button", { name: `Color ${targetColor}` }),
       `"color":"${targetColor}"`,
     );
-    await expect(tile).toHaveClass(new RegExp(`bg-pastel-${targetColor}`));
+    await expect(card).toHaveAttribute("data-tone", targetColor);
     await page.reload();
     await page
       .getByRole("button", { name: "Acciones de Cuaderno renombrado" })

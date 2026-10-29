@@ -23,14 +23,12 @@ vi.mock("@/modules/notebooks", () => ({
     </button>
   ),
   getHomeOverview,
+  NotebookCardActions: ({ notebook }: { notebook: { title: string } }) => (
+    <button type="button">{`Acciones de ${notebook.title}`}</button>
+  ),
 }));
 
 vi.mock("../_components/breadcrumb", () => ({ SetBreadcrumb: () => null }));
-vi.mock("../_components/notebook-card", () => ({
-  NotebookCard: ({ notebook }: { notebook: { title: string } }) => (
-    <article>{notebook.title}</article>
-  ),
-}));
 vi.mock("../_components/notebook-list-row", () => ({
   NotebookListRow: () => null,
 }));
@@ -188,5 +186,49 @@ describe("notebooks hub route", () => {
     expect(
       container.querySelector('[data-slot="illustrated-empty-state"]'),
     ).toBeNull();
+  });
+
+  // Phase 8 H4-T5 (user request 2026-10-28): the grid shows each notebook
+  // as the empty state's closed notebook, not a flat card.
+  it("presents each notebook in the grid as a notebook cover", async () => {
+    getHomeOverview.mockResolvedValue({
+      notebooks: [
+        {
+          id: "nb1",
+          title: "Biología",
+          color: "green",
+          icon: "🧬",
+          pageCount: 1,
+          updatedAt: new Date("2026-10-01T00:00:00.000Z"),
+        },
+        {
+          id: "nb2",
+          title: "Cálculo",
+          color: null,
+          icon: null,
+          pageCount: 4,
+          updatedAt: new Date("2026-10-01T00:00:00.000Z"),
+        },
+      ],
+    });
+    const { container } = await renderRoute();
+
+    const cards = container.querySelectorAll(
+      '[data-slot="notebook-cover-card"]',
+    );
+    expect(cards).toHaveLength(2);
+    const [biology, calculus] = Array.from(cards) as HTMLElement[];
+    expect(biology).toHaveAttribute("data-tone", "green");
+    expect(calculus).toHaveAttribute("data-tone", "purple");
+    expect(
+      within(biology).getByRole("link", { name: "Biología" }),
+    ).toHaveAttribute("href", "/notebooks/nb1");
+    expect(within(biology).getByText("1 página")).toBeInTheDocument();
+    // User correction 2026-10-28: no notebook icon on the cover.
+    expect(within(biology).queryByText("🧬")).toBeNull();
+    expect(within(calculus).getByText("4 páginas")).toBeInTheDocument();
+    expect(
+      within(calculus).getByRole("button", { name: "Acciones de Cálculo" }),
+    ).toBeInTheDocument();
   });
 });
