@@ -124,13 +124,13 @@ export function NotebookCoverCard({
         <NotebookCover cover={look.cover} ribbon={look.ribbon} />
         {/* Same box as the `lg` cover face (100% − the 8px page edge); the
             left padding clears the 14px spine, the top one the ribbon. */}
-        <div className="absolute top-0 left-0 flex size-[calc(100%-8px)] flex-col pt-2 pr-1.5 pb-1.5 pl-3.5 @[150px]/book:pt-4 @[150px]/book:pr-3 @[150px]/book:pb-3 @[150px]/book:pl-6">
+        <div className="absolute top-0 left-0 flex size-[calc(100%-8px)] flex-col pt-2 pr-1.5 pb-1.5 pl-3.5 @[150px]/book:pt-4 @[150px]/book:pr-3 @[150px]/book:pb-3 @[150px]/book:pl-6 @[280px]/book:pt-6 @[280px]/book:pr-5 @[280px]/book:pb-5 @[280px]/book:pl-9">
           {/* Plain meta text, the same style as the date (user correction
               2026-10-28: no badge, glyph or tile). */}
           <span
             data-part="page-count"
             className={cn(
-              "hidden max-w-[calc(100%-36px)] truncate font-medium text-[11px] @[150px]/book:block",
+              "hidden max-w-[calc(100%-36px)] truncate font-medium text-[11px] @[150px]/book:block @[280px]/book:text-[13px]",
               look.meta,
             )}
           >
@@ -143,7 +143,7 @@ export function NotebookCoverCard({
             >
               <span
                 className={cn(
-                  "line-clamp-3 text-balance wrap-anywhere text-center font-semibold text-[11px] leading-snug @[150px]/book:text-[15px]",
+                  "line-clamp-3 text-balance wrap-anywhere text-center font-semibold text-[11px] leading-snug @[150px]/book:text-[15px] @[280px]/book:text-xl",
                   look.title,
                 )}
               >
@@ -154,7 +154,7 @@ export function NotebookCoverCard({
           <div className="flex min-h-7 items-center justify-end gap-2 @[150px]/book:justify-between">
             <span
               className={cn(
-                "hidden min-w-0 truncate font-medium text-[11px] @[150px]/book:inline",
+                "hidden min-w-0 truncate font-medium text-[11px] @[150px]/book:inline @[280px]/book:text-[13px]",
                 look.meta,
               )}
             >

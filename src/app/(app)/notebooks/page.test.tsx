@@ -217,6 +217,19 @@ describe("notebooks hub route", () => {
       '[data-slot="notebook-cover-card"]',
     );
     expect(cards).toHaveLength(2);
+    // User 2026-10-28 ("5 por fila"): columns follow the grid's own width
+    // and cap at five, so wide screens grow the covers instead of adding
+    // columns.
+    const grid = cards[0]?.parentElement as HTMLElement;
+    expect(grid).toHaveClass(
+      "grid-cols-1",
+      "@[300px]/grid:grid-cols-2",
+      "@[540px]/grid:grid-cols-3",
+      "@[680px]/grid:grid-cols-4",
+      "@[960px]/grid:grid-cols-5",
+    );
+    expect(grid.className).not.toMatch(/auto-fill/);
+    expect(grid.parentElement).toHaveClass("@container/grid");
     const [biology, calculus] = Array.from(cards) as HTMLElement[];
     expect(biology).toHaveAttribute("data-tone", "green");
     expect(calculus).toHaveAttribute("data-tone", "purple");

@@ -95,21 +95,26 @@ export default async function NotebooksPage({
 
           {view === "grid" ? (
             // Phase 8 H4-T5 (user request 2026-10-28): each notebook is a
-            // closed notebook like the empty state's fan, its colour and
-            // icon on the cover, the title in the middle.
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,210px),1fr))] gap-x-6 gap-y-8">
-              {notebooks.map((notebook) => (
-                <NotebookCoverCard
-                  key={notebook.id}
-                  href={`/notebooks/${notebook.id}`}
-                  title={notebook.title}
-                  pageCount={notebook.pageCount}
-                  dateLabel={formatTimeAgo(notebook.updatedAt, now)}
-                  tone={notebook.color}
-                  actions={<NotebookCardActions notebook={notebook} />}
-                />
-              ))}
-              <CreateNotebookTrigger variant="tile" />
+            // closed notebook like the empty state's fan, its colour on the
+            // cover, the title in the middle. Columns follow the grid's own
+            // width (the sidebar eats the viewport) and cap at five ("5 por
+            // fila"): 5 at 1440 with the sidebar open, 4 at 1024, 2 on a
+            // phone; wider screens grow the covers, never add columns.
+            <div className="@container/grid">
+              <div className="grid grid-cols-1 gap-x-6 gap-y-8 @[300px]/grid:grid-cols-2 @[540px]/grid:grid-cols-3 @[680px]/grid:grid-cols-4 @[960px]/grid:grid-cols-5">
+                {notebooks.map((notebook) => (
+                  <NotebookCoverCard
+                    key={notebook.id}
+                    href={`/notebooks/${notebook.id}`}
+                    title={notebook.title}
+                    pageCount={notebook.pageCount}
+                    dateLabel={formatTimeAgo(notebook.updatedAt, now)}
+                    tone={notebook.color}
+                    actions={<NotebookCardActions notebook={notebook} />}
+                  />
+                ))}
+                <CreateNotebookTrigger variant="tile" />
+              </div>
             </div>
           ) : (
             <Card>

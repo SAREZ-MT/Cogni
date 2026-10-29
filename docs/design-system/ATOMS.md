@@ -276,10 +276,15 @@ left padding clearing the spine), the readable content:
   `prefers-reduced-motion` it never moves.
 - Below 150px wide (container query on the book: the sidebar may eat the
   column) only a smaller 11px title and the actions remain.
+- From 280px wide the type scales up: title 20px (`text-xl`), page count
+  and date 13px, more inner padding. The create tile follows the same
+  step (56px disc, 18px label, 13px hint).
 
-Used by: `notebooks/page.tsx` (grid view, columns
-`minmax(min(100%,210px),1fr)`: 4 per row at 1440 and 3 at 1024 with the
-sidebar open; `NotebookCardActions` as `actions`,
+Used by: `notebooks/page.tsx` (grid view; explicit columns on the grid's
+own width, `@container/grid`, capped at five, user "5 por fila"
+2026-10-28: 1 below 300px, 2 from 300, 3 from 540, 4 from 680, 5 from
+960 — 5 at 1440 and 4 at 1024 with the sidebar open; wider screens grow
+the covers, never add columns; `NotebookCardActions` as `actions`,
 `formatTimeAgo(updatedAt)` as `dateLabel`, the last update by user
 decision 2026-10-28).
 

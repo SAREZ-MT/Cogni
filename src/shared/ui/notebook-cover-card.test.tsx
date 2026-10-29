@@ -35,6 +35,8 @@ describe("NotebookCoverCard", () => {
 
     const title = screen.getByText(long);
     expect(title).toHaveClass("line-clamp-3", "text-center");
+    // Large covers (3 per row at 1440, user 2026-10-28) scale the type up.
+    expect(title).toHaveClass("@[280px]/book:text-xl");
     // The full name stays in the accessible name even when clamped.
     expect(screen.getByRole("link", { name: long })).toBeInTheDocument();
   });

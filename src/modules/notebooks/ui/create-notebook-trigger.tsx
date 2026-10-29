@@ -69,19 +69,19 @@ export function CreateNotebookTrigger({
             moves under reduced motion. */}
         <span
           data-part="face"
-          className="absolute top-0 left-0 flex size-[calc(100%-8px)] flex-col items-center justify-center gap-2 rounded-[8px_16px_16px_8px] border-2 border-primary-300 border-dashed bg-primary-50 px-1.5 text-center @[150px]/new:gap-3 @[150px]/new:px-4 transition-[translate,scale,background-color,border-color] duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] group-hover/new:-translate-y-1 group-hover/new:border-primary-400 group-hover/new:bg-primary-100 group-active/new:scale-[0.98] motion-reduce:transform-none motion-reduce:transition-none"
+          className="absolute top-0 left-0 flex size-[calc(100%-8px)] flex-col items-center justify-center gap-2 rounded-[8px_16px_16px_8px] border-2 border-primary-300 border-dashed bg-primary-50 px-1.5 text-center @[150px]/new:gap-3 @[150px]/new:px-4 @[280px]/new:gap-4 @[280px]/new:px-6 transition-[translate,scale,background-color,border-color] duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] group-hover/new:-translate-y-1 group-hover/new:border-primary-400 group-hover/new:bg-primary-100 group-active/new:scale-[0.98] motion-reduce:transform-none motion-reduce:transition-none"
         >
           <span
             data-part="plus"
-            className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary-600 @[150px]/new:size-12 text-white shadow-[0_8px_18px_-8px_rgb(109_40_217/0.55)]"
+            className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary-600 @[150px]/new:size-12 @[280px]/new:size-14 text-white shadow-[0_8px_18px_-8px_rgb(109_40_217/0.55)]"
           >
             <Plus aria-hidden="true" size={22} strokeWidth={2} />
           </span>
           <span className="flex flex-col gap-1">
-            <span className="font-semibold text-[11px] text-primary-700 @[150px]/new:text-sm">
+            <span className="font-semibold text-[11px] text-primary-700 @[150px]/new:text-sm @[280px]/new:text-lg">
               Nuevo cuaderno
             </span>
-            <span className="hidden text-balance text-[11.5px] text-primary-600/80 leading-snug @[150px]/new:block">
+            <span className="hidden text-balance text-[11.5px] text-primary-600/80 leading-snug @[150px]/new:block @[280px]/new:text-[13px]">
               Crea un cuaderno para una materia
             </span>
           </span>
