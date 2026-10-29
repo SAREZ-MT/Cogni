@@ -66,3 +66,10 @@ export async function withBoundary<T, E extends ActionError = ActionError>(
 export function revalidateDecks(): void {
   revalidatePath("/flashcards", "layout");
 }
+
+// Phase 8 H19: deleting a whole deck changes every screen that counts
+// study material (hubs, the notebook and page views, Inicio, the calendar),
+// so the whole app layout is revalidated.
+export function revalidateAfterDelete(): void {
+  revalidatePath("/", "layout");
+}

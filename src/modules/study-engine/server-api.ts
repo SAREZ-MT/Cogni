@@ -24,10 +24,15 @@ import {
 import type { FlashcardSession } from "./domain/flashcard-session";
 import type { FlashcardSessionRepository } from "./domain/flashcard-session-repository";
 import type { PageMastery } from "./domain/page-mastery";
+import type { SessionKind } from "./domain/review-log";
 import type { ReviewLogRepository } from "./domain/review-log-repository";
 import type { SessionFeedbackRepository } from "./domain/session-feedback-repository";
 import type { StudiedPage } from "./domain/studied-page-reader";
-import type { DueCutoff, FlashcardRating } from "./domain/study-item";
+import type {
+  DueCutoff,
+  FlashcardRating,
+  StudyItemKind,
+} from "./domain/study-item";
 import type { StudyItemRepository } from "./domain/study-item-repository";
 import {
   DrizzleFlashcardSessionRepository,
@@ -37,6 +42,10 @@ import {
   DrizzleStudiedPageReader,
   DrizzleStudyItemRepository,
   DrizzleStudyUnitOfWork,
+  eraseFlashcardSessions,
+  eraseSessionFeedback,
+  eraseStudyItems,
+  refreshPageMastery,
 } from "./infrastructure";
 
 // `db` may be an open transaction, so the items join the caller's commit
@@ -55,6 +64,45 @@ export interface PageMasteryReader {
 export function createPageMasteryReader(db: DbExecutor): PageMasteryReader {
   const repository = new DrizzlePageMasteryRepository(db);
   return { listByOwner: (ownerId) => repository.listByOwner(ownerId) };
+}
+
+// Phase 8 H19: what a technique module deleting a page's whole set (a
+// deck, its recall questions or its exam questions) removes from
+// study-engine, in its own transaction (`db`): the set's study items (their
+// review logs cascade), the AI feedback of its sessions, the page's
+// flashcard sessions, and then the page's mastery, rewritten from the items
+// left (a page with none loses its row). No metric keeps counting the
+// deleted items.
+export interface StudySetEraser {
+  eraseItems(input: {
+    pageId: string;
+    ownerId: string;
+    kind: StudyItemKind;
+  }): Promise<number>;
+  eraseSessionFeedback(input: {
+    ownerId: string;
+    sessionKind: SessionKind;
+    sessionIds: readonly string[];
+  }): Promise<void>;
+  eraseFlashcardSessions(input: {
+    pageId: string;
+    ownerId: string;
+  }): Promise<number>;
+  refreshMastery(input: {
+    pageId: string;
+    ownerId: string;
+    now: Date;
+    id: string;
+  }): Promise<void>;
+}
+
+export function createStudySetEraser(db: DbExecutor): StudySetEraser {
+  return {
+    eraseItems: (input) => eraseStudyItems(db, input),
+    eraseSessionFeedback: (input) => eraseSessionFeedback(db, input),
+    eraseFlashcardSessions: (input) => eraseFlashcardSessions(db, input),
+    refreshMastery: (input) => refreshPageMastery(db, input),
+  };
 }
 
 // The flashcard review session (§3.3) as the flashcards Server Actions

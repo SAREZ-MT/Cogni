@@ -6,7 +6,10 @@ import {
   notebookFilter,
   orderHubItems,
 } from "@/shared/navigation/technique-hub";
-import { DropdownMenuItem } from "@/shared/ui/dropdown-menu";
+import {
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "@/shared/ui/dropdown-menu";
 import { IllustratedEmptyState } from "@/shared/ui/illustrated-empty-state";
 import { TechniqueEmptyArt } from "@/shared/ui/technique-empty-art";
 import { TechniqueHubFilter } from "@/shared/ui/technique-hub-filter";
@@ -16,6 +19,10 @@ import {
   TechniqueItemPill,
 } from "@/shared/ui/technique-item-card";
 import { SetBreadcrumb } from "../_components/breadcrumb";
+import {
+  DeleteTechniqueSetMenuItem,
+  DeleteTechniqueSetProvider,
+} from "../_components/delete-technique-set";
 import { plural } from "../flashcards/_lib/plural";
 import { CreateExamDialog } from "./_components/create-exam-dialog";
 import { loadCreateExamNotebooks } from "./_lib/create-exam-notebooks";
@@ -76,70 +83,82 @@ export default async function ExamsHubPage({
     const examined = page.attempts > 0 && page.lastScore !== null;
     const retake = page.retakePending;
     return (
-      <TechniqueItemCard
+      <DeleteTechniqueSetProvider
         key={page.pageId}
-        technique="exams"
-        href={hubItemHref(examHref, filter.selected)}
-        notebook={{ title: page.notebookTitle, tone: page.notebookColor }}
+        kind="exam"
+        pageId={page.pageId}
         title={page.pageTitle}
-        metric={{
-          icon: ClipboardList,
-          value: page.questionCount,
-          unit: page.questionCount === 1 ? "pregunta" : "preguntas",
-        }}
-        status={
-          retake ? (
+      >
+        <TechniqueItemCard
+          technique="exams"
+          href={hubItemHref(examHref, filter.selected)}
+          notebook={{ title: page.notebookTitle, tone: page.notebookColor }}
+          title={page.pageTitle}
+          metric={{
+            icon: ClipboardList,
+            value: page.questionCount,
+            unit: page.questionCount === 1 ? "pregunta" : "preguntas",
+          }}
+          status={
+            retake ? (
+              <>
+                <TechniqueItemPill>
+                  Repetir cuando estés listo
+                </TechniqueItemPill>
+                {page.lastScore !== null ? (
+                  <span>
+                    Último intento{" "}
+                    <b className="font-semibold text-fg">{page.lastScore} %</b>
+                  </span>
+                ) : null}
+              </>
+            ) : examined ? (
+              <span>
+                Mejor nota{" "}
+                <b className="font-semibold text-fg">
+                  {page.bestScore ?? page.lastScore} %
+                </b>
+                {` · último ${page.lastScore} %`}
+              </span>
+            ) : (
+              <span>Sin intentos</span>
+            )
+          }
+          progress={
+            retake
+              ? (page.lastScore ?? undefined)
+              : examined
+                ? (page.bestScore ?? page.lastScore ?? undefined)
+                : undefined
+          }
+          action={
+            retake
+              ? { label: "Repetir examen", icon: RotateCcw }
+              : { label: "Hacer examen" }
+          }
+          emphasis={retake ? "primary" : "soft"}
+          menu={
             <>
-              <TechniqueItemPill>Repetir cuando estés listo</TechniqueItemPill>
-              {page.lastScore !== null ? (
-                <span>
-                  Último intento{" "}
-                  <b className="font-semibold text-fg">{page.lastScore} %</b>
-                </span>
-              ) : null}
+              <DropdownMenuItem asChild>
+                <Link href={hubItemHref(`${examHref}/editar`, filter.selected)}>
+                  <Pencil aria-hidden="true" size={15} strokeWidth={1.75} />
+                  Editar preguntas
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link
+                  href={`/notebooks/${page.notebookId}/pages/${page.pageId}`}
+                >
+                  <FileText aria-hidden="true" size={15} strokeWidth={1.75} />
+                  Abrir página
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DeleteTechniqueSetMenuItem />
             </>
-          ) : examined ? (
-            <span>
-              Mejor nota{" "}
-              <b className="font-semibold text-fg">
-                {page.bestScore ?? page.lastScore} %
-              </b>
-              {` · último ${page.lastScore} %`}
-            </span>
-          ) : (
-            <span>Sin intentos</span>
-          )
-        }
-        progress={
-          retake
-            ? (page.lastScore ?? undefined)
-            : examined
-              ? (page.bestScore ?? page.lastScore ?? undefined)
-              : undefined
-        }
-        action={
-          retake
-            ? { label: "Repetir examen", icon: RotateCcw }
-            : { label: "Hacer examen" }
-        }
-        emphasis={retake ? "primary" : "soft"}
-        menu={
-          <>
-            <DropdownMenuItem asChild>
-              <Link href={hubItemHref(`${examHref}/editar`, filter.selected)}>
-                <Pencil aria-hidden="true" size={15} strokeWidth={1.75} />
-                Editar preguntas
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href={`/notebooks/${page.notebookId}/pages/${page.pageId}`}>
-                <FileText aria-hidden="true" size={15} strokeWidth={1.75} />
-                Abrir página
-              </Link>
-            </DropdownMenuItem>
-          </>
-        }
-      />
+          }
+        />
+      </DeleteTechniqueSetProvider>
     );
   };
 

@@ -14,7 +14,10 @@ import {
   notebookFilter,
   orderHubItems,
 } from "@/shared/navigation/technique-hub";
-import { DropdownMenuItem } from "@/shared/ui/dropdown-menu";
+import {
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "@/shared/ui/dropdown-menu";
 import { IllustratedEmptyState } from "@/shared/ui/illustrated-empty-state";
 import { TechniqueEmptyArt } from "@/shared/ui/technique-empty-art";
 import { TechniqueHubFilter } from "@/shared/ui/technique-hub-filter";
@@ -24,6 +27,10 @@ import {
   TechniqueItemPill,
 } from "@/shared/ui/technique-item-card";
 import { SetBreadcrumb } from "../_components/breadcrumb";
+import {
+  DeleteTechniqueSetMenuItem,
+  DeleteTechniqueSetProvider,
+} from "../_components/delete-technique-set";
 import { loadCreateExamNotebooks } from "../exams/_lib/create-exam-notebooks";
 import { CreateFromPageDialog } from "../flashcards/_components/create-from-page-dialog";
 import { plural } from "../flashcards/_lib/plural";
@@ -93,69 +100,83 @@ export default async function ActiveRecallHubPage({
     const latest = page.sessions[0];
     const sessionHref = `/active-recall/${page.notebookId}/${page.pageId}`;
     return (
-      <TechniqueItemCard
+      <DeleteTechniqueSetProvider
         key={page.pageId}
-        technique="recall"
-        href={hubItemHref(sessionHref, filter.selected)}
-        notebook={{ title: page.notebookTitle, tone: page.notebookColor }}
+        kind="recall"
+        pageId={page.pageId}
         title={page.pageTitle}
-        metric={{
-          icon: MessageCircleQuestion,
-          value: page.questionCount,
-          unit: page.questionCount === 1 ? "pregunta" : "preguntas",
-        }}
-        status={
-          sessions === 0 ? (
-            <span>Sin sesiones terminadas</span>
-          ) : (
-            <>
-              {due > 0 ? (
-                <TechniqueItemPill>{due} para repasar</TechniqueItemPill>
-              ) : null}
-              <span>
-                {plural(sessions, "sesión", "sesiones")}
-                {page.mastery !== null ? (
-                  <>
-                    {" · dominio "}
-                    <b className="font-semibold text-fg">{page.mastery} %</b>
-                  </>
+      >
+        <TechniqueItemCard
+          technique="recall"
+          href={hubItemHref(sessionHref, filter.selected)}
+          notebook={{ title: page.notebookTitle, tone: page.notebookColor }}
+          title={page.pageTitle}
+          metric={{
+            icon: MessageCircleQuestion,
+            value: page.questionCount,
+            unit: page.questionCount === 1 ? "pregunta" : "preguntas",
+          }}
+          status={
+            sessions === 0 ? (
+              <span>Sin sesiones terminadas</span>
+            ) : (
+              <>
+                {due > 0 ? (
+                  <TechniqueItemPill>{due} para repasar</TechniqueItemPill>
                 ) : null}
-              </span>
-            </>
-          )
-        }
-        progress={
-          sessions > 0 && page.mastery !== null ? page.mastery : undefined
-        }
-        action={{ label: "Practicar" }}
-        emphasis={due > 0 ? "primary" : "soft"}
-        menu={
-          <>
-            <DropdownMenuItem asChild>
-              <Link
-                href={hubItemHref(`${sessionHref}/editar`, filter.selected)}
-              >
-                <Pencil aria-hidden="true" size={15} strokeWidth={1.75} />
-                Editar preguntas
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href={`/notebooks/${page.notebookId}/pages/${page.pageId}`}>
-                <FileText aria-hidden="true" size={15} strokeWidth={1.75} />
-                Abrir página
-              </Link>
-            </DropdownMenuItem>
-            {latest ? (
+                <span>
+                  {plural(sessions, "sesión", "sesiones")}
+                  {page.mastery !== null ? (
+                    <>
+                      {" · dominio "}
+                      <b className="font-semibold text-fg">{page.mastery} %</b>
+                    </>
+                  ) : null}
+                </span>
+              </>
+            )
+          }
+          progress={
+            sessions > 0 && page.mastery !== null ? page.mastery : undefined
+          }
+          action={{ label: "Practicar" }}
+          emphasis={due > 0 ? "primary" : "soft"}
+          menu={
+            <>
               <DropdownMenuItem asChild>
-                <Link href={`${sessionHref}/resultados?sesion=${latest.id}`}>
-                  <ListChecks aria-hidden="true" size={15} strokeWidth={1.75} />
-                  Ver último resultado
+                <Link
+                  href={hubItemHref(`${sessionHref}/editar`, filter.selected)}
+                >
+                  <Pencil aria-hidden="true" size={15} strokeWidth={1.75} />
+                  Editar preguntas
                 </Link>
               </DropdownMenuItem>
-            ) : null}
-          </>
-        }
-      />
+              <DropdownMenuItem asChild>
+                <Link
+                  href={`/notebooks/${page.notebookId}/pages/${page.pageId}`}
+                >
+                  <FileText aria-hidden="true" size={15} strokeWidth={1.75} />
+                  Abrir página
+                </Link>
+              </DropdownMenuItem>
+              {latest ? (
+                <DropdownMenuItem asChild>
+                  <Link href={`${sessionHref}/resultados?sesion=${latest.id}`}>
+                    <ListChecks
+                      aria-hidden="true"
+                      size={15}
+                      strokeWidth={1.75}
+                    />
+                    Ver último resultado
+                  </Link>
+                </DropdownMenuItem>
+              ) : null}
+              <DropdownMenuSeparator />
+              <DeleteTechniqueSetMenuItem />
+            </>
+          }
+        />
+      </DeleteTechniqueSetProvider>
     );
   };
 

@@ -12,6 +12,7 @@ export {
   type DeleteRecallQuestionResult,
   deleteRecallQuestion,
 } from "./delete-recall-question";
+export { deleteRecallSet, previewRecallSetDeletion } from "./delete-recall-set";
 export {
   editRecallQuestion,
   type RecallQuestionContent,
@@ -62,6 +63,10 @@ export {
   type RecallSessionRepositories,
   type RecallSessionUnitOfWork,
 } from "./recall-session-work";
+export type {
+  RecallSetDeletion,
+  RecallSetDeletionPreview,
+} from "./recall-set-deletion";
 export {
   type RecallQuestionRepositories,
   type RecallStudyItems,

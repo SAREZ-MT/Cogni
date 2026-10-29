@@ -2,6 +2,11 @@ import { render, screen, within } from "@testing-library/react";
 import { createElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+// Phase 8 H19: the card's delete provider is client code with its own test.
+vi.mock("../_components/delete-technique-set", () => ({
+  DeleteTechniqueSetProvider: ({ children }: { children: unknown }) => children,
+  DeleteTechniqueSetMenuItem: () => null,
+}));
 vi.mock("server-only", () => ({}));
 
 const { listRecallHubAction } = vi.hoisted(() => ({

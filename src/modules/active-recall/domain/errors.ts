@@ -28,6 +28,8 @@ export const RECALL_ERROR = {
   // edit page keeps at least one; the whole set goes with a separate
   // action).
   LAST_QUESTION: "RECALL_LAST_QUESTION",
+  // The owner has no such page to delete the recall set of (Phase 8 H19).
+  SET_NOT_FOUND: "RECALL_SET_NOT_FOUND",
   // "Generar" found no paragraph active recall has not used yet on the page
   // (Phase 6 T5c incremental generation): no AI call, no unit consumed.
   NO_NEW_CONTENT: "RECALL_NO_NEW_CONTENT",

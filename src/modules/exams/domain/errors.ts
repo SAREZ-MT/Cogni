@@ -34,6 +34,8 @@ export const EXAM_ERROR = {
   SESSION_FINISHED: "EXAMS_SESSION_FINISHED",
   // The owner has no such question (missing or another owner's).
   QUESTION_NOT_FOUND: "EXAMS_QUESTION_NOT_FOUND",
+  // The owner has no such page to delete the exam set of (Phase 8 H19).
+  SET_NOT_FOUND: "EXAMS_SET_NOT_FOUND",
   // Deleting it would leave the page without questions (Phase 8 H18: the
   // edit page keeps at least one; the whole set goes with a separate
   // action).

@@ -8,6 +8,10 @@ export {
   type RecallQuestionView,
   saveRecallEditsAction,
 } from "./actions";
+export {
+  deleteRecallSetAction,
+  previewRecallSetDeletionAction,
+} from "./deletion-actions";
 export * from "./domain";
 export {
   type DisagreedRecallAnswerView,

@@ -23,10 +23,12 @@ export {
   createRecallReviewRecorder,
   createSessionFeedbackSources,
   createStudyItemRepository,
+  createStudySetEraser,
   type ExamReviewRecorder,
   type FlashcardSessionsServerApi,
   type MasteryRecomputeJob,
   type PageMasteryReader,
   type RecallReviewRecorder,
   type SessionFeedbackSources,
+  type StudySetEraser,
 } from "./server-api";

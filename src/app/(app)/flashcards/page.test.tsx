@@ -31,9 +31,9 @@ vi.mock("@/modules/identity", () => ({
     chosen: true,
   }),
 }));
-vi.mock("./_components/delete-deck", () => ({
-  DeleteDeckProvider: ({ children }: { children: unknown }) => children,
-  DeleteDeckMenuItem: () => null,
+vi.mock("../_components/delete-technique-set", () => ({
+  DeleteTechniqueSetProvider: ({ children }: { children: unknown }) => children,
+  DeleteTechniqueSetMenuItem: () => null,
 }));
 vi.mock("@/modules/notebooks", () => ({
   COLOR_PALETTE: [
