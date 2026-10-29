@@ -177,6 +177,27 @@ describe("ActiveRecallNotebookPage", () => {
     ).toBeInTheDocument();
   });
 
+  // Phase 8 H16: questions generated from the hub, no finished session.
+  it("lists a page with questions and no finished session with a card that opens its session", async () => {
+    listRecallHubAction.mockResolvedValue({
+      ok: true,
+      value: {
+        pages: [entry("nucleo", "Núcleo celular", [])],
+        averageMastery: 0,
+      },
+    });
+
+    render(await ActiveRecallNotebookPage(params(NOTEBOOK)));
+
+    const card = screen.getByRole("link", { name: /Núcleo celular/ });
+    expect(card).toHaveAttribute("href", `/active-recall/${NOTEBOOK}/nucleo`);
+    expect(card).toHaveTextContent("Practicar →");
+    expect(screen.queryByText("Sin sesiones todavía")).toBeNull();
+    expect(
+      screen.getByText("0 sesiones · 1 página con preguntas"),
+    ).toBeInTheDocument();
+  });
+
   it("shows the load error in the empty state when the sessions cannot load", async () => {
     listRecallHubAction.mockResolvedValue({
       ok: false,

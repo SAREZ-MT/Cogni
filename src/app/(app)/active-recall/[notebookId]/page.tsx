@@ -18,7 +18,9 @@ interface ActiveRecallNotebookPageProps {
 // Sessions-by-page list for one notebook on real data (Phase 6 T7): every
 // page of the notebook with a finished session, each card showing its
 // latest session (date, questions, AI buckets, percentage) and opening
-// that session's results, where "Nueva sesión →" starts the next one. Same
+// that session's results, where "Nueva sesión →" starts the next one. A
+// page with recall questions and no finished session yet gets a
+// "Practicar →" card that opens its session (Phase 8 H16). Same
 // not-found contract as exams/[notebookId]/page.tsx: a notebookId that is
 // unknown, archived or another user's 404s. The layout is the design
 // preview's (Phase 6 UI freeze).
@@ -83,7 +85,20 @@ export default async function ActiveRecallNotebookPage({
           <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4">
             {pages.map((page) => {
               const [latest, ...previous] = page.sessions;
-              if (!latest) return null;
+              // Phase 8 H16: questions without a finished session yet
+              // (generated from the hub, or a session left open) open the
+              // practice session.
+              if (!latest) {
+                return (
+                  <RecallPageCard
+                    key={page.pageId}
+                    practice
+                    href={`/active-recall/${notebookId}/${page.pageId}`}
+                    notebookTitle={notebookTitle}
+                    pageTitle={page.pageTitle}
+                  />
+                );
+              }
 
               return (
                 <RecallPageCard

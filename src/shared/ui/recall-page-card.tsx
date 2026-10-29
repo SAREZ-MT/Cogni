@@ -8,11 +8,25 @@ function masteryToneClassName(mastery: number): string {
   return "text-error-600";
 }
 
-export interface RecallPageCardProps {
-  // The latest session's results route (Phase 6 T7).
-  href: string;
+interface RecallPageCardBaseProps {
   notebookTitle: string;
   pageTitle: string;
+  className?: string;
+}
+
+// Phase 8 H16: a page with recall questions and no finished session yet
+// (freshly generated from a hub, or every session left open). The card
+// keeps the same header and opens the practice session instead.
+export interface RecallPagePracticeCardProps extends RecallPageCardBaseProps {
+  practice: true;
+  // The page's session route.
+  href: string;
+}
+
+export interface RecallPageResultsCardProps extends RecallPageCardBaseProps {
+  practice?: false;
+  // The latest session's results route (Phase 6 T7).
+  href: string;
   // Preformatted (e.g. "24 sept") — sample data owns formatting, same
   // pattern as flashcards/_data/sample.ts's saved-study-item rows.
   lastSessionDate: string;
@@ -27,8 +41,30 @@ export interface RecallPageCardProps {
   aiCorrect: number;
   aiPartial: number;
   aiIncorrect: number;
-  className?: string;
 }
+
+export type RecallPageCardProps =
+  | RecallPageResultsCardProps
+  | RecallPagePracticeCardProps;
+
+function CardHeader({
+  notebookTitle,
+  pageTitle,
+}: Pick<RecallPageCardBaseProps, "notebookTitle" | "pageTitle">) {
+  return (
+    <div className="bg-success-100/35 px-4 pt-3.5 pb-3">
+      <p className="font-medium text-[11px] text-success-600">
+        {notebookTitle}
+      </p>
+      <p className="mt-0.5 truncate font-semibold text-[15px] text-fg">
+        {pageTitle}
+      </p>
+    </div>
+  );
+}
+
+const CARD_CLASS_NAME =
+  "block overflow-hidden rounded-2xl border border-border-subtle bg-card shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card-hover";
 
 // Active recall's "Sesiones por página" grid item (design preview,
 // studyplatform-active-recall-style.md hub SessionCard, adapted to the
@@ -38,7 +74,32 @@ export interface RecallPageCardProps {
 // the latest accuracy (tone by threshold) + its correct/partial/incorrect
 // breakdown, plus a "Ver resultados →" pill: the card opens the latest
 // session's results (user decision 2026-10-08, Phase 6 T7; was "Repasar →").
-export function RecallPageCard({
+export function RecallPageCard(props: RecallPageCardProps) {
+  if (props.practice) {
+    const { href, notebookTitle, pageTitle, className } = props;
+    return (
+      <Link href={href} className={cn(CARD_CLASS_NAME, className)}>
+        <CardHeader notebookTitle={notebookTitle} pageTitle={pageTitle} />
+        <div className="px-4 pt-3 pb-4">
+          <p className="font-medium text-fg-muted text-xs">
+            Sin sesiones terminadas
+          </p>
+          <p className="mt-0.5 text-fg-muted text-xs">
+            Preguntas listas para practicar
+          </p>
+          <div className="mt-3 flex items-end justify-end">
+            <Pill size="sm" tone="success">
+              Practicar →
+            </Pill>
+          </div>
+        </div>
+      </Link>
+    );
+  }
+  return <ResultsCard {...props} />;
+}
+
+function ResultsCard({
   href,
   notebookTitle,
   pageTitle,
@@ -50,23 +111,10 @@ export function RecallPageCard({
   aiPartial,
   aiIncorrect,
   className,
-}: RecallPageCardProps) {
+}: RecallPageResultsCardProps) {
   return (
-    <Link
-      href={href}
-      className={cn(
-        "block overflow-hidden rounded-2xl border border-border-subtle bg-card shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card-hover",
-        className,
-      )}
-    >
-      <div className="bg-success-100/35 px-4 pt-3.5 pb-3">
-        <p className="font-medium text-[11px] text-success-600">
-          {notebookTitle}
-        </p>
-        <p className="mt-0.5 truncate font-semibold text-[15px] text-fg">
-          {pageTitle}
-        </p>
-      </div>
+    <Link href={href} className={cn(CARD_CLASS_NAME, className)}>
+      <CardHeader notebookTitle={notebookTitle} pageTitle={pageTitle} />
       <div className="px-4 pt-3 pb-4">
         <p className="font-medium text-fg-muted text-xs">{lastSessionDate}</p>
         <p className="mt-0.5 text-fg-muted text-xs">

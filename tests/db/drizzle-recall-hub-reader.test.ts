@@ -15,9 +15,10 @@ import {
 import { createTestDb } from "./helpers/test-db";
 import { createTestOwner, deleteTestOwner } from "./helpers/test-owner";
 
-// The active recall hub reader against Postgres (Phase 6 T7): pages with a
-// finished session holding answers, their sessions newest first with the
-// answers' scores, owner scoping, archived pages and notebooks left out.
+// The active recall hub reader against Postgres (Phase 6 T7, Phase 8 H16):
+// pages with active recall questions or a finished session holding
+// answers, their finished sessions newest first with the answers' scores,
+// owner scoping, archived pages and notebooks left out.
 // Also study-engine's page mastery reader the hub averages.
 if (process.env.DATABASE_URL) {
   const db = createTestDb();
@@ -135,6 +136,7 @@ if (process.env.DATABASE_URL) {
   const sinSesiones = await newPage(nbA, "Sin sesiones");
   const soloAbierta = await newPage(nbA, "Solo abierta");
   const archivada = await newPage(nbA, "Archivada");
+  const soloRetiradas = await newPage(nbA, "Solo retiradas");
   const nbArchived = await newNotebook("A archivado");
   const enArchivado = await newPage(nbArchived, "En cuaderno archivado");
   const nbOther = await newNotebook("A ajeno", otherOwner.id);
@@ -156,6 +158,17 @@ if (process.env.DATABASE_URL) {
   const derivadasSession = await newSession(derivadas, 10, 2, [[2, 2]]);
   await newQuestion(sinSesiones);
   await newSession(soloAbierta, 0, null, [[5, 5]]);
+  // A finished session keeps its page listed after its questions were
+  // archived; a page holding only archived questions is left out.
+  await db
+    .update(recallQuestions)
+    .set({ archivedAt: T0 })
+    .where(eq(recallQuestions.pageId, membrana));
+  await newQuestion(soloRetiradas);
+  await db
+    .update(recallQuestions)
+    .set({ archivedAt: T0 })
+    .where(eq(recallQuestions.pageId, soloRetiradas));
   await newSession(archivada, 0, 1, [[5, 5]]);
   await db.update(pages).set({ archivedAt: T0 }).where(eq(pages.id, archivada));
   await newSession(enArchivado, 0, 1, [[5, 5]]);
@@ -174,9 +187,11 @@ if (process.env.DATABASE_URL) {
       expect(listed.map((page) => page.pageTitle)).toEqual([
         "Membrana",
         "Mitocondria",
+        "Sin sesiones",
+        "Solo abierta",
         "Derivadas",
       ]);
-      const [membranaRow, mitocondriaRow, derivadasRow] = listed;
+      const [membranaRow, mitocondriaRow, , , derivadasRow] = listed;
       expect(membranaRow).toMatchObject({
         pageId: membrana,
         notebookId: nbA,
@@ -200,6 +215,24 @@ if (process.env.DATABASE_URL) {
       expect(derivadasRow?.sessions.map((s) => s.id)).toEqual([
         derivadasSession,
       ]);
+    });
+
+    // Phase 8 H16: questions generated from a hub and an abandoned session
+    // must not leave the page out of the recall screens.
+    it("lists pages with recall questions and no finished session, without sessions", async () => {
+      const listed = await reader.listRecallPages(owner.id);
+
+      expect(listed.find((page) => page.pageId === sinSesiones)).toEqual({
+        pageId: sinSesiones,
+        pageTitle: "Sin sesiones",
+        notebookId: nbA,
+        notebookTitle: "A biología celular",
+        notebookColor: "green",
+        sessions: [],
+      });
+      expect(
+        listed.find((page) => page.pageId === soloAbierta)?.sessions,
+      ).toEqual([]);
     });
 
     it("never lists another owner's pages", async () => {

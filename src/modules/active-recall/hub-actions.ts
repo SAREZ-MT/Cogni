@@ -96,8 +96,8 @@ function hubSources(db: ReturnType<typeof getDb>): {
   };
 }
 
-// The caller's pages with a finished recall session (archived pages and
-// notebooks left out), ordered by notebook title then page title, and the
+// The caller's pages with recall questions or a finished recall session
+// (archived pages and notebooks left out), ordered by notebook title then page title, and the
 // average page mastery of those pages.
 export async function listRecallHubAction(): Promise<
   Result<RecallHubView, ActionError>

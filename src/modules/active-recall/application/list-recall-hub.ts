@@ -69,7 +69,8 @@ function toSessionEntry(session: RecallHubSession): RecallHubSessionEntry {
 }
 
 // The active recall hub and notebook view (documento-maestro §3.3): every
-// page of the owner with a finished session, its sessions with their
+// page of the owner with recall questions or a finished session, its
+// finished sessions (none yet for a page that only has questions) with their
 // scores (decision in force: average combined × 20 and AI score buckets),
 // the page mastery from study-engine — never a recall-local formula — and
 // its recall questions due today, in the reader's order.
