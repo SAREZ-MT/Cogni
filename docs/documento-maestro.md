@@ -131,7 +131,7 @@ Notas de implementación de la Fase 5 (ADR 0006):
 - **Repasar antes de repetir.** Un resultado fallado ofrece "Repasar contenido", que abre la página del cuaderno con un aviso de los conceptos fallados y la acción "Repetir examen".
 - Editar una pregunta la cambia en el lugar y conserva su raíz; retirarla suspende el ítem de la raíz cuando su linaje no tiene otra pregunta activa. No hay límite de tiempo y una sesión abandonada queda abierta (como en flashcards).
 
-Nota de implementación de la Fase 6 (ADR 0007): `/exams` y la vista por cuaderno siguen listando solo las páginas con preguntas. Su encabezado ofrece "Crear examen" (en lugar del inicio rápido "Nuevo examen"): se elige cuaderno y página y luego "Generar con IA" (N de 10 a 30). Desde el 2026-10-29 (Fase 8, H12 y H13, decisión del usuario) la creación es solo con IA: ya no existe "Crear mis preguntas" ni una entrada para escribir la primera pregunta a mano.
+Nota de implementación de la Fase 6 (ADR 0007): `/exams` y la vista por cuaderno siguen listando solo las páginas con preguntas. Ofrecen "Crear examen" (en lugar del inicio rápido "Nuevo examen"); desde el 2026-10-29 (Fase 8, H13, decisión del usuario) ya no está en el encabezado, sino en la llamada a la acción del estado vacío y en el primer recuadro fijo de la cuadrícula, como en los demás centros de técnicas. Se elige cuaderno y página y luego "Generar con IA" (N de 10 a 30). Desde el 2026-10-29 (Fase 8, H12 y H13, decisión del usuario) la creación es solo con IA: ya no existe "Crear mis preguntas" ni una entrada para escribir la primera pregunta a mano.
 
 #### Recordación activa
 

@@ -115,6 +115,8 @@ describe("ExamsHubPage (real data)", () => {
     expect(grid.firstElementChild).toBe(tile);
     expect(grid.querySelectorAll("a")).toHaveLength(2);
     expect(screen.queryByTestId("create-exam-cta")).toBeNull();
+    // Phase 8 H13 (user 2026-10-29): no "Crear examen" in the header.
+    expect(screen.queryByTestId("create-exam-button")).toBeNull();
   });
 
   it("derives the totals from the real pages", async () => {
@@ -204,8 +206,8 @@ describe("ExamsHubPage (real data)", () => {
     render(await ExamsHubPage());
 
     // Phase 8 H10: the illustrated empty state (a stacked exam sheet,
-    // gradient headline). "Crear examen" stays in the header; the CTA leads
-    // to the notebooks, since the dialog has nothing to offer without one.
+    // gradient headline). Since H13 the header has no "Crear examen": the
+    // CTA is the empty hub's only create control.
     expect(
       screen.getByRole("heading", { name: "Pon a prueba lo que sabes" }),
     ).toBeInTheDocument();
@@ -224,15 +226,15 @@ describe("ExamsHubPage (real data)", () => {
     expect(
       document.querySelector('[data-slot="illustrated-empty-state"]'),
     ).toHaveAttribute("data-technique-theme", "exams");
-    // Phase 8 H11: the CTA opens "Crear examen" itself (the header keeps
-    // its button); there is no grid, so no create tile.
+    // Phase 8 H11: the CTA opens "Crear examen" itself; there is no grid, so
+    // no create tile, and since H13 no header button either.
     const empty = document.querySelector(
       '[data-slot="illustrated-empty-state"]',
     ) as HTMLElement;
     expect(
       empty.querySelector('[data-testid="create-exam-cta"]'),
     ).toBeInTheDocument();
-    expect(screen.getByTestId("create-exam-button")).toBeInTheDocument();
+    expect(screen.queryByTestId("create-exam-button")).toBeNull();
     expect(screen.queryByTestId("create-exam-tile")).toBeNull();
     expect(
       screen.queryByRole("link", { name: "Ir a mis cuadernos" }),
@@ -309,15 +311,15 @@ describe("ExamsHubPage (real data)", () => {
     expect(screen.queryByText(/vencen mañana/)).toBeNull();
   });
 
-  it("offers only 'Crear examen' in the header: no 'Nuevo examen' quick start", async () => {
+  it("offers 'Crear examen' only from the grid tile: no header button, no 'Nuevo examen'", async () => {
     render(await ExamsHubPage());
 
-    // The header's button (no trigger) plus H11's grid tile.
+    // Phase 8 H13: the header's button is gone; H11's grid tile stays.
     expect(
       CreateExamDialog.mock.calls.map(
         (call) => (call as unknown as [{ trigger?: string }])[0].trigger,
       ),
-    ).toEqual([undefined, "tile"]);
+    ).toEqual(["tile"]);
     expect(screen.queryByText("Nuevo examen")).toBeNull();
     expect(screen.queryByText(/páginas con preguntas/)).toBeNull();
   });
@@ -339,8 +341,8 @@ describe("ExamsHubPage (real data)", () => {
 
       render(await ExamsHubPage());
 
-      // The header's button and H11's empty-state CTA share the notebooks.
-      expect(CreateExamDialog).toHaveBeenCalledTimes(2);
+      // H11's empty-state CTA is the only trigger (no header button, H13).
+      expect(CreateExamDialog).toHaveBeenCalledTimes(1);
       const [props] = CreateExamDialog.mock.calls[0] as unknown as [
         Record<string, unknown>,
       ];

@@ -60,10 +60,12 @@ test.describe("Crear examen", () => {
         "Elige una página y la IA crea un examen de opción múltiple desde su texto.",
       ),
     ).toBeVisible();
-    // Only "Crear examen" in the header: the "Nuevo examen" quick start is gone.
+    // No "Nuevo examen" quick start, and since H13 no header button: the
+    // empty state's CTA opens "Crear examen".
     await expect(page.getByText("Nuevo examen")).toHaveCount(0);
+    await expect(page.getByTestId("create-exam-button")).toHaveCount(0);
     await shot(page, "exams-hub-empty-v2");
-    await page.getByTestId("create-exam-button").click();
+    await page.getByTestId("create-exam-cta").click();
 
     const create = page.getByRole("dialog", { name: "Crear examen" });
     await chooseOption(create, "Cuaderno", notebookTitle);

@@ -920,7 +920,11 @@ deepens its tint on hover, presses to 0.98, still under reduced motion.
 A plain `<button>` (`type="button"` default) for `DialogTrigger asChild`.
 Props: `label` (also the accessible name), `hint?`, button props. Used by
 the `/flashcards` ("Crear flashcards"), `/active-recall` ("Generar
-preguntas") and `/exams` ("Crear examen") grids.
+preguntas"), `/exams` and, since Phase 8 H13, `/exams/[notebookId]`
+("Crear examen", the notebook preselected) grids. H13 removed the exams
+header's "Crear examen" button: on the exams screens the tile and the
+empty state's CTA (`data-technique-theme="exams"` around it on the
+notebook view) are the create controls.
 
 ## ViewToggle (`view-toggle.tsx`)
 

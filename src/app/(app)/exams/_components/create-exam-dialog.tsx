@@ -1,6 +1,5 @@
 "use client";
 
-import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import {
@@ -37,10 +36,9 @@ export interface CreateExamDialogProps {
   notebooks: readonly CreateExamNotebook[] | null;
   // Preselected notebook (the exams notebook view); the first one otherwise.
   initialNotebookId?: string;
-  // Phase 8 H11: "button" (default) is the header's "Crear examen"; "cta"
-  // the hub empty state's rose pill; "tile" the first, fixed tile of the
-  // hub's grid.
-  trigger?: "button" | "cta" | "tile";
+  // Phase 8 H11: "cta" is an empty state's rose pill; "tile" (default) the
+  // first, fixed tile of a grid. H13 removed the header button ("button").
+  trigger?: "cta" | "tile";
 }
 
 // Same steps as the techniques panel's exam count (10–30 in steps of 5).
@@ -68,12 +66,12 @@ const ERROR_COPY: Record<string, string> = {
 // a notebook and a page (mandatory: an exam belongs to a page for SM-2),
 // then generates the questions with AI (same action, limits and error copy
 // as the techniques panel; on success the notebook's exams open). AI only
-// (user decision 2026-10-29, Phase 8 H12): writing questions by hand stays
-// on the page's questions screen ("Nueva pregunta").
+// (user decision 2026-10-29, Phase 8 H12; H13 removed "Nueva pregunta" too,
+// so no question is written by hand anywhere).
 export function CreateExamDialog({
   notebooks: loadedNotebooks,
   initialNotebookId,
-  trigger = "button",
+  trigger = "tile",
 }: CreateExamDialogProps) {
   const notebooks = loadedNotebooks ?? [];
   const router = useRouter();
@@ -143,17 +141,12 @@ export function CreateExamDialog({
           <EmptyStateCta tone="technique" data-testid="create-exam-cta">
             Crear mi primer examen
           </EmptyStateCta>
-        ) : trigger === "tile" ? (
+        ) : (
           <TechniqueCreateTile
             label="Crear examen"
             hint="Elige una página para el examen"
             data-testid="create-exam-tile"
           />
-        ) : (
-          <Button type="button" data-testid="create-exam-button">
-            <Plus aria-hidden="true" size={16} strokeWidth={1.75} />
-            Crear examen
-          </Button>
         )}
       </DialogTrigger>
       <DialogContent

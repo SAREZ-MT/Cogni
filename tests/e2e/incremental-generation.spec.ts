@@ -182,7 +182,9 @@ test.describe("incremental generation", () => {
 
     // "Crear examen" in AI mode says the same in the dialog.
     await page.goto("/exams");
-    await page.getByTestId("create-exam-button").click();
+    // The hub lists this page, so its grid's first tile opens the dialog
+    // (Phase 8 H13: no header button).
+    await page.getByTestId("create-exam-tile").click();
     const create = page.getByRole("dialog", { name: "Crear examen" });
     await chooseOption(create, "Cuaderno", notebookTitle);
     await chooseOption(create, "Página", "Sin título");

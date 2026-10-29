@@ -70,6 +70,15 @@ test.describe("exam questions screen", () => {
     await expect(page.getByText("Nueva pregunta")).toHaveCount(0);
     await shot(page, "questions-list");
 
+    // The hub and the notebook view now list the page: "Crear examen" is the
+    // grid's first tile, never a header button (Phase 8 H13).
+    for (const path of ["/exams", `/exams/${notebookId}`]) {
+      await page.goto(path);
+      await expect(page.getByTestId("create-exam-tile")).toBeVisible();
+      await expect(page.getByTestId("create-exam-button")).toHaveCount(0);
+    }
+    await page.goto(`/exams/${notebookId}/${pageId}/preguntas`);
+
     // Edit in place.
     await rows.first().getByRole("button", { name: "Editar" }).click();
     const edit = page.getByRole("dialog", { name: "Editar pregunta" });

@@ -106,7 +106,6 @@ export default async function ExamsHubPage() {
         technique="exams"
         title="Exámenes"
         description={`${plural(examenesPresentados, "examen", "exámenes")} · ${plural(activeNotebookCount, "cuaderno", "cuadernos")}`}
-        actions={<CreateExamDialog notebooks={createExamNotebooks} />}
       />
 
       {retakePage && (
@@ -159,8 +158,9 @@ export default async function ExamsHubPage() {
         // Phase 8 H10/H11: the illustrated empty state — the test sheet on
         // the rose dotted paper, a cascade entrance, the technique-gradient
         // headline and the rose CTA, which opens "Crear examen" (its
-        // no-notebooks state now links to /notebooks). The header keeps
-        // its "Crear examen". A failed read keeps the load error as the
+        // no-notebooks state now links to /notebooks). Since H13 the header
+        // has no "Crear examen": the CTA here and the grid's first tile are
+        // the create controls. A failed read keeps the load error as the
         // message.
         <IllustratedEmptyState
           entrance="cascade"
