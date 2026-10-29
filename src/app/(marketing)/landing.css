@@ -86,6 +86,8 @@
   --lp-rose-100: #ffe4e6;
   --lp-rose-700: #be123c;
   --lp-rose-950: #4c0519;
+  --lp-rose-900: #881337;
+  --lp-violet-900: #3b0f80;
   --lp-blue-100: #dbeafe;
   --lp-orange-100: #ffedd5;
 
@@ -785,43 +787,54 @@
 }
 
 /*
- * Feature icons of the pillar points (pillar-block.tsx): a tinted tile with
- * a ring in the pillar hue, a top highlight and a soft tinted drop under a
- * filled Phosphor glyph (Untitled UI featured icons, Linear and Raycast
- * feature lists).
+ * Pillar point icons (pixel-tile.tsx): a dithered tile in the pillar hue
+ * (the .lp-hobj family) under a crisp vector Phosphor glyph. Three dither
+ * steps, a glyph ink and a glyph shadow per tone; the shadow is dark under
+ * light ink and light under dark ink, so the glyph lifts off the dither.
+ * Not rotated, so the 2 px cells stay crisp.
  */
-.lp-ficon {
-  color: var(--fi-ink);
-  background: var(--fi-soft);
-  box-shadow:
-    inset 0 0 0 1px var(--fi-ring),
-    inset 0 1px 0 rgb(255 255 255 / 0.85),
-    0 1px 2px rgb(26 16 51 / 0.06),
-    0 8px 16px -8px var(--fi-drop);
+.lp-ptile {
+  display: block;
+  overflow: hidden;
+  border-radius: 13px;
+  box-shadow: 0 6px 12px -6px var(--pt-dark);
 }
-.lp-ficon[data-tone="yellow"] {
-  --fi-soft: var(--lp-yellow-100);
-  --fi-ring: var(--lp-yellow-200);
-  --fi-ink: var(--lp-amber-700);
-  --fi-drop: rgb(180 83 9 / 0.45);
+.lp-ptile-glyph {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 27px;
+  height: 27px;
+  color: var(--pt-ink);
+  filter: drop-shadow(1px 1px 0 var(--pt-shadow));
 }
-.lp-ficon[data-tone="violet"] {
-  --fi-soft: var(--lp-violet-100);
-  --fi-ring: var(--lp-violet-200);
-  --fi-ink: var(--lp-violet-deep);
-  --fi-drop: rgb(109 40 217 / 0.45);
+.lp-ptile[data-tone="yellow"] {
+  --pt-dark: var(--lp-amber-500);
+  --pt-mid: var(--lp-yellow);
+  --pt-light: var(--lp-yellow-100);
+  --pt-ink: var(--lp-amber-800);
+  --pt-shadow: var(--lp-yellow-100);
 }
-.lp-ficon[data-tone="mint"] {
-  --fi-soft: var(--lp-mint-100);
-  --fi-ring: var(--lp-mint-200);
-  --fi-ink: var(--lp-green-700);
-  --fi-drop: rgb(4 120 87 / 0.4);
+.lp-ptile[data-tone="violet"] {
+  --pt-dark: var(--lp-violet-800);
+  --pt-mid: var(--lp-violet);
+  --pt-light: var(--lp-violet-300);
+  --pt-ink: var(--lp-paper);
+  --pt-shadow: var(--lp-violet-900);
 }
-.lp-ficon[data-tone="rose"] {
-  --fi-soft: var(--lp-rose-100);
-  --fi-ring: var(--lp-rose-200);
-  --fi-ink: var(--lp-rose-700);
-  --fi-drop: rgb(190 18 60 / 0.4);
+.lp-ptile[data-tone="mint"] {
+  --pt-dark: var(--lp-green-500);
+  --pt-mid: var(--lp-mint);
+  --pt-light: var(--lp-mint-50);
+  --pt-ink: var(--lp-mint-800);
+  --pt-shadow: var(--lp-mint-50);
+}
+.lp-ptile[data-tone="rose"] {
+  --pt-dark: var(--lp-rose-700);
+  --pt-mid: var(--lp-rose);
+  --pt-light: var(--lp-rose-200);
+  --pt-ink: var(--lp-paper);
+  --pt-shadow: var(--lp-rose-900);
 }
 
 /*

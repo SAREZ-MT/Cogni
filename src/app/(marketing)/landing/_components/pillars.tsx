@@ -19,6 +19,7 @@ import {
   PillarVisual,
 } from "./pillar-block";
 import { CurveDemo, ImportDemo, ProgressDemo, TodayDemo } from "./pillar-demos";
+import { PixelTileDefs } from "./pixel-tile";
 
 type Pillar = {
   id: string;
@@ -30,7 +31,7 @@ type Pillar = {
   tone: BandTone;
   heading: string;
   points: readonly PillarPoint[];
-  // The pillar's hue for its feature icons.
+  // The pillar's hue for its point tiles.
   iconTone: IconTone;
   visual: ReactNode;
 };
@@ -185,6 +186,7 @@ export const PILLARS: readonly Pillar[] = [
 export function Pillars() {
   return (
     <div className="lp-on-paper bg-(--lp-paper)">
+      <PixelTileDefs />
       {PILLARS.map((pillar, index) => (
         <section
           key={pillar.id}

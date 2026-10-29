@@ -1,18 +1,19 @@
 import type { Icon } from "@phosphor-icons/react/dist/lib/types";
 import Image from "next/image";
 import type { ReactNode } from "react";
+import { PixelTile, type PixelTone } from "./pixel-tile";
 import { Reveal } from "./reveal";
 
-// Phosphor glyphs, drawn in the fill weight inside a tinted tile.
+// Each point carries a Phosphor glyph, drawn over a dithered tile.
 export type PillarPoint = { icon: Icon; title: string; text: string };
 
-// The pillar's hue for its feature icons (landing.css .lp-ficon).
-export type IconTone = "yellow" | "violet" | "mint" | "rose";
+// The pillar's hue for its point tiles (landing.css .lp-ptile).
+export type IconTone = PixelTone;
 
 export type PillarImage = { src: string; alt: string };
 
 // RemNote-style block under each band: a heading, three short points with
-// small icons, and a visual on the other side. Sides alternate per pillar.
+// dithered icon tiles, and a visual on the other side. Sides alternate per pillar.
 export function PillarBlock({
   heading,
   points,
@@ -35,16 +36,14 @@ export function PillarBlock({
           {heading}
         </h3>
         <ul className="flex max-w-[520px] flex-col gap-6">
-          {points.map(({ icon: Icon, title, text }) => (
+          {points.map(({ icon, title, text }) => (
             <li key={title} className="flex gap-4">
-              <span
-                aria-hidden="true"
-                data-tone={iconTone}
-                className="lp-ficon flex size-11 shrink-0 items-center justify-center rounded-[13px]"
-              >
-                <Icon weight="fill" className="size-[22px]" />
-              </span>
-              <span className="flex flex-col gap-1 pt-0.5">
+              <PixelTile
+                tone={iconTone}
+                icon={icon}
+                className="size-14 shrink-0"
+              />
+              <span className="flex flex-col gap-1 pt-1.5">
                 <span className="font-extrabold text-(--lp-ink) text-[17px]">
                   {title}
                 </span>

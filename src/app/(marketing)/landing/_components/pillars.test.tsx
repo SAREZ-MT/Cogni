@@ -66,13 +66,25 @@ describe("Pillars", () => {
     expect(document.body).not.toHaveTextContent("Dominio por técnica");
   });
 
-  it("draws every point icon as a filled tile in its pillar's hue", () => {
+  it("draws every point icon as a vector glyph on a dithered tile in its pillar's hue", () => {
     render(<Pillars />);
     const tones = Object.fromEntries(
       PILLARS.map((pillar) => {
         const section = document.getElementById(pillar.id) as HTMLElement;
-        const tiles = [...section.querySelectorAll<HTMLElement>(".lp-ficon")];
+        const tiles = [...section.querySelectorAll<HTMLElement>(".lp-ptile")];
         expect(tiles).toHaveLength(3);
+        for (const tile of tiles) {
+          expect(tile).toHaveAttribute("aria-hidden", "true");
+          const dither = tile.querySelector(".lp-ptile-dither");
+          expect(dither).toHaveAttribute("shape-rendering", "crispEdges");
+          const glyph = tile.querySelector(".lp-ptile-glyph");
+          expect(glyph).not.toBeNull();
+          expect(glyph).not.toHaveAttribute("shape-rendering");
+          expect(tile.querySelector("use")).toHaveAttribute(
+            "href",
+            "#lp-ptile-dither",
+          );
+        }
         return [
           pillar.id,
           [...new Set(tiles.map((tile) => tile.dataset.tone))],
@@ -85,6 +97,15 @@ describe("Pillars", () => {
       "pilar-hoy": ["mint"],
       "pilar-progreso": ["rose"],
     });
+    expect(document.querySelectorAll("#lp-ptile-dither")).toHaveLength(1);
+  });
+
+  it("gives each of the twelve points its own glyph", () => {
+    const icons = PILLARS.flatMap((pillar) =>
+      pillar.points.map((point) => point.icon),
+    );
+    expect(icons).toHaveLength(12);
+    expect(new Set(icons).size).toBe(12);
   });
 
   it("shows only the PDF, DOCX and PPTX file types in the import demo", () => {
