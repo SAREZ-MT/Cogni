@@ -136,7 +136,8 @@ describe("TechniquesPanel", () => {
   it("shows the 'Técnicas de estudio' header and the three techniques, all three Generar live", async () => {
     await renderPanel(false);
 
-    expect(screen.getByText("Técnicas de estudio")).toBeInTheDocument();
+    // H9-T2: a noticeably larger panel title.
+    expect(screen.getByText("Técnicas de estudio")).toHaveClass("text-[17px]");
     expect(
       screen.getByText("Genera contenido de estudio con IA"),
     ).toBeInTheDocument();
@@ -171,8 +172,9 @@ describe("TechniquesPanel", () => {
     ] as const) {
       const button = screen.getByTestId(testId);
       expect(button).toHaveClass(`text-${pair}-fg`);
-      expect(button.closest("[data-part=technique-card]")?.className).toContain(
-        `bg-${pair}/`,
+      expect(button).toHaveClass(`bg-${pair}`);
+      expect(button.closest("[data-part=technique-card]")).toHaveClass(
+        `technique-glow-${pair.replace("pastel-", "")}`,
       );
     }
   });
@@ -238,11 +240,11 @@ describe("TechniquesPanel", () => {
         "Te quedan 4 generaciones hoy",
       );
     }
-    // H9-T1: the remaining line sits under the name, above "Generar".
+    // H9-T2: the remaining line sits below "Generar".
     expect(
       screen
-        .getByTestId("generation-remaining")
-        .compareDocumentPosition(screen.getByTestId("generate-flashcards")) &
+        .getByTestId("generate-flashcards")
+        .compareDocumentPosition(screen.getByTestId("generation-remaining")) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
   });
@@ -279,9 +281,7 @@ describe("TechniquesPanel", () => {
         screen.getByText("Aquí verás todo lo que generes"),
       ).toBeInTheDocument();
       expect(
-        screen.getByText(
-          "Las flashcards, preguntas y exámenes que crees a partir de esta página aparecerán en esta sección para que los practiques.",
-        ),
+        screen.getByText("Empieza con una técnica de arriba."),
       ).toBeInTheDocument();
       expect(
         screen.queryByText("Aún no generaste nada en esta página"),

@@ -598,40 +598,49 @@ its collapsed icon strip (design/shell-look, studyplatform `StudyPanel.tsx`
 anatomy; simplified per user decision 2026-09-24 — a card has **only** a
 "Generar" action, no navigation).
 
-- `TechniqueCard` props: `icon`, `tone`, `name`, `meta?`, `disabled?`
+- `TechniqueCard` props: `icon`, `tone`, `name`, `disabled?`
   (default `true` — no technique is built yet), `className?`. `href`, the
-  old stats line and `actionLabel` were removed long ago; H9-T1
-  (user, 2026-10-29) also removed `description` — users already know each
+  old stats line and `actionLabel` were removed long ago; H9-T1 (user,
+  2026-10-29) also removed `description` — users already know each
   technique, so a tile is only icon + name + "Generar" + remaining
-  generations. `meta` is that one short line under the name (the panel
-  passes "Te quedan N generaciones hoy"); the caller owns its copy.
+  generations.
 - Wired variant (Phase 3, Flashcards): pass `onGenerate` and the card becomes
   live — the button is enabled by default (`disabled` can still force it
   off, e.g. quota exhausted, without the "Disponible pronto" title, which is
   reserved for unwired cards), `pending` disables it, sets `aria-busy` and
   swaps the label to "Generando…", `generateTestId` tags the button and
-  `children` render under it inside the card (the caller owns notice/
-  error copy). Without `onGenerate` the card behaves exactly as before.
-- Anatomy (H9-T1): the **tile itself is tinted** in the technique colour —
-  `bg-pastel-*/55` with a `border-pastel-*-fg/18` border, no shadow,
-  `rounded-lg p-3`, tagged `data-part="technique-card"` + `data-tone` — so
-  the panel has presence. Header row: a white icon tile (`IconTile` size
-  `"30"`, radius `"md"`, `bg-card shadow-xs` with the glyph in the
-  technique's `-fg`) + the name (13px bold) over `meta`. Then one
-  full-width 32px "Generar" with a leading `Sparkles` (12px, strokeWidth 2):
-  a **white** button (`bg-card border shadow-xs`, 12px semibold) whose label
-  is the technique's `-fg` (pastel-yellow-fg 7.1:1, pastel-mint-fg 7.7:1,
-  pastel-pink-fg 7.6:1 on white) and whose border is the `-fg` at 25%;
-  hover fills it with the technique pastel. The three buttons share every
-  class except those colour classes. Disabled keeps the colour at
+  `children` render under it inside the card (the caller owns the
+  remaining-generations, notice and error copy). Without `onGenerate` the
+  card behaves exactly as before.
+- Anatomy (H9-T2, user 2026-10-29): Home's "Tu progreso de hoy" look
+  (`TechniqueCountCard`) — a white bordered `rounded-xl` card
+  (`px-3.5 pt-3.5 pb-3`, `shadow-xs`) with the technique's pastel fading in
+  from the icon corner (`TECHNIQUE_GLOW_CLASS` → globals.css
+  `technique-glow-yellow|mint|pink`), tagged `data-part="technique-card"` +
+  `data-tone`. Row 1: the pastel icon tile (`IconTile` size `"36"`, radius
+  `"md"`, glyph 19px stroke 1.9, `data-part="technique-icon"`) and the name
+  as a one-line 15px semibold title (`truncate`) vertically centred with it.
+  Row 2: one full-width 36px "Generar" (`rounded-md`, 13px semibold,
+  leading `Sparkles` 12px) in the technique's pastel pair — yellow
+  `bg-pastel-yellow`/`text-pastel-yellow-fg` (6.4:1), mint (6.8:1), pink
+  (5.9:1) — hover `brightness-95`; the three buttons share every class
+  except the pair. Then `children` (the panel puts "Te quedan N
+  generaciones hoy" there, centred 11px). Disabled keeps the colour at
   `disabled:opacity-60` + `disabled:cursor-not-allowed`; disabled unwired
-  cards also get `aria-disabled` and `title="Disponible pronto"`.
-- `TechniqueStack` (H9-T1): the decorative glyph of the panel's
-  "Generado en esta página" empty state — three small pastel tiles (pink,
-  mint, yellow, each `data-part="technique-layer"` + `data-tone`) fanned
-  like a stack of study material, `aria-hidden`. Props: `className?`.
-- `TechniqueIconStrip`: the collapsed-state 36x36 tinted tile (`IconTile`
-  size `"36"` radius `"input"`) with a native `title` tooltip; `opacity-35`
+  cards also get `aria-disabled` and `title="Disponible pronto"`. (H9-T1's
+  flat pastel surface with a white button was rejected by the user.)
+- `TECHNIQUE_GLOW_CLASS`: the faded glow per `TechniqueTone`, same
+  utilities as `TechniqueCountCard`. `TECHNIQUE_TRIO_GLOW_CLASS`: the same
+  faded look with all three pastels (yellow top-left, mint top-right, pink
+  bottom-right, 50–60% strength over `bg-card`) for surfaces that stand for
+  every technique — the panel's "Generado en esta página" empty state.
+- `TechniqueStack` (H9-T1): the decorative glyph of that empty state —
+  three small pastel tiles (pink, mint, yellow, each
+  `data-part="technique-layer"` + `data-tone`) fanned like a stack of study
+  material, `aria-hidden`. Props: `className?`.
+- `TechniqueIconStrip`: the collapsed-state tinted tile (`IconTile`
+  size `"40"` since H9-T2 — was 36 — radius `"input"`, glyph 20px) with a
+  native `title` tooltip; the panel's collapsed width is 56; `opacity-35`
   when `available` is false (default).
 - `TechniqueTone`: `"yellow" | "green" | "rose"` (Flashcards / Recordación
   activa / Examen) — mapped onto the **existing** pastel pairs `yellow` /
@@ -669,10 +678,10 @@ practice button or deck/exam link inside a card; Examen's "Preguntas" link
 was removed too (manual questions live in Exámenes → cuaderno → página).
 `SavedStudySection` keys rows by tone + href + label, so rows sharing a label
 need distinct hrefs. Its empty state (H9-T1) explains the section instead of
-asking for an action: `EmptyState` `tinted` with `TechniqueStack` as the icon,
-"Aquí verás todo lo que generes" + "Las flashcards, preguntas y exámenes que
-crees a partir de esta página aparecerán en esta sección para que los
-practiques."
+asking for an action: `EmptyState` `tinted` restyled as a white
+`rounded-xl` card with `TECHNIQUE_TRIO_GLOW_CLASS` (H9-T2), `TechniqueStack`
+as the icon, "Aquí verás todo lo que generes" + "Empieza con una técnica de
+arriba." The panel is 280px wide since H9-T2 (was 264).
 
 ## StudyItemRow (`study-item-row.tsx`)
 

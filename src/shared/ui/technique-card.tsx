@@ -50,38 +50,34 @@ export const TECHNIQUE_ACCENT_TEXT_CLASS: Record<TechniqueTone, string> = {
   rose: "text-technique-exam-accent",
 };
 
-// H9-T1 (user, 2026-10-29): the panel lacked presence, so the tile itself
-// now carries the technique colour — its pastel at half strength as the
-// surface and a border in the same hue (the -fg at 18%) — instead of a
-// white card with a pastel button. Each class is spelled out per tone so
-// Tailwind sees the literal names.
-const TONE_CARD_CLASS: Record<TechniqueTone, string> = {
-  yellow: "bg-pastel-yellow/55 border-pastel-yellow-fg/18",
-  green: "bg-pastel-mint/55 border-pastel-mint-fg/18",
-  rose: "bg-pastel-pink/55 border-pastel-pink-fg/18",
+// H9-T2 (user, 2026-10-29): the tile uses Home's "Tu progreso de hoy"
+// look (TechniqueCountCard) — a white bordered card with the technique's
+// pastel fading in from the icon corner, the globals.css technique-glow-*
+// utility — instead of a flat pastel surface.
+export const TECHNIQUE_GLOW_CLASS: Record<TechniqueTone, string> = {
+  yellow: "technique-glow-yellow",
+  green: "technique-glow-mint",
+  rose: "technique-glow-pink",
 };
 
-// On the tinted tile the icon sits on a white tile in the technique's -fg,
-// so it pops instead of blending into the surface.
-const TONE_ICON_CLASS: Record<TechniqueTone, string> = {
-  yellow: "text-pastel-yellow-fg",
-  green: "text-pastel-mint-fg",
-  rose: "text-pastel-pink-fg",
-};
+// The same faded look with all three technique pastels, one per corner,
+// for surfaces that stand for every technique at once (the panel's
+// "Generado en esta página" empty state, H9-T2). Kept faint: a hint.
+export const TECHNIQUE_TRIO_GLOW_CLASS =
+  "bg-card bg-[radial-gradient(95%_120%_at_0%_0%,color-mix(in_oklch,var(--color-pastel-yellow)_60%,transparent),transparent_62%),radial-gradient(80%_110%_at_100%_0%,color-mix(in_oklch,var(--color-pastel-mint)_50%,transparent),transparent_60%),radial-gradient(95%_120%_at_100%_100%,color-mix(in_oklch,var(--color-pastel-pink)_50%,transparent),transparent_62%)]";
 
-// "Generar" is a white button with the -fg label and a border in the same
-// hue: the tile's one clear action. Every -fg meets WCAG AA on white
-// (pastel-yellow-fg 7.1:1, pastel-mint-fg 7.7:1, pastel-pink-fg 7.6:1).
-// Hover fills it with the technique pastel; the label keeps its colour.
+// "Generar" in the technique's pastel pair (each -fg meets WCAG AA on its
+// pastel: yellow 6.4:1, mint 6.8:1, pink 5.9:1); on the white-to-pastel
+// card it reads as the tile's one clear action. Hover darkens the same
+// pair (brightness-95) instead of switching colour.
 const TONE_BUTTON_CLASS: Record<TechniqueTone, string> = {
-  yellow:
-    "text-pastel-yellow-fg border-pastel-yellow-fg/25 hover:bg-pastel-yellow",
-  green: "text-pastel-mint-fg border-pastel-mint-fg/25 hover:bg-pastel-mint",
-  rose: "text-pastel-pink-fg border-pastel-pink-fg/25 hover:bg-pastel-pink",
+  yellow: `${TECHNIQUE_PAIR_CLASS.yellow} hover:bg-pastel-yellow`,
+  green: `${TECHNIQUE_PAIR_CLASS.green} hover:bg-pastel-mint`,
+  rose: `${TECHNIQUE_PAIR_CLASS.rose} hover:bg-pastel-pink`,
 };
 
 const GENERATE_BUTTON_CLASS =
-  "h-8 w-full border bg-card font-semibold text-[12px] shadow-xs disabled:cursor-not-allowed disabled:opacity-60";
+  "h-9 w-full rounded-md font-semibold text-[13px] hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60";
 
 export interface TechniqueCardProps {
   icon: LucideIcon;
@@ -100,22 +96,20 @@ export interface TechniqueCardProps {
   // "Generando…".
   pending?: boolean;
   generateTestId?: string;
-  // One short line under the name (H9-T1: the remaining generations); the
-  // caller owns the copy. There is no description line any more.
-  meta?: ReactNode;
   // Options of the action rendered between the header and the button
   // (e.g. Examen's question count); the caller owns them.
   controls?: ReactNode;
-  // Feedback under the button (notices, errors); the caller owns the copy.
+  // Feedback under the button (remaining generations, notices, errors);
+  // the caller owns the copy.
   children?: ReactNode;
   className?: string;
 }
 
-// Technique tile (H9-T1, user 2026-10-29; was the design/shell-look
-// studyplatform StudyPanel.tsx card): icon + name (+ the meta line) and a
-// single full-width "Generar" — no description, no navigation. The whole
-// tile is tinted in the technique colour so the panel reads colourful and
-// alive; a disabled button keeps that colour at `disabled:opacity-60`.
+// Technique tile (H9-T1/T2, user 2026-10-29; was the design/shell-look
+// studyplatform StudyPanel.tsx card): one row of icon + one-line name, then
+// a single full-width "Generar", then the caller's feedback — no
+// description, no navigation. A disabled button keeps its colour at
+// `disabled:opacity-60`.
 export function TechniqueCard({
   icon: Icon,
   tone,
@@ -124,7 +118,6 @@ export function TechniqueCard({
   onGenerate,
   pending = false,
   generateTestId,
-  meta,
   controls,
   children,
   className,
@@ -137,24 +130,23 @@ export function TechniqueCard({
       data-part="technique-card"
       data-tone={tone}
       className={cn(
-        "flex flex-col gap-2.5 rounded-lg p-3 shadow-none",
-        TONE_CARD_CLASS[tone],
+        "flex flex-col gap-3 rounded-xl bg-card px-3.5 pt-3.5 pb-3",
+        TECHNIQUE_GLOW_CLASS[tone],
         className,
       )}
     >
-      <div className="flex items-center gap-2.5">
+      <div className="flex items-center gap-3">
         <IconTile
-          size="30"
+          tone={TONE_TILE[tone]}
+          size="36"
           radius="md"
           data-part="technique-icon"
-          className={cn("bg-card shadow-xs", TONE_ICON_CLASS[tone])}
         >
-          <Icon aria-hidden="true" size={16} strokeWidth={1.75} />
+          <Icon aria-hidden="true" size={19} strokeWidth={1.9} />
         </IconTile>
-        <div className="min-w-0 flex-1">
-          <p className="font-bold text-[13px] text-fg leading-tight">{name}</p>
-          {meta}
-        </div>
+        <p className="min-w-0 flex-1 truncate font-semibold text-[15px] text-fg leading-tight tracking-[-0.01em]">
+          {name}
+        </p>
       </div>
       {controls}
       <Button
@@ -228,7 +220,7 @@ export interface TechniqueIconStripProps {
 }
 
 // Collapsed-state icon (design/shell-look, studyplatform StudyPanel.tsx
-// `IconStrip`): a 36x36 tinted tile with a native `title` tooltip, dimmed
+// `IconStrip`; 40px since H9-T2 so it reads when collapsed): a tinted tile with a native `title` tooltip, dimmed
 // when the technique isn't available yet.
 export function TechniqueIconStrip({
   icon: Icon,
@@ -239,12 +231,12 @@ export function TechniqueIconStrip({
   return (
     <IconTile
       tone={TONE_TILE[tone]}
-      size="36"
+      size="40"
       radius="input"
       title={title}
       className={cn("shadow-xs", !available && "opacity-35")}
     >
-      <Icon aria-hidden="true" size={16} strokeWidth={1.75} />
+      <Icon aria-hidden="true" size={20} strokeWidth={1.9} />
     </IconTile>
   );
 }

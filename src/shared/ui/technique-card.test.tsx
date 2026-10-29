@@ -36,20 +36,19 @@ describe("TechniqueCard", () => {
     expect(container.querySelectorAll("p")).toHaveLength(1);
   });
 
-  it("renders the meta line (remaining generations) under the name, above the button", () => {
-    renderCard({
-      onGenerate: () => {},
-      meta: <span>Te quedan 4 generaciones hoy</span>,
-    });
+  // H9-T2 (user, 2026-10-29): icon and name form one row, the name a
+  // larger one-line title; "Generar" sits below that row.
+  it("puts the icon and a one-line name in one row above the button", () => {
+    const { container } = renderCard({ onGenerate: () => {} });
 
+    const tile = container.querySelector("[data-part=technique-icon]");
     const name = screen.getByText("Flashcards");
-    const meta = screen.getByText("Te quedan 4 generaciones hoy");
-    const button = screen.getByRole("button", { name: "Generar" });
+    expect(name.parentElement).toBe(tile?.parentElement);
+    expect(name).toHaveClass("truncate", "text-[15px]");
     expect(
-      name.compareDocumentPosition(meta) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-    expect(
-      meta.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING,
+      name.compareDocumentPosition(
+        screen.getByRole("button", { name: "Generar" }),
+      ) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
   });
 
@@ -160,12 +159,11 @@ describe("TechniqueCard", () => {
 });
 
 describe("TechniqueCard technique colours", () => {
-  // H9-T1 (user, 2026-10-29): the tile itself carries the technique colour
-  // (pastel surface + a border in the same hue), the icon sits on a white
-  // tile in the technique's -fg, and Generar is a white button with the
-  // -fg label so it reads as the tile's one action. Every -fg meets WCAG
-  // AA on white and on its pastel.
-  const SHARED = ["w-full", "text-[12px]", "font-semibold", "bg-card"];
+  // H9-T2 (user, 2026-10-29): the Home "Tu progreso de hoy" look — a white
+  // card with the technique's pastel fading in from the icon corner
+  // (globals.css technique-glow-*), the pastel icon tile, and a "Generar"
+  // in the technique's pastel pair.
+  const SHARED = ["w-full", "h-9", "text-[13px]", "font-semibold"];
   it.each([
     ["yellow", "pastel-yellow"],
     ["green", "pastel-mint"],
@@ -182,15 +180,17 @@ describe("TechniqueCard technique colours", () => {
 
     const card = container.querySelector("[data-part=technique-card]");
     expect(card).toHaveAttribute("data-tone", tone);
-    expect(card?.className).toContain(`bg-${pair}/`);
-    expect(card?.className).toContain(`border-${pair}-fg/`);
+    expect(card).toHaveClass(
+      "bg-card",
+      `technique-glow-${pair.replace("pastel-", "")}`,
+    );
     const button = screen.getByRole("button", { name: "Generar" });
-    expect(button).toHaveClass(...SHARED, `text-${pair}-fg`);
+    expect(button).toHaveClass(...SHARED, `bg-${pair}`, `text-${pair}-fg`);
     expect(button.className).not.toMatch(
       /text-white|bg-(warning|success|rose)-\d/,
     );
     const tile = container.querySelector("[data-part=technique-icon]");
-    expect(tile).toHaveClass("bg-card", `text-${pair}-fg`);
+    expect(tile).toHaveClass("size-9", `bg-${pair}`, `text-${pair}-fg`);
   });
 
   it("gives the three Generar buttons the same classes apart from the colour pair", () => {
@@ -245,10 +245,10 @@ describe("TechniqueIconStrip", () => {
     expect(screen.getByTitle("Recordación activa")).toBeInTheDocument();
   });
 
-  it("uses the technique's pastel tile", () => {
+  it("uses the technique's pastel tile, at 40px so it reads when collapsed (H9-T2)", () => {
     render(<TechniqueIconStrip icon={Layers} tone="yellow" title="t" />);
 
-    expect(screen.getByTitle("t")).toHaveClass("bg-pastel-yellow");
+    expect(screen.getByTitle("t")).toHaveClass("bg-pastel-yellow", "size-10");
   });
 
   it("is dimmed unless the technique is available", () => {

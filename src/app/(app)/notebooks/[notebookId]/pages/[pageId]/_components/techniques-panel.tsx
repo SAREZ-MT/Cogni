@@ -26,10 +26,12 @@ import { SavedStudySection } from "@/shared/ui/saved-study-section";
 import { SidePanel } from "@/shared/ui/side-panel";
 import type { StudyItemRowProps } from "@/shared/ui/study-item-row";
 import {
+  TECHNIQUE_TRIO_GLOW_CLASS,
   TechniqueCard,
   TechniqueIconStrip,
   TechniqueStack,
 } from "@/shared/ui/technique-card";
+import { cn } from "@/shared/ui/utils";
 import {
   TECHNIQUES_PANEL_COLLAPSED,
   TECHNIQUES_PANEL_COOKIE,
@@ -185,39 +187,31 @@ function generatedRow(
   };
 }
 
-// The remaining-generations line under every technique's name (H9-T1:
-// the tile's meta line), identical for the three; `prefix` namespaces the
-// test id.
-function RemainingLine({
-  prefix,
-  remaining,
-}: {
-  prefix: string;
-  remaining: number | null;
-}) {
-  if (remaining === null) return null;
-  return (
-    <p
-      data-testid={`${prefix}generation-remaining`}
-      className="mt-0.5 text-[10.5px] text-fg-secondary leading-snug"
-    >
-      {remainingCopy(remaining)}
-    </p>
-  );
-}
-
-// The feedback lines under every technique's "Generar" (notice, error).
+// The feedback lines under every technique's "Generar", identical for the
+// three (remaining generations, notice, error); `prefix` namespaces the
+// test ids. H9-T2 (user 2026-10-29): the remaining line sits below the
+// button again.
 function CardFeedback({
   prefix,
+  remaining,
   notice,
   error,
 }: {
   prefix: string;
+  remaining: number | null;
   notice: string | null;
   error: string | null;
 }) {
   return (
     <>
+      {remaining !== null && (
+        <p
+          data-testid={`${prefix}generation-remaining`}
+          className="-mt-1 text-center text-[11px] text-fg-secondary"
+        >
+          {remainingCopy(remaining)}
+        </p>
+      )}
       {notice && (
         <p
           data-testid={`${prefix}generation-notice`}
@@ -507,8 +501,10 @@ export function TechniquesPanel({
   return createPortal(
     <SidePanel
       collapsed={collapsed}
-      width={264}
-      collapsedWidth={52}
+      // 280 since H9-T2 (user 2026-10-29: larger tiles and title); at 1440
+      // the editor column keeps ample room.
+      width={280}
+      collapsedWidth={56}
       side="right"
       className="hidden lg:flex"
       aria-label="Técnicas de estudio"
@@ -521,15 +517,15 @@ export function TechniquesPanel({
             <div className="flex min-w-0 items-center gap-2">
               <Sparkles
                 aria-hidden="true"
-                size={14}
+                size={16}
                 strokeWidth={2}
                 className="shrink-0 text-primary-600"
               />
               <div className="min-w-0">
-                <p className="font-bold text-[13px] text-fg leading-tight">
+                <p className="font-bold text-[17px] text-fg leading-tight tracking-[-0.015em]">
                   Técnicas de estudio
                 </p>
-                <p className="mt-0.5 text-[10.5px] text-fg-muted leading-tight">
+                <p className="mt-0.5 text-[11px] text-fg-muted leading-tight">
                   Genera contenido de estudio con IA
                 </p>
               </div>
@@ -539,7 +535,7 @@ export function TechniquesPanel({
         )
       }
       collapsedContent={
-        <div className="flex flex-col items-center gap-[5px] py-2.5">
+        <div className="flex flex-col items-center gap-2 py-3">
           {TECHNIQUES.map((t) => (
             <TechniqueIconStrip
               key={t.id}
@@ -552,7 +548,7 @@ export function TechniquesPanel({
         </div>
       }
     >
-      <div className="flex flex-col gap-2 p-3 pb-4">
+      <div className="flex flex-col gap-2.5 p-3 pb-4">
         {TECHNIQUES.map((t) => {
           const card =
             t.id === "flashcards"
@@ -591,12 +587,10 @@ export function TechniquesPanel({
               pending={card.pending}
               disabled={limitReached}
               generateTestId={card.testId}
-              meta={
-                <RemainingLine prefix={card.prefix} remaining={remaining} />
-              }
             >
               <CardFeedback
                 prefix={card.prefix}
+                remaining={remaining}
                 notice={card.notice}
                 error={card.error}
               />
@@ -624,10 +618,13 @@ export function TechniquesPanel({
               icon={<TechniqueStack />}
               title="Aquí verás todo lo que generes"
               titleAs="p"
-              titleClassName="font-semibold text-[12px]"
-              description="Las flashcards, preguntas y exámenes que crees a partir de esta página aparecerán en esta sección para que los practiques."
-              descriptionClassName="text-[10.5px] leading-relaxed"
-              className="px-4 py-5"
+              titleClassName="font-semibold text-[12.5px]"
+              description="Empieza con una técnica de arriba."
+              descriptionClassName="text-[11px] text-fg-secondary"
+              className={cn(
+                "rounded-xl border-border-subtle px-4 py-5 shadow-xs",
+                TECHNIQUE_TRIO_GLOW_CLASS,
+              )}
             />
           }
         />
