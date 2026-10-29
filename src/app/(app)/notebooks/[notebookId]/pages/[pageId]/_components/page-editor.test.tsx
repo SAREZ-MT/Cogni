@@ -70,6 +70,93 @@ describe("PageEditor", () => {
     expect(props.initialVersion).toBe(1);
   });
 
+  // Phase 8 H14: each successful save tells the techniques panel the
+  // page's current word count.
+  describe("save port", () => {
+    function mountWithSave(save: ReturnType<typeof vi.fn>) {
+      render(
+        <PageEditor
+          notebookId="n1"
+          pageId="p1"
+          initialContent={{ type: "doc", content: [] }}
+          initialVersion={1}
+          port={{ save, getCurrent: vi.fn() } as unknown as EditorProps["port"]}
+        />,
+      );
+      if (!captured.props) throw new Error("Editor not rendered");
+      return captured.props.port;
+    }
+    const doc = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "uno dos tres" }],
+        },
+      ],
+    } as EditorProps["initialContent"];
+
+    it("publishes the loaded page's words when it mounts", () => {
+      const heard: unknown[] = [];
+      const listener = (event: Event) =>
+        heard.push((event as CustomEvent).detail);
+      window.addEventListener("cogni:page-words", listener);
+      render(
+        <PageEditor
+          notebookId="n1"
+          pageId="p9"
+          initialContent={doc}
+          initialVersion={1}
+          port={{ save: vi.fn() } as unknown as EditorProps["port"]}
+        />,
+      );
+
+      window.removeEventListener("cogni:page-words", listener);
+      expect(heard).toEqual([{ pageId: "p9", words: 3 }]);
+    });
+
+    it("publishes the saved page's words once the save succeeds", async () => {
+      const save = vi
+        .fn()
+        .mockResolvedValue({ ok: true, value: { version: 2 } });
+      const port = mountWithSave(save);
+      const heard: unknown[] = [];
+      const listener = (event: Event) =>
+        heard.push((event as CustomEvent).detail);
+      window.addEventListener("cogni:page-words", listener);
+
+      const result = await port.save({
+        pageId: "p1",
+        content: doc,
+        expectedVersion: 1,
+      });
+
+      window.removeEventListener("cogni:page-words", listener);
+      expect(result).toEqual({ ok: true, value: { version: 2 } });
+      expect(save).toHaveBeenCalledWith({
+        pageId: "p1",
+        content: doc,
+        expectedVersion: 1,
+      });
+      expect(heard).toEqual([{ pageId: "p1", words: 3 }]);
+    });
+
+    it("publishes nothing when the save fails", async () => {
+      const save = vi
+        .fn()
+        .mockResolvedValue({ ok: false, error: { code: "X", message: "x" } });
+      const port = mountWithSave(save);
+      const heard: unknown[] = [];
+      const listener = (event: Event) => heard.push(event);
+      window.addEventListener("cogni:page-words", listener);
+
+      await port.save({ pageId: "p1", content: doc, expectedVersion: 1 });
+
+      window.removeEventListener("cogni:page-words", listener);
+      expect(heard).toEqual([]);
+    });
+  });
+
   describe("mention port", () => {
     it("returns every page for an empty query", async () => {
       const { mentionPort } = mountEditor();

@@ -20,9 +20,20 @@ import {
   generateFlashcardsAction,
   listFlashcardsAction,
 } from "@/modules/flashcards";
+import {
+  EXAM_MIN_WORDS,
+  examCountsForWords,
+  MIN_GENERATION_WORDS,
+  PAGE_TOO_SHORT_CODE,
+  RECALL_MIN_WORDS,
+} from "@/shared/kernel/generation-capacity";
 import { EmptyState } from "@/shared/ui/empty-state";
 import { PanelToggleButton } from "@/shared/ui/panel-toggle-button";
 import { SavedStudySection } from "@/shared/ui/saved-study-section";
+import {
+  pageTooShortMessage,
+  shortPageHint,
+} from "@/shared/ui/short-page-copy";
 import { SidePanel } from "@/shared/ui/side-panel";
 import type { StudyItemRowProps } from "@/shared/ui/study-item-row";
 import { TechniqueCard, TechniqueIconStrip } from "@/shared/ui/technique-card";
@@ -33,6 +44,7 @@ import {
 } from "../../../../../_components/techniques-panel-cookie";
 import { TECHNIQUES_PANEL_SLOT_ID } from "../../../../../_components/techniques-panel-slot";
 import { ExamGenerateDialog } from "./exam-generate-dialog";
+import { usePageWords } from "./page-words";
 import { TECHNIQUES, type TechniqueDefinition } from "./techniques";
 
 // "Técnicas de estudio" panel (Phase 6 T5b, user decision 2026-10-06:
@@ -190,14 +202,25 @@ function CardFeedback({
   remaining,
   notice,
   error,
+  short,
 }: {
   prefix: string;
   remaining: number | null;
   notice: string | null;
   error: string | null;
+  // Phase 8 H14: why "Generar" is disabled on a short page.
+  short?: string | null;
 }) {
   return (
     <>
+      {short && (
+        <p
+          data-testid={`${prefix}generation-short`}
+          className="text-center text-[10.5px] text-fg-secondary"
+        >
+          {short}
+        </p>
+      )}
       {remaining !== null && (
         <p
           data-testid={`${prefix}generation-remaining`}
@@ -250,6 +273,9 @@ export interface TechniquesPanelProps {
   initialRecallQuestionCount: number | null;
   // Generations left today; null when the status could not be read.
   initialRemaining: number | null;
+  // Phase 8 H14: the page's word count on the server (plain_text); the
+  // editor's saves update it (page-words.ts). Unknown disables nothing.
+  initialWords?: number;
 }
 
 // design/shell-look: the page-editor route's only consumer of the
@@ -266,7 +292,9 @@ export function TechniquesPanel({
   initialFlashcards,
   initialRecallQuestionCount,
   initialRemaining,
+  initialWords,
 }: TechniquesPanelProps) {
+  const words = usePageWords(pageId, initialWords);
   const [collapsed, setCollapsed] = useState(initialCollapsed);
   const [cards, setCards] = useState(initialFlashcards);
   const [remaining, setRemaining] = useState(initialRemaining);
@@ -357,7 +385,11 @@ export function TechniquesPanel({
           setNotice(NO_NEW_CONTENT);
           return;
         }
-        setError(ERROR_COPY[result.error.code] ?? GENERIC_FAILURE);
+        setError(
+          result.error.code === PAGE_TOO_SHORT_CODE
+            ? pageTooShortMessage(result.error.minWords)
+            : (ERROR_COPY[result.error.code] ?? GENERIC_FAILURE),
+        );
         if (result.error.code === "AI_DAILY_LIMIT_REACHED") setRemaining(0);
         return;
       }
@@ -399,7 +431,9 @@ export function TechniquesPanel({
           return;
         }
         setExamError(
-          EXAM_ERROR_COPY[result.error.code] ?? EXAM_GENERIC_FAILURE,
+          result.error.code === PAGE_TOO_SHORT_CODE
+            ? pageTooShortMessage(result.error.minWords)
+            : (EXAM_ERROR_COPY[result.error.code] ?? EXAM_GENERIC_FAILURE),
         );
         if (result.error.code === "AI_DAILY_LIMIT_REACHED") setRemaining(0);
         return;
@@ -428,7 +462,9 @@ export function TechniquesPanel({
           return;
         }
         setRecallError(
-          RECALL_ERROR_COPY[result.error.code] ?? EXAM_GENERIC_FAILURE,
+          result.error.code === PAGE_TOO_SHORT_CODE
+            ? pageTooShortMessage(result.error.minWords)
+            : (RECALL_ERROR_COPY[result.error.code] ?? EXAM_GENERIC_FAILURE),
         );
         if (result.error.code === "AI_DAILY_LIMIT_REACHED") setRemaining(0);
         return;
@@ -442,6 +478,19 @@ export function TechniquesPanel({
   if (!slotNode) return null;
 
   const limitReached = remaining !== null && remaining <= 0;
+
+  // Phase 8 H14 (user 2026-10-29): the words each technique needs, and the
+  // exam counts the page's words support (the full range while unknown).
+  function shortHint(minWords: number): string | null {
+    return words !== undefined && words < minWords
+      ? shortPageHint(words, minWords)
+      : null;
+  }
+  const examCounts = words === undefined ? [] : examCountsForWords(words);
+  const examMax =
+    words === undefined || examCounts.length === 0
+      ? EXAM_MAX_QUESTIONS
+      : (examCounts[examCounts.length - 1] ?? EXAM_MAX_QUESTIONS);
 
   const generatedRows: StudyItemRowProps[] = TECHNIQUES.flatMap((t) => {
     if (t.id === "flashcards") {
@@ -559,15 +608,20 @@ export function TechniquesPanel({
                   prefix: "",
                   notice,
                   error,
+                  short: shortHint(MIN_GENERATION_WORDS),
                 }
               : t.id === "exam"
                 ? {
-                    onGenerate: () => setExamDialogOpen(true),
+                    onGenerate: () => {
+                      setExamCount((current) => Math.min(current, examMax));
+                      setExamDialogOpen(true);
+                    },
                     pending: examPending,
                     testId: "generate-exam-questions",
                     prefix: "exam-",
                     notice: examNotice,
                     error: examError,
+                    short: shortHint(EXAM_MIN_WORDS),
                   }
                 : {
                     onGenerate: generateRecall,
@@ -576,6 +630,7 @@ export function TechniquesPanel({
                     prefix: "recall-",
                     notice: recallNotice,
                     error: recallError,
+                    short: shortHint(RECALL_MIN_WORDS),
                   };
           return (
             <TechniqueCard
@@ -585,7 +640,7 @@ export function TechniquesPanel({
               name={t.name}
               onGenerate={card.onGenerate}
               pending={card.pending}
-              disabled={limitReached}
+              disabled={limitReached || card.short !== null}
               generateTestId={card.testId}
             >
               <CardFeedback
@@ -593,6 +648,7 @@ export function TechniquesPanel({
                 remaining={remaining}
                 notice={card.notice}
                 error={card.error}
+                short={card.short}
               />
             </TechniqueCard>
           );
@@ -603,9 +659,14 @@ export function TechniquesPanel({
           count={examCount}
           onCountChange={setExamCount}
           min={EXAM_MIN_QUESTIONS}
-          max={EXAM_MAX_QUESTIONS}
+          max={examMax}
           step={EXAM_COUNT_STEP}
           onConfirm={generateExam}
+          hint={
+            examMax < EXAM_MAX_QUESTIONS
+              ? `Esta página admite hasta ${examMax} preguntas`
+              : undefined
+          }
         />
 
         <SavedStudySection

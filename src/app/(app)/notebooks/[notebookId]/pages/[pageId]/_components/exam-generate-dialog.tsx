@@ -23,6 +23,9 @@ export interface ExamGenerateDialogProps {
   step: number;
   // Called with the chosen count; the dialog closes itself first.
   onConfirm: (count: number) => void;
+  // Phase 8 H14: replaces the range hint, e.g. when the page's words allow
+  // fewer questions than the maximum.
+  hint?: string;
 }
 
 // Examen's "Generar" (Phase 6 T5b v2, user decision 2026-10-06): the
@@ -38,6 +41,7 @@ export function ExamGenerateDialog({
   max,
   step,
   onConfirm,
+  hint,
 }: ExamGenerateDialogProps) {
   function confirm() {
     onOpenChange(false);
@@ -74,7 +78,7 @@ export function ExamGenerateDialog({
           onChange={onCountChange}
           testId="exam-count"
           size="field"
-          hint={`Entre ${min} y ${max}, de ${step} en ${step}`}
+          hint={hint ?? `Entre ${min} y ${max}, de ${step} en ${step}`}
         />
         <DialogFooter>
           <Button
