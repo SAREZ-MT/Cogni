@@ -202,3 +202,96 @@ describe("Breadcrumb links", () => {
     expect(screen.getByText("Biología")).toBeInTheDocument();
   });
 });
+
+// H6-E7 (odd/tasks/phase-8-design-flows.md): the trail is a key navigation
+// aid, so it reads larger and clearer — 15px, ink for the current page,
+// chevron separators, roomy hover targets with an underline, and long names
+// truncated with the full name kept as a tooltip.
+describe("Breadcrumb legibility", () => {
+  function renderLongTrail() {
+    return render(
+      <BreadcrumbProvider>
+        <SetBreadcrumb
+          items={[
+            { label: "Cuadernos", href: "/notebooks" },
+            {
+              label: "Biología celular y fotosíntesis de plantas",
+              href: "/notebooks/nb1",
+            },
+            { label: "La fase luminosa explicada paso a paso" },
+          ]}
+        />
+        <Breadcrumb />
+      </BreadcrumbProvider>,
+    );
+  }
+
+  it("sets the trail at 15px and lets it shrink inside the topbar", () => {
+    renderLongTrail();
+
+    const nav = screen.getByRole("navigation", { name: "Ruta de navegación" });
+    expect(nav).toHaveClass("min-w-0");
+    expect(nav.querySelector("ol")).toHaveClass("text-[15px]");
+  });
+
+  it("gives every link a comfortable hit area and a hover underline", () => {
+    renderLongTrail();
+
+    const link = screen.getByRole("link", { name: "Cuadernos" });
+    expect(link).toHaveClass("h-8");
+    expect(link).toHaveClass("hover:underline");
+  });
+
+  it("truncates long names and keeps the full name as a tooltip", () => {
+    renderLongTrail();
+
+    const notebook = screen.getByRole("link", {
+      name: "Biología celular y fotosíntesis de plantas",
+    });
+    expect(notebook).toHaveClass("truncate");
+    expect(notebook).toHaveAttribute(
+      "title",
+      "Biología celular y fotosíntesis de plantas",
+    );
+    const current = screen.getByText("La fase luminosa explicada paso a paso");
+    expect(current).toHaveClass("truncate");
+    expect(current).toHaveAttribute(
+      "title",
+      "La fase luminosa explicada paso a paso",
+    );
+  });
+
+  it("draws the separators as chevron icons", () => {
+    renderLongTrail();
+
+    const separators = screen
+      .getByRole("navigation", { name: "Ruta de navegación" })
+      .querySelectorAll('svg[aria-hidden="true"]');
+    expect(separators).toHaveLength(3);
+  });
+});
+
+describe("Breadcrumb in a narrow topbar", () => {
+  it("keeps the parent and the current page, and hides the segments before them below 32rem", () => {
+    render(
+      <BreadcrumbProvider>
+        <SetBreadcrumb
+          items={[
+            { label: "Cuadernos", href: "/notebooks" },
+            { label: "Biología", href: "/notebooks/nb1" },
+            { label: "Mitosis" },
+          ]}
+        />
+        <Breadcrumb />
+      </BreadcrumbProvider>,
+    );
+
+    const nav = screen.getByRole("navigation", { name: "Ruta de navegación" });
+    expect(nav).toHaveClass("@container");
+    const far = screen.getByRole("link", { name: "Cuadernos" }).closest("li");
+    expect(far).toHaveClass("hidden", "@lg:flex");
+    const parent = screen.getByRole("link", { name: "Biología" }).closest("li");
+    expect(parent).not.toHaveClass("hidden");
+    expect(screen.getByText("Mitosis").closest("li")).not.toHaveClass("hidden");
+  });
+});
