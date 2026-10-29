@@ -500,6 +500,68 @@ Slice-artefact advisories (CalendarNav/TodayList callers "not migrated") are res
     other specs using `createPageAndOpen` were not run (pre-PR full suite).
   - Commits: `6e69fef` (create first), `54ec518` (paper strips).
 
+- [x] **H5-T3** — "Nueva página" asks how to create the page and opens it right away (user, 2026-10-29).
+  - Route: delegated writer (writer trigger: dialog composition + atom +
+    page + tests + e2e helper + ATOMS.md).
+  - Request: land in the new page's editor after creating it; every "Nueva
+    página" opens a modal with "Página en blanco" and "Importar un
+    documento" (PDF/DOCX/PPTX) reusing the existing import flow.
+  - Built: `createPage` (the route's inline Server Action) now `redirect`s
+    to `/notebooks/{id}/pages/{newId}`; `notebooks/actions.ts` already
+    returned the created `Page`, so NO backend file changed. New
+    `_components/new-page-dialog.tsx` (route composition: notebooks cannot
+    import ingestion) on the `Dialog` atom: two option cards; blank submits
+    the action ("Creando página…" while pending); import closes the dialog
+    and calls the existing `DocumentImportProvider.start` (its hidden
+    picker `accept` = .pdf,.docx,.pptx + mimes, 20 MB check, progress
+    banner and errors unchanged; it already `router.push`es to the new
+    page once the import job starts, so no change there), disabled while
+    another import runs. New atom `FileFormatBadge`. The grid tile, list
+    row and empty-state CTA are triggers (`type="button"`). No sidebar
+    entry point: the sidebar no longer mounts the page tree (design pass
+    2), so `sidebar-tree-client`'s create page was left unchanged. No
+    ingestion file changed (deep imports of its UI hooks from the app
+    layer, as `notebook-actions.tsx` does).
+  - RED: 3 route tests (header create count/type, redirect) and the
+    dialog suite (module missing) failed → GREEN.
+  - Checks: tsc clean; biome clean; vitest shared/ui + notebooks +
+    ingestion + (app) + no-inline-hex 2630 tests: 2629 pass, 1 fail
+    (`inicio` pre-existing); depcruise no violations. e2e helper
+    `createPageAndOpen` picks "Página en blanco" and asserts the editor
+    URL; notebooks-acceptance + slash-command + editor-a11y + image-upload
+    + flashcards-manual + exams-hub: 15 pass, 2 fail (exams-hub
+    "offers its retake" and "marks a passed page…", also failing when
+    rerun alone): page creation and the editor work; they fail in
+    `takeExam`, whose stem is real AI text ("¿Qué componente…") instead
+    of the fake provider's "Pregunta N:" — the reused dev server on :3000
+    is not running with the e2e fake AI env. Environmental, not this task.
+    Screenshots `t3after-dialog-1440.png`, `-dialog-focus-1440.png`,
+    `-dialog-390.png`, `-editor-1440.png` (lands in the editor).
+  - Commit: `920be62`.
+- [x] **H5-T4** — the empty notebook: a fan of sheets and one clear first step (user, 2026-10-29).
+  - Route: delegated writer (new atom + page + tests + ATOMS.md).
+  - Built: new atom `PageSheetFan` (three `PageSheet`s in the notebook's
+    colour fanned with the `TechniqueFan` helpers, "Tu primera página" with
+    a caret on the front sheet, container-query scale steps). The zero-pages
+    state is now an `IllustratedEmptyState` (cascade, dotted paper):
+    "Tu cuaderno está listo para su primera página" / "Escribe tus apuntes
+    desde cero o importa un PDF, Word o PowerPoint. Luego podrás
+    repasarlos con las técnicas de estudio." and the hub's violet pill
+    "Nueva página" (opens the H5-T3 dialog, which holds the import
+    option). Header meta "Cuaderno · Sin páginas todavía".
+  - RED: 2 route tests (fan + CTA, header meta) failed → GREEN. The fan's
+    own test was written right after the atom (not before).
+  - Checks: tsc clean; biome clean; vitest scoped 1726 tests: 1725 pass, 1
+    fail (`inicio` pre-existing); depcruise no violations. One iteration:
+    front-sheet text resized to fit beside the fold; smaller scale steps
+    for the 390 pre-existing sidebar. Screenshots `t4before-empty-1440.png`,
+    `t4before-empty-390.png` (the old copy), `t4after-empty-1440.png`,
+    `t4after-empty-blue-1440.png`, `t4after-empty-1024.png`,
+    `t4after-empty-390.png`. e2e notebooks-acceptance + shell-empty-state +
+    slash-command 24/24 pass (4.8m; every new notebook starts empty, so
+    the CTA → dialog → blank path is exercised).
+  - Commit: `b16efa3`.
+
 ## Backlog — technique sections reform (user, 2026-10-18)
 Parked for when the flashcards / active recall / exams sections are redesigned (not now; Active Recall has the Phase 6 UI freeze, so its changes need the user's explicit go-ahead at that time).
 - [ ] TR-1 — No skipping in any technique (user rule): every question must be answered right or wrong so mastery and metrics stay meaningful. Today exams already comply; active recall has "Saltar" (`active-recall-player.tsx:171`, saved as "(sin respuesta)") and "Terminar" mid-session (`:272`); flashcards has "Terminar" mid-session (`flashcard-player.tsx:237`). Remove early "Terminar" (start = finish).
