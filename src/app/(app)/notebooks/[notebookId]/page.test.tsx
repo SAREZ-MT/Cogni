@@ -250,13 +250,48 @@ describe("notebook detail route", () => {
     getNotebookForRoute.mockResolvedValue({ notebook, pages: [] });
     await renderRoute();
 
-    expect(screen.getByText("Crea tu primera página")).toBeInTheDocument();
     expect(
       screen.queryByRole("link", { name: "Ver como lista" }),
     ).not.toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Nueva página" }),
     ).toBeInTheDocument();
+  });
+
+  // Phase 8 H5-T4 (user request 2026-10-29): the hub's empty-state line —
+  // a fan of page sheets in the notebook's colour on the dotted paper, a
+  // cascade entrance, a gradient headline and one violet CTA that opens
+  // the "Nueva página" dialog.
+  it("invites the first page with a fan of sheets in the notebook's colour", async () => {
+    getNotebookForRoute.mockResolvedValue({ notebook, pages: [] });
+    const { container } = await renderRoute();
+
+    const empty = container.querySelector(
+      '[data-slot="illustrated-empty-state"]',
+    ) as HTMLElement;
+    expect(empty).toHaveAttribute("data-entrance", "cascade");
+    expect(empty).toHaveAttribute("data-surface", "paper");
+    const fan = empty.querySelector('[data-slot="page-sheet-fan"]');
+    expect(fan?.querySelector('[data-slot="page-sheet"]')).toHaveAttribute(
+      "data-tone",
+      "green",
+    );
+    expect(
+      within(empty).getByText("Tu cuaderno está listo para su primera página"),
+    ).toBeInTheDocument();
+    const cta = within(empty).getByRole("button", { name: "Nueva página" });
+    expect(cta).toHaveClass("bg-primary-600", "rounded-pill");
+    expect(dialogProps.current?.notebookId).toBe("nb1");
+  });
+
+  it("says the notebook has no pages yet in the header, without the old sentence", async () => {
+    getNotebookForRoute.mockResolvedValue({ notebook, pages: [] });
+    await renderRoute();
+
+    expect(screen.getByText("Sin páginas todavía")).toBeInTheDocument();
+    expect(
+      screen.queryByText("Aún no hay páginas. Crea la primera para empezar."),
+    ).toBeNull();
   });
 
   it.each([

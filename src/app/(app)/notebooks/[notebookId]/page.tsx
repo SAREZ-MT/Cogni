@@ -1,4 +1,3 @@
-import { FileText, Plus } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import {
@@ -7,11 +6,12 @@ import {
   getNotebookForRoute,
 } from "@/modules/notebooks";
 import { BackLink } from "@/shared/ui/back-link";
-import { EmptyState } from "@/shared/ui/empty-state";
-import { IconTile } from "@/shared/ui/icon-tile";
+import { Button } from "@/shared/ui/button";
+import { IllustratedEmptyState } from "@/shared/ui/illustrated-empty-state";
 import { PageSheet } from "@/shared/ui/page-sheet";
 import { PageSheetCard } from "@/shared/ui/page-sheet-card";
 import { PageSheetCreateTile } from "@/shared/ui/page-sheet-create-tile";
+import { PageSheetFan } from "@/shared/ui/page-sheet-fan";
 import { PageStripCreateRow } from "@/shared/ui/page-strip";
 import { SectionHeader } from "@/shared/ui/section-header";
 import { ViewToggle } from "@/shared/ui/view-toggle";
@@ -89,7 +89,7 @@ export default async function NotebookPage({
           description={[
             "Cuaderno",
             pages.length === 0
-              ? "Aún no hay páginas. Crea la primera para empezar."
+              ? "Sin páginas todavía"
               : pages.length === 1
                 ? "1 página"
                 : `${pages.length} páginas`,
@@ -98,31 +98,26 @@ export default async function NotebookPage({
       </div>
 
       {pages.length === 0 ? (
-        <EmptyState
-          variant="dashed"
-          fill
-          icon={
-            <IconTile size="56" tone="primary">
-              <FileText aria-hidden="true" size={26} strokeWidth={1.5} />
-            </IconTile>
-          }
-          title="Crea tu primera página"
-          titleClassName="text-base"
-          description="Cada página puede contener notas, imágenes, listas y más con autoguardado en segundos."
-          descriptionClassName="max-w-sm"
-          action={
-            // The only create control while the notebook is empty (the
-            // header lost its button in H5-T2); step 2 redesigns this state.
-            newPage(
-              <button
-                type="button"
-                className="flex h-10 items-center gap-1.5 rounded-input bg-neutral-900 px-4 text-[13.5px] text-white transition-all hover:bg-neutral-800"
-              >
-                <Plus aria-hidden="true" size={16} strokeWidth={1.75} />
-                Nueva página
-              </button>,
-            )
-          }
+        // Phase 8 H5-T4 (user request 2026-10-29): the hub's empty-state
+        // line (H4-T1..T3) — a fan of page sheets in the notebook's colour
+        // on the dotted paper, a cascade entrance, a gradient headline and
+        // the hub's violet CTA, which opens the "Nueva página" dialog
+        // (blank page or document import).
+        <IllustratedEmptyState
+          entrance="cascade"
+          paper
+          art={<PageSheetFan tone={tone} />}
+          title="Tu cuaderno está listo para su primera página"
+          description="Escribe tus apuntes desde cero o importa un PDF, Word o PowerPoint. Luego podrás repasarlos con las técnicas de estudio."
+          action={newPage(
+            <Button
+              type="button"
+              size="lg"
+              className="rounded-pill bg-primary-600 px-6 font-semibold text-[15px] text-white shadow-[0_6px_18px_-6px_rgb(124_58_237/0.55)] hover:bg-primary-700"
+            >
+              Nueva página
+            </Button>,
+          )}
         />
       ) : (
         <>

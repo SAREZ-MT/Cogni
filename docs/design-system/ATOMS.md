@@ -45,9 +45,9 @@ The pastel/semantic square behind notebook, stat and empty-state icons.
 
 Used by: `home/stat-card.tsx`,
 `home/ready-to-review.tsx`, `home/weak-topics.tsx`, `app/(app)/page.tsx`,
-`notebooks/[notebookId]/page.tsx` (the zero-pages empty state only, which
-also holds the page's create button while it has no pages; its
-header badge is a `PageSheet` since Phase 8 H5-T1),
+`notebooks/[notebookId]/page.tsx` (no longer: its header badge is a
+`PageSheet` since Phase 8 H5-T1 and its empty state an
+`IllustratedEmptyState` with a `PageSheetFan` since H5-T4),
 `modules/notebooks/ui/create-notebook-trigger.tsx`.
 
 ## Pill (`pill.tsx`)
@@ -114,9 +114,9 @@ atom only lays it out. `fill` adds `flex-1`; `as`/`titleAs` pick the root/
 title element tag.
 
 Used by: `home/home-empty-state.tsx` (zero-notebooks Home, `plain`, Phase 8
-H2-T3), `notebooks/[notebookId]/page.tsx` (zero-pages,
-`dashed`), `home/ready-to-review.tsx` (`success`), `home/weak-topics.tsx`
-(`tinted`).
+H2-T3), `home/ready-to-review.tsx` (`success`), `home/weak-topics.tsx`
+(`tinted`). The notebook page's zero-pages `dashed` state became an
+`IllustratedEmptyState` in Phase 8 H5-T4.
 
 ## FeaturePreviewCard (`feature-preview-card.tsx`)
 
@@ -331,6 +331,23 @@ index tab on the top edge (`data-part="tab"`) and a margin rule
 Used by: `page-sheet-card.tsx` (`lg`), `notebooks/[notebookId]/page.tsx`
 (the header badge, `sm`, tinted by the notebook's colour, through
 `SectionHeader`'s `icon`).
+
+## PageSheetFan (`page-sheet-fan.tsx`)
+
+Phase 8 H5-T4 (user request 2026-10-29): the empty notebook's hero, the
+pages' sibling of `NotebookFan`. Three `PageSheet`s (`lg`) in the
+notebook's colour (null → violet), fanned with `TechniqueFan`'s
+`fanPose`/`fanStack`/`fanTransition` (±7deg, 104px out, outer 8px lower,
+front raised 4px; outer 134×168, front 150×188 on top). The front sheet
+reads "Tu primera página" (12px semibold) with a 2px `primary-500` caret
+that pulses (`motion-safe:animate-pulse`, still under reduced motion). The
+400×196 stage scales in container-query steps (0.25 → 0.45 @180 → 0.6
+@220 → 0.8 @300 → 1 @400), so it never overflows a narrow column.
+Decorative (`aria-hidden`, `data-slot="page-sheet-fan"`,
+`data-part="fan-sheet"`, `data-sheet`). Props: `tone?`, `className?`.
+
+Used by: `notebooks/[notebookId]/page.tsx` (the zero-pages
+`IllustratedEmptyState` `art`).
 
 ## PageSheetCard (`page-sheet-card.tsx`)
 
@@ -1829,6 +1846,11 @@ once; under prefers-reduced-motion only the transition becomes
   `action?` (rendered in `data-part="action"`), `steps?`
   (`readonly string[]`), `entrance?` (`"block"` default | `"cascade"`),
   `paper?`, `className?`.
+- Since Phase 8 H5-T4 also the empty notebook page
+  (`notebooks/[notebookId]/page.tsx`): `art={<PageSheetFan tone />}`,
+  `entrance="cascade"`, `paper`, title "Tu cuaderno está listo para su
+  primera página", and the hub's violet pill CTA "Nueva página" (a
+  `Button` that opens `NewPageDialog`).
 - `data-slot="illustrated-empty-state"`, `data-entrance="block" |
   "cascade"`, `data-surface="paper"` when `paper`.
 - `steps` (Phase 8 H4, user decision 2026-10-20): an
