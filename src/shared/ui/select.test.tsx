@@ -126,4 +126,24 @@ describe("chooseOption (test helper)", () => {
 
     expect(onChange).toHaveBeenCalledWith("plum");
   });
+  it("clips long labels to one line and keeps the full text as a tooltip", async () => {
+    const user = userEvent.setup();
+    const long = "Una página con un título tan largo que no cabe en el diálogo";
+    render(
+      <Select>
+        <SelectTrigger aria-label="Página" data-testid="long">
+          <SelectValue placeholder="Elige una página" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="p1">{long}</SelectItem>
+        </SelectContent>
+      </Select>,
+    );
+    expect(screen.getByTestId("long").className).toContain("[&>span]:min-w-0");
+    screen.getByTestId("long").focus();
+    await user.keyboard("{Enter}");
+    const option = await screen.findByRole("option", { name: long });
+    expect(option).toHaveAttribute("title", long);
+    expect(option.querySelector(".truncate")).not.toBeNull();
+  });
 });

@@ -32,7 +32,7 @@ function SelectTrigger({
     <SelectPrimitive.Trigger
       data-slot="select-trigger"
       className={cn(
-        "group/select flex h-11 w-full min-w-0 items-center justify-between gap-2 rounded-input border border-input bg-card px-3.5 text-left text-fg text-sm outline-none transition-[border-color,box-shadow] duration-150 hover:border-neutral-300 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 data-[state=open]:border-ring data-[state=open]:ring-3 data-[state=open]:ring-ring/30 data-placeholder:text-fg-placeholder [&>span]:truncate",
+        "group/select flex h-11 w-full min-w-0 items-center justify-between gap-2 rounded-input border border-input bg-card px-3.5 text-left text-fg text-sm outline-none transition-[border-color,box-shadow] duration-150 hover:border-neutral-300 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 data-[state=open]:border-ring data-[state=open]:ring-3 data-[state=open]:ring-ring/30 data-placeholder:text-fg-placeholder [&>span]:min-w-0 [&>span]:flex-1 [&>span]:truncate",
         className,
       )}
       {...props}
@@ -64,7 +64,7 @@ function SelectContent({
         position={position}
         sideOffset={sideOffset}
         className={cn(
-          "relative z-50 max-h-(--radix-select-content-available-height) min-w-(--radix-select-trigger-width) overflow-hidden rounded-xl border border-border-default bg-card text-fg shadow-lg data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-[0.97] data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[side=bottom]:slide-in-from-top-1 data-[side=top]:slide-in-from-bottom-1",
+          "relative z-50 max-h-(--radix-select-content-available-height) w-(--radix-select-trigger-width) min-w-(--radix-select-trigger-width) max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-border-default bg-card text-fg shadow-lg data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-[0.97] data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[side=bottom]:slide-in-from-top-1 data-[side=top]:slide-in-from-bottom-1",
           className,
         )}
         {...props}
@@ -94,15 +94,23 @@ function SelectItem({
         "relative flex w-full cursor-default select-none items-center rounded-lg py-2.5 pr-9 pl-3 text-sm outline-none data-disabled:pointer-events-none data-highlighted:bg-neutral-100 data-[state=checked]:font-medium data-disabled:opacity-50",
         className,
       )}
+      title={typeof children === "string" ? children : undefined}
       {...props}
     >
+      {/* Long labels (page titles) clip to one line so the list never
+          grows past the trigger and breaks the dialog; the full text stays
+          in the title tooltip. */}
       {hint ? (
-        <span className="flex flex-col gap-0.5">
-          <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="truncate">
+            <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+          </span>
           <span className="text-[12px] text-fg-muted">{hint}</span>
         </span>
       ) : (
-        <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+        <span className="min-w-0 flex-1 truncate">
+          <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+        </span>
       )}
       <span className="absolute right-3 flex size-4 items-center justify-center">
         <SelectPrimitive.ItemIndicator>

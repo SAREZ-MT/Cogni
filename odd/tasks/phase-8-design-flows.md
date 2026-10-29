@@ -695,3 +695,12 @@ Parked for when the flashcards / active recall / exams sections are redesigned (
   5. 3ab4a78..3727276 (H7 part 1). Advisories: R3-001, R3-002, R3-003.
   6. 3727276..124eecc (H7 part 2 and the follow-up). Advisories: R3-ime-enter, R3-pointerdown-mousedown-all, R3-stale-math-pos, R3-weak-callout-assert.
 - The reviewed boundary is now 124eecc. All advisories are non-blocking follow-ups.
+
+## H15 — long names in the page picker (user, 2026-10-29)
+- [x] Long notebook or page names broke the create dialogs: the "Generar" button was pushed out. Fix in the shared atoms:
+  - The `Select` trigger value and the option labels clip to one line, with the full text in a `title` tooltip.
+  - The list is as wide as the trigger, capped at the viewport.
+  - `DialogContent` uses `grid-cols-[minmax(0,1fr)]`, so no child can widen any dialog.
+  - Route: inline (2 atoms). RED observed on the new select test, then GREEN.
+  - Checks: vitest shared/ui + technique hubs 923/923; typecheck; biome.
+  - Browser check with a 130-character page title and a long notebook name in the recall dialog: at 1440 the button sits inside the dialog (button right 919 < dialog right 944); at 390 likewise (349 < 374). No horizontal overflow. Screenshots in `scratchpad/longtitle/`.
