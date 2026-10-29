@@ -29,7 +29,17 @@ describe("PageListRow", () => {
   it("shows the formatted last update and keeps the archive action", () => {
     render(<PageListRow page={page} notebookId="nb1" />);
 
-    expect(screen.getByText(/^Actualizada /)).toBeInTheDocument();
+    expect(screen.getByRole("article")).toHaveTextContent(
+      /Actualizada \d+ sept/,
+    );
     expect(screen.getByTestId("archive-p1")).toBeInTheDocument();
+  });
+
+  it("draws the row as a paper strip tinted by the notebook's colour", () => {
+    render(<PageListRow page={page} notebookId="nb1" tone="blue" />);
+
+    const row = screen.getByRole("article");
+    expect(row).toHaveAttribute("data-slot", "page-strip-row");
+    expect(row).toHaveAttribute("data-tone", "blue");
   });
 });

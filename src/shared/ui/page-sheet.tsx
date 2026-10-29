@@ -64,7 +64,11 @@ const SIZES: Record<
 
 // The notebook's colour on the sheet: the index tab and the margin rule,
 // in the same 400 step as the hub covers' gradient ends.
-const TONES: Record<NotebookCoverTone, { tab: string; margin: string }> = {
+// Shared with the list view's `PageStripRow`, so strips and sheets agree.
+export const PAGE_SHEET_TONES: Record<
+  NotebookCoverTone,
+  { tab: string; margin: string }
+> = {
   pink: { tab: "bg-pink-400", margin: "bg-pink-400/45" },
   green: { tab: "bg-emerald-400", margin: "bg-emerald-400/45" },
   yellow: { tab: "bg-amber-400", margin: "bg-amber-400/45" },
@@ -91,7 +95,7 @@ export interface PageSheetProps {
 export function PageSheet({ size = "lg", tone, className }: PageSheetProps) {
   const look = SIZES[size];
   const toneKey = tone ?? "purple";
-  const colour = TONES[toneKey];
+  const colour = PAGE_SHEET_TONES[toneKey];
 
   return (
     <span

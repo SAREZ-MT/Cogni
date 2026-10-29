@@ -6,7 +6,6 @@ import {
   getNotebookForRoute,
 } from "@/modules/notebooks";
 import { BackLink } from "@/shared/ui/back-link";
-import { Card } from "@/shared/ui/card";
 import { EmptyState } from "@/shared/ui/empty-state";
 import { IconTile } from "@/shared/ui/icon-tile";
 import { PageSheet } from "@/shared/ui/page-sheet";
@@ -154,7 +153,8 @@ export default async function NotebookPage({
             </div>
           ) : (
             <div className="flex flex-col gap-2">
-              {/* H5-T2: the list's first row creates a page too. */}
+              {/* H5-T2: the list's first row creates a page too; each page
+                  is a paper strip. */}
               <form action={createPage}>
                 <PageStripCreateRow
                   type="submit"
@@ -162,15 +162,14 @@ export default async function NotebookPage({
                   hint={CREATE_HINT}
                 />
               </form>
-              <Card>
-                {pages.map((page) => (
-                  <PageListRow
-                    key={page.id}
-                    page={page}
-                    notebookId={notebook.id}
-                  />
-                ))}
-              </Card>
+              {pages.map((page) => (
+                <PageListRow
+                  key={page.id}
+                  page={page}
+                  notebookId={notebook.id}
+                  tone={tone}
+                />
+              ))}
             </div>
           )}
         </>

@@ -383,13 +383,38 @@ Used by: `notebooks/[notebookId]/page.tsx` (grid view, "Nueva página" /
 "Escribe o importa un apunte", inside the same `createPage` server-action
 form the header button used; the header has no create button since H5-T2).
 
+## PageStripRow (`page-strip.tsx`)
+
+Phase 8 H5-T2 (user request 2026-10-29): one page of the notebook page's
+list view as a thin paper strip, the row version of `PageSheetCard`. An
+`article` (`data-slot="page-strip-row"`, `data-tone`), 56px tall, 10px
+radius, `bg-card`, a hairline `border-default` and a `0 1px 2px` contact
+shadow. Decorative (`aria-hidden`): a 4×32 index tab on the left edge
+(`data-part="tab"`) and a margin rule 20px in (`data-part="margin"`), both
+in `PAGE_SHEET_TONES` (shared with `PageSheet`), and a `neutral-100` ruled
+baseline under the text (`data-part="rule"`).
+
+- The title: the stretched `Link` (accessible name = full title, focus
+  ring on the overlay), 14px semibold, one truncated line on the baseline.
+- Then the 12px medium `fg-muted` date (`datePrefix` from 360px wide; the
+  whole date hides below 240px) and the `actions` slot, always visible
+  (`relative z-10`, never inside the link).
+- Props: `href`, `title`, `dateLabel?`, `datePrefix?`, `tone?`, `actions?`,
+  `className?`.
+- Motion: hover lifts 1px, the border darkens to `neutral-300` and a soft
+  ambient shadow appears (200ms, `cubic-bezier(0.23,1,0.32,1)`); none
+  under reduced motion.
+
+Used by: `_components/page-list-row.tsx`.
+
 ## PageStripCreateRow (`page-strip.tsx`)
 
 Phase 8 H5-T2: the list view's first row, the strip version of
 `PageSheetCreateTile` — a 56px-tall `button`
 (`data-slot="page-strip-create-row"`, 10px radius) with the same violet
 fill, dashed border and plus disc (28px), the label and, from 360px wide,
-the hint beside it. Hover lifts 1px and deepens its tint, press 0.99, none
+the hint beside it (below 160px only the disc remains; the accessible name
+stays the label). Hover lifts 1px and deepens its tint, press 0.99, none
 under reduced motion. Props: `label`, `hint?`, plus `button` attributes.
 
 Used by: `notebooks/[notebookId]/page.tsx` (list view, same form and copy as
@@ -673,16 +698,14 @@ Used by: `notebooks/[notebookId]/page.tsx`.
 
 ## List-row molecule: PageListRow
 
-`page-list-row.tsx` (`app/(app)/_components/`) is the Notion/file-explorer-style rows a `ViewToggle`'s `list` option
-renders inside one `Card`: a divider (`border-b border-border-subtle
-last:border-b-0`), `hover:bg-hover`, an `IconTile` (size `28`, radius
-`md`), a stretched-link title, a right-aligned muted meta column, a
-`relative z-10` hover action (`ArchivePageButton`) so it stays clickable over the stretched link, and a
-trailing muted `ChevronRight` (16/1.75). `PageListRow` reuses
-`formatUpdatedAt` (`_components/format.ts`) for its "Actualizada {d MMM}"
-column, the same formatter the `PageSheetCard` grid uses. Since Phase 8
-H5-T1 it sits next to the sheet grid unchanged (a flat violet `FileText`
-tile row); restyling it is left for a later step.
+`page-list-row.tsx` (`app/(app)/_components/`) is one row of the notebook
+page's `ViewToggle` `list` view. Since Phase 8 H5-T2 (user request
+2026-10-29) it composes `PageStripRow`: the page's route as `href`,
+`formatUpdatedAt(updatedAt)` as `dateLabel` with "Actualizada" as
+`datePrefix` (the same formatter the `PageSheetCard` grid uses),
+`ArchivePageButton` as `actions` and the notebook's colour as `tone`. The
+rows stack with an 8px gap under the `PageStripCreateRow`, no `Card`
+wrapper, no `IconTile` and no chevron anymore.
 
 Used by: `notebooks/[notebookId]/page.tsx`. The notebook list row was
 deleted in Phase 8 H4-T6, when the `/notebooks` list view was dropped.
