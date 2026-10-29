@@ -9,8 +9,7 @@ interface PageListRowProps {
   notebookId: string;
 }
 
-// notebookId/page.tsx list view (Notion/file-explorer style, mirroring
-// notebook-list-row.tsx): a full-width row per page with a divider, same
+// notebookId/page.tsx list view (Notion/file-explorer style): a full-width row per page with a divider, same
 // stretched-link + hover-revealed action pattern as the page-card grid.
 export function PageListRow({ page, notebookId }: PageListRowProps) {
   return (

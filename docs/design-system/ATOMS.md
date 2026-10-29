@@ -43,7 +43,7 @@ The pastel/semantic square behind notebook, stat and empty-state icons.
 `NotebookColor | null` straight onto an `IconTile` tone, falling back to
 `"purple"` for legacy notebooks without a stored color.
 
-Used by: `notebook-list-row.tsx`, `home/stat-card.tsx`,
+Used by: `home/stat-card.tsx`,
 `home/ready-to-review.tsx`, `home/weak-topics.tsx`, `app/(app)/page.tsx`,
 `notebooks/[notebookId]/page.tsx`,
 `modules/notebooks/ui/create-notebook-trigger.tsx`.
@@ -573,21 +573,19 @@ page list. Phase 8 H4-T6 (user decision 2026-10-29) removed it from the
 
 Used by: `notebooks/[notebookId]/page.tsx`.
 
-## List-row molecules: NotebookListRow / PageListRow
+## List-row molecule: PageListRow
 
-`notebook-list-row.tsx` and `page-list-row.tsx` (`app/(app)/_components/`)
-are the Notion/file-explorer-style rows a `ViewToggle`'s `list` option
+`page-list-row.tsx` (`app/(app)/_components/`) is the Notion/file-explorer-style rows a `ViewToggle`'s `list` option
 renders inside one `Card`: a divider (`border-b border-border-subtle
 last:border-b-0`), `hover:bg-hover`, an `IconTile` (size `28`, radius
 `md`), a stretched-link title, a right-aligned muted meta column, a
-`relative z-10` hover action (`NotebookCardActions` /
-`ArchivePageButton`) so it stays clickable over the stretched link, and a
+`relative z-10` hover action (`ArchivePageButton`) so it stays clickable over the stretched link, and a
 trailing muted `ChevronRight` (16/1.75). `PageListRow` reuses
 `formatUpdatedAt` (`_components/format.ts`) for its "Actualizada {d MMM}"
 column, the same formatter the page-card grid uses.
 
-Used by: `notebooks/[notebookId]/page.tsx` (`PageListRow`). `NotebookListRow`
-has no user since Phase 8 H4-T6 dropped the `/notebooks` list view.
+Used by: `notebooks/[notebookId]/page.tsx`. The notebook list row was
+deleted in Phase 8 H4-T6, when the `/notebooks` list view was dropped.
 
 ## DropdownMenu / Popover (`dropdown-menu.tsx`)
 

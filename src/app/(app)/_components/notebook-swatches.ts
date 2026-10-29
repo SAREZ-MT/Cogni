@@ -1,7 +1,8 @@
 import type { NotebookColor } from "@/modules/notebooks";
 import type { IconTileProps } from "@/shared/ui/icon-tile";
 
-// design-system atoms pass: notebook-card.tsx, notebook-list-row.tsx and
+// design-system atoms pass: the old notebook card and list row (both since
+// removed) and
 // notebookId/page.tsx used to each import a NOTEBOOK_SWATCH_CLASSES class
 // map to color their <IconTile>. NotebookColor's keys ("pink" | "green" |
 // ... | "mint") already match IconTile's pastel tone keys 1:1 (icon-
