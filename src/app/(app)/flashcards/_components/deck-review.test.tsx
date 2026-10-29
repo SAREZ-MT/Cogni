@@ -595,6 +595,45 @@ describe("DeckReview, up to date and practice mode", () => {
     expect(actions.startFlashcardSessionAction).toHaveBeenCalledTimes(1);
   });
 
+  it("asks for the due cards again after a graded session, so the deck says it is up to date", async () => {
+    actions.startFlashcardSessionAction
+      .mockResolvedValueOnce({
+        ok: true,
+        value: { sessionId: SESSION, cards: [card(1)] },
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        error: { code: "STUDY_ENGINE_NOTHING_DUE", message: "x" },
+      });
+    actions.gradeFlashcardAction.mockResolvedValue({
+      ok: true,
+      value: { reviewedCount: 1, againCount: 0, masteryLevel: "Aprendiendo" },
+    });
+    actions.finishFlashcardSessionAction.mockResolvedValue({
+      ok: true,
+      value: { reviewedCount: 1, againCount: 0 },
+    });
+    actions.requestSessionFeedbackAction.mockResolvedValue({
+      ok: false,
+      error: { code: "X", message: "x" },
+    });
+    const user = userEvent.setup();
+    renderDeck();
+
+    await user.click(
+      await screen.findByRole("button", { name: /Mostrar respuesta/ }),
+    );
+    await user.click(screen.getByRole("button", { name: /Bien/ }));
+    await user.click(
+      await screen.findByRole("button", { name: "Volver al mazo" }),
+    );
+
+    expect(
+      await screen.findByText("Estás al día con este mazo"),
+    ).toBeInTheDocument();
+    expect(actions.startFlashcardSessionAction).toHaveBeenCalledTimes(2);
+  });
+
   it("opens straight into practice with ?modo=practica, starting no session", async () => {
     renderDeck(true);
 

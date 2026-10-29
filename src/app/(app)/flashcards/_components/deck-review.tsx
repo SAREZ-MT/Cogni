@@ -181,19 +181,25 @@ export function DeckReview({
     });
   }
 
-  // Leaving a practice pass drops `?modo=practica`, so a reload shows the
-  // deck again instead of practising.
+  // "Volver al mazo" from the summary. Leaving a practice pass drops
+  // `?modo=practica` (a reload shows the deck instead of practising) and
+  // shows the up-to-date state again; leaving a graded session asks for
+  // the deck's due cards again, so the deck says it is up to date, or
+  // goes on with what is still due.
   function exitSession() {
-    if (session?.sessionId === null) {
+    const practised = session?.sessionId === null;
+    setSession(null);
+    router.refresh();
+    if (practised) {
       window.history.replaceState(
         null,
         "",
         `${deckPath}${keepQuery ? `?${keepQuery}` : ""}`,
       );
       setNotice("nothing-due");
+      return;
     }
-    setSession(null);
-    router.refresh();
+    if (practiceCards) startReview();
   }
 
   function startReview() {
@@ -249,11 +255,12 @@ export function DeckReview({
   if (session?.sessionId === null) {
     // Practice (H18): every rating is accepted locally, nothing is saved.
     return (
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col">
         <StatusBanner
           tone="info"
           title="Modo práctica"
           description="Tus respuestas no cambian tus próximos repasos."
+          className="mx-auto w-full max-w-[660px]"
         />
         <FlashcardPlayer
           notebookId={notebookId}
@@ -317,7 +324,7 @@ export function DeckReview({
           actions={
             <div className="flex items-center gap-2">
               {actions}
-              {canReview && (
+              {canReview && !upToDate && (
                 <Button
                   type="button"
                   data-testid="start-review-button"

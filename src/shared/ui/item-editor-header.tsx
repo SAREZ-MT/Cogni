@@ -41,6 +41,8 @@ export function ItemEditorHeader({
         titleClassName="text-xl"
         description={description}
         actions={actions}
+        className="flex-wrap"
+        leadingClassName="min-w-[240px] flex-1"
       />
     </div>
   );
