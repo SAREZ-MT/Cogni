@@ -10,6 +10,7 @@ import {
   PAGE_TOO_SHORT_CODE,
   RECALL_MIN_WORDS,
 } from "@/shared/kernel/generation-capacity";
+import { FROM_HUB_QUERY } from "@/shared/navigation/hub-return";
 import { Button } from "@/shared/ui/button";
 import {
   Dialog,
@@ -163,13 +164,15 @@ export function CreateFromPageDialog({
           const result = await generateFlashcardsAction({ pageId });
           if (!result.ok) return failWith(result.error);
           setOpen(false);
-          router.push(`/flashcards/${notebookId}/${pageId}`);
+          router.push(
+            `/flashcards/${notebookId}/${pageId}?repasar=1&${FROM_HUB_QUERY}`,
+          );
           return;
         }
         const result = await generateRecallQuestionsAction({ pageId });
         if (!result.ok) return failWith(result.error);
         setOpen(false);
-        router.push(`/active-recall/${notebookId}/${pageId}`);
+        router.push(`/active-recall/${notebookId}/${pageId}?${FROM_HUB_QUERY}`);
       } catch {
         setError(config.genericFailure);
       }

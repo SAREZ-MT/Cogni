@@ -16,6 +16,7 @@ import {
   requestSessionFeedbackAction,
   startFlashcardSessionAction,
 } from "@/modules/flashcards";
+import { FROM_HUB_QUERY } from "@/shared/navigation/hub-return";
 import { BackLink } from "@/shared/ui/back-link";
 import { Button } from "@/shared/ui/button";
 import type { RatingTone } from "@/shared/ui/rating-button";
@@ -54,6 +55,10 @@ export interface DeckReviewProps {
   // Opened from "Repasos de hoy" (`?repasar=1`): start the review right
   // away instead of waiting for "Repasar".
   autoStart?: boolean;
+  // Opened from the hub's create dialog (`?desde=hub`, Phase 8 H16): the
+  // back links lead to /flashcards instead of the notebook's decks, and
+  // the marker survives dropping `?repasar=1`.
+  fromHub?: boolean;
 }
 
 interface ActiveSession {
@@ -114,7 +119,9 @@ export function DeckReview({
   actions,
   children,
   autoStart = false,
+  fromHub = false,
 }: DeckReviewProps) {
+  const backHref = fromHub ? "/flashcards" : `/flashcards/${notebookId}`;
   const router = useRouter();
   const autoStarted = useRef(false);
   const [session, setSession] = useState<ActiveSession | null>(null);
@@ -161,10 +168,10 @@ export function DeckReview({
     window.history.replaceState(
       null,
       "",
-      `/flashcards/${notebookId}/${pageId}`,
+      `/flashcards/${notebookId}/${pageId}${fromHub ? `?${FROM_HUB_QUERY}` : ""}`,
     );
     startReview();
-  }, [autoStart, canReview, notebookId, pageId]);
+  }, [autoStart, canReview, notebookId, pageId, fromHub]);
 
   if (session) {
     const { sessionId } = session;
@@ -194,6 +201,7 @@ export function DeckReview({
           setFeedback(await finishWithFeedback(sessionId));
         }}
         feedback={feedback && <SessionFeedbackPanel state={feedback} />}
+        backHref={backHref}
         onExit={() => {
           setSession(null);
           router.refresh();
@@ -205,7 +213,9 @@ export function DeckReview({
   return (
     <>
       <div className="flex flex-col gap-3">
-        <BackLink href={`/flashcards/${notebookId}`}>{notebookTitle}</BackLink>
+        <BackLink href={backHref}>
+          {fromHub ? "Flashcards" : notebookTitle}
+        </BackLink>
         <SectionHeader
           eyebrow="Flashcards"
           title={deckLabel}

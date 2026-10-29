@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { listFlashcardsAction } from "@/modules/flashcards";
 import { getNotebookTitleForRoute, getPageForRoute } from "@/modules/notebooks";
 import { designPreviewsEnabled } from "@/shared/config/design-previews";
+import { fromHub } from "@/shared/navigation/hub-return";
 import { EmptyState } from "@/shared/ui/empty-state";
 import { EmptyStateCta } from "@/shared/ui/empty-state-cta";
 import { IconTile } from "@/shared/ui/icon-tile";
@@ -41,7 +42,7 @@ export default async function FlashcardsSessionPage({
   searchParams,
 }: FlashcardsSessionPageProps) {
   const { notebookId, pageId } = await params;
-  const { repasar } = await searchParams;
+  const { repasar, desde } = await searchParams;
 
   if (designPreviewsEnabled()) {
     const sampleNotebook = getSampleNotebook(notebookId);
@@ -99,6 +100,7 @@ export default async function FlashcardsSessionPage({
         }
         canReview={cards.value.length > 0}
         autoStart={repasar === "1"}
+        fromHub={fromHub(desde)}
       >
         {cards.value.length === 0 ? (
           <EmptyState

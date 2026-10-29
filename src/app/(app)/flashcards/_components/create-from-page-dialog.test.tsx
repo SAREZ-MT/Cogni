@@ -136,7 +136,9 @@ describe("CreateFromPageDialog — flashcards", () => {
     await user.click(within(dialog).getByTestId("create-flashcards-submit"));
 
     expect(generateFlashcardsAction).toHaveBeenCalledWith({ pageId: "p-2" });
-    expect(push).toHaveBeenCalledWith("/flashcards/nb-bio/p-2");
+    expect(push).toHaveBeenCalledWith(
+      "/flashcards/nb-bio/p-2?repasar=1&desde=hub",
+    );
   });
 
   it("explains an empty page and offers to open it", async () => {
@@ -278,7 +280,7 @@ describe("CreateFromPageDialog — active recall", () => {
     expect(generateRecallQuestionsAction).toHaveBeenCalledWith({
       pageId: "p-1",
     });
-    expect(push).toHaveBeenCalledWith("/active-recall/nb-bio/p-1");
+    expect(push).toHaveBeenCalledWith("/active-recall/nb-bio/p-1?desde=hub");
   });
 
   it("explains an empty page and offers to open it", async () => {
