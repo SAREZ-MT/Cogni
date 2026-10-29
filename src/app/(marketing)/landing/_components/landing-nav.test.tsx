@@ -26,6 +26,18 @@ describe("LandingNav", () => {
     ]);
   });
 
+  it("puts the decorative paper and ink glass marks before the cogni wordmark", () => {
+    render(<LandingNav />);
+    const brand = within(nav()).getByRole("link", { name: "cogni" });
+    const marks = Array.from(brand.querySelectorAll("img"));
+
+    expect(marks.map((img) => img.getAttribute("src"))).toEqual([
+      "/brand/cogni-mark-ink.svg",
+      "/brand/cogni-mark.svg",
+    ]);
+    for (const img of marks) expect(img).toHaveAttribute("alt", "");
+  });
+
   it("shows visitors the section links and the sign-in and sign-up actions", () => {
     render(<LandingNav />);
     for (const link of NAV_LINKS) {

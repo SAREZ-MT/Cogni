@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 
 type FooterLink = { href: string; label: string };
@@ -43,8 +44,19 @@ export function SiteFooter({ signedIn = false }: { signedIn?: boolean }) {
           <div className="flex flex-col gap-3">
             <Link
               href={signedIn ? "/inicio" : "/"}
-              className="w-fit rounded-md font-(family-name:--lp-font-head) font-bold text-(--lp-night-ink) text-[28px] tracking-[-0.03em]"
+              className="flex w-fit items-center gap-2.5 rounded-md font-(family-name:--lp-font-head) font-bold text-(--lp-night-ink) text-[28px] tracking-[-0.03em]"
             >
+              {/* Ink glass on the night footer, 17% larger than the 28px
+                  wordmark, as in the approved lockup. */}
+              <Image
+                src="/brand/cogni-mark-ink.svg"
+                alt=""
+                aria-hidden="true"
+                width={33}
+                height={33}
+                unoptimized
+                className="shrink-0"
+              />
               cogni
             </Link>
             <p className="font-(family-name:--lp-font-display) text-[22px] italic">

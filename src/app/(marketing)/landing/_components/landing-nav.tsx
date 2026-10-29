@@ -1,6 +1,7 @@
 "use client";
 
 import { useMotionValueEvent, useScroll } from "motion/react";
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
@@ -96,8 +97,9 @@ export function LandingNav({ signedIn = false }: { signedIn?: boolean }) {
         <div className="mx-auto flex h-16 max-w-[1440px] items-center justify-between gap-6 px-4 md:px-10 xl:px-20">
           <Link
             href={signedIn ? "/inicio" : "/"}
-            className="lp-nav-ink rounded-md font-extrabold text-[24px] tracking-[-0.03em]"
+            className="lp-nav-ink flex items-center gap-2 rounded-md font-extrabold text-[24px] tracking-[-0.03em]"
           >
+            <NavMark />
             cogni
           </Link>
           {signedIn ? (
@@ -140,5 +142,33 @@ export function LandingNav({ signedIn = false }: { signedIn?: boolean }) {
         </div>
       </nav>
     </header>
+  );
+}
+
+// The 7 v2 Glass mark, 17% larger than the 24px wordmark (28px). Both
+// glass builds are stacked and cross-faded with the nav theme (.lp-nav-mark
+// in landing.css): ink glass over the night scenes, paper glass over paper.
+function NavMark() {
+  return (
+    <span aria-hidden="true" className="lp-nav-mark relative size-7 shrink-0">
+      <Image
+        src="/brand/cogni-mark-ink.svg"
+        alt=""
+        width={28}
+        height={28}
+        unoptimized
+        data-mark="ink"
+        className="absolute inset-0"
+      />
+      <Image
+        src="/brand/cogni-mark.svg"
+        alt=""
+        width={28}
+        height={28}
+        unoptimized
+        data-mark="paper"
+        className="absolute inset-0"
+      />
+    </span>
   );
 }

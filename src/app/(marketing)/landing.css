@@ -180,6 +180,16 @@
 .lp-nav-link:hover {
   color: var(--nav-ink);
 }
+.lp-nav-mark img {
+  transition: opacity 320ms var(--lp-ease-out);
+}
+.lp-nav-mark [data-mark="paper"],
+.lp-nav[data-theme="light"] .lp-nav-mark [data-mark="ink"] {
+  opacity: 0;
+}
+.lp-nav[data-theme="light"] .lp-nav-mark [data-mark="paper"] {
+  opacity: 1;
+}
 .lp-nav[data-theme="light"] :focus-visible {
   outline-color: var(--lp-violet);
 }
@@ -1215,7 +1225,8 @@
   }
   .lp-nav-bar,
   .lp-nav-ink,
-  .lp-nav-link {
+  .lp-nav-link,
+  .lp-nav-mark img {
     transition: none;
   }
   .lp-hobj-placeholder,
