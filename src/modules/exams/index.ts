@@ -9,6 +9,7 @@ export {
   listExamQuestionsAction,
   type RetiredExamQuestionView,
   retireExamQuestionAction,
+  saveExamEditsAction,
 } from "./actions";
 export type { ExamReviewNotice } from "./application";
 export * from "./domain";

@@ -41,4 +41,8 @@ export interface ExamQuestionRepository {
   // its original retiredAt. Returns the question, or null when the owner
   // has no such question.
   retire(id: string, ownerId: string, now: Date): Promise<ExamQuestion | null>;
+  // Real delete of every question of a root's lineage, retired ones and
+  // variants included, in one statement (Phase 8 H18). Their answers go
+  // with them (ON DELETE CASCADE). Another owner's rows are left untouched.
+  deleteLineage(rootId: string, ownerId: string): Promise<void>;
 }

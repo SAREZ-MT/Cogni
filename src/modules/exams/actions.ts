@@ -30,6 +30,7 @@ import {
   withBoundary,
 } from "./action-support";
 import {
+  applyExamEdits,
   ExamDailyLimitReachedError,
   editExamQuestion,
   listPageExamQuestions,
@@ -117,6 +118,14 @@ const content = {
 const pageInput = z.object({ pageId: z.uuid() });
 const editInput = z.object({ questionId: z.uuid(), ...content });
 const questionInput = z.object({ questionId: z.uuid() });
+// One edit page save (Phase 8 H18).
+const MAX_DRAFT_ITEMS = 200;
+const saveExamEditsInput = z.object({
+  pageId: z.uuid(),
+  updates: z.array(z.object({ id: z.uuid(), ...content })).max(MAX_DRAFT_ITEMS),
+  creates: z.array(z.object(content)).max(MAX_DRAFT_ITEMS),
+  deletes: z.array(z.uuid()).max(MAX_DRAFT_ITEMS),
+});
 const generateInput = z.object({
   pageId: z.uuid(),
   count: z
@@ -335,5 +344,30 @@ export async function generateExamQuestionsAction(
       wordsUsed: value.wordsUsed,
       wordsTotal: value.wordsTotal,
     });
+  });
+}
+
+// "Guardar" on the exam questions' edit page (Phase 8 H18): the draft's
+// edits, additions and real deletions (a deleted question takes its whole
+// lineage), applied together in one transaction (applyExamEdits) or not
+// at all. Answers the page's active questions.
+export async function saveExamEditsAction(
+  input: unknown,
+): Promise<Result<ExamQuestionView[], ActionError>> {
+  return withBoundary(async () => {
+    const ownerId = await requireOwnerId();
+    if (!ownerId.ok) return ownerId;
+    const parsed = parseInput(saveExamEditsInput, input);
+    if (!parsed.ok) return parsed;
+
+    const { pages, uow } = deps();
+    const result = await applyExamEdits(
+      parsed.value,
+      { pages, uow, clock: systemClock, ids: { next: createId } },
+      ownerId.value,
+    );
+    if (!result.ok) return err(toActionError(result.error));
+    revalidateExams();
+    return ok(result.value.questions.map(toView));
   });
 }

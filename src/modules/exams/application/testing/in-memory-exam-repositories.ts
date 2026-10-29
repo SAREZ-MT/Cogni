@@ -106,6 +106,13 @@ export class InMemoryExamQuestionRepository implements ExamQuestionRepository {
     return retired;
   }
 
+  async deleteLineage(rootId: string, ownerId: string): Promise<void> {
+    for (const [id, row] of this.rows) {
+      if (row.rootId === rootId && row.ownerId === ownerId)
+        this.rows.delete(id);
+    }
+  }
+
   // Test helpers for a transactional fake unit of work: copy the stored
   // rows before a run and put them back when it throws.
   snapshot(): ExamQuestion[] {

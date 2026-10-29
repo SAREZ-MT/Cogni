@@ -4,6 +4,12 @@ export {
   answerExamQuestion,
 } from "./answer-exam-question";
 export {
+  type ApplyExamEditsDeps,
+  applyExamEdits,
+  type ExamEdits,
+  type ExamEditsResult,
+} from "./apply-exam-edits";
+export {
   type CompletedExamSession,
   type CompleteExamSessionDeps,
   completeExamSession,
@@ -13,6 +19,10 @@ export {
   createExamQuestion,
   type ExamQuestionContent,
 } from "./create-exam-question";
+export {
+  type DeleteExamQuestionResult,
+  deleteExamQuestion,
+} from "./delete-exam-question";
 export { editExamQuestion } from "./edit-exam-question";
 export {
   composeNormalExam,
@@ -23,6 +33,7 @@ export {
   loadSessionQuestions,
 } from "./exam-session-work";
 export {
+  type ExamLineageReferences,
   type ExamQuestionRepositories,
   type ExamStudyItems,
   type ExamUnitOfWork,

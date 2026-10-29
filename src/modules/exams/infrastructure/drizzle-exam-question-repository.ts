@@ -172,6 +172,19 @@ export class DrizzleExamQuestionRepository implements ExamQuestionRepository {
       .where(and(owned(id, ownerId), isNull(examQuestions.retiredAt)));
     return this.findById(id, ownerId);
   }
+
+  async deleteLineage(rootId: string, ownerId: string): Promise<void> {
+    // One statement: the lineage's own foreign keys (root, variant_of) are
+    // checked at its end, when every row of the lineage is gone.
+    await this.db
+      .delete(examQuestions)
+      .where(
+        and(
+          eq(examQuestions.rootId, rootId),
+          eq(examQuestions.ownerId, ownerId),
+        ),
+      );
+  }
 }
 
 function owned(id: string, ownerId: string) {

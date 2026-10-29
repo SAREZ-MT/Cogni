@@ -34,6 +34,10 @@ export const EXAM_ERROR = {
   SESSION_FINISHED: "EXAMS_SESSION_FINISHED",
   // The owner has no such question (missing or another owner's).
   QUESTION_NOT_FOUND: "EXAMS_QUESTION_NOT_FOUND",
+  // Deleting it would leave the page without questions (Phase 8 H18: the
+  // edit page keeps at least one; the whole set goes with a separate
+  // action).
+  LAST_QUESTION: "EXAMS_LAST_QUESTION",
   // The page failed its last exam: only a retake with reformulated
   // questions may start (§7.5), never a normal exam that repeats wordings.
   RETAKE_PENDING: "EXAMS_RETAKE_PENDING",
