@@ -14,6 +14,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/shared/ui/dialog";
+import { FormMessage } from "@/shared/ui/form-message";
 
 const GENERIC_FAILURE = "No pudimos archivar la tarjeta. Intenta de nuevo.";
 
@@ -85,11 +86,7 @@ export function ArchiveFlashcardButton({
           <DialogTitle>¿Archivar esta tarjeta?</DialogTitle>
           <DialogDescription>Sale del mazo y de tus repasos.</DialogDescription>
         </DialogHeader>
-        {error && (
-          <p role="alert" className="text-destructive text-sm">
-            {error}
-          </p>
-        )}
+        {error && <FormMessage>{error}</FormMessage>}
         <DialogFooter>
           <Button
             type="button"

@@ -381,4 +381,32 @@ describe("QuestionFormDialog", () => {
     expect(props.onOpenChange).not.toHaveBeenCalled();
     expect(screen.getByTestId("question-form-dialog")).toBeInTheDocument();
   });
+
+  // Phase 8 H12: the exams theme, and the correct option's row is tinted.
+  it("wears the exams theme and tints the correct option's row", async () => {
+    const { user } = setup();
+
+    const dialog = screen.getByRole("dialog", { name: "Nueva pregunta" });
+    expect(dialog).toHaveAttribute("data-technique-theme", "exams");
+    expect(dialog.querySelector('[data-slot="pixel-tile"]')).toHaveAttribute(
+      "data-tone",
+      "rose",
+    );
+    expect(
+      screen.getByRole("button", { name: "Guardar pregunta" }),
+    ).toHaveAttribute("data-variant", "technique");
+
+    const rowOf = (letter: string) =>
+      screen
+        .getByRole("radio", { name: `Opción ${letter} es la correcta` })
+        .closest('[data-slot="answer-option"]');
+    expect(rowOf("A")).toHaveAttribute("data-correct", "true");
+    expect(rowOf("B")).not.toHaveAttribute("data-correct");
+
+    await user.click(
+      screen.getByRole("radio", { name: "Opción B es la correcta" }),
+    );
+    expect(rowOf("B")).toHaveAttribute("data-correct", "true");
+    expect(rowOf("A")).not.toHaveAttribute("data-correct");
+  });
 });

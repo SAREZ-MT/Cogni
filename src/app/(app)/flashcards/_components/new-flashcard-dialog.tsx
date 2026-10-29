@@ -17,6 +17,10 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/shared/ui/dialog";
+import { FieldLabel } from "@/shared/ui/field-label";
+import { FormMessage } from "@/shared/ui/form-message";
+import { PixelTile } from "@/shared/ui/pixel-tile";
+import { TECHNIQUE_THEME } from "@/shared/ui/technique-theme";
 import { Textarea } from "@/shared/ui/textarea";
 
 const GENERIC_FAILURE = "No pudimos guardar la tarjeta. Intenta de nuevo.";
@@ -87,8 +91,20 @@ export function NewFlashcardDialog({ pageId }: NewFlashcardDialogProps) {
           Nueva tarjeta
         </Button>
       </DialogTrigger>
-      <DialogContent data-testid="new-flashcard-dialog" className="sm:max-w-lg">
-        <DialogHeader>
+      <DialogContent
+        data-testid="new-flashcard-dialog"
+        data-technique-theme="flashcards"
+        className="sm:max-w-lg"
+      >
+        <DialogHeader
+          icon={
+            <PixelTile
+              tone={TECHNIQUE_THEME.flashcards.tone}
+              icon={TECHNIQUE_THEME.flashcards.icon}
+              size={48}
+            />
+          }
+        >
           <DialogTitle>Nueva tarjeta</DialogTitle>
           <DialogDescription>
             Se agrega al mazo de esta página y entra hoy a tus repasos.
@@ -96,16 +112,14 @@ export function NewFlashcardDialog({ pageId }: NewFlashcardDialogProps) {
         </DialogHeader>
 
         <form
-          className="flex flex-col gap-3"
+          className="flex flex-col gap-4"
           onSubmit={(event) => {
             event.preventDefault();
             submit();
           }}
         >
           <div className="flex flex-col gap-1.5">
-            <label htmlFor={frontId} className="text-fg-secondary text-sm">
-              Anverso
-            </label>
+            <FieldLabel htmlFor={frontId}>Anverso</FieldLabel>
             <Textarea
               id={frontId}
               autoFocus
@@ -113,27 +127,21 @@ export function NewFlashcardDialog({ pageId }: NewFlashcardDialogProps) {
               maxLength={MAX_FLASHCARD_SIDE_LENGTH}
               onChange={(event) => setFront(event.target.value)}
               placeholder="La pregunta o el concepto"
-              className="min-h-20"
+              className="min-h-20 rounded-input px-3.5 py-2.5"
             />
           </div>
           <div className="flex flex-col gap-1.5">
-            <label htmlFor={backId} className="text-fg-secondary text-sm">
-              Reverso
-            </label>
+            <FieldLabel htmlFor={backId}>Reverso</FieldLabel>
             <Textarea
               id={backId}
               value={back}
               maxLength={MAX_FLASHCARD_SIDE_LENGTH}
               onChange={(event) => setBack(event.target.value)}
               placeholder="La respuesta"
-              className="min-h-24"
+              className="min-h-24 rounded-input px-3.5 py-2.5"
             />
           </div>
-          {error && (
-            <p role="alert" className="text-destructive text-sm">
-              {error}
-            </p>
-          )}
+          {error && <FormMessage>{error}</FormMessage>}
           <DialogFooter>
             <Button
               type="button"
@@ -142,7 +150,7 @@ export function NewFlashcardDialog({ pageId }: NewFlashcardDialogProps) {
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={!canSave}>
+            <Button type="submit" variant="technique" disabled={!canSave}>
               {pending ? "Guardando…" : "Guardar tarjeta"}
             </Button>
           </DialogFooter>

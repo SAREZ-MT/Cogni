@@ -1,9 +1,11 @@
 "use client";
 
+import { Check } from "lucide-react";
 import { useState } from "react";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -59,28 +61,36 @@ export function ChangeAppearanceDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Apariencia de {notebookTitle}</DialogTitle>
+          <DialogDescription>Elige el color de su portada.</DialogDescription>
         </DialogHeader>
-        <div className="flex flex-wrap gap-2">
-          {COLOR_PALETTE.map((color) => (
-            <button
-              key={color}
-              type="button"
-              aria-label={`Color ${color}`}
-              onClick={() => {
-                onChange(color);
-                setOpen(false);
-              }}
-              className={cn(
-                "size-8 rounded-full transition-transform hover:scale-105",
-                DOT_CLASSES[color],
-                // Legacy notebooks without a stored color preview as violet
-                // (same fallback as the icon tiles), so the ring still
-                // highlights the color the tile actually renders.
-                (currentColor ?? "purple") === color &&
-                  "ring-2 ring-ring ring-offset-2",
-              )}
-            />
-          ))}
+        <div className="flex flex-wrap gap-3">
+          {COLOR_PALETTE.map((color) => {
+            // Legacy notebooks without a stored color preview as violet
+            // (same fallback as the icon tiles), so the ring still
+            // highlights the color the tile actually renders.
+            const current = (currentColor ?? "purple") === color;
+            return (
+              <button
+                key={color}
+                type="button"
+                aria-label={`Color ${color}`}
+                aria-pressed={current}
+                onClick={() => {
+                  onChange(color);
+                  setOpen(false);
+                }}
+                className={cn(
+                  "flex size-10 items-center justify-center rounded-full text-fg-secondary shadow-[inset_0_0_0_1px_rgb(0_0_0/0.06)] outline-none transition-transform duration-150 hover:scale-105 focus-visible:ring-3 focus-visible:ring-ring/50 active:scale-95 motion-reduce:transform-none",
+                  DOT_CLASSES[color],
+                  current && "ring-2 ring-primary-500 ring-offset-2",
+                )}
+              >
+                {current && (
+                  <Check aria-hidden="true" size={16} strokeWidth={2.25} />
+                )}
+              </button>
+            );
+          })}
         </div>
       </DialogContent>
     </Dialog>

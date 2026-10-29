@@ -5,12 +5,18 @@ import { Button } from "@/shared/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/shared/ui/dialog";
+import { FieldLabel } from "@/shared/ui/field-label";
+import { FormMessage } from "@/shared/ui/form-message";
 import { Input } from "@/shared/ui/input";
+import { PixelTile } from "@/shared/ui/pixel-tile";
+import { TECHNIQUE_THEME } from "@/shared/ui/technique-theme";
 import { Textarea } from "@/shared/ui/textarea";
+import { cn } from "@/shared/ui/utils";
 
 export interface QuestionFormValues {
   stem: string;
@@ -139,18 +145,31 @@ export function QuestionFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={changeOpen}>
-      <DialogContent data-testid="question-form-dialog" className="sm:max-w-lg">
-        <DialogHeader>
+      <DialogContent
+        data-testid="question-form-dialog"
+        data-technique-theme="exams"
+        className="sm:max-w-lg"
+      >
+        <DialogHeader
+          icon={
+            <PixelTile
+              tone={TECHNIQUE_THEME.exams.tone}
+              icon={TECHNIQUE_THEME.exams.icon}
+              size={48}
+            />
+          }
+        >
           <DialogTitle>
             {mode === "edit" ? "Editar pregunta" : "Nueva pregunta"}
           </DialogTitle>
+          <DialogDescription>
+            Escribe el enunciado y 4 opciones, y marca la correcta.
+          </DialogDescription>
         </DialogHeader>
 
-        <div className="flex max-h-[65vh] flex-col gap-3 overflow-y-auto pr-1">
+        <div className="-mx-1 flex max-h-[60vh] flex-col gap-4 overflow-y-auto px-1 pb-1">
           <div className="flex flex-col gap-1.5">
-            <label htmlFor={stemId} className="text-fg-secondary text-sm">
-              Enunciado
-            </label>
+            <FieldLabel htmlFor={stemId}>Enunciado</FieldLabel>
             <Textarea
               id={stemId}
               autoFocus
@@ -159,46 +178,64 @@ export function QuestionFormDialog({
                 setValues((prev) => ({ ...prev, stem: event.target.value }))
               }
               placeholder="Escribe la pregunta"
+              className="rounded-input px-3.5 py-2.5"
             />
           </div>
 
           <fieldset className="flex flex-col gap-2">
-            <legend className="text-fg-secondary text-sm">
+            <legend className="mb-1.5 font-medium text-[13px] text-fg-secondary">
               Opciones · marca la correcta
             </legend>
-            {OPTION_LETTERS.map((letter, index) => (
-              <div key={letter} className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  name="correct-option"
-                  aria-label={`Opción ${letter} es la correcta`}
-                  checked={values.correctIndex === index}
-                  onChange={() =>
-                    setValues((prev) => ({
-                      ...prev,
-                      correctIndex: index as 0 | 1 | 2 | 3,
-                    }))
-                  }
-                  className="size-4 shrink-0 accent-pastel-pink-fg"
-                />
-                <span className="w-4 shrink-0 font-medium text-fg-muted text-xs">
-                  {letter}
-                </span>
-                <Input
-                  value={values.options[index]}
-                  onChange={(event) =>
-                    updateOption(index as 0 | 1 | 2 | 3, event.target.value)
-                  }
-                  placeholder={`Opción ${letter}`}
-                />
-              </div>
-            ))}
+            {OPTION_LETTERS.map((letter, index) => {
+              const correct = values.correctIndex === index;
+              return (
+                <div
+                  key={letter}
+                  data-slot="answer-option"
+                  data-correct={correct || undefined}
+                  className={cn(
+                    "flex items-center gap-2.5 rounded-xl border py-1.5 pr-1.5 pl-3 transition-colors duration-150",
+                    correct
+                      ? "border-rose-400/50 bg-pastel-pink/35"
+                      : "border-border-default bg-card",
+                  )}
+                >
+                  <input
+                    type="radio"
+                    name="correct-option"
+                    aria-label={`Opción ${letter} es la correcta`}
+                    checked={values.correctIndex === index}
+                    onChange={() =>
+                      setValues((prev) => ({
+                        ...prev,
+                        correctIndex: index as 0 | 1 | 2 | 3,
+                      }))
+                    }
+                    className="size-4 shrink-0 accent-(--theme-ink)"
+                  />
+                  <span
+                    className={cn(
+                      "w-4 shrink-0 font-semibold text-xs",
+                      correct ? "text-(--theme-ink)" : "text-fg-muted",
+                    )}
+                  >
+                    {letter}
+                  </span>
+                  <Input
+                    value={values.options[index]}
+                    onChange={(event) =>
+                      updateOption(index as 0 | 1 | 2 | 3, event.target.value)
+                    }
+                    placeholder={`Opción ${letter}`}
+                    className="h-9 rounded-lg border-transparent bg-transparent px-1.5 shadow-none focus-visible:bg-card"
+                  />
+                </div>
+              );
+            })}
           </fieldset>
 
           <div className="flex flex-col gap-1.5">
-            <label htmlFor={conceptId} className="text-fg-secondary text-sm">
-              Concepto que evalúa
-            </label>
+            <FieldLabel htmlFor={conceptId}>Concepto que evalúa</FieldLabel>
             <Input
               id={conceptId}
               value={values.concept}
@@ -206,19 +243,17 @@ export function QuestionFormDialog({
                 setValues((prev) => ({ ...prev, concept: event.target.value }))
               }
               placeholder="Fosforilación oxidativa"
+              className="h-11 rounded-input px-3.5"
             />
-            <p className="text-[11px] text-fg-muted">
+            <p className="text-fg-muted text-xs">
               Corto, por ejemplo: Fosforilación oxidativa
             </p>
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label
-              htmlFor={explanationId}
-              className="text-fg-secondary text-sm"
-            >
+            <FieldLabel htmlFor={explanationId}>
               Explicación (opcional)
-            </label>
+            </FieldLabel>
             <Textarea
               id={explanationId}
               value={values.explanation}
@@ -229,15 +264,12 @@ export function QuestionFormDialog({
                 }))
               }
               placeholder="Por qué es correcta esta opción"
+              className="rounded-input px-3.5 py-2.5"
             />
           </div>
         </div>
 
-        {error && (
-          <p role="alert" className="text-destructive text-sm">
-            {error}
-          </p>
-        )}
+        {error && <FormMessage>{error}</FormMessage>}
 
         <DialogFooter>
           <Button
@@ -247,7 +279,12 @@ export function QuestionFormDialog({
           >
             Cancelar
           </Button>
-          <Button type="button" onClick={submit} disabled={!isValid || pending}>
+          <Button
+            type="button"
+            variant="technique"
+            onClick={submit}
+            disabled={!isValid || pending}
+          >
             {pending
               ? "Guardando…"
               : mode === "edit"

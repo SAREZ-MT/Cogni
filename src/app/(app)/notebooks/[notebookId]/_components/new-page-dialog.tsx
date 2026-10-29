@@ -98,11 +98,9 @@ export function NewPageDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent className="gap-5 p-5 sm:max-w-[560px] sm:p-6">
+      <DialogContent className="sm:max-w-[560px]">
         <DialogHeader>
-          <DialogTitle className="font-semibold text-lg">
-            Nueva página
-          </DialogTitle>
+          <DialogTitle>Nueva página</DialogTitle>
           <DialogDescription>
             Elige cómo quieres empezar. Siempre puedes seguir escribiendo
             después.

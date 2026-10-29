@@ -135,4 +135,19 @@ describe("NewFlashcardDialog", () => {
       "No pudimos guardar la tarjeta. Intenta de nuevo.",
     );
   });
+
+  // Phase 8 H12: a flashcards dialog wears the flashcards theme.
+  it("wears the flashcards theme with an amber Guardar tarjeta", async () => {
+    await openDialog();
+
+    const dialog = screen.getByRole("dialog", { name: "Nueva tarjeta" });
+    expect(dialog).toHaveAttribute("data-technique-theme", "flashcards");
+    expect(dialog.querySelector('[data-slot="pixel-tile"]')).toHaveAttribute(
+      "data-tone",
+      "yellow",
+    );
+    expect(
+      screen.getByRole("button", { name: "Guardar tarjeta" }),
+    ).toHaveAttribute("data-variant", "technique");
+  });
 });

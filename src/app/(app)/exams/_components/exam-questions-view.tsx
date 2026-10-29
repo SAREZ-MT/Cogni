@@ -23,6 +23,7 @@ import {
 } from "@/shared/ui/dialog";
 import { EmptyState } from "@/shared/ui/empty-state";
 import { ExamQuestionRow } from "@/shared/ui/exam-question-row";
+import { FormMessage } from "@/shared/ui/form-message";
 import { IconTile } from "@/shared/ui/icon-tile";
 import {
   QuestionFormDialog,
@@ -270,11 +271,7 @@ export function ExamQuestionsView({
               Sale de tus exámenes y de tus repasos. Su historial se conserva.
             </DialogDescription>
           </DialogHeader>
-          {retireError && (
-            <p role="alert" className="text-destructive text-sm">
-              {retireError}
-            </p>
-          )}
+          {retireError && <FormMessage>{retireError}</FormMessage>}
           <DialogFooter>
             <Button
               type="button"

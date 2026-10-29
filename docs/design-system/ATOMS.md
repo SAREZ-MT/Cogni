@@ -1008,6 +1008,16 @@ with `data-technique-theme` so `Button variant="technique"` takes its
 colours; every other dialog's primary is `variant="brand"`
 (violet), the cancel an `outline`, never the dark default.
 
+Per dialog (H12): `CreateNotebookDialog` and `RenameNotebookDialog` add a
+description, a `FieldLabel` + 44px `Input` and a `brand` primary;
+`ChangeAppearanceDialog` a description and 40px swatches with
+`aria-pressed` and a check on the current colour; `NewPageDialog` drops its
+own padding and title overrides for the shell's; `NewFlashcardDialog`
+wears the flashcards theme (amber `PixelTile`, `technique` save);
+`QuestionFormDialog` and `ExamGenerateDialog` / `CreateExamDialog` the
+exams theme; the archive and retire confirms keep `destructive` and show
+errors as `FormMessage`.
+
 ## Flashcards design preview (2026-09-24)
 
 Six new atoms for the `/flashcards` design-preview screens (user decision:
@@ -1681,6 +1691,13 @@ pregunta" and every row's "Editar"; it re-syncs its local form state from
 - `open`, `onOpenChange`, `mode: "create" | "edit"`, `initialValues?`,
   `onSubmit: (values: QuestionFormValues) => undefined | Promise<string |
   null | undefined>`. `data-testid="question-form-dialog"`.
+- Phase 8 H12 (user 2026-10-29): the exams theme (`data-technique-theme=
+  "exams"`, a 48px rose `PixelTile` in the header, a short description,
+  `Button variant="technique"` for the save), `FieldLabel` labels, 44px
+  fields, the error as a `FormMessage`, and each answer as a bordered
+  `data-slot="answer-option"` row; the correct one carries `data-correct`
+  and a rose tint (`border-rose-400/50 bg-pastel-pink/35`, letter in
+  `--theme-ink`, radio `accent-(--theme-ink)`).
 - Since Phase 5 T4: a sync `onSubmit` closes at once (as before); an async
   one keeps the dialog open while it runs (save button disabled, reading
   "Guardando…"), then closes on `null`/`undefined` or shows the returned
