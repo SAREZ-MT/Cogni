@@ -47,7 +47,20 @@ describe("bubble toolbar highlighter", () => {
     const row = await screen.findByRole("group", {
       name: "Colores de resaltado",
     });
-    expect(row.querySelectorAll("button[data-color]")).toHaveLength(6);
+    // H7 follow-up: circular pastel swatches, each with a thin border in
+    // its hue, then a divider and the "no highlight" icon.
+    const swatches = row.querySelectorAll("button[data-color]");
+    expect(swatches).toHaveLength(5);
+    for (const swatch of swatches) {
+      const dot = swatch.querySelector("span");
+      expect(dot?.className).toContain("rounded-full");
+      expect(dot?.className).toMatch(/border-highlighter-\w+-edge/);
+      expect(swatch).toHaveTextContent("");
+    }
+    expect(screen.getByRole("separator")).toBeInTheDocument();
+    const remove = screen.getByRole("button", { name: "Quitar resaltado" });
+    expect(remove).toHaveTextContent("");
+    expect(remove.querySelector("svg")).not.toBeNull();
     act(() => {
       fireEvent.click(screen.getByRole("button", { name: "Resaltar en azul" }));
     });

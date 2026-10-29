@@ -59,17 +59,26 @@
   --color-pastel-blue-fg: #1e40af;
   --color-pastel-mint: #d1fae5;
   --color-pastel-mint-fg: #065f46;
-  /* H7 (editor polish round 2): classic highlighter-pen colours for the
-     editor's highlight mark — the -300 step of each hue, strong enough to
-     read as a marker stroke and still AA (≥ 9:1) behind ink text. Same
-     seven names as the pastel palette (the content catalogue's). */
-  --color-highlighter-yellow: #fde047;
-  --color-highlighter-green: #86efac;
-  --color-highlighter-blue: #7dd3fc;
-  --color-highlighter-pink: #f9a8d4;
-  --color-highlighter-orange: #fdba74;
-  --color-highlighter-purple: #c4b5fd;
-  --color-highlighter-mint: #6ee7b7;
+  /* H7 follow-up (user reference highlight-ref.png): soft pastel fills
+     for the editor's highlight mark, ink text on top (≥ 12:1), and a
+     mid "-edge" step of the same hue for the picker's swatch borders.
+     Same seven names as the pastel palette (the content catalogue's), so
+     stored colours are unchanged; orange and mint still render although
+     the picker offers the reference's five. */
+  --color-highlighter-yellow: #fdf3b0;
+  --color-highlighter-yellow-edge: #e6d36a;
+  --color-highlighter-green: #d4f4df;
+  --color-highlighter-green-edge: #9fd9b3;
+  --color-highlighter-blue: #d8e7fb;
+  --color-highlighter-blue-edge: #a6c5ec;
+  --color-highlighter-pink: #fbdde1;
+  --color-highlighter-pink-edge: #eeb1ba;
+  --color-highlighter-orange: #fde3cf;
+  --color-highlighter-orange-edge: #efbd94;
+  --color-highlighter-purple: #e9e1fb;
+  --color-highlighter-purple-edge: #c8b7ef;
+  --color-highlighter-mint: #cff3e4;
+  --color-highlighter-mint-edge: #95d9bd;
   /* H7 follow-up (user reference callout-ref.png, light theme): editor
      callouts keep the landing band hues (idea yellow, note violet, warning
      rose) as a light tint, a mid "-edge" border, a strong "-icon" step for
@@ -518,10 +527,11 @@
   /* H7 (editor polish round 2): the highlight mark is a marker-pen stroke
      instead of a flat box. A left-to-right ink gradient (light where the
      pen lands, saturated through the middle, fading where it lifts), uneven
-     corner radii for the irregular edges, and a band a little shorter than
-     the line box. Negative inline margins let the stroke overrun the words
+     corner radii for the irregular edges, and a band over the full text
+     height. Negative inline margins let the stroke overrun the words
      slightly without moving the text; `box-decoration-break: clone` paints
-     every line of a wrapped highlight as its own stroke. Ink text stays. */
+     every line of a wrapped highlight as its own stroke. Ink text stays.
+     H7 follow-up: pastel fills and full height, per the user's reference. */
   .editor-content mark {
     --highlighter: var(--color-highlighter-yellow);
     color: inherit;
@@ -535,8 +545,8 @@
       color-mix(in oklch, var(--highlighter) 45%, transparent) 100%
     );
     background-repeat: no-repeat;
-    background-size: 100% 84%;
-    background-position: 0 70%;
+    background-size: 100% 100%;
+    background-position: 0 0;
     border-radius: 0.7em 0.25em 0.6em 0.3em / 0.35em 0.6em 0.3em 0.55em;
     margin-inline: -0.12em;
     padding-inline: 0.22em;

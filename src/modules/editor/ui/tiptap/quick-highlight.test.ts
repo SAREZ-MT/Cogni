@@ -33,14 +33,15 @@ describe("quick highlight", () => {
     vi.restoreAllMocks();
   });
 
-  it("offers six AA-readable palette colours, yellow first", () => {
+  // H7 follow-up (user reference highlight-ref.png): the picker offers the
+  // reference's five pastels in its order; yellow stays the default.
+  it("offers the reference's five pastel colours, yellow the default", () => {
     expect(HIGHLIGHTER_COLORS).toEqual([
-      "yellow",
       "green",
       "blue",
       "pink",
       "purple",
-      "orange",
+      "yellow",
     ]);
     expect(DEFAULT_HIGHLIGHT_COLOR).toBe("yellow");
   });

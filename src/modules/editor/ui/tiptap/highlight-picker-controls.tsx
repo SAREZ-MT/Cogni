@@ -25,13 +25,13 @@ export const PALETTE_LABELS: Record<HighlightColor, string> = {
 };
 
 const SWATCH_CLASSES: Record<HighlightColor, string> = {
-  pink: "bg-highlighter-pink",
-  green: "bg-highlighter-green",
-  yellow: "bg-highlighter-yellow",
-  purple: "bg-highlighter-purple",
-  orange: "bg-highlighter-orange",
-  blue: "bg-highlighter-blue",
-  mint: "bg-highlighter-mint",
+  pink: "border bg-highlighter-pink border-highlighter-pink-edge",
+  green: "border bg-highlighter-green border-highlighter-green-edge",
+  yellow: "border bg-highlighter-yellow border-highlighter-yellow-edge",
+  purple: "border bg-highlighter-purple border-highlighter-purple-edge",
+  orange: "border bg-highlighter-orange border-highlighter-orange-edge",
+  blue: "border bg-highlighter-blue border-highlighter-blue-edge",
+  mint: "border bg-highlighter-mint border-highlighter-mint-edge",
 };
 
 export interface HighlightPickerControlsProps {

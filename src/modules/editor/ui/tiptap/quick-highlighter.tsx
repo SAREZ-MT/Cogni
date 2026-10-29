@@ -3,12 +3,13 @@
 // H6-E6 (odd/tasks/phase-8-design-flows.md): the bubble toolbar's
 // highlighter. The main button carries the last colour used as a tinted
 // chip and applies it in one click (Mod+Shift+H does the same); the chevron
-// opens a small swatch row of six palette colours plus "Quitar resaltado".
+// opens a small swatch row of five pastel colours plus "Quitar resaltado"
+// (H7 follow-up: circular swatches, a divider and a circle-slash icon).
 // A colour picked here, or in the "Color de texto" popover's highlight row,
 // becomes the next one-click colour (quick-highlight.ts remembers it).
 import type { Editor } from "@tiptap/core";
 import { useEditorState } from "@tiptap/react";
-import { ChevronDown, Highlighter } from "lucide-react";
+import { Ban, ChevronDown, Highlighter } from "lucide-react";
 import { useState } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
@@ -23,6 +24,17 @@ import {
 } from "./quick-highlight";
 
 // Literal class names for Tailwind's scanner (see highlight-palette.tsx).
+// Swatches: the pastel fill with a thin border in the same hue.
+const SWATCH_CLASSES: Record<HighlightColor, string> = {
+  pink: "bg-highlighter-pink border-highlighter-pink-edge",
+  green: "bg-highlighter-green border-highlighter-green-edge",
+  yellow: "bg-highlighter-yellow border-highlighter-yellow-edge",
+  purple: "bg-highlighter-purple border-highlighter-purple-edge",
+  orange: "bg-highlighter-orange border-highlighter-orange-edge",
+  blue: "bg-highlighter-blue border-highlighter-blue-edge",
+  mint: "bg-highlighter-mint border-highlighter-mint-edge",
+};
+
 const CHIP_CLASSES: Record<HighlightColor, string> = {
   pink: "bg-highlighter-pink text-fg",
   green: "bg-highlighter-green text-fg",
@@ -90,7 +102,7 @@ export function QuickHighlighter({ editor }: QuickHighlighterProps) {
         </PopoverTrigger>
         <PopoverContent
           align="start"
-          className="editor-surface w-auto gap-1.5 p-1.5"
+          className="editor-surface flex w-auto flex-row items-center gap-1 px-2 py-1.5"
           // Picking a colour hands focus back to the text (focusEditorView);
           // Radix would otherwise move it to the chevron as the menu closes.
           onCloseAutoFocus={(event) => event.preventDefault()}
@@ -107,28 +119,37 @@ export function QuickHighlighter({ editor }: QuickHighlighterProps) {
                 aria-label={`Resaltar en ${PALETTE_LABELS[color]}`}
                 aria-pressed={activeColor === color}
                 title={PALETTE_LABELS[color]}
-                className={`flex size-7 items-center justify-center rounded-sm text-[13px] font-medium outline-none transition-shadow hover:ring-1 hover:ring-fg-muted focus-visible:ring-2 focus-visible:ring-ring aria-pressed:ring-2 aria-pressed:ring-fg ${CHIP_CLASSES[color]}`}
+                className="flex size-8 items-center justify-center rounded-full outline-none transition-colors hover:bg-hover focus-visible:ring-2 focus-visible:ring-ring aria-pressed:bg-active"
                 onClick={() => {
                   applyHighlight(editor, color);
                   focusEditorView(editor);
                   setOpen(false);
                 }}
               >
-                A
+                <span
+                  aria-hidden="true"
+                  className={`size-6 rounded-full border ${SWATCH_CLASSES[color]}`}
+                />
               </button>
             ))}
           </fieldset>
+          <hr
+            aria-orientation="vertical"
+            className="mx-1 h-6 w-px shrink-0 border-0 bg-border-default"
+          />
           <button
             type="button"
+            aria-label="Quitar resaltado"
+            title="Quitar resaltado"
             data-testid="bubble-toolbar-highlight-remove"
-            className="rounded-sm px-2 py-1 text-left text-[13px] text-fg-secondary outline-none transition-colors hover:bg-hover focus-visible:ring-2 focus-visible:ring-ring"
+            className="flex size-8 items-center justify-center rounded-full text-fg-secondary outline-none transition-colors hover:bg-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-ring"
             onClick={() => {
               editor.chain().unsetHighlight().run();
               focusEditorView(editor);
               setOpen(false);
             }}
           >
-            Quitar resaltado
+            <Ban aria-hidden="true" size={18} strokeWidth={1.75} />
           </button>
         </PopoverContent>
       </Popover>

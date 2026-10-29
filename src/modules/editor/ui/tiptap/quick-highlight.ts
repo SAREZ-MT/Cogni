@@ -10,13 +10,15 @@ import { type HighlightColor, isHighlightColor } from "./highlight-palette";
 // Six of the seven palette colours, yellow first like a real highlighter;
 // mint sits too close to green to tell apart at swatch size. Every pair is
 // the design system's pastel background with its `-fg` ink, AA on purpose.
+// H7 follow-up (user reference highlight-ref.png): the reference's five
+// pastels in its order. Orange and mint stay valid stored colours (they
+// still render, globals.css) but are no longer offered here.
 export const HIGHLIGHTER_COLORS: readonly HighlightColor[] = [
-  "yellow",
   "green",
   "blue",
   "pink",
   "purple",
-  "orange",
+  "yellow",
 ];
 
 export const DEFAULT_HIGHLIGHT_COLOR: HighlightColor = "yellow";
