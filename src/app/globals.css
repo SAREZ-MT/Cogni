@@ -636,6 +636,19 @@
   .editor-content [data-type="block-math"] .katex-display {
     margin: 0;
   }
+  /* H7: formulas are editable — a click (or Enter when selected) opens the
+     LaTeX input (math-editor.tsx), so they show a hover affordance. */
+  .editor-content .tiptap-mathematics-render--editable {
+    cursor: pointer;
+    border-radius: var(--radius-editor);
+    transition: background-color 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .editor-content .tiptap-mathematics-render--editable:hover {
+    background-color: var(--color-hover);
+  }
+  .editor-content [data-type="block-math"].tiptap-mathematics-render--editable {
+    padding-block: 0.25rem;
+  }
 
   .editor-content span[data-type="emoji"] img {
     display: inline-block;

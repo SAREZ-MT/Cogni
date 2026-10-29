@@ -18,7 +18,7 @@
 // dependencies.
 import type { AnyExtension } from "@tiptap/core";
 import Emoji from "@tiptap/extension-emoji";
-import { BlockMath, InlineMath } from "@tiptap/extension-mathematics";
+import { BlockMath } from "@tiptap/extension-mathematics";
 import { NodeRange } from "@tiptap/extension-node-range";
 import Subscript from "@tiptap/extension-subscript";
 import Superscript from "@tiptap/extension-superscript";
@@ -69,6 +69,7 @@ import { BlockShortcuts } from "./block-shortcuts";
 import { CodeBlock } from "./code-block";
 import { createDetailsExtensions } from "./details";
 import { MarkdownShortcuts, withoutQuoteChevron } from "./markdown-shortcuts";
+import { CogniInlineMath, MathEditing } from "./math-editing";
 import { NodeBackground } from "./node-background";
 import { createTableExtensions } from "./table";
 import { CogniYoutube } from "./youtube";
@@ -201,9 +202,10 @@ export function createEditorExtensions(
     CogniMention.configure({
       suggestion: createMentionSuggestion(mentionPort),
     }),
-    // E1: KaTeX-rendered inline `$…$` / block `$$…$$` math. Kept
-    // registered so existing math content renders and round-trips; there is
-    // no insert entry point until a math editing UI exists.
+    // E1: KaTeX-rendered inline / block math. H7: formulas can now be
+    // written — `$…$` (CogniInlineMath), the slash menu's "Ecuación" items
+    // and a click or Enter on a formula open the LaTeX input
+    // (math-editing.ts, math-editor.tsx).
     //
     // document-import T11b: registered as the two node extensions instead
     // of the `Mathematics` bundle, because the bundle hands one shared
@@ -213,9 +215,10 @@ export function createEditorExtensions(
     BlockMath.configure({
       katexOptions: { throwOnError: false, displayMode: true },
     }),
-    InlineMath.configure({
+    CogniInlineMath.configure({
       katexOptions: { throwOnError: false, displayMode: false },
     }),
+    MathEditing,
     // E1: heading-tracking utility extension (see toc-node.tsx's header
     // comment for why the TOC *node view* computes its own heading list
     // directly from the document instead of depending on this extension's
