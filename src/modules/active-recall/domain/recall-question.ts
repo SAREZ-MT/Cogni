@@ -50,28 +50,55 @@ export function newRecallQuestion(
       "an AI question needs a generation id; a manual one has none",
     );
   }
-  const prompt = input.prompt.trim();
-  if (prompt.length === 0) return invalid("a question needs a prompt");
-  const keyConcepts = input.rubric.keyConcepts.map((concept) => concept.trim());
-  if (keyConcepts.length === 0 || keyConcepts.some((c) => c.length === 0)) {
-    return invalid("a rubric needs at least one non-blank key concept");
-  }
-  const acceptableAnswerSummary = input.rubric.acceptableAnswerSummary.trim();
-  if (acceptableAnswerSummary.length === 0) {
-    return invalid("a rubric needs an acceptable answer summary");
-  }
+  const content = checkedContent(input);
+  if (!content.ok) return content;
+  const { prompt, rubric } = content.value;
   return ok({
     id: input.id,
     ownerId: input.ownerId,
     pageId: input.pageId,
     prompt,
-    rubric: { keyConcepts, acceptableAnswerSummary },
+    rubric,
     origin: input.origin,
     generationId: input.generationId,
     archivedAt: null,
     createdAt: now,
     updatedAt: now,
   });
+}
+
+// A manual edit (Phase 8 H18 edit page): same id, origin and generation,
+// new prompt and rubric under the same rules as a new question, so the
+// question's study item and its history stay attached.
+export function editRecallQuestion(
+  question: RecallQuestion,
+  content: { prompt: string; rubric: RecallRubric },
+  now: Date,
+): Result<RecallQuestion, DomainError> {
+  const checked = checkedContent(content);
+  if (!checked.ok) return checked;
+  return ok({ ...question, ...checked.value, updatedAt: now });
+}
+
+// Trims the prompt and the rubric, refusing a blank prompt, a rubric
+// without key concepts or with a blank one, and a blank answer summary.
+function checkedContent(content: {
+  prompt: string;
+  rubric: RecallRubric;
+}): Result<{ prompt: string; rubric: RecallRubric }, DomainError> {
+  const prompt = content.prompt.trim();
+  if (prompt.length === 0) return invalid("a question needs a prompt");
+  const keyConcepts = content.rubric.keyConcepts.map((concept) =>
+    concept.trim(),
+  );
+  if (keyConcepts.length === 0 || keyConcepts.some((c) => c.length === 0)) {
+    return invalid("a rubric needs at least one non-blank key concept");
+  }
+  const acceptableAnswerSummary = content.rubric.acceptableAnswerSummary.trim();
+  if (acceptableAnswerSummary.length === 0) {
+    return invalid("a rubric needs an acceptable answer summary");
+  }
+  return ok({ prompt, rubric: { keyConcepts, acceptableAnswerSummary } });
 }
 
 function invalid(message: string) {

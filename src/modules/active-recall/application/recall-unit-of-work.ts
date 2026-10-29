@@ -1,12 +1,24 @@
-import type { StudyItemRepository } from "@/modules/study-engine";
+import type {
+  StudyItemKind,
+  StudyItemRepository,
+} from "@/modules/study-engine";
 import type { GenerationFingerprintRepository } from "@/shared/kernel/generation-fingerprints";
 import type { Result } from "@/shared/kernel/result";
 import type { RecallQuestionRepository } from "../domain/recall-question-repository";
 
-// The slice of StudyItemRepository a question generation needs: every
+// The slice of StudyItemRepository a question change needs: every
 // question owns one StudyItem(kind = "recall_question", sourceId =
-// question id) (documento-maestro §6.1), created with it.
-export type RecallStudyItems = Pick<StudyItemRepository, "save">;
+// question id) (documento-maestro §6.1), created with it and deleted, with
+// its review history, when the question is deleted (Phase 8 H18).
+// study-engine has no delete of its own, so the recall adapter adds it.
+export type RecallStudyItems = Pick<StudyItemRepository, "save"> & {
+  // Removes the source's study item; its review logs cascade with it.
+  deleteBySource(
+    kind: StudyItemKind,
+    sourceId: string,
+    ownerId: string,
+  ): Promise<void>;
+};
 
 export interface RecallQuestionRepositories {
   readonly questions: RecallQuestionRepository;

@@ -118,6 +118,22 @@ Implementado:
   y ordena lo vencido, luego lo nunca practicado, luego lo más reciente; la
   vista por cuaderno redirige al centro filtrado y ya no hay promedio de
   dominio en pantalla.
+- Página de edición (Fase 8, H18, 2026-10-29): "la creación nace con IA; la
+  edición permite ajustar y añadir". `editRecallQuestion` reescribe en su
+  lugar el enunciado y la rúbrica (conceptos clave y respuesta esperada),
+  con las mismas reglas que una pregunta nueva; `createRecallQuestion`
+  añade una pregunta `manual` con su ítem de estudio; `deleteRecallQuestion`
+  la borra de verdad: la fila, sus respuestas (`ON DELETE CASCADE`), su
+  ítem de estudio (`RecallStudyItems.deleteBySource`, que el adaptador
+  Drizzle añade al repositorio de study-engine) y, en cascada, su historial
+  de repasos, así las métricas no la cuentan. La página conserva al menos
+  una pregunta (`RECALL_LAST_QUESTION`). `applyRecallEdits` aplica el
+  borrador de "Guardar" (`updates`, `creates`, `deletes`) en UNA unidad de
+  trabajo a través de esos tres casos de uso; cualquier rechazo deshace
+  todo. Acciones: `listRecallQuestionsAction` y `saveRecallEditsAction`
+  (`actions.ts`, revalida `/active-recall`). Las sesiones no dependen de lo
+  vencido (siempre componen preguntas), así que la recordación no tiene
+  estado "al día".
 
 ## Pendientes
 

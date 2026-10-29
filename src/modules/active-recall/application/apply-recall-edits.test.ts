@@ -1,0 +1,266 @@
+import { beforeEach, describe, expect, it } from "vitest";
+import { newStudyItem } from "@/modules/study-engine";
+import { createFixedClock } from "@/shared/kernel/clock";
+import { DomainError } from "@/shared/kernel/domain-error";
+import { err, ok } from "@/shared/kernel/result";
+import { RECALL_ERROR } from "../domain/errors";
+import type { RecallQuestion } from "../domain/recall-question";
+import { applyRecallEdits } from "./apply-recall-edits";
+import { deleteRecallQuestion } from "./delete-recall-question";
+import { editRecallQuestion } from "./edit-recall-question";
+import { InMemoryRecallUnitOfWork } from "./testing/in-memory-recall-unit-of-work";
+
+const OWNER = "owner-1";
+const OTHER = "owner-2";
+const PAGE = "page-1";
+const CREATED = new Date("2026-10-01T10:00:00.000Z");
+const NOW = new Date("2026-10-29T10:00:00.000Z");
+
+function question(id: string, n: number, pageId = PAGE): RecallQuestion {
+  return {
+    id,
+    ownerId: OWNER,
+    pageId,
+    prompt: `Pregunta ${n}`,
+    rubric: {
+      keyConcepts: [`Concepto ${n}`],
+      acceptableAnswerSummary: `Resumen ${n}`,
+    },
+    origin: "ai",
+    generationId: "gen-1",
+    archivedAt: null,
+    createdAt: new Date(CREATED.getTime() + n * 1000),
+    updatedAt: CREATED,
+  };
+}
+
+async function seed(
+  uow: InMemoryRecallUnitOfWork,
+  count: number,
+  pageId = PAGE,
+) {
+  const questions = Array.from({ length: count }, (_, i) =>
+    question(`${pageId}-q${i}`, i, pageId),
+  );
+  await uow.questions.saveMany(questions);
+  for (const q of questions) {
+    await uow.studyItems.save(
+      newStudyItem({
+        id: `item-${q.id}`,
+        ownerId: OWNER,
+        pageId,
+        kind: "recall_question",
+        sourceId: q.id,
+        now: CREATED,
+      }),
+    );
+  }
+  return questions;
+}
+
+const itemOf = (uow: InMemoryRecallUnitOfWork, id: string) =>
+  uow.studyItems.all().find((item) => item.sourceId === id);
+
+const pages = {
+  async getPageText(pageId: string, ownerId: string) {
+    return ownerId === OWNER
+      ? ok({ title: "Página", plainText: "" })
+      : err(new DomainError("PAGE_NOT_FOUND", pageId));
+  },
+};
+
+const content = (prompt: string) => ({
+  prompt,
+  keyConcepts: ["Idea A", " Idea B "],
+  acceptableAnswerSummary: "Lo que se espera",
+});
+
+describe("editRecallQuestion", () => {
+  let uow: InMemoryRecallUnitOfWork;
+  beforeEach(() => {
+    uow = new InMemoryRecallUnitOfWork();
+  });
+
+  it("rewrites the prompt and rubric in place, trimmed", async () => {
+    const [first] = await seed(uow, 2);
+
+    const result = await editRecallQuestion(
+      { questionId: first?.id ?? "", ...content(" Nueva pregunta ") },
+      { uow, clock: createFixedClock(NOW) },
+      OWNER,
+    );
+
+    expect(result.ok && result.value).toMatchObject({
+      id: first?.id,
+      prompt: "Nueva pregunta",
+      rubric: {
+        keyConcepts: ["Idea A", "Idea B"],
+        acceptableAnswerSummary: "Lo que se espera",
+      },
+      origin: "ai",
+      updatedAt: NOW,
+    });
+  });
+
+  it("refuses an empty rubric and another owner's question", async () => {
+    const [first] = await seed(uow, 1);
+    const deps = { uow, clock: createFixedClock(NOW) };
+
+    const invalid = await editRecallQuestion(
+      {
+        questionId: first?.id ?? "",
+        prompt: "P",
+        keyConcepts: [],
+        acceptableAnswerSummary: "R",
+      },
+      deps,
+      OWNER,
+    );
+    const foreign = await editRecallQuestion(
+      { questionId: first?.id ?? "", ...content("P") },
+      deps,
+      OTHER,
+    );
+
+    expect(!invalid.ok && invalid.error.code).toBe(
+      RECALL_ERROR.INVALID_QUESTION,
+    );
+    expect(!foreign.ok && foreign.error.code).toBe(
+      RECALL_ERROR.QUESTION_NOT_FOUND,
+    );
+  });
+});
+
+describe("deleteRecallQuestion", () => {
+  let uow: InMemoryRecallUnitOfWork;
+  beforeEach(() => {
+    uow = new InMemoryRecallUnitOfWork();
+  });
+
+  it("removes the question and its study item for good", async () => {
+    const [first] = await seed(uow, 2);
+
+    const result = await deleteRecallQuestion(
+      { questionId: first?.id ?? "" },
+      { uow },
+      OWNER,
+    );
+
+    expect(result.ok && result.value.remaining).toBe(1);
+    expect(uow.questions.rows.has(first?.id ?? "")).toBe(false);
+    expect(itemOf(uow, first?.id ?? "")).toBeUndefined();
+  });
+
+  it("keeps the page's last question", async () => {
+    const [only] = await seed(uow, 1);
+
+    const result = await deleteRecallQuestion(
+      { questionId: only?.id ?? "" },
+      { uow },
+      OWNER,
+    );
+
+    expect(!result.ok && result.error.code).toBe(RECALL_ERROR.LAST_QUESTION);
+    expect(uow.questions.rows.has(only?.id ?? "")).toBe(true);
+  });
+});
+
+describe("applyRecallEdits", () => {
+  let uow: InMemoryRecallUnitOfWork;
+  let n = 0;
+  const deps = () => ({
+    pages,
+    uow,
+    clock: createFixedClock(NOW),
+    ids: { next: () => `new-${++n}` },
+  });
+
+  beforeEach(() => {
+    uow = new InMemoryRecallUnitOfWork();
+    n = 0;
+  });
+
+  it("edits, adds a manual question with its study item and deletes, in one unit of work", async () => {
+    const [a, b, c] = await seed(uow, 3);
+
+    const result = await applyRecallEdits(
+      {
+        pageId: PAGE,
+        updates: [{ id: a?.id ?? "", ...content("A editada") }],
+        creates: [content("Nueva")],
+        deletes: [b?.id ?? ""],
+      },
+      deps(),
+      OWNER,
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(uow.runs).toBe(1);
+    expect(result.value.questions.map((q) => q.prompt)).toEqual([
+      "A editada",
+      c?.prompt,
+      "Nueva",
+    ]);
+    const created = result.value.questions.at(-1);
+    expect(created).toMatchObject({ origin: "manual", generationId: null });
+    expect(itemOf(uow, created?.id ?? "")?.kind).toBe("recall_question");
+    expect(itemOf(uow, b?.id ?? "")).toBeUndefined();
+  });
+
+  it("rolls everything back when the save would leave the page without questions", async () => {
+    const [a, b] = await seed(uow, 2);
+
+    const result = await applyRecallEdits(
+      {
+        pageId: PAGE,
+        updates: [{ id: a?.id ?? "", ...content("Cambio") }],
+        creates: [],
+        deletes: [a?.id ?? "", b?.id ?? ""],
+      },
+      deps(),
+      OWNER,
+    );
+
+    expect(!result.ok && result.error.code).toBe(RECALL_ERROR.LAST_QUESTION);
+    expect(uow.questions.rows.get(a?.id ?? "")?.prompt).toBe("Pregunta 0");
+    expect(itemOf(uow, b?.id ?? "")).toBeDefined();
+  });
+
+  it("validates every item before writing", async () => {
+    const [a] = await seed(uow, 1);
+
+    const result = await applyRecallEdits(
+      {
+        pageId: PAGE,
+        updates: [{ id: a?.id ?? "", ...content("Cambio") }],
+        creates: [content(" ")],
+        deletes: [],
+      },
+      deps(),
+      OWNER,
+    );
+
+    expect(!result.ok && result.error.code).toBe(RECALL_ERROR.INVALID_QUESTION);
+    expect(uow.runs).toBe(0);
+  });
+
+  it("refuses a question of another page and another owner's page", async () => {
+    await seed(uow, 1);
+    const [foreign] = await seed(uow, 1, "page-2");
+
+    const other = await applyRecallEdits(
+      { pageId: PAGE, updates: [], creates: [], deletes: [foreign?.id ?? ""] },
+      deps(),
+      OWNER,
+    );
+    const page = await applyRecallEdits(
+      { pageId: PAGE, updates: [], creates: [content("P")], deletes: [] },
+      deps(),
+      OTHER,
+    );
+
+    expect(!other.ok && other.error.code).toBe(RECALL_ERROR.QUESTION_NOT_FOUND);
+    expect(!page.ok && page.error.code).toBe("PAGE_NOT_FOUND");
+  });
+});

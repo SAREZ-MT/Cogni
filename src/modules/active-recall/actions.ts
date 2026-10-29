@@ -30,6 +30,7 @@ import {
   withBoundary,
 } from "./action-support";
 import {
+  applyRecallEdits,
   RecallDailyLimitReachedError,
   requestRecallGeneration,
 } from "./application";
@@ -81,6 +82,26 @@ export interface RecallGenerationActionError extends ActionError {
 }
 
 const generateInput = z.object({ pageId: z.uuid() });
+const pageInput = z.object({ pageId: z.uuid() });
+
+// One edit page save (Phase 8 H18). The bounds only keep the payload sane;
+// the domain trims and checks every field (non-blank prompt, at least one
+// non-blank key concept, a non-blank summary).
+const MAX_DRAFT_ITEMS = 200;
+const fieldText = z.string().max(4000);
+const questionContent = z.object({
+  prompt: fieldText,
+  keyConcepts: z.array(z.string().max(500)).max(30),
+  acceptableAnswerSummary: fieldText,
+});
+const saveRecallEditsInput = z.object({
+  pageId: z.uuid(),
+  updates: z
+    .array(questionContent.extend({ id: z.uuid() }))
+    .max(MAX_DRAFT_ITEMS),
+  creates: z.array(questionContent).max(MAX_DRAFT_ITEMS),
+  deletes: z.array(z.uuid()).max(MAX_DRAFT_ITEMS),
+});
 
 // Adapters are built per call, like exams/actions.ts: serverless functions
 // are short-lived, so no module-level singletons.
@@ -214,5 +235,49 @@ export async function generateRecallQuestionsAction(
       wordsUsed: value.wordsUsed,
       wordsTotal: value.wordsTotal,
     });
+  });
+}
+
+// The page's active questions with their rubric, oldest first: what the
+// recall edit page edits (Phase 8 H18). Another owner's page reads empty.
+export async function listRecallQuestionsAction(
+  input: unknown,
+): Promise<Result<RecallQuestionView[], ActionError>> {
+  return withBoundary(async () => {
+    const ownerId = await requireOwnerId();
+    if (!ownerId.ok) return ownerId;
+    const parsed = parseInput(pageInput, input);
+    if (!parsed.ok) return parsed;
+
+    const { questions } = generationDeps();
+    const listed = await questions.listActiveByPage(
+      parsed.value.pageId,
+      ownerId.value,
+    );
+    return ok(listed.map(toView));
+  });
+}
+
+// "Guardar" on the recall edit page (Phase 8 H18): the draft's edits,
+// additions and real deletions, applied together in one transaction
+// (applyRecallEdits) or not at all. Answers the page's questions.
+export async function saveRecallEditsAction(
+  input: unknown,
+): Promise<Result<RecallQuestionView[], ActionError>> {
+  return withBoundary(async () => {
+    const ownerId = await requireOwnerId();
+    if (!ownerId.ok) return ownerId;
+    const parsed = parseInput(saveRecallEditsInput, input);
+    if (!parsed.ok) return parsed;
+
+    const { pages, uow } = generationDeps();
+    const result = await applyRecallEdits(
+      parsed.value,
+      { pages, uow, clock: systemClock, ids: { next: createId } },
+      ownerId.value,
+    );
+    if (!result.ok) return err(toActionError(result.error));
+    revalidateActiveRecall();
+    return ok(result.value.questions.map(toView));
   });
 }

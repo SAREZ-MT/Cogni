@@ -1,4 +1,4 @@
-import type { StudyItem } from "@/modules/study-engine";
+import type { StudyItem, StudyItemKind } from "@/modules/study-engine";
 import {
   InMemoryGenerationFingerprintStore,
   type InMemoryGenerationFingerprints,
@@ -13,7 +13,8 @@ import { InMemoryRecallQuestionRepository } from "./in-memory-recall-repositorie
 
 // Minimal in-memory RecallStudyItems. The full fake lives in
 // study-engine's testing.ts, which cross-module-via-index keeps out of
-// reach of this module; this one covers `save`, with the same unique
+// reach of this module; this one covers `save` and `deleteBySource`, with
+// the same unique
 // (kind, sourceId) rule as the database.
 export class InMemoryRecallStudyItems implements RecallStudyItems {
   private readonly rows = new Map<string, StudyItem>();
@@ -35,6 +36,22 @@ export class InMemoryRecallStudyItems implements RecallStudyItems {
       }
     }
     this.rows.set(item.id, item);
+  }
+
+  async deleteBySource(
+    kind: StudyItemKind,
+    sourceId: string,
+    ownerId: string,
+  ): Promise<void> {
+    for (const [id, row] of this.rows) {
+      if (
+        row.kind === kind &&
+        row.sourceId === sourceId &&
+        row.ownerId === ownerId
+      ) {
+        this.rows.delete(id);
+      }
+    }
   }
 
   // Every item of the page, suspended ones included, ordered by creation
