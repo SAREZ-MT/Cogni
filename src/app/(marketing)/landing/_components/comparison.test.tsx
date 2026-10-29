@@ -1,6 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { Comparison, PAINS, ROUTE } from "./comparison";
+import { PILE_FILES } from "./usual-pile";
 
 globalThis.IntersectionObserver ??= class {
   observe() {}
@@ -40,6 +41,25 @@ describe("Comparison", () => {
       expect(screen.getByText(pain)).toBeInTheDocument();
     }
     expect(PAINS).toHaveLength(4);
+  });
+
+  it("piles up only PDF, DOCX and PPTX files, and never study time, on the usual way", () => {
+    render(<Comparison />);
+    const usual = screen
+      .getByRole("heading", { level: 3, name: "El camino de siempre" })
+      .closest(".lp-way-usual") as HTMLElement;
+    const kinds = new Set(
+      [...usual.querySelectorAll<HTMLElement>(".lp-fbadge")].map(
+        (badge) => badge.dataset.kind,
+      ),
+    );
+    expect(kinds).toEqual(new Set(["pdf", "docx", "pptx"]));
+    for (const file of PILE_FILES) {
+      expect(file.name).toMatch(/\.(pdf|docx|pptx)$/);
+    }
+    expect(usual).not.toHaveTextContent(
+      /\.png|\.jpe?g|horas|tiempo de estudio/i,
+    );
   });
 
   it("walks the five-step Cogni route in order, each with its mechanism and a link to its section", () => {
