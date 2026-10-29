@@ -44,15 +44,23 @@ describe("Callout node", () => {
     // render() call returns — findByTestId waits for that commit.
     const callout = await screen.findByTestId("callout");
     expect(callout).toHaveAttribute("data-kind", "warning");
+    // H7 follow-up (user reference callout-ref.png): a light tint, a 1px
+    // border in the same hue, a rounded frame, the icon in the strong step
+    // and the text in the kind's deep hue.
     expect(callout.className).toContain("bg-callout-warning");
-    // Body text stays ink; the icon and the label carry the kind's ink.
-    expect(callout.className).toContain("text-fg");
+    expect(callout.className).toContain("border-callout-warning-edge");
+    expect(callout.className).toContain("rounded-(--radius-callout)");
+    expect(callout.className).toContain("text-callout-warning-fg");
+    expect(callout.className).not.toContain("text-fg ");
     expect(screen.getByTestId("callout-icon")).toHaveClass(
-      "text-callout-warning-fg",
+      "text-callout-warning-icon",
     );
+    // The label sits inline at the start of the text row, floated ahead of
+    // the editable content instead of on its own line.
     const label = screen.getByTestId("callout-label");
-    expect(label).toHaveTextContent("Cuidado");
+    expect(label).toHaveTextContent("Cuidado ·");
     expect(label).toHaveClass("italic");
+    expect(label).toHaveClass("float-left");
     expect(label).toHaveAttribute("contenteditable", "false");
     expect(callout).toHaveTextContent("cuidado");
   });

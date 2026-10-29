@@ -70,16 +70,23 @@
   --color-highlighter-orange: #fdba74;
   --color-highlighter-purple: #c4b5fd;
   --color-highlighter-mint: #6ee7b7;
-  /* H7: editor callouts in the landing pillar band hues (landing.css
-     --lp-yellow / --lp-violet / --lp-rose) at the -200 step, so they have
-     body behind ink text; -fg is the deep ink of the icon and the italic
-     label (AA on its own ground). */
-  --color-callout-idea: #fde68a;
-  --color-callout-idea-fg: #854d0e;
-  --color-callout-note: #ddd6fe;
-  --color-callout-note-fg: #5b21b6;
-  --color-callout-warning: #fecdd3;
-  --color-callout-warning-fg: #9f1239;
+  /* H7 follow-up (user reference callout-ref.png, light theme): editor
+     callouts keep the landing band hues (idea yellow, note violet, warning
+     rose) as a light tint, a mid "-edge" border, a strong "-icon" step for
+     the outlined icon (≥ 3:1) and a deep "-fg" step for the text (≥ 7:1 on
+     the tint). */
+  --color-callout-idea: #fefae6;
+  --color-callout-idea-edge: #f1d77a;
+  --color-callout-idea-icon: #b7791f;
+  --color-callout-idea-fg: #6b3d0e;
+  --color-callout-note: #f6f3ff;
+  --color-callout-note-edge: #d3c6fb;
+  --color-callout-note-icon: #7c3aed;
+  --color-callout-note-fg: #4c1d95;
+  --color-callout-warning: #fff3f4;
+  --color-callout-warning-edge: #f7bcc6;
+  --color-callout-warning-icon: #e11d48;
+  --color-callout-warning-fg: #881337;
   /* H7: a neutral grey for code blocks (the warm --muted read yellowish
      behind code). */
   --color-code-block: #f3f3f3;
@@ -160,6 +167,8 @@
   --radius-editor: 3px;
   /* H7: tables keep their own, softer frame (moderate, never round). */
   --radius-table: 8px;
+  /* H7 follow-up: callouts are rounded too, after the user's reference. */
+  --radius-callout: 14px;
   --radius-sm: 6px;
   --radius-md: 8px;
   --radius-input: 10px;
@@ -494,6 +503,16 @@
     background-color: var(--color-muted);
     border-radius: var(--radius-editor);
     padding: 0.125rem 0.375rem;
+  }
+
+  /* H7 follow-up: inside a callout, inline code is a subtle chip of the
+     callout's own deep hue, and bold keeps that hue. */
+  .editor-content .callout :not(pre) > code {
+    background-color: color-mix(in oklch, currentColor 9%, transparent);
+    color: inherit;
+  }
+  .editor-content .callout strong {
+    color: inherit;
   }
 
   /* H7 (editor polish round 2): the highlight mark is a marker-pen stroke
