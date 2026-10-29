@@ -1,21 +1,21 @@
 "use client";
 
-// H7 (editor polish round 2): the bubble toolbar's "Texto" menu — font
-// family and size for the selected text (text-style-options.ts). One
-// dropdown with two radio groups, like the toolbar's "Convertir en" and
-// "Alineación" menus; each family is previewed in its own face.
+// H7 (editor polish round 2): the bubble toolbar's "Texto" menu — the font
+// family of the selected text (text-style-options.ts), each family
+// previewed in its own face. H8-2: the size has its own compact menu right
+// next to it (`FontSizeMenu`), whose trigger shows the current size, so the
+// sizes no longer sit below the long font list.
 import type { Editor } from "@tiptap/core";
 import { useEditorState } from "@tiptap/react";
 import { ChevronDown, Type } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 import { focusEditorView } from "./focus-editor-view";
 import {
   applyFontFamily,
@@ -24,10 +24,16 @@ import {
   currentFontSize,
   FONT_FAMILY_OPTIONS,
   FONT_SIZE_OPTIONS,
+  type FontSizeOption,
 } from "./text-style-options";
 
 // Radio values must be strings; the default options store no value.
 const DEFAULT_VALUE = "default";
+
+// Normal stores no size; its pixel value is the editor's 16px body.
+function sizeInPixels(option: FontSizeOption): string {
+  return option.value ? option.value.replace("px", "") : "16";
+}
 
 export interface TextStyleMenuProps {
   editor: Editor;
@@ -38,34 +44,34 @@ export function TextStyleMenu({
   editor,
   triggerClassName,
 }: TextStyleMenuProps) {
-  const { family, size } = useEditorState({
+  const family = useEditorState({
     editor,
-    selector: ({ editor: current }) => ({
-      family: currentFontFamily(current).value ?? DEFAULT_VALUE,
-      size: currentFontSize(current).value ?? DEFAULT_VALUE,
-    }),
+    selector: ({ editor: current }) =>
+      currentFontFamily(current).value ?? DEFAULT_VALUE,
   });
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          aria-label="Texto: fuente y tamaño"
-          data-testid="bubble-toolbar-text-style"
-          className={triggerClassName}
-        >
-          <Type aria-hidden="true" size={16} strokeWidth={1.75} />
-          <ChevronDown aria-hidden="true" size={12} strokeWidth={1.75} />
-        </button>
-      </DropdownMenuTrigger>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              aria-label="Fuente"
+              data-testid="bubble-toolbar-text-style"
+              className={triggerClassName}
+            >
+              <Type aria-hidden="true" size={16} strokeWidth={1.75} />
+              <ChevronDown aria-hidden="true" size={12} strokeWidth={1.75} />
+            </button>
+          </DropdownMenuTrigger>
+        </TooltipTrigger>
+        <TooltipContent>Fuente</TooltipContent>
+      </Tooltip>
       <DropdownMenuContent
         align="start"
-        className="editor-surface max-h-(--radix-dropdown-menu-content-available-height) min-w-52 overflow-y-auto p-1"
+        className="editor-surface max-h-(--radix-dropdown-menu-content-available-height) min-w-48 overflow-y-auto p-1"
       >
-        <DropdownMenuLabel className="px-2 py-1 text-xs font-medium text-fg-muted">
-          Fuente
-        </DropdownMenuLabel>
         <DropdownMenuRadioGroup
           value={family}
           onValueChange={(value) => {
@@ -89,12 +95,46 @@ export function TextStyleMenu({
             </DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>
-        <DropdownMenuSeparator />
-        <DropdownMenuLabel className="px-2 py-1 text-xs font-medium text-fg-muted">
-          Tamaño
-        </DropdownMenuLabel>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+export function FontSizeMenu({ editor, triggerClassName }: TextStyleMenuProps) {
+  const sizeLabel = useEditorState({
+    editor,
+    selector: ({ editor: current }) => currentFontSize(current).label,
+  });
+  const current =
+    FONT_SIZE_OPTIONS.find((option) => option.label === sizeLabel) ??
+    FONT_SIZE_OPTIONS[1];
+
+  return (
+    <DropdownMenu>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              aria-label={`Tamaño de texto: ${current.label}`}
+              data-testid="bubble-toolbar-font-size"
+              className={triggerClassName}
+            >
+              <span className="min-w-[2ch] text-center text-[13px] tabular-nums">
+                {sizeInPixels(current)}
+              </span>
+              <ChevronDown aria-hidden="true" size={12} strokeWidth={1.75} />
+            </button>
+          </DropdownMenuTrigger>
+        </TooltipTrigger>
+        <TooltipContent>Tamaño</TooltipContent>
+      </Tooltip>
+      <DropdownMenuContent
+        align="start"
+        className="editor-surface min-w-40 p-1"
+      >
         <DropdownMenuRadioGroup
-          value={size}
+          value={current.value ?? DEFAULT_VALUE}
           onValueChange={(value) => {
             const option = FONT_SIZE_OPTIONS.find(
               (candidate) => (candidate.value ?? DEFAULT_VALUE) === value,
@@ -109,11 +149,11 @@ export function TextStyleMenu({
               key={option.label}
               value={option.value ?? DEFAULT_VALUE}
               data-testid={`text-style-size-${option.label}`}
-              className="text-[13.5px]"
+              className="text-[13.5px] whitespace-nowrap"
             >
               {option.label}
               <span className="ml-auto pl-4 text-xs tabular-nums text-fg-muted">
-                {option.value ? option.value.replace("px", "") : "16"}
+                {sizeInPixels(option)}
               </span>
             </DropdownMenuRadioItem>
           ))}

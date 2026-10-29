@@ -80,7 +80,8 @@ test.describe("editor polish round 2", () => {
     await expect(span).toHaveText("fuente");
     await expect(span).toHaveAttribute("style", /Bitter, serif/);
 
-    await page.getByTestId("bubble-toolbar-text-style").click();
+    // H8-2: the size has its own menu next to the font.
+    await page.getByTestId("bubble-toolbar-font-size").click();
     await page.getByRole("menuitemradio", { name: /^Grande/ }).click();
     await expect(span).toHaveAttribute("style", /font-size: 22px/);
     // The self-hosted face, not the system fallback.

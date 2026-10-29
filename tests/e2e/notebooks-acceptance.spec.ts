@@ -396,11 +396,10 @@ test.describe("notebooks acceptance", () => {
     await applyMarkTo("codigoinline", "ControlOrMeta+e");
 
     // Cogni highlight mark: S6a folded the standalone highlight-picker
-    // BubbleMenu into the shared bubble toolbar (bubble-toolbar.tsx) — the
-    // palette (highlight-picker-controls.tsx) now only appears after
-    // opening the toolbar's color popover ("Color de texto", whose
-    // "Fondo/Resaltado" row reuses it unchanged), instead of floating on its
-    // own on selection. Same triple-click selection as the inline marks
+    // BubbleMenu into the shared bubble toolbar (bubble-toolbar.tsx); since
+    // H8-4 the palette is the highlighter's own swatch row (its chevron,
+    // "Más colores de resaltado"), and "Color de texto" only colours text.
+    // Same triple-click selection as the inline marks
     // above; a keyboard-only Home/Shift+End does not reliably make the
     // toolbar appear.
     await editable
@@ -408,9 +407,11 @@ test.describe("notebooks acceptance", () => {
       .click({ clickCount: 3 });
     const bubbleToolbar = page.getByTestId("bubble-toolbar");
     await expect(bubbleToolbar).toBeVisible();
-    await bubbleToolbar.getByRole("button", { name: "Color de texto" }).click();
+    await bubbleToolbar
+      .getByRole("button", { name: "Más colores de resaltado" })
+      .click();
     await page
-      .getByTestId("highlight-picker")
+      .getByRole("group", { name: "Colores de resaltado" })
       .getByRole("button", { name: "Resaltar en verde" })
       .click();
     await expect(editable.locator('mark[data-color="green"]')).toContainText(

@@ -5,7 +5,7 @@
 // chip and applies it in one click (Mod+Shift+H does the same); the chevron
 // opens a small swatch row of five pastel colours plus "Quitar resaltado"
 // (H7 follow-up: circular swatches, a divider and a circle-slash icon).
-// A colour picked here, or in the "Color de texto" popover's highlight row,
+// A colour picked here, or in a highlight palette elsewhere,
 // becomes the next one-click colour (quick-highlight.ts remembers it).
 import type { Editor } from "@tiptap/core";
 import { useEditorState } from "@tiptap/react";
@@ -87,19 +87,25 @@ export function QuickHighlighter({ editor }: QuickHighlighterProps) {
             </span>
           </button>
         </TooltipTrigger>
-        <TooltipContent>Resaltar · Mod+Shift+H</TooltipContent>
+        {/* H8-4: same "label · shortcut" form as every toolbar button. */}
+        <TooltipContent>Resaltar · ⇧⌘H</TooltipContent>
       </Tooltip>
       <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <button
-            type="button"
-            aria-label="Más colores de resaltado"
-            data-testid="bubble-toolbar-highlight-more"
-            className="flex h-8 w-4 items-center justify-center rounded-sm text-fg-muted outline-none transition-colors hover:bg-hover focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <ChevronDown aria-hidden="true" size={12} strokeWidth={1.75} />
-          </button>
-        </PopoverTrigger>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                aria-label="Más colores de resaltado"
+                data-testid="bubble-toolbar-highlight-more"
+                className="flex h-8 w-4 items-center justify-center rounded-sm text-fg-muted outline-none transition-colors hover:bg-hover focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <ChevronDown aria-hidden="true" size={12} strokeWidth={1.75} />
+              </button>
+            </PopoverTrigger>
+          </TooltipTrigger>
+          <TooltipContent>Colores de resaltado</TooltipContent>
+        </Tooltip>
         <PopoverContent
           align="start"
           className="editor-surface flex w-auto flex-row items-center gap-1 px-2 py-1.5"
