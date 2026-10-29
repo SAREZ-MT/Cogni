@@ -1,7 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { ArchiveConfirmDialog } from "./archive-confirm-dialog";
 import { ChangeAppearanceDialog } from "./change-appearance-dialog";
 import { CreateNotebookDialog } from "./create-notebook-dialog";
 import { RenameNotebookDialog } from "./rename-notebook-dialog";
@@ -78,25 +77,5 @@ describe("notebook dialogs", () => {
     expect(
       within(dialog).getByRole("button", { name: "Color pink" }),
     ).toHaveAttribute("aria-pressed", "false");
-  });
-
-  it("Archivar keeps the destructive action beside an outline Cancelar", async () => {
-    const user = userEvent.setup();
-    render(
-      <ArchiveConfirmDialog
-        itemLabel="Biología"
-        onConfirm={() => {}}
-        trigger={<button type="button">Archivar</button>}
-      />,
-    );
-    await user.click(screen.getByRole("button", { name: "Archivar" }));
-
-    const dialog = screen.getByRole("dialog", { name: "Archivar Biología" });
-    expect(
-      within(dialog).getByRole("button", { name: "Archivar" }),
-    ).toHaveAttribute("data-variant", "destructive");
-    expect(
-      within(dialog).getByRole("button", { name: "Cancelar" }),
-    ).toHaveAttribute("data-variant", "outline");
   });
 });

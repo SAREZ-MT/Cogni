@@ -1,9 +1,17 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { SidebarPage } from "../application/list-sidebar";
 import { NotebookActionsSlotProvider } from "./notebook-actions-slot";
 import { PageItem } from "./page-item";
+
+// Phase 8 H19: the delete dialogs call the notebooks Server Actions.
+vi.mock("../actions", () => ({
+  previewNotebookDeletion: vi.fn(),
+  deleteNotebook: vi.fn(),
+  previewPageDeletion: vi.fn(),
+  deletePage: vi.fn(),
+}));
 
 const page: SidebarPage = { id: "p1", title: "Capítulo 1" };
 const noop = () => {};
@@ -18,7 +26,7 @@ describe("PageItem", () => {
           notebookId="n1"
           page={page}
           onRename={noop}
-          onArchive={noop}
+          onDeleted={noop}
         />
       </ul>,
     );
@@ -27,7 +35,7 @@ describe("PageItem", () => {
       screen.getByRole("link", { name: "Capítulo 1" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Archivar página Capítulo 1" }),
+      screen.getByRole("button", { name: "Eliminar página Capítulo 1" }),
     ).toBeInTheDocument();
   });
 
@@ -41,7 +49,7 @@ describe("PageItem", () => {
           notebookId="n1"
           page={page}
           onRename={noop}
-          onArchive={noop}
+          onDeleted={noop}
         />
       </ul>,
     );
@@ -59,7 +67,7 @@ describe("PageItem", () => {
           notebookId="n1"
           page={page}
           onRename={noop}
-          onArchive={noop}
+          onDeleted={noop}
         />
       </ul>,
     );
@@ -77,7 +85,7 @@ describe("PageItem", () => {
             notebookId="n1"
             page={page}
             onRename={noop}
-            onArchive={noop}
+            onDeleted={noop}
           />
         </ul>
       </NotebookActionsSlotProvider>,
@@ -94,7 +102,7 @@ describe("PageItem", () => {
             notebookId="n1"
             page={page}
             onRename={noop}
-            onArchive={noop}
+            onDeleted={noop}
           />
         </ul>
       </NotebookActionsSlotProvider>,
@@ -114,7 +122,7 @@ describe("PageItem", () => {
             notebookId="n1"
             page={page}
             onRename={noop}
-            onArchive={noop}
+            onDeleted={noop}
           />
         </ul>
       </NotebookActionsSlotProvider>,

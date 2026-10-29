@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 import { createFixedClock } from "@/shared/kernel/clock";
 import { ASSET_ERROR, PAGE_ERROR } from "../domain/errors";
 import { isCanonicalStoragePath, MAX_ASSET_BYTES } from "../domain/page-asset";
-import { archivePage } from "./archive-page";
 import { createNotebook } from "./create-notebook";
 import { createPage } from "./create-page";
 import { deleteImportedAssets } from "./delete-imported-assets";
 import { storeImportedAsset } from "./store-imported-asset";
+import { markPageArchived } from "./testing/archived-fixtures";
 import { FakeStorageGateway } from "./testing/fake-storage-gateway";
 import { InMemoryNotebookRepository } from "./testing/in-memory-notebook-repository";
 import { InMemoryPageAssetRepository } from "./testing/in-memory-page-asset-repository";
@@ -115,7 +115,7 @@ describe("storeImportedAsset use case", () => {
       deps,
       OTHER_OWNER_ID,
     );
-    await archivePage({ pageId: page.id }, deps, OWNER_ID);
+    await markPageArchived(deps.pages, page.id);
     const archived = await storeImportedAsset(
       { pageId: page.id, bytes: PNG_BYTES, mime: "image/png" },
       deps,

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { markNotebookArchived } from "./application/testing/archived-fixtures";
 import { FakeStorageGateway } from "./application/testing/fake-storage-gateway";
 import { InMemoryNotebookRepository } from "./application/testing/in-memory-notebook-repository";
 import { InMemoryPageAssetRepository } from "./application/testing/in-memory-page-asset-repository";
@@ -18,6 +19,14 @@ const notebooks = new InMemoryNotebookRepository();
 const pages = new InMemoryPageRepository();
 const assets = new InMemoryPageAssetRepository();
 const storage = new FakeStorageGateway();
+// Phase 8 H19: the hard delete's adapter, faked per test.
+const deletion = {
+  previewPage: vi.fn(),
+  previewNotebook: vi.fn(),
+  deletePage: vi.fn(),
+  deleteNotebook: vi.fn(),
+};
+const importSources = { remove: vi.fn(async () => {}) };
 vi.mock("@/shared/db/client", () => ({ getDb: () => ({}) }));
 vi.mock("./infrastructure", () => ({
   DrizzleNotebookRepository: vi.fn(function DrizzleNotebookRepository() {
@@ -31,6 +40,12 @@ vi.mock("./infrastructure", () => ({
   }),
   SupabaseStorageGateway: vi.fn(function SupabaseStorageGateway() {
     return storage;
+  }),
+  DrizzleContentDeletion: vi.fn(function DrizzleContentDeletion() {
+    return deletion;
+  }),
+  SupabaseImportSourceStorage: vi.fn(function SupabaseImportSourceStorage() {
+    return importSources;
   }),
 }));
 
@@ -172,10 +187,11 @@ describe("notebooks Server Actions", () => {
     });
 
     it("returns null for an archived notebook", async () => {
-      const { createNotebook, archiveNotebook, getNotebookTitleForRoute } =
-        await import("./actions");
+      const { createNotebook, getNotebookTitleForRoute } = await import(
+        "./actions"
+      );
       const notebook = await createNotebook({ title: "Archivado" });
-      await archiveNotebook({ notebookId: notebook.id });
+      await markNotebookArchived({ notebooks, pages }, notebook.id);
 
       const result = await getNotebookTitleForRoute(notebook.id);
 
@@ -429,6 +445,52 @@ describe("notebooks Server Actions", () => {
       expect(result.ok).toBe(false);
       if (!result.ok)
         expect(result.error.code).toBe("NOTEBOOKS_SESSION_REQUIRED");
+    });
+  });
+
+  // Phase 8 H19: the hard deletes answer Results, never throw at the client.
+  describe("deleteNotebook / deletePage", () => {
+    const NOTEBOOK = "11111111-1111-4111-8111-111111111111";
+    const PAGE = "22222222-2222-4222-8222-222222222222";
+
+    it("refuse without a session, deleting nothing", async () => {
+      getCurrentUser.mockResolvedValue(null);
+      deletion.deleteNotebook.mockReset();
+      const { deleteNotebook, previewPageDeletion } = await import("./actions");
+
+      const result = await deleteNotebook({ notebookId: NOTEBOOK });
+      const preview = await previewPageDeletion({ pageId: PAGE });
+
+      expect(result.ok || result.error.code).toBe("NOTEBOOKS_SESSION_REQUIRED");
+      expect(preview.ok || preview.error.code).toBe(
+        "NOTEBOOKS_SESSION_REQUIRED",
+      );
+      expect(deletion.deleteNotebook).not.toHaveBeenCalled();
+    });
+
+    it("delete for the signed-in owner and remove the files after", async () => {
+      getCurrentUser.mockResolvedValue({ id: OWNER_ID, email: "a@b.com" });
+      deletion.deletePage.mockResolvedValue({
+        assetPaths: ["a.png"],
+        importPaths: ["u.pdf"],
+      });
+      const { deletePage } = await import("./actions");
+
+      const result = await deletePage({ pageId: PAGE });
+
+      expect(result).toEqual({ ok: true, value: { pageId: PAGE } });
+      expect(deletion.deletePage).toHaveBeenCalledWith(PAGE, OWNER_ID);
+      expect(importSources.remove).toHaveBeenCalledWith(["u.pdf"]);
+    });
+
+    it("answer UNEXPECTED instead of throwing when the database fails", async () => {
+      getCurrentUser.mockResolvedValue({ id: OWNER_ID, email: "a@b.com" });
+      deletion.previewNotebook.mockRejectedValue(new Error("db down"));
+      const { previewNotebookDeletion } = await import("./actions");
+
+      const result = await previewNotebookDeletion({ notebookId: NOTEBOOK });
+
+      expect(result.ok || result.error.code).toBe("NOTEBOOKS_UNEXPECTED");
     });
   });
 });

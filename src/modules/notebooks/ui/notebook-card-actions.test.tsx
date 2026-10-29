@@ -8,17 +8,22 @@ import { NotebookCardActions } from "./notebook-card-actions";
 const { refresh } = vi.hoisted(() => ({ refresh: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
 
-const { renameNotebook, setNotebookAppearance, archiveNotebook } = vi.hoisted(
-  () => ({
-    renameNotebook: vi.fn().mockResolvedValue(undefined),
-    setNotebookAppearance: vi.fn().mockResolvedValue(undefined),
-    archiveNotebook: vi.fn().mockResolvedValue(undefined),
-  }),
-);
+const {
+  renameNotebook,
+  setNotebookAppearance,
+  previewNotebookDeletion,
+  deleteNotebook,
+} = vi.hoisted(() => ({
+  renameNotebook: vi.fn().mockResolvedValue(undefined),
+  setNotebookAppearance: vi.fn().mockResolvedValue(undefined),
+  previewNotebookDeletion: vi.fn(),
+  deleteNotebook: vi.fn(),
+}));
 vi.mock("../actions", () => ({
   renameNotebook,
   setNotebookAppearance,
-  archiveNotebook,
+  previewNotebookDeletion,
+  deleteNotebook,
 }));
 
 const notebook = {
@@ -39,10 +44,17 @@ describe("NotebookCardActions", () => {
     refresh.mockReset();
     renameNotebook.mockClear();
     setNotebookAppearance.mockClear();
-    archiveNotebook.mockClear();
+    previewNotebookDeletion.mockReset().mockResolvedValue({
+      ok: true,
+      value: { pages: 4, decks: 2, recallSets: 0, examSets: 1 },
+    });
+    deleteNotebook.mockReset().mockResolvedValue({
+      ok: true,
+      value: { notebookId: "n1" },
+    });
   });
 
-  it("offers rename, appearance and archive", async () => {
+  it("offers rename, appearance and delete", async () => {
     const user = userEvent.setup();
     render(<NotebookCardActions notebook={notebook} />);
 
@@ -52,7 +64,51 @@ describe("NotebookCardActions", () => {
     expect(
       screen.getByRole("menuitem", { name: "Cambiar apariencia" }),
     ).toBeVisible();
-    expect(screen.getByRole("menuitem", { name: "Archivar" })).toBeVisible();
+    expect(screen.getByRole("menuitem", { name: "Eliminar" })).toBeVisible();
+  });
+
+  // Phase 8 H19: a real delete, confirmed in the app dialog with the
+  // server's cascade counts.
+  it("deletes the notebook after confirming the counts, then refreshes", async () => {
+    const user = userEvent.setup();
+    render(<NotebookCardActions notebook={notebook} />);
+
+    await openMenu(user);
+    await user.click(screen.getByRole("menuitem", { name: "Eliminar" }));
+
+    const dialog = await screen.findByRole("dialog", {
+      name: "¿Eliminar el cuaderno «Biología»?",
+    });
+    expect(
+      await screen.findByText("Se eliminarán 4 páginas, 2 mazos y 1 examen."),
+    ).toBeInTheDocument();
+    expect(previewNotebookDeletion).toHaveBeenCalledWith({ notebookId: "n1" });
+    expect(dialog).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Eliminar cuaderno" }));
+
+    await waitFor(() => expect(refresh).toHaveBeenCalledTimes(1));
+    expect(deleteNotebook).toHaveBeenCalledWith({ notebookId: "n1" });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("keeps the dialog open with the reason when the delete fails", async () => {
+    deleteNotebook.mockResolvedValueOnce({
+      ok: false,
+      error: { code: "NOTEBOOK_NOT_FOUND", message: "x" },
+    });
+    const user = userEvent.setup();
+    render(<NotebookCardActions notebook={notebook} />);
+
+    await openMenu(user);
+    await user.click(screen.getByRole("menuitem", { name: "Eliminar" }));
+    await screen.findByText("Se eliminarán 4 páginas, 2 mazos y 1 examen.");
+    await user.click(screen.getByRole("button", { name: "Eliminar cuaderno" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Este cuaderno ya no existe.",
+    );
+    expect(refresh).not.toHaveBeenCalled();
   });
 
   describe("items injected through the notebook actions slot (PDF import)", () => {
@@ -200,19 +256,17 @@ describe("NotebookCardActions", () => {
       expect(refresh).not.toHaveBeenCalled();
     });
 
-    it("announces a failed archive, then clears the message when dismissed", async () => {
-      archiveNotebook.mockRejectedValueOnce(new Error("boom"));
+    it("clears a failure message when dismissed", async () => {
+      renameNotebook.mockRejectedValueOnce(new Error("boom"));
       const user = userEvent.setup();
       render(<NotebookCardActions notebook={notebook} />);
 
       await openMenu(user);
-      await user.click(screen.getByRole("menuitem", { name: "Archivar" }));
-      await user.click(screen.getByRole("button", { name: "Archivar" }));
-
-      expect(await screen.findByRole("alert")).toHaveTextContent(
-        "No se pudo archivar el cuaderno",
-      );
-      expect(refresh).not.toHaveBeenCalled();
+      await user.click(screen.getByRole("menuitem", { name: "Renombrar" }));
+      await user.clear(screen.getByLabelText("Título"));
+      await user.type(screen.getByLabelText("Título"), "Química");
+      await user.click(screen.getByRole("button", { name: "Guardar" }));
+      expect(await screen.findByRole("alert")).toBeInTheDocument();
 
       await user.click(screen.getByRole("button", { name: "Cerrar aviso" }));
       expect(screen.queryByRole("alert")).not.toBeInTheDocument();

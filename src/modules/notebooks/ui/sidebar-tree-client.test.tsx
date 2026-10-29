@@ -19,10 +19,16 @@ const {
   renameNotebook: vi.fn(),
   renamePage: vi.fn(),
 }));
+const { previewPageDeletion, deletePage } = vi.hoisted(() => ({
+  previewPageDeletion: vi.fn(),
+  deletePage: vi.fn(),
+}));
 vi.mock("../actions", () => ({
   createNotebook,
-  archiveNotebook: vi.fn(),
-  archivePage: vi.fn(),
+  previewPageDeletion,
+  deletePage,
+  previewNotebookDeletion: vi.fn(),
+  deleteNotebook: vi.fn(),
   createPage,
   renameNotebook,
   renamePage,
@@ -35,12 +41,13 @@ vi.mock("../actions", () => ({
 // Extended for the same follow-up's remaining mutations: the refresh must
 // only fire while the user is actually on Home (pathname "/inicio"), never on
 // another route (e.g. mid-edit on a page), so usePathname is mocked too.
-const { refresh, pathname } = vi.hoisted(() => ({
+const { refresh, push, pathname } = vi.hoisted(() => ({
   refresh: vi.fn(),
+  push: vi.fn(),
   pathname: { current: "/inicio" },
 }));
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ refresh }),
+  useRouter: () => ({ refresh, push }),
   usePathname: () => pathname.current,
 }));
 
@@ -60,7 +67,59 @@ describe("SidebarTreeClient", () => {
     renameNotebook.mockReset();
     renamePage.mockReset();
     refresh.mockReset();
+    push.mockReset();
     pathname.current = "/inicio";
+  });
+
+  // Phase 8 H19: a page deleted while its route is open leaves for its
+  // notebook; the tree drops it at once.
+  it("deletes a page after the confirmation and leaves its open route for the notebook", async () => {
+    previewPageDeletion.mockResolvedValue({
+      ok: true,
+      value: { flashcards: 3, recallQuestions: 0, examQuestions: 0, images: 0 },
+    });
+    deletePage.mockResolvedValue({ ok: true, value: { pageId: "p1" } });
+    pathname.current = "/notebooks/n1/pages/p1";
+    const notebooksTree = [
+      {
+        id: "n1",
+        title: "Biología",
+        icon: null,
+        color: null,
+        pages: [{ id: "p1", title: "Célula" }],
+      },
+    ];
+    // The mount's refetch still sees the page; the one after the delete
+    // does not.
+    getSidebarTree
+      .mockResolvedValueOnce(notebooksTree)
+      .mockResolvedValue([{ ...notebooksTree[0], pages: [] }]);
+    const user = userEvent.setup();
+    render(<SidebarTreeClient initialNotebooks={notebooksTree} />, {
+      wrapper: Wrapper,
+    });
+
+    await user.click(
+      screen.getByRole("button", { name: "Eliminar página Célula" }),
+    );
+    const dialog = await screen.findByRole("dialog", {
+      name: "¿Eliminar la página «Célula»?",
+    });
+    expect(
+      await within(dialog).findByText("Se eliminarán sus apuntes, 3 tarjetas."),
+    ).toBeInTheDocument();
+    await user.click(
+      within(dialog).getByRole("button", { name: "Eliminar página" }),
+    );
+
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/notebooks/n1"));
+    expect(deletePage).toHaveBeenCalledWith({ pageId: "p1" });
+    expect(refresh).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("link", { name: /Célula/ }),
+      ).not.toBeInTheDocument(),
+    );
   });
 
   // Scenario "Reescritura de shell-empty-state.spec.ts" (e2e) — the same

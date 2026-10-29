@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { createFixedClock } from "@/shared/kernel/clock";
-import { archivePage } from "./archive-page";
 import { createNotebook } from "./create-notebook";
 import { createPage } from "./create-page";
 import { getPage } from "./get-page";
@@ -58,16 +57,6 @@ describe("cross-owner authorization (Scenario: Pagina ajena)", () => {
 
     expect(result.ok).toBe(false);
     expect((await deps.pages.findById(page.id))?.title).toBe(page.title);
-  });
-
-  it("ArchivePage returns a DomainError and does not archive", async () => {
-    const deps = makeDeps();
-    const page = await setupPage(deps);
-
-    const result = await archivePage({ pageId: page.id }, deps, OTHER_OWNER_ID);
-
-    expect(result.ok).toBe(false);
-    expect((await deps.pages.findById(page.id))?.archivedAt).toBeNull();
   });
 
   it("SavePage returns a DomainError and does not write", async () => {
