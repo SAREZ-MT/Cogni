@@ -8,9 +8,9 @@ interface ExamQuestionsPageProps {
   params: Promise<{ notebookId: string; pageId: string }>;
 }
 
-// "Preguntas" of one page (Phase 5 T4, documento-maestro §3.3 "creadas
-// manualmente"): the page's active questions on real data, with manual
-// create, edit and retire, and "Rendir examen". It left the design-preview
+// "Preguntas" of one page (Phase 5 T4, documento-maestro §3.3): the page's
+// active questions on real data, with edit and retire, and "Rendir
+// examen". Creation is AI only since Phase 8 H13 (user 2026-10-29). It left the design-preview
 // gate in T4 (the player and results in T6; the hub, linked from the
 // breadcrumb's "Exámenes", in T9). A page that is unknown, archived, in
 // another notebook or not the caller's 404s.
@@ -42,7 +42,6 @@ export default async function ExamQuestionsPage({
       />
       <ExamQuestionsView
         notebookTitle={notebookTitle}
-        pageId={page.id}
         pageTitle={page.title}
         pageHref={pageHref}
         questions={questions.value}

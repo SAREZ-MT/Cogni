@@ -19,7 +19,6 @@ const EDIT_VALUES: QuestionFormValues = {
 
 function setup(
   props: {
-    mode?: "create" | "edit";
     initialValues?: QuestionFormValues;
     open?: boolean;
     onSubmit?: QuestionFormDialogProps["onSubmit"];
@@ -32,21 +31,28 @@ function setup(
     <QuestionFormDialog
       open={props.open ?? true}
       onOpenChange={onOpenChange}
-      mode={props.mode ?? "create"}
-      initialValues={props.initialValues}
+      initialValues={
+        "initialValues" in props ? props.initialValues : EDIT_VALUES
+      }
       onSubmit={onSubmit}
     />,
   );
   return { user, onSubmit, onOpenChange, ...view };
 }
 
-async function fillValid(user: User) {
-  await user.type(screen.getByLabelText("Enunciado"), "  Pregunta nueva ");
-  await user.type(screen.getByPlaceholderText("Opción A"), "Uno");
-  await user.type(screen.getByPlaceholderText("Opción B"), "Dos");
-  await user.type(screen.getByPlaceholderText("Opción C"), "Tres");
-  await user.type(screen.getByPlaceholderText("Opción D"), "Cuatro");
-  await user.type(screen.getByLabelText("Concepto que evalúa"), " Concepto ");
+async function replaceAll(user: User) {
+  const fields: [HTMLElement, string][] = [
+    [screen.getByLabelText("Enunciado"), "  Pregunta corregida "],
+    [screen.getByPlaceholderText("Opción A"), "Uno"],
+    [screen.getByPlaceholderText("Opción B"), "Dos"],
+    [screen.getByPlaceholderText("Opción C"), "Tres"],
+    [screen.getByPlaceholderText("Opción D"), "Cuatro"],
+    [screen.getByLabelText("Concepto que evalúa"), " Concepto "],
+  ];
+  for (const [field, text] of fields) {
+    await user.clear(field);
+    await user.type(field, text);
+  }
 }
 
 describe("QuestionFormDialog", () => {
@@ -58,35 +64,23 @@ describe("QuestionFormDialog", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("titles the dialog by mode", () => {
-    const { unmount } = setup({ mode: "create" });
-    expect(screen.getByText("Nueva pregunta")).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Guardar pregunta" }),
-    ).toBeInTheDocument();
-    unmount();
+  // Phase 8 H13 (user 2026-10-29): questions are created by AI only, so the
+  // dialog only edits.
+  it("only edits: no create title or save label", () => {
+    setup();
 
-    setup({ mode: "edit", initialValues: EDIT_VALUES });
     expect(screen.getByText("Editar pregunta")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Guardar cambios" }),
     ).toBeInTheDocument();
+    expect(screen.queryByText("Nueva pregunta")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Guardar pregunta" }),
+    ).not.toBeInTheDocument();
   });
 
-  it("starts empty with option A marked correct in create mode", () => {
-    setup();
-
-    expect(screen.getByLabelText("Enunciado")).toHaveValue("");
-    expect(
-      screen.getByRole("radio", { name: "Opción A es la correcta" }),
-    ).toBeChecked();
-    expect(
-      screen.getByRole("button", { name: "Guardar pregunta" }),
-    ).toBeDisabled();
-  });
-
-  it("prefills every field in edit mode", () => {
-    setup({ mode: "edit", initialValues: EDIT_VALUES });
+  it("prefills every field from the question", () => {
+    setup({ initialValues: EDIT_VALUES });
 
     expect(screen.getByLabelText("Enunciado")).toHaveValue(EDIT_VALUES.stem);
     expect(screen.getByPlaceholderText("Opción C")).toHaveValue("Lípidos");
@@ -98,18 +92,12 @@ describe("QuestionFormDialog", () => {
     );
   });
 
-  it("ignores initial values in create mode", () => {
-    setup({ mode: "create", initialValues: undefined });
-
-    expect(screen.getByPlaceholderText("Opción A")).toHaveValue("");
-  });
-
   it.each([
     ["the stem", "Enunciado"],
     ["an option", "Opción B"],
     ["the concept", "Concepto que evalúa"],
   ])("keeps saving disabled while %s is missing", async (_name, field) => {
-    const { user } = setup({ mode: "edit", initialValues: EDIT_VALUES });
+    const { user } = setup({ initialValues: EDIT_VALUES });
     const input =
       field === "Opción B"
         ? screen.getByPlaceholderText("Opción B")
@@ -126,7 +114,7 @@ describe("QuestionFormDialog", () => {
     ["Concepto que evalúa"],
     ["Enunciado"],
   ])("treats whitespace-only %s as missing", async (field) => {
-    const { user } = setup({ mode: "edit", initialValues: EDIT_VALUES });
+    const { user } = setup({ initialValues: EDIT_VALUES });
 
     await user.clear(screen.getByLabelText(field));
     await user.type(screen.getByLabelText(field), "   ");
@@ -137,12 +125,14 @@ describe("QuestionFormDialog", () => {
   });
 
   it("does not require the explanation", async () => {
-    const { user } = setup();
+    const { user } = setup({
+      initialValues: { ...EDIT_VALUES, explanation: "Algo" },
+    });
 
-    await fillValid(user);
+    await user.clear(screen.getByLabelText("Explicación (opcional)"));
 
     expect(
-      screen.getByRole("button", { name: "Guardar pregunta" }),
+      screen.getByRole("button", { name: "Guardar cambios" }),
     ).toBeEnabled();
   });
 
@@ -163,31 +153,28 @@ describe("QuestionFormDialog", () => {
   it("submits trimmed values with the chosen correct index and closes", async () => {
     const { user, onSubmit, onOpenChange } = setup();
 
-    await fillValid(user);
+    await replaceAll(user);
     await user.click(
-      screen.getByRole("radio", { name: "Opción C es la correcta" }),
+      screen.getByRole("radio", { name: "Opción D es la correcta" }),
     );
     await user.type(
       screen.getByLabelText("Explicación (opcional)"),
       "  Porque sí ",
     );
-    await user.click(screen.getByRole("button", { name: "Guardar pregunta" }));
+    await user.click(screen.getByRole("button", { name: "Guardar cambios" }));
 
     expect(onSubmit).toHaveBeenCalledWith({
-      stem: "Pregunta nueva",
+      stem: "Pregunta corregida",
       options: ["Uno", "Dos", "Tres", "Cuatro"],
-      correctIndex: 2,
+      correctIndex: 3,
       concept: "Concepto",
       explanation: "Porque sí",
     });
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
-  it("submits edited values", async () => {
-    const { user, onSubmit } = setup({
-      mode: "edit",
-      initialValues: EDIT_VALUES,
-    });
+  it("submits the prefilled values trimmed", async () => {
+    const { user, onSubmit } = setup({ initialValues: EDIT_VALUES });
 
     await user.click(screen.getByRole("button", { name: "Guardar cambios" }));
 
@@ -202,7 +189,6 @@ describe("QuestionFormDialog", () => {
 
   it("closes on 'Cancelar' without submitting", async () => {
     const { user, onSubmit, onOpenChange } = setup({
-      mode: "edit",
       initialValues: EDIT_VALUES,
     });
 
@@ -214,11 +200,14 @@ describe("QuestionFormDialog", () => {
 
   it("re-syncs the form each time the dialog reopens", () => {
     const onSubmit = vi.fn();
+    const other: QuestionFormValues = {
+      ...EDIT_VALUES,
+      options: ["Glucosa", "ADN", "Lípidos", "Almidón"],
+    };
     const { rerender } = render(
       <QuestionFormDialog
         open
         onOpenChange={() => {}}
-        mode="edit"
         initialValues={EDIT_VALUES}
         onSubmit={onSubmit}
       />,
@@ -229,7 +218,7 @@ describe("QuestionFormDialog", () => {
       <QuestionFormDialog
         open={false}
         onOpenChange={() => {}}
-        mode="create"
+        initialValues={other}
         onSubmit={onSubmit}
       />,
     );
@@ -237,18 +226,17 @@ describe("QuestionFormDialog", () => {
       <QuestionFormDialog
         open
         onOpenChange={() => {}}
-        mode="create"
+        initialValues={other}
         onSubmit={onSubmit}
       />,
     );
 
-    expect(screen.getByPlaceholderText("Opción A")).toHaveValue("");
+    expect(screen.getByPlaceholderText("Opción A")).toHaveValue("Glucosa");
   });
 
   it("waits for an async submit, then closes when it reports no error", async () => {
     let resolve: (error: string | null) => void = () => {};
     const { user, onOpenChange } = setup({
-      mode: "edit",
       initialValues: EDIT_VALUES,
       onSubmit: () =>
         new Promise<string | null>((done) => {
@@ -266,7 +254,6 @@ describe("QuestionFormDialog", () => {
 
   it("stays open and shows the error an async submit reports", async () => {
     const { user, onOpenChange } = setup({
-      mode: "edit",
       initialValues: EDIT_VALUES,
       onSubmit: async () => "Las opciones deben ser distintas.",
     });
@@ -285,7 +272,6 @@ describe("QuestionFormDialog", () => {
   it("clears a previous error when the dialog opens again", async () => {
     const onSubmit = async () => "Algo falló.";
     const props = {
-      mode: "edit" as const,
       initialValues: EDIT_VALUES,
       onOpenChange: vi.fn(),
       onSubmit,
@@ -304,7 +290,6 @@ describe("QuestionFormDialog", () => {
   it("cannot be cancelled or dismissed while an async submit runs", async () => {
     let resolve: (error: string | null) => void = () => {};
     const { user, onOpenChange } = setup({
-      mode: "edit",
       initialValues: EDIT_VALUES,
       onSubmit: () =>
         new Promise<string | null>((done) => {
@@ -325,7 +310,6 @@ describe("QuestionFormDialog", () => {
   it("ignores a save that resolves after the dialog was closed and reopened", async () => {
     const pendingSaves: ((error: string | null) => void)[] = [];
     const props = {
-      mode: "edit" as const,
       initialValues: EDIT_VALUES,
       onOpenChange: vi.fn(),
       onSubmit: () =>
@@ -360,7 +344,6 @@ describe("QuestionFormDialog", () => {
   it("ignores a stale save that succeeds after the dialog was reopened", async () => {
     const pendingSaves: ((error: string | null) => void)[] = [];
     const props = {
-      mode: "edit" as const,
       initialValues: EDIT_VALUES,
       onOpenChange: vi.fn(),
       onSubmit: () =>
@@ -386,27 +369,27 @@ describe("QuestionFormDialog", () => {
   it("wears the exams theme and tints the correct option's row", async () => {
     const { user } = setup();
 
-    const dialog = screen.getByRole("dialog", { name: "Nueva pregunta" });
+    const dialog = screen.getByRole("dialog", { name: "Editar pregunta" });
     expect(dialog).toHaveAttribute("data-technique-theme", "exams");
     expect(dialog.querySelector('[data-slot="pixel-tile"]')).toHaveAttribute(
       "data-tone",
       "rose",
     );
     expect(
-      screen.getByRole("button", { name: "Guardar pregunta" }),
+      screen.getByRole("button", { name: "Guardar cambios" }),
     ).toHaveAttribute("data-variant", "technique");
 
     const rowOf = (letter: string) =>
       screen
         .getByRole("radio", { name: `Opción ${letter} es la correcta` })
         .closest('[data-slot="answer-option"]');
-    expect(rowOf("A")).toHaveAttribute("data-correct", "true");
+    expect(rowOf("C")).toHaveAttribute("data-correct", "true");
     expect(rowOf("B")).not.toHaveAttribute("data-correct");
 
     await user.click(
       screen.getByRole("radio", { name: "Opción B es la correcta" }),
     );
     expect(rowOf("B")).toHaveAttribute("data-correct", "true");
-    expect(rowOf("A")).not.toHaveAttribute("data-correct");
+    expect(rowOf("C")).not.toHaveAttribute("data-correct");
   });
 });

@@ -1,11 +1,10 @@
 "use client";
 
-import { ClipboardList, FileCheck, Info, Plus } from "lucide-react";
+import { ClipboardList, FileCheck, Info } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import {
-  createExamQuestionAction,
   EXAM_MIN_QUESTIONS,
   type ExamQuestionView,
   editExamQuestionAction,
@@ -22,6 +21,7 @@ import {
   DialogTitle,
 } from "@/shared/ui/dialog";
 import { EmptyState } from "@/shared/ui/empty-state";
+import { EmptyStateCta } from "@/shared/ui/empty-state-cta";
 import { ExamQuestionRow } from "@/shared/ui/exam-question-row";
 import { FormMessage } from "@/shared/ui/form-message";
 import { IconTile } from "@/shared/ui/icon-tile";
@@ -53,7 +53,6 @@ type OptionIndex = 0 | 1 | 2 | 3;
 
 export interface ExamQuestionsViewProps {
   notebookTitle: string;
-  pageId: string;
   pageTitle: string;
   // The notebook page the questions belong to ("Volver a la página").
   pageHref: string;
@@ -66,15 +65,16 @@ export interface ExamQuestionsViewProps {
   retakePending?: boolean;
 }
 
-// "Preguntas del examen" of one page on real data (documento-maestro §3.3
-// "creadas manualmente", Fase 5 "edición manual de preguntas con concept"):
-// the active questions, "Nueva pregunta", in-place "Editar" and "Retirar"
-// with a confirmation (a retired question leaves the exam and its concept
+// "Preguntas del examen" of one page on real data (documento-maestro §3.3,
+// Fase 5 "edición manual de preguntas con concept"): the active questions,
+// in-place "Editar" and "Retirar" with a confirmation. Questions are created
+// by AI only (Phase 8 H13, user 2026-10-29): there is no "Nueva pregunta";
+// an empty or short page links back to the page, whose techniques panel
+// generates them, and existing manual questions keep their count (a retired question leaves the exam and its concept
 // leaves the reviews). Every change goes through an exams Server Action and
 // refreshes the route, which re-reads the list on the server.
 export function ExamQuestionsView({
   notebookTitle,
-  pageId,
   pageTitle,
   pageHref,
   questions,
@@ -95,21 +95,18 @@ export function ExamQuestionsView({
   const aiCount = questions.length - manualCount;
   const missing = EXAM_MIN_QUESTIONS - questions.length;
 
-  function openCreate() {
-    setEditingId(null);
-    setFormOpen(true);
-  }
-
   function openEdit(id: string) {
     setEditingId(id);
     setFormOpen(true);
   }
 
   async function save(values: QuestionFormValues): Promise<string | null> {
+    if (!editingId) return SAVE_FAILURE;
     try {
-      const result = editingId
-        ? await editExamQuestionAction({ questionId: editingId, ...values })
-        : await createExamQuestionAction({ pageId, ...values });
+      const result = await editExamQuestionAction({
+        questionId: editingId,
+        ...values,
+      });
       if (!result.ok) return ERROR_COPY[result.error.code] ?? SAVE_FAILURE;
     } catch {
       return SAVE_FAILURE;
@@ -165,7 +162,9 @@ export function ExamQuestionsView({
         description={[
           plural(questions.length, "pregunta", "preguntas"),
           plural(aiCount, "generada por IA", "generadas por IA"),
-          plural(manualCount, "manual", "manuales"),
+          ...(manualCount > 0
+            ? [plural(manualCount, "manual", "manuales")]
+            : []),
         ].join(" · ")}
         actions={
           <div className="flex flex-wrap items-center gap-2">
@@ -189,14 +188,6 @@ export function ExamQuestionsView({
                 </Link>
               </Button>
             )}
-            <Button
-              type="button"
-              onClick={openCreate}
-              data-testid="new-exam-question-button"
-            >
-              <Plus aria-hidden="true" size={16} strokeWidth={2} />
-              Nueva pregunta
-            </Button>
           </div>
         }
       />
@@ -212,7 +203,7 @@ export function ExamQuestionsView({
             strokeWidth={1.75}
             className="mt-px shrink-0 text-fg-muted"
           />
-          {`Un examen necesita al menos ${EXAM_MIN_QUESTIONS} preguntas. Agrega ${missing} más para poder rendirlo.`}
+          {`Un examen necesita al menos ${EXAM_MIN_QUESTIONS} preguntas. Genera ${missing} más con IA desde la página para poder rendirlo.`}
         </p>
       )}
 
@@ -226,8 +217,13 @@ export function ExamQuestionsView({
           }
           title="Esta página aún no tiene preguntas"
           titleClassName="text-base"
-          description="Crea la primera con Nueva pregunta: enunciado, 4 opciones, la correcta y el concepto que evalúa."
+          description="Genéralas con IA desde la página con Técnicas → Examen."
           descriptionClassName="max-w-[380px]"
+          action={
+            <EmptyStateCta href={pageHref}>
+              Generar desde la página
+            </EmptyStateCta>
+          }
         />
       ) : (
         <div className="flex flex-col gap-3">
@@ -253,7 +249,6 @@ export function ExamQuestionsView({
           setFormOpen(open);
           if (!open) setEditingId(null);
         }}
-        mode={editingId ? "edit" : "create"}
         initialValues={initialValues}
         onSubmit={save}
       />

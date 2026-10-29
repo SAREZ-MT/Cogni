@@ -115,7 +115,7 @@ Notas de implementación de la Fase 6 (ADR 0007):
 
 #### Exámenes
 
-- Preguntas de opción múltiple con 4 opciones y una correcta, generadas por IA desde la página o creadas manualmente.
+- Preguntas de opción múltiple con 4 opciones y una correcta, generadas por IA desde la página. La creación es solo con IA por decisión del usuario del 2026-10-29 (Fase 8, H13): la pantalla de preguntas no ofrece "Nueva pregunta", pero conserva "Editar" y "Retirar" para corregir lo generado. Las preguntas creadas a mano antes de esa fecha (`origin = manual`) se siguen mostrando, rindiendo, editando y retirando.
 - Sesión: N preguntas (configurable, por defecto 10). Corrección determinista.
 - Cada pregunta es un ítem del motor. Correcta → q=4. Incorrecta → q=1.
 - Si la nota del examen es menor a 70 %, la página queda marcada para repetir examen; el motor reprograma las preguntas falladas y el calendario lo muestra.
@@ -131,7 +131,7 @@ Notas de implementación de la Fase 5 (ADR 0006):
 - **Repasar antes de repetir.** Un resultado fallado ofrece "Repasar contenido", que abre la página del cuaderno con un aviso de los conceptos fallados y la acción "Repetir examen".
 - Editar una pregunta la cambia en el lugar y conserva su raíz; retirarla suspende el ítem de la raíz cuando su linaje no tiene otra pregunta activa. No hay límite de tiempo y una sesión abandonada queda abierta (como en flashcards).
 
-Nota de implementación de la Fase 6 (ADR 0007): `/exams` y la vista por cuaderno siguen listando solo las páginas con preguntas. Su encabezado ofrece "Crear examen" (en lugar del inicio rápido "Nuevo examen"): se elige cuaderno y página y luego "Generar con IA" (N de 10 a 30) o "Crear mis preguntas", que abre la pantalla de preguntas de la página; es la entrada para la primera pregunta manual de una página sin preguntas.
+Nota de implementación de la Fase 6 (ADR 0007): `/exams` y la vista por cuaderno siguen listando solo las páginas con preguntas. Su encabezado ofrece "Crear examen" (en lugar del inicio rápido "Nuevo examen"): se elige cuaderno y página y luego "Generar con IA" (N de 10 a 30). Desde el 2026-10-29 (Fase 8, H12 y H13, decisión del usuario) la creación es solo con IA: ya no existe "Crear mis preguntas" ni una entrada para escribir la primera pregunta a mano.
 
 #### Recordación activa
 

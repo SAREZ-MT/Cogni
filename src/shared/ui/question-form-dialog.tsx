@@ -39,8 +39,9 @@ const OPTION_LETTERS = ["A", "B", "C", "D"] as const;
 export interface QuestionFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  mode: "create" | "edit";
-  // Prefills the form for `mode="edit"`; ignored for `mode="create"`.
+  // The question being edited. Questions are created by AI only (Phase 8
+  // H13, user 2026-10-29), so the dialog only edits; while no question is
+  // chosen (the dialog is closed) the form falls back to empty values.
   initialValues?: QuestionFormValues;
   // A sync handler closes the dialog at once. An async one keeps it open
   // while it runs ("Guardando…"); resolving to a message shows it as an
@@ -53,16 +54,15 @@ export interface QuestionFormDialogProps {
   ) => undefined | Promise<string | null | undefined>;
 }
 
-// Manual question creation/editing dialog (design preview, 2026-09-24;
-// documento-maestro §3.3 "creadas manualmente", Fase 5 "edición manual de
-// preguntas con concept") — built on Cogni's Dialog atom, same composition
+// Question editing dialog (design preview, 2026-09-24; documento-maestro
+// Fase 5 "edición manual de preguntas con concept"; edit only since Phase 8
+// H13) — built on Cogni's Dialog atom, same composition
 // pattern as modules/notebooks/ui/create-notebook-dialog.tsx. The caller
 // (exam-questions-view.tsx) persists the values through a Server Action;
 // this atom collects and validates them and shows the caller's error.
 export function QuestionFormDialog({
   open,
   onOpenChange,
-  mode,
   initialValues,
   onSubmit,
 }: QuestionFormDialogProps) {
@@ -79,9 +79,9 @@ export function QuestionFormDialog({
   const conceptId = useId();
   const explanationId = useId();
 
-  // Re-syncs the form every time the dialog opens (both a fresh "Nueva
-  // pregunta" and a re-opened "Editar" for a different row use the same
-  // controlled `open` prop) instead of keying/remounting the component.
+  // Re-syncs the form every time the dialog opens (a re-opened "Editar" for
+  // a different row uses the same controlled `open` prop) instead of
+  // keying/remounting the component.
   // biome-ignore lint/correctness/useExhaustiveDependencies: only re-sync on the open transition, not on every initialValues identity change while open.
   useEffect(() => {
     session.current += 1;
@@ -159,11 +159,9 @@ export function QuestionFormDialog({
             />
           }
         >
-          <DialogTitle>
-            {mode === "edit" ? "Editar pregunta" : "Nueva pregunta"}
-          </DialogTitle>
+          <DialogTitle>Editar pregunta</DialogTitle>
           <DialogDescription>
-            Escribe el enunciado y 4 opciones, y marca la correcta.
+            Corrige el enunciado, las 4 opciones o la correcta.
           </DialogDescription>
         </DialogHeader>
 
@@ -285,11 +283,7 @@ export function QuestionFormDialog({
             onClick={submit}
             disabled={!isValid || pending}
           >
-            {pending
-              ? "Guardando…"
-              : mode === "edit"
-                ? "Guardar cambios"
-                : "Guardar pregunta"}
+            {pending ? "Guardando…" : "Guardar cambios"}
           </Button>
         </DialogFooter>
       </DialogContent>

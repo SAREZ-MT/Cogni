@@ -1621,7 +1621,15 @@ stored record per attempted page (Mitocondria 60 % / 6/10 with 2 wrong + 2
 unanswered, Membrana celular 83 % / 5/6, Renacimiento 100 %). `data-testid`
 stays `exam-results` (reused).
 
-### Manual question creation/editing — `/exams/[notebookId]/[pageId]/preguntas`
+### Question management — `/exams/[notebookId]/[pageId]/preguntas`
+
+Phase 8 H13 (user 2026-10-29): questions are created by AI only. The
+"Nueva pregunta" button and `createExamQuestionAction` are gone; the
+header count leaves out "· {K} manuales" when K is 0; the minimum note
+reads "Genera {n} más con IA desde la página para poder rendirlo."; the
+empty state's `EmptyStateCta` "Generar desde la página" links to the
+notebook page (its techniques panel generates). "Editar" and "Retirar"
+stay. The history below describes the screen before H13.
 
 New route + client view (`exams/_components/exam-questions-view.tsx`):
 header count "{N} preguntas · {M} generadas por IA · {K} manuales" (N/M/K
@@ -1688,7 +1696,11 @@ controlled (`open`/`onOpenChange`) so the same instance serves both "Nueva
 pregunta" and every row's "Editar"; it re-syncs its local form state from
 `initialValues` on every `open` transition instead of being remounted.
 
-- `open`, `onOpenChange`, `mode: "create" | "edit"`, `initialValues?`,
+- Edit only since Phase 8 H13: the `mode` prop is gone; the title is
+  "Editar pregunta", the save "Guardar cambios", the description "Corrige
+  el enunciado, las 4 opciones o la correcta." `initialValues` falls back
+  to empty values only while no question is chosen (the dialog is closed).
+- `open`, `onOpenChange`, `initialValues?`,
   `onSubmit: (values: QuestionFormValues) => undefined | Promise<string |
   null | undefined>`. `data-testid="question-form-dialog"`.
 - Phase 8 H12 (user 2026-10-29): the exams theme (`data-technique-theme=

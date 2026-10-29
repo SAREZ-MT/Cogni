@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { systemClock } from "@/shared/kernel/clock";
 import { DomainError } from "@/shared/kernel/domain-error";
+import { createId } from "@/shared/kernel/id";
 import { err, ok } from "@/shared/kernel/result";
+import { createExamQuestion } from "./application/create-exam-question";
 import { InMemoryExamUnitOfWork } from "./application/testing/in-memory-exam-unit-of-work";
 
 // Session, composition roots and Sentry are mocked so this proves the
@@ -84,9 +87,22 @@ async function actions() {
   return import("./actions");
 }
 
+// Questions are created by AI only (Phase 8 H13): there is no create action,
+// so a question is seeded straight into the fakes through the use case,
+// with its study item.
 async function created() {
-  const { createExamQuestionAction } = await actions();
-  const result = await createExamQuestionAction({ pageId: PAGE, ...QUESTION });
+  const result = await createExamQuestion(
+    { pageId: PAGE, ...QUESTION },
+    {
+      pages: {
+        getPageText: async () => ok({ title: "Mitocondria", plainText: "x" }),
+      },
+      uow: current.uow,
+      clock: systemClock,
+      ids: { next: createId },
+    },
+    OWNER,
+  );
   if (!result.ok) throw new Error(result.error.code);
   return result.value;
 }
@@ -105,85 +121,6 @@ describe("exams Server Actions", () => {
       pageFound: true,
       throwOnPageRead: false,
     };
-  });
-
-  describe("createExamQuestionAction", () => {
-    it("creates a manual question with its study item and revalidates the exams routes", async () => {
-      const view = await created();
-
-      expect(view).toMatchObject({
-        pageId: PAGE,
-        ...QUESTION,
-        origin: "manual",
-      });
-      expect(current.uow.studyItems.all()).toEqual([
-        expect.objectContaining({ kind: "exam_question", sourceId: view.id }),
-      ]);
-      expect(revalidatePath).toHaveBeenCalledWith("/exams", "layout");
-    });
-
-    it("rejects an unauthenticated caller before doing anything", async () => {
-      getCurrentUser.mockResolvedValue(null);
-      const { createExamQuestionAction } = await actions();
-
-      const result = await createExamQuestionAction({
-        pageId: PAGE,
-        ...QUESTION,
-      });
-
-      expect(!result.ok && result.error.code).toBe("EXAMS_SESSION_REQUIRED");
-      expect(current.uow.runs).toBe(0);
-    });
-
-    it.each([
-      ["a non-uuid page", { pageId: "x" }],
-      ["a missing concept", { concept: undefined }],
-      ["five options", { options: ["a", "b", "c", "d", "e"] }],
-      ["a fractional index", { correctIndex: 1.5 }],
-    ])("rejects %s as invalid input", async (_, patch) => {
-      const { createExamQuestionAction } = await actions();
-
-      const result = await createExamQuestionAction({
-        pageId: PAGE,
-        ...QUESTION,
-        ...patch,
-      });
-
-      expect(!result.ok && result.error.code).toBe("EXAMS_INVALID_INPUT");
-    });
-
-    it("maps domain refusals to their codes", async () => {
-      const { createExamQuestionAction } = await actions();
-
-      const repeated = await createExamQuestionAction({
-        pageId: PAGE,
-        ...QUESTION,
-        options: ["ATP", "atp", "B", "C"],
-      });
-      current.pageFound = false;
-      const noPage = await createExamQuestionAction({
-        pageId: MISSING,
-        ...QUESTION,
-      });
-
-      expect(!repeated.ok && repeated.error.code).toBe(
-        "EXAMS_INVALID_QUESTION",
-      );
-      expect(!noPage.ok && noPage.error.code).toBe("PAGE_NOT_FOUND");
-    });
-
-    it("never throws: an unexpected failure is reported and answered generically", async () => {
-      current.throwOnPageRead = true;
-      const { createExamQuestionAction } = await actions();
-
-      const result = await createExamQuestionAction({
-        pageId: PAGE,
-        ...QUESTION,
-      });
-
-      expect(!result.ok && result.error.code).toBe("EXAMS_UNEXPECTED");
-      expect(captureException).toHaveBeenCalledOnce();
-    });
   });
 
   describe("editExamQuestionAction", () => {

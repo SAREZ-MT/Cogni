@@ -25,7 +25,6 @@ import {
   withBoundary,
 } from "./action-support";
 import {
-  createExamQuestion,
   ExamDailyLimitReachedError,
   editExamQuestion,
   listPageExamQuestions,
@@ -106,7 +105,6 @@ const content = {
   concept: text(MAX_CONCEPT_LENGTH),
 };
 const pageInput = z.object({ pageId: z.uuid() });
-const createInput = z.object({ pageId: z.uuid(), ...content });
 const editInput = z.object({ questionId: z.uuid(), ...content });
 const questionInput = z.object({ questionId: z.uuid() });
 const generateInput = z.object({
@@ -206,27 +204,6 @@ export async function listExamQuestionsAction(
     );
     if (!result.ok) return err(toActionError(result.error));
     return ok(result.value.map(toView));
-  });
-}
-
-export async function createExamQuestionAction(
-  input: unknown,
-): Promise<Result<ExamQuestionView, ActionError>> {
-  return withBoundary(async () => {
-    const ownerId = await requireOwnerId();
-    if (!ownerId.ok) return ownerId;
-    const parsed = parseInput(createInput, input);
-    if (!parsed.ok) return parsed;
-
-    const { pages, uow } = deps();
-    const result = await createExamQuestion(
-      parsed.value,
-      { pages, uow, clock: systemClock, ids: { next: createId } },
-      ownerId.value,
-    );
-    if (!result.ok) return err(toActionError(result.error));
-    revalidateExams();
-    return ok(toView(result.value));
   });
 }
 

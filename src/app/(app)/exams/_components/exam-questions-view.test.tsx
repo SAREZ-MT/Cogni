@@ -5,20 +5,14 @@ import type { ExamQuestionView } from "@/modules/exams";
 import { err, ok } from "@/shared/kernel/result";
 import { ExamQuestionsView } from "./exam-questions-view";
 
-const {
-  createExamQuestionAction,
-  editExamQuestionAction,
-  retireExamQuestionAction,
-  refresh,
-} = vi.hoisted(() => ({
-  createExamQuestionAction: vi.fn(),
-  editExamQuestionAction: vi.fn(),
-  retireExamQuestionAction: vi.fn(),
-  refresh: vi.fn(),
-}));
+const { editExamQuestionAction, retireExamQuestionAction, refresh } =
+  vi.hoisted(() => ({
+    editExamQuestionAction: vi.fn(),
+    retireExamQuestionAction: vi.fn(),
+    refresh: vi.fn(),
+  }));
 vi.mock("@/modules/exams", () => ({
   EXAM_MIN_QUESTIONS: 10,
-  createExamQuestionAction,
   editExamQuestionAction,
   retireExamQuestionAction,
 }));
@@ -48,7 +42,6 @@ function renderView(questions: ExamQuestionView[], retakePending = false) {
   render(
     <ExamQuestionsView
       notebookTitle="Biología"
-      pageId={PAGE_ID}
       pageTitle="Mitocondria"
       pageHref="/notebooks/nb/pages/pg"
       questions={questions}
@@ -59,34 +52,9 @@ function renderView(questions: ExamQuestionView[], retakePending = false) {
   return user;
 }
 
-async function fillForm(user: ReturnType<typeof userEvent.setup>) {
-  const dialog = screen.getByTestId("question-form-dialog");
-  await user.type(within(dialog).getByLabelText("Enunciado"), "¿Qué es?");
-  for (const [letter, text] of [
-    ["A", "Uno"],
-    ["B", "Dos"],
-    ["C", "Tres"],
-    ["D", "Cuatro"],
-  ] as const) {
-    await user.type(
-      within(dialog).getByPlaceholderText(`Opción ${letter}`),
-      text,
-    );
-  }
-  await user.click(
-    within(dialog).getByRole("radio", { name: "Opción B es la correcta" }),
-  );
-  await user.type(
-    within(dialog).getByLabelText("Concepto que evalúa"),
-    "Definición",
-  );
-  return dialog;
-}
-
 describe("ExamQuestionsView", () => {
   beforeEach(() => {
     for (const fn of [
-      createExamQuestionAction,
       editExamQuestionAction,
       retireExamQuestionAction,
       refresh,
@@ -119,6 +87,16 @@ describe("ExamQuestionsView", () => {
     ).toBeInTheDocument();
   });
 
+  // Phase 8 H13: creation is AI only, so a page without manual questions
+  // (every new one) does not count "0 manuales".
+  it("leaves the manual count out when the page has none", () => {
+    renderView([view("q1", { origin: "ai" }), view("q2", { origin: "ai" })]);
+
+    expect(
+      screen.getByText("2 preguntas · 2 generadas por IA"),
+    ).toBeInTheDocument();
+  });
+
   it("uses the singular for one AI question among several", () => {
     renderView([view("q1", { origin: "ai" }), view("q2"), view("q3")]);
 
@@ -131,7 +109,7 @@ describe("ExamQuestionsView", () => {
     renderView([view("q1"), view("q2"), view("q3")]);
 
     expect(screen.getByTestId("exam-questions-minimum")).toHaveTextContent(
-      "Un examen necesita al menos 10 preguntas. Agrega 7 más para poder rendirlo.",
+      "Un examen necesita al menos 10 preguntas. Genera 7 más con IA desde la página para poder rendirlo.",
     );
   });
 
@@ -143,48 +121,38 @@ describe("ExamQuestionsView", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("shows an empty state when the page has no questions", () => {
+  // Phase 8 H13 (user, 2026-10-29): questions are created by AI only.
+  it("offers no manual question creation", () => {
+    renderView([view("q1", { origin: "ai" })]);
+
+    expect(screen.queryByText("Nueva pregunta")).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("new-exam-question-button"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("sends a page without questions back to generate them", () => {
     renderView([]);
 
     expect(
       screen.getByText("Esta página aún no tiene preguntas"),
     ).toBeInTheDocument();
-  });
-
-  it("creates a question through the Server Action and refreshes", async () => {
-    createExamQuestionAction.mockResolvedValue(ok(view("new")));
-    const user = renderView([]);
-
-    await user.click(screen.getByRole("button", { name: "Nueva pregunta" }));
-    const dialog = await fillForm(user);
-    await user.click(
-      within(dialog).getByRole("button", { name: "Guardar pregunta" }),
-    );
-
-    expect(createExamQuestionAction).toHaveBeenCalledWith({
-      pageId: PAGE_ID,
-      stem: "¿Qué es?",
-      options: ["Uno", "Dos", "Tres", "Cuatro"],
-      correctIndex: 1,
-      concept: "Definición",
-      explanation: "",
-    });
-    expect(refresh).toHaveBeenCalled();
+    expect(screen.queryByText("Nueva pregunta")).not.toBeInTheDocument();
     expect(
-      screen.queryByTestId("question-form-dialog"),
-    ).not.toBeInTheDocument();
+      screen.getByRole("link", { name: "Generar desde la página" }),
+    ).toHaveAttribute("href", "/notebooks/nb/pages/pg");
   });
 
-  it("keeps the dialog open with Spanish copy when the server refuses", async () => {
-    createExamQuestionAction.mockResolvedValue(
+  it("keeps the edit server error in the dialog with Spanish copy", async () => {
+    editExamQuestionAction.mockResolvedValue(
       err({ code: "EXAMS_INVALID_QUESTION", message: "x" }),
     );
-    const user = renderView([]);
+    const user = renderView([view("q1")]);
 
-    await user.click(screen.getByRole("button", { name: "Nueva pregunta" }));
-    const dialog = await fillForm(user);
+    await user.click(screen.getByRole("button", { name: "Editar" }));
+    const dialog = screen.getByTestId("question-form-dialog");
     await user.click(
-      within(dialog).getByRole("button", { name: "Guardar pregunta" }),
+      within(dialog).getByRole("button", { name: "Guardar cambios" }),
     );
 
     expect(await within(dialog).findByRole("alert")).toHaveTextContent(
@@ -193,14 +161,14 @@ describe("ExamQuestionsView", () => {
     expect(refresh).not.toHaveBeenCalled();
   });
 
-  it("answers a thrown action with the generic failure", async () => {
-    createExamQuestionAction.mockRejectedValue(new Error("network"));
-    const user = renderView([]);
+  it("answers a thrown edit with the generic failure", async () => {
+    editExamQuestionAction.mockRejectedValue(new Error("network"));
+    const user = renderView([view("q1")]);
 
-    await user.click(screen.getByRole("button", { name: "Nueva pregunta" }));
-    const dialog = await fillForm(user);
+    await user.click(screen.getByRole("button", { name: "Editar" }));
+    const dialog = screen.getByTestId("question-form-dialog");
     await user.click(
-      within(dialog).getByRole("button", { name: "Guardar pregunta" }),
+      within(dialog).getByRole("button", { name: "Guardar cambios" }),
     );
 
     expect(await within(dialog).findByRole("alert")).toHaveTextContent(

@@ -30,7 +30,6 @@ vi.mock("@/modules/exams", () => ({
   EXAM_MIN_QUESTIONS: 10,
   listExamQuestionsAction,
   getExamStartAction,
-  createExamQuestionAction: vi.fn(),
   editExamQuestionAction: vi.fn(),
   retireExamQuestionAction: vi.fn(),
 }));
