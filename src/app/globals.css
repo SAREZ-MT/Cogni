@@ -70,6 +70,16 @@
   --color-highlighter-orange: #fdba74;
   --color-highlighter-purple: #c4b5fd;
   --color-highlighter-mint: #6ee7b7;
+  /* H7: editor callouts in the landing pillar band hues (landing.css
+     --lp-yellow / --lp-violet / --lp-rose) at the -200 step, so they have
+     body behind ink text; -fg is the deep ink of the icon and the italic
+     label (AA on its own ground). */
+  --color-callout-idea: #fde68a;
+  --color-callout-idea-fg: #854d0e;
+  --color-callout-note: #ddd6fe;
+  --color-callout-note-fg: #5b21b6;
+  --color-callout-warning: #fecdd3;
+  --color-callout-warning-fg: #9f1239;
   /* Technique accents (Phase 8 H3, user decisions 2026-10-19): soft but
      visible pastels for the calendar's technique bars, dots and progress
      fills (pastel yellow, not amber); Examen a solid, vivid red. Fills

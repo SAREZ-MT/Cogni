@@ -3,7 +3,8 @@
 // Callout block (specs/editor/spec.md, "Conjunto completo de bloques de
 // §3.2" and "Paleta de resaltado de Cogni y callouts"): a block-level node
 // with a `kind` attribute in `idea | note | warning`, mapped to the
-// `yellow | blue | orange` design tokens and a matching Lucide icon.
+// callout design tokens (H7: yellow | violet | rose), a matching Lucide icon
+// and an italic label by kind.
 // `content: "block+"` so a callout can hold any number of paragraphs/
 // lists, like blockquote in @tiptap/starter-kit.
 import { mergeAttributes, Node } from "@tiptap/core";
@@ -30,25 +31,35 @@ export function isCalloutKind(value: unknown): value is CalloutKind {
   );
 }
 
-// specs/editor/spec.md: "idea" → yellow, "note" → blue, "warning" → orange.
-// H6-E2 (Notion-like callout): a soft tint of the kind's pastel behind
-// normal ink text; only the icon carries the kind's ink colour.
+// H7 (editor polish round 2): the kinds take the landing pillar band hues
+// with real body — idea yellow, note violet, warning rose (globals.css
+// `--color-callout-*`) — behind ink text. The icon and the label carry the
+// kind's deep ink.
 const CALLOUT_CLASSES: Record<CalloutKind, string> = {
-  idea: "bg-pastel-yellow/60",
-  note: "bg-pastel-blue/60",
-  warning: "bg-pastel-orange/60",
+  idea: "bg-callout-idea",
+  note: "bg-callout-note",
+  warning: "bg-callout-warning",
 };
 
-const CALLOUT_ICON_CLASSES: Record<CalloutKind, string> = {
-  idea: "text-pastel-yellow-fg",
-  note: "text-pastel-blue-fg",
-  warning: "text-pastel-orange-fg",
+const CALLOUT_INK_CLASSES: Record<CalloutKind, string> = {
+  idea: "text-callout-idea-fg",
+  note: "text-callout-note-fg",
+  warning: "text-callout-warning-fg",
 };
 
 const CALLOUT_ICONS: Record<CalloutKind, typeof Lightbulb> = {
   idea: Lightbulb,
   note: Info,
   warning: TriangleAlert,
+};
+
+// The label is rendered by kind, outside the editable content, so the
+// stored document, the plain text the AI reads and the content catalogue
+// never see it.
+export const CALLOUT_LABELS: Record<CalloutKind, string> = {
+  idea: "Idea clave",
+  note: "Nota",
+  warning: "Cuidado",
 };
 
 function CalloutView({ node }: ReactNodeViewProps) {
@@ -61,14 +72,24 @@ function CalloutView({ node }: ReactNodeViewProps) {
     <NodeViewWrapper
       data-testid="callout"
       data-kind={kind}
-      className={`my-1 flex gap-2.5 rounded-(--radius-editor) px-4 py-3 text-fg ${CALLOUT_CLASSES[kind]}`}
+      className={`my-1.5 flex gap-3 rounded-(--radius-editor) px-4 py-3 text-fg ${CALLOUT_CLASSES[kind]}`}
     >
       <Icon
         data-testid="callout-icon"
-        className={`mt-0.5 size-5 shrink-0 ${CALLOUT_ICON_CLASSES[kind]}`}
-        strokeWidth={1.75}
+        aria-hidden="true"
+        className={`mt-0.5 size-5 shrink-0 ${CALLOUT_INK_CLASSES[kind]}`}
+        strokeWidth={2}
       />
-      <NodeViewContent className="flex-1" />
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span
+          data-testid="callout-label"
+          contentEditable={false}
+          className={`select-none text-sm font-semibold italic leading-6 ${CALLOUT_INK_CLASSES[kind]}`}
+        >
+          {CALLOUT_LABELS[kind]}
+        </span>
+        <NodeViewContent className="min-w-0" />
+      </div>
     </NodeViewWrapper>
   );
 }
