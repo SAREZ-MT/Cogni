@@ -1,6 +1,11 @@
 import { notFound } from "next/navigation";
 import { getExamResultsAction } from "@/modules/exams";
 import { getNotebookTitleForRoute, getPageForRoute } from "@/modules/notebooks";
+import { fromHub } from "@/shared/navigation/hub-return";
+import {
+  hubReturnHref,
+  hubReturnQuery,
+} from "@/shared/navigation/technique-hub";
 import { SetBreadcrumb } from "../../../../_components/breadcrumb";
 import { ExamResultsView } from "../../../_components/exam-results-view";
 
@@ -13,13 +18,15 @@ interface ExamResultsPageProps {
 // §3.3/§7.5: a completed session is a durable record). `?sesion=<id>` picks
 // the session (the player opens its results this way); without it, the
 // page's last finished exam. An unknown/foreign page, an unknown or open
-// session, another page's session or a page never examined 404s.
+// session, another page's session or a page never examined 404s. Opened
+// from the hub (`?desde=hub`, Phase 8 H18) the back link leads to the hub
+// and "Repetir examen" / "Nuevo examen" keep the marker.
 export default async function ExamResultsPage({
   params,
   searchParams,
 }: ExamResultsPageProps) {
   const { notebookId, pageId } = await params;
-  const { sesion } = await searchParams;
+  const { sesion, desde, cuaderno } = await searchParams;
   const page = await getPageForRoute(notebookId, pageId);
   if (!page) notFound();
   const results = await getExamResultsAction({
@@ -30,7 +37,9 @@ export default async function ExamResultsPage({
   const notebookTitle =
     (await getNotebookTitleForRoute(notebookId)) ?? "Cuaderno";
   const pageHref = `/notebooks/${notebookId}/pages/${page.id}`;
-  const examHref = `/exams/${notebookId}/${page.id}`;
+  const examPath = `/exams/${notebookId}/${page.id}`;
+  const keepQuery = hubReturnQuery({ desde, cuaderno });
+  const examHref = keepQuery ? `${examPath}?${keepQuery}` : examPath;
 
   return (
     <section className="flex flex-1 flex-col">
@@ -46,9 +55,15 @@ export default async function ExamResultsPage({
         notebookTitle={notebookTitle}
         pageTitle={page.title}
         pageHref={pageHref}
-        questionsHref={`${examHref}/preguntas`}
+        questionsHref={`${examPath}/preguntas`}
         examHref={examHref}
         results={results.value}
+        {...(fromHub(desde) && {
+          back: {
+            href: hubReturnHref("/exams", { desde, cuaderno }, notebookId),
+            label: "Exámenes",
+          },
+        })}
       />
     </section>
   );

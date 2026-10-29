@@ -56,7 +56,10 @@ function session(questions: ExamPlayerQuestionView[]): ExamSessionView {
   };
 }
 
-function renderPlayer(questions: ExamPlayerQuestionView[]) {
+function renderPlayer(
+  questions: ExamPlayerQuestionView[],
+  hub?: { back: { href: string; label: string }; keepQuery: string },
+) {
   const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
   render(
     <ExamPlayer
@@ -64,6 +67,7 @@ function renderPlayer(questions: ExamPlayerQuestionView[]) {
       pageTitle="Mitocondria"
       pageHref="/notebooks/nb/pages/pg"
       session={session(questions)}
+      {...hub}
     />,
   );
   return user;
@@ -224,6 +228,25 @@ describe("ExamPlayer", () => {
     });
     expect(push).toHaveBeenCalledWith(
       `/exams/nb/${PAGE_ID}/resultados?sesion=${SESSION_ID}`,
+    );
+  });
+
+  // Phase 8 H18: opened from the hub, the results keep the marker.
+  it("keeps the hub marker on the results when opened from the hub", async () => {
+    finishExamSessionAction.mockResolvedValue(
+      ok({ sessionId: SESSION_ID, passed: true }),
+    );
+    const user = renderPlayer([question(1, answered(1, 0))], {
+      back: { href: "/exams", label: "Exámenes" },
+      keepQuery: "desde=hub",
+    });
+    expect(screen.getByRole("link", { name: /Exámenes/ })).toHaveAttribute(
+      "href",
+      "/exams",
+    );
+    await user.click(screen.getByTestId("finish-exam-button"));
+    expect(push).toHaveBeenCalledWith(
+      `/exams/nb/${PAGE_ID}/resultados?sesion=${SESSION_ID}&desde=hub`,
     );
   });
 

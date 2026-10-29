@@ -47,8 +47,11 @@ const NOTEBOOK = "5e6f7a8b-9c0d-4e1f-8a2b-3c4d5e6f7a8b";
 const PAGE = "0a1b2c3d-4e5f-4061-8798-a1b2c3d4e5f6";
 const SESSION = "11111111-1111-4111-8111-111111111111";
 
-function params() {
-  return { params: Promise.resolve({ notebookId: NOTEBOOK, pageId: PAGE }) };
+function params(search: Record<string, string> = {}) {
+  return {
+    params: Promise.resolve({ notebookId: NOTEBOOK, pageId: PAGE }),
+    searchParams: Promise.resolve(search),
+  };
 }
 
 function startView(
@@ -170,5 +173,62 @@ describe("ExamSessionPage", () => {
       err({ code: "EXAMS_UNEXPECTED", message: "x" }),
     );
     await expect(ExamSessionPage(params())).rejects.toThrow("NEXT_NOT_FOUND");
+  });
+
+  // Phase 8 H18 (the H17 open issue): opened from the hub card
+  // (`?desde=hub`), the back link returns to the hub, keeping its filter.
+  describe("opened from the hub", () => {
+    const FILTER = "2b2c3d4e-5f60-4172-8899-b2c3d4e5f607";
+
+    it("leads the start screen back to the hub, keeping the filter", async () => {
+      getExamStartAction.mockResolvedValue(startView(null));
+
+      render(await ExamSessionPage(params({ desde: "hub", cuaderno: FILTER })));
+
+      expect(screen.getByRole("link", { name: /Exámenes/ })).toHaveAttribute(
+        "href",
+        `/exams?cuaderno=${FILTER}`,
+      );
+      expect(
+        screen.queryByRole("link", { name: /Volver a la página/ }),
+      ).toBeNull();
+    });
+
+    it("leads the player back to the hub", async () => {
+      getExamStartAction.mockResolvedValue(startView(SESSION));
+      getExamSessionAction.mockResolvedValue(
+        ok({
+          sessionId: SESSION,
+          pageId: PAGE,
+          startedAt: new Date().toISOString(),
+          finished: false,
+          questions: [
+            {
+              id: "q1",
+              stem: "Pregunta",
+              options: ["A", "B", "C", "D"],
+              answer: null,
+            },
+          ],
+        }),
+      );
+
+      render(await ExamSessionPage(params({ desde: "hub" })));
+
+      expect(screen.getByRole("link", { name: /Exámenes/ })).toHaveAttribute(
+        "href",
+        "/exams",
+      );
+    });
+
+    it("keeps the page as the back target without the marker", async () => {
+      getExamStartAction.mockResolvedValue(startView(null));
+
+      render(await ExamSessionPage(params()));
+
+      expect(
+        screen.getByRole("link", { name: /Volver a la página/ }),
+      ).toHaveAttribute("href", `/notebooks/${NOTEBOOK}/pages/${PAGE}`);
+    });
   });
 });

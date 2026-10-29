@@ -95,4 +95,24 @@ describe("ExamResultsPage", () => {
     await expect(ExamResultsPage(props())).rejects.toThrow("NEXT_NOT_FOUND");
     expect(getExamResultsAction).not.toHaveBeenCalled();
   });
+
+  // Phase 8 H18: results reached from the hub lead back to it and keep
+  // the marker on "Nuevo examen".
+  it("leads back to the hub and keeps the marker when opened from it", async () => {
+    render(
+      await ExamResultsPage({
+        params: Promise.resolve({ notebookId: NOTEBOOK, pageId: PAGE }),
+        searchParams: Promise.resolve({ sesion: SESSION, desde: "hub" }),
+      }),
+    );
+
+    expect(screen.getByRole("link", { name: /Exámenes/ })).toHaveAttribute(
+      "href",
+      "/exams",
+    );
+    expect(screen.getByTestId("new-exam-link")).toHaveAttribute(
+      "href",
+      `/exams/${NOTEBOOK}/${PAGE}?desde=hub`,
+    );
+  });
 });
