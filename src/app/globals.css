@@ -81,7 +81,7 @@
   --color-highlighter-mint-edge: #95d9bd;
   /* H7 follow-up (user reference callout-ref.png, light theme): editor
      callouts keep the landing band hues (idea yellow, note violet, warning
-     rose) as a light tint, a mid "-edge" border, a strong "-icon" step for
+     rose; H8 adds important blue and tip green) as a light tint, a mid "-edge" border, a strong "-icon" step for
      the outlined icon (≥ 3:1) and a deep "-fg" step for the text (≥ 7:1 on
      the tint). */
   --color-callout-idea: #fefae6;
@@ -96,6 +96,16 @@
   --color-callout-warning-edge: #f7bcc6;
   --color-callout-warning-icon: #e11d48;
   --color-callout-warning-fg: #881337;
+  /* H8: important (blue) and tip (green), same steps — icon 4.8:1, text
+     9.5:1 and 8.7:1 on the tint. */
+  --color-callout-important: #eff6ff;
+  --color-callout-important-edge: #bfdbfe;
+  --color-callout-important-icon: #2563eb;
+  --color-callout-important-fg: #1e3a8a;
+  --color-callout-tip: #f0fdf4;
+  --color-callout-tip-edge: #bbf7d0;
+  --color-callout-tip-icon: #15803d;
+  --color-callout-tip-fg: #14532d;
   /* H7: a neutral grey for code blocks (the warm --muted read yellowish
      behind code). */
   --color-code-block: #f3f3f3;

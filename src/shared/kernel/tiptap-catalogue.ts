@@ -56,8 +56,15 @@ export type TextAlign = (typeof TEXT_ALIGNS)[number];
 export const IMAGE_ALIGNS = ["left", "center", "right"] as const;
 export type ImageAlign = (typeof IMAGE_ALIGNS)[number];
 
-// The editor callout node's kinds; default "idea".
-export const CALLOUT_KINDS = ["idea", "note", "warning"] as const;
+// The editor callout node's kinds; default "idea". H8: "important" (blue)
+// and "tip" (green) join idea, note and warning.
+export const CALLOUT_KINDS = [
+  "idea",
+  "note",
+  "warning",
+  "important",
+  "tip",
+] as const;
 export type CalloutKind = (typeof CALLOUT_KINDS)[number];
 
 export const HEADING_LEVELS = [1, 2, 3, 4, 5, 6] as const;

@@ -1,6 +1,8 @@
 import type { Editor, Range } from "@tiptap/core";
 import {
   AtSign,
+  CircleAlert,
+  CircleCheck,
   Code2,
   Heading1,
   Heading2,
@@ -317,6 +319,45 @@ export const SLASH_COMMAND_ITEMS: SlashCommandItem[] = [
         .insertContent({
           type: "callout",
           attrs: { kind: "warning" },
+          content: [{ type: "paragraph" }],
+        })
+        .run(),
+  },
+  // H8: important (blue) and tip (green).
+  {
+    id: "callout-important",
+    label: "Callout importante",
+    keywords: ["importante", "important", "alerta", "callout"],
+    icon: CircleAlert,
+    group: "Callouts",
+    description: "Señala algo importante",
+    run: (editor, range) =>
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertContent({
+          type: "callout",
+          attrs: { kind: "important" },
+          content: [{ type: "paragraph" }],
+        })
+        .run(),
+  },
+  {
+    id: "callout-tip",
+    label: "Callout de consejo",
+    keywords: ["consejo", "tip", "sugerencia", "callout"],
+    icon: CircleCheck,
+    group: "Callouts",
+    description: "Comparte un consejo",
+    run: (editor, range) =>
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertContent({
+          type: "callout",
+          attrs: { kind: "tip" },
           content: [{ type: "paragraph" }],
         })
         .run(),
