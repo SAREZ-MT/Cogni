@@ -105,8 +105,8 @@ export function TechniqueItemCard({
                   >
                     <EllipsisVertical
                       aria-hidden="true"
-                      size={16}
                       strokeWidth={2}
+                      className="size-4"
                     />
                   </Button>
                 </DropdownMenuTrigger>
