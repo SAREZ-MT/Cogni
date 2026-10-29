@@ -604,3 +604,13 @@ Parked for when the flashcards / active recall / exams sections are redesigned (
 - Phase 8 work continues on `feat/phase-8-hub`, made from `feat/landing-polish` 528dda9 (the stack is main → phase-8-design-flows → landing-v1 → legal-consent → landing-polish → phase-8-hub). The user chose to keep stacking (option B) so the app shows the new logo, /inicio and the legal notice while iterating.
 - Next: the notebooks hub reform (H4), continuing after H4-T4 (6a41fa7, rebased as fd75456). Open follow-ups: SectionHeader advisory R3-001; delete the unused `notebook-list-row.tsx` (H4-T6). The List view create-control follow-up closed with H4-T6.
 - H4-T6 committed as `5d4dff8`. Follow-up (inline, parent): deleted the now-unused `notebook-list-row.tsx` and fixed the comments and ATOMS.md entries that still named the removed card and list row. Checks: typecheck clean; vitest notebooks + (app)/notebooks + (app)/_components 608/608; biome clean.
+
+### RDD, hub + notebook + editor (2026-10-29)
+- 292d8fb..124eecc reviewed in 6 slices, each granted, approved and acknowledged (1 reliability lens per slice):
+  1. 292d8fb..8108b54 (hub covers, five per row, list removal). Advisories: R3-reduced-motion-transform-none, R3-tile-reduced-motion-transform-none.
+  2. 8108b54..12a9fb0 (pages header, sheets, create first, paper strips). Advisories: R3-empty-state-create-untested, R3-unmapped-tone-crash (WARNING: check an unmapped notebook colour cannot crash the sheet tone lookup).
+  3. 12a9fb0..35b72c4 (create dialog, open the editor, empty notebook). Advisories: R3-asChild-trigger-unproved, R3-busy-and-pending-untested, R3-busy-scoped-per-notebook.
+  4. 35b72c4..3ab4a78 (H6). Advisories: R3-e2e-fixed-sleep, R3-mod-shift-h-fallthrough, R3-stale-stored-color.
+  5. 3ab4a78..3727276 (H7 part 1). Advisories: R3-001, R3-002, R3-003.
+  6. 3727276..124eecc (H7 part 2 and the follow-up). Advisories: R3-ime-enter, R3-pointerdown-mousedown-all, R3-stale-math-pos, R3-weak-callout-assert.
+- The reviewed boundary is now 124eecc. All advisories are non-blocking follow-ups.
