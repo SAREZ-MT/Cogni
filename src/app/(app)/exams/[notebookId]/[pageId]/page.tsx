@@ -89,7 +89,7 @@ export default async function ExamSessionPage({
           pageId={page.id}
           pageTitle={page.title}
           pageHref={pageHref}
-          questionsHref={`${examHref}/preguntas`}
+          questionsHref={`${examHref}/editar${keepQuery ? `?${keepQuery}` : ""}`}
           activeQuestionCount={start.value.activeQuestionCount}
           retakePending={retakePending}
           failedRootCount={start.value.failedRootCount}

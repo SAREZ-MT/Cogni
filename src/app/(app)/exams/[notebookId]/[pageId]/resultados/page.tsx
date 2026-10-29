@@ -55,7 +55,7 @@ export default async function ExamResultsPage({
         notebookTitle={notebookTitle}
         pageTitle={page.title}
         pageHref={pageHref}
-        questionsHref={`${examPath}/preguntas`}
+        questionsHref={`${examPath}/editar${keepQuery ? `?${keepQuery}` : ""}`}
         examHref={examHref}
         results={results.value}
         {...(fromHub(desde) && {

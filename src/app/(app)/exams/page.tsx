@@ -1,4 +1,4 @@
-import { ClipboardList, FileText, ListChecks, RotateCcw } from "lucide-react";
+import { ClipboardList, FileText, Pencil, RotateCcw } from "lucide-react";
 import Link from "next/link";
 import { type ExamHubPageView, listExamHubAction } from "@/modules/exams";
 import {
@@ -126,9 +126,9 @@ export default async function ExamsHubPage({
         menu={
           <>
             <DropdownMenuItem asChild>
-              <Link href={`${examHref}/preguntas`}>
-                <ListChecks aria-hidden="true" size={15} strokeWidth={1.75} />
-                Ver preguntas
+              <Link href={hubItemHref(`${examHref}/editar`, filter.selected)}>
+                <Pencil aria-hidden="true" size={15} strokeWidth={1.75} />
+                Editar preguntas
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>

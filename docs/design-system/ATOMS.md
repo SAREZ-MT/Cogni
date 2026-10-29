@@ -1655,6 +1655,12 @@ stays `exam-results` (reused).
 
 ### Question management — `/exams/[notebookId]/[pageId]/preguntas`
 
+**Replaced in Phase 8 H18 (user 2026-10-29):** the route redirects to the
+exam edit page `/exams/{nb}/{page}/editar` (`ItemEditor` with the exam
+fields in `exams/_components/exam-questions-editor.tsx`), and
+`exam-questions-view.tsx`, `ExamQuestionRow` and `QuestionFormDialog` were
+removed. The history below describes the screen before H18.
+
 Phase 8 H13 (user 2026-10-29): questions are created by AI only. The
 "Nueva pregunta" button and `createExamQuestionAction` are gone; the
 header count leaves out "· {K} manuales" when K is 0; the minimum note
@@ -1702,7 +1708,7 @@ with `variantOf` pointing at the original they replace, the 5th — the
 "topped up" extra question — with none). Every other page's management
 list is just its plain question set tagged `origin: "ai"`.
 
-#### ExamQuestionRow (`exam-question-row.tsx`)
+#### ExamQuestionRow (`exam-question-row.tsx`) — removed in Phase 8 H18
 
 Index + stem, a neutral "Concepto: …" `Pill`, an origin `Pill` ("IA"
 primary / "Manual" success / "Variante" rose), a muted "Retirada" `Pill` +
@@ -1716,7 +1722,10 @@ buttons (`onRetire` omitted, not just disabled, once already retired).
 
 Used by: `exams/_components/exam-questions-view.tsx`.
 
-#### QuestionFormDialog (`question-form-dialog.tsx`)
+#### QuestionFormDialog (`question-form-dialog.tsx`) — removed in Phase 8 H18
+
+Its option rows (bordered `answer-option`, rose tint on the correct one)
+live on in the exam edit page's fields.
 
 Built on Cogni's `Dialog` atom (same composition as `modules/notebooks/ui/
 create-notebook-dialog.tsx`): "Enunciado" `Textarea`, 4 "Opción A–D" rows
