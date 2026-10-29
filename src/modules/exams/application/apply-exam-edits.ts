@@ -55,6 +55,10 @@ export async function applyExamEdits(
 
   const page = await deps.pages.getPageText(input.pageId, ownerId);
   if (!page.ok) return page;
+  // The page was read above; the single-item use cases reuse that answer,
+  // so nothing inside the transaction asks for a second connection (the
+  // app's pool holds one: a read there would wait for it forever).
+  const checkedPage = { getPageText: async () => page };
 
   return runExamWork(deps.uow, async (repos) => {
     const uow = sameTransaction(repos);
@@ -81,7 +85,7 @@ export async function applyExamEdits(
     for (const content of input.creates) {
       const created = await createExamQuestion(
         { pageId: input.pageId, ...content },
-        { ...deps, uow },
+        { ...deps, pages: checkedPage, uow },
         ownerId,
       );
       if (!created.ok) return created;

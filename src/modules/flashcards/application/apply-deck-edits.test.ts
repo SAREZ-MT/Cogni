@@ -64,6 +64,8 @@ const pages = {
   },
 };
 
+const CREATE = { front: "Frente", back: "Reverso" };
+
 describe("editFlashcard", () => {
   let deck: InMemoryDeckUnitOfWork;
   beforeEach(() => {
@@ -285,5 +287,43 @@ describe("applyDeckEdits", () => {
     );
 
     expect(!result.ok && result.error.code).toBe("PAGE_NOT_FOUND");
+  });
+
+  // The app's pool holds one connection (shared/db/client.ts): a page read
+  // from inside the transaction would wait for that connection forever.
+  // The page is read once, before the unit of work.
+  it("reads the page once, before the unit of work, never inside it", async () => {
+    const base = deps();
+    let inside = false;
+    let reads = 0;
+    const uow = base.deck;
+    const guarded = {
+      run: async <T>(work: Parameters<typeof uow.run>[0]) => {
+        inside = true;
+        try {
+          return (await uow.run(work as never)) as T;
+        } finally {
+          inside = false;
+        }
+      },
+    };
+    const result = await applyDeckEdits(
+      { pageId: PAGE, updates: [], creates: [CREATE], deletes: [] },
+      {
+        ...base,
+        deck: guarded as never,
+        pages: {
+          getPageText: async (pageId: string, ownerId: string) => {
+            if (inside) throw new Error("page read inside the transaction");
+            reads += 1;
+            return base.pages.getPageText(pageId, ownerId);
+          },
+        },
+      },
+      OWNER,
+    );
+
+    expect(result.ok).toBe(true);
+    expect(reads).toBe(1);
   });
 });

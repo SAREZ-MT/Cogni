@@ -60,6 +60,10 @@ export async function applyDeckEdits(
 
   const page = await deps.pages.getPageText(input.pageId, ownerId);
   if (!page.ok) return page;
+  // The page was read above; the single-item use cases reuse that answer,
+  // so nothing inside the transaction asks for a second connection (the
+  // app's pool holds one: a read there would wait for it forever).
+  const checkedPage = { getPageText: async () => page };
 
   try {
     return await deps.deck.run(async (repos) => {
@@ -85,7 +89,7 @@ export async function applyDeckEdits(
         must(
           await createManualFlashcard(
             { pageId: input.pageId, ...sides },
-            { ...deps, deck },
+            { ...deps, pages: checkedPage, deck },
             ownerId,
           ),
         );

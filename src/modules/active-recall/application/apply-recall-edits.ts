@@ -57,6 +57,10 @@ export async function applyRecallEdits(
 
   const page = await deps.pages.getPageText(input.pageId, ownerId);
   if (!page.ok) return page;
+  // The page was read above; the single-item use cases reuse that answer,
+  // so nothing inside the transaction asks for a second connection (the
+  // app's pool holds one: a read there would wait for it forever).
+  const checkedPage = { getPageText: async () => page };
 
   return runRecallWork(deps.uow, async (repos) => {
     const uow = sameTransaction(repos);
@@ -83,7 +87,7 @@ export async function applyRecallEdits(
     for (const content of input.creates) {
       const created = await createRecallQuestion(
         { pageId: input.pageId, ...content },
-        { ...deps, uow },
+        { ...deps, pages: checkedPage, uow },
         ownerId,
       );
       if (!created.ok) return created;
