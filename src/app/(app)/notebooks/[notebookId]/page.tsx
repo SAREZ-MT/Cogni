@@ -1,5 +1,4 @@
-import { FileText, Notebook as NotebookIcon, Plus } from "lucide-react";
-import Link from "next/link";
+import { FileText, Plus } from "lucide-react";
 import { notFound } from "next/navigation";
 import {
   ArchivePageButton,
@@ -10,11 +9,12 @@ import { BackLink } from "@/shared/ui/back-link";
 import { Card } from "@/shared/ui/card";
 import { EmptyState } from "@/shared/ui/empty-state";
 import { IconTile } from "@/shared/ui/icon-tile";
+import { PageSheet } from "@/shared/ui/page-sheet";
+import { PageSheetCard } from "@/shared/ui/page-sheet-card";
 import { SectionHeader } from "@/shared/ui/section-header";
 import { ViewToggle } from "@/shared/ui/view-toggle";
 import { SetBreadcrumb } from "../../_components/breadcrumb";
 import { formatUpdatedAt } from "../../_components/format";
-import { notebookToneFromColor } from "../../_components/notebook-swatches";
 import { PageListRow } from "../../_components/page-list-row";
 
 interface NotebookPageProps {
@@ -27,7 +27,10 @@ interface NotebookPageProps {
 // pass 2 (user decision "el árbol de páginas del cuaderno vive aquí"):
 // restyled after studyplatform-style-report.md §8 (workspace detail) — the
 // notebook's own page tree, which used to render inside the sidebar, now
-// lives on this route as a card grid.
+// lives on this route as a card grid. Phase 8 H5-T1 (user request
+// 2026-10-29): the hub's header line — a badge beside a gradient title, the
+// eyebrow folded into the meta line — with a page-sheet badge in the
+// notebook's colour (pages are this section), and each page as a sheet.
 export default async function NotebookPage({
   params,
   searchParams,
@@ -37,6 +40,8 @@ export default async function NotebookPage({
   if (!routeView) notFound();
 
   const { notebook, pages } = routeView;
+  // Null (legacy notebooks) falls back to violet inside the atoms.
+  const tone = notebook.color;
   const { view: viewParam } = await searchParams;
   const view = viewParam === "list" ? "list" : "grid";
 
@@ -58,28 +63,18 @@ export default async function NotebookPage({
         <BackLink href="/notebooks">Cuadernos</BackLink>
 
         <SectionHeader
-          icon={
-            <IconTile
-              size="44"
-              className="text-lg"
-              tone={notebookToneFromColor(notebook.color)}
-            >
-              {notebook.icon ?? (
-                <NotebookIcon aria-hidden="true" size={20} strokeWidth={1.75} />
-              )}
-            </IconTile>
-          }
-          eyebrow="Cuaderno"
+          icon={<PageSheet size="sm" tone={tone} />}
+          leadingClassName="gap-4"
           title={notebook.title}
-          titleClassName="mt-0 text-xl"
-          description={
+          titleClassName="text-[32px] leading-tight tracking-tight text-gradient-brand wrap-anywhere"
+          description={[
+            "Cuaderno",
             pages.length === 0
               ? "Aún no hay páginas. Crea la primera para empezar."
               : pages.length === 1
                 ? "1 página"
-                : `${pages.length} páginas`
-          }
-          descriptionClassName="mt-0.5"
+                : `${pages.length} páginas`,
+          ]}
           actions={
             <form action={createPage}>
               <button
@@ -116,41 +111,31 @@ export default async function NotebookPage({
           />
 
           {view === "grid" ? (
-            <ul className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3">
-              {pages.map((page) => (
-                <li key={page.id} className="group relative">
-                  <Card
-                    asChild
-                    padding="sm"
-                    interactive
-                    className="flex items-center gap-3 rounded-[14px]"
-                  >
-                    <Link href={`/notebooks/${notebook.id}/pages/${page.id}`}>
-                      <IconTile size="36" radius="input" tone="primary">
-                        <FileText
-                          aria-hidden="true"
-                          size={18}
-                          strokeWidth={1.75}
+            // Phase 8 H5-T1 (user request 2026-10-29): each page is a paper
+            // sheet in the hub covers' family, on the hub's grid — columns
+            // follow the grid's own width (the sidebar eats the viewport)
+            // and cap at five.
+            <div className="@container/grid">
+              <ul className="grid grid-cols-1 gap-x-6 gap-y-8 @[300px]/grid:grid-cols-2 @[540px]/grid:grid-cols-3 @[680px]/grid:grid-cols-4 @[960px]/grid:grid-cols-5">
+                {pages.map((page) => (
+                  <li key={page.id}>
+                    <PageSheetCard
+                      href={`/notebooks/${notebook.id}/pages/${page.id}`}
+                      title={page.title}
+                      datePrefix="Actualizada"
+                      dateLabel={formatUpdatedAt(page.updatedAt)}
+                      tone={tone}
+                      actions={
+                        <ArchivePageButton
+                          pageId={page.id}
+                          title={page.title}
                         />
-                      </IconTile>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate font-medium text-[13.5px] text-fg">
-                          {page.title}
-                        </span>
-                        <span className="block text-fg-muted text-xs">
-                          Actualizada {formatUpdatedAt(page.updatedAt)}
-                        </span>
-                      </span>
-                    </Link>
-                  </Card>
-                  <ArchivePageButton
-                    pageId={page.id}
-                    title={page.title}
-                    className="absolute top-2 right-2 z-10 opacity-0 transition-opacity group-hover:opacity-100"
-                  />
-                </li>
-              ))}
-            </ul>
+                      }
+                    />
+                  </li>
+                ))}
+              </ul>
+            </div>
           ) : (
             <Card>
               {pages.map((page) => (

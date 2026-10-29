@@ -416,6 +416,48 @@ Slice-artefact advisories (CalendarNav/TodayList callers "not migrated") are res
     `_components/notebook-swatches.ts`, `page-list-row.tsx` that name the
     removed files).
 
+## H5 — notebook detail reform (user, 2026-10-29)
+
+- [x] **H5-T1** — notebook page: pages header and paper-sheet page cards (step 1 of the reform).
+  - Route: delegated writer (writer trigger: two new atoms + page + tests +
+    ATOMS.md).
+  - Request: the hub's H4-T4 header line and H4-T5 card family on
+    `notebooks/[notebookId]/page.tsx`. Out of scope: the zero-pages empty
+    state (step 2), the grid/list `ViewToggle` (unchanged, pending a user
+    question) and the editor.
+  - Built: new atom `PageSheet` (decorative paper sheet: two stacked sheets,
+    a white face with a folded corner, an index tab and a margin rule in
+    the notebook's colour; `lg` is ruled paper, `sm` the 58×70 header badge
+    with three short rules) and `PageSheetCard` (an `aspect-[4/5]` article,
+    stretched title link, title 15px on 22px rules and `line-clamp-4`,
+    bottom row date + actions, optional top-corner `meta`, hover lift 4px +
+    0.4deg, press 0.98, none under reduced motion, a narrow fallback below
+    150px, "Actualizada" prefix only from 190px so the date never
+    truncates). Header: `PageSheet sm` badge tinted by the notebook's colour
+    (violet when null), 32px `text-gradient-brand` title, meta "Cuaderno ·
+    N páginas" (the uppercase eyebrow folded into the dot line); breadcrumb,
+    `BackLink` and "Nueva página" kept. Grid: the hub's `@container/grid`
+    columns capped at 5. The archive button is now always visible on each
+    sheet (it was opacity-0 until hover, invisible to keyboard focus).
+    ATOMS.md updated (PageSheet, PageSheetCard, Card/IconTile/SectionHeader/
+    PageListRow lines).
+  - RED: page-sheet and page-sheet-card suites failed to resolve the
+    modules; 3 route tests (header badge + gradient title, sheet cards,
+    capped grid) failed → GREEN. The route fixture's colour changed from an
+    old hex to `green` (a real `NotebookColor`).
+  - Checks: tsc clean; biome clean on the 6 changed source files; vitest
+    src/shared/ui + src/modules/notebooks + (app) + no-inline-hex 212 files /
+    1698 tests: 1697 pass, 1 fail (`inicio/page.test.tsx` "tells done, idle
+    and never-generated techniques apart", pre-existing); depcruise no
+    violations. Screenshots in the session scratchpad `notebook-detail/`
+    (`before-*`, `after-1440.png` 5 per row, `after-1024.png` 4 per row,
+    `after-390.png` narrow fallback with the pre-existing 240px sidebar,
+    `after-hover-1440.png`, `after-violet-1440.png`, `after-list-1440.png`).
+  - Open: the list view's `PageListRow` (flat violet icon rows) no longer
+    matches the sheets; the notebook's emoji `icon` is no longer shown in
+    this header (the sidebar still shows it; the hub covers dropped it in
+    H4-T5); the optional `meta` slot is unused until a product decision.
+
 ## Backlog — technique sections reform (user, 2026-10-18)
 Parked for when the flashcards / active recall / exams sections are redesigned (not now; Active Recall has the Phase 6 UI freeze, so its changes need the user's explicit go-ahead at that time).
 - [ ] TR-1 — No skipping in any technique (user rule): every question must be answered right or wrong so mastery and metrics stay meaningful. Today exams already comply; active recall has "Saltar" (`active-recall-player.tsx:171`, saved as "(sin respuesta)") and "Terminar" mid-session (`:272`); flashcards has "Terminar" mid-session (`flashcard-player.tsx:237`). Remove early "Terminar" (start = finish).

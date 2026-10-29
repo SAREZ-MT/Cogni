@@ -21,8 +21,8 @@ Surface box: `rounded-xl border`.
   `CardFooter` (shadcn-style, available for future composition).
 
 Used by: `stat-card.tsx`, `home/ready-to-review.tsx`, `home/recent-pages.tsx`,
-`notebooks/[notebookId]/page.tsx` (interactive `asChild` page-card Link, and
-its list-view wrapper).
+`notebooks/[notebookId]/page.tsx` (its list-view wrapper; the grid's page
+cards are `PageSheetCard` since Phase 8 H5-T1).
 
 ## IconTile (`icon-tile.tsx`)
 
@@ -45,7 +45,8 @@ The pastel/semantic square behind notebook, stat and empty-state icons.
 
 Used by: `home/stat-card.tsx`,
 `home/ready-to-review.tsx`, `home/weak-topics.tsx`, `app/(app)/page.tsx`,
-`notebooks/[notebookId]/page.tsx`,
+`notebooks/[notebookId]/page.tsx` (the zero-pages empty state only; its
+header badge is a `PageSheet` since Phase 8 H5-T1),
 `modules/notebooks/ui/create-notebook-trigger.tsx`.
 
 ## Pill (`pill.tsx`)
@@ -78,7 +79,9 @@ Used by: `nav-item.tsx` (disabled row's "pronto" badge),
   `action` switches it to 16px/600 with a right-aligned link/action row.
 
 Used by: `home/home-header.tsx`, `notebooks/page.tsx`,
-`notebooks/[notebookId]/page.tsx` (`SectionHeader`); `home/ready-to-review.tsx`,
+`notebooks/[notebookId]/page.tsx` (`SectionHeader`; since Phase 8 H5-T1 the
+hub's line: a `PageSheet` `sm` badge, the 32px `text-gradient-brand` title
+and a "Cuaderno · N páginas" dot list, no eyebrow); `home/ready-to-review.tsx`,
 `home/recent-pages.tsx`, `app/(app)/page.tsx` ("Mis cuadernos") (`SectionTitle`).
 
 Not used by `page-header.tsx` (the editor page title): its title+meta-row
@@ -296,6 +299,67 @@ cuaderno para una materia" (`primary-600/80`). Hover lifts 4px and
 deepens to `primary-100` / `primary-400`, press 0.98, none under reduced
 motion; below 150px the hint hides and the disc shrinks to 32px. Accessible
 name stays "Nuevo cuaderno".
+
+## PageSheet (`page-sheet.tsx`)
+
+Phase 8 H5-T1 (user request 2026-10-29), the sibling of `NotebookCover`:
+one page of a notebook as a paper sheet, decorative (`aria-hidden`,
+`data-slot="page-sheet"`, `data-tone`). Two sheets stacked behind
+(`data-part="stack"`, `neutral-100` and `neutral-50`, hairline
+`border-default`, offset 8px / 4px), a `bg-card` face (`data-part="face"`)
+with its top-right corner cut by a clip-path and a folded corner
+(`data-part="fold"`, `neutral-100` triangle with a crease hairline), an
+index tab on the top edge (`data-part="tab"`) and a margin rule
+(`data-part="margin"`) in the notebook's colour. Depth is two
+`drop-shadow`s (they follow the clipped outline), no glow.
+
+- Props: `size?` (`"lg"` default | `"sm"`), `tone?` (`NotebookCoverTone`;
+  null → `purple`), `className?`.
+- Tones: the 400 step of the hub covers' gradients — pink `pink-400`, green
+  `emerald-400`, yellow `amber-400`, purple `primary-500`, orange
+  `orange-400`, blue `blue-400`, mint `teal-400`; the margin rule at `/45`.
+- `lg`: fills its parent; 10px radius, 22px fold, 48×6 tab 20px in, margin
+  rule 18px in (hidden below 150px wide, a container query on the sheet);
+  ruled paper — a `neutral-100` hairline every 22px from 36px down,
+  stopping 56px short of the bottom so the date row stays clean.
+- `sm`: the fixed 58×70 header badge (the same box as the hub's
+  `NotebookCover` badge); 6px radius, 12px fold, 20×4 tab and three short
+  `neutral-200` rules (`data-part="rule"`) so it reads as a page.
+
+Used by: `page-sheet-card.tsx` (`lg`), `notebooks/[notebookId]/page.tsx`
+(the header badge, `sm`, tinted by the notebook's colour, through
+`SectionHeader`'s `icon`).
+
+## PageSheetCard (`page-sheet-card.tsx`)
+
+Phase 8 H5-T1 (user request 2026-10-29): one page of the notebook page's
+grid as a paper sheet, in the family of `NotebookCoverCard`. An `article`
+(`data-slot="page-sheet-card"`, `data-tone`) in `aspect-[4/5]` (the covers'
+proportion, so both grids share row rhythm) holding a large `PageSheet` and,
+laid over its face, the readable content:
+
+- Top corner (optional `meta`): plain 11px medium `fg-muted` text
+  (`data-part="meta"`). Not used yet.
+- The title: the stretched `Link` to the page (`after:inset-0`, accessible
+  name = full title, focus ring `ring-3 ring-ring/50` on the overlay), 15px
+  semibold `fg`, 22px lines that sit on the sheet's rules, `wrap-anywhere`,
+  `line-clamp-4`; it keeps clear of the folded corner.
+- Bottom row: the date (11px medium `fg-muted`, `datePrefix` such as
+  "Actualizada" shown only from 190px wide so the date never truncates)
+  and the `actions` slot (`relative z-10`, above the link, never inside it).
+- Props: `href`, `title`, `dateLabel?`, `datePrefix?`, `meta?`, `tone?`,
+  `actions?`, `className?`.
+- Motion: hover lifts 4px and tilts 0.4deg (200ms,
+  `cubic-bezier(0.23,1,0.32,1)`, transform only), press 0.98; never moves
+  under `prefers-reduced-motion`.
+- Below 150px wide only an 11px three-line title and the actions remain;
+  from 280px the title is 18px and the dates 13px.
+
+Used by: `notebooks/[notebookId]/page.tsx` (the grid view, on the hub's
+`@container/grid` columns: 1 → 2 @300 → 3 @540 → 4 @680 → 5 @960, never
+more; `formatUpdatedAt(updatedAt)` as `dateLabel`, "Actualizada" as
+`datePrefix`, `ArchivePageButton` as `actions`, the notebook's colour as
+`tone`).
 
 ## StudyBackdrop (`study-backdrop.tsx`)
 
@@ -582,7 +646,9 @@ last:border-b-0`), `hover:bg-hover`, an `IconTile` (size `28`, radius
 `relative z-10` hover action (`ArchivePageButton`) so it stays clickable over the stretched link, and a
 trailing muted `ChevronRight` (16/1.75). `PageListRow` reuses
 `formatUpdatedAt` (`_components/format.ts`) for its "Actualizada {d MMM}"
-column, the same formatter the page-card grid uses.
+column, the same formatter the `PageSheetCard` grid uses. Since Phase 8
+H5-T1 it sits next to the sheet grid unchanged (a flat violet `FileText`
+tile row); restyling it is left for a later step.
 
 Used by: `notebooks/[notebookId]/page.tsx`. The notebook list row was
 deleted in Phase 8 H4-T6, when the `/notebooks` list view was dropped.

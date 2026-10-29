@@ -25,7 +25,7 @@ vi.mock("@/modules/notebooks", () => ({
 
 import NotebookPage from "./page";
 
-const notebook = { id: "nb1", title: "Biología", color: "#6d4cff", icon: null };
+const notebook = { id: "nb1", title: "Biología", color: "green", icon: null };
 const pages = [
   {
     id: "p1",
@@ -91,6 +91,54 @@ describe("notebook detail route", () => {
     expect(
       screen.getByRole("link", { name: "Ver como cuadrícula" }),
     ).toHaveAttribute("aria-current", "true");
+  });
+
+  // Phase 8 H5-T1 (user request 2026-10-29): the hub header's line — a
+  // badge and a gradient title — with a page-sheet badge in the notebook's
+  // colour, and each page as a paper sheet.
+  it("heads the page with a page-sheet badge in the notebook's colour and a gradient title", async () => {
+    const { container } = await renderRoute();
+
+    const heading = screen.getByRole("heading", { level: 1, name: "Biología" });
+    expect(heading).toHaveClass("text-gradient-brand", "text-[32px]");
+    const badge = container.querySelector('[data-slot="page-sheet"]');
+    expect(badge).toHaveAttribute("data-tone", "green");
+    expect(badge).toHaveClass("h-[70px]", "w-[58px]");
+    // No uppercase eyebrow anymore: "Cuaderno" joins the meta line.
+    expect(screen.getByText("Cuaderno")).not.toHaveClass("uppercase");
+    expect(screen.getByText("2 páginas")).toBeInTheDocument();
+    expect(container.querySelectorAll('[data-part="separator"]')).toHaveLength(
+      1,
+    );
+  });
+
+  it("presents each page as a paper sheet with its update date", async () => {
+    await renderRoute();
+
+    const items = within(screen.getByRole("list")).getAllByRole("listitem");
+    for (const item of items) {
+      expect(within(item).getByRole("article")).toHaveAttribute(
+        "data-slot",
+        "page-sheet-card",
+      );
+    }
+    expect(within(items[0]).getByRole("article")).toHaveAttribute(
+      "data-tone",
+      "green",
+    );
+    expect(within(items[0]).getByRole("article")).toHaveTextContent(
+      /Actualizada \d+ sept/,
+    );
+  });
+
+  it("lays the sheets on the hub's container-query grid, capped at five columns", async () => {
+    await renderRoute();
+
+    expect(screen.getByRole("list")).toHaveClass(
+      "grid-cols-1",
+      "@[300px]/grid:grid-cols-2",
+      "@[960px]/grid:grid-cols-5",
+    );
   });
 
   it("renders pages as list rows when ?view=list", async () => {
