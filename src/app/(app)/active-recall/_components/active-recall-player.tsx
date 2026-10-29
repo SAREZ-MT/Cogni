@@ -7,6 +7,7 @@ import {
   saveRecallAnswerAction,
   startRecallSessionAction,
 } from "@/modules/active-recall";
+import { hubHref } from "@/shared/navigation/technique-hub";
 import { AnswerTextarea } from "@/shared/ui/answer-textarea";
 import { BackLink } from "@/shared/ui/back-link";
 import { Button } from "@/shared/ui/button";
@@ -102,7 +103,7 @@ export function ActiveRecallPlayer({
   const total = questions.length;
   const progress = total > 0 ? Math.round((index / total) * 100) : 0;
   const question = questions[index];
-  const sessionsHref = backHref ?? `/active-recall/${notebookId}`;
+  const sessionsHref = backHref ?? hubHref("/active-recall", notebookId);
 
   // Runs `task` after every earlier one; a failure never stops the queue.
   function enqueue(task: () => Promise<void>): Promise<void> {

@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { z } from "zod";
 import { getRecallSessionReviewAction } from "@/modules/active-recall";
 import { getNotebookTitleForRoute, getPageForRoute } from "@/modules/notebooks";
+import { hubHref, hubReturnHref } from "@/shared/navigation/technique-hub";
 import { SetBreadcrumb } from "../../../../_components/breadcrumb";
 import { PastSessionResults } from "../../../_components/past-session-results";
 
@@ -28,7 +29,7 @@ export default async function ActiveRecallResultsPage({
   searchParams,
 }: ActiveRecallResultsPageProps) {
   const { notebookId, pageId } = await params;
-  const { sesion } = await searchParams;
+  const { sesion, desde, cuaderno } = await searchParams;
   // A malformed id is a plain not-found, before any read (never a 500).
   if (typeof sesion !== "string" || !SESSION_ID.safeParse(sesion).success) {
     notFound();
@@ -42,7 +43,13 @@ export default async function ActiveRecallResultsPage({
   if (!review.ok) notFound();
   const notebookTitle =
     (await getNotebookTitleForRoute(notebookId)) ?? "Cuaderno";
-  const sessionsHref = `/active-recall/${notebookId}`;
+  // Phase 8 H17: the hub (filtered by the notebook, or as it was when
+  // opened from it); the notebook view is gone.
+  const sessionsHref = hubReturnHref(
+    "/active-recall",
+    { desde, cuaderno },
+    notebookId,
+  );
   const sessionHref = `/active-recall/${notebookId}/${page.id}`;
 
   return (
@@ -50,7 +57,7 @@ export default async function ActiveRecallResultsPage({
       <SetBreadcrumb
         items={[
           { label: "Recordación activa", href: "/active-recall" },
-          { label: notebookTitle, href: sessionsHref },
+          { label: notebookTitle, href: hubHref("/active-recall", notebookId) },
           { label: page.title, href: sessionHref },
           { label: "Resultados" },
         ]}

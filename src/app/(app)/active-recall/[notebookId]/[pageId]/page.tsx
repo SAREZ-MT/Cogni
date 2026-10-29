@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { getRecallSessionPlanAction } from "@/modules/active-recall";
 import { getNotebookTitleForRoute, getPageForRoute } from "@/modules/notebooks";
-import { FROM_HUB_PARAM, returnHref } from "@/shared/navigation/hub-return";
+import { hubHref, hubReturnHref } from "@/shared/navigation/technique-hub";
 import { SetBreadcrumb } from "../../../_components/breadcrumb";
 import { ActiveRecallPlayer } from "../../_components/active-recall-player";
 
@@ -30,12 +30,15 @@ export default async function ActiveRecallSessionPage({
   searchParams,
 }: ActiveRecallSessionPageProps) {
   const { notebookId, pageId } = await params;
-  // Phase 8 H16: opened from the hub's create dialog, its back links and
-  // "Terminar"'s results lead back to the hub.
-  const backHref = returnHref(
-    (await searchParams)[FROM_HUB_PARAM],
+  // Phase 8 H16/H17: opened from the hub (its create dialog or a card),
+  // the back links and "Terminar"'s results lead back to the hub as it was
+  // (`?desde=hub&cuaderno=`); otherwise to the hub filtered by the
+  // notebook (the notebook view is gone).
+  const { desde, cuaderno } = await searchParams;
+  const backHref = hubReturnHref(
     "/active-recall",
-    `/active-recall/${notebookId}`,
+    { desde, cuaderno },
+    notebookId,
   );
   const page = await getPageForRoute(notebookId, pageId);
   if (!page) notFound();
@@ -49,7 +52,7 @@ export default async function ActiveRecallSessionPage({
       <SetBreadcrumb
         items={[
           { label: "Recordación activa", href: "/active-recall" },
-          { label: notebookTitle, href: `/active-recall/${notebookId}` },
+          { label: notebookTitle, href: hubHref("/active-recall", notebookId) },
           { label: page.title },
         ]}
       />
