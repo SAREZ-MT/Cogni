@@ -24,13 +24,13 @@ import {
 
 // Literal class names for Tailwind's scanner (see highlight-palette.tsx).
 const CHIP_CLASSES: Record<HighlightColor, string> = {
-  pink: "bg-pastel-pink text-pastel-pink-fg",
-  green: "bg-pastel-green text-pastel-green-fg",
-  yellow: "bg-pastel-yellow text-pastel-yellow-fg",
-  purple: "bg-pastel-purple text-pastel-purple-fg",
-  orange: "bg-pastel-orange text-pastel-orange-fg",
-  blue: "bg-pastel-blue text-pastel-blue-fg",
-  mint: "bg-pastel-mint text-pastel-mint-fg",
+  pink: "bg-highlighter-pink text-fg",
+  green: "bg-highlighter-green text-fg",
+  yellow: "bg-highlighter-yellow text-fg",
+  purple: "bg-highlighter-purple text-fg",
+  orange: "bg-highlighter-orange text-fg",
+  blue: "bg-highlighter-blue text-fg",
+  mint: "bg-highlighter-mint text-fg",
 };
 
 export interface QuickHighlighterProps {
