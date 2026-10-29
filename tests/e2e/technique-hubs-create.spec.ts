@@ -7,6 +7,7 @@ import {
   createPageAndOpen,
   openNotebook,
 } from "./helpers/notebooks";
+import { setPagePlainText, wordsOfText } from "./helpers/page-text";
 import { chooseOption } from "./helpers/select";
 
 // Phase 8 H11 (user-approved flow, 2026-10-29): every technique hub creates
@@ -82,6 +83,28 @@ test.describe("technique hubs: create from the section", () => {
     // With a page: AI only in every technique (opened, never generated).
     await openNotebook(page, title);
     await createPageAndOpen(page);
+    const pageId = new URL(page.url()).pathname.split("/")[4] ?? "";
+
+    // Phase 8 H14 (user 2026-10-29): an empty page cannot be picked; each
+    // technique says how many words it needs.
+    for (const [hub, minWords] of [
+      [HUBS[0], 100],
+      [HUBS[1], 150],
+      [HUBS[2], 150],
+    ] as const) {
+      const dialog = await openFromCta(page, hub);
+      await dialog.getByRole("combobox", { name: "Página" }).click();
+      const option = page
+        .getByRole("listbox")
+        .getByRole("option", { name: /Sin título/ });
+      await expect(option).toHaveAttribute("aria-disabled", "true");
+      await expect(option).toContainText(
+        `Muy poco contenido (0 palabras): escribe al menos ${minWords}`,
+      );
+    }
+
+    // With enough text the page can be picked.
+    await setPagePlainText(pageId, wordsOfText(200));
 
     const flashcards = await openFromCta(page, HUBS[0]);
     await chooseOption(flashcards, "Página", "Sin título");

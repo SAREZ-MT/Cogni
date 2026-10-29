@@ -3,6 +3,7 @@ import type { Locator, Page } from "@playwright/test";
 import { expect, hasSupabaseEnv, signIn, test } from "./fixtures/auth";
 import { createNotebookWithOpenPage } from "./helpers/notebooks";
 import { chooseOption } from "./helpers/select";
+import { withStudyFiller } from "./helpers/study-text";
 
 // Phase 6 T5c (user decision 2026-10-06): "Generar" only sends the page
 // paragraphs a technique has not used yet. Unchanged page: no AI call, no
@@ -42,7 +43,7 @@ async function writeFirstParagraph(page: Page) {
   await editor(page).click();
   // Keys sent <15 ms after a click can precede Chrome's selectionchange.
   await page.waitForTimeout(100);
-  await page.keyboard.type(FIRST);
+  await page.keyboard.type(withStudyFiller(FIRST));
   await waitForSaved(page);
 }
 
@@ -65,7 +66,7 @@ async function addSecondParagraph(page: Page) {
   // ProseMirror reads the DOM selection on selectionchange.
   await page.waitForTimeout(100);
   await page.keyboard.press("Enter");
-  await page.keyboard.type(SECOND);
+  await page.keyboard.type(withStudyFiller(SECOND));
   // The first paragraph must stay as it was: an edit to it makes it new
   // again and it would be re-sent (correctly), breaking this spec's counts.
   await expect(editor(page).locator("p")).toHaveText([FIRST, SECOND]);

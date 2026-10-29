@@ -3,6 +3,7 @@ import type { Page } from "@playwright/test";
 import postgres from "postgres";
 import { expect, hasSupabaseEnv, signIn, test } from "./fixtures/auth";
 import { createNotebookWithOpenPage } from "./helpers/notebooks";
+import { withStudyFiller } from "./helpers/study-text";
 
 // Phase 6 T4 AI recall questions (documento-maestro §3.3, §8.4
 // generate_recall_questions): the student writes a page, presses "Técnicas
@@ -76,7 +77,7 @@ test.describe("active recall questions generation", () => {
     await editable.click();
     // Keys sent <15 ms after a click can precede Chrome's selectionchange.
     await page.waitForTimeout(100);
-    await page.keyboard.type(SENTENCES);
+    await page.keyboard.type(withStudyFiller(SENTENCES));
     await expect(page.getByTestId("autosave-status")).toHaveText("guardado", {
       timeout: 15000,
     });

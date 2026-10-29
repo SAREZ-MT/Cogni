@@ -3,6 +3,7 @@ import type { Page } from "@playwright/test";
 import postgres from "postgres";
 import { expect, hasSupabaseEnv, signIn, test } from "./fixtures/auth";
 import { createNotebookWithOpenPage } from "./helpers/notebooks";
+import { withStudyFiller } from "./helpers/study-text";
 
 // Phase 6 done criterion (documento-maestro §13 Fase 6, §8.5; SRS CU-09
 // alternate flow): a full session works even if a provider fails mid-way,
@@ -109,7 +110,7 @@ test.describe("active recall evaluation", () => {
       .locator('[contenteditable="true"]');
     await editable.click();
     await page.waitForTimeout(100);
-    await page.keyboard.type(SENTENCES);
+    await page.keyboard.type(withStudyFiller(SENTENCES));
     await expect(page.getByTestId("autosave-status")).toHaveText("guardado", {
       timeout: 15000,
     });

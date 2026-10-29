@@ -6,6 +6,7 @@ import {
   createPageAndOpen,
   openNotebook,
 } from "./helpers/notebooks";
+import { withStudyFiller } from "./helpers/study-text";
 
 // Phase 3 acceptance flow (documento-maestro §3.3, §13): the student presses
 // "Generar" on a page, the cards are persisted for that page and the page's
@@ -53,7 +54,7 @@ test.describe("flashcards generation", () => {
     await editable.click();
     // Keys sent <15 ms after a click can precede Chrome's selectionchange.
     await page.waitForTimeout(100);
-    await page.keyboard.type(SENTENCES);
+    await page.keyboard.type(withStudyFiller(SENTENCES));
     await expect(page.getByTestId("autosave-status")).toHaveText("guardado", {
       timeout: 15000,
     });
