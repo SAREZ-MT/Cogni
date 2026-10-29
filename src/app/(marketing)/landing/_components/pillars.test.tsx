@@ -97,6 +97,15 @@ describe("Pillars", () => {
     expect(section).not.toHaveTextContent(/png|jpe?g|\.doc\b|\.ppt\b/i);
   });
 
+  it("shows the schedule as a light week of the calendar, today first", () => {
+    render(<Pillars />);
+    const section = document.getElementById("pilar-hoy") as HTMLElement;
+    for (const day of ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]) {
+      expect(section).toHaveTextContent(day);
+    }
+    expect(section.querySelector(".bg-\\(--lp-ground\\)")).toBeNull();
+  });
+
   it("never mentions study time", () => {
     render(<Pillars />);
     expect(document.body).not.toHaveTextContent(/tiempo de estudio|horas/i);

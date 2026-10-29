@@ -1,5 +1,7 @@
 "use client";
 
+import { CalendarDots } from "@phosphor-icons/react/dist/csr/CalendarDots";
+import { CaretLeft } from "@phosphor-icons/react/dist/csr/CaretLeft";
 import { CaretRight } from "@phosphor-icons/react/dist/csr/CaretRight";
 import { FileText } from "@phosphor-icons/react/dist/csr/FileText";
 import { ListBullets } from "@phosphor-icons/react/dist/csr/ListBullets";
@@ -7,7 +9,7 @@ import { Notebook } from "@phosphor-icons/react/dist/csr/Notebook";
 import { Plus } from "@phosphor-icons/react/dist/csr/Plus";
 import { Quotes } from "@phosphor-icons/react/dist/csr/Quotes";
 import { TextHOne } from "@phosphor-icons/react/dist/csr/TextHOne";
-import { CalendarDays, Flame, Sparkles } from "lucide-react";
+import { Flame, Sparkles } from "lucide-react";
 import { motion } from "motion/react";
 import { useRef } from "react";
 import { FileBadge, type FileKind } from "./file-badge";
@@ -345,43 +347,82 @@ export function CurveDemo() {
 
 /* ------------------------------------------------------------------ 03 */
 
-const WEEK = [
-  { day: "Lun", date: 13, bars: ["bg-(--lp-yellow)"], today: true },
-  { day: "Mar", date: 14, bars: [] },
-  { day: "Mié", date: 15, bars: ["bg-(--lp-yellow)", "bg-(--lp-mint)"] },
-  { day: "Jue", date: 16, bars: [] },
-  { day: "Vie", date: 17, bars: ["bg-(--lp-rose)"] },
-  { day: "Sáb", date: 18, bars: [] },
-  { day: "Dom", date: 19, bars: ["bg-(--lp-yellow)", "bg-(--lp-mint)"] },
-] as const;
+type Technique = "flashcards" | "recall" | "exam";
+
+// One week of the app's calendar (calendario, week view): each review is a
+// chip with a bar in its technique's colour, as the real CalendarGrid draws.
+const WEEK: readonly {
+  day: string;
+  date: number;
+  today?: boolean;
+  events: readonly { page: string; technique: Technique }[];
+}[] = [
+  {
+    day: "Lun",
+    date: 13,
+    today: true,
+    events: [
+      { page: "Tu apunte", technique: "flashcards" },
+      { page: "Tema 2", technique: "recall" },
+      { page: "Tema 1", technique: "exam" },
+    ],
+  },
+  { day: "Mar", date: 14, events: [] },
+  {
+    day: "Mié",
+    date: 15,
+    events: [
+      { page: "Tema 3", technique: "flashcards" },
+      { page: "Tu apunte", technique: "recall" },
+    ],
+  },
+  { day: "Jue", date: 16, events: [] },
+  { day: "Vie", date: 17, events: [{ page: "Tema 2", technique: "exam" }] },
+  { day: "Sáb", date: 18, events: [] },
+  {
+    day: "Dom",
+    date: 19,
+    events: [
+      { page: "Tu apunte", technique: "flashcards" },
+      { page: "Tema 4", technique: "recall" },
+    ],
+  },
+];
+
+const ACCENT: Record<Technique, string> = {
+  flashcards: "bg-(--lp-yellow)",
+  recall: "bg-(--lp-mint)",
+  exam: "bg-(--lp-rose)",
+};
 
 const LEGEND = [
-  { label: "Flashcards", tone: "bg-(--lp-yellow)" },
-  { label: "Recuperación activa", tone: "bg-(--lp-mint)" },
-  { label: "Exámenes", tone: "bg-(--lp-rose)" },
+  { label: "Flashcards", tone: ACCENT.flashcards },
+  { label: "Recuperación activa", tone: ACCENT.recall },
+  { label: "Exámenes", tone: ACCENT.exam },
 ] as const;
 
 const TODAY = [
   {
     title: "Repasar flashcards",
     meta: "Tu apunte · 12 tarjetas",
-    tone: "bg-(--lp-yellow)",
+    tone: ACCENT.flashcards,
   },
   {
     title: "Explícalo con tus palabras",
     meta: "Tu cuaderno · Tema 2",
-    tone: "bg-(--lp-mint)",
+    tone: ACCENT.recall,
   },
   {
     title: "Examen corto",
     meta: "Tu cuaderno · Tema 1",
-    tone: "bg-(--lp-rose)",
+    tone: ACCENT.exam,
     done: true,
   },
 ] as const;
 
-// Schedule and Hoy: the Hoy rows slide in one after another, then the
-// finished one gets its checkmark drawn.
+// Schedule and Hoy: a light week of the calendar whose review chips land
+// day by day, then the Hoy rows slide in and the finished one gets its
+// checkmark drawn.
 export function TodayDemo() {
   const root = useRef<HTMLDivElement>(null);
   const play = usePlayOnce(root);
@@ -390,50 +431,88 @@ export function TodayDemo() {
     <div
       ref={root}
       aria-hidden="true"
-      className="relative flex flex-col gap-6 sm:pb-[230px]"
+      data-ui=""
+      className="relative flex flex-col gap-6 sm:pb-[200px]"
     >
-      <div className="lp-shadow-float rounded-[24px] bg-(--lp-ground) p-6 sm:mr-20 sm:p-7">
-        <div className="mb-5 flex items-center justify-between">
-          <p className="font-extrabold text-(--lp-paper) text-lg">
-            Esta semana
-          </p>
-          <span className="flex items-center gap-1.5 text-(--lp-violet-300) text-[13px]">
-            <CalendarDays className="size-4" />4 días de repaso
+      <div className="lp-shadow-window overflow-hidden rounded-[24px] border border-(--lp-line) bg-white sm:mr-16">
+        <div className="flex items-center justify-between gap-3 px-5 py-4 sm:px-6">
+          <span className="flex items-center gap-3">
+            <span className="hidden overflow-hidden rounded-lg border border-(--lp-line) text-(--lp-ink-3) sm:flex">
+              <span className="flex size-7 items-center justify-center border-(--lp-line) border-r">
+                <CaretLeft weight="bold" className="size-3.5" />
+              </span>
+              <span className="flex size-7 items-center justify-center">
+                <CaretRight weight="bold" className="size-3.5" />
+              </span>
+            </span>
+            <span className="whitespace-nowrap font-extrabold text-(--lp-ink) text-lg">
+              Esta semana
+            </span>
+          </span>
+          <span className="flex items-center gap-1.5 whitespace-nowrap rounded-full bg-(--lp-violet-100) px-2.5 py-1 font-bold text-(--lp-violet-deep) text-[12px]">
+            <CalendarDots weight="duotone" className="size-4" />4 días de repaso
           </span>
         </div>
-        <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
+        <div className="grid grid-cols-7 border-(--lp-line) border-y bg-(--lp-sidebar)">
           {WEEK.map((cell) => (
-            <div
+            <span
               key={cell.day}
-              className={`flex min-h-[112px] flex-col gap-1 rounded-xl border p-2 ${
-                "today" in cell
-                  ? "border-(--lp-violet-400) bg-(--lp-violet)"
-                  : cell.bars.length > 0
-                    ? "border-white/8 bg-(--lp-ground-raise)"
-                    : "border-white/8 bg-white/3"
-              }`}
+              className="flex flex-col items-center gap-1 py-2.5 sm:flex-row sm:justify-center sm:gap-1.5"
             >
-              <span
-                className={`text-[12px] ${"today" in cell ? "text-(--lp-violet-100)" : "text-(--lp-on-dark-3)"}`}
-              >
+              <span className="font-semibold text-(--lp-ink-3) text-[11px] sm:text-[12px]">
                 {cell.day}
               </span>
-              <span className="font-(family-name:--lp-font-display) text-(--lp-paper) text-[26px] leading-none">
+              <span
+                className={`inline-flex h-6 min-w-6 items-center justify-center rounded-md px-1 font-bold text-[12px] tabular-nums ${
+                  cell.today ? "bg-(--lp-violet) text-white" : "text-(--lp-ink)"
+                }`}
+              >
                 {cell.date}
               </span>
-              <span className="mt-auto flex flex-col gap-1">
-                {cell.bars.map((bar) => (
-                  <span key={bar} className={`h-1.5 rounded-full ${bar}`} />
-                ))}
-              </span>
+            </span>
+          ))}
+        </div>
+        <div className="grid grid-cols-7">
+          {WEEK.map((cell, column) => (
+            <div
+              key={cell.day}
+              className={`flex min-h-[104px] min-w-0 flex-col gap-1.5 border-(--lp-line) p-1 sm:min-h-[196px] sm:p-1.5 ${
+                column < WEEK.length - 1 ? "border-r" : ""
+              } ${cell.today ? "bg-(--lp-lilac-soft)" : ""}`}
+            >
+              {cell.events.map((event, index) => (
+                <motion.span
+                  key={`${event.page}-${event.technique}`}
+                  className="relative flex min-w-0 items-center rounded-[6px] border border-(--lp-line) bg-white py-1.5 pr-1.5 pl-3 max-sm:mx-auto max-sm:size-2.5 max-sm:rounded-full max-sm:border-0 max-sm:p-0"
+                  data-technique={event.technique}
+                  initial={{ opacity: 0, transform: "translateY(6px)" }}
+                  animate={
+                    play
+                      ? { opacity: 1, transform: "translateY(0px)" }
+                      : undefined
+                  }
+                  transition={{
+                    duration: 0.35,
+                    ease: EASE_OUT,
+                    delay: 0.1 + column * 0.06 + index * 0.05,
+                  }}
+                >
+                  <span
+                    className={`absolute inset-y-1.5 left-1 w-[3px] rounded-full max-sm:inset-0 max-sm:w-auto ${ACCENT[event.technique]}`}
+                  />
+                  <span className="truncate font-semibold text-(--lp-ink) text-[11px] leading-snug max-sm:hidden lg:text-[12px]">
+                    {event.page}
+                  </span>
+                </motion.span>
+              ))}
             </div>
           ))}
         </div>
-        <div className="mt-5 flex flex-wrap gap-x-4 gap-y-1.5">
+        <div className="flex flex-wrap gap-x-4 gap-y-1.5 border-(--lp-line) border-t px-5 py-3.5 sm:px-6">
           {LEGEND.map((item) => (
             <span
               key={item.label}
-              className="flex items-center gap-1.5 text-(--lp-on-dark-2) text-[12px]"
+              className="flex items-center gap-1.5 text-(--lp-ink-3) text-[12px]"
             >
               <span className={`size-2 rounded-full ${item.tone}`} />
               {item.label}
