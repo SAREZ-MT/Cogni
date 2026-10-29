@@ -20,10 +20,9 @@ Surface box: `rounded-xl border`.
 - Slots: `CardHeader`, `CardTitle`, `CardDescription`, `CardContent`,
   `CardFooter` (shadcn-style, available for future composition).
 
-Used by: `notebook-card.tsx` (interactive, `asChild` article), `stat-card.tsx`,
-`home/ready-to-review.tsx`, `home/recent-pages.tsx`, `notebooks/page.tsx`
-(list-view wrapper), `notebooks/[notebookId]/page.tsx` (interactive
-`asChild` page-card Link).
+Used by: `stat-card.tsx`, `home/ready-to-review.tsx`, `home/recent-pages.tsx`,
+`notebooks/[notebookId]/page.tsx` (interactive `asChild` page-card Link, and
+its list-view wrapper).
 
 ## IconTile (`icon-tile.tsx`)
 
@@ -44,7 +43,7 @@ The pastel/semantic square behind notebook, stat and empty-state icons.
 `NotebookColor | null` straight onto an `IconTile` tone, falling back to
 `"purple"` for legacy notebooks without a stored color.
 
-Used by: `notebook-card.tsx`, `notebook-list-row.tsx`, `home/stat-card.tsx`,
+Used by: `notebook-list-row.tsx`, `home/stat-card.tsx`,
 `home/ready-to-review.tsx`, `home/weak-topics.tsx`, `app/(app)/page.tsx`,
 `notebooks/[notebookId]/page.tsx`,
 `modules/notebooks/ui/create-notebook-trigger.tsx`.
@@ -280,8 +279,8 @@ left padding clearing the spine), the readable content:
   and date 13px, more inner padding. The create tile follows the same
   step (56px disc, 18px label, 13px hint).
 
-Used by: `notebooks/page.tsx` (grid view; explicit columns on the grid's
-own width, `@container/grid`, capped at five, user "5 por fila"
+Used by: `notebooks/page.tsx` (the hub's only view since H4-T6; explicit
+columns on the grid's own width, `@container/grid`, capped at five, user "5 por fila"
 2026-10-28: 1 below 300px, 2 from 300, 3 from 540, 4 from 680, 5 from
 960 — 5 at 1440 and 4 at 1024 with the sidebar open; wider screens grow
 the covers, never add columns; `NotebookCardActions` as `actions`,
@@ -560,7 +559,8 @@ The segmented grid/list control (`LayoutGrid`/`List` icons, `rounded-input`
 border, `bg-neutral-100` track, active option gets `bg-card` + `shadow-xs`).
 Extracted from `notebooks/page.tsx` (design pass 2 atoms-first rule) so
 `notebooks/[notebookId]/page.tsx` could reuse the identical control for its
-page list — zero visual change on `/notebooks`.
+page list. Phase 8 H4-T6 (user decision 2026-10-29) removed it from the
+`/notebooks` hub, which now shows only the cover grid.
 
 - `value`: `"grid" | "list"`.
 - `hrefFor`: `(view) => string` — builds each option's `Link` href, so the
@@ -568,10 +568,10 @@ page list — zero visual change on `/notebooks`.
   param (default grid) instead of client state.
 - `className`: forwarded onto the root via `cn()`.
 - Options (`aria-label` "Ver como cuadrícula"/"Ver como lista",
-  `aria-current`) are fixed at two — grid/list is the only case both
-  screens need — not a generic `options` prop.
+  `aria-current`) are fixed at two — grid/list is the only case the screen
+  needs — not a generic `options` prop.
 
-Used by: `notebooks/page.tsx`, `notebooks/[notebookId]/page.tsx`.
+Used by: `notebooks/[notebookId]/page.tsx`.
 
 ## List-row molecules: NotebookListRow / PageListRow
 
@@ -586,8 +586,8 @@ trailing muted `ChevronRight` (16/1.75). `PageListRow` reuses
 `formatUpdatedAt` (`_components/format.ts`) for its "Actualizada {d MMM}"
 column, the same formatter the page-card grid uses.
 
-Used by: `notebooks/page.tsx` (`NotebookListRow`),
-`notebooks/[notebookId]/page.tsx` (`PageListRow`).
+Used by: `notebooks/[notebookId]/page.tsx` (`PageListRow`). `NotebookListRow`
+has no user since Phase 8 H4-T6 dropped the `/notebooks` list view.
 
 ## DropdownMenu / Popover (`dropdown-menu.tsx`)
 

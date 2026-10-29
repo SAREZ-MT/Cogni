@@ -64,7 +64,7 @@ export function notebookCard(page: Page, title: string): Locator {
 // CTA, anyone else the grid's dashed "Nuevo cuaderno" tile — exactly one of
 // the two is on the page.
 export async function createNotebook(page: Page, title: string) {
-  await page.goto("/notebooks?view=grid");
+  await page.goto("/notebooks");
   await page
     .getByRole("button", {
       name: /^(Nuevo cuaderno|Crear mi primer cuaderno)$/,

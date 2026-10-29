@@ -29,15 +29,16 @@ vi.mock("@/modules/notebooks", () => ({
 }));
 
 vi.mock("../_components/breadcrumb", () => ({ SetBreadcrumb: () => null }));
-vi.mock("../_components/notebook-list-row", () => ({
-  NotebookListRow: () => null,
-}));
-vi.mock("@/shared/ui/view-toggle", () => ({ ViewToggle: () => null }));
 
 import NotebooksPage from "./page";
 
-async function renderRoute() {
-  const ui = await NotebooksPage({ searchParams: Promise.resolve({}) });
+// Next.js still hands every page its `searchParams`; the hub reads none of
+// them since H4-T6, so the route is called the way Next calls it.
+async function renderRoute(searchParams: Record<string, string> = {}) {
+  const route = NotebooksPage as (props: {
+    searchParams: Promise<Record<string, string>>;
+  }) => Promise<unknown>;
+  const ui = await route({ searchParams: Promise.resolve(searchParams) });
   return render(ui as React.ReactElement);
 }
 
@@ -243,5 +244,36 @@ describe("notebooks hub route", () => {
     expect(
       within(calculus).getByRole("button", { name: "Acciones de Cálculo" }),
     ).toBeInTheDocument();
+  });
+
+  // Phase 8 H4-T6 (user decision 2026-10-29): the hub drops the grid/list
+  // option and keeps only the cover grid; an old `?view=list` URL simply
+  // renders the grid.
+  it.each([
+    [{}],
+    [{ view: "list" }],
+    [{ view: "grid" }],
+  ])("renders no view toggle and the cover grid for %o", async (params) => {
+    getHomeOverview.mockResolvedValue({
+      notebooks: [
+        {
+          id: "nb1",
+          title: "Biología",
+          color: "green",
+          icon: null,
+          pageCount: 1,
+          updatedAt: new Date("2026-10-01T00:00:00.000Z"),
+        },
+      ],
+    });
+    const { container } = await renderRoute(params);
+
+    expect(
+      screen.queryByRole("link", { name: "Ver como cuadrícula" }),
+    ).toBeNull();
+    expect(screen.queryByRole("link", { name: "Ver como lista" })).toBeNull();
+    expect(
+      container.querySelectorAll('[data-slot="notebook-cover-card"]'),
+    ).toHaveLength(1);
   });
 });

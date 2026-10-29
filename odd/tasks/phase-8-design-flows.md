@@ -307,6 +307,7 @@ Slice-artefact advisories (CalendarNav/TodayList callers "not migrated") are res
   - Commit: `6a41fa7`.
   - Follow-up: List view has no create control since the header button was
     removed (user decision 2026-10-20); revisit in the hub list reform.
+    Closed by H4-T6: the hub has no list view anymore.
   - Follow-up: active-recall-hub.spec.ts:100 and active-recall-session.spec.ts:89
     fail on base too (evaluation stays "pending"); investigate before the
     next PR's full e2e run.
@@ -385,6 +386,35 @@ Slice-artefact advisories (CalendarNav/TodayList callers "not migrated") are res
     (outside this task's edit surface; delete in a follow-up). The list
     view (`notebook-list-row.tsx`) is unchanged and still has no create
     control.
+- [x] **H4-T6** — hub keeps only the cover grid: grid/list view option removed (user, 2026-10-29).
+  - Route: delegated writer (writer trigger: page + page test + e2e helper
+    + ATOMS.md + a deletion).
+  - Built: `notebooks/page.tsx` drops `ViewToggle`, the `searchParams`
+    `?view=` handling and the list branch (`Card` + `NotebookListRow`); the
+    page takes no props, so `?view=list` / `?view=grid` simply render the
+    grid. `ViewToggle` stays (the notebook detail page still uses it).
+    e2e `createNotebook` opens `/notebooks` instead of `/notebooks?view=grid`.
+    ATOMS.md: Card, IconTile, ViewToggle, NotebookCoverCard and the
+    list-row "Used by" lines updated.
+  - Deleted: `src/app/(app)/_components/notebook-card.tsx` (no importer
+    since H4-T5: rg and CodeGraph show no caller; it had no test).
+  - RED: new page test "renders no view toggle and the cover grid" failed
+    3/3 (toggle links present) → GREEN 12/12.
+  - Checks: tsc clean; biome clean on the 4 changed code files; vitest
+    scoped 210 files / 1681 tests: 1680 pass, 1 fail
+    (`inicio/page.test.tsx` "tells done, idle and never-generated
+    techniques apart"), fails identically on the base, pre-existing;
+    depcruise no violations; curl `/notebooks?view=list` without session
+    → 307 to `/login`. e2e notebooks-acceptance + shell-empty-state 21/21
+    pass (4.1m); the other ~17 specs that use `createNotebook` were not run
+    (left for the pre-PR full suite).
+  - Closes the H4-T4 follow-up "List view has no create control": there
+    is no list view anymore.
+  - Follow-up: `src/app/(app)/_components/notebook-list-row.tsx` has no
+    user now (outside this task's edit surface; delete next, plus the
+    comments in `modules/notebooks/ui/notebook-card-actions.tsx` and
+    `_components/notebook-swatches.ts`, `page-list-row.tsx` that name the
+    removed files).
 
 ## Backlog — technique sections reform (user, 2026-10-18)
 Parked for when the flashcards / active recall / exams sections are redesigned (not now; Active Recall has the Phase 6 UI freeze, so its changes need the user's explicit go-ahead at that time).
@@ -396,4 +426,4 @@ Parked for when the flashcards / active recall / exams sections are redesigned (
 
 ## Continuation branch (user, 2026-10-28)
 - Phase 8 work continues on `feat/phase-8-hub`, made from `feat/landing-polish` 528dda9 (the stack is main → phase-8-design-flows → landing-v1 → legal-consent → landing-polish → phase-8-hub). The user chose to keep stacking (option B) so the app shows the new logo, /inicio and the legal notice while iterating.
-- Next: the notebooks hub reform (H4), continuing after H4-T4 (6a41fa7, rebased as fd75456). Open follow-ups: the List view has no create control; SectionHeader advisory R3-001.
+- Next: the notebooks hub reform (H4), continuing after H4-T4 (6a41fa7, rebased as fd75456). Open follow-ups: SectionHeader advisory R3-001; delete the unused `notebook-list-row.tsx` (H4-T6). The List view create-control follow-up closed with H4-T6.

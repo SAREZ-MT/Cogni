@@ -256,8 +256,8 @@ test.describe("docx import acceptance", () => {
     await expect(banner).toContainText(
       "Solo puedes importar archivos PDF, Word (.docx) o PowerPoint (.pptx).",
     );
-    // Still on the library: createNotebook opens it as /notebooks?view=grid
-    // since the Phase 8 hub, so the query string is allowed.
+    // Still on the library: createNotebook opens it as /notebooks; an
+    // optional query string is still allowed.
     await expect(page).toHaveURL(/\/notebooks(\?[^/]*)?$/);
   });
 });
