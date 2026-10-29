@@ -14,6 +14,7 @@ import { collectBlockIds, isBlockIdOnlyChange } from "./block-ids";
 import { BubbleToolbar } from "./bubble-toolbar";
 import { withEditableStart } from "./editable-start";
 import { createEditorExtensions } from "./extensions";
+import { HistoryControls } from "./history-controls";
 import { MathEditor } from "./math-editor";
 import type { SlashCommandItem } from "./slash-command-items";
 import { TableToolbar } from "./table-toolbar";
@@ -196,7 +197,14 @@ export function Editor({
     };
   }, [flush]);
 
-  const statusNode = <SaveStatus status={status} />;
+  // H7: the undo/redo arrows sit with the autosave status in the page's
+  // meta row ("Editada… · guardado ↶ ↷").
+  const statusNode = (
+    <span className="inline-flex items-center gap-2">
+      <SaveStatus status={status} />
+      {editor ? <HistoryControls editor={editor} /> : null}
+    </span>
+  );
 
   return (
     <div className="flex flex-col gap-2">
