@@ -466,7 +466,7 @@ laid over its face, the readable content:
 Used by: `notebooks/[notebookId]/page.tsx` (the grid view, on the hub's
 `@container/grid` columns: 1 → 2 @300 → 3 @540 → 4 @680 → 5 @960, never
 more; `formatUpdatedAt(updatedAt)` as `dateLabel`, "Actualizada" as
-`datePrefix`, `ArchivePageButton` as `actions`, the notebook's colour as
+`datePrefix`, `DeletePageButton` (Phase 8 H19, was `ArchivePageButton`) as `actions`, the notebook's colour as
 `tone`).
 
 ## PageSheetCreateTile (`page-sheet-create-tile.tsx`)
@@ -1034,6 +1034,25 @@ outline "Seguir editando" · destructive "Salir sin guardar", which then
 `router.push`es). Never a native `confirm`. The browser's back button is
 not intercepted.
 
+## DeleteConfirmDialog (`delete-confirm-dialog.tsx`) and `deletionSummary` (`deletion-summary.ts`)
+
+Phase 8 H19: the one confirmation of every hard delete (notebook, page,
+deck, recall set, exam set). Controlled (`open` / `onOpenChange`), so a
+kebab item opens it from outside the menu and it survives the menu closing.
+On every opening it calls `loadSummary()` (a server read of the cascade
+counts) and shows the line in `text-fg` medium ("Revisando qué se
+eliminará…" while it loads; `emptySummary` when nothing is counted) above
+"Esta acción no se puede deshacer.". `sm:max-w-md`, outline "Cancelar" and
+a destructive `confirmLabel` button (H18 "Salir sin guardar" styling),
+disabled until the counts are in and showing "Eliminando…" while the
+delete runs; `onConfirm()` resolves to null or to the Spanish reason, shown
+in a `FormMessage` with the dialog kept open; a failed read shows "No
+pudimos revisar qué se eliminará…" and never deletes. Never a native
+`confirm`. `deletionSummary(parts)` writes the line: non-empty parts with
+singular/plural nouns joined with commas and «y», "Se eliminará" only for
+one single item ("Se eliminarán 4 páginas, 2 mazos y 1 examen."), null when
+nothing is counted.
+
 ## NotebookDot (`notebook-dot.ts`)
 
 Phase 8 H17: `NOTEBOOK_DOT`, a notebook colour as a small dot (the 400
@@ -1068,7 +1087,7 @@ page's `ViewToggle` `list` view. Since Phase 8 H5-T2 (user request
 2026-10-29) it composes `PageStripRow`: the page's route as `href`,
 `formatUpdatedAt(updatedAt)` as `dateLabel` with "Actualizada" as
 `datePrefix` (the same formatter the `PageSheetCard` grid uses),
-`ArchivePageButton` as `actions` and the notebook's colour as `tone`. The
+`DeletePageButton` (Phase 8 H19, was `ArchivePageButton`) as `actions` and the notebook's colour as `tone`. The
 rows stack with an 8px gap under the `PageStripCreateRow`, no `Card`
 wrapper, no `IconTile` and no chevron anymore.
 
