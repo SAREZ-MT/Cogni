@@ -970,6 +970,9 @@ one per notebook with its `NOTEBOOK_DOT` and count) pointing at
 technique's soft colours. Scrolls sideways (hidden scrollbar) instead of
 wrapping. The chips come from `notebookFilter` (`shared/navigation/
 technique-hub.ts`), which also filters the items on the server.
+`TechniqueHubGroupTitle` (same file) is a grid group heading ("PARA HOY
+3", "AL DÍA 4" in the flashcards hub): an `<h2>` 12px semibold uppercase
+muted label with the count in `--theme-ink`.
 
 ## NotebookDot (`notebook-dot.ts`)
 
@@ -1099,40 +1102,13 @@ creation. `flashcards/_data/sample.ts` models this with `SamplePage` (no
 separate deck entity) and `getSamplePagesWithCards(notebookId)`, which only
 returns pages that actually have cards (no empty decks).
 
-### DeckSummaryCard (`deck-summary-card.tsx`)
+### DeckSummaryCard (`deck-summary-card.tsx`) — removed
 
-Hub grid item (one per notebook that has pages with decks): a pastel-toned
-header (`HEADER_BG`, keyed by `NotebookColor` — always that notebook's own
-color) with a translucent `IconTile` (`size="48"`, `bg-white/[55%]`
-override) and a red due-count badge, then a body with the notebook title
-and a due/al-día meta line (`text-error-600`/`text-success-600`).
+Removed in Phase 8 H17 (flat technique hubs, 2026-10-29): the hubs list one `TechniqueItemCard` per item and the notebook views redirect to the filtered hub, so nothing renders it any more.
 
-- `href`, `tone: NotebookColor`, `title`, `cardCount`, `dueCount`.
+### DeckCard (`deck-card.tsx`) — removed
 
-Used by: `flashcards/page.tsx` (hub).
-
-### DeckCard (`deck-card.tsx`)
-
-Deck grid item (one per page with cards on a notebook's
-`/flashcards/[notebookId]` list): a fixed 200px-tall link card with a
-cycling `DeckTone` border (13% alpha) and icon tile (14% alpha), a
-due/al-día status `Pill`, a centered two-line-clamped label and a footer
-card count. `label` is the page title; the footer's left text is the fixed
-string "Página" (not a `Pill`/prop — one page is always one deck, so it
-never needs to say anything else).
-
-- `DeckTone`: `"warning" | "info" | "success" | "orange" | "pink"` — the
-  report's amber/blue/green/orange/pink `DECK_COLORS` cycle, mapped onto
-  existing warning/info/success/pastel-orange/pastel-pink tokens instead of
-  new hex literals. Assigned by position in the notebook's page list.
-- `href`, `tone`, `label`, `cardCount`, `dueCount?`. `dueCount` is optional:
-  omitted (the due list could not be loaded) the status pill is not
-  rendered at all, instead of showing a false "Al día". Since Phase 4 T6
-  `flashcards/[notebookId]/page.tsx` passes the page's flashcards due now
-  (scheduling's `listDueTodayAction`); the pill reads "1 pendiente" /
-  "{N} pendientes".
-
-Used by: `flashcards/[notebookId]/page.tsx`.
+Removed in Phase 8 H17 (flat technique hubs, 2026-10-29): the hubs list one `TechniqueItemCard` per item and the notebook views redirect to the filtered hub, so nothing renders it any more.
 
 ### StatDots (`stat-dots.tsx`)
 
@@ -1249,34 +1225,13 @@ passing raw counts — zero visual change.
 Used by: `flashcards/_components/flashcard-player.tsx`,
 `active-recall/_components/active-recall-player.tsx`.
 
-### DeckSummaryCard (`deck-summary-card.tsx`) — generalized
+### DeckSummaryCard (`deck-summary-card.tsx`) — generalized — removed
 
-Generalized 2026-09-24 (Active recall design preview): `cardCount`/
-`dueCount` are now optional, and a new `meta?: ReactNode` prop overrides
-the default "{cardCount} tarjetas · {due|al día}" line entirely — Active
-recall's hub passes `meta="{N} sesiones · última {p}%"` instead (no
-card/due concept). Flashcards' call site is unchanged (still passes
-`cardCount`/`dueCount`, no `meta`) — zero visual change.
+Removed in Phase 8 H17 (flat technique hubs, 2026-10-29): the hubs list one `TechniqueItemCard` per item and the notebook views redirect to the filtered hub, so nothing renders it any more.
 
-Used by: `flashcards/page.tsx`, `active-recall/page.tsx`.
+### "Repasos de hoy" list (`flashcards/_components/due-today-list.tsx`) — removed
 
-Phase 4 T6 (2026-10-04): the default meta line pluralizes ("1 tarjeta",
-"1 pendiente"). The flashcards hub now passes `cardCount` and the
-notebook's summed flashcards due now as `dueCount`; when the due list
-cannot be loaded it passes `meta` with the card count only, so the card
-never claims "al día" without data.
-
-### "Repasos de hoy" list (`flashcards/_components/due-today-list.tsx`)
-
-Route component, not an atom: it composes `Card` (`padding="md"`),
-`SectionTitle`, `IconTile` (size `36`, radius `input`, notebook tone),
-`Pill` (`sm`, `error`, `dot`: "{N} pendientes") and `Button`
-(`asChild`, `size="sm"`, `variant="outline"`) around a `next/link`
-"Repasar" that opens `/flashcards/{notebookId}/{pageId}?repasar=1`.
-Rows reuse the divider pattern of the former Home ReadyToReview panel
-(removed in Phase 8 H2-T5). Nothing due shows
-`EmptyState variant="success"` ("Estás al día"); a failed load shows one
-muted line instead.
+Removed in Phase 8 H17 (flat technique hubs, 2026-10-29): the hubs list one `TechniqueItemCard` per item and the notebook views redirect to the filtered hub, so nothing renders it any more.
 
 ## Active recall design preview (2026-09-24)
 
@@ -1356,28 +1311,9 @@ the next question — there's no separate "Siguiente". `data-testid=
 
 Used by: `active-recall/_components/active-recall-player.tsx`.
 
-### RecallPageCard (`recall-page-card.tsx`)
+### RecallPageCard (`recall-page-card.tsx`) — removed
 
-The "Sesiones por página" grid item (one per page with sessions on a
-notebook's `/active-recall/[notebookId]` list): a tinted `success-100/35`
-header (notebook name + page title), a body with the latest session's date
-and a preguntas/sesiones meta line, and a footer with the latest session's
-mastery/"dominio" (tone by threshold: ≥70 success, ≥40 warning, else error)
-+ its AI-score breakdown, plus a "Ver resultados →" success `Pill` (was
-"Repasar →" until Phase 6 T7, user decision 2026-10-08: the card opens the
-latest session's results, where "Nueva sesión →" starts a session). The
-meta line uses the singular for one question or one session ("1 pregunta", "1 sesión").
-
-- `href`, `notebookTitle`, `pageTitle`, `lastSessionDate`, `questionCount`,
-  `sessionCount`, `mastery`, `aiCorrect`, `aiPartial`, `aiIncorrect`.
-  Renamed from `accuracy`/`correct`/`partial`/`incorrect` (design/shell-look
-  fix, 2026-09-24 — documento-maestro §7.4 "dominio"/combined quality, not
-  raw accuracy; the breakdown is explicitly the AI score buckets: ≥4
-  `aiCorrect`, 2-3 `aiPartial`, ≤1 `aiIncorrect` — never the self-rating
-  bucket, see `StatDots`/`ActiveRecallResultsView`'s stats grid for that
-  one).
-
-Used by: `active-recall/[notebookId]/page.tsx`.
+Removed in Phase 8 H17 (flat technique hubs, 2026-10-29): the hubs list one `TechniqueItemCard` per item and the notebook views redirect to the filtered hub, so nothing renders it any more.
 
 ### StatusBanner (`status-banner.tsx`)
 
@@ -1501,25 +1437,9 @@ independent of whether it has been attempted (`exams/_data/sample.ts`'s
 `getExamPagesWithQuestions` filters on `questionCount > 0`, not on
 `attempts`).
 
-### ExamPageCard (`exam-page-card.tsx`)
+### ExamPageCard (`exam-page-card.tsx`) — removed
 
-The "Exámenes por página" grid item (one per page with generated
-questions on a notebook's `/exams/[notebookId]` list): a 4px rose/pink
-gradient top accent bar, page title, a preguntas/intentos meta line, a
-score-or-"Sin intentar" `Pill` row (+ a "Repetir pendiente" `Pill` when
-`retakePending`, or a "Vence hoy" `Pill` when questions are due today), the
-last attempt date, and a CTA that reads the page's state ("Presentar
-examen" / "Repetir examen" / "Rendir examen" / "Ver resultados").
-
-- `notebookId`, `pageId`, `pageTitle`, `questionCount`, `attempts`,
-  `lastScore: number | null`, `retakePending`, `lastDate?`, `dueToday?`,
-  `className?`.
-- Due state (user decision 2026-10-06): `dueToday > 0` on an examined page
-  with no pending retake shows the pink "Vence hoy" pill and the CTA
-  "Rendir examen →" on the exam route. A pending retake ("Repetir examen")
-  and a never-attempted page ("Presentar examen") take precedence.
-
-Used by: `exams/[notebookId]/page.tsx`.
+Removed in Phase 8 H17 (flat technique hubs, 2026-10-29): the hubs list one `TechniqueItemCard` per item and the notebook views redirect to the filtered hub, so nothing renders it any more.
 
 ### TimerChip (`timer-chip.tsx`)
 
@@ -1643,19 +1563,9 @@ placeholder `#` href. The sidebar's "Exámenes" item is no longer disabled
 A follow-up design-only pass against documento-maestro §3.3/§7.5, fixing 5
 gaps found while auditing the exams preview above.
 
-### ExamPageCard — routing fix
+### ExamPageCard — routing fix — removed
 
-`exam-page-card.tsx` no longer takes a single `href`: it takes
-`notebookId`/`pageId` and computes 3 destinations itself — a
-`retakePending` page links straight to `?retake=1` (never the plain
-session), a passed/scored page links to its new `/resultados` route
-instead of re-running the exam, and only a never-attempted page still
-links to the plain session. The root is now a `div` (not one big `Link`),
-because the footer gained a second "Preguntas (N)" link to the new
-`/preguntas` route: the title uses the stretched-link pattern
-(`after:absolute after:inset-0` on a `relative` root, same as
-`page-list-row.tsx`) to keep the whole card clickable, and the footer link
-opts back into its own clickable layer with `relative z-10`.
+Removed in Phase 8 H17 (flat technique hubs, 2026-10-29): the hubs list one `TechniqueItemCard` per item and the notebook views redirect to the filtered hub, so nothing renders it any more.
 
 ### Stored results — `/exams/[notebookId]/[pageId]/resultados`
 
