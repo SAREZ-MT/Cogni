@@ -96,4 +96,20 @@ describe("/creditos", () => {
     ).toBeNull();
     session.user = null;
   });
+
+  it("points every landing and sign-up link to the app for a signed-in user", async () => {
+    session.user = { id: "u1", email: "a@b.test" };
+    render(await CreditsPage());
+    for (const link of screen.getAllByRole("link")) {
+      expect(link.getAttribute("href")).not.toMatch(
+        /^\/(#.*)?$|^\/(login|register|forgot-password)/,
+      );
+    }
+    expect(
+      within(screen.getByRole("contentinfo")).getByRole("link", {
+        name: "Ir a la app",
+      }),
+    ).toHaveAttribute("href", "/inicio");
+    session.user = null;
+  });
 });

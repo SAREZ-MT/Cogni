@@ -131,4 +131,27 @@ describe("/ciencia", () => {
     ).toBeNull();
     session.user = null;
   });
+
+  it("points every landing and sign-up link to the app for a signed-in user", async () => {
+    session.user = { id: "u1", email: "a@b.test" };
+    render(await SciencePage());
+    expect(
+      screen.getByRole("link", { name: "Volver a la app" }),
+    ).toHaveAttribute("href", "/inicio");
+    expect(screen.queryByRole("link", { name: "Volver a Cogni" })).toBeNull();
+    const closing = screen.getByRole("region", {
+      name: "Todo esto, en tus páginas.",
+    });
+    const closingLinks = within(closing).getAllByRole("link");
+    expect(closingLinks).toHaveLength(1);
+    expect(closingLinks[0]).toHaveTextContent("Ir a la app");
+    expect(closingLinks[0]).toHaveAttribute("href", "/inicio");
+    expect(closingLinks[0]).toHaveClass("lp-cta-primary");
+    for (const link of screen.getAllByRole("link")) {
+      expect(link.getAttribute("href")).not.toMatch(
+        /^\/(#.*)?$|^\/(login|register|forgot-password)/,
+      );
+    }
+    session.user = null;
+  });
 });

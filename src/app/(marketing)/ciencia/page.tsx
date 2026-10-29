@@ -19,7 +19,8 @@ export const metadata: Metadata = {
 // close back into the night. "recordar" is the italic keyword: it is what
 // every idea on the page is for.
 // A signed-in user may read it too (the proxy only bounces them from /);
-// the nav then offers "Ir a la app" instead of the landing section links.
+// the nav, the back link, the closing and the footer then point to the app
+// (/inicio) instead of the landing and the sign-up page.
 export default async function SciencePage() {
   const signedIn = (await getCurrentUser()) !== null;
   return (
@@ -28,6 +29,7 @@ export default async function SciencePage() {
       <main>
         <PageHeader
           back
+          signedIn={signedIn}
           label="La ciencia detrás de Cogni"
           titleId="ciencia-title"
           title={
@@ -68,23 +70,34 @@ export default async function SciencePage() {
               <em className="lp-headline-accent lp-accent-yellow">páginas</em>.
             </h2>
             <div className="mt-9 flex flex-wrap justify-center gap-4">
-              <Link
-                href="/register"
-                className="lp-press lp-cta-primary rounded-full px-[30px] py-4 font-(family-name:--lp-font-head) font-semibold text-[17px]"
-              >
-                Empieza gratis
-              </Link>
-              <Link
-                href="/#como-funciona"
-                className="lp-press lp-cta-ghost rounded-full px-[30px] py-4 font-(family-name:--lp-font-head) font-semibold text-[17px]"
-              >
-                Ver cómo funciona
-              </Link>
+              {signedIn ? (
+                <Link
+                  href="/inicio"
+                  className="lp-press lp-cta-primary rounded-full px-[30px] py-4 font-(family-name:--lp-font-head) font-semibold text-[17px]"
+                >
+                  Ir a la app
+                </Link>
+              ) : (
+                <>
+                  <Link
+                    href="/register"
+                    className="lp-press lp-cta-primary rounded-full px-[30px] py-4 font-(family-name:--lp-font-head) font-semibold text-[17px]"
+                  >
+                    Empieza gratis
+                  </Link>
+                  <Link
+                    href="/#como-funciona"
+                    className="lp-press lp-cta-ghost rounded-full px-[30px] py-4 font-(family-name:--lp-font-head) font-semibold text-[17px]"
+                  >
+                    Ver cómo funciona
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </section>
       </main>
-      <SiteFooter />
+      <SiteFooter signedIn={signedIn} />
     </>
   );
 }

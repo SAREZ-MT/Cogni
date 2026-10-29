@@ -15,7 +15,8 @@ export const metadata: Metadata = {
 // (docs/landing/propuesta-contenido.md §10.2). "ayuda" is the italic
 // keyword: the page thanks the work it is built with.
 // A signed-in user may read it too (the proxy only bounces them from /);
-// the nav then offers "Ir a la app" instead of the landing section links.
+// the nav and the footer then point to the app (/inicio) instead of the
+// landing.
 export default async function CreditsPage() {
   const signedIn = (await getCurrentUser()) !== null;
   return (
@@ -34,7 +35,7 @@ export default async function CreditsPage() {
         />
         <CreditsList />
       </main>
-      <SiteFooter />
+      <SiteFooter signedIn={signedIn} />
     </>
   );
 }

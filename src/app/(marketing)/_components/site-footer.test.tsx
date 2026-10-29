@@ -46,4 +46,43 @@ describe("SiteFooter", () => {
       "Cogni es un proyecto académico (trabajo de grado) en desarrollo.",
     );
   });
+
+  it("keeps the landing logo for visitors", () => {
+    render(<SiteFooter />);
+    expect(screen.getByRole("link", { name: "cogni" })).toHaveAttribute(
+      "href",
+      "/",
+    );
+    expect(screen.queryByRole("link", { name: "Ir a la app" })).toBeNull();
+  });
+
+  it("sends a signed-in user to the app instead of the landing sections", () => {
+    render(<SiteFooter signedIn />);
+    const nav = screen.getByRole("navigation", { name: "Pie de página" });
+    expect(
+      within(nav).getByRole("link", { name: "Ir a la app" }),
+    ).toHaveAttribute("href", "/inicio");
+    for (const name of [
+      "Cómo funciona",
+      "Técnicas",
+      "Comparación",
+      "Preguntas",
+    ]) {
+      expect(within(nav).queryByRole("link", { name })).toBeNull();
+    }
+    expect(screen.getByRole("link", { name: "cogni" })).toHaveAttribute(
+      "href",
+      "/inicio",
+    );
+    for (const link of screen.getAllByRole("link")) {
+      expect(link.getAttribute("href")).not.toMatch(/^\/(#.*)?$/);
+    }
+    expect(
+      screen.getByRole("link", { name: "La ciencia detrás de Cogni →" }),
+    ).toHaveAttribute("href", "/ciencia");
+    expect(screen.getByRole("link", { name: "Créditos" })).toHaveAttribute(
+      "href",
+      "/creditos",
+    );
+  });
 });
