@@ -251,6 +251,23 @@ describe("BubbleToolbarControls", () => {
     expect(editor.isActive("blockquote")).toBe(true);
   });
 
+  // H7: the BubbleMenu only survives the editor's blur after a mousedown on
+  // its element; Radix dropdown triggers cancel pointerdown (and with it the
+  // mousedown), so the toolbar re-signals it.
+  it("signals a mousedown to the bubble menu when a dropdown trigger is pressed", () => {
+    editor = createHeadlessEditor();
+    const { container } = render(<BubbleToolbarControls editor={editor} />);
+    const onMouseDown = vi.fn();
+    container.addEventListener("mousedown", onMouseDown);
+
+    fireEvent.pointerDown(screen.getByTestId("bubble-toolbar-text-style"), {
+      button: 0,
+      ctrlKey: false,
+    });
+
+    expect(onMouseDown).toHaveBeenCalled();
+  });
+
   // H7: the "Texto" menu sets the font family and size of the selection.
   it("sets the font family and size through the 'Texto' menu", async () => {
     editor = createHeadlessEditor();

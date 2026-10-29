@@ -39,6 +39,7 @@ import {
 } from "lucide-react";
 import {
   type KeyboardEvent,
+  type PointerEvent,
   type ReactElement,
   useEffect,
   useRef,
@@ -280,6 +281,18 @@ function ToolbarButton({
   );
 }
 
+// H7: the BubbleMenu keeps itself open across the editor's blur only when
+// it saw a `mousedown` on its own element first. A Radix dropdown trigger
+// ("Convertir en", "Texto", "Alineación") cancels its `pointerdown`, which
+// suppresses that compatibility `mousedown`, so the menu's focus move blurred
+// the editor, the toolbar was removed and the dropdown lost its anchor on
+// the first click. Re-dispatching the `mousedown` restores that signal.
+function keepBubbleMenuOnPointerDown(event: PointerEvent<HTMLDivElement>) {
+  event.currentTarget.dispatchEvent(
+    new MouseEvent("mousedown", { bubbles: true }),
+  );
+}
+
 export interface BubbleToolbarControlsProps {
   editor: Editor;
 }
@@ -389,6 +402,7 @@ export function BubbleToolbarControls({ editor }: BubbleToolbarControlsProps) {
         aria-label="Formato de texto"
         data-testid="bubble-toolbar"
         className="editor-surface flex items-center gap-0.5 border border-border-default bg-card p-1 shadow-md"
+        onPointerDownCapture={keepBubbleMenuOnPointerDown}
       >
         {/* E2 scope B: "Convertir en" — same catalogue and commands as
             block-context-menu.tsx's own submenu, applied to whatever block
