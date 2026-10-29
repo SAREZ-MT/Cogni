@@ -1,49 +1,68 @@
+import Image from "next/image";
 import type * as React from "react";
 import { cn } from "@/shared/ui/utils";
 
+type BrandTone = "light" | "dark";
+
 type BrandMarkProps = React.ComponentProps<"span"> & {
-  // "light" sits on warm-neutral surfaces (near-black tile, dark wordmark);
-  // "dark" sits on the near-black brand panel (glass tile, white wordmark).
-  tone?: "light" | "dark";
-  // Wordmark size: "sm" for the app sidebar (14px), "md" for auth screens.
+  // "light" sits on paper/warm-neutral surfaces (paper glass, ink wordmark);
+  // "dark" sits on ink surfaces such as the auth brand panel (ink glass,
+  // paper wordmark).
+  tone?: BrandTone;
+  // "sm" for the app sidebar (20px mark), "md" for auth screens (28px).
   size?: "sm" | "md";
-  // false renders the tile alone (collapsed sidebar); the caller then owns
+  // false renders the mark alone (collapsed sidebar); the caller then owns
   // the accessible name.
   wordmark?: boolean;
 };
 
-// The Cogni glyph (docs/design-system/assets/logo.svg): a "C" arc whose two
-// ends are knowledge nodes, with a violet node at its centre — the memory
-// the arc keeps reinforcing. Geometric so it survives 16px.
+// Mark heights in px. At 20px and below the glass blur turns to mush, so
+// the dedicated favicon build (no blur, heavier c) takes over.
+const MARK_PX = { sm: 20, md: 28 } as const;
+const FAVICON_BUILD_MAX_PX = 20;
+// The outlined wordmark shares the mark's vertical box in the approved
+// lockup (public/brand/cogni-lockup.svg), so at the same height it keeps
+// the lockup's proportions: width = 2.1462 × mark.
+const WORDMARK_RATIO = 2.1462;
+
+function markSrc(tone: BrandTone, px: number) {
+  if (px <= FAVICON_BUILD_MAX_PX) return "/brand/cogni-favicon.svg";
+  return tone === "dark"
+    ? "/brand/cogni-mark-ink.svg"
+    : "/brand/cogni-mark.svg";
+}
+
+// The Cogni mark ("7 v2 Glass", docs/design-system/assets/logo.md): a
+// frosted violet squircle with a white lowercase "c" in Manrope ExtraBold.
+// Same-origin static SVG with outlined paths, so it is CSP-safe and keeps
+// colour out of the component. Always decorative.
 export function BrandGlyph({
+  tone = "light",
+  px = MARK_PX.md,
   className,
-  ...props
-}: React.ComponentProps<"svg">) {
+}: {
+  tone?: BrandTone;
+  px?: number;
+  className?: string;
+}) {
   return (
-    <svg
-      aria-hidden="true"
+    <Image
       data-slot="brand-glyph"
-      viewBox="0 0 24 24"
-      fill="none"
-      className={className}
-      {...props}
-    >
-      <path
-        d="M16.95 7.05A7 7 0 1 0 16.95 16.95"
-        stroke="white"
-        strokeWidth="2.4"
-        strokeLinecap="round"
-      />
-      <circle cx="16.95" cy="7.05" r="2.2" fill="white" />
-      <circle cx="16.95" cy="16.95" r="2.2" fill="white" />
-      <circle cx="12" cy="12" r="2.3" fill="var(--color-primary-400)" />
-    </svg>
+      src={markSrc(tone, px)}
+      alt=""
+      aria-hidden="true"
+      width={px}
+      height={px}
+      unoptimized
+      className={cn("shrink-0", className)}
+    />
   );
 }
 
-// Cogni brand: rounded tile with the glyph plus the "Cogni" wordmark. Single
-// source of truth for the brand (auth screens, app sidebar Logo). Not a
-// link; wrap it when it must navigate.
+// Cogni brand: the mark plus the outlined lowercase "cogni" wordmark
+// (Manrope ExtraBold, -0.03em; the app does not load Manrope, so the
+// wordmark ships as paths, with a visually hidden "Cogni" as its name). Single source of truth for the brand in the app
+// (auth screens, sidebar Logo). Not a link; wrap it when it must navigate.
 export function BrandMark({
   tone = "light",
   size = "md",
@@ -51,32 +70,39 @@ export function BrandMark({
   className,
   ...props
 }: BrandMarkProps) {
-  const dark = tone === "dark";
+  const px = MARK_PX[size];
   return (
     <span
       data-slot="brand-mark"
       data-tone={tone}
-      className={cn("inline-flex items-center gap-3", className)}
+      className={cn(
+        "inline-flex items-center",
+        size === "sm" ? "gap-1.5" : "gap-2",
+        className,
+      )}
       {...props}
     >
-      <span
-        className={cn(
-          "flex size-9 shrink-0 items-center justify-center rounded-[10px]",
-          dark ? "border border-white/15 bg-white/10" : "bg-neutral-900",
-        )}
-      >
-        <BrandGlyph className="size-[22px]" />
-      </span>
+      <BrandGlyph tone={tone} px={px} />
       {wordmark && (
-        <span
-          className={cn(
-            "font-bold tracking-tight",
-            size === "sm" ? "text-[14px]" : "text-base",
-            dark ? "text-neutral-0" : "text-fg",
-          )}
-        >
-          Cogni
-        </span>
+        <>
+          <Image
+            data-slot="brand-wordmark"
+            src={
+              tone === "dark"
+                ? "/brand/cogni-wordmark-ink.svg"
+                : "/brand/cogni-wordmark.svg"
+            }
+            alt=""
+            aria-hidden="true"
+            width={Math.round(px * WORDMARK_RATIO)}
+            height={px}
+            unoptimized
+            className="shrink-0"
+          />
+          {/* The outlined wordmark is a picture; this text is the brand's
+              accessible name and text content. */}
+          <span className="sr-only">Cogni</span>
+        </>
       )}
     </span>
   );

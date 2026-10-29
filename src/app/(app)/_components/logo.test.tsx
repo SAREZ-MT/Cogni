@@ -9,19 +9,19 @@ describe("Logo", () => {
     const link = screen.getByRole("link", { name: "Cogni" });
     expect(link).toHaveAttribute("href", "/inicio");
     expect(link).not.toHaveAttribute("aria-label");
-    expect(screen.getByText("Cogni")).toHaveClass("font-bold", "text-fg");
+    expect(link.querySelector('[data-slot="brand-wordmark"]')).toHaveAttribute(
+      "src",
+      "/brand/cogni-wordmark.svg",
+    );
   });
 
-  it("renders the shared BrandMark: a 36px dark tile with the aria-hidden C glyph", () => {
+  it("renders the shared BrandMark with the decorative 20px favicon-build mark", () => {
     const { container } = render(<Logo />);
 
-    const mark = container.querySelector("span.size-9");
-    expect(mark).toBeInTheDocument();
-    expect(mark).toHaveClass("bg-neutral-900");
-
-    const svg = mark?.querySelector("svg");
-    expect(svg).toHaveAttribute("aria-hidden", "true");
-    expect(svg).toHaveAttribute("data-slot", "brand-glyph");
+    const mark = container.querySelector('[data-slot="brand-glyph"]');
+    expect(mark).toHaveAttribute("src", "/brand/cogni-favicon.svg");
+    expect(mark).toHaveAttribute("alt", "");
+    expect(mark).toHaveAttribute("aria-hidden", "true");
   });
 
   it("hides the wordmark when collapsed and moves the accessible name to the link", () => {

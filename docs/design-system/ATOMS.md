@@ -1880,20 +1880,27 @@ Used by: the four `(public)` auth pages and
 
 ### BrandMark / BrandGlyph (`brand-mark.tsx`)
 
-Single source of truth for the Cogni brand. `BrandGlyph` is the mark: a "C"
-arc (stroke 2.4, round caps) whose two ends are white knowledge nodes, with
-a violet (`--color-primary-400`) node at its centre — the memory the arc
-keeps reinforcing. `BrandMark` puts the glyph (22px) in a 36px tile
-(`rounded-[10px]`) next to the bold "Cogni" wordmark. Static copy of the
-light variant: `docs/design-system/assets/logo.svg`.
+Single source of truth for the Cogni brand ("7 v2 Glass", usage rules in
+`docs/design-system/assets/logo.md`). `BrandGlyph` is the mark: the frosted
+violet squircle with a white lowercase "c", rendered with `next/image`
+(`unoptimized`) from the static SVGs in `public/brand/`, always decorative
+(`alt=""`, `aria-hidden`). At 20px and below it switches to the blur-free
+favicon build. `BrandMark` puts the mark next to the outlined lowercase
+"cogni" wordmark SVG (decorative, with a visually hidden "Cogni" as the
+accessible name and text content), sized to the
+lockup's proportions (wordmark width = 2.1462 × mark height). Static copy of
+the paper lockup: `docs/design-system/assets/logo.svg`.
 
-- `tone`: `light` (default; `bg-neutral-900` tile, `text-fg` wordmark) ·
-  `dark` (glass tile `bg-white/10 border-white/15`, white wordmark) for the
-  near-black brand panel.
-- `size`: `md` (default, 16px wordmark) · `sm` (14px, app sidebar).
-- `wordmark`: `false` renders the tile alone (collapsed sidebar); the caller
+- `tone`: `light` (default; paper glass, ink wordmark) · `dark` (ink glass,
+  paper wordmark) for ink surfaces such as the auth brand panel.
+- `size`: `md` (default, 28px mark) · `sm` (20px favicon-build mark, app
+  sidebar).
+- `wordmark`: `false` renders the mark alone (collapsed sidebar); the caller
   then owns the accessible name.
-- Not a link; `data-slot="brand-mark"` / `"brand-glyph"`, `data-tone`.
+- Not a link; `data-slot="brand-mark"` / `"brand-glyph"` /
+  `"brand-wordmark"`, `data-tone`.
+- The landing nav and footer (`(marketing)`) keep a live Manrope/Inter text
+  wordmark and place the same `public/brand` mark before it.
 
 Used by: `(public)/layout.tsx` (dark tone on the brand panel; light tone
 above the form below `md`), `(app)/_components/logo.tsx` (wrapped in the home
