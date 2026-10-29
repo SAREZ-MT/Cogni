@@ -460,6 +460,46 @@ Slice-artefact advisories (CalendarNav/TodayList callers "not migrated") are res
     this header (the sidebar still shows it; the hub covers dropped it in
     H4-T5); the optional `meta` slot is unused until a product decision.
 
+- [x] **H5-T2** — create control first and fixed in both grids; list rows as paper strips (user, 2026-10-29).
+  - Route: delegated writer (writer trigger: three new atoms + two pages +
+    list row + tests + ATOMS.md + e2e helper).
+  - Request: "Nuevo cuaderno" first in the hub grid; a sheet-shaped "Nueva
+    página" tile first in the notebook grid, the header button removed (one
+    create control, like the hub); keep the list view (user decision) but
+    restyle `PageListRow` as paper strips with a create row first. "Fijo" =
+    first item, not sticky.
+  - Built (commit 1): hub `CreateNotebookTrigger` tile moved before the
+    covers. New atoms `PageSheetCreateTile` (sheet-sized violet dashed tile,
+    plus disc, "Nueva página" / "Escribe o importa un apunte", hover lift
+    4px) and `PageStripCreateRow` (the same as a 56px strip), each inside
+    the same `createPage` server-action form the header button used; the
+    header has no button. Decision: while a notebook has no pages the
+    empty state holds the old "Nueva página" button as its `action` (the
+    only create control there; step 2 redesigns that state).
+  - Built (commit 2): new atom `PageStripRow` (white strip, hairline border,
+    left index tab and margin rule in the notebook's colour via the shared
+    `PAGE_SHEET_TONES`, title on a `neutral-100` ruled baseline, muted date
+    with "Actualizada" from 360px, archive always visible, hover lift 1px;
+    below 240px only title + actions). `PageListRow` composes it with the
+    notebook's `tone`; the list drops its `Card`, `IconTile` and chevron.
+    e2e `createPageAndOpen` unchanged (the tile keeps the accessible name
+    "Nueva página"); its comment updated.
+  - RED: hub "create tile first" and 4 notebook-page tests (no header
+    button, tile first, item counts) failed → GREEN; then 6 strip /
+    list-row tests failed to resolve or matched the old row → GREEN.
+  - Checks: tsc clean; biome clean on the changed files; vitest
+    src/shared/ui + src/modules/notebooks + (app) + no-inline-hex 214 files /
+    1713 tests: 1712 pass, 1 fail (`inicio/page.test.tsx`, pre-existing);
+    depcruise no violations. Screenshots in the session scratchpad
+    `notebook-detail/` (`t2before-*`, `t2after-*`: hub 1440 + hover, grid
+    and list at 1440 / 1024 / 390, card, strip and create hovers). One
+    iteration: strip text moved onto its baseline; narrow fallbacks added
+    for the 390 pre-existing sidebar.
+    e2e notebooks-acceptance + shell-empty-state + slash-command +
+    editor-a11y + image-upload + flashcards-manual 30/30 pass (7.3m); the
+    other specs using `createPageAndOpen` were not run (pre-PR full suite).
+  - Commits: `6e69fef` (create first), `54ec518` (paper strips).
+
 ## Backlog — technique sections reform (user, 2026-10-18)
 Parked for when the flashcards / active recall / exams sections are redesigned (not now; Active Recall has the Phase 6 UI freeze, so its changes need the user's explicit go-ahead at that time).
 - [ ] TR-1 — No skipping in any technique (user rule): every question must be answered right or wrong so mastery and metrics stay meaningful. Today exams already comply; active recall has "Saltar" (`active-recall-player.tsx:171`, saved as "(sin respuesta)") and "Terminar" mid-session (`:272`); flashcards has "Terminar" mid-session (`flashcard-player.tsx:237`). Remove early "Terminar" (start = finish).

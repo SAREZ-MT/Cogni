@@ -90,8 +90,11 @@ export async function openNotebook(page: Page, title: string) {
 }
 
 // Adds a page from "Nueva página" on the notebook's route (the notebook must
-// be the current page) and opens it from its card. A freshly created page is
-// titled "Sin título".
+// be the current page) and opens it from its card. Since Phase 8 H5-T2 that
+// is the grid's first item (the sheet-shaped create tile; the header has no
+// create button), or the empty state's button while the notebook has no
+// pages; exactly one is on the page. A freshly created page is titled
+// "Sin título".
 export async function createPageAndOpen(page: Page) {
   await clickAndWaitForAction(
     page,
