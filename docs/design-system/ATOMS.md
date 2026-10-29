@@ -1323,7 +1323,7 @@ feedback only shows once every evaluation for the session has finished): a
 tone-tinted panel (`pending` warning / `success` / `error`) with an
 `IconTile` (a spinning `Loader2` for `pending`) + title + muted description.
 
-- `tone: "pending" | "success" | "error" | "rose"`, `title`, `description`
+- `tone: "pending" | "success" | "error" | "rose" | "info"`, `title`, `description`
   (`ReactNode`), `action?` (`ReactNode`, rendered below the description),
   `className?`, plus the rest of `React.ComponentProps<"div">` (e.g.
   `data-testid`) forwarded onto the root.
@@ -1339,6 +1339,12 @@ needed). Used by `exams/page.tsx` (hub retake banner, with `action` =
 "Repetir examen"), `exams/_components/exam-player.tsx` ("Examen de
 repetición" notice, no action) and `exams/_components/exam-results-view.tsx`
 (failed-exam banner, with `action` = "Repetir examen").
+
+**Extended for Phase 8 H18 (2026-10-29):** `info` tone (bg `info-50`, border
+`info-500/25`, `Info` icon on the `info` `IconTile` tone), a calm neutral
+notice. Used by `flashcards/_components/deck-review.tsx` above the player in
+practice mode ("Modo práctica · Tus respuestas no cambian tus próximos
+repasos.").
 
 ### QuestionFeedbackItem (`question-feedback-item.tsx`)
 
