@@ -1,11 +1,11 @@
-import { Layers } from "lucide-react";
 import { listDecksAction } from "@/modules/flashcards";
 import { COLOR_PALETTE, type NotebookColor } from "@/modules/notebooks";
 import { listDueTodayAction } from "@/modules/scheduling";
 import { DeckSummaryCard } from "@/shared/ui/deck-summary-card";
-import { EmptyState } from "@/shared/ui/empty-state";
-import { IconTile } from "@/shared/ui/icon-tile";
+import { EmptyStateCta } from "@/shared/ui/empty-state-cta";
+import { IllustratedEmptyState } from "@/shared/ui/illustrated-empty-state";
 import { SectionHeader, SectionTitle } from "@/shared/ui/section-header";
+import { TechniqueEmptyArt } from "@/shared/ui/technique-empty-art";
 import { SetBreadcrumb } from "../_components/breadcrumb";
 import { DueTodayList, type DueTodayRow } from "./_components/due-today-list";
 import { plural } from "./_lib/plural";
@@ -83,21 +83,24 @@ export default async function FlashcardsHubPage() {
       />
 
       {notebooks.length === 0 ? (
-        <EmptyState
-          fill
-          icon={
-            <IconTile size="56" tone="warning">
-              <Layers aria-hidden="true" size={28} strokeWidth={1.75} />
-            </IconTile>
-          }
-          title="Sin mazos todavía"
-          titleClassName="text-base"
+        // Phase 8 H10 (user request 2026-10-29): the notebooks hub's
+        // empty-state line (H4-T1..T3) — fanned flashcards on the dotted
+        // paper, a cascade entrance, a gradient headline and the violet
+        // pill to the notebooks, where a page's techniques panel generates
+        // the cards. A failed read keeps the load error as the message.
+        <IllustratedEmptyState
+          entrance="cascade"
+          paper
+          art={<TechniqueEmptyArt technique="flashcards" />}
+          title="Tus primeras flashcards te esperan"
           description={
             result.ok
-              ? "Abre una página en el editor y usa el panel de Técnicas → Flashcards → Generar para crear tarjetas con IA."
+              ? "Genera tarjetas desde cualquier página de tus cuadernos y repásalas aquí."
               : "No pudimos cargar tus mazos. Intenta de nuevo."
           }
-          descriptionClassName="max-w-[340px]"
+          action={
+            <EmptyStateCta href="/notebooks">Ir a mis cuadernos</EmptyStateCta>
+          }
         />
       ) : (
         <>

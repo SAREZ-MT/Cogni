@@ -244,12 +244,24 @@ describe("ActiveRecallHubPage", () => {
 
     render(await ActiveRecallHubPage());
 
-    expect(screen.getByText("Sin sesiones todavía")).toBeInTheDocument();
+    // Phase 8 H10: the illustrated empty state (stacked prompt cards,
+    // gradient headline) leads to the notebooks, where questions are made.
+    expect(
+      screen.getByRole("heading", {
+        name: "Practica explicando con tus palabras",
+      }),
+    ).toBeInTheDocument();
     expect(
       screen.getByText(
-        "Abre una página en el editor y usa Técnicas → Recordación activa → Generar.",
+        "Genera preguntas abiertas desde una página de tus cuadernos y respóndelas aquí.",
       ),
     ).toBeInTheDocument();
+    expect(
+      document.querySelector('[data-slot="technique-empty-art"]'),
+    ).toHaveAttribute("data-technique", "recall");
+    expect(
+      screen.getByRole("link", { name: "Ir a mis cuadernos" }),
+    ).toHaveAttribute("href", "/notebooks");
     expect(screen.queryByRole("link", { name: /Nueva sesión/ })).toBeNull();
     expect(screen.getByText("0 sesiones · 0 cuadernos")).toBeInTheDocument();
   });
@@ -262,7 +274,11 @@ describe("ActiveRecallHubPage", () => {
 
     render(await ActiveRecallHubPage());
 
-    expect(screen.getByText("Sin sesiones todavía")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", {
+        name: "Practica explicando con tus palabras",
+      }),
+    ).toBeInTheDocument();
     expect(
       screen.getByText("No pudimos cargar tus sesiones. Intenta de nuevo."),
     ).toBeInTheDocument();

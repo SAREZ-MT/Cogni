@@ -1,14 +1,14 @@
-import { ClipboardList } from "lucide-react";
 import Link from "next/link";
 import { type ExamHubPageView, listExamHubAction } from "@/modules/exams";
 import { COLOR_PALETTE, type NotebookColor } from "@/modules/notebooks";
 import { Button } from "@/shared/ui/button";
 import { DeckSummaryCard } from "@/shared/ui/deck-summary-card";
-import { EmptyState } from "@/shared/ui/empty-state";
-import { IconTile } from "@/shared/ui/icon-tile";
+import { EmptyStateCta } from "@/shared/ui/empty-state-cta";
+import { IllustratedEmptyState } from "@/shared/ui/illustrated-empty-state";
 import { Pill } from "@/shared/ui/pill";
 import { SectionHeader } from "@/shared/ui/section-header";
 import { StatusBanner } from "@/shared/ui/status-banner";
+import { TechniqueEmptyArt } from "@/shared/ui/technique-empty-art";
 import { SetBreadcrumb } from "../_components/breadcrumb";
 import { plural } from "../flashcards/_lib/plural";
 import { CreateExamDialog } from "./_components/create-exam-dialog";
@@ -153,21 +153,25 @@ export default async function ExamsHubPage() {
       )}
 
       {notebooksWithPages.length === 0 ? (
-        <EmptyState
-          fill
-          icon={
-            <IconTile size="56" tone="pink">
-              <ClipboardList aria-hidden="true" size={28} strokeWidth={1.75} />
-            </IconTile>
-          }
-          title="Aún no tienes exámenes"
-          titleClassName="text-base"
+        // Phase 8 H10 (user request 2026-10-29): the notebooks hub's
+        // empty-state line — a stacked exam sheet on the dotted paper, a
+        // cascade entrance, a gradient headline and the violet pill to the
+        // notebooks. "Crear examen" stays in the header; it is not the CTA
+        // because without a notebook its dialog only says to create one.
+        // A failed read keeps the load error as the message.
+        <IllustratedEmptyState
+          entrance="cascade"
+          paper
+          art={<TechniqueEmptyArt technique="exams" />}
+          title="Pon a prueba lo que sabes"
           description={
             result.ok
-              ? "Usa «Crear examen» para elegir una página y generar o escribir sus preguntas."
+              ? "Genera un examen desde una página o con «Crear examen»."
               : "No pudimos cargar tus exámenes. Intenta de nuevo."
           }
-          descriptionClassName="max-w-[340px]"
+          action={
+            <EmptyStateCta href="/notebooks">Ir a mis cuadernos</EmptyStateCta>
+          }
         />
       ) : (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3.5">

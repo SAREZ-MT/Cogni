@@ -184,12 +184,23 @@ describe("ExamsHubPage (real data)", () => {
 
     render(await ExamsHubPage());
 
-    expect(screen.getByText("Aún no tienes exámenes")).toBeInTheDocument();
+    // Phase 8 H10: the illustrated empty state (a stacked exam sheet,
+    // gradient headline). "Crear examen" stays in the header; the CTA leads
+    // to the notebooks, since the dialog has nothing to offer without one.
+    expect(
+      screen.getByRole("heading", { name: "Pon a prueba lo que sabes" }),
+    ).toBeInTheDocument();
     expect(
       screen.getByText(
-        "Usa «Crear examen» para elegir una página y generar o escribir sus preguntas.",
+        "Genera un examen desde una página o con «Crear examen».",
       ),
     ).toBeInTheDocument();
+    expect(
+      document.querySelector('[data-slot="technique-empty-art"]'),
+    ).toHaveAttribute("data-technique", "exams");
+    expect(
+      screen.getByRole("link", { name: "Ir a mis cuadernos" }),
+    ).toHaveAttribute("href", "/notebooks");
     expect(screen.queryByText(/Técnicas → Examen/)).toBeNull();
   });
 
@@ -204,8 +215,10 @@ describe("ExamsHubPage (real data)", () => {
     expect(
       screen.getByText("No pudimos cargar tus exámenes. Intenta de nuevo."),
     ).toBeInTheDocument();
-    // Same EmptyState as Flashcards' load error: its title stays.
-    expect(screen.getByText("Aún no tienes exámenes")).toBeInTheDocument();
+    // Same empty state as Flashcards' load error: its headline stays.
+    expect(
+      screen.getByRole("heading", { name: "Pon a prueba lo que sabes" }),
+    ).toBeInTheDocument();
   });
 
   it("has no 'Vista previa' pill on real data", async () => {

@@ -116,7 +116,9 @@ title element tag.
 Used by: `home/home-empty-state.tsx` (zero-notebooks Home, `plain`, Phase 8
 H2-T3), `home/ready-to-review.tsx` (`success`), `home/weak-topics.tsx`
 (`tinted`). The notebook page's zero-pages `dashed` state became an
-`IllustratedEmptyState` in Phase 8 H5-T4.
+`IllustratedEmptyState` in Phase 8 H5-T4, and the `/flashcards`,
+`/active-recall` and `/exams` hubs' empty states in H10 (the notebook
+views `[notebookId]` still use `EmptyState`).
 
 ## FeaturePreviewCard (`feature-preview-card.tsx`)
 
@@ -345,6 +347,50 @@ that pulses (`motion-safe:animate-pulse`, still under reduced motion). The
 @220 → 0.8 @300 → 1 @400), so it never overflows a narrow column.
 Decorative (`aria-hidden`, `data-slot="page-sheet-fan"`,
 `data-part="fan-sheet"`, `data-sheet`). Props: `tone?`, `className?`.
+
+## TechniqueEmptyArt (`technique-empty-art.tsx`)
+
+Phase 8 H10 (user request 2026-10-29): the technique hubs' empty-state
+hero, one family with `NotebookFan` and `PageSheetFan`. Client component
+(Motion). One parameterised atom, `technique: "flashcards" | "recall" |
+"exams"` (`FanTechnique`): three cards fanned with `TechniqueFan`'s
+`fanPose`/`fanStack`/`fanTransition`, the two back cards in the technique
+pastel (`pastel-yellow` / `pastel-mint` / `pastel-pink`) and the front one
+white, all with a 1px `pastel-*-fg/15` edge and a soft two-layer shadow.
+
+- Flashcards (±8deg, 84px out): landscape cards (front 220×148), the
+  front showing a `PixelTile` (`yellow`, `Layers`, 36), "¿Qué es…?"
+  (20px semibold) and a flip hint "Toca para voltear" with `RotateCw` in
+  `pastel-yellow-fg`.
+- Recall (±5deg, 64px out, more stacked than fanned): landscape prompt
+  cards (front 228×152), the front with a "Pregunta abierta" mint pill,
+  "¿Cómo lo explicarías?" and a dashed mint answer line reading
+  "Explícalo con tus palabras…" with a 2px `technique-recall-outline`
+  caret (`data-part="caret"`, `motion-safe:animate-pulse`).
+- Exams (±5deg, 64px out): portrait sheets (front 150×188, like
+  `PageSheetFan`), the front with "Pregunta 1", two grey question bars and
+  three `data-part="option"` rows "Opción A/B/C"; B is chosen
+  (`data-selected="true"`, pink fill, `technique-exam-outline` border and
+  filled radio).
+- Content is generic by rule (no real subjects). Same 400×196 stage and
+  container-query scale steps as `PageSheetFan`, so it never overflows.
+  Under reduced motion only the fan's transition changes (never
+  `initial`) and the caret rests (CSS).
+- Decorative (`aria-hidden`, `data-slot="technique-empty-art"`,
+  `data-technique`, `data-part="fan-card"`, `data-card="left" | "right" |
+  "front"`). Props: `technique`, `className?`.
+- Used by the `/flashcards`, `/active-recall` and `/exams` hubs inside
+  `IllustratedEmptyState` (`entrance="cascade"`, `paper`).
+
+## EmptyStateCta (`empty-state-cta.tsx`)
+
+Phase 8 H10: the illustrated empty states' violet pill as a link (`Button
+asChild` + `next/link`): `rounded-pill bg-primary-600`, 15px semibold
+white label, the soft violet shadow of H4-T1's "Crear mi primer cuaderno"
+and H5-T4's "Nueva página", `hover:bg-primary-700`. `max-w-full
+whitespace-normal min-h-12 h-auto` so a narrow column wraps the label
+instead of clipping it. Props: `href`, `children`, `className?`. Used by
+the technique hubs' "Ir a mis cuadernos" (→ `/notebooks`).
 
 Used by: `notebooks/[notebookId]/page.tsx` (the zero-pages
 `IllustratedEmptyState` `art`).
@@ -1894,6 +1940,12 @@ once; under prefers-reduced-motion only the transition becomes
   `entrance="cascade"`, `paper`, title "Tu cuaderno está listo para su
   primera página", and the hub's violet pill CTA "Nueva página" (a
   `Button` that opens `NewPageDialog`).
+- Since Phase 8 H10 also the `/flashcards`, `/active-recall` and `/exams`
+  hubs: `art={<TechniqueEmptyArt technique />}`, `entrance="cascade"`,
+  `paper`, titles "Tus primeras flashcards te esperan" / "Practica
+  explicando con tus palabras" / "Pon a prueba lo que sabes", the load
+  error as the message when the hub cannot read, and `EmptyStateCta` "Ir a
+  mis cuadernos".
 - `data-slot="illustrated-empty-state"`, `data-entrance="block" |
   "cascade"`, `data-surface="paper"` when `paper`.
 - `steps` (Phase 8 H4, user decision 2026-10-20): an

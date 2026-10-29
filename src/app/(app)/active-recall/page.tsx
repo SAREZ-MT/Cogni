@@ -1,4 +1,4 @@
-import { Brain, Zap } from "lucide-react";
+import { Zap } from "lucide-react";
 import Link from "next/link";
 import {
   listRecallHubAction,
@@ -6,10 +6,12 @@ import {
 } from "@/modules/active-recall";
 import { COLOR_PALETTE, type NotebookColor } from "@/modules/notebooks";
 import { DeckSummaryCard } from "@/shared/ui/deck-summary-card";
-import { EmptyState } from "@/shared/ui/empty-state";
+import { EmptyStateCta } from "@/shared/ui/empty-state-cta";
 import { IconTile } from "@/shared/ui/icon-tile";
+import { IllustratedEmptyState } from "@/shared/ui/illustrated-empty-state";
 import { Pill } from "@/shared/ui/pill";
 import { SectionHeader } from "@/shared/ui/section-header";
+import { TechniqueEmptyArt } from "@/shared/ui/technique-empty-art";
 import { SetBreadcrumb } from "../_components/breadcrumb";
 import { plural } from "../flashcards/_lib/plural";
 
@@ -138,21 +140,25 @@ export default async function ActiveRecallHubPage() {
       )}
 
       {notebooksWithPages.length === 0 ? (
-        <EmptyState
-          fill
-          icon={
-            <IconTile size="56" tone="success">
-              <Brain aria-hidden="true" size={28} strokeWidth={1.75} />
-            </IconTile>
-          }
-          title="Sin sesiones todavía"
-          titleClassName="text-base"
+        // Phase 8 H10 (user request 2026-10-29, explicit go-ahead past the
+        // Phase 6 UI freeze for this empty state only): the notebooks hub's
+        // empty-state line — stacked prompt cards on the dotted paper, a
+        // cascade entrance, a gradient headline and the violet pill to the
+        // notebooks, where a page's techniques panel creates the questions.
+        // A failed read keeps the load error as the message.
+        <IllustratedEmptyState
+          entrance="cascade"
+          paper
+          art={<TechniqueEmptyArt technique="recall" />}
+          title="Practica explicando con tus palabras"
           description={
             result.ok
-              ? "Abre una página en el editor y usa Técnicas → Recordación activa → Generar."
+              ? "Genera preguntas abiertas desde una página de tus cuadernos y respóndelas aquí."
               : "No pudimos cargar tus sesiones. Intenta de nuevo."
           }
-          descriptionClassName="max-w-[340px]"
+          action={
+            <EmptyStateCta href="/notebooks">Ir a mis cuadernos</EmptyStateCta>
+          }
         />
       ) : (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3.5">

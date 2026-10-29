@@ -202,7 +202,24 @@ describe("FlashcardsHubPage (real data)", () => {
 
     render(await FlashcardsHubPage());
 
-    expect(screen.getByText("Sin mazos todavía")).toBeInTheDocument();
+    // Phase 8 H10: the illustrated empty state (fanned flashcards, gradient
+    // headline) leads to the notebooks, where cards are generated.
+    expect(
+      screen.getByRole("heading", {
+        name: "Tus primeras flashcards te esperan",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Genera tarjetas desde cualquier página de tus cuadernos y repásalas aquí.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      document.querySelector('[data-slot="technique-empty-art"]'),
+    ).toHaveAttribute("data-technique", "flashcards");
+    expect(
+      screen.getByRole("link", { name: "Ir a mis cuadernos" }),
+    ).toHaveAttribute("href", "/notebooks");
     // Nothing can be due without cards: no Repasos de hoy section.
     expect(screen.queryByTestId("due-today")).not.toBeInTheDocument();
   });
@@ -217,6 +234,11 @@ describe("FlashcardsHubPage (real data)", () => {
 
     expect(
       screen.getByText("No pudimos cargar tus mazos. Intenta de nuevo."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", {
+        name: "Tus primeras flashcards te esperan",
+      }),
     ).toBeInTheDocument();
   });
 });

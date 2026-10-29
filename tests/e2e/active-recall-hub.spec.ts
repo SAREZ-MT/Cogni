@@ -120,7 +120,9 @@ test.describe("active recall hub", () => {
     const sidebar = page.getByRole("navigation", { name: "Barra lateral" });
     await sidebar.getByRole("link", { name: "Recordación activa" }).click();
     await expect(page).toHaveURL(/\/active-recall$/);
-    await expect(page.getByText("Sin sesiones todavía")).toBeVisible();
+    await expect(
+      page.getByText("Practica explicando con tus palabras"),
+    ).toBeVisible();
     await page.goBack();
 
     const panel = page.getByTestId("techniques-panel");

@@ -53,11 +53,9 @@ test.describe("Crear examen", () => {
     });
 
     await page.goto("/exams");
-    await expect(page.getByText("Aún no tienes exámenes")).toBeVisible();
+    await expect(page.getByText("Pon a prueba lo que sabes")).toBeVisible();
     await expect(
-      page.getByText(
-        "Usa «Crear examen» para elegir una página y generar o escribir sus preguntas.",
-      ),
+      page.getByText("Genera un examen desde una página o con «Crear examen»."),
     ).toBeVisible();
     // Only "Crear examen" in the header: the "Nuevo examen" quick start is gone.
     await expect(page.getByText("Nuevo examen")).toHaveCount(0);

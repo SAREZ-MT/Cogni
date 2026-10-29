@@ -142,6 +142,60 @@ test.describe("app shell", () => {
     ).toBeVisible();
   });
 
+  // Phase 8 H10 (user request 2026-10-29): a brand-new owner's technique
+  // hubs show the notebooks hub's illustrated empty state, each with its
+  // own fan and a CTA to the notebooks, where a page's techniques panel
+  // creates that technique. No AI is involved.
+  test("technique hubs show their illustrated empty states for a new owner", async ({
+    page,
+    freshUser,
+  }) => {
+    await page.context().clearCookies();
+    await signIn(page, freshUser);
+    await page.setViewportSize({ width: 1440, height: 1000 });
+
+    for (const hub of [
+      {
+        path: "/flashcards",
+        technique: "flashcards",
+        heading: "Tus primeras flashcards te esperan",
+      },
+      {
+        path: "/active-recall",
+        technique: "recall",
+        heading: "Practica explicando con tus palabras",
+      },
+      {
+        path: "/exams",
+        technique: "exams",
+        heading: "Pon a prueba lo que sabes",
+      },
+    ]) {
+      await page.goto(hub.path);
+      const empty = page
+        .getByTestId("content-area")
+        .locator('[data-slot="illustrated-empty-state"]');
+      await expect(
+        empty.getByRole("heading", { name: hub.heading }),
+      ).toBeVisible();
+      await expect(
+        empty.locator(
+          `[data-slot="technique-empty-art"][data-technique="${hub.technique}"]`,
+        ),
+      ).toBeVisible();
+      await expect(
+        empty.getByRole("link", { name: "Ir a mis cuadernos" }),
+      ).toHaveAttribute("href", "/notebooks");
+    }
+
+    // The exams CTA leads to the notebooks hub.
+    await page
+      .getByTestId("content-area")
+      .getByRole("link", { name: "Ir a mis cuadernos" })
+      .click();
+    await expect(page).toHaveURL("/notebooks");
+  });
+
   // Every sidebar area runs on real data, so each one is a live link:
   // Flashcards (Phase 3), Exámenes (Phase 5 T9), Active recall (Phase 6 T7),
   // Calendario (Phase 7 T1), Configuración (Phase 7 T2a) and Dashboard
