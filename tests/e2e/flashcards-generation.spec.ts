@@ -86,15 +86,13 @@ test.describe("flashcards generation", () => {
     await expect(page.getByTestId("flashcard-player")).toBeVisible();
     await expect(page).toHaveURL(/\/flashcards\/[^/]+\/[^/#?]+$/);
 
-    // The hub lists the notebook and its notebook page lists the page deck,
-    // both with the same real count.
+    // The flat hub (Phase 8 H17) lists the page's deck, labelled with its
+    // notebook, with the same real count.
     await page.goto("/flashcards");
-    const notebookDeck = page.getByRole("link", { name: new RegExp(title) });
-    await expect(notebookDeck).toContainText(`${cardCount} tarjeta`);
-    await notebookDeck.click();
-    await expect(page).toHaveURL(/\/flashcards\/[^/]+$/);
-    await expect(page.getByRole("link", { name: /Sin título/ })).toContainText(
-      `${cardCount} tarjetas`,
+    const deckCard = page.getByRole("article").filter({ hasText: title });
+    await expect(deckCard).toContainText("Sin título");
+    await expect(deckCard.getByTestId("technique-item-metric")).toHaveText(
+      `${cardCount} ${cardCount === 1 ? "tarjeta" : "tarjetas"}`,
     );
   });
 });

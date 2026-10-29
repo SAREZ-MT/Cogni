@@ -137,7 +137,7 @@ test.describe("technique hubs: create from the section", () => {
     await page.keyboard.press("Escape");
   });
 
-  test("a first card on the page's deck makes the hub offer the create tile first", async ({
+  test("a first card on the page's deck shows it in the hub after the create tile", async ({
     page,
   }) => {
     test.setTimeout(120_000);
@@ -163,19 +163,18 @@ test.describe("technique hubs: create from the section", () => {
     await page.reload();
     await expect(page.getByText("¿Qué idea resume el tema?")).toBeVisible();
 
-    await page.goto("/flashcards");
+    // Phase 8 H17: the flat hub, filtered to this notebook. The new card
+    // is due, so the deck sits under PARA HOY, after the fixed create tile.
+    await page.goto(`/flashcards?cuaderno=${notebookId}`);
     const tile = page.getByTestId("create-flashcards-tile");
     await expect(tile).toBeVisible();
-    // First and fixed: before the notebook's deck card.
-    const firstInGrid = page
-      .getByRole("heading", { name: "Mazos por cuaderno" })
-      .locator("xpath=following-sibling::div[1]/*[1]");
-    await expect(firstInGrid).toHaveAttribute(
+    const dueGroup = page.getByRole("region", { name: /^Para hoy/ });
+    await expect(dueGroup.locator(".grid > *").first()).toHaveAttribute(
       "data-testid",
       "create-flashcards-tile",
     );
     await expect(
-      page.getByRole("link", { name: new RegExp(title) }),
+      dueGroup.getByRole("article").filter({ hasText: title }),
     ).toBeVisible();
     await tile.click();
     await expect(

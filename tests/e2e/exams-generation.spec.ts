@@ -77,10 +77,11 @@ test.describe("exam questions generation", () => {
     );
     await shot(page, "panel-after");
 
-    // The questions live in the Exams section: Exámenes → cuaderno →
-    // página → Preguntas.
-    await page.goto(`/exams/${notebookId}`);
-    await page.getByRole("link", { name: "Preguntas (10)" }).click();
+    // The questions live in the Exams section (Phase 8 H17: the flat hub,
+    // filtered by the notebook) → the page card's menu → Ver preguntas.
+    await page.goto(`/exams?cuaderno=${notebookId}`);
+    await page.getByRole("button", { name: /^Acciones de / }).click();
+    await page.getByRole("menuitem", { name: "Ver preguntas" }).click();
     await expect(page).toHaveURL(`/exams/${notebookId}/${pageId}/preguntas`);
     const rows = page.getByTestId("exam-question-row");
     await expect(rows).toHaveCount(10);
