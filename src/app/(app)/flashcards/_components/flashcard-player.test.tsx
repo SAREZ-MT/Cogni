@@ -115,7 +115,7 @@ describe("FlashcardPlayer", () => {
     expect(summary).toHaveTextContent("Mi mazo — 3 tarjetas revisadas");
     expect(
       within(summary).getByRole("link", { name: "Volver al mazo" }),
-    ).toHaveAttribute("href", "/flashcards/nb");
+    ).toHaveAttribute("href", "/flashcards?cuaderno=nb");
   });
 
   it("does not show the summary while a card is flipped", async () => {
@@ -167,12 +167,12 @@ describe("FlashcardPlayer", () => {
     expect(screen.getByText("1 tarjeta en esta sesión")).toBeInTheDocument();
   });
 
-  it("links back to the notebook's decks", () => {
+  it("links back to the hub filtered by the notebook", () => {
     setup();
 
     expect(
       screen.getByRole("link", { name: /Todos los mazos/ }),
-    ).toHaveAttribute("href", "/flashcards/nb");
+    ).toHaveAttribute("href", "/flashcards?cuaderno=nb");
   });
 
   it("shows an empty state instead of a session when the deck has no cards", () => {
@@ -182,7 +182,7 @@ describe("FlashcardPlayer", () => {
     expect(screen.queryByTestId("flip-card")).not.toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: "Volver al mazo" }),
-    ).toHaveAttribute("href", "/flashcards/nb");
+    ).toHaveAttribute("href", "/flashcards?cuaderno=nb");
   });
 
   describe("graded session (onRate/onFinish/onExit)", () => {

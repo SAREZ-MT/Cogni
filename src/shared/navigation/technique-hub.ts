@@ -133,3 +133,16 @@ export function hubReturnHref(
     cuaderno !== null && NOTEBOOK_ID.test(cuaderno) ? cuaderno : null,
   );
 }
+
+// The hub query a practice route keeps in its own URL (`desde=hub` plus a
+// valid filter), without "?"; empty when not opened from the hub.
+export function hubReturnQuery(params: {
+  desde?: SearchParamValue;
+  cuaderno?: SearchParamValue;
+}): string {
+  if (!fromHub(params.desde)) return "";
+  const cuaderno = selectedNotebook(params.cuaderno);
+  return cuaderno !== null && NOTEBOOK_ID.test(cuaderno)
+    ? `${FROM_HUB_QUERY}&${NOTEBOOK_FILTER_PARAM}=${cuaderno}`
+    : FROM_HUB_QUERY;
+}

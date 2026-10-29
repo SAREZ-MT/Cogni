@@ -3,6 +3,7 @@ import {
   hubHref,
   hubItemHref,
   hubReturnHref,
+  hubReturnQuery,
   notebookFilter,
   orderHubItems,
 } from "./technique-hub";
@@ -142,6 +143,17 @@ describe("hub links", () => {
     ).toBe("/active-recall");
     expect(hubReturnHref("/active-recall", {}, NB_B)).toBe(
       `/active-recall?cuaderno=${NB_B}`,
+    );
+  });
+
+  it("keeps the hub marker and a valid filter in the practice route's URL", () => {
+    expect(hubReturnQuery({})).toBe("");
+    expect(hubReturnQuery({ desde: "hub" })).toBe("desde=hub");
+    expect(hubReturnQuery({ desde: "hub", cuaderno: NB_A })).toBe(
+      `desde=hub&cuaderno=${NB_A}`,
+    );
+    expect(hubReturnQuery({ desde: "hub", cuaderno: "x&y=1" })).toBe(
+      "desde=hub",
     );
   });
 });

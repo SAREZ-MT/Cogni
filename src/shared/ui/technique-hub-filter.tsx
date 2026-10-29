@@ -69,3 +69,28 @@ export function TechniqueHubFilter({
     </nav>
   );
 }
+
+// A group heading of a technique hub's grid ("PARA HOY 3", "AL DÍA 4"):
+// 12px semibold uppercase muted label, the count in the technique ink.
+export function TechniqueHubGroupTitle({
+  label,
+  count,
+  id,
+}: {
+  label: string;
+  count: number;
+  id?: string;
+}) {
+  return (
+    <h2
+      id={id}
+      data-slot="technique-hub-group-title"
+      className="flex items-baseline gap-2 font-semibold text-fg-muted text-xs uppercase tracking-[0.06em]"
+    >
+      {label}{" "}
+      <span className="text-(--theme-ink) tabular-nums tracking-normal">
+        {count}
+      </span>
+    </h2>
+  );
+}

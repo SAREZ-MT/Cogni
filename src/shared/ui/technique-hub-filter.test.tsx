@@ -1,6 +1,9 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { TechniqueHubFilter } from "./technique-hub-filter";
+import {
+  TechniqueHubFilter,
+  TechniqueHubGroupTitle,
+} from "./technique-hub-filter";
 
 const chips = [
   {
@@ -70,5 +73,15 @@ describe("TechniqueHubFilter", () => {
   it("scrolls sideways instead of wrapping", () => {
     render(<TechniqueHubFilter chips={chips} />);
     expect(screen.getByRole("navigation")).toHaveClass("overflow-x-auto");
+  });
+});
+
+describe("TechniqueHubGroupTitle", () => {
+  it("is a heading with its count in the technique ink", () => {
+    render(<TechniqueHubGroupTitle label="Para hoy" count={3} />);
+
+    const heading = screen.getByRole("heading", { name: "Para hoy 3" });
+    expect(heading).toHaveClass("uppercase");
+    expect(within(heading).getByText("3")).toHaveClass("text-(--theme-ink)");
   });
 });

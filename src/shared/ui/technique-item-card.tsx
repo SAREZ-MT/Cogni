@@ -94,7 +94,7 @@ export function TechniqueItemCard({
           </Pill>
           {menu !== undefined ? (
             <span className="relative z-10 -mr-1 shrink-0">
-              <DropdownMenu>
+              <DropdownMenu modal={false}>
                 <DropdownMenuTrigger asChild>
                   <Button
                     type="button"

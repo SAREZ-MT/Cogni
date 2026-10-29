@@ -3,7 +3,11 @@ import { notFound } from "next/navigation";
 import { listFlashcardsAction } from "@/modules/flashcards";
 import { getNotebookTitleForRoute, getPageForRoute } from "@/modules/notebooks";
 import { designPreviewsEnabled } from "@/shared/config/design-previews";
-import { fromHub } from "@/shared/navigation/hub-return";
+import {
+  hubHref,
+  hubReturnHref,
+  hubReturnQuery,
+} from "@/shared/navigation/technique-hub";
 import { EmptyState } from "@/shared/ui/empty-state";
 import { EmptyStateCta } from "@/shared/ui/empty-state-cta";
 import { IconTile } from "@/shared/ui/icon-tile";
@@ -31,8 +35,10 @@ interface FlashcardsSessionPageProps {
 //   sample data, ungraded and local.
 // - Otherwise: the page's real cards as a flip-card review list, with a
 //   per-card archive action and "Repasar", which runs the graded SM-2
-//   session over the page's due cards (DeckReview); opened from "Repasos de
-//   hoy" with `?repasar=1`, that session starts at once. A page that is
+//   session over the page's due cards (DeckReview); opened with
+//   `?repasar=1` (the hub card's "Repasar"), that session starts at once.
+//   Back leads to the hub (Phase 8 H17: no notebook level), as it was when
+//   opened from it (`?desde=hub&cuaderno=`), else filtered by the notebook. A page that is
 //   unknown, archived or not the caller's 404s. Cards are created by AI only
 //   (Phase 8 H13, user 2026-10-29): a page without cards has no deck yet (a
 //   deck is never empty), and its empty state links to the page, whose
@@ -42,7 +48,7 @@ export default async function FlashcardsSessionPage({
   searchParams,
 }: FlashcardsSessionPageProps) {
   const { notebookId, pageId } = await params;
-  const { repasar, desde } = await searchParams;
+  const { repasar, desde, cuaderno } = await searchParams;
 
   if (designPreviewsEnabled()) {
     const sampleNotebook = getSampleNotebook(notebookId);
@@ -57,7 +63,7 @@ export default async function FlashcardsSessionPage({
               { label: "Flashcards", href: "/flashcards" },
               {
                 label: sampleNotebook.title,
-                href: `/flashcards/${notebookId}`,
+                href: hubHref("/flashcards", notebookId),
               },
               { label: samplePage.title },
             ]}
@@ -84,7 +90,7 @@ export default async function FlashcardsSessionPage({
       <SetBreadcrumb
         items={[
           { label: "Flashcards", href: "/flashcards" },
-          { label: notebookTitle, href: `/flashcards/${notebookId}` },
+          { label: notebookTitle, href: hubHref("/flashcards", notebookId) },
           { label: page.title },
         ]}
       />
@@ -100,7 +106,8 @@ export default async function FlashcardsSessionPage({
         }
         canReview={cards.value.length > 0}
         autoStart={repasar === "1"}
-        fromHub={fromHub(desde)}
+        backHref={hubReturnHref("/flashcards", { desde, cuaderno }, notebookId)}
+        keepQuery={hubReturnQuery({ desde, cuaderno })}
       >
         {cards.value.length === 0 ? (
           <EmptyState

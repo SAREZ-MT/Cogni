@@ -16,7 +16,7 @@ import {
   requestSessionFeedbackAction,
   startFlashcardSessionAction,
 } from "@/modules/flashcards";
-import { FROM_HUB_QUERY } from "@/shared/navigation/hub-return";
+import { hubHref } from "@/shared/navigation/technique-hub";
 import { BackLink } from "@/shared/ui/back-link";
 import { Button } from "@/shared/ui/button";
 import type { RatingTone } from "@/shared/ui/rating-button";
@@ -55,10 +55,12 @@ export interface DeckReviewProps {
   // Opened from "Repasos de hoy" (`?repasar=1`): start the review right
   // away instead of waiting for "Repasar".
   autoStart?: boolean;
-  // Opened from the hub's create dialog (`?desde=hub`, Phase 8 H16): the
-  // back links lead to /flashcards instead of the notebook's decks, and
-  // the marker survives dropping `?repasar=1`.
-  fromHub?: boolean;
+  // Where the back links and "Todos los mazos" lead (Phase 8 H16/H17: the
+  // route's hubReturnHref); defaults to the hub filtered by the notebook.
+  backHref?: string;
+  // The query kept when `?repasar=1` is dropped (the `desde=hub` marker
+  // and the hub's filter), without the leading "?".
+  keepQuery?: string;
 }
 
 interface ActiveSession {
@@ -111,7 +113,6 @@ function toPlayerCard(card: ReviewCardView): PlayerCard {
 // brings the refreshed deck back.
 export function DeckReview({
   notebookId,
-  notebookTitle,
   pageId,
   deckLabel,
   description,
@@ -119,9 +120,9 @@ export function DeckReview({
   actions,
   children,
   autoStart = false,
-  fromHub = false,
+  backHref = hubHref("/flashcards", notebookId),
+  keepQuery = "",
 }: DeckReviewProps) {
-  const backHref = fromHub ? "/flashcards" : `/flashcards/${notebookId}`;
   const router = useRouter();
   const autoStarted = useRef(false);
   const [session, setSession] = useState<ActiveSession | null>(null);
@@ -168,10 +169,10 @@ export function DeckReview({
     window.history.replaceState(
       null,
       "",
-      `/flashcards/${notebookId}/${pageId}${fromHub ? `?${FROM_HUB_QUERY}` : ""}`,
+      `/flashcards/${notebookId}/${pageId}${keepQuery ? `?${keepQuery}` : ""}`,
     );
     startReview();
-  }, [autoStart, canReview, notebookId, pageId, fromHub]);
+  }, [autoStart, canReview, notebookId, pageId, keepQuery]);
 
   if (session) {
     const { sessionId } = session;
@@ -213,9 +214,7 @@ export function DeckReview({
   return (
     <>
       <div className="flex flex-col gap-3">
-        <BackLink href={backHref}>
-          {fromHub ? "Flashcards" : notebookTitle}
-        </BackLink>
+        <BackLink href={backHref}>Flashcards</BackLink>
         <SectionHeader
           eyebrow="Flashcards"
           title={deckLabel}
