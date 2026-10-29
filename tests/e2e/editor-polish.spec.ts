@@ -1,5 +1,15 @@
+import type { Page } from "@playwright/test";
 import { expect, hasSupabaseEnv, signIn, test } from "./fixtures/auth";
 import { createNotebookWithOpenPage } from "./helpers/notebooks";
+
+async function selectBackwards(page: Page, characters: number) {
+  for (let i = 0; i < characters; i += 1) {
+    await page.keyboard.press("Shift+ArrowLeft");
+  }
+  // Chrome's selectionchange (which ProseMirror reads the selection from)
+  // lands after the keys; the next key must not race it.
+  await page.waitForTimeout(60);
+}
 
 // H6 — editor polish (odd/tasks/phase-8-design-flows.md).
 
@@ -34,7 +44,7 @@ test.describe("editor polish", () => {
     await page.keyboard.type("Texto de prueba");
     await expect(toolbar).toBeHidden();
 
-    await page.keyboard.press("Shift+Home");
+    await selectBackwards(page, 6);
     await expect(toolbar).toBeVisible();
   });
 
@@ -58,5 +68,46 @@ test.describe("editor polish", () => {
     await page.waitForTimeout(60);
     await page.keyboard.type('" Una cita');
     await expect(editable.locator("blockquote")).toHaveText("Una cita");
+  });
+
+  // E6: the toolbar highlighter applies the last colour in one click, the
+  // swatch row picks another, and Mod+Shift+H reuses it from the keyboard.
+  test("highlights a selection in one click and with Mod+Shift+H", async ({
+    page,
+  }) => {
+    await createNotebookWithOpenPage(page, "Cuaderno resaltado");
+
+    const editable = page
+      .getByTestId("editor-mount")
+      .locator('[contenteditable="true"]');
+    await editable.click();
+    await page.waitForTimeout(60);
+    await page.keyboard.type("Idea clave");
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("Otra idea");
+    // Home/End do not move the caret on macOS: select with arrows instead.
+    await selectBackwards(page, "Otra idea".length);
+
+    await page.getByRole("button", { name: "Resaltar en amarillo" }).click();
+    await expect(editable.locator("mark[data-color='yellow']")).toHaveText(
+      "Otra idea",
+    );
+
+    await page
+      .getByRole("button", { name: "Más colores de resaltado" })
+      .click();
+    await page.getByRole("button", { name: "Resaltar en azul" }).click();
+    await expect(editable.locator("mark[data-color='blue']")).toHaveText(
+      "Otra idea",
+    );
+
+    // Collapse to the start of "Otra idea", step back to the end of "Idea
+    // clave" and select it.
+    await page.keyboard.press("ArrowLeft");
+    await page.keyboard.press("ArrowLeft");
+    await page.waitForTimeout(60);
+    await selectBackwards(page, "Idea clave".length);
+    await page.keyboard.press("ControlOrMeta+Shift+H");
+    await expect(editable.locator("mark[data-color='blue']")).toHaveCount(2);
   });
 });

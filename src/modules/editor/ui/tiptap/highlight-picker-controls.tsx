@@ -10,10 +10,11 @@
 import type { Editor } from "@tiptap/core";
 import { focusEditorView } from "./focus-editor-view";
 import { HIGHLIGHT_PALETTE, type HighlightColor } from "./highlight-palette";
+import { applyHighlight } from "./quick-highlight";
 
 // Spanish labels for the seven Cogni palette colors (design.md, "Paleta de
 // resaltado de Cogni"; specs/editor/spec.md never asks for English names).
-const PALETTE_LABELS: Record<HighlightColor, string> = {
+export const PALETTE_LABELS: Record<HighlightColor, string> = {
   pink: "rosa",
   green: "verde",
   yellow: "amarillo",
@@ -55,7 +56,8 @@ export function HighlightPickerControls({
           data-testid={`highlight-swatch-${color}`}
           className={`size-6 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring ${SWATCH_CLASSES[color]}`}
           onClick={() => {
-            editor.chain().setHighlight({ color }).run();
+            // H6-E6: also becomes the toolbar highlighter's one-click colour.
+            applyHighlight(editor, color);
             focusEditorView(editor);
           }}
         />

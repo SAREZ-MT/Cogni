@@ -61,6 +61,7 @@ import { createEmojiSuggestion } from "../emoji-suggestion";
 import { CogniHighlight } from "../highlight-palette";
 import { ImageBlock } from "../image-node";
 import { CogniMention, createMentionSuggestion } from "../mention-node";
+import { QuickHighlightShortcut } from "../quick-highlight";
 import { SlashCommand } from "../slash-command";
 import type { SlashCommandItem } from "../slash-command-items";
 import { TocBlock } from "../toc-node";
@@ -147,6 +148,8 @@ export function createEditorExtensions(
     TaskList,
     TaskItem.configure({ nested: true }),
     CogniHighlight,
+    // H6-E6: Mod+Shift+H highlights with the last colour used.
+    QuickHighlightShortcut,
     Callout,
     CodeBlock,
     ImageBlock.configure({ pageId, imagePort }),

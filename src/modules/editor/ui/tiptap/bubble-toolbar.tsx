@@ -65,6 +65,7 @@ import {
 import { BLOCK_KIND_ITEMS, currentBlockKindLabel } from "./block-kind";
 import { focusEditorView } from "./focus-editor-view";
 import { HighlightPickerControls } from "./highlight-picker-controls";
+import { QuickHighlighter } from "./quick-highlighter";
 import { isTableCellSelection } from "./table-selection";
 
 export interface BubbleToolbarProps {
@@ -477,6 +478,9 @@ export function BubbleToolbarControls({ editor }: BubbleToolbarControlsProps) {
         })}
 
         <ToolbarSeparator />
+
+        {/* H6-E6: one-click highlighter with the last colour used. */}
+        <QuickHighlighter editor={editor} />
 
         {/* E2 scope B: one popover, two swatch rows — "Texto" (inline
             Color/TextStyle mark, block-color-palette.ts) and
