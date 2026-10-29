@@ -417,6 +417,10 @@ describe("flashcards Server Actions", () => {
             notebookTitle: "Biología",
             notebookColor: "purple",
             count: 1,
+            // ISO instants (Phase 8 H17): the newest card and, with no
+            // study item scheduled in memory, no next review.
+            latestCardAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+            nextDueAt: null,
           },
         ],
       });
@@ -522,6 +526,44 @@ describe("flashcards Server Actions", () => {
 
       expect(!result.ok && result.error.code).toBe("FLASHCARDS_UNEXPECTED");
       expect(captureException).toHaveBeenCalledTimes(1);
+    });
+
+    // Phase 8 H17: the flashcards hub's "Eliminar mazo".
+    describe("archiveDeckAction", () => {
+      it("rejects an unauthenticated caller and an invalid page id", async () => {
+        const { archiveDeckAction } = await actions();
+        expect(
+          await archiveDeckAction({ pageId: "x" }).then(
+            (result) => !result.ok && result.error.code,
+          ),
+        ).toBe("FLASHCARDS_INVALID_INPUT");
+        getCurrentUser.mockResolvedValue(null);
+        expect(
+          await archiveDeckAction({ pageId: PAGE }).then(
+            (result) => !result.ok && result.error.code,
+          ),
+        ).toBe("FLASHCARDS_SESSION_REQUIRED");
+      });
+
+      it("archives the whole deck, even its last card, and revalidates", async () => {
+        await seedDeck(2);
+        const { archiveDeckAction } = await actions();
+
+        const result = await archiveDeckAction({ pageId: PAGE });
+
+        expect(result).toEqual({ ok: true, value: { archived: 2 } });
+        expect(await current.flashcards.countByPage(PAGE, OWNER)).toBe(0);
+        expect(revalidatePath).toHaveBeenCalledWith("/flashcards", "layout");
+      });
+
+      it("is not found for a page without a deck, without revalidating", async () => {
+        const { archiveDeckAction } = await actions();
+
+        const result = await archiveDeckAction({ pageId: PAGE });
+
+        expect(!result.ok && result.error.code).toBe("FLASHCARD_NOT_FOUND");
+        expect(revalidatePath).not.toHaveBeenCalled();
+      });
     });
   });
 });

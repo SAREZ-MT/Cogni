@@ -207,6 +207,10 @@ export function runFlashcardRepositoryContract(
           pageId: pageA,
           ...ctx.pageInfo(pageA),
           count: 3,
+          // Phase 8 H17: the newest active card's creation and the
+          // earliest due date of the deck's study items (none here).
+          latestCardAt: new Date("2026-10-03T10:00:00.000Z"),
+          nextDueAt: null,
         });
         expect(byPage.get(pageB)?.count).toBe(1);
         expect(byPage.has(emptyPage)).toBe(false);
