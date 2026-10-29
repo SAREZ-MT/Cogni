@@ -36,6 +36,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu";
+import { createCodeBlockPastePlugin } from "./code-block-paste";
 
 const registry = createLowlight();
 registry.register({ bash, css, javascript, json, python, typescript, xml });
@@ -135,6 +136,14 @@ function CodeBlockView({ node, updateAttributes }: ReactNodeViewProps) {
 }
 
 export const CodeBlock = CodeBlockLowlight.extend({
+  // H8-6: pasted code keeps its lines and indentation (code-block-paste.ts).
+  // Listed first so it runs before the parent's VS Code paste handler.
+  addProseMirrorPlugins() {
+    return [
+      createCodeBlockPastePlugin(this.editor, this.name),
+      ...(this.parent?.() ?? []),
+    ];
+  },
   addNodeView() {
     return ReactNodeViewRenderer(CodeBlockView);
   },
