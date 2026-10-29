@@ -11,10 +11,10 @@ const { listExamHubAction } = vi.hoisted(() => ({
   listExamHubAction: vi.fn(),
 }));
 vi.mock("@/modules/exams", () => ({ listExamHubAction }));
-const { getNotebookTitleForRoute, getSidebarTree, CreateExamDialog } =
+const { getNotebookTitleForRoute, getPagePickerTree, CreateExamDialog } =
   vi.hoisted(() => ({
     getNotebookTitleForRoute: vi.fn(),
-    getSidebarTree: vi.fn(),
+    getPagePickerTree: vi.fn(),
     CreateExamDialog: vi.fn(({ trigger }: { trigger?: string }) => (
       // A stand-in trigger, so the test sees where each one renders.
       <button type="button" data-testid={`create-exam-${trigger}`} />
@@ -22,7 +22,7 @@ const { getNotebookTitleForRoute, getSidebarTree, CreateExamDialog } =
   }));
 vi.mock("@/modules/notebooks", () => ({
   getNotebookTitleForRoute,
-  getSidebarTree,
+  getPagePickerTree,
 }));
 vi.mock("../_components/create-exam-dialog", () => ({ CreateExamDialog }));
 
@@ -76,8 +76,8 @@ const ENTRIES = [
 describe("ExamsNotebookPage (real data)", () => {
   beforeEach(() => {
     notFound.mockClear();
-    getSidebarTree.mockReset();
-    getSidebarTree.mockResolvedValue([]);
+    getPagePickerTree.mockReset();
+    getPagePickerTree.mockResolvedValue([]);
     CreateExamDialog.mockClear();
     getNotebookTitleForRoute.mockReset();
     getNotebookTitleForRoute.mockResolvedValue("Biología Celular");
@@ -195,7 +195,7 @@ describe("ExamsNotebookPage (real data)", () => {
   });
 
   it("offers 'Crear examen' with this notebook preselected", async () => {
-    getSidebarTree.mockResolvedValue([
+    getPagePickerTree.mockResolvedValue([
       { id: "x", title: "Otro", icon: null, color: null, pages: [] },
       {
         id: NOTEBOOK,

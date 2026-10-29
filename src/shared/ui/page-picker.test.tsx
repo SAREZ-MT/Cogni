@@ -65,6 +65,61 @@ describe("PagePicker", () => {
     expect(screen.getByTestId("pick-page")).toBeInTheDocument();
   });
 
+  // Phase 8 H14 (user 2026-10-29): a page under the technique's minimum
+  // words (100 by default) cannot be picked, and says why.
+  it("disables a page too short to generate from, with the reason", async () => {
+    const user = userEvent.setup();
+    const { onPageChange } = renderPicker({
+      notebooks: [
+        {
+          id: "nb-bio",
+          title: "Biología",
+          pages: [
+            { id: "p-1", title: "Corta", words: 40 },
+            { id: "p-2", title: "Larga", words: 320 },
+            { id: "p-3", title: "Sin contar" },
+          ],
+        },
+      ],
+    });
+
+    screen.getByRole("combobox", { name: "Página" }).focus();
+    await user.keyboard("{Enter}");
+    const short = screen.getByRole("option", { name: /Corta/ });
+    expect(short).toHaveAttribute("aria-disabled", "true");
+    expect(short).toHaveTextContent(
+      "Muy poco contenido (40 palabras): escribe al menos 100",
+    );
+    expect(screen.getByRole("option", { name: "Larga" })).not.toHaveAttribute(
+      "aria-disabled",
+    );
+    expect(
+      screen.getByRole("option", { name: "Sin contar" }),
+    ).not.toHaveAttribute("aria-disabled");
+    await user.click(short);
+    expect(onPageChange).not.toHaveBeenCalled();
+  });
+
+  it("applies the technique's own minimum", async () => {
+    const user = userEvent.setup();
+    renderPicker({
+      minWords: 150,
+      notebooks: [
+        {
+          id: "nb-bio",
+          title: "Biología",
+          pages: [{ id: "p-1", title: "Media", words: 120 }],
+        },
+      ],
+    });
+
+    screen.getByRole("combobox", { name: "Página" }).focus();
+    await user.keyboard("{Enter}");
+    expect(screen.getByRole("option", { name: /Media/ })).toHaveTextContent(
+      "Muy poco contenido (120 palabras): escribe al menos 150",
+    );
+  });
+
   it("is operable from the keyboard alone", async () => {
     const user = userEvent.setup();
     const { onPageChange } = renderPicker();

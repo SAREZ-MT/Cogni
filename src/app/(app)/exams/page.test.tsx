@@ -6,13 +6,13 @@ const { listExamHubAction } = vi.hoisted(() => ({
   listExamHubAction: vi.fn(),
 }));
 vi.mock("@/modules/exams", () => ({ listExamHubAction }));
-const { getSidebarTree, CreateExamDialog } = vi.hoisted(() => ({
-  getSidebarTree: vi.fn(),
+const { getPagePickerTree, CreateExamDialog } = vi.hoisted(() => ({
+  getPagePickerTree: vi.fn(),
   CreateExamDialog: vi.fn(() => null),
 }));
 vi.mock("./_components/create-exam-dialog", () => ({ CreateExamDialog }));
 vi.mock("@/modules/notebooks", () => ({
-  getSidebarTree,
+  getPagePickerTree,
   COLOR_PALETTE: [
     "pink",
     "green",
@@ -77,8 +77,8 @@ const ENTRIES = [
 
 describe("ExamsHubPage (real data)", () => {
   beforeEach(() => {
-    getSidebarTree.mockReset();
-    getSidebarTree.mockResolvedValue([]);
+    getPagePickerTree.mockReset();
+    getPagePickerTree.mockResolvedValue([]);
     CreateExamDialog.mockClear();
     // Each instance renders a marker named after its trigger, so the
     // tests can see where the dialog's entry points sit.
@@ -336,7 +336,7 @@ describe("ExamsHubPage (real data)", () => {
     ];
 
     it("offers 'Crear examen' with the owner's notebooks and their pages", async () => {
-      getSidebarTree.mockResolvedValue(TREE);
+      getPagePickerTree.mockResolvedValue(TREE);
       listExamHubAction.mockResolvedValue({ ok: true, value: [] });
 
       render(await ExamsHubPage());
@@ -357,7 +357,7 @@ describe("ExamsHubPage (real data)", () => {
     });
 
     it("still offers it, with the notebooks unknown (a load error), when the tree cannot be read", async () => {
-      getSidebarTree.mockRejectedValue(new Error("db down"));
+      getPagePickerTree.mockRejectedValue(new Error("db down"));
       listExamHubAction.mockResolvedValue({ ok: true, value: [] });
 
       render(await ExamsHubPage());

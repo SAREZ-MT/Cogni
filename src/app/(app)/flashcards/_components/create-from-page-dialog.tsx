@@ -5,6 +5,11 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { generateRecallQuestionsAction } from "@/modules/active-recall";
 import { generateFlashcardsAction } from "@/modules/flashcards";
+import {
+  MIN_GENERATION_WORDS,
+  PAGE_TOO_SHORT_CODE,
+  RECALL_MIN_WORDS,
+} from "@/shared/kernel/generation-capacity";
 import { Button } from "@/shared/ui/button";
 import {
   Dialog,
@@ -20,6 +25,7 @@ import { FormMessage } from "@/shared/ui/form-message";
 import { GenerationsLeft } from "@/shared/ui/generations-left";
 import { PagePicker, type PagePickerNotebook } from "@/shared/ui/page-picker";
 import { PixelTile } from "@/shared/ui/pixel-tile";
+import { pageTooShortMessage } from "@/shared/ui/short-page-copy";
 import { TechniqueCreateTile } from "@/shared/ui/technique-create-tile";
 import { TECHNIQUE_THEME } from "@/shared/ui/technique-theme";
 
@@ -53,6 +59,8 @@ const CONFIG = {
     description:
       "Elige la página: la IA crea tarjetas de pregunta y respuesta desde su texto.",
     cta: "Crear mis primeras flashcards",
+    // Phase 8 H14: the words a page needs (100; recall's 10 questions 150).
+    minWords: MIN_GENERATION_WORDS,
     tileHint: "Elige una página de tus cuadernos",
     genericFailure: "No pudimos generar las tarjetas. Intenta de nuevo.",
     errors: {
@@ -67,6 +75,7 @@ const CONFIG = {
     description:
       "Elige la página: la IA crea preguntas abiertas desde su texto para que las respondas de memoria.",
     cta: "Generar mis primeras preguntas",
+    minWords: RECALL_MIN_WORDS,
     tileHint: "Elige una página para practicar",
     genericFailure: "No pudimos generar las preguntas. Intenta de nuevo.",
     errors: {
@@ -131,9 +140,13 @@ export function CreateFromPageDialog({
     }
   }
 
-  function failWith(code: string) {
+  function failWith({ code, minWords }: { code: string; minWords?: number }) {
     if (NO_NEW_CONTENT_CODES.has(code)) {
       setNotice(NO_NEW_CONTENT);
+      return;
+    }
+    if (code === PAGE_TOO_SHORT_CODE) {
+      setError(pageTooShortMessage(minWords ?? config.minWords));
       return;
     }
     setError(config.errors[code] ?? config.genericFailure);
@@ -148,13 +161,13 @@ export function CreateFromPageDialog({
       try {
         if (technique === "flashcards") {
           const result = await generateFlashcardsAction({ pageId });
-          if (!result.ok) return failWith(result.error.code);
+          if (!result.ok) return failWith(result.error);
           setOpen(false);
           router.push(`/flashcards/${notebookId}/${pageId}`);
           return;
         }
         const result = await generateRecallQuestionsAction({ pageId });
-        if (!result.ok) return failWith(result.error.code);
+        if (!result.ok) return failWith(result.error);
         setOpen(false);
         router.push(`/active-recall/${notebookId}/${pageId}`);
       } catch {
@@ -207,6 +220,7 @@ export function CreateFromPageDialog({
             }}
             disabled={pending}
             testIdPrefix={prefix}
+            minWords={config.minWords}
           />
           {notebooks !== null && notebooks.length > 0 && (
             <>

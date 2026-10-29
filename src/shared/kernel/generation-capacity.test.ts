@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  EXAM_MIN_WORDS,
   examCountsForWords,
   flashcardCountForWords,
   MIN_GENERATION_WORDS,
@@ -37,8 +38,9 @@ describe("generation capacity (Phase 8 H14, user 2026-10-29)", () => {
     expect(requiredWordsFor(30)).toBe(450);
   });
 
-  it("lets recall's ten questions need 150 words", () => {
+  it("lets recall's ten questions and the smallest exam need 150 words", () => {
     expect(RECALL_MIN_WORDS).toBe(150);
+    expect(EXAM_MIN_WORDS).toBe(150);
   });
 
   describe("exam counts", () => {

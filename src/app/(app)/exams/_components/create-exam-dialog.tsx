@@ -8,6 +8,11 @@ import {
   EXAM_MIN_QUESTIONS,
   generateExamQuestionsAction,
 } from "@/modules/exams";
+import {
+  EXAM_MIN_WORDS,
+  examCountsForWords,
+  PAGE_TOO_SHORT_CODE,
+} from "@/shared/kernel/generation-capacity";
 import { Button } from "@/shared/ui/button";
 import { CountStepper } from "@/shared/ui/count-stepper";
 import {
@@ -23,6 +28,7 @@ import { EmptyStateCta } from "@/shared/ui/empty-state-cta";
 import { FormMessage } from "@/shared/ui/form-message";
 import { PagePicker, type PagePickerNotebook } from "@/shared/ui/page-picker";
 import { PixelTile } from "@/shared/ui/pixel-tile";
+import { pageTooShortMessage } from "@/shared/ui/short-page-copy";
 import { TechniqueCreateTile } from "@/shared/ui/technique-create-tile";
 import { TECHNIQUE_THEME } from "@/shared/ui/technique-theme";
 
@@ -89,6 +95,33 @@ export function CreateExamDialog({
 
   const canSubmit = pageId !== "" && !pending;
 
+  // Phase 8 H14 (user 2026-10-29): about 15 words per question, so the
+  // stepper only offers the counts the chosen page's words support (the
+  // whole page's count: an approximation of the new paragraphs the server
+  // measures). A page without a known count keeps the full 10–30 range.
+  const chosenWords = notebooks
+    .find((n) => n.id === notebookId)
+    ?.pages.find((p) => p.id === pageId)?.words;
+  const supported =
+    chosenWords === undefined ? [] : examCountsForWords(chosenWords);
+  const maxCount =
+    chosenWords === undefined || supported.length === 0
+      ? EXAM_MAX_QUESTIONS
+      : (supported[supported.length - 1] ?? EXAM_MAX_QUESTIONS);
+
+  function choosePage(next: string) {
+    setPageId(next);
+    setError(null);
+    setNotice(null);
+    const words = notebooks
+      .find((n) => n.id === notebookId)
+      ?.pages.find((p) => p.id === next)?.words;
+    if (words === undefined) return;
+    const counts = examCountsForWords(words);
+    const max = counts[counts.length - 1];
+    if (max !== undefined) setCount((current) => Math.min(current, max));
+  }
+
   function changeOpen(next: boolean) {
     if (pending) return;
     setOpen(next);
@@ -123,6 +156,10 @@ export function CreateExamDialog({
       if (!result.ok) {
         if (result.error.code === NO_NEW_CONTENT_CODE) {
           setNotice(NO_NEW_CONTENT);
+          return;
+        }
+        if (result.error.code === PAGE_TOO_SHORT_CODE) {
+          setError(pageTooShortMessage(result.error.minWords));
           return;
         }
         setError(ERROR_COPY[result.error.code] ?? GENERIC_FAILURE);
@@ -174,13 +211,10 @@ export function CreateExamDialog({
             notebookId={notebookId}
             pageId={pageId}
             onNotebookChange={changeNotebook}
-            onPageChange={(next) => {
-              setPageId(next);
-              setError(null);
-              setNotice(null);
-            }}
+            onPageChange={choosePage}
             disabled={pending}
             testIdPrefix="create-exam"
+            minWords={EXAM_MIN_WORDS}
           />
           {notebooks.length > 0 && (
             <>
@@ -188,13 +222,17 @@ export function CreateExamDialog({
                 label="Preguntas a generar"
                 value={count}
                 min={EXAM_MIN_QUESTIONS}
-                max={EXAM_MAX_QUESTIONS}
+                max={maxCount}
                 step={EXAM_COUNT_STEP}
                 onChange={setCount}
                 disabled={pending}
                 testId="exam-count"
                 size="field"
-                hint={`Entre ${EXAM_MIN_QUESTIONS} y ${EXAM_MAX_QUESTIONS}, de ${EXAM_COUNT_STEP} en ${EXAM_COUNT_STEP}`}
+                hint={
+                  maxCount < EXAM_MAX_QUESTIONS
+                    ? `Esta página admite hasta ${maxCount} preguntas`
+                    : `Entre ${EXAM_MIN_QUESTIONS} y ${EXAM_MAX_QUESTIONS}, de ${EXAM_COUNT_STEP} en ${EXAM_COUNT_STEP}`
+                }
               />
               {notice && (
                 <FormMessage tone="info" data-testid="create-exam-notice">

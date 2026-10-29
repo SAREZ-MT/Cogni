@@ -33,6 +33,8 @@ export function requiredWordsFor(count: number): number {
 }
 
 export const RECALL_MIN_WORDS = requiredWordsFor(RECALL_QUESTION_COUNT);
+// The smallest exam (10 questions) needs as many.
+export const EXAM_MIN_WORDS = requiredWordsFor(EXAM_COUNT_STEPS[0]);
 
 // The exam counts `words` supports, smallest first; empty under 150 words.
 export function examCountsForWords(words: number): number[] {

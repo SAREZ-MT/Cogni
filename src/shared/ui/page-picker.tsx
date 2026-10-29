@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useId } from "react";
+import { MIN_GENERATION_WORDS } from "@/shared/kernel/generation-capacity";
 import { FieldLabel } from "@/shared/ui/field-label";
 import {
   Select,
@@ -10,12 +11,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/shared/ui/select";
+import { shortPageHint } from "@/shared/ui/short-page-copy";
 
 export interface PagePickerNotebook {
   id: string;
   title: string;
-  // The notebook's active pages, in notebook order.
-  pages: readonly { id: string; title: string }[];
+  // The notebook's active pages, in notebook order. `words` (Phase 8 H14)
+  // is the page's word count; unknown pages stay selectable.
+  pages: readonly { id: string; title: string; words?: number }[];
 }
 
 export interface PagePickerProps {
@@ -30,6 +33,10 @@ export interface PagePickerProps {
   disabled?: boolean;
   // Tags the selects as `${testIdPrefix}-notebook` / `-page`.
   testIdPrefix: string;
+  // Phase 8 H14 (user 2026-10-29): pages under these words are disabled
+  // with the reason (100 by default; 150 for recall and exams, whose ten
+  // questions need about 15 words each).
+  minWords?: number;
 }
 
 const LOAD_FAILURE = "No pudimos cargar tus cuadernos. Intenta de nuevo.";
@@ -52,6 +59,7 @@ export function PagePicker({
   onPageChange,
   disabled = false,
   testIdPrefix,
+  minWords = MIN_GENERATION_WORDS,
 }: PagePickerProps) {
   const notebookFieldId = useId();
   const pageFieldId = useId();
@@ -124,11 +132,23 @@ export function PagePicker({
               <SelectValue placeholder="Elige una página" />
             </SelectTrigger>
             <SelectContent>
-              {pages.map((p) => (
-                <SelectItem key={p.id} value={p.id}>
-                  {p.title}
-                </SelectItem>
-              ))}
+              {pages.map((p) => {
+                const short = p.words !== undefined && p.words < minWords;
+                return (
+                  <SelectItem
+                    key={p.id}
+                    value={p.id}
+                    disabled={short}
+                    hint={
+                      short && p.words !== undefined
+                        ? shortPageHint(p.words, minWords)
+                        : undefined
+                    }
+                  >
+                    {p.title}
+                  </SelectItem>
+                );
+              })}
             </SelectContent>
           </Select>
         </div>

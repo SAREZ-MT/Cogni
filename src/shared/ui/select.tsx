@@ -77,11 +77,16 @@ function SelectContent({
   );
 }
 
+// `hint` (Phase 8 H14): a muted second line under the label, e.g. why a
+// disabled option cannot be chosen; it stays out of the trigger's value.
 function SelectItem({
   className,
   children,
+  hint,
   ...props
-}: React.ComponentProps<typeof SelectPrimitive.Item>) {
+}: React.ComponentProps<typeof SelectPrimitive.Item> & {
+  hint?: React.ReactNode;
+}) {
   return (
     <SelectPrimitive.Item
       data-slot="select-item"
@@ -91,7 +96,14 @@ function SelectItem({
       )}
       {...props}
     >
-      <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+      {hint ? (
+        <span className="flex flex-col gap-0.5">
+          <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+          <span className="text-[12px] text-fg-muted">{hint}</span>
+        </span>
+      ) : (
+        <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+      )}
       <span className="absolute right-3 flex size-4 items-center justify-center">
         <SelectPrimitive.ItemIndicator>
           <CheckIcon

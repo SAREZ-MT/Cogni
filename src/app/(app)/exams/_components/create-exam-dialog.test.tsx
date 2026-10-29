@@ -367,3 +367,101 @@ describe("CreateExamDialog", () => {
     expect(push).not.toHaveBeenCalled();
   });
 });
+
+// Phase 8 H14 (user 2026-10-29): about 15 words per question, 150 for the
+// smallest exam; the stepper only offers what the chosen page supports.
+describe("CreateExamDialog — page content thresholds", () => {
+  const WITH_WORDS: CreateExamNotebook[] = [
+    {
+      id: "nb-bio",
+      title: "Biología",
+      pages: [
+        { id: "p-short", title: "Corta", words: 120 },
+        { id: "p-mid", title: "Media", words: 240 },
+        { id: "p-long", title: "Larga", words: 900 },
+      ],
+    },
+  ];
+
+  beforeEach(() => {
+    generateExamQuestionsAction.mockReset();
+  });
+
+  it("disables a page under 150 words", async () => {
+    const { user, dialog } = await open({ notebooks: WITH_WORDS });
+    within(dialog).getByRole("combobox", { name: "Página" }).focus();
+    await user.keyboard("{Enter}");
+
+    const option = screen.getByRole("option", { name: /Corta/ });
+    expect(option).toHaveAttribute("aria-disabled", "true");
+    expect(option).toHaveTextContent(
+      "Muy poco contenido (120 palabras): escribe al menos 150",
+    );
+  });
+
+  it("offers only the counts the chosen page supports, with a hint", async () => {
+    const { user, dialog } = await open({ notebooks: WITH_WORDS });
+    await chooseOption(
+      user,
+      within(dialog).getByRole("combobox", { name: "Página" }),
+      "Media",
+    );
+    const more = within(dialog).getByRole("button", {
+      name: "Más preguntas a generar",
+    });
+
+    await user.click(more);
+    expect(within(dialog).getByTestId("exam-count-value")).toHaveTextContent(
+      "15",
+    );
+    expect(more).toBeDisabled();
+    expect(
+      within(dialog).getByText("Esta página admite hasta 15 preguntas"),
+    ).toBeInTheDocument();
+  });
+
+  it("lowers the count when a shorter page is chosen", async () => {
+    const { user, dialog } = await open({ notebooks: WITH_WORDS });
+    const page = within(dialog).getByRole("combobox", { name: "Página" });
+    await chooseOption(user, page, "Larga");
+    const more = within(dialog).getByRole("button", {
+      name: "Más preguntas a generar",
+    });
+    await user.click(more);
+    await user.click(more);
+    expect(within(dialog).getByTestId("exam-count-value")).toHaveTextContent(
+      "20",
+    );
+
+    await chooseOption(user, page, "Media");
+
+    expect(within(dialog).getByTestId("exam-count-value")).toHaveTextContent(
+      "15",
+    );
+  });
+
+  it("explains AI_PAGE_TOO_SHORT with the words the server asks for", async () => {
+    generateExamQuestionsAction.mockResolvedValue({
+      ok: false,
+      error: {
+        code: "AI_PAGE_TOO_SHORT",
+        message: "x",
+        words: 160,
+        minWords: 300,
+        maxItems: 10,
+      },
+    });
+    const { user, dialog } = await open();
+    await chooseOption(
+      user,
+      within(dialog).getByRole("combobox", { name: "Página" }),
+      "Ribosomas",
+    );
+
+    await user.click(within(dialog).getByTestId("create-exam-submit"));
+
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+      "Esta página tiene poco contenido para generar. Agrega más texto (mínimo 300 palabras).",
+    );
+  });
+});

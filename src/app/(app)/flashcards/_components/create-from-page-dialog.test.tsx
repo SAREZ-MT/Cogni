@@ -299,3 +299,65 @@ describe("CreateFromPageDialog — active recall", () => {
     ).toHaveAttribute("href", "/notebooks/nb-bio/pages/p-2");
   });
 });
+
+// Phase 8 H14 (user 2026-10-29): 100 words to generate cards, 150 for the
+// ten recall questions; the server's AI_PAGE_TOO_SHORT reads in Spanish.
+describe("CreateFromPageDialog — page content thresholds", () => {
+  const WITH_WORDS: PagePickerNotebook[] = [
+    {
+      id: "nb-bio",
+      title: "Biología",
+      pages: [
+        { id: "p-1", title: "Corta", words: 120 },
+        { id: "p-2", title: "Larga", words: 400 },
+      ],
+    },
+  ];
+
+  beforeEach(() => {
+    generateFlashcardsAction.mockReset();
+    generateRecallQuestionsAction.mockReset();
+  });
+
+  async function pageOption(technique: "flashcards" | "recall") {
+    const { user, dialog } = await open({ technique, notebooks: WITH_WORDS });
+    within(dialog).getByRole("combobox", { name: "Página" }).focus();
+    await user.keyboard("{Enter}");
+    return screen.getByRole("option", { name: /Corta/ });
+  }
+
+  it("lets flashcards use a 120-word page", async () => {
+    expect(await pageOption("flashcards")).not.toHaveAttribute(
+      "aria-disabled",
+    );
+  });
+
+  it("disables a 120-word page for recall, which needs 150", async () => {
+    const option = await pageOption("recall");
+    expect(option).toHaveAttribute("aria-disabled", "true");
+    expect(option).toHaveTextContent(
+      "Muy poco contenido (120 palabras): escribe al menos 150",
+    );
+  });
+
+  it("explains AI_PAGE_TOO_SHORT with the words the server asks for", async () => {
+    generateRecallQuestionsAction.mockResolvedValue({
+      ok: false,
+      error: {
+        code: "AI_PAGE_TOO_SHORT",
+        message: "x",
+        words: 90,
+        minWords: 150,
+        maxItems: 6,
+      },
+    });
+    const { user, dialog } = await open({ technique: "recall" });
+    await pickPage(user, dialog);
+
+    await user.click(within(dialog).getByTestId("create-recall-submit"));
+
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+      "Esta página tiene poco contenido para generar. Agrega más texto (mínimo 150 palabras).",
+    );
+  });
+});
