@@ -101,7 +101,7 @@ describe("/ciencia", () => {
       screen.getByRole("heading", { name: "Todo esto, en tus páginas." }),
     ).toBeInTheDocument();
     expect(
-      screen.getAllByRole("link", { name: "Empieza gratis" }).at(-1),
+      screen.getAllByRole("link", { name: "Empieza ya" }).at(-1),
     ).toHaveAttribute("href", "/register");
     expect(
       screen.getByRole("link", { name: "Ver cómo funciona" }),

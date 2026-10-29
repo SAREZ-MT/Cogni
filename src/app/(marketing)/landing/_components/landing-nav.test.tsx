@@ -27,7 +27,7 @@ describe("LandingNav", () => {
       within(nav()).getByRole("link", { name: "Iniciar sesión" }),
     ).toHaveAttribute("href", "/login");
     expect(
-      within(nav()).getByRole("link", { name: "Empieza gratis" }),
+      within(nav()).getByRole("link", { name: "Empieza ya" }),
     ).toHaveAttribute("href", "/register");
     expect(
       within(nav()).queryByRole("link", { name: "Ir a la app" }),
@@ -48,7 +48,7 @@ describe("LandingNav", () => {
       within(nav()).queryByRole("link", { name: "Iniciar sesión" }),
     ).toBeNull();
     expect(
-      within(nav()).queryByRole("link", { name: "Empieza gratis" }),
+      within(nav()).queryByRole("link", { name: "Empieza ya" }),
     ).toBeNull();
   });
 });

@@ -77,7 +77,7 @@ export function Closing() {
           href="/register"
           className="lp-press lp-cta-primary mt-9 inline-flex items-center gap-2.5 rounded-full px-[34px] py-[18px] font-(family-name:--lp-font-head) font-semibold text-[18px]"
         >
-          Empieza gratis
+          Empieza ya
           <ArrowRight aria-hidden="true" className="size-[18px]" />
         </Link>
       </div>

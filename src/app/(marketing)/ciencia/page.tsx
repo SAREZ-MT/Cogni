@@ -83,7 +83,7 @@ export default async function SciencePage() {
                     href="/register"
                     className="lp-press lp-cta-primary rounded-full px-[30px] py-4 font-(family-name:--lp-font-head) font-semibold text-[17px]"
                   >
-                    Empieza gratis
+                    Empieza ya
                   </Link>
                   <Link
                     href="/#como-funciona"

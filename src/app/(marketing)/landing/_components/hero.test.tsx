@@ -65,7 +65,7 @@ describe("Hero", () => {
     );
     if (!actions) throw new Error("hero actions not rendered");
     expect(
-      within(actions).getByRole("link", { name: /Empieza gratis/ }),
+      within(actions).getByRole("link", { name: /Empieza ya/ }),
     ).toHaveAttribute("href", "/register");
     expect(
       within(actions).getByRole("link", { name: /Ver cómo funciona/ }),
