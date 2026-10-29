@@ -17,7 +17,7 @@ recorded in `docs/adr/0006-examenes-y-repeticion-con-variantes.md`
 | Adapters | `infrastructure/` | Drizzle repositories, unit-of-work adapters (one transaction each) and the hub reader. |
 | Server Actions | `actions.ts`, `session-actions.ts`, `retake-actions.ts`, `feedback-actions.ts`, `hub-actions.ts` | The only UI entry points; exported through `index.ts`. |
 | AI prompts | `src/modules/ai` | `generate_exam_questions/v1`, `generate_exam_variants/v1`, `session_feedback/v2` (exams never import the AI SDK). |
-| Screens | `src/app/(app)/exams/` | Hub, notebook view, start, player, results, questions. |
+| Screens | `src/app/(app)/exams/` | Hub (flat since Phase 8 H17), start, player, results, questions. |
 
 ## Server Actions
 
@@ -218,10 +218,18 @@ is dropped), and a feedback read failure in `getExamResultsAction` returns
   start of the owner's next local day as the bound, filtered to
   those roots through the `ExamDueCounts` port, built in `hub-actions.ts`);
   `null` when unreadable, and the banner falls back to neutral copy.
-- The hub's header offers only "Crear examen" (Phase 6 T5b): pick a
-  notebook and a page, then generate the questions with AI or write them on
-  the page's `/preguntas` screen; the former "Nuevo examen" quick start was
-  removed.
+- "Crear examen" (Phase 6 T5b) picks a notebook and a page and generates
+  the questions with AI; since Phase 8 H13 it is the grid's first tile and
+  the empty state's CTA, not a header button.
+- Flat hub (Phase 8 H17, 2026-10-29): the reader also returns `bestScore`
+  (best whole percent over the finished exams, a window next to the
+  attempts count) and `latestQuestionAt` (newest active question, in the
+  grouped questions read). `/exams` shows one card per page ("Mejor nota X %
+  · último Y %", "Sin intentos" or the pending retake), filtered by
+  `?cuaderno=` on the server; "Hacer examen" / "Repetir examen" open the
+  page's exam route. The retake banner (and so `failedDueNow`'s copy) and
+  the summary pills are no longer shown; `/exams/[notebookId]` redirects to
+  the filtered hub.
 
 ## Domain
 

@@ -110,6 +110,14 @@ Implementado:
   respondió) para volver a abrir sus resultados; una sesión ajena, abierta
   o de otra página es `RECALL_SESSION_NOT_FOUND`.
 - `hub-actions.ts`: `listRecallHubAction` y `getRecallSessionReviewAction`.
+- Centro plano (Fase 8, H17, 2026-10-29): `RecallHubPage` suma
+  `questionCount` (preguntas activas) y `latestQuestionAt` (creación de la
+  más nueva), como subconsultas correlacionadas de la misma lectura de
+  páginas. `/active-recall` muestra una tarjeta por página (preguntas,
+  sesiones, dominio, vencidas hoy), filtra por `?cuaderno=` en el servidor
+  y ordena lo vencido, luego lo nunca practicado, luego lo más reciente; la
+  vista por cuaderno redirige al centro filtrado y ya no hay promedio de
+  dominio en pantalla.
 
 ## Pendientes
 
