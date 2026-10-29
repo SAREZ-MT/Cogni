@@ -36,7 +36,13 @@ Implementado:
   `generation_fingerprints`, migración `0013`) y sus huellas se guardan con
   las preguntas; sin nada nuevo responde `RECALL_NO_NEW_CONTENT` sin llamar
   a la IA ni consumir unidad. Una página generada antes de T5c envía todos
-  sus párrafos una vez.
+  sus párrafos una vez. Contenido mínimo (Fase 8, H14, decisión del usuario
+  del 2026-10-29, `generation-capacity.ts` del kernel): los párrafos nuevos
+  necesitan 100 palabras y unas 15 por pregunta, es decir 150 para las 10;
+  si no, responde `AI_PAGE_TOO_SHORT` (`words`, `minWords`, `maxItems`,
+  también en el error de la acción) antes de consultar el límite. Solo se
+  guardan las huellas de la parte de los párrafos enviados que cubren las
+  preguntas guardadas (`consumedParagraphs`).
 - Sesión (`application/`): `planRecallSession` (lectura de la ruta, no
   escribe), `startRecallSession` (hasta 10 preguntas: vencidas, nuevas y
   las repasadas hace más tiempo; `RECALL_NO_QUESTIONS` si la página no

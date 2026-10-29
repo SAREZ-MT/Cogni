@@ -96,6 +96,12 @@ is dropped), and a feedback read failure in `getExamResultsAction` returns
   sent; their fingerprints are stored with the questions. Nothing new
   answers `EXAMS_NO_NEW_CONTENT` before the limiter (no AI call, no unit); a
   page generated before T5c sends every paragraph once.
+- Page content thresholds (Phase 8 H14, user 2026-10-29, kernel
+  `generation-capacity.ts`): the new paragraphs need 100 words and about 15
+  per question, so 10 questions need 150 and 30 need 450. Otherwise
+  `AI_PAGE_TOO_SHORT` (`words`, `minWords`, `maxItems`, also on the action
+  error) before the limiter. Only the share of the sent paragraphs the
+  saved questions cover is fingerprinted (`consumedParagraphs`).
 - Prompt `generate_exam_questions/v1` (ai module) receives the truncated
   page text, the count and the page's active questions (`[concept] stem`,
   last 60) so the model avoids duplicates.

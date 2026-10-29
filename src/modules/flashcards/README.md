@@ -45,6 +45,14 @@ sessions are scheduled by `study-engine`; this module adds the card text.
     `generation_fingerprints`) are sent; their fingerprints are stored with
     the cards. Nothing new answers `FLASHCARDS_NO_NEW_CONTENT` with no AI call
     and no unit; a page generated before T5c sends every paragraph once.
+    Page content thresholds (Phase 8 H14, user 2026-10-29, kernel
+    `generation-capacity.ts`): the new paragraphs need 100 words and about
+    15 per card; without an explicit count the cards follow the words (3 to
+    10, a 100-word page yields 6). Below that, `AI_PAGE_TOO_SHORT`
+    (`PageTooShortError`: `words`, `minWords`, `maxItems`, also on the
+    action error) before the limiter. When fewer cards come back than were
+    asked for, only that share of the sent paragraphs is fingerprinted
+    (`consumedParagraphs`).
   - `listFlashcardsByPage`, `listDecks` (one deck per page, count derived from
     its cards), `getGenerationStatus` (remaining generations, does not consume).
   - `requestSessionFeedback` (§3.3, §8.4) asks the AI for feedback on a

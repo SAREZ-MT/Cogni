@@ -50,7 +50,10 @@ Hexagonal shape enforced by `.dependency-cruiser.cjs` (`domain-is-pure`,
   `get-asset-read-url.ts`), its server-side twin for imported images
   (`store-imported-asset.ts`, which validates mime/size and ownership,
   uploads to the canonical path and reuses `registerPageAsset`, plus the
-  best-effort cleanup `delete-imported-assets.ts`) and `list-sidebar.ts`.
+  best-effort cleanup `delete-imported-assets.ts`), `list-sidebar.ts` and
+  `list-page-picker-tree.ts` (Phase 8 H14: the same tree with each page's
+  word count, for the technique hubs' page pickers; served by
+  `getPagePickerTree`, the plain text never leaves the server).
   Tested against the
   in-memory fakes under `application/testing/`.
 - `infrastructure/`: Drizzle repositories (`DrizzleNotebookRepository`,
