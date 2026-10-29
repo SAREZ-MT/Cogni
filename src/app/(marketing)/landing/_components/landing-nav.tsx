@@ -15,6 +15,7 @@ import {
 export const NAV_LINKS = [
   { href: "/#como-funciona", label: "Cómo funciona" },
   { href: "/#tecnicas", label: "Técnicas" },
+  { href: "/#pilares", label: "Pilares" },
   { href: "/#comparacion", label: "Comparación" },
   { href: "/#preguntas", label: "Preguntas" },
 ] as const;
@@ -23,7 +24,7 @@ const SOLID_AFTER = 24;
 // Middle of the 64px bar: the theme follows what sits under this line.
 const PROBE_Y = 32;
 
-// Plain bar fixed at the top at all times: wordmark, four in-page links,
+// Plain bar fixed at the top at all times: wordmark, five in-page links,
 // one action. A signed-in user (/ciencia, /creditos) gets only "Ir a la app"
 // instead: the section links point at the landing, which the proxy sends a
 // signed-in user away from. It is transparent over the very top of the hero and turns

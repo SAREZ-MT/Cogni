@@ -134,4 +134,8 @@ describe("Pillars", () => {
     render(<Pillars />);
     expect(document.body).not.toHaveTextContent(/tiempo de estudio|horas/i);
   });
+  it("gives the whole pillars run one anchor for the nav", () => {
+    const { container } = render(<Pillars />);
+    expect(container.querySelector("#pilares")).not.toBeNull();
+  });
 });

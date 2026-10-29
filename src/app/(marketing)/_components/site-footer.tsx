@@ -7,6 +7,7 @@ type FooterLink = { href: string; label: string };
 const PRODUCT: readonly FooterLink[] = [
   { href: "/#como-funciona", label: "Cómo funciona" },
   { href: "/#tecnicas", label: "Técnicas" },
+  { href: "/#pilares", label: "Pilares" },
   { href: "/#comparacion", label: "Comparación" },
   { href: "/#preguntas", label: "Preguntas" },
 ];

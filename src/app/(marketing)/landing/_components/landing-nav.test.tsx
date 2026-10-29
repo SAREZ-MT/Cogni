@@ -16,6 +16,16 @@ function nav() {
 }
 
 describe("LandingNav", () => {
+  it("links the landing sections in page order, pillars included", () => {
+    expect(NAV_LINKS.map((link) => link.href)).toEqual([
+      "/#como-funciona",
+      "/#tecnicas",
+      "/#pilares",
+      "/#comparacion",
+      "/#preguntas",
+    ]);
+  });
+
   it("shows visitors the section links and the sign-in and sign-up actions", () => {
     render(<LandingNav />);
     for (const link of NAV_LINKS) {

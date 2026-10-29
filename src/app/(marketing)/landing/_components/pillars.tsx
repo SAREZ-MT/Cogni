@@ -185,7 +185,7 @@ export const PILLARS: readonly Pillar[] = [
 // companion, once pillar 04, now closes the Técnicas scroll.
 export function Pillars() {
   return (
-    <div className="lp-on-paper bg-(--lp-paper)">
+    <div id="pilares" className="lp-on-paper scroll-mt-16 bg-(--lp-paper)">
       <PixelTileDefs />
       {PILLARS.map((pillar, index) => (
         <section
