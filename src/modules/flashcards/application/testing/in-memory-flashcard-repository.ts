@@ -85,6 +85,32 @@ export class InMemoryFlashcardRepository implements FlashcardRepository {
     this.rows[index] = { ...card, archivedAt: now, updatedAt: now };
   }
 
+  async update(card: Flashcard): Promise<Flashcard | null> {
+    const index = this.rows.findIndex(
+      (row) =>
+        row.id === card.id &&
+        row.ownerId === card.ownerId &&
+        row.archivedAt === null,
+    );
+    const stored = this.rows[index];
+    if (!stored) return null;
+    const updated = {
+      ...stored,
+      front: card.front,
+      back: card.back,
+      updatedAt: card.updatedAt,
+    };
+    this.rows[index] = updated;
+    return updated;
+  }
+
+  async delete(id: string, ownerId: string): Promise<void> {
+    const index = this.rows.findIndex(
+      (card) => card.id === id && card.ownerId === ownerId,
+    );
+    if (index !== -1) this.rows.splice(index, 1);
+  }
+
   // Nothing runs concurrently in memory.
   async lockDeck(): Promise<void> {}
 

@@ -1,3 +1,9 @@
+export {
+  type ApplyDeckEditsDeps,
+  applyDeckEdits,
+  type DeckEdits,
+  type DeckEditsResult,
+} from "./apply-deck-edits";
 export { type ArchiveDeckResult, archiveDeck } from "./archive-deck";
 export {
   type ArchiveFlashcardResult,
@@ -12,6 +18,11 @@ export type {
   DeckStudyItems,
   DeckUnitOfWork,
 } from "./deck-unit-of-work";
+export {
+  type DeleteFlashcardResult,
+  deleteFlashcard,
+} from "./delete-flashcard";
+export { editFlashcard } from "./edit-flashcard";
 export { getGenerationStatus } from "./get-generation-status";
 export { listDecks } from "./list-decks";
 export { listFlashcardsByPage } from "./list-flashcards-by-page";

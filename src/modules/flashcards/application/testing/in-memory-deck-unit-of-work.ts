@@ -12,7 +12,7 @@ import { InMemoryFlashcardRepository } from "./in-memory-flashcard-repository";
 
 // Minimal in-memory DeckStudyItems. The full fake lives in study-engine's
 // testing.ts, which cross-module-via-index keeps out of reach of this
-// module; this one covers only the three methods a deck change uses, with
+// module; this one covers only the methods a deck change uses, with
 // the same unique (kind, sourceId) rule as the database.
 export class InMemoryDeckStudyItems implements DeckStudyItems {
   private readonly rows = new Map<string, StudyItem>();
@@ -60,6 +60,22 @@ export class InMemoryDeckStudyItems implements DeckStudyItems {
     const suspended = { ...item, suspendedAt: now, updatedAt: now };
     this.rows.set(id, suspended);
     return suspended;
+  }
+
+  async deleteBySource(
+    kind: StudyItemKind,
+    sourceId: string,
+    ownerId: string,
+  ): Promise<void> {
+    for (const [id, row] of this.rows) {
+      if (
+        row.kind === kind &&
+        row.sourceId === sourceId &&
+        row.ownerId === ownerId
+      ) {
+        this.rows.delete(id);
+      }
+    }
   }
 
   // Test helper: every stored item, in insertion order.

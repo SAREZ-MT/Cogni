@@ -30,6 +30,7 @@ import {
   withBoundary,
 } from "./action-support";
 import {
+  applyDeckEdits as applyDeckEditsUseCase,
   archiveDeck as archiveDeckUseCase,
   archiveFlashcard as archiveFlashcardUseCase,
   DailyLimitReachedError,
@@ -116,6 +117,18 @@ const generateInput = z.object({
 });
 
 const archiveInput = z.object({ flashcardId: z.uuid() });
+
+// One edit page save (Phase 8 H18). The bounds only keep the payload sane;
+// the domain trims and checks each side (non-blank, at most 1000).
+const MAX_DRAFT_ITEMS = 200;
+const sideText = z.string().max(4000);
+const cardSides = z.object({ front: sideText, back: sideText });
+const saveDeckEditsInput = z.object({
+  pageId: z.uuid(),
+  updates: z.array(cardSides.extend({ id: z.uuid() })).max(MAX_DRAFT_ITEMS),
+  creates: z.array(cardSides).max(MAX_DRAFT_ITEMS),
+  deletes: z.array(z.uuid()).max(MAX_DRAFT_ITEMS),
+});
 const archiveDeckInput = z.object({ pageId: z.uuid() });
 
 // Adapters are built per call, like ingestion/actions.ts: serverless
@@ -346,5 +359,34 @@ export async function archiveDeckAction(
     if (!result.ok) return err(toActionError(result.error));
     revalidateDecks();
     return ok({ archived: result.value.archived });
+  });
+}
+
+export interface DeckEditsView {
+  // The deck after saving, by position.
+  cards: FlashcardView[];
+}
+
+// "Guardar" on the deck's edit page (Phase 8 H18): the draft's edits,
+// additions and real deletions, applied together in one transaction
+// (applyDeckEdits) or not at all.
+export async function saveDeckEditsAction(
+  input: unknown,
+): Promise<Result<DeckEditsView, ActionError>> {
+  return withBoundary(async () => {
+    const ownerId = await requireOwnerId();
+    if (!ownerId.ok) return ownerId;
+    const parsed = parseInput(saveDeckEditsInput, input);
+    if (!parsed.ok) return parsed;
+
+    const { deck, pages } = deps();
+    const result = await applyDeckEditsUseCase(
+      parsed.value,
+      { pages, deck, clock: systemClock, ids: { next: createId } },
+      ownerId.value,
+    );
+    if (!result.ok) return err(toActionError(result.error));
+    revalidateDecks();
+    return ok({ cards: result.value.cards.map(toView) });
   });
 }

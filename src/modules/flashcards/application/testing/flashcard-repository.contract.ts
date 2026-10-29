@@ -181,6 +181,74 @@ export function runFlashcardRepositoryContract(
       });
     });
 
+    // Phase 8 H18: the edit page rewrites a card in place and deletes one
+    // for good.
+    describe("update", () => {
+      const EDITED_AT = new Date("2026-10-29T09:00:00.000Z");
+
+      it("rewrites front, back and updatedAt of an active card, keeping the rest", async () => {
+        const ctx = options.context();
+        const repo = options.createRepository();
+        const pageId = await ctx.newPageId();
+        const card = makeCard(ctx, pageId, 0);
+        await repo.insertMany([card]);
+        const saved = await repo.update({
+          ...card,
+          front: "Frente nuevo",
+          back: "Reverso nuevo",
+          updatedAt: EDITED_AT,
+        });
+        const expected = {
+          ...card,
+          front: "Frente nuevo",
+          back: "Reverso nuevo",
+          updatedAt: EDITED_AT,
+        };
+        expect(saved).toEqual(expected);
+        expect(await repo.findById(card.id, ctx.ownerId)).toEqual(expected);
+      });
+
+      it("never rewrites another owner's or an archived card", async () => {
+        const ctx = options.context();
+        const repo = options.createRepository();
+        const pageId = await ctx.newPageId();
+        const card = makeCard(ctx, pageId, 0);
+        const archived = makeCard(ctx, pageId, 1);
+        await repo.insertMany([card, archived]);
+        await repo.archive(archived.id, ctx.ownerId, ARCHIVED_AT);
+        expect(
+          await repo.update({ ...card, ownerId: ctx.otherOwnerId, front: "X" }),
+        ).toBeNull();
+        expect(await repo.update({ ...archived, front: "X" })).toBeNull();
+        expect((await repo.findById(card.id, ctx.ownerId))?.front).toBe(
+          card.front,
+        );
+      });
+    });
+
+    describe("delete", () => {
+      it("removes the card for good", async () => {
+        const ctx = options.context();
+        const repo = options.createRepository();
+        const pageId = await ctx.newPageId();
+        const card = makeCard(ctx, pageId, 0);
+        await repo.insertMany([card, makeCard(ctx, pageId, 1)]);
+        await repo.delete(card.id, ctx.ownerId);
+        expect(await repo.findById(card.id, ctx.ownerId)).toBeNull();
+        expect(await repo.countByPage(pageId, ctx.ownerId)).toBe(1);
+      });
+
+      it("never deletes another owner's card", async () => {
+        const ctx = options.context();
+        const repo = options.createRepository();
+        const pageId = await ctx.newPageId();
+        const card = makeCard(ctx, pageId, 0);
+        await repo.insertMany([card]);
+        await repo.delete(card.id, ctx.otherOwnerId);
+        expect(await repo.findById(card.id, ctx.ownerId)).toEqual(card);
+      });
+    });
+
     it("lockDeck resolves for an owned page, with or without cards", async () => {
       const ctx = options.context();
       const repo = options.createRepository();

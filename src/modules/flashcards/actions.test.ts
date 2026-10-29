@@ -565,5 +565,59 @@ describe("flashcards Server Actions", () => {
         expect(revalidatePath).not.toHaveBeenCalled();
       });
     });
+
+    // Phase 8 H18: the edit page's "Guardar".
+    describe("saveDeckEditsAction", () => {
+      it("rejects an unauthenticated caller and a malformed draft", async () => {
+        const { saveDeckEditsAction } = await actions();
+        expect(
+          await saveDeckEditsAction({ pageId: PAGE, updates: "x" }).then(
+            (result) => !result.ok && result.error.code,
+          ),
+        ).toBe("FLASHCARDS_INVALID_INPUT");
+        getCurrentUser.mockResolvedValue(null);
+        expect(
+          await saveDeckEditsAction({
+            pageId: PAGE,
+            updates: [],
+            creates: [],
+            deletes: [],
+          }).then((result) => !result.ok && result.error.code),
+        ).toBe("FLASHCARDS_SESSION_REQUIRED");
+      });
+
+      it("saves edits, additions and deletions, answers the deck and revalidates", async () => {
+        const [a, b] = await seedDeck(2);
+        const { saveDeckEditsAction } = await actions();
+
+        const result = await saveDeckEditsAction({
+          pageId: PAGE,
+          updates: [{ id: a, front: "Editada", back: "R" }],
+          creates: [{ front: "Nueva", back: "RN" }],
+          deletes: [b],
+        });
+
+        expect(result.ok && result.value.cards.map((c) => c.front)).toEqual([
+          "Editada",
+          "Nueva",
+        ]);
+        expect(revalidatePath).toHaveBeenCalledWith("/flashcards", "layout");
+      });
+
+      it("refuses a draft that would leave the deck empty", async () => {
+        const [a] = await seedDeck(1);
+        const { saveDeckEditsAction } = await actions();
+
+        const result = await saveDeckEditsAction({
+          pageId: PAGE,
+          updates: [],
+          creates: [],
+          deletes: [a],
+        });
+
+        expect(!result.ok && result.error.code).toBe("FLASHCARD_LAST_CARD");
+        expect(revalidatePath).not.toHaveBeenCalled();
+      });
+    });
   });
 });

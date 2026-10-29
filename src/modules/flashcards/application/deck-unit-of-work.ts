@@ -1,14 +1,26 @@
-import type { StudyItemRepository } from "@/modules/study-engine";
+import type {
+  StudyItemKind,
+  StudyItemRepository,
+} from "@/modules/study-engine";
 import type { GenerationFingerprintRepository } from "@/shared/kernel/generation-fingerprints";
 import type { FlashcardRepository } from "../domain/flashcard-repository";
 
 // The slice of StudyItemRepository a deck change needs: every card owns one
-// StudyItem (documento-maestro §3.4), created with the card and suspended
-// when the card is archived.
+// StudyItem (documento-maestro §3.4), created with the card, suspended
+// when the card is archived and deleted, with its review history, when the
+// card is deleted (Phase 8 H18). study-engine has no delete of its own, so
+// the deck's adapter adds deleteBySource.
 export type DeckStudyItems = Pick<
   StudyItemRepository,
   "save" | "findBySource" | "suspend"
->;
+> & {
+  // Removes the source's study item; its review logs cascade with it.
+  deleteBySource(
+    kind: StudyItemKind,
+    sourceId: string,
+    ownerId: string,
+  ): Promise<void>;
+};
 
 export interface DeckRepositories {
   readonly flashcards: FlashcardRepository;

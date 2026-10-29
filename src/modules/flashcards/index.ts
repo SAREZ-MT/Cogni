@@ -5,6 +5,7 @@ export {
   type ArchiveView,
   archiveDeckAction,
   archiveFlashcardAction,
+  type DeckEditsView,
   type DeckView,
   type FlashcardView,
   type GenerationActionError,
@@ -14,6 +15,7 @@ export {
   getGenerationStatusAction,
   listDecksAction,
   listFlashcardsAction,
+  saveDeckEditsAction,
 } from "./actions";
 export * from "./domain";
 export {
