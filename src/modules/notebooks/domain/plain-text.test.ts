@@ -197,6 +197,33 @@ describe("extractPlainText", () => {
     expect(extractPlainText(doc)).toBe("importante");
   });
 
+  // H7: the "Texto" menu's font family and size live in a textStyle mark;
+  // the AI reads only the words.
+  it("ignores textStyle font family and size", () => {
+    const doc: TiptapDoc = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            {
+              ...text("Bitter grande"),
+              marks: [
+                {
+                  type: "textStyle",
+                  attrs: { fontFamily: "Bitter, serif", fontSize: "22px" },
+                },
+              ],
+            },
+            text(" y normal"),
+          ],
+        },
+      ],
+    };
+
+    expect(extractPlainText(doc)).toBe("Bitter grande y normal");
+  });
+
   // Fingerprint stability (shared/kernel/page-paragraphs.ts): a page that
   // only uses the nodes extractPlainText handled before the catalogue
   // (paragraphs, headings, lists, tables, code, quotes, hard breaks) must

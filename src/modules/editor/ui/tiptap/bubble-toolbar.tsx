@@ -67,6 +67,7 @@ import { focusEditorView } from "./focus-editor-view";
 import { HighlightPickerControls } from "./highlight-picker-controls";
 import { QuickHighlighter } from "./quick-highlighter";
 import { isTableCellSelection } from "./table-selection";
+import { TextStyleMenu } from "./text-style-menu";
 
 export interface BubbleToolbarProps {
   editor: Editor;
@@ -423,6 +424,12 @@ export function BubbleToolbarControls({ editor }: BubbleToolbarControlsProps) {
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
+
+        {/* H7: "Texto" — font family and size of the selection. */}
+        <TextStyleMenu
+          editor={editor}
+          triggerClassName={`${BUTTON_CLASS} w-auto gap-1 px-1.5 text-fg-secondary hover:bg-hover`}
+        />
 
         <ToolbarSeparator />
 

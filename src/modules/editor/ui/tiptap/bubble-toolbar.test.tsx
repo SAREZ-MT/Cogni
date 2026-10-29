@@ -63,6 +63,7 @@ describe("BubbleToolbarControls", () => {
 
     for (const name of [
       "Convertir en",
+      "Texto: fuente y tamaño",
       "Deshacer",
       "Rehacer",
       "Negrita",
@@ -248,6 +249,39 @@ describe("BubbleToolbarControls", () => {
     fireEvent.click(await screen.findByRole("menuitem", { name: /Cita/ }));
 
     expect(editor.isActive("blockquote")).toBe(true);
+  });
+
+  // H7: the "Texto" menu sets the font family and size of the selection.
+  it("sets the font family and size through the 'Texto' menu", async () => {
+    editor = createHeadlessEditor();
+    render(<BubbleToolbarControls editor={editor} />);
+
+    const openMenu = () =>
+      fireEvent.pointerDown(screen.getByTestId("bubble-toolbar-text-style"), {
+        button: 0,
+        ctrlKey: false,
+      });
+    openMenu();
+    const bitter = await screen.findByRole("menuitemradio", { name: "Bitter" });
+    expect(bitter).toHaveStyle({ fontFamily: "Bitter, serif" });
+    expect(
+      screen.getByRole("menuitemradio", { name: "Predeterminada" }),
+    ).toHaveAttribute("aria-checked", "true");
+    fireEvent.click(bitter);
+    expect(editor.getAttributes("textStyle").fontFamily).toBe("Bitter, serif");
+
+    openMenu();
+    fireEvent.click(
+      await screen.findByRole("menuitemradio", { name: /^Grande/ }),
+    );
+    expect(editor.getAttributes("textStyle").fontSize).toBe("22px");
+
+    openMenu();
+    expect(
+      await screen.findByRole("menuitemradio", { name: "Bitter" }),
+    ).toHaveAttribute("aria-checked", "true");
+    fireEvent.click(screen.getByRole("menuitemradio", { name: /^Normal/ }));
+    expect(editor.getAttributes("textStyle").fontSize ?? null).toBeNull();
   });
 
   it("disables undo/redo until there is history, then undoes and redoes", () => {

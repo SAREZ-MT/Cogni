@@ -546,6 +546,27 @@
     --highlighter: var(--color-highlighter-mint);
   }
 
+  /* H7: the "Texto" menu stores plain font stacks ("Bitter, serif"); the
+     faces the app self-hosts through next/font have hashed family names, so
+     these rules point the stored stack at them. `!important` beats the
+     mark's inline style; the system stacks (Arial, Georgia…) need no rule.
+     `.editor-font-preview` is the menu item that previews each face. */
+  .editor-content [style*="font-family: Inter"],
+  .editor-font-preview[style*="font-family: Inter"] {
+    /* biome-ignore lint/complexity/noImportantStyles: must beat the mark's inline style */
+    font-family: var(--font-inter), Inter, sans-serif !important;
+  }
+  .editor-content [style*="font-family: Bitter"],
+  .editor-font-preview[style*="font-family: Bitter"] {
+    /* biome-ignore lint/complexity/noImportantStyles: must beat the mark's inline style */
+    font-family: var(--font-bitter), Bitter, Georgia, serif !important;
+  }
+  .editor-content [style*="font-family: JetBrains Mono"],
+  .editor-font-preview[style*="font-family: JetBrains Mono"] {
+    /* biome-ignore lint/complexity/noImportantStyles: must beat the mark's inline style */
+    font-family: var(--font-mono) !important;
+  }
+
   .editor-content a {
     color: var(--color-primary-600);
     text-decoration: underline;
