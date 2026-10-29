@@ -1,5 +1,6 @@
 import { FileText, Plus } from "lucide-react";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import type { ReactNode } from "react";
 import {
   ArchivePageButton,
   createPageAction,
@@ -17,6 +18,7 @@ import { ViewToggle } from "@/shared/ui/view-toggle";
 import { SetBreadcrumb } from "../../_components/breadcrumb";
 import { formatUpdatedAt } from "../../_components/format";
 import { PageListRow } from "../../_components/page-list-row";
+import { NewPageDialog } from "./_components/new-page-dialog";
 
 const CREATE_HINT = "Escribe o importa un apunte";
 
@@ -48,10 +50,24 @@ export default async function NotebookPage({
   const { view: viewParam } = await searchParams;
   const view = viewParam === "list" ? "list" : "grid";
 
+  // H5-T3 (user 2026-10-29): a blank page opens in its editor right away.
+  // `redirect` throws, so nothing runs after it; the action's errors still
+  // reach the route's error boundary, as before.
   async function createPage() {
     "use server";
-    await createPageAction({ notebookId });
+    const created = await createPageAction({ notebookId });
+    redirect(`/notebooks/${notebookId}/pages/${created.id}`);
   }
+
+  // Every "Nueva página" opens the same "how to create" dialog (H5-T3).
+  const newPage = (trigger: ReactNode) => (
+    <NewPageDialog
+      notebookId={notebook.id}
+      createBlankPage={createPage}
+      tone={tone}
+      trigger={trigger}
+    />
+  );
 
   return (
     <section className="flex flex-1 flex-col gap-6">
@@ -97,15 +113,15 @@ export default async function NotebookPage({
           action={
             // The only create control while the notebook is empty (the
             // header lost its button in H5-T2); step 2 redesigns this state.
-            <form action={createPage}>
+            newPage(
               <button
-                type="submit"
+                type="button"
                 className="flex h-10 items-center gap-1.5 rounded-input bg-neutral-900 px-4 text-[13.5px] text-white transition-all hover:bg-neutral-800"
               >
                 <Plus aria-hidden="true" size={16} strokeWidth={1.75} />
                 Nueva página
-              </button>
-            </form>
+              </button>,
+            )
           }
         />
       ) : (
@@ -124,13 +140,12 @@ export default async function NotebookPage({
             <div className="@container/grid">
               <ul className="grid grid-cols-1 gap-x-6 gap-y-8 @[300px]/grid:grid-cols-2 @[540px]/grid:grid-cols-3 @[680px]/grid:grid-cols-4 @[960px]/grid:grid-cols-5">
                 <li>
-                  <form action={createPage} className="contents">
+                  {newPage(
                     <PageSheetCreateTile
-                      type="submit"
                       label="Nueva página"
                       hint={CREATE_HINT}
-                    />
-                  </form>
+                    />,
+                  )}
                 </li>
                 {pages.map((page) => (
                   <li key={page.id}>
@@ -155,13 +170,9 @@ export default async function NotebookPage({
             <div className="flex flex-col gap-2">
               {/* H5-T2: the list's first row creates a page too; each page
                   is a paper strip. */}
-              <form action={createPage}>
-                <PageStripCreateRow
-                  type="submit"
-                  label="Nueva página"
-                  hint={CREATE_HINT}
-                />
-              </form>
+              {newPage(
+                <PageStripCreateRow label="Nueva página" hint={CREATE_HINT} />,
+              )}
               {pages.map((page) => (
                 <PageListRow
                   key={page.id}

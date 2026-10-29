@@ -89,20 +89,17 @@ export async function openNotebook(page: Page, title: string) {
   return new URL(page.url()).pathname.split("/")[2] ?? "";
 }
 
-// Adds a page from "Nueva página" on the notebook's route (the notebook must
-// be the current page) and opens it from its card. Since Phase 8 H5-T2 that
-// is the grid's first item (the sheet-shaped create tile; the header has no
-// create button), or the empty state's button while the notebook has no
-// pages; exactly one is on the page. A freshly created page is titled
-// "Sin título".
+// Adds a blank page from "Nueva página" on the notebook's route (the
+// notebook must be the current page). Since Phase 8 H5-T2 that control is
+// the grid's first item (or the empty state's button while the notebook
+// has no pages); since H5-T3 it opens the "Nueva página" dialog, whose
+// "Página en blanco" creates the page and lands in its editor right away.
+// A freshly created page is titled "Sin título".
 export async function createPageAndOpen(page: Page) {
-  await clickAndWaitForAction(
-    page,
-    page.getByRole("button", { name: "Nueva página" }),
-  );
-  const pageLink = page.getByRole("link", { name: /^Sin título/ });
-  await expect(pageLink).toBeVisible();
-  await pageLink.click();
+  await page.getByRole("button", { name: "Nueva página" }).click();
+  const dialog = page.getByRole("dialog", { name: "Nueva página" });
+  await dialog.getByRole("button", { name: /Página en blanco/ }).click();
+  await expect(page).toHaveURL(/\/notebooks\/[^/]+\/pages\/[^/?]+$/);
   await expect(page.getByTestId("editor-mount")).toBeVisible();
 }
 

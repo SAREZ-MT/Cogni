@@ -380,8 +380,9 @@ same 150px / 280px container steps as the hub tile.
   `"button"`; the page passes `"submit"` inside its create form).
 
 Used by: `notebooks/[notebookId]/page.tsx` (grid view, "Nueva página" /
-"Escribe o importa un apunte", inside the same `createPage` server-action
-form the header button used; the header has no create button since H5-T2).
+"Escribe o importa un apunte"; the header has no create button since H5-T2).
+Since H5-T3 it is a plain `button` that opens `NewPageDialog`, which asks
+how to create the page.
 
 ## PageStripRow (`page-strip.tsx`)
 
@@ -417,8 +418,45 @@ the hint beside it (below 160px only the disc remains; the accessible name
 stays the label). Hover lifts 1px and deepens its tint, press 0.99, none
 under reduced motion. Props: `label`, `hint?`, plus `button` attributes.
 
-Used by: `notebooks/[notebookId]/page.tsx` (list view, same form and copy as
-the grid tile).
+Used by: `notebooks/[notebookId]/page.tsx` (list view, same copy as the
+grid tile; since H5-T3 it opens `NewPageDialog` too).
+
+## FileFormatBadge (`file-format-badge.tsx`)
+
+Phase 8 H5-T3: a small uppercase file-type tag — the extension ("PDF",
+"DOCX", "PPTX") in 10.5px bold on its format's pastel (PDF
+`pastel-pink`, Word `pastel-blue`, PowerPoint `pastel-orange`, each with
+its `-fg` text), 24px tall, 6px radius, a hairline inset border
+(`data-slot="file-format-badge"`, `data-format`). A file label, not a
+status `Pill`. Props: `format` (`"pdf" | "docx" | "pptx"`), `className?`.
+
+Used by: `notebooks/[notebookId]/_components/new-page-dialog.tsx` (the
+import option, one per `UI_IMPORT_FORMATS` entry, so it follows the
+formats the import picker really takes).
+
+### NewPageDialog (route composition, `notebooks/[notebookId]/_components/new-page-dialog.tsx`)
+
+Phase 8 H5-T3 (user request 2026-10-29): every "Nueva página" (grid tile,
+list row, empty-state CTA) opens it. Built on `Dialog` (focus trap, Escape,
+focus return): title "Nueva página", subtitle "Elige cómo quieres empezar.
+Siempre puedes seguir escribiendo después.", two large option cards
+(`rounded-2xl`, hairline border, hover lift 2px with a violet border and
+soft violet shadow, focus ring, none under reduced motion), side by side
+from `sm`, stacked on a phone:
+
+- "Página en blanco": a `PageSheet` in the notebook's colour on a
+  `neutral-50` art well; submits the route's `createPage` Server Action
+  (creates the page, `redirect`s to its editor); "Creando página…" while
+  pending.
+- "Importar un documento": a violet `FileUp` disc over the three
+  `FileFormatBadge`s; closes the dialog and calls the existing
+  `DocumentImportProvider`'s `start` (its hidden picker, PDF/DOCX/PPTX, 20
+  MB, its own progress banner and errors, then it opens the new page's
+  editor); disabled while another import runs.
+
+It lives in the route, not in `src/modules/notebooks/ui`: notebooks cannot
+import ingestion (`cross-module-via-index`), and the app layer is where
+the two meet (as in `_components/notebook-actions.tsx`).
 
 ## StudyBackdrop (`study-backdrop.tsx`)
 

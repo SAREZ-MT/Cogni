@@ -8,7 +8,8 @@ const { notFound } = vi.hoisted(() => ({
     throw new Error("NEXT_NOT_FOUND");
   }),
 }));
-vi.mock("next/navigation", () => ({ notFound }));
+const { redirect } = vi.hoisted(() => ({ redirect: vi.fn() }));
+vi.mock("next/navigation", () => ({ notFound, redirect }));
 
 const { getNotebookForRoute } = vi.hoisted(() => ({
   getNotebookForRoute: vi.fn(),
@@ -19,8 +20,31 @@ vi.mock("@/modules/notebooks", () => ({
       Archivar {title}
     </button>
   ),
-  createPageAction: vi.fn(),
+  createPageAction,
   getNotebookForRoute,
+}));
+
+const { createPageAction } = vi.hoisted(() => ({
+  createPageAction: vi.fn(),
+}));
+
+// The dialog is a client component tested on its own; here it renders only
+// its trigger and hands the route's blank-page action to the test.
+const dialogProps = vi.hoisted(() => ({
+  current: null as null | {
+    notebookId: string;
+    createBlankPage: () => Promise<void>;
+  },
+}));
+vi.mock("./_components/new-page-dialog", () => ({
+  NewPageDialog: (props: {
+    notebookId: string;
+    createBlankPage: () => Promise<void>;
+    trigger: React.ReactNode;
+  }) => {
+    dialogProps.current = props;
+    return props.trigger;
+  },
 }));
 
 import NotebookPage from "./page";
@@ -50,6 +74,9 @@ async function renderRoute(view?: string) {
 describe("notebook detail route", () => {
   beforeEach(() => {
     notFound.mockClear();
+    redirect.mockClear();
+    createPageAction.mockReset();
+    dialogProps.current = null;
     getNotebookForRoute.mockReset();
     getNotebookForRoute.mockResolvedValue({ notebook, pages });
   });
@@ -89,13 +116,26 @@ describe("notebook detail route", () => {
 
     const creates = screen.getAllByRole("button", { name: "Nueva página" });
     expect(creates).toHaveLength(1);
-    expect(creates[0]).toHaveAttribute("type", "submit");
-    expect(creates[0].closest("form")).not.toBeNull();
+    // H5-T3: it opens the "how to create" dialog instead of submitting.
+    expect(creates[0]).toHaveAttribute("type", "button");
+    expect(creates[0].closest("form")).toBeNull();
     const firstPageLink = screen.getByRole("link", { name: /Mitosis/ });
     expect(
       creates[0].compareDocumentPosition(firstPageLink) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
+  });
+
+  // Phase 8 H5-T3 (user 2026-10-29): a blank page opens in its editor
+  // right after it is created.
+  it("creates a blank page and redirects to its editor", async () => {
+    createPageAction.mockResolvedValue({ id: "new1" });
+    await renderRoute();
+
+    expect(dialogProps.current?.notebookId).toBe("nb1");
+    await dialogProps.current?.createBlankPage();
+    expect(createPageAction).toHaveBeenCalledWith({ notebookId: "nb1" });
+    expect(redirect).toHaveBeenCalledWith("/notebooks/nb1/pages/new1");
   });
 
   it("makes the grid's first item the sheet-shaped create tile", async () => {
