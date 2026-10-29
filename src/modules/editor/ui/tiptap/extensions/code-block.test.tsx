@@ -39,6 +39,9 @@ describe("code block", () => {
 
     const codeBlock = await screen.findByTestId("code-block");
     expect(codeBlock.querySelector(".hljs-keyword")).not.toBeNull();
+    // H7: a neutral grey ground (`--color-code-block`), not the warm muted.
+    expect(codeBlock.className).toContain("bg-code-block");
+    expect(codeBlock.className).not.toContain("bg-muted");
 
     // H6-E4: a discreet button (not a native select) names the language.
     const picker = screen.getByTestId("code-block-language");

@@ -88,7 +88,7 @@ function CodeBlockView({ node, updateAttributes }: ReactNodeViewProps) {
   return (
     <NodeViewWrapper
       data-testid="code-block"
-      className="group/code not-prose relative my-1 overflow-hidden rounded-(--radius-editor) bg-muted"
+      className="group/code not-prose relative my-1 overflow-hidden rounded-(--radius-editor) bg-code-block"
     >
       <div contentEditable={false} className="absolute top-1.5 right-1.5">
         <DropdownMenu>
