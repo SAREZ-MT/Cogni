@@ -29,6 +29,10 @@ export interface RecallHubPage {
   // both descending). Empty while the page only has questions (freshly
   // generated, or every session still open).
   readonly sessions: readonly RecallHubSession[];
+  // Active (not archived) recall questions of the page (Phase 8 H17).
+  readonly questionCount: number;
+  // When the newest active question was created; null without any.
+  readonly latestQuestionAt: Date | null;
 }
 
 export interface RecallHubReader {

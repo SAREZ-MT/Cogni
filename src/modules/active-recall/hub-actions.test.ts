@@ -96,6 +96,8 @@ function hubPage(overrides: Partial<RecallHubPage> = {}): RecallHubPage {
     notebookId: "nb-1",
     notebookTitle: "Biología",
     notebookColor: "green",
+    questionCount: 8,
+    latestQuestionAt: new Date("2026-10-05T10:00:00.000Z"),
     sessions: [
       {
         id: "s-1",
@@ -171,6 +173,8 @@ describe("listRecallHubAction", () => {
             notebookColor: "green",
             mastery: 42,
             dueToday: 3,
+            questionCount: 8,
+            latestQuestionAt: "2026-10-05T10:00:00.000Z",
             sessions: [
               {
                 id: "s-1",

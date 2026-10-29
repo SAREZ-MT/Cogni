@@ -46,6 +46,10 @@ export interface RecallHubEntry {
   mastery: number | null;
   // The page's recall questions due today; null when unknown.
   dueToday: number | null;
+  // Active recall questions of the page and the newest one's creation
+  // (Phase 8 H17: the flat hub's "N preguntas" and recency).
+  questionCount: number;
+  latestQuestionAt: Date | null;
 }
 
 export interface RecallHub {
@@ -99,6 +103,8 @@ export async function listRecallHub(
         ? null
         : Math.round((masteryByPage.get(page.pageId) ?? 0) * 100),
     dueToday: due === null ? null : (due.get(page.pageId) ?? 0),
+    questionCount: page.questionCount,
+    latestQuestionAt: page.latestQuestionAt,
   }));
   const averageMastery =
     masteryByPage === null || pages.length === 0
