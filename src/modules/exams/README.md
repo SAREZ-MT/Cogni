@@ -17,7 +17,7 @@ recorded in `docs/adr/0006-examenes-y-repeticion-con-variantes.md`
 | Adapters | `infrastructure/` | Drizzle repositories, unit-of-work adapters (one transaction each) and the hub reader. |
 | Server Actions | `actions.ts`, `session-actions.ts`, `retake-actions.ts`, `feedback-actions.ts`, `hub-actions.ts` | The only UI entry points; exported through `index.ts`. |
 | AI prompts | `src/modules/ai` | `generate_exam_questions/v1`, `generate_exam_variants/v1`, `session_feedback/v2` (exams never import the AI SDK). |
-| Screens | `src/app/(app)/exams/` | Hub (flat since Phase 8 H17), start, player, results, questions. |
+| Screens | `src/app/(app)/exams/` | Hub (flat since Phase 8 H17), start, player, results (they honour the hub's `?desde=hub` since H18), the questions' edit page `editar` (H18; `preguntas` redirects there). |
 
 ## Server Actions
 

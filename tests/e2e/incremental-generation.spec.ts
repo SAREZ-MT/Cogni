@@ -175,11 +175,21 @@ test.describe("incremental generation", () => {
 
     // The second generation was sent only the new paragraph: its ten stems
     // quote the second paragraph, the first ten the first one.
-    await page.goto(`/exams/${notebookId}/${pageId}/preguntas`);
-    const rows = page.getByTestId("exam-question-row");
+    await page.goto(`/exams/${notebookId}/${pageId}/editar`);
+    const rows = page.getByTestId("item-editor-entry");
     await expect(rows).toHaveCount(20);
-    await expect(rows.filter({ hasText: "«La mitocondria" })).toHaveCount(10);
-    await expect(rows.filter({ hasText: "«El ribosoma" })).toHaveCount(10);
+    // The stems live in the edit page's fields (Phase 8 H18).
+    const stems = await rows
+      .getByLabel("Enunciado")
+      .evaluateAll((fields) =>
+        fields.map((field) => (field as HTMLTextAreaElement).value),
+      );
+    expect(
+      stems.filter((stem) => stem.includes("«La mitocondria")),
+    ).toHaveLength(10);
+    expect(stems.filter((stem) => stem.includes("«El ribosoma"))).toHaveLength(
+      10,
+    );
 
     // "Crear examen" in AI mode says the same in the dialog.
     await page.goto("/exams");

@@ -126,9 +126,15 @@ earliest due date of the deck's active study items, read in the same
 grouped query), newest first (`latestCardAt`), filtered by `?cuaderno=`.
 Its menu deletes a deck with `archiveDeckAction` (every card archived and
 its study item suspended under the deck lock). `/flashcards/[notebookId]`
-redirects to the filtered hub. Cards are created by AI only (Phase 8 H13): the deck
-has no "Nueva tarjeta", and an empty deck links to its page, whose
-techniques panel generates cards.
+redirects to the filtered hub. Cards are born from AI (Phase 8 H13): an
+empty deck links to its page, whose techniques panel generates cards.
+Since Phase 8 H18 (user 2026-10-29) opening a deck starts its graded
+review at once; with nothing due it says "Estás al día con este mazo" with
+the next review and offers "Repasar igual", a practice pass
+(`?modo=practica`) that calls no review-session action, so the SM-2
+schedule, the review logs and the metrics stay as they were. The cards are
+listed on the edit page `/flashcards/{nb}/{page}/editar` (the hub menu's
+"Editar tarjetas"), which saves its draft through `saveDeckEditsAction`.
 
 ## Next phase
 
