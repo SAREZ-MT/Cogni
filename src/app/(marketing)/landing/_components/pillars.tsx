@@ -105,7 +105,7 @@ export const PILLARS: readonly Pillar[] = [
       {
         icon: StackSimple,
         title: "Un solo motor para todo",
-        text: "Las tres técnicas escriben en el mismo plan, no solo las tarjetas.",
+        text: "Flashcards, recuperación activa y exámenes usan la misma repetición espaciada, y Cogni junta sus repasos en un solo plan.",
       },
     ],
     iconTone: "violet",
@@ -137,8 +137,8 @@ export const PILLARS: readonly Pillar[] = [
       },
       {
         icon: GlobeHemisphereWest,
-        title: "En tu zona horaria",
-        text: "Tu día empieza y termina cuando empieza y termina para ti.",
+        title: "Tu calendario, siempre al día",
+        text: "En las vistas Semana y Mes ves cuándo vuelve cada página, así llegas a tiempo a cada repaso.",
       },
     ],
     iconTone: "mint",
@@ -162,17 +162,17 @@ export const PILLARS: readonly Pillar[] = [
       {
         icon: CheckCircle,
         title: "Repasos completados",
-        text: "Cuenta lo que hiciste, comparado con la semana pasada.",
+        text: "Mira cuántos repasos completaste esta semana y compáralo con la anterior.",
       },
       {
         icon: Fire,
         title: "Tu racha",
-        text: "Días seguidos con al menos un repaso.",
+        text: "Son los días seguidos en que repasas al menos una vez. Verla crecer te ayuda a mantener el hábito.",
       },
       {
         icon: Gauge,
         title: "Dominio por página",
-        text: "Qué páginas están listas, tu acierto por técnica y tu calibración.",
+        text: "Mira cuánto has avanzado en cada página con tus repasos y cuáles ya están listas.",
       },
     ],
     iconTone: "rose",

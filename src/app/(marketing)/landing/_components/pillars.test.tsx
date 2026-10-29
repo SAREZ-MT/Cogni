@@ -53,12 +53,15 @@ describe("Pillars", () => {
     expect(progress?.points.map((point) => [point.title, point.text])).toEqual([
       [
         "Repasos completados",
-        "Cuenta lo que hiciste, comparado con la semana pasada.",
+        "Mira cuántos repasos completaste esta semana y compáralo con la anterior.",
       ],
-      ["Tu racha", "Días seguidos con al menos un repaso."],
+      [
+        "Tu racha",
+        "Son los días seguidos en que repasas al menos una vez. Verla crecer te ayuda a mantener el hábito.",
+      ],
       [
         "Dominio por página",
-        "Qué páginas están listas, tu acierto por técnica y tu calibración.",
+        "Mira cuánto has avanzado en cada página con tus repasos y cuáles ya están listas.",
       ],
     ]);
     render(<Pillars />);
