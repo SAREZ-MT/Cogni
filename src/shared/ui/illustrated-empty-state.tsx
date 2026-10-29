@@ -3,6 +3,7 @@
 import { motion, useReducedMotion } from "motion/react";
 import Image from "next/image";
 import type { ReactNode } from "react";
+import type { TechniqueTheme } from "@/shared/ui/technique-theme";
 import { cn } from "@/shared/ui/utils";
 
 // The art above the title: a decorative illustration (rendered with
@@ -24,6 +25,11 @@ export type IllustratedEmptyStateProps = IllustratedEmptyStateArt & {
   entrance?: "block" | "cascade";
   // Phase 8 H4-T2: a dotted notebook-paper field behind the block.
   paper?: boolean;
+  // Phase 8 H11: a technique hub's theme — the glow, the dotted paper, the
+  // headline gradient and a `tone="technique"` CTA take the technique
+  // colours (globals.css `[data-technique-theme]`), and the headline gets
+  // the approved mock's bold 30px weight and spacing.
+  technique?: TechniqueTheme;
   className?: string;
 };
 
@@ -55,6 +61,7 @@ export function IllustratedEmptyState({
   steps,
   entrance = "block",
   paper = false,
+  technique,
   className,
 }: IllustratedEmptyStateProps) {
   const reduce = useReducedMotion() ?? false;
@@ -89,6 +96,7 @@ export function IllustratedEmptyState({
       data-slot="illustrated-empty-state"
       data-entrance={entrance}
       data-surface={paper ? "paper" : undefined}
+      data-technique-theme={technique}
       className={cn(
         "empty-state-glow",
         paper && "dotted-paper",
@@ -119,15 +127,19 @@ export function IllustratedEmptyState({
       )}
       <motion.h3
         className={cn(
-          image ? "-mt-2" : "mt-4",
-          "text-balance font-semibold text-2xl text-gradient-brand leading-tight md:text-3xl",
+          image ? "-mt-2" : technique ? "mt-7" : "mt-4",
+          "text-balance text-2xl text-gradient-brand leading-tight md:text-3xl",
+          technique ? "font-bold tracking-[-0.015em]" : "font-semibold",
         )}
         {...enter(0.08)}
       >
         {title}
       </motion.h3>
       <motion.p
-        className="mt-3 max-w-md text-pretty text-[15px] text-fg-muted"
+        className={cn(
+          "max-w-md text-pretty text-[15px]",
+          technique ? "mt-2.5 text-fg-secondary" : "mt-3 text-fg-muted",
+        )}
         {...enter(0.13)}
       >
         {description}

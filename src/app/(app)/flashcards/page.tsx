@@ -4,8 +4,9 @@ import { listDueTodayAction } from "@/modules/scheduling";
 import { DeckSummaryCard } from "@/shared/ui/deck-summary-card";
 import { EmptyStateCta } from "@/shared/ui/empty-state-cta";
 import { IllustratedEmptyState } from "@/shared/ui/illustrated-empty-state";
-import { SectionHeader, SectionTitle } from "@/shared/ui/section-header";
+import { SectionTitle } from "@/shared/ui/section-header";
 import { TechniqueEmptyArt } from "@/shared/ui/technique-empty-art";
+import { TechniqueHubHeader } from "@/shared/ui/technique-hub-header";
 import { SetBreadcrumb } from "../_components/breadcrumb";
 import { DueTodayList, type DueTodayRow } from "./_components/due-today-list";
 import { plural } from "./_lib/plural";
@@ -75,10 +76,9 @@ export default async function FlashcardsHubPage() {
     <section className="flex flex-1 flex-col gap-6">
       <SetBreadcrumb items={[{ label: "Flashcards" }]} />
 
-      <SectionHeader
-        eyebrow="Técnicas de estudio"
+      <TechniqueHubHeader
+        technique="flashcards"
         title="Flashcards"
-        titleClassName="text-[26px]"
         description={`${plural(totalCards, "tarjeta", "tarjetas")} · ${plural(notebooks.length, "cuaderno", "cuadernos")}`}
       />
 
@@ -91,6 +91,7 @@ export default async function FlashcardsHubPage() {
         <IllustratedEmptyState
           entrance="cascade"
           paper
+          technique="flashcards"
           art={<TechniqueEmptyArt technique="flashcards" />}
           title="Tus primeras flashcards te esperan"
           description={
@@ -99,7 +100,9 @@ export default async function FlashcardsHubPage() {
               : "No pudimos cargar tus mazos. Intenta de nuevo."
           }
           action={
-            <EmptyStateCta href="/notebooks">Ir a mis cuadernos</EmptyStateCta>
+            <EmptyStateCta href="/notebooks" tone="technique">
+              Ir a mis cuadernos
+            </EmptyStateCta>
           }
         />
       ) : (

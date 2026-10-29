@@ -10,8 +10,8 @@ import { EmptyStateCta } from "@/shared/ui/empty-state-cta";
 import { IconTile } from "@/shared/ui/icon-tile";
 import { IllustratedEmptyState } from "@/shared/ui/illustrated-empty-state";
 import { Pill } from "@/shared/ui/pill";
-import { SectionHeader } from "@/shared/ui/section-header";
 import { TechniqueEmptyArt } from "@/shared/ui/technique-empty-art";
+import { TechniqueHubHeader } from "@/shared/ui/technique-hub-header";
 import { SetBreadcrumb } from "../_components/breadcrumb";
 import { plural } from "../flashcards/_lib/plural";
 
@@ -87,10 +87,9 @@ export default async function ActiveRecallHubPage() {
     <section className="flex flex-1 flex-col gap-6">
       <SetBreadcrumb items={[{ label: "Recordación activa" }]} />
 
-      <SectionHeader
-        eyebrow="Técnicas de estudio"
+      <TechniqueHubHeader
+        technique="recall"
         title="Recordación activa"
-        titleClassName="text-[26px]"
         description={`${plural(totalSessions, "sesión", "sesiones")} · ${plural(activeNotebookCount, "cuaderno", "cuadernos")}`}
         actions={
           quickStartHref && (
@@ -149,6 +148,7 @@ export default async function ActiveRecallHubPage() {
         <IllustratedEmptyState
           entrance="cascade"
           paper
+          technique="recall"
           art={<TechniqueEmptyArt technique="recall" />}
           title="Practica explicando con tus palabras"
           description={
@@ -157,7 +157,9 @@ export default async function ActiveRecallHubPage() {
               : "No pudimos cargar tus sesiones. Intenta de nuevo."
           }
           action={
-            <EmptyStateCta href="/notebooks">Ir a mis cuadernos</EmptyStateCta>
+            <EmptyStateCta href="/notebooks" tone="technique">
+              Ir a mis cuadernos
+            </EmptyStateCta>
           }
         />
       ) : (

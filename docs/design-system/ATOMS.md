@@ -350,47 +350,78 @@ Decorative (`aria-hidden`, `data-slot="page-sheet-fan"`,
 
 ## TechniqueEmptyArt (`technique-empty-art.tsx`)
 
-Phase 8 H10 (user request 2026-10-29): the technique hubs' empty-state
-hero, one family with `NotebookFan` and `PageSheetFan`. Client component
-(Motion). One parameterised atom, `technique: "flashcards" | "recall" |
-"exams"` (`FanTechnique`): three cards fanned with `TechniqueFan`'s
-`fanPose`/`fanStack`/`fanTransition`, the two back cards in the technique
-pastel (`pastel-yellow` / `pastel-mint` / `pastel-pink`) and the front one
-white, all with a 1px `pastel-*-fg/15` edge and a soft two-layer shadow.
+Phase 8 H11 (the user-approved v2 mock of 2026-10-29, replacing H10's
+fanned cards): the technique hubs' empty-state hero shows each technique
+at work. Server component, no client JavaScript; the look is the mock's
+CSS ported to globals.css (`.tea-*`, `@layer components`). One
+parameterised atom, `technique: TechniqueTheme` (`"flashcards" | "recall"
+| "exams"`, `technique-theme.ts`).
 
-- Flashcards (±8deg, 84px out): landscape cards (front 220×148), the
-  front showing a `PixelTile` (`yellow`, `Layers`, 36), "¿Qué es…?"
-  (20px semibold) and a flip hint "Toca para voltear" with `RotateCw` in
-  `pastel-yellow-fg`.
-- Recall (±5deg, 64px out, more stacked than fanned): landscape prompt
-  cards (front 228×152), the front with a "Pregunta abierta" mint pill,
-  "¿Cómo lo explicarías?" and a dashed mint answer line reading
-  "Explícalo con tus palabras…" with a 2px `technique-recall-outline`
-  caret (`data-part="caret"`, `motion-safe:animate-pulse`).
-- Exams (±5deg, 64px out): portrait sheets (front 150×188, like
-  `PageSheetFan`), the front with "Pregunta 1", two grey question bars and
-  three `data-part="option"` rows "Opción A/B/C"; B is chosen
-  (`data-selected="true"`, pink fill, `technique-exam-outline` border and
-  filled radio).
-- Content is generic by rule (no real subjects). Same 400×196 stage and
-  container-query scale steps as `PageSheetFan`, so it never overflows.
-  Under reduced motion only the fan's transition changes (never
-  `initial`) and the caret rests (CSS).
+- Flashcards: a tidy deck (no rotation), 316×206, four cards behind the
+  front stepping 7px right and 8px up (`data-part="deck-back"`,
+  `data-depth` 4→1) from `pastel-yellow` to amber-400; the white front
+  (`deck-front`) shows "Pregunta", a "1 / 12" counter, "¿Qué describe el
+  concepto clave de esta página?", "Toca para voltear" (`RotateCw`) and
+  five position dots (`deck-dot`, the first `data-on`).
+- Recordación activa: a mint speech bubble with a `Sparkle` tile,
+  "Pregunta abierta" and "¿Cómo le explicarías esta idea a alguien que no
+  la conoce?", over a ruled answer sheet: the "De memoria, sin mirar tu
+  apunte" chip (`EyeOff`), a handwritten answer (`data-part="handwriting"`,
+  `.tea-hand`, Caveat 500 through `--font-handwriting`, root layout,
+  self-hosted and not preloaded) ending in a blinking emerald caret
+  (`.tea-caret`, still under reduced motion), "24 palabras" and the
+  self-rating chips "Me faltó", "A medias" (`data-on`, check) and "Lo
+  recordé" (`rating-chip`).
+- Exámenes: a clean test sheet over a pink under-sheet: "Examen · 10
+  preguntas", "Pregunta 3", a score badge "8/10" tilted -6deg
+  (`data-part="score"`), a ten-step strip (`exam-step`, `data-state`
+  done/done/now/todo…) and options A–D (`option`), B chosen
+  (`data-selected`, rose border and tint, check in a rose disc).
+- Content is generic by rule. The stage keeps its design size and zooms
+  down in steps with its column (`container-type: inline-size` on `.tea`,
+  `zoom` 0.82/0.66/0.5/0.36 below 380/310/250/190px), so it never
+  overflows.
 - Decorative (`aria-hidden`, `data-slot="technique-empty-art"`,
-  `data-technique`, `data-part="fan-card"`, `data-card="left" | "right" |
-  "front"`). Props: `technique`, `className?`.
+  `data-technique`). Props: `technique`, `className?`.
 - Used by the `/flashcards`, `/active-recall` and `/exams` hubs inside
-  `IllustratedEmptyState` (`entrance="cascade"`, `paper`).
+  `IllustratedEmptyState` (`entrance="cascade"`, `paper`, `technique`).
+
+## Technique themes (`technique-theme.ts`, globals.css)
+
+Phase 8 H11: `TechniqueTheme` and `TECHNIQUE_THEME` (pixel tile tone and
+Lucide icon per technique: flashcards `yellow`/`Layers`, recall
+`green`/`Brain`, exams `rose`/`ClipboardList`). An element tagged
+`data-technique-theme` sets `--theme-ink`/`-ink-deep`, `--theme-glow`/
+`-glow-soft`, `--theme-dot` and `--theme-cta`/`-cta-fg`/`-cta-edge`/
+`-cta-shadow`/`-cta-hover` from the `--color-technique-{flashcards,recall,
+exam}-*` tokens; `text-gradient-brand`, `empty-state-glow` and
+`dotted-paper` read them with the violet as fallback, so the same
+utilities turn amber (CTA amber-300 with amber-900 ink), emerald
+(emerald-700, white ink) or rose (rose-700, white ink) inside a theme.
+
+## TechniqueHubHeader (`technique-hub-header.tsx`)
+
+Phase 8 H11: the page head of the three technique hubs, empty or not.
+`SectionHeader` with the technique's 48px `PixelTile` (top-aligned,
+`mt-1.5`, gap 16px), the "Técnicas de estudio" eyebrow, a 32px bold title
+in the technique gradient (`text-gradient-brand` under
+`data-technique-theme`; 26px below `sm`, tracking -0.02em) and the counts
+in `fg-secondary`; below `sm` the actions drop under the title. Props:
+`technique`, `title`, `description`, `actions?`
+(`data-slot="technique-hub-header"`).
 
 ## EmptyStateCta (`empty-state-cta.tsx`)
 
-Phase 8 H10: the illustrated empty states' violet pill as a link (`Button
-asChild` + `next/link`): `rounded-pill bg-primary-600`, 15px semibold
-white label, the soft violet shadow of H4-T1's "Crear mi primer cuaderno"
-and H5-T4's "Nueva página", `hover:bg-primary-700`. `max-w-full
-whitespace-normal min-h-12 h-auto` so a narrow column wraps the label
-instead of clipping it. Props: `href`, `children`, `className?`. Used by
-the technique hubs' "Ir a mis cuadernos" (→ `/notebooks`).
+Phase 8 H10: the illustrated empty states' pill as a link (`Button
+asChild` + `next/link`), 15px semibold, `max-w-full whitespace-normal
+min-h-12 h-auto` so a narrow column wraps the label instead of clipping
+it. `tone="brand"` (default): `bg-primary-600`, white, the soft violet
+shadow of H4-T1's "Crear mi primer cuaderno", `hover:bg-primary-700`.
+`tone="technique"` (H11): `bg-(--theme-cta) text-(--theme-cta-fg)
+hover:bg-(--theme-cta-hover)` plus `technique-cta` (1px inner edge and a
+coloured shadow), inside a `data-technique-theme`. Props: `href`,
+`children`, `tone?`, `className?`. The shape and tone class lists are
+exported (`EMPTY_STATE_CTA_SHAPE`, `EMPTY_STATE_CTA_TONE`).
 
 Used by: `notebooks/[notebookId]/page.tsx` (the zero-pages
 `IllustratedEmptyState` `art`).

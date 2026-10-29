@@ -217,6 +217,13 @@ describe("FlashcardsHubPage (real data)", () => {
     expect(
       document.querySelector('[data-slot="technique-empty-art"]'),
     ).toHaveAttribute("data-technique", "flashcards");
+    // Phase 8 H11: the technique theme on the header and the empty state.
+    expect(
+      document.querySelector('[data-slot="technique-hub-header"]'),
+    ).toHaveAttribute("data-technique-theme", "flashcards");
+    expect(
+      document.querySelector('[data-slot="illustrated-empty-state"]'),
+    ).toHaveAttribute("data-technique-theme", "flashcards");
     expect(
       screen.getByRole("link", { name: "Ir a mis cuadernos" }),
     ).toHaveAttribute("href", "/notebooks");

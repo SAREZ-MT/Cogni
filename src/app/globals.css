@@ -130,6 +130,39 @@
   --color-pixel-rose-light: #fecdd3;
   --color-pixel-rose-shadow: #881337;
   --color-pixel-paper: #fbf8f3;
+  /* Technique hub themes (Phase 8 H11, user-approved v2 mock 2026-10-29):
+     the empty state's glow pair and paper dots, the headline/title
+     gradient (both ends AA on white and on the glow: amber 5.0/7.1:1,
+     emerald 5.5/7.6:1, rose 6.3/8.0:1) and the CTA (fill, ink, inner edge,
+     shadow; ink on fill amber 6.3:1, emerald 5.5:1, rose 6.3:1). Read
+     through [data-technique-theme]. */
+  --color-technique-flashcards-glow: #fde68a;
+  --color-technique-flashcards-glow-soft: #fef3c7;
+  --color-technique-flashcards-dot: #f5c451;
+  --color-technique-flashcards-ink: #b45309;
+  --color-technique-flashcards-ink-deep: #92400e;
+  --color-technique-flashcards-cta: #fcd34d;
+  --color-technique-flashcards-cta-fg: #78350f;
+  --color-technique-flashcards-cta-edge: #f59e0b;
+  --color-technique-flashcards-cta-shadow: #d97706;
+  --color-technique-recall-glow: #a7f3d0;
+  --color-technique-recall-glow-soft: #d1fae5;
+  --color-technique-recall-dot: #6fd3a8;
+  --color-technique-recall-ink: #047857;
+  --color-technique-recall-ink-deep: #065f46;
+  --color-technique-recall-cta: #047857;
+  --color-technique-recall-cta-fg: #ffffff;
+  --color-technique-recall-cta-edge: #047857;
+  --color-technique-recall-cta-shadow: #047857;
+  --color-technique-exam-glow: #fecdd3;
+  --color-technique-exam-glow-soft: #ffe4e6;
+  --color-technique-exam-dot: #f4a3b3;
+  --color-technique-exam-ink: #be123c;
+  --color-technique-exam-ink-deep: #9f1239;
+  --color-technique-exam-cta: #be123c;
+  --color-technique-exam-cta-fg: #ffffff;
+  --color-technique-exam-cta-edge: #be123c;
+  --color-technique-exam-cta-shadow: #be123c;
 
   /* Semantic status: *-50 stays the near-white tint, *-100 is the stronger
      pastel tint used for metric/stat icon tiles and badges (design pass 2,
@@ -988,8 +1021,8 @@
 @utility text-gradient-brand {
   background-image: linear-gradient(
     120deg,
-    var(--color-primary-600),
-    var(--color-primary-800)
+    var(--theme-ink, var(--color-primary-600)),
+    var(--theme-ink-deep, var(--color-primary-800))
   );
   -webkit-background-clip: text;
   background-clip: text;
@@ -1004,8 +1037,15 @@
 @utility empty-state-glow {
   background-image: radial-gradient(
     70% 62% at 50% 34%,
-    color-mix(in oklch, var(--color-primary-200) 55%, transparent),
-    color-mix(in oklch, var(--color-primary-100) 45%, transparent) 45%,
+    var(
+      --theme-glow,
+      color-mix(in oklch, var(--color-primary-200) 55%, transparent)
+    ),
+    var(
+        --theme-glow-soft,
+        color-mix(in oklch, var(--color-primary-100) 45%, transparent)
+      )
+      45%,
     transparent 78%
   );
 }
@@ -1049,7 +1089,11 @@
     z-index: -1;
     background-image: radial-gradient(
       circle at center,
-      color-mix(in oklch, var(--color-primary-200) 85%, transparent) 1.1px,
+      var(
+          --theme-dot,
+          color-mix(in oklch, var(--color-primary-200) 85%, transparent)
+        )
+        1.1px,
       transparent 1.6px
     );
     background-size: 22px 22px;
@@ -1061,6 +1105,552 @@
       transparent 100%
     );
     pointer-events: none;
+  }
+}
+
+/* Technique hub themes (Phase 8 H11): an element tagged
+   data-technique-theme re-points text-gradient-brand, empty-state-glow,
+   dotted-paper and technique-cta at its technique's colours; without the
+   attribute they keep the Cogni violet. */
+[data-technique-theme="flashcards"] {
+  --theme-ink: var(--color-technique-flashcards-ink);
+  --theme-ink-deep: var(--color-technique-flashcards-ink-deep);
+  --theme-glow: color-mix(
+    in oklch,
+    var(--color-technique-flashcards-glow) 50%,
+    transparent
+  );
+  --theme-glow-soft: color-mix(
+    in oklch,
+    var(--color-technique-flashcards-glow-soft) 45%,
+    transparent
+  );
+  --theme-dot: color-mix(
+    in oklch,
+    var(--color-technique-flashcards-dot) 80%,
+    transparent
+  );
+  --theme-cta: var(--color-technique-flashcards-cta);
+  --theme-cta-hover: color-mix(
+    in oklch,
+    var(--color-technique-flashcards-cta) 88%,
+    black
+  );
+  --theme-cta-fg: var(--color-technique-flashcards-cta-fg);
+  --theme-cta-edge: var(--color-technique-flashcards-cta-edge);
+  --theme-cta-shadow: color-mix(
+    in oklch,
+    var(--color-technique-flashcards-cta-shadow) 45%,
+    transparent
+  );
+}
+[data-technique-theme="recall"] {
+  --theme-ink: var(--color-technique-recall-ink);
+  --theme-ink-deep: var(--color-technique-recall-ink-deep);
+  --theme-glow: color-mix(
+    in oklch,
+    var(--color-technique-recall-glow) 50%,
+    transparent
+  );
+  --theme-glow-soft: color-mix(
+    in oklch,
+    var(--color-technique-recall-glow-soft) 45%,
+    transparent
+  );
+  --theme-dot: color-mix(
+    in oklch,
+    var(--color-technique-recall-dot) 80%,
+    transparent
+  );
+  --theme-cta: var(--color-technique-recall-cta);
+  --theme-cta-hover: color-mix(
+    in oklch,
+    var(--color-technique-recall-cta) 88%,
+    black
+  );
+  --theme-cta-fg: var(--color-technique-recall-cta-fg);
+  --theme-cta-edge: var(--color-technique-recall-cta-edge);
+  --theme-cta-shadow: color-mix(
+    in oklch,
+    var(--color-technique-recall-cta-shadow) 45%,
+    transparent
+  );
+}
+[data-technique-theme="exams"] {
+  --theme-ink: var(--color-technique-exam-ink);
+  --theme-ink-deep: var(--color-technique-exam-ink-deep);
+  --theme-glow: color-mix(
+    in oklch,
+    var(--color-technique-exam-glow) 50%,
+    transparent
+  );
+  --theme-glow-soft: color-mix(
+    in oklch,
+    var(--color-technique-exam-glow-soft) 45%,
+    transparent
+  );
+  --theme-dot: color-mix(
+    in oklch,
+    var(--color-technique-exam-dot) 80%,
+    transparent
+  );
+  --theme-cta: var(--color-technique-exam-cta);
+  --theme-cta-hover: color-mix(
+    in oklch,
+    var(--color-technique-exam-cta) 88%,
+    black
+  );
+  --theme-cta-fg: var(--color-technique-exam-cta-fg);
+  --theme-cta-edge: var(--color-technique-exam-cta-edge);
+  --theme-cta-shadow: color-mix(
+    in oklch,
+    var(--color-technique-exam-cta-shadow) 42%,
+    transparent
+  );
+}
+
+/* The technique's empty-state CTA (EmptyStateCta tone="technique"): a 1px
+   inner edge and a soft coloured shadow; the fill, ink and hover fill are
+   bg-/text-(--theme-cta*) on the element. Only used inside a theme. */
+@utility technique-cta {
+  box-shadow:
+    0 8px 20px -8px var(--theme-cta-shadow),
+    inset 0 0 0 1px var(--theme-cta-edge);
+}
+
+/* TechniqueEmptyArt (src/shared/ui/technique-empty-art.tsx, Phase 8 H11):
+   the approved v2 mock's CSS (scratchpad technique-empty/v2-mock/build.mjs).
+   The stage keeps its design size and zooms down in steps with its column
+   (container queries), so it never overflows a narrow column. */
+@layer components {
+  .tea {
+    container-type: inline-size;
+    width: 100%;
+  }
+  .tea-stage {
+    display: flex;
+    justify-content: center;
+  }
+  @container (max-width: 379px) {
+    .tea-stage {
+      zoom: 0.82;
+    }
+  }
+  @container (max-width: 309px) {
+    .tea-stage {
+      zoom: 0.66;
+    }
+  }
+  @container (max-width: 249px) {
+    .tea-stage {
+      zoom: 0.5;
+    }
+  }
+  @container (max-width: 189px) {
+    .tea-stage {
+      zoom: 0.36;
+    }
+  }
+  .tea-kicker {
+    display: block;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .tea[data-technique="flashcards"] .tea-kicker {
+    color: var(--color-warning-700);
+  }
+  .tea[data-technique="recall"] .tea-kicker {
+    color: var(--color-success-700);
+  }
+  .tea[data-technique="exams"] .tea-kicker {
+    color: var(--color-technique-exam-ink-deep);
+  }
+
+  /* Flashcards: a tidy deck. */
+  .tea-deck {
+    position: relative;
+    width: 316px;
+    height: 206px;
+    margin: 34px 28px 0 0;
+    text-align: left;
+  }
+  .tea-deck-card {
+    position: absolute;
+    inset: 0;
+    border-radius: 18px;
+  }
+  .tea-deck-back {
+    border: 1px solid #e9b949;
+    box-shadow: 0 1px 0 rgb(255 255 255 / 0.6) inset;
+  }
+  .tea-deck-back[data-depth="4"] {
+    transform: translate(28px, -32px);
+    background: var(--color-pastel-yellow);
+    z-index: 1;
+  }
+  .tea-deck-back[data-depth="3"] {
+    transform: translate(21px, -24px);
+    background: var(--color-technique-flashcards-glow);
+    z-index: 2;
+  }
+  .tea-deck-back[data-depth="2"] {
+    transform: translate(14px, -16px);
+    background: var(--color-technique-flashcards-accent);
+    z-index: 3;
+  }
+  .tea-deck-back[data-depth="1"] {
+    transform: translate(7px, -8px);
+    background: #fbbf24;
+    z-index: 4;
+  }
+  .tea-deck-front {
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    padding: 18px 20px;
+    background: white;
+    border: 1px solid var(--color-technique-flashcards-accent);
+    box-shadow:
+      0 14px 30px -14px rgb(146 64 14 / 0.35),
+      0 2px 6px rgb(120 53 15 / 0.06);
+  }
+  .tea-deck-top,
+  .tea-deck-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .tea-counter {
+    border-radius: 9999px;
+    padding: 3px 9px;
+    font-size: 12px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-technique-flashcards-cta-fg);
+    background: var(--color-pastel-yellow);
+  }
+  .tea-deck-q {
+    margin: 14px 0 0;
+    font-size: 19px;
+    line-height: 1.3;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+    color: var(--fg-default);
+  }
+  .tea-deck-foot {
+    margin-top: auto;
+  }
+  .tea-flip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--color-warning-700);
+  }
+  .tea-deck-dots {
+    display: flex;
+    gap: 4px;
+  }
+  .tea-deck-dots i {
+    width: 6px;
+    height: 6px;
+    border-radius: 9999px;
+    background: var(--color-technique-flashcards-glow);
+  }
+  .tea-deck-dots i[data-on] {
+    width: 16px;
+    background: var(--color-warning-600);
+  }
+  .tea-deck-shadow {
+    position: absolute;
+    left: 8%;
+    right: 8%;
+    bottom: -16px;
+    z-index: 0;
+    height: 18px;
+    border-radius: 50%;
+    background: rgb(146 64 14 / 0.12);
+    filter: blur(8px);
+  }
+
+  /* Recordación activa: an open question over a ruled answer sheet. */
+  .tea-recall {
+    position: relative;
+    width: 360px;
+    text-align: left;
+  }
+  .tea-bubble {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin: 0 46px 14px 0;
+    padding: 12px 14px;
+    border: 1px solid var(--color-technique-recall-glow);
+    border-radius: 18px 18px 18px 6px;
+    background: var(--color-success-50);
+    box-shadow: 0 6px 16px -10px rgb(6 95 70 / 0.35);
+  }
+  .tea-bubble::after {
+    content: "";
+    position: absolute;
+    left: 18px;
+    bottom: -7px;
+    width: 12px;
+    height: 12px;
+    background: var(--color-success-50);
+    border-right: 1px solid var(--color-technique-recall-glow);
+    border-bottom: 1px solid var(--color-technique-recall-glow);
+    transform: rotate(45deg) skew(8deg, 8deg);
+  }
+  .tea-bubble-icon {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 8px;
+    background: var(--color-technique-recall-ink);
+    color: white;
+  }
+  .tea-bubble-q {
+    margin: 3px 0 0;
+    font-size: 15px;
+    line-height: 1.35;
+    font-weight: 700;
+    text-wrap: balance;
+    color: var(--fg-default);
+  }
+  .tea-sheet {
+    margin-left: 34px;
+    overflow: hidden;
+    border: 1px solid #d6efe3;
+    border-radius: 16px;
+    background: white;
+    box-shadow:
+      0 14px 30px -16px rgb(6 95 70 / 0.35),
+      0 2px 6px rgb(0 0 0 / 0.04);
+  }
+  .tea-sheet-head {
+    padding: 10px 14px 0;
+  }
+  .tea-memory {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 9999px;
+    padding: 3px 9px;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--color-success-700);
+    background: var(--color-success-100);
+  }
+  .tea-lines {
+    min-height: 78px;
+    margin: 8px 14px 0;
+    padding-left: 12px;
+    border-left: 2px solid var(--color-technique-recall-glow);
+    background-image: repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent 25px,
+      #e7e5e4 25px,
+      #e7e5e4 26px
+    );
+    background-position: 0 2px;
+  }
+  .tea-hand {
+    margin: 0;
+    font-family: var(--font-handwriting), cursive;
+    font-size: 21px;
+    line-height: 26px;
+    font-weight: 500;
+    color: #1f3b33;
+  }
+  .tea-caret {
+    display: inline-block;
+    width: 2px;
+    height: 20px;
+    margin-left: 2px;
+    vertical-align: -3px;
+    border-radius: 1px;
+    background: var(--color-technique-recall-ink);
+    animation: tea-blink 1.05s steps(1) infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .tea-caret {
+      animation: none;
+    }
+  }
+  .tea-sheet-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 6px;
+    padding: 10px 14px 12px;
+    border-top: 1px solid #f0efed;
+  }
+  .tea-wc {
+    font-size: 11.5px;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-neutral-600);
+  }
+  .tea-rate {
+    display: flex;
+    gap: 4px;
+  }
+  .tea-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 3px 8px;
+    border: 1px solid #e7e5e4;
+    border-radius: 9999px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--color-neutral-600);
+    background: white;
+  }
+  .tea-chip[data-on] {
+    border-color: var(--color-technique-recall-accent);
+    color: var(--color-success-700);
+    background: var(--color-success-100);
+  }
+
+  /* Exámenes: a clean test sheet. */
+  .tea-exam {
+    position: relative;
+    width: 300px;
+    margin-top: 6px;
+    text-align: left;
+  }
+  .tea-paper {
+    position: relative;
+    z-index: 2;
+    padding: 16px 18px 18px;
+    border: 1px solid #f5d0d8;
+    border-radius: 14px;
+    background: white;
+    box-shadow:
+      0 16px 32px -18px rgb(159 18 57 / 0.35),
+      0 2px 6px rgb(0 0 0 / 0.04);
+  }
+  .tea-paper-under {
+    position: absolute;
+    inset: 8px -8px -8px 8px;
+    z-index: 1;
+    padding: 0;
+    border-color: #fbd5dc;
+    background: #fff1f3;
+  }
+  .tea-exam-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding-bottom: 12px;
+    border-bottom: 1px dashed #f3c4cf;
+  }
+  .tea-exam-sub {
+    margin: 3px 0 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-neutral-700);
+  }
+  .tea-score {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 1px;
+    padding: 4px 9px;
+    border: 1.5px solid #fda4af;
+    border-radius: 10px;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-technique-exam-ink-deep);
+    background: white;
+    transform: rotate(-6deg);
+  }
+  .tea-score b {
+    font-size: 16px;
+  }
+  .tea-score small {
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .tea-exam-steps {
+    display: flex;
+    gap: 5px;
+    margin: 12px 0 0;
+  }
+  .tea-exam-steps i {
+    flex: 1;
+    height: 5px;
+    border-radius: 9999px;
+    background: #f5f5f4;
+  }
+  .tea-exam-steps i[data-state="done"] {
+    background: var(--color-rose-400);
+  }
+  .tea-exam-steps i[data-state="now"] {
+    background: var(--color-technique-exam-ink);
+  }
+  .tea-exam-q {
+    margin: 12px 0 10px;
+    font-size: 15px;
+    line-height: 1.35;
+    font-weight: 700;
+    color: var(--fg-default);
+  }
+  .tea-opts {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .tea-opts li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 10px;
+    border: 1px solid #e7e5e4;
+    border-radius: 10px;
+    font-size: 13px;
+    color: var(--color-neutral-700);
+  }
+  .tea-opts li[data-selected] {
+    border-color: var(--color-rose-600);
+    font-weight: 600;
+    color: var(--fg-default);
+    background: #fff1f2;
+    box-shadow: 0 0 0 3px rgb(225 29 72 / 0.08);
+  }
+  .tea-opt-key {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 9999px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--color-neutral-600);
+    background: #f5f5f4;
+  }
+  .tea-opts li[data-selected] .tea-opt-key {
+    color: white;
+    background: var(--color-technique-exam-ink);
+  }
+}
+
+@keyframes tea-blink {
+  50% {
+    opacity: 0;
   }
 }
 

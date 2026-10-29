@@ -6,9 +6,9 @@ import { DeckSummaryCard } from "@/shared/ui/deck-summary-card";
 import { EmptyStateCta } from "@/shared/ui/empty-state-cta";
 import { IllustratedEmptyState } from "@/shared/ui/illustrated-empty-state";
 import { Pill } from "@/shared/ui/pill";
-import { SectionHeader } from "@/shared/ui/section-header";
 import { StatusBanner } from "@/shared/ui/status-banner";
 import { TechniqueEmptyArt } from "@/shared/ui/technique-empty-art";
+import { TechniqueHubHeader } from "@/shared/ui/technique-hub-header";
 import { SetBreadcrumb } from "../_components/breadcrumb";
 import { plural } from "../flashcards/_lib/plural";
 import { CreateExamDialog } from "./_components/create-exam-dialog";
@@ -98,10 +98,9 @@ export default async function ExamsHubPage() {
     <section className="flex flex-1 flex-col gap-6">
       <SetBreadcrumb items={[{ label: "Exámenes" }]} />
 
-      <SectionHeader
-        eyebrow="Técnicas de estudio"
+      <TechniqueHubHeader
+        technique="exams"
         title="Exámenes"
-        titleClassName="text-[26px]"
         description={`${plural(examenesPresentados, "examen", "exámenes")} · ${plural(activeNotebookCount, "cuaderno", "cuadernos")}`}
         actions={<CreateExamDialog notebooks={createExamNotebooks} />}
       />
@@ -162,6 +161,7 @@ export default async function ExamsHubPage() {
         <IllustratedEmptyState
           entrance="cascade"
           paper
+          technique="exams"
           art={<TechniqueEmptyArt technique="exams" />}
           title="Pon a prueba lo que sabes"
           description={
@@ -170,7 +170,9 @@ export default async function ExamsHubPage() {
               : "No pudimos cargar tus exámenes. Intenta de nuevo."
           }
           action={
-            <EmptyStateCta href="/notebooks">Ir a mis cuadernos</EmptyStateCta>
+            <EmptyStateCta href="/notebooks" tone="technique">
+              Ir a mis cuadernos
+            </EmptyStateCta>
           }
         />
       ) : (

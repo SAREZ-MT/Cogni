@@ -79,6 +79,37 @@ describe("IllustratedEmptyState", () => {
     );
   });
 
+  // Phase 8 H11 (user-approved v2 mock): a technique hub's empty state
+  // carries its technique theme, so the glow, the dotted paper, the
+  // headline gradient and the CTA take the technique colour.
+  it("themes the glow, paper and headline with a technique", () => {
+    const { container } = render(
+      <IllustratedEmptyState
+        art={<span />}
+        paper
+        technique="recall"
+        title="Practica"
+        description="d"
+      />,
+    );
+    const root = container.querySelector(
+      '[data-slot="illustrated-empty-state"]',
+    );
+    expect(root).toHaveAttribute("data-technique-theme", "recall");
+    expect(root).toHaveClass("empty-state-glow", "dotted-paper");
+    const title = screen.getByRole("heading", { name: "Practica" });
+    expect(title).toHaveClass("text-gradient-brand", "font-bold", "mt-7");
+  });
+
+  it("has no technique theme by default", () => {
+    const { container } = render(
+      <IllustratedEmptyState image={IMAGE} title="t" description="d" />,
+    );
+    expect(
+      container.querySelector('[data-slot="illustrated-empty-state"]'),
+    ).not.toHaveAttribute("data-technique-theme");
+  });
+
   it("omits the action slot when none is given", () => {
     const { container } = render(
       <IllustratedEmptyState image={IMAGE} title="t" description="d" />,
