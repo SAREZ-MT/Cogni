@@ -14,6 +14,12 @@ type SearchParamValue = string | string[] | undefined;
 const NOTEBOOK_ID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// Whether a value can be a notebook id at all (the notebook redirects 404
+// anything else, like the retired sample slugs).
+export function isNotebookId(value: string): boolean {
+  return NOTEBOOK_ID.test(value);
+}
+
 function selectedNotebook(value: SearchParamValue): string | null {
   return typeof value === "string" && value !== "" ? value : null;
 }

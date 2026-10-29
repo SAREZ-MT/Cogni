@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
-import { hubHref } from "@/shared/navigation/technique-hub";
+import { notFound, redirect } from "next/navigation";
+import { hubHref, isNotebookId } from "@/shared/navigation/technique-hub";
 
 interface ExamsNotebookPageProps {
   params: Promise<{ notebookId: string }>;
@@ -13,5 +13,7 @@ export default async function ExamsNotebookPage({
   params,
 }: ExamsNotebookPageProps) {
   const { notebookId } = await params;
+  // Not an id at all (a retired sample slug): a plain not-found.
+  if (!isNotebookId(notebookId)) notFound();
   redirect(hubHref("/exams", notebookId));
 }

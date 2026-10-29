@@ -1,11 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 
-const { redirect } = vi.hoisted(() => ({
+const { redirect, notFound } = vi.hoisted(() => ({
   redirect: vi.fn((url: string) => {
     throw new Error(`NEXT_REDIRECT ${url}`);
   }),
+  notFound: vi.fn(() => {
+    throw new Error("NEXT_NOT_FOUND");
+  }),
 }));
-vi.mock("next/navigation", () => ({ redirect }));
+vi.mock("next/navigation", () => ({ redirect, notFound }));
 
 import ActiveRecallNotebookPage from "./page";
 
@@ -23,5 +26,13 @@ describe("/active-recall/[notebookId]", () => {
     expect(redirect).toHaveBeenCalledWith(
       `/active-recall?cuaderno=${NOTEBOOK}`,
     );
+  });
+
+  it("answers 404 for something that is not a notebook id", async () => {
+    await expect(
+      ActiveRecallNotebookPage({
+        params: Promise.resolve({ notebookId: "biologia-celular" }),
+      }),
+    ).rejects.toThrow("NEXT_NOT_FOUND");
   });
 });
