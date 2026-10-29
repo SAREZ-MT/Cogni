@@ -37,4 +37,26 @@ test.describe("editor polish", () => {
     await page.keyboard.press("Shift+Home");
     await expect(toolbar).toBeVisible();
   });
+
+  // E5: Notion's markdown shortcuts — `>` + space opens a toggle and `"` +
+  // space a quote.
+  test("'> ' opens a toggle and '\" ' opens a quote", async ({ page }) => {
+    await createNotebookWithOpenPage(page, "Cuaderno atajos");
+
+    const editable = page
+      .getByTestId("editor-mount")
+      .locator('[contenteditable="true"]');
+    await editable.click();
+    await page.waitForTimeout(60);
+    await page.keyboard.type("> Mi desplegable");
+    await expect(editable.locator("[data-type='details']")).toBeVisible();
+    await expect(editable.locator("summary")).toHaveText("Mi desplegable");
+    await expect(editable.locator("blockquote")).toHaveCount(0);
+
+    // Leave the toggle: click the trailing empty paragraph at the end.
+    await editable.locator("> p").last().click();
+    await page.waitForTimeout(60);
+    await page.keyboard.type('" Una cita');
+    await expect(editable.locator("blockquote")).toHaveText("Una cita");
+  });
 });

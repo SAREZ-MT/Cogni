@@ -67,6 +67,7 @@ import { TocBlock } from "../toc-node";
 import { BlockShortcuts } from "./block-shortcuts";
 import { CodeBlock } from "./code-block";
 import { createDetailsExtensions } from "./details";
+import { MarkdownShortcuts, withoutQuoteChevron } from "./markdown-shortcuts";
 import { NodeBackground } from "./node-background";
 import { createTableExtensions } from "./table";
 import { CogniYoutube } from "./youtube";
@@ -121,7 +122,13 @@ export function createEditorExtensions(
   const mentionPort = options.mentionPort ?? null;
   const extraSlashItems = options.extraSlashItems ?? [];
   return [
-    StarterKit.configure({
+    // H6-E5: StarterKit's quote loses its `>` rule to the toggle shortcut
+    // (markdown-shortcuts.ts); `"` + space opens a quote instead.
+    StarterKit.extend({
+      addExtensions() {
+        return withoutQuoteChevron(this.parent?.() ?? []);
+      },
+    }).configure({
       // Replaced below by `CodeBlock` (`@tiptap/extension-code-block-
       // lowlight`), which adds syntax highlighting and a language
       // selector (design.md, "Tiptap y ProseMirror solo en editor/ui").
@@ -176,6 +183,8 @@ export function createEditorExtensions(
     // Mod-Backspace): the context menu's own row handlers and these
     // shortcuts share one implementation (block-actions.ts).
     BlockShortcuts,
+    // H6-E5: Notion's `>` toggle and `"` quote markdown shortcuts.
+    MarkdownShortcuts,
     // E1 (goal doc §2): ":" emoji popup. `emoji-suggestion.ts` only adds the
     // `items`/`render` pair on top of the extension's own default
     // char/command/allow (a `.configure()` deep-merge — see its own header
