@@ -453,6 +453,8 @@ Slice-artefact advisories (CalendarNav/TodayList callers "not migrated") are res
     (`before-*`, `after-1440.png` 5 per row, `after-1024.png` 4 per row,
     `after-390.png` narrow fallback with the pre-existing 240px sidebar,
     `after-hover-1440.png`, `after-violet-1440.png`, `after-list-1440.png`).
+    e2e notebooks-acceptance + flashcards-generation 7/7 pass (3.0m).
+  - Commit: `4dc9f19`.
   - Open: the list view's `PageListRow` (flat violet icon rows) no longer
     matches the sheets; the notebook's emoji `icon` is no longer shown in
     this header (the sidebar still shows it; the hub covers dropped it in
