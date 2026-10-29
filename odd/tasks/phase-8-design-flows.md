@@ -319,6 +319,54 @@ Slice-artefact advisories (CalendarNav/TodayList callers "not migrated") are res
     `description` (ReactNode allows JSX arrays) as the dot list and keys
     parts by value (duplicate strings collide). Fix later: type it as
     `string | readonly string[]` or key by index, plus a test.
+- [x] **H4-T5** — hub grid: each notebook as a notebook cover (user, 2026-10-28).
+  - Route: delegated writer (writer trigger: new atom + page + trigger +
+    tests + docs).
+  - Request: replace the grid card with a "ficha" in the empty state's
+    visual line, a reusable atom. Corrections the same day: no icon on the
+    cover; the page count in the top-left corner as plain meta text (no
+    badge, glyph or tile); the bottom row only the date and the kebab.
+  - Built: new atom `NotebookCoverCard` (a large `NotebookCover` tinted by
+    the notebook's pastel colour in the fan's 200 → 400 language, violet
+    when null; content laid over the decorative cover; stretched title link;
+    hover lift 4px + −0.6deg, press 0.98, none under reduced motion;
+    container query below 150px). `notebooks/page.tsx` composes it with
+    `NotebookCardActions`; grid `minmax(min(100%,180px),1fr)`. The
+    `CreateNotebookTrigger` tile takes the book proportion and radius.
+    ATOMS.md updated.
+  - RED: notebook-cover-card suite failed to resolve the module; page test
+    "presents each notebook in the grid as a notebook cover" failed; then
+    the corrected layout tests failed against the first layout → GREEN.
+  - Checks: tsc clean; biome clean on the changed files; vitest
+    src/shared/ui + src/modules/notebooks + notebooks route + no-inline-hex
+    129 files / 946 tests pass; depcruise no violations. e2e
+    shell-empty-state + notebooks-acceptance: 20/21, the acceptance
+    recolor step read the old IconTile `bg-pastel-*` class → spec now reads
+    the card's `data-tone`; notebooks-acceptance rerun 6/6 pass.
+    Screenshots in the session scratchpad `hub-cards/` (`before-*`,
+    `after-*`).
+  - Final checks (after the review round): tsc clean; biome clean on the
+    7 changed source files; vitest scoped suites 129 files / 947 tests
+    pass; depcruise no violations; e2e notebooks-acceptance +
+    shell-empty-state 21/21 pass. Screenshots `hub-cards/after-grid-1440.png`
+    (4 per row), `after-grid-1024.png` (3 per row), `after-grid-390.png`
+    (pre-existing 240px sidebar: narrow fallback), `after-grid-hover-1440.png`,
+    `after-tile-hover-1440.png`.
+  - Commit: `02d064a`.
+  - Decision (user 2026-10-28, closed): the bottom-row date stays the
+    last update (`formatTimeAgo(updatedAt)`); `HomeNotebookSummary` has no
+    `createdAt` and no backend change is made.
+  - Review round (user 2026-10-28): covers bigger (grid min 180 → 210px:
+    4 per row at 1440, 3 at 1024; page count and date visible at both);
+    "Nuevo cuaderno" tile redesigned as a violet-tinted cover (dashed
+    `primary-300` border, `primary-600` plus disc, violet label + hint
+    "Crea un cuaderno para una materia", hover lift + tint, narrow
+    fallback below 150px). RED: the new tile test failed against the grey
+    dashed tile → GREEN.
+  - Impact: `src/app/(app)/_components/notebook-card.tsx` is now unused
+    (outside this task's edit surface; delete in a follow-up). The list
+    view (`notebook-list-row.tsx`) is unchanged and still has no create
+    control.
 
 ## Backlog — technique sections reform (user, 2026-10-18)
 Parked for when the flashcards / active recall / exams sections are redesigned (not now; Active Recall has the Phase 6 UI freeze, so its changes need the user's explicit go-ahead at that time).
