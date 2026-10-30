@@ -65,21 +65,21 @@ describe("Sidebar", () => {
     expect(screen.getByRole("link", { name: "Cogni" })).toBeInTheDocument();
   });
 
-  it("renders the Menú principal, Técnicas and Configuración sections with an active Inicio", () => {
+  it("renders the Menú principal, Técnicas and General sections with an active Inicio", () => {
     render(<Sidebar initialCollapsed={false} user={USER} previewsEnabled />);
 
     expect(screen.getByText("Menú principal")).toBeInTheDocument();
     expect(screen.getByText("Técnicas")).toBeInTheDocument();
-    // "Configuración" is both the section label and its one nav item's
-    // label; scope to the label element specifically.
+    // User decision 2026-10-17: the last section is "General"; the
+    // "Configuración" name stays only on its nav item.
+    expect(screen.getByText("General", { selector: "p" })).toBeInTheDocument();
     expect(
-      screen.getByText("Configuración", { selector: "p" }),
-    ).toBeInTheDocument();
+      screen.queryByText("Configuración", { selector: "p" }),
+    ).not.toBeInTheDocument();
 
-    // "Inicio"'s accessible name also includes its "⌘ H" shortcut keycap
-    // (nav-item.tsx renders it whenever the row isn't collapsed, active or
-    // not) — a substring match instead of the stale exact-"Inicio" one.
-    expect(screen.getByRole("link", { name: /Inicio/ })).toHaveAttribute(
+    // User decision 2026-10-17: "Inicio" no longer shows the "⌘ H" keycaps
+    // (no shortcut was wired to them), so its name is exactly "Inicio".
+    expect(screen.getByRole("link", { name: "Inicio" })).toHaveAttribute(
       "aria-current",
       "page",
     );
@@ -97,6 +97,28 @@ describe("Sidebar", () => {
     expect(screen.getByRole("link", { name: "Flashcards" })).toHaveAttribute(
       "href",
       "/flashcards",
+    );
+  });
+
+  it.each([
+    ["/flashcards/biologia-celular", "Flashcards", "yellow"],
+    ["/active-recall/nb-1/pg-1", "Recordación activa", "green"],
+    ["/exams/nb-1/pg-1", "Exámenes", "rose"],
+  ])("highlights the active technique %s in its own colour", (path, label, tone) => {
+    pathname.current = path;
+    render(<Sidebar initialCollapsed={false} user={USER} previewsEnabled />);
+
+    expect(screen.getByRole("link", { name: label })).toHaveAttribute(
+      "data-tone",
+      tone,
+    );
+  });
+
+  it("keeps the neutral highlight for entries that are not techniques", () => {
+    render(<Sidebar initialCollapsed={false} user={USER} previewsEnabled />);
+
+    expect(screen.getByRole("link", { name: /Inicio/ })).not.toHaveAttribute(
+      "data-tone",
     );
   });
 
@@ -129,20 +151,18 @@ describe("Sidebar", () => {
   it("links the Active recall nav item to /active-recall while previews are enabled", () => {
     render(<Sidebar initialCollapsed={false} user={USER} previewsEnabled />);
 
-    expect(screen.getByRole("link", { name: "Active recall" })).toHaveAttribute(
-      "href",
-      "/active-recall",
-    );
+    expect(
+      screen.getByRole("link", { name: "Recordación activa" }),
+    ).toHaveAttribute("href", "/active-recall");
   });
 
   it("marks Active recall active on its own routes", () => {
     pathname.current = "/active-recall/biologia-celular/mitocondria";
     render(<Sidebar initialCollapsed={false} user={USER} previewsEnabled />);
 
-    expect(screen.getByRole("link", { name: "Active recall" })).toHaveAttribute(
-      "aria-current",
-      "page",
-    );
+    expect(
+      screen.getByRole("link", { name: "Recordación activa" }),
+    ).toHaveAttribute("aria-current", "page");
   });
 
   it("keeps Active recall a live link when previews are disabled (production)", () => {
@@ -151,11 +171,11 @@ describe("Sidebar", () => {
       <Sidebar initialCollapsed={false} user={USER} previewsEnabled={false} />,
     );
 
-    const link = screen.getByRole("link", { name: "Active recall" });
+    const link = screen.getByRole("link", { name: "Recordación activa" });
     expect(link).toHaveAttribute("href", "/active-recall");
     expect(link).toHaveAttribute("aria-current", "page");
     expect(
-      screen.getByText("Active recall").closest("[aria-disabled]"),
+      screen.getByText("Recordación activa").closest("[aria-disabled]"),
     ).toBeNull();
   });
 
@@ -201,7 +221,7 @@ describe("Sidebar", () => {
     pathname.current = "/dashboard";
     render(<Sidebar initialCollapsed={false} user={USER} previewsEnabled />);
 
-    expect(screen.getByRole("link", { name: "Dashboard" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Progreso" })).toHaveAttribute(
       "aria-current",
       "page",
     );
@@ -242,6 +262,33 @@ describe("Sidebar", () => {
     );
   });
 
+  // H2-T2: the product tour anchors on stable data-tour attributes, never on
+  // classes or copy, in both the expanded and the collapsed sidebar.
+  it.each([
+    ["expanded", false],
+    ["collapsed", true],
+  ])("exposes the product tour anchors while %s", (_state, collapsed) => {
+    const { container } = render(
+      <Sidebar initialCollapsed={collapsed} user={USER} previewsEnabled />,
+    );
+
+    const cuadernos = container.querySelector('[data-tour="cuadernos"]');
+    expect(cuadernos).toHaveAttribute("href", "/notebooks");
+    // Step 4 highlights Progreso and Calendario together (user 2026-10-18).
+    const avance = container.querySelector('[data-tour="avance"]');
+    expect(
+      Array.from(avance?.querySelectorAll("a") ?? []).map((link) =>
+        link.getAttribute("href"),
+      ),
+    ).toEqual(["/dashboard", "/calendario"]);
+    const tecnicas = container.querySelector('[data-tour="tecnicas"]');
+    expect(
+      Array.from(tecnicas?.querySelectorAll("a") ?? []).map((link) =>
+        link.getAttribute("href"),
+      ),
+    ).toEqual(["/flashcards", "/active-recall", "/exams"]);
+  });
+
   // Configuración is live since Phase 7 T2a (the time-zone setting).
   it("marks Configuración active on its own routes", () => {
     pathname.current = "/configuracion";
@@ -268,12 +315,12 @@ describe("Sidebar", () => {
         />,
       );
 
-      expect(screen.getByRole("link", { name: "Dashboard" })).toHaveAttribute(
+      expect(screen.getByRole("link", { name: "Progreso" })).toHaveAttribute(
         "href",
         "/dashboard",
       );
       expect(
-        screen.getByText("Dashboard").closest("[aria-disabled]"),
+        screen.getByText("Progreso").closest("[aria-disabled]"),
       ).toBeNull();
     });
 

@@ -25,7 +25,7 @@ describe("AccuracyRing", () => {
     expect(items[0]).toHaveTextContent("Flashcards");
     expect(items[0]).toHaveTextContent("75%");
     expect(items[0]).toHaveTextContent("25");
-    expect(items[1]).toHaveTextContent("Active recall");
+    expect(items[1]).toHaveTextContent("Recordación activa");
     expect(items[2]).toHaveTextContent("Exámenes");
     expect(items[2]).toHaveTextContent("50%");
     expect(items[2]).toHaveTextContent("50");

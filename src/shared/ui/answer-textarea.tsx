@@ -16,7 +16,7 @@ export function AnswerTextarea({ className, ...props }: AnswerTextareaProps) {
     <textarea
       data-testid="answer-textarea"
       className={cn(
-        "min-h-[120px] w-full resize-none rounded-lg border-[1.5px] border-neutral-200/80 bg-neutral-50 px-4 py-3.5 text-fg text-sm leading-[1.6] outline-none transition-colors placeholder:text-fg-muted focus:border-success-500 focus:bg-card focus:ring-[3px] focus:ring-success-500/10",
+        "min-h-[120px] w-full resize-none rounded-lg border-[1.5px] border-neutral-200/80 bg-neutral-50 px-4 py-3.5 text-fg text-sm leading-[1.6] outline-none transition-colors placeholder:text-fg-placeholder focus:border-success-500 focus:bg-card focus:ring-[3px] focus:ring-success-500/10",
         className,
       )}
       {...props}

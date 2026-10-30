@@ -91,7 +91,7 @@ export function CalibrationTable({
           </IconTile>
         }
         title="Calibración metacognitiva"
-        description="Lo que sentiste vs. lo que evaluó la IA (Active recall)."
+        description="Lo que sentiste vs. lo que evaluó la IA (recordación activa)."
         ariaLabel="Calibración metacognitiva: autoevaluación promedio comparada con el resultado real de la IA, por página"
         bodyClassName="gap-3"
       >
@@ -110,7 +110,7 @@ export function CalibrationTable({
             title="Sin autoevaluaciones en este período"
             titleAs="p"
             titleClassName="text-[13px]"
-            description="Responde preguntas de Active recall para comparar lo que sientes con lo que evalúa la IA."
+            description="Responde preguntas de recordación activa para comparar lo que sientes con lo que evalúa la IA."
             descriptionClassName="text-[12px]"
           />
         ) : (

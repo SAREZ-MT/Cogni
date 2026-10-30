@@ -1,0 +1,143 @@
+/* Product tour theme (H2-T2, docs/new_design_fase_8/inicio-tour-y-empty-state.md
+   §1.6): restyles Driver.js's popover through its `popoverClass` ("cogni-tour")
+   from the tokens in globals.css. Kept unlayered and with two-class
+   selectors so it wins over driver.js/dist/driver.css (also unlayered,
+   loaded by product-tour.tsx). No hex here: tokens only. */
+
+.driver-popover.cogni-tour {
+  font-family: var(--font-sans);
+  color: var(--fg-default);
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.08);
+  padding: 20px;
+  min-width: 280px;
+  max-width: 340px;
+}
+
+/* Step 1: the centered welcome modal is wider. */
+.driver-popover.cogni-tour.cogni-tour-welcome {
+  max-width: 440px;
+  width: 440px;
+}
+
+/* Step 5: three footer buttons (Terminar, Atrás, Crear cuaderno) need room
+   so the primary button never truncates. */
+.driver-popover.cogni-tour.cogni-tour-create {
+  max-width: 400px;
+  width: 400px;
+}
+
+/* Step 1 illustration above the title, injected by product-tour.tsx. */
+.driver-popover.cogni-tour .cogni-tour-art {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-bottom: 16px;
+  border-radius: var(--radius-lg);
+}
+
+.driver-popover.cogni-tour .driver-popover-arrow {
+  display: none;
+}
+
+.driver-popover.cogni-tour .driver-popover-title {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--fg-default);
+}
+
+.driver-popover.cogni-tour .driver-popover-description {
+  margin-top: 6px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--fg-muted);
+}
+
+.driver-popover.cogni-tour .driver-popover-footer {
+  margin-top: 18px;
+  gap: 12px;
+}
+
+.driver-popover.cogni-tour .driver-popover-progress-text {
+  font-size: 12px;
+  color: var(--fg-muted);
+  white-space: nowrap;
+}
+
+.driver-popover.cogni-tour .driver-popover-navigation-btns {
+  align-items: center;
+  gap: 8px;
+}
+
+.driver-popover.cogni-tour .driver-popover-navigation-btns button + button {
+  margin-left: 0;
+}
+
+/* "Atrás" / "Ahora no" / "Terminar": outlined. */
+.driver-popover.cogni-tour .driver-popover-footer-btn {
+  box-sizing: border-box;
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-pill);
+  background-color: var(--bg-card);
+  color: var(--fg-default);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 32px;
+  text-shadow: none;
+  transition: background-color 200ms var(--ease-default);
+}
+
+.driver-popover.cogni-tour .driver-popover-footer-btn:hover {
+  background-color: var(--bg-muted);
+}
+
+/* "Siguiente" / "Empezar" / "Crear cuaderno": black pill like Button. */
+.driver-popover.cogni-tour .driver-popover-next-btn {
+  border-color: var(--primary);
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.driver-popover.cogni-tour .driver-popover-next-btn:hover {
+  background-color: var(--color-neutral-800);
+}
+
+/* "Omitir": plain text, added by product-tour.tsx in onPopoverRender. */
+.driver-popover.cogni-tour .cogni-tour-skip {
+  all: unset;
+  cursor: pointer;
+  margin-right: 2px;
+  padding: 4px 6px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  color: var(--fg-secondary);
+}
+
+.driver-popover.cogni-tour .cogni-tour-skip:hover {
+  color: var(--fg-default);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+/* Same soft ring as Button's focus-visible (ring-3 ring-ring/50). */
+.driver-popover.cogni-tour .driver-popover-footer-btn:focus-visible,
+.driver-popover.cogni-tour .cogni-tour-skip:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 50%, transparent);
+}
+
+/* Phones: the card takes the available width with a 16px margin (§1.8). */
+@media (max-width: 640px) {
+  .driver-popover.cogni-tour,
+  .driver-popover.cogni-tour.cogni-tour-welcome,
+  .driver-popover.cogni-tour.cogni-tour-create {
+    width: auto;
+    min-width: 0;
+    max-width: calc(100vw - 32px);
+  }
+}

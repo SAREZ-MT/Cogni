@@ -1,13 +1,20 @@
-import { Button } from "@/shared/ui/button";
+import { GoogleIcon } from "@/shared/ui/google-icon";
+import { SubmitButton } from "@/shared/ui/submit-button";
 import { signInWithGoogleAction } from "../actions";
 
 // Server-rendered form: the action fetches the Google URL and redirects.
+// SubmitButton reads the form status, so the redirect wait shows a spinner.
 export function GoogleButton() {
   return (
     <form action={signInWithGoogleAction}>
-      <Button type="submit" variant="outline" size="lg" className="w-full">
+      <SubmitButton
+        variant="outline"
+        size="lg"
+        className="w-full border-border-default bg-card hover:bg-hover"
+      >
+        <GoogleIcon />
         Continuar con Google
-      </Button>
+      </SubmitButton>
     </form>
   );
 }

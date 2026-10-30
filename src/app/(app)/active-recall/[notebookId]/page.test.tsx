@@ -169,7 +169,7 @@ describe("ActiveRecallNotebookPage", () => {
     expect(screen.getByText("Sin sesiones todavía")).toBeInTheDocument();
     expect(
       screen.getByText(
-        "Abre una página de este cuaderno y usa Técnicas → Active recall → Generar.",
+        "Abre una página de este cuaderno y usa Técnicas → Recordación activa → Generar.",
       ),
     ).toBeInTheDocument();
     expect(

@@ -28,5 +28,3 @@ export const NOTEBOOK_DOT_CLASSES: Record<NotebookColor, string> = {
   blue: "bg-pastel-blue-fg",
   mint: "bg-pastel-mint-fg",
 };
-
-export const NEUTRAL_DOT_CLASS = "bg-neutral-300";

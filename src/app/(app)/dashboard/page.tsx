@@ -93,11 +93,11 @@ export default async function DashboardPage({
 
   return (
     <section data-testid="dashboard" className="flex flex-1 flex-col gap-6">
-      <SetBreadcrumb items={[{ label: "Dashboard" }]} />
+      <SetBreadcrumb items={[{ label: "Progreso" }]} />
 
       <SectionHeader
         eyebrow="Progreso"
-        title="Dashboard"
+        title="Progreso"
         titleClassName="text-[24px]"
         description={`Cómo vas en ${PERIOD_LABEL[range]}`}
       />

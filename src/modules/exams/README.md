@@ -195,12 +195,15 @@ is dropped), and a feedback read failure in `getExamResultsAction` returns
   `application/testing/exam-hub-reader.contract.ts` (fake + `pnpm test:db`).
 - `listExamHub` adds the whole-percent last score (rounded down, as on the
   results screen) and `dueToday`, the page's
-  exam questions due now from scheduling's "Repasos de hoy"
-  (`createSchedulingServerApi().listDueToday`, `due.exam_question`). A
+  exam questions due today from scheduling's "Repasos de hoy"
+  (`createSchedulingServerApi().listDueToday(ownerId, { timeZone })`,
+  `due.exam_question`; reviews are due per local day of the profile's zone,
+  user decision 2026-10-18). A
   failing due list degrades to `dueToday: null` (reported to Sentry), never
   hiding the hub.
 - `failedDueNow` drives the retake banner copy: whether a failed root of
-  the last exam has its item due now (study-engine `listDue` filtered to
+  the last exam has its item due today (study-engine `listDue` with the
+  start of the owner's next local day as the bound, filtered to
   those roots through the `ExamDueCounts` port, built in `hub-actions.ts`);
   `null` when unreadable, and the banner falls back to neutral copy.
 - The hub's header offers only "Crear examen" (Phase 6 T5b): pick a
@@ -232,7 +235,8 @@ is dropped), and a feedback read failure in `getExamResultsAction` returns
   (`EXAMS_DUPLICATE_ANSWER`). A failure leaves a retake pending with the failed roots and
   keeps the last pass; a pass clears it and records the session.
 - `composition.ts`: `composeExam` orders roots failed last time first, then
-  due roots (oldest first), then least recently seen (never seen first), one
+  due roots (due before `dueBefore`, the start of the owner's next local
+  day, oldest first), then least recently seen (never seen first), one
   question per root, ties broken by id. `composeRetake` puts one fresh
   variant per failed root first, then the rest in the same order.
 - `exam-quality.ts`: `examQualityFor` — wrong → review with q = 1 always;

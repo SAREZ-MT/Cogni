@@ -99,7 +99,13 @@ export async function listExamCandidates(
 // EXAMS_NOT_ENOUGH_QUESTIONS). Called once, by startExamSession; the
 // result is stored on the session.
 export async function composeNormalExam(
-  input: { pageId: string; requestedCount: number; now: Date },
+  input: {
+    pageId: string;
+    requestedCount: number;
+    now: Date;
+    // The owner's "due" bound at `now` (start of their next local day).
+    dueBefore: Date;
+  },
   ownerId: string,
   repos: Pick<
     ExamSessionRepositories,
@@ -110,7 +116,7 @@ export async function composeNormalExam(
   const composed = composeExam({
     requestedCount: input.requestedCount,
     candidates,
-    now: input.now,
+    dueBefore: input.dueBefore,
   });
   if (!composed.ok) return composed;
   return ok(composed.value.map(({ questionId }) => questionId));

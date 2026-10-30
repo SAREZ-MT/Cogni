@@ -1,11 +1,12 @@
-import Link from "next/link";
 import { ForgotPasswordForm } from "@/modules/identity/ui";
+import { TextLink } from "@/shared/ui/text-link";
+import { AuthStack } from "../_components/auth-stack";
 
 export default function ForgotPasswordPage() {
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="font-semibold text-2xl text-fg">
+    <AuthStack>
+      <div className="flex flex-col gap-1.5">
+        <h1 className="font-semibold text-2xl text-fg tracking-tight">
           Recupera tu contraseña
         </h1>
         <p className="text-fg-secondary text-sm">
@@ -13,9 +14,9 @@ export default function ForgotPasswordPage() {
         </p>
       </div>
       <ForgotPasswordForm />
-      <p className="text-center text-fg-secondary text-sm">
-        <Link href="/login">Volver a iniciar sesión</Link>
+      <p className="text-center text-sm">
+        <TextLink href="/login">Volver a iniciar sesión</TextLink>
       </p>
-    </div>
+    </AuthStack>
   );
 }

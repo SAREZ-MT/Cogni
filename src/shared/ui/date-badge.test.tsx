@@ -43,4 +43,47 @@ describe("DateBadge", () => {
     const time = screen.getByText((_, element) => element?.tagName === "TIME");
     expect(time).toHaveAttribute("datetime", "2026-10-12");
   });
+
+  it("keeps a neutral month strip by default and a violet one when branded", () => {
+    const { rerender } = render(
+      <DateBadge
+        data-testid="badge"
+        date={new Date("2026-10-12T15:00:00.000Z")}
+        timeZone="UTC"
+      />,
+    );
+    const month = () =>
+      screen.getByTestId("badge").querySelector('[data-part="month"]');
+    expect(month()).toHaveClass("bg-neutral-50", "text-fg-muted");
+
+    rerender(
+      <DateBadge
+        data-testid="badge"
+        date={new Date("2026-10-12T15:00:00.000Z")}
+        timeZone="UTC"
+        tone="brand"
+      />,
+    );
+    expect(month()).toHaveClass("bg-primary-600", "text-white");
+    expect(month()).not.toHaveClass("bg-neutral-50");
+  });
+
+  it("fills its slot's height in the xl size, the strip in proportion", () => {
+    render(
+      <DateBadge
+        data-testid="badge"
+        date={new Date("2026-10-12T15:00:00.000Z")}
+        timeZone="UTC"
+        size="xl"
+      />,
+    );
+    const badge = screen.getByTestId("badge");
+    expect(badge).toHaveAttribute("data-size", "xl");
+    expect(badge).toHaveClass("h-full", "w-[88px]");
+    expect(badge.querySelector('[data-part="month"]')).toHaveClass("text-xs");
+    expect(badge.querySelector('[data-part="day"]')).toHaveClass(
+      "flex-1",
+      "text-[34px]",
+    );
+  });
 });

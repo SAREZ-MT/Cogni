@@ -9,6 +9,7 @@ import {
   truncateToTokenCap,
 } from "@/modules/ai";
 import type { PageTextReader } from "@/modules/notebooks";
+import type { DueCutoff } from "@/modules/study-engine";
 import type { Clock } from "@/shared/kernel/clock";
 import { DomainError } from "@/shared/kernel/domain-error";
 import { err, ok, type Result } from "@/shared/kernel/result";
@@ -50,6 +51,9 @@ export interface StartExamRetakeDeps {
   };
   uow: ExamSessionUnitOfWork;
   clock: Clock;
+  // The owner's per-day "due" bound (start of their next local day), for
+  // the order of the page's other questions (composeRetake).
+  dueCutoff: DueCutoff;
   ids: { next(): string };
   tokenCap: number;
 }
@@ -164,7 +168,7 @@ export async function startExamRetake(
 
   const now = deps.clock.now();
   const outcome = await runExamWork(deps.uow, (repos) =>
-    checkRetake(input, ownerId, repos, now),
+    checkRetake(input, ownerId, repos, now, deps.dueCutoff(now)),
   );
   if (!outcome.ok) return outcome;
   if (outcome.value.kind === "cleared") return ok({ kind: "cleared" });
@@ -243,7 +247,7 @@ export async function startExamRetake(
           ownerId,
           repos,
         ),
-        now,
+        dueBefore: deps.dueCutoff(now),
       });
       if (!composed.ok) return composed;
       const session = newExamSession(
@@ -300,6 +304,7 @@ async function checkRetake(
   ownerId: string,
   repos: ExamSessionRepositories,
   now: Date,
+  dueBefore: Date,
 ): Promise<Result<CheckedOutcome, DomainError>> {
   let outcome = await planRetake(input.pageId, ownerId, repos);
   if (!outcome.ok || outcome.value.kind === "resume") return outcome;
@@ -328,7 +333,7 @@ async function checkRetake(
       ownerId,
       repos,
     ),
-    now,
+    dueBefore,
   });
   if (!composed.ok) return composed;
   return outcome;

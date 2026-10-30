@@ -1,7 +1,11 @@
 "use server";
 
 import * as Sentry from "@sentry/nextjs";
-import { createSchedulingServerApi } from "@/modules/scheduling";
+import { getCurrentTimeZoneSetting } from "@/modules/identity";
+import {
+  createSchedulingServerApi,
+  startOfTomorrowIn,
+} from "@/modules/scheduling";
 import { createStudyItemRepository } from "@/modules/study-engine";
 import { getDb } from "@/shared/db/client";
 import { systemClock } from "@/shared/kernel/clock";
@@ -25,15 +29,22 @@ export type ExamHubPageView = Omit<ExamHubEntry, "lastFinishedAt"> & {
 
 // Exam questions due today from scheduling's "Repasos de hoy", and the
 // roots whose exam item is due from study-engine's due items (the same
-// "due" as "Hoy"). A failing read never hides the hub: it degrades to
-// unknown (null).
-function dueCounts(db: ReturnType<typeof getDb>): ExamDueCounts {
+// "due" as "Hoy": before the start of the owner's next local day in
+// `timeZone`, the profile's zone). A failing read never hides the hub: it
+// degrades to unknown (null).
+function dueCounts(
+  db: ReturnType<typeof getDb>,
+  timeZone: string,
+): ExamDueCounts {
   const scheduling = createSchedulingServerApi({ db, clock: systemClock });
   const studyItems = createStudyItemRepository(db);
   return {
     async examRootsDueNow(ownerId) {
       try {
-        const items = await studyItems.listDue(ownerId, systemClock.now());
+        const items = await studyItems.listDue(
+          ownerId,
+          startOfTomorrowIn(systemClock.now(), timeZone),
+        );
         return new Set(
           items
             .filter((item) => item.kind === "exam_question")
@@ -46,7 +57,7 @@ function dueCounts(db: ReturnType<typeof getDb>): ExamDueCounts {
     },
     async examQuestionsDueByPage(ownerId) {
       try {
-        const pages = await scheduling.listDueToday(ownerId);
+        const pages = await scheduling.listDueToday(ownerId, { timeZone });
         return new Map(
           pages.map((page) => [page.pageId, page.due.exam_question]),
         );
@@ -68,8 +79,9 @@ export async function listExamHubAction(): Promise<
     if (!ownerId.ok) return ownerId;
 
     const db = getDb();
+    const { timeZone } = await getCurrentTimeZoneSetting();
     const result = await listExamHub(
-      { reader: new DrizzleExamHubReader(db), due: dueCounts(db) },
+      { reader: new DrizzleExamHubReader(db), due: dueCounts(db, timeZone) },
       ownerId.value,
     );
     if (!result.ok) return err(toActionError(result.error));

@@ -1,4 +1,5 @@
 import type { PageTextReader } from "@/modules/notebooks";
+import type { DueCutoff } from "@/modules/study-engine";
 import type { Clock } from "@/shared/kernel/clock";
 import { DomainError } from "@/shared/kernel/domain-error";
 import { err, ok, type Result } from "@/shared/kernel/result";
@@ -14,6 +15,9 @@ export interface StartRecallSessionDeps {
   pages: PageTextReader;
   uow: RecallSessionUnitOfWork;
   clock: Clock;
+  // The owner's per-day "due" bound (start of their next local day): a
+  // question due later today is among the due ones.
+  dueCutoff: DueCutoff;
   ids: { next(): string };
 }
 
@@ -54,7 +58,7 @@ export async function startRecallSession(
     deps.uow,
     async (repos): Promise<Result<StartedRecallSession, DomainError>> => {
       const questions = await composeRecallQuestions(
-        { pageId: input.pageId, now },
+        { pageId: input.pageId, dueBefore: deps.dueCutoff(now) },
         ownerId,
         repos,
       );

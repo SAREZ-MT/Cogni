@@ -32,6 +32,7 @@ export class DrizzleDueInRangeReader implements DueInRangeReader {
         pageId: pages.id,
         pageTitle: pages.title,
         notebookId: notebooks.id,
+        notebookTitle: notebooks.title,
         kind: studyItems.kind,
         dueAt: studyItems.dueAt,
       })
@@ -58,6 +59,7 @@ export class DrizzleDueInRangeReader implements DueInRangeReader {
         pageId: pages.id,
         pageTitle: pages.title,
         notebookId: notebooks.id,
+        notebookTitle: notebooks.title,
         kind: studyItems.kind,
         count: count(),
         earliestDueAt: earliest,
@@ -66,7 +68,13 @@ export class DrizzleDueInRangeReader implements DueInRangeReader {
       .innerJoin(pages, eq(pages.id, studyItems.pageId))
       .innerJoin(notebooks, eq(notebooks.id, pages.notebookId))
       .where(and(...this.live(ownerId), lt(studyItems.dueAt, before)))
-      .groupBy(pages.id, pages.title, notebooks.id, studyItems.kind)
+      .groupBy(
+        pages.id,
+        pages.title,
+        notebooks.id,
+        notebooks.title,
+        studyItems.kind,
+      )
       // Kind in byte order (collate "C"), the code-unit order of the
       // in-memory reader, whatever the database's default collation.
       .orderBy(

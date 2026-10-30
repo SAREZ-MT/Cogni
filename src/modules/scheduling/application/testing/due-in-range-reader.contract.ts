@@ -48,7 +48,7 @@ export function runDueInRangeReaderContract(
   };
 
   describe("DueInRangeReader contract", () => {
-    it("describes each item in the range with its page, notebook and kind", async () => {
+    it("describes each item in the range with its page, notebook (id and title) and kind", async () => {
       const ctx = options.context();
       const reader = options.createReader();
       const page = await ctx.newPage();
@@ -63,6 +63,7 @@ export function runDueInRangeReaderContract(
           pageId: page.pageId,
           pageTitle: page.pageTitle,
           notebookId: page.notebookId,
+          notebookTitle: page.notebookTitle,
           kind: "recall_question",
           dueAt: daysFromStart(1),
         },
@@ -70,6 +71,7 @@ export function runDueInRangeReaderContract(
           pageId: page.pageId,
           pageTitle: page.pageTitle,
           notebookId: page.notebookId,
+          notebookTitle: page.notebookTitle,
           kind: "flashcard",
           dueAt: daysFromStart(2),
         },
@@ -176,6 +178,7 @@ export function runDueInRangeReaderContract(
           pageId: page.pageId,
           pageTitle: page.pageTitle,
           notebookId: page.notebookId,
+          notebookTitle: page.notebookTitle,
           kind: "flashcard",
           count: 3,
           earliestDueAt: daysFromStart(-400),
@@ -184,6 +187,7 @@ export function runDueInRangeReaderContract(
           pageId: page.pageId,
           pageTitle: page.pageTitle,
           notebookId: page.notebookId,
+          notebookTitle: page.notebookTitle,
           kind: "exam_question",
           count: 1,
           earliestDueAt: daysFromStart(-2),

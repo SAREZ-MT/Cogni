@@ -19,12 +19,14 @@ import {
   getCalibration,
   getProgress,
   getTechniqueMetrics,
+  getWeakTopics,
   type TechniqueMetricsReport,
 } from "./application";
 import type { CalibrationRollup } from "./domain/calibration";
 import { ANALYTICS_ERROR } from "./domain/errors";
 import { isAnalyticsRange, isTimeZone } from "./domain/local-day";
 import type { Progress } from "./domain/progress";
+import type { WeakTopic } from "./domain/weak-topics";
 import {
   DrizzleAnswerOutcomeReader,
   DrizzlePageProgressReader,
@@ -187,4 +189,26 @@ export function getDashboardCalibration(
   input: DashboardRangeInput,
 ): Promise<Result<CalibrationRollup, ActionError>> {
   return readCalibration(input);
+}
+
+// "Temas débiles" on Home (Phase 8 H2-T5a) with the page's render instant.
+// It takes no input besides the clock, so there is nothing to parse.
+export function getHomeWeakTopics(input: {
+  now: Date;
+}): Promise<Result<WeakTopic[], ActionError>> {
+  return forCurrentOwner(
+    null,
+    () => ({}),
+    (ownerId) => {
+      const db = getDb();
+      return getWeakTopics(
+        { ownerId },
+        {
+          answers: new DrizzleAnswerOutcomeReader(db),
+          pages: new DrizzlePageProgressReader(db),
+          clock: createFixedClock(input.now),
+        },
+      );
+    },
+  );
 }

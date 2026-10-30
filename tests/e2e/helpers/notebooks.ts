@@ -4,7 +4,9 @@ import { expect } from "../fixtures/auth";
 // Shared entry points of the notebook flows. Since design pass 2 the sidebar
 // is navigation only, so notebooks are created, opened and managed from the
 // /notebooks library and from the notebook's own route:
-// - "Nuevo cuaderno" (Home and /notebooks) opens the "Crear cuaderno" dialog;
+// - the /notebooks grid tile "Nuevo cuaderno" (or, with no notebooks yet,
+//   the empty state's "Crear mi primer cuaderno") opens the "Crear
+//   cuaderno" dialog;
 // - each notebook is a card ("article") with an "Acciones de {título}" kebab
 //   (Renombrar, Cambiar apariencia, Archivar);
 // - pages are created ("Nueva página") and archived ("Archivar página
@@ -57,11 +59,17 @@ export function notebookCard(page: Page, title: string): Locator {
 }
 
 // Creates a notebook from the /notebooks library and waits until its card is
-// rendered. The header pill is the first "Nuevo cuaderno" button in the DOM
-// (the dashed grid tile carries the same name), hence `.first()`.
+// rendered. Since Phase 8 H4-T4 the hub has no header create button: an
+// owner without notebooks gets the empty state's "Crear mi primer cuaderno"
+// CTA, anyone else the grid's dashed "Nuevo cuaderno" tile — exactly one of
+// the two is on the page.
 export async function createNotebook(page: Page, title: string) {
-  await page.goto("/notebooks");
-  await page.getByRole("button", { name: "Nuevo cuaderno" }).first().click();
+  await page.goto("/notebooks?view=grid");
+  await page
+    .getByRole("button", {
+      name: /^(Nuevo cuaderno|Crear mi primer cuaderno)$/,
+    })
+    .click();
   const dialog = page.getByRole("dialog");
   await dialog.getByLabel("Título").fill(title);
   await clickAndWaitForAction(

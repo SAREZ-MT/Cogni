@@ -60,6 +60,8 @@ export const TERMS_COPY = {
   },
   links: {
     notice: "Al crear una cuenta deberás aceptar los",
+    signUpNotice: "Al crear tu cuenta aceptarás los",
+    signUpNoticeSuffix: "en el siguiente paso",
     link: "términos de uso",
     menu: "Términos de uso",
   },

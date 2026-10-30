@@ -4,8 +4,14 @@ import { InMemoryDueTodayReader } from "./application/testing/in-memory-due-toda
 // Session, database and Sentry are mocked so this proves the Server Action
 // boundary (session first, owner scoping, never throws) without Postgres;
 // the reader itself is covered by its shared contract.
-const { getCurrentUser } = vi.hoisted(() => ({ getCurrentUser: vi.fn() }));
-vi.mock("@/modules/identity", () => ({ getCurrentUser }));
+const { getCurrentUser, getCurrentTimeZoneSetting } = vi.hoisted(() => ({
+  getCurrentUser: vi.fn(),
+  getCurrentTimeZoneSetting: vi.fn(),
+}));
+vi.mock("@/modules/identity", () => ({
+  getCurrentUser,
+  getCurrentTimeZoneSetting,
+}));
 vi.mock("@/shared/db/client", () => ({ getDb: () => ({}) }));
 const { captureException } = vi.hoisted(() => ({ captureException: vi.fn() }));
 vi.mock("@sentry/nextjs", () => ({ captureException }));
@@ -13,8 +19,8 @@ vi.mock("@sentry/nextjs", () => ({ captureException }));
 let reader: InMemoryDueTodayReader;
 vi.mock("./infrastructure", () => ({
   DrizzleDueTodayReader: class {
-    listDueToday(ownerId: string, now: Date) {
-      return reader.listDueToday(ownerId, now);
+    listDueToday(ownerId: string, dueBefore: Date) {
+      return reader.listDueToday(ownerId, dueBefore);
     }
   },
   DrizzleDueInRangeReader: class {
@@ -48,6 +54,13 @@ describe("listDueTodayAction", () => {
     vi.setSystemTime(NOW);
     reader = new InMemoryDueTodayReader();
     getCurrentUser.mockReset();
+    getCurrentTimeZoneSetting.mockReset();
+    // 12:00Z is 07:00 in Bogotá (-05): the local day ends at 5 Oct 05:00Z.
+    getCurrentTimeZoneSetting.mockResolvedValue({
+      status: "ok",
+      timeZone: "America/Bogota",
+      chosen: true,
+    });
     captureException.mockReset();
   });
   afterEach(() => {
@@ -63,17 +76,23 @@ describe("listDueTodayAction", () => {
     });
   });
 
-  it("lists only the caller's pages with items due at or before now", async () => {
+  it("lists only the caller's pages with items due during the local day of the profile's zone", async () => {
     getCurrentUser.mockResolvedValue({ id: "owner-1" });
     seedPage("p-due", "owner-1", new Date(NOW.getTime() - 1000));
-    seedPage("p-later", "owner-1", new Date(NOW.getTime() + 1000));
+    // 23:30 local today: due today although it is still hours away.
+    seedPage("p-tonight", "owner-1", new Date("2026-10-05T04:30:00.000Z"));
+    // 00:30 local tomorrow.
+    seedPage("p-tomorrow", "owner-1", new Date("2026-10-05T05:30:00.000Z"));
     seedPage("p-other", "owner-2", new Date(NOW.getTime() - 1000));
 
     const result = await listDueTodayAction();
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.value.map((page) => page.pageId)).toEqual(["p-due"]);
+    expect(result.value.map((page) => page.pageId)).toEqual([
+      "p-due",
+      "p-tonight",
+    ]);
     expect(result.value[0]).toMatchObject({
       pageTitle: "Mitosis",
       notebookId: "nb-p-due",
@@ -137,6 +156,7 @@ describe("listCalendarDaysAction", () => {
           pageId: "p-in",
           pageTitle: "Mitosis",
           notebookId: "nb-p-in",
+          notebookTitle: "Biología",
           due: { flashcard: 1, exam_question: 0, recall_question: 0 },
         },
       ],

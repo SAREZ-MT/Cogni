@@ -14,10 +14,15 @@ export interface StudyItemRepository {
     sourceId: string,
     ownerId: string,
   ): Promise<StudyItem | null>;
-  // Non-suspended items with dueAt <= now, oldest due first; limited to one
-  // page when pageId is given. Items of archived pages and of pages in
-  // archived notebooks are never due.
-  listDue(ownerId: string, now: Date, pageId?: string): Promise<StudyItem[]>;
+  // Non-suspended items with dueAt < dueBefore (a DueCutoff: the start of
+  // the owner's next local day), oldest due first; limited to one page
+  // when pageId is given. Items of archived pages and of pages in archived
+  // notebooks are never due.
+  listDue(
+    ownerId: string,
+    dueBefore: Date,
+    pageId?: string,
+  ): Promise<StudyItem[]>;
   // Every item of the page, suspended ones included (computeMastery skips
   // them), ordered by creation.
   listByPage(pageId: string, ownerId: string): Promise<StudyItem[]>;

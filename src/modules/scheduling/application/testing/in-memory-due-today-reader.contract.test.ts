@@ -1,16 +1,17 @@
 import { randomUUID } from "node:crypto";
 import { runDueInRangeReaderContract } from "./due-in-range-reader.contract";
-import {
-  type DueTodayReaderContractContext,
-  runDueTodayReaderContract,
-} from "./due-today-reader.contract";
+import { runDueTodayReaderContract } from "./due-today-reader.contract";
 import { InMemoryDueTodayReader } from "./in-memory-due-today-reader";
+import {
+  runTechniqueOverviewReaderContract,
+  type TechniqueOverviewReaderContractContext,
+} from "./technique-overview-reader.contract";
 
 // The fake is its own seed: the contract's fixtures are written straight
 // into it, standing in for the notebooks, pages and study_items tables.
 let reader = new InMemoryDueTodayReader();
 
-const context = (): DueTodayReaderContractContext => ({
+const context = (): TechniqueOverviewReaderContractContext => ({
   ownerId: "owner-1",
   otherOwnerId: "owner-2",
   newPage: async (ownerId = "owner-1") => {
@@ -43,6 +44,23 @@ const context = (): DueTodayReaderContractContext => ({
       suspended: input.suspended ?? false,
     });
   },
+  addReviewedItem: async (page, input) => {
+    const kind = input.kind ?? "flashcard";
+    reader.addItem({
+      pageId: page.pageId,
+      kind,
+      dueAt: input.dueAt,
+      suspended: false,
+    });
+    reader.addReview({
+      pageId: page.pageId,
+      kind,
+      reviewedAt: input.reviewedAt,
+    });
+  },
+  addExamSession: async (page, finishedAt) => {
+    reader.addExamSession({ pageId: page.pageId, finishedAt });
+  },
   archivePage: async (page) => reader.archivePage(page.pageId),
   archiveNotebook: async (page) => reader.archiveNotebook(page.notebookId),
 });
@@ -54,3 +72,4 @@ const createReader = () => {
 
 runDueTodayReaderContract({ createReader, context });
 runDueInRangeReaderContract({ createReader, context });
+runTechniqueOverviewReaderContract({ createReader, context });

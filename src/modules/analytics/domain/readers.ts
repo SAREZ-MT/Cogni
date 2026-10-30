@@ -22,9 +22,13 @@ export interface ReviewHistoryReader {
 export interface PageProgressReader {
   // Every live page with its notebook, its page_mastery level and score
   // (null without a row) and its live item counts: non-suspended items,
-  // and those with `due_at <= now`. Ordered by notebook position, then page
-  // position.
-  listPageProgress(ownerId: string, now: Date): Promise<PageProgressRow[]>;
+  // and those with `due_at < dueBefore` (the start of the owner's next
+  // local day: reviews are due per day). Ordered by notebook position,
+  // then page position.
+  listPageProgress(
+    ownerId: string,
+    dueBefore: Date,
+  ): Promise<PageProgressRow[]>;
 }
 
 // One graded exam answer (exam_answers.is_correct) of a finished exam.

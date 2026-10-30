@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { createAiServerApi } from "@/modules/ai";
 import { createNotebooksServerApi } from "@/modules/notebooks";
+import { getCurrentDueCutoff } from "@/modules/scheduling";
 import {
   createFlashcardSessionsServerApi,
   createSessionFeedbackSources,
@@ -86,13 +87,17 @@ const gradeInput = z.object({
 const finishInput = z.object({ sessionId: z.uuid() });
 const feedbackInput = z.object({ sessionId: z.uuid() });
 
-function deps() {
+// Reviews are due per local day: the owner's "due" bound comes from their
+// profile zone, read server-side (never from the client), so a session
+// offers exactly the cards Home and "Hoy" count as due today.
+async function deps() {
   const db = getDb();
   return {
     sessions: createFlashcardSessionsServerApi({
       db,
       pages: createNotebooksServerApi({ db, clock: systemClock }),
       clock: systemClock,
+      dueCutoff: await getCurrentDueCutoff(),
       ids: { next: createId },
     }),
     flashcards: new DrizzleFlashcardRepository(db),
@@ -137,7 +142,7 @@ export async function startFlashcardSessionAction(
     const parsed = parseInput(startInput, input);
     if (!parsed.ok) return parsed;
 
-    const { sessions, flashcards } = deps();
+    const { sessions, flashcards } = await deps();
     const started = await sessions.start(ownerId.value, parsed.value);
     if (!started.ok) return err(toActionError(started.error));
     return ok({
@@ -157,7 +162,10 @@ export async function gradeFlashcardAction(
     if (!parsed.ok) return parsed;
 
     // No revalidation here: the deck re-renders once, when the session ends.
-    const graded = await deps().sessions.grade(ownerId.value, parsed.value);
+    const graded = await (await deps()).sessions.grade(
+      ownerId.value,
+      parsed.value,
+    );
     if (!graded.ok) return err(toActionError(graded.error));
     return ok({
       reviewedCount: graded.value.session.reviewedCount,
@@ -176,7 +184,10 @@ export async function finishFlashcardSessionAction(
     const parsed = parseInput(finishInput, input);
     if (!parsed.ok) return parsed;
 
-    const finished = await deps().sessions.finish(ownerId.value, parsed.value);
+    const finished = await (await deps()).sessions.finish(
+      ownerId.value,
+      parsed.value,
+    );
     if (!finished.ok) return err(toActionError(finished.error));
     revalidateDecks();
     return ok({

@@ -12,7 +12,7 @@ Surface box: `rounded-xl border`.
   · `success` · `error` · `achievement` (gradient) — only `default` is
   currently consumed; the rest exist as documented API surface.
 - `padding`: `none | sm(16px) | md(20px) | lg(24px)`. A non-standard padding
-  (StatCard's 18px) stays `padding="none"` + a `className` override.
+  (the former Home StatCard's 18px) stays `padding="none"` + a `className` override.
 - `interactive`: adds the hover lift (`-translate-y-0.5` + `shadow-card-hover`).
 - `asChild` (radix Slot, same pattern as `Button`): renders the styling onto
   the single child instead of a `div` — used to keep `<article>`/`<Link>`
@@ -34,7 +34,7 @@ The pastel/semantic square behind notebook, stat and empty-state icons.
   scale, so the key is the exact px value instead of an idealized
   sm/md/lg/xl/2xl. `"48"` was added for the Flashcards design preview's
   `DeckSummaryCard` header tile (studyplatform-flashcards-style.md §4).
-- `radius`: `md(8px) | input(10px) | tile(14px) | xl(16px)` — independent of
+- `radius`: `md(8px) | input(10px) | tile(14px) | xl(16px) | full` — independent of
   `size` (size 36 ships with both `md` and `input` radius on different screens).
 - `tone`: notebook pastel pairs (`purple | pink | green | yellow | orange |
   blue | mint`, matching `NotebookColor`) plus semantic tones (`primary |
@@ -46,7 +46,7 @@ The pastel/semantic square behind notebook, stat and empty-state icons.
 
 Used by: `notebook-card.tsx`, `notebook-list-row.tsx`, `home/stat-card.tsx`,
 `home/ready-to-review.tsx`, `home/weak-topics.tsx`, `app/(app)/page.tsx`,
-`notebooks/page.tsx`, `notebooks/[notebookId]/page.tsx`,
+`notebooks/[notebookId]/page.tsx`,
 `modules/notebooks/ui/create-notebook-trigger.tsx`.
 
 ## Pill (`pill.tsx`)
@@ -69,6 +69,12 @@ Used by: `nav-item.tsx` (disabled row's "pronto" badge),
 - `SectionHeader`: page-level head — `eyebrow` (11px uppercase overline),
   `title` (24px/700 by default, override via `titleClassName`),
   `description`, `actions` (right-aligned), optional leading `icon`.
+  `description` may be a list of strings: one line of phrases joined by
+  6px `primary-300` dots (`data-part="separator"`, `aria-hidden`), wrapping
+  on narrow columns. `leadingClassName` overrides the icon + text row
+  (default `gap-3`). Phase 8 H4-T4: the notebooks hub passes a small
+  `NotebookCover` as `icon` with `gap-4`, a 32px tight-tracked
+  `text-gradient-brand` title and `["Tus materias, organizadas", count]`.
 - `SectionTitle`: in-card section heading — 14px/600 by default; passing
   `action` switches it to 16px/600 with a right-aligned link/action row.
 
@@ -88,8 +94,8 @@ Thin rounded-pill track + fill. `value` (0-100, clamped; non-finite counts as
 an inline `style`. The track exposes `role="progressbar"` with
 `aria-valuenow` (clamped) / `aria-valuemin=0` / `aria-valuemax=100`; a name
 is required whenever the bar is not decorative (axe `aria-progressbar-name`):
-pass `aria-label`, or `aria-labelledby` pointing at a visible label (StatCard
-uses `useId` + the stat's label). Only a purely decorative bar may opt out with
+pass `aria-label`, or `aria-labelledby` pointing at a visible label (the former
+Home StatCard used `useId` + the stat's label). Only a purely decorative bar may opt out with
 `role="presentation" aria-hidden`. `data-slot="progress-bar"`/`"progress-fill"`
 are unchanged so existing test queries still work.
 
@@ -104,15 +110,178 @@ caught up" panel). `icon` is a pre-built node (usually an `IconTile`) — this
 atom only lays it out. `fill` adds `flex-1`; `as`/`titleAs` pick the root/
 title element tag.
 
-Used by: `app/(app)/page.tsx` (zero-notebooks, `plain`), `notebooks/page.tsx`
-(zero-notebooks, `dashed`), `notebooks/[notebookId]/page.tsx` (zero-pages,
+Used by: `home/home-empty-state.tsx` (zero-notebooks Home, `plain`, Phase 8
+H2-T3), `notebooks/[notebookId]/page.tsx` (zero-pages,
 `dashed`), `home/ready-to-review.tsx` (`success`), `home/weak-topics.tsx`
 (`tinted`).
 
+## FeaturePreviewCard (`feature-preview-card.tsx`)
+
+Phase 8 H2-T3. A dashed, text-only box that previews a section the user
+will see once there is data (Home empty state, "Lo que verás aquí"). It is
+static on purpose: no link, no button, no skeleton shimmer, so it never
+reads as clickable or loading.
+
+- `icon` (pre-built node; Home passes a neutral `IconTile` 36 with an 18px
+  / 1.75 stroke lucide icon), optional `adornment` at the right of the icon
+  row (Home: the technique-colour dots `warning-500` / `success-500` /
+  `rose-500` of the techniques that feed the section), `title` (an `h3`,
+  15px medium), `description` (14px `text-fg-muted`), `className?`.
+- Style: `rounded-xl` (16px), 1px dashed `neutral-300` border, `bg-card`
+  (so a backdrop never shows through), `px-5 py-4`, `h-full` so the boxes
+  in a grid row share one height.
+
+Used by: `home/home-empty-state.tsx` (three boxes: Para hoy, Continúa donde
+lo dejaste, Temas débiles; dots on Para hoy (3) and Temas débiles (2)).
+
+`CreateNotebookTrigger` (notebooks module) also gained a `hero` variant for
+the same screen: the large `rounded-pill` primary `Button` with a custom
+`label` ("Crea tu primer cuaderno") and a `tourId` that becomes its
+`data-tour` anchor for the product tour. Phase 8 H4-T1 added a `cta`
+variant for the notebooks hub empty state: the same dialog behind a large
+`rounded-pill` violet `Button` (`primary-600`, hover `primary-700`, 15px
+semibold, soft violet shadow `0 6px 18px -6px rgb(124 58 237 / .55)`) with
+no plus icon and a custom `label` ("Crear mi primer cuaderno").
+
+## TechniqueFan (`technique-fan.tsx`)
+
+Phase 8 Home empty state hero, client. The three study techniques as mini
+cards fanned like a hand of flashcards behind a mini notebook, so an empty
+screen still says what Cogni does. Decorative only: `aria-hidden`, no text,
+no data.
+
+- Props: `techniques` (`("flashcards" | "recall" | "exams")[]`, left to right —
+  keys, not icon components, because a server parent cannot pass
+  components to this client atom), `className?`. Footprint 300×150.
+- Each card: 92×112, `rounded-[14px]`, white, hairline `border-default`,
+  layered shadow (tight contact `0 1px 2px` + soft offset ambient
+  `0 8px 20px -8px`, no glow), a 20px pastel chip with the lucide icon
+  (12px / 1.75 stroke, pair from `TECHNIQUE_PAIR_CLASS`) and a miniature
+  of the technique's screen: Flashcards a card front (question lines +
+  `pastel-yellow` "Ver respuesta" pill), Recordación activa a prompt plus
+  an answer in a `pastel-mint` box, Exámenes three options with the middle
+  one chosen in `pastel-pink`. Cards carry `data-technique`.
+- Pose (`fanPose`): ±8deg outer tilt, ±80px spread, outer cards 10px lower,
+  middle lifted 4px; pivot at each card's bottom. `fanPose(index, count,
+  shape?)` and `fanStack(shape?)` take an optional `FanShape` (`tiltDeg`,
+  `spreadPx`, `outerDropPx`, `middleLiftPx`; Phase 8 H4-T3) so
+  `NotebookFan` reuses the same geometry and `fanTransition`.
+- Front: a built-in mini notebook (`data-part="notebook"`, 72×76, rounded
+  8px at the spine and 14px at the fore edge, same white/border/shadow as
+  the cards) with a `primary-100` spine carrying three punched ring holes,
+  a `primary-200` title stroke and a soft "+" chip (`primary-50` fill,
+  `primary-200` border, `primary-600` `Plus`). Violet only in the spine and
+  the chip. Static and not interactive: the real action is the CTA under
+  the title. It replaced the former `center` slot (the violet
+  `IconTile` 56 with `BookPlus`).
+- Motion (`fanTransition`): once on mount the cards settle from a squared
+  stack into the fan — spring, no bounce, `visualDuration` 0.36s, 40ms
+  stagger, all done within 0.5s — and keep a stable transform. Under
+  `prefers-reduced-motion` the transition is zero-duration; `initial`
+  never changes, so server markup and hydration match.
+
+Used by: `home/home-empty-state.tsx`.
+
+## NotebookFan (`notebook-fan.tsx`)
+
+Phase 8 H4-T3 hero of the notebooks hub's empty state, client (user
+decision 2026-10-20: option D, palette 1 "Técnicas vivas"). Three closed
+notebooks fanned on a 560×236 stage: "Historia" / "18 páginas" on the left
+(−9deg, 150px out), "Biología" / "9 páginas" on the right (+9deg), both
+166×208 and 10px lower, and an upright, larger (180×226) "Nueva materia" /
+"Tu primer cuaderno" in front, raised 2px, rendered last with `z-10`.
+Decorative only: `aria-hidden`, the names are sample decoration, not data;
+no buttons, links or images.
+
+- Props: `className?`.
+- Each book (`data-part="fan-notebook"`, `data-notebook="left" | "right" |
+  "front"`) is a large `NotebookCover` (see below) carrying the name
+  (13px semibold; 15px in front) over a 10.5px meta line, and a 26px icon
+  tile bottom-left (lucide 15px / 1.75 stroke).
+- Palette: left `amber-200` → `amber-400`, `warning-500` border, white
+  tile with a `warning-700` `Layers`, white ribbon; right `emerald-200` →
+  `emerald-400`, `success-500` border, white tile with a `success-700`
+  `Brain`, white ribbon; front `primary-500` → `primary-700`, white text
+  (meta `white/75`), a translucent white tile with `Plus` and a
+  `technique-flashcards-accent` ribbon.
+- Motion: `TechniqueFan`'s helpers with the notebook `FanShape` — once on
+  mount the books settle from a squared stack into the fan (spring, no
+  bounce, staggered, done within 0.5s). Under `prefers-reduced-motion`
+  only the transition is zero-duration; `initial` never changes.
+- Responsive: the root is a size container; the stage scales in steps
+  with its own column (0.22 under 210px, 0.4, 0.56 from 300px, 0.75 from
+  420px, 1 from 560px) and the box height follows, so it never overflows
+  even when the sidebar takes the width.
+
+Used by: `notebooks/page.tsx` (through `IllustratedEmptyState`'s `art`).
+
+## NotebookCover (`notebook-cover.tsx`)
+
+Phase 8 H4-T4 (user decision 2026-10-20), extracted from `NotebookFan` so
+the fan's books and the notebooks hub header's badge are one drawing. A
+closed notebook seen from the front, decorative (`aria-hidden`,
+`data-slot="notebook-cover"`): page-edge thickness from two layers offset
+behind the cover (a striped `neutral-0`/`neutral-150` page block and a
+`neutral-50` back cover, hairline `border-default`, `data-part="pages"`),
+a 160deg gradient cover (`data-part="cover"`) with a `black/7` spine strip
+(`data-part="spine"`) and a notched bookmark ribbon (`data-part="ribbon"`,
+clip-path) near the top-right.
+
+- Props: `size?` (`"lg"` default | `"sm"`), `cover?` (border + gradient
+  stops, default `border-primary-700 from-primary-500 to-primary-700`),
+  `ribbon?` (default `bg-technique-flashcards-accent`), `className?`,
+  `children?` (printed on the cover).
+- `lg`: fills its parent (`size-full`); layers offset 8px / 4px, radius
+  `8px 16px 16px 8px`, 14px spine, 14×46 ribbon 26px from the edge;
+  depth `0 1px 2px` contact + `0 12px 28px -12px` ambient, no glow.
+- `sm`: a fixed 58×70 badge (52×64 cover); layers offset 6px / 3px,
+  radius `5px 11px 11px 5px`, 8px spine, 8×22 ribbon 9px from the edge;
+  depth `0 1px 2px` contact + a violet-tinted `0 10px 20px -10px` ambient.
+  No icon or "+" on it (user correction 2026-10-20).
+
+Used by: `notebook-fan.tsx` (all three books, `lg`), `notebooks/page.tsx`
+(the header badge, `sm`, through `SectionHeader`'s `icon`).
+
+## StudyBackdrop (`study-backdrop.tsx`)
+
+Phase 8. A static decorative background that gives a sparse screen body
+without competing with its content. Absolutely positioned, `aria-hidden`,
+`pointer-events-none`, no text, no animation or parallax. Grid only, no
+colour (user decision 2026-10-17):
+
+- `grid`: an SVG of 28px notebook graph paper, lines in
+  `stroke-ink-placeholder/55`, centred so a line crosses the middle of the
+  card. A radial mask keeps it strongest in the centre and fades it out
+  towards the edges.
+- `grid-cell`: 16 fixed cells filled with `neutral-150` (light dry gray),
+  aligned to the lines and kept clear of the hero text.
+
+Put it first inside a `relative` parent and give the content after it
+`relative`. `className?` overrides the inset: Home passes
+`inset-[calc(var(--content-padding)*-1)]` so it bleeds over `<main>`'s
+padding and fills the whole content card.
+
+Used by: `home/home-empty-state.tsx`.
+
+## RevealGroup / RevealItem (`reveal.tsx`)
+
+Phase 8, client. Staggered entrance with Motion (same feel as the auth
+pages' `AuthStack`): each `RevealItem` under a `RevealGroup` (any depth)
+rises 8px and fades in, 60ms apart, spring without bounce,
+`visualDuration` 0.34s. Opacity/translate only, and items end at
+`transform: none`, so the product tour measures the real position of an
+anchor inside one. Under `prefers-reduced-motion` the transitions become
+zero-duration (nothing animates); only transitions change, never
+`initial`, so server markup and hydration match. `revealVariants(reduce)`
+is exported for tests.
+
+Used by: `home/home-empty-state.tsx`.
+
 ## Keycap (`keycap.tsx`)
 
-The ⌘/H shortcut chip. Used by `nav-item.tsx` (once per key in a shortcut
-array).
+A keyboard shortcut chip. `nav-item.tsx` renders one per key of an entry's
+`shortcut` array. No sidebar entry sets one since 2026-10-17: the "⌘ H"
+chips on "Inicio" were removed because no shortcut was wired to them.
 
 ## BackLink (`back-link.tsx`)
 
@@ -136,7 +305,7 @@ child of the centered `max-w-2xl` column, above `PageHeader`).
 
 Audited for hand-rolled duplication; the existing `default | outline |
 secondary | ghost | destructive | link` variants already cover every
-Button-composed call site (dialog actions, `CreateNotebookTrigger`'s pill,
+Button-composed call site (dialog actions, `CreateNotebookTrigger`'s hero and cta,
 `ArchivePageButton`, the kebab menu). The remaining hand-rolled buttons
 (`notebooks/[notebookId]/page.tsx`'s "Nueva página", `home/weak-topics.tsx`'s
 disabled "pronto", `app/(app)/page.tsx`'s disabled "Ajustar") are each used
@@ -235,6 +404,16 @@ anatomy; simplified per user decision 2026-09-24 — a card has **only** a
   text-pastel-mint-fg`, `bg-pastel-pink text-pastel-pink-fg`), exported so
   `TechniqueChip` reuses exactly the panel's mapping; the button classes are
   derived from it (no visual change).
+- `TECHNIQUE_ACCENT_CLASS` (Phase 8 H3, user decisions 2026-10-19): the
+  technique accent per tone — `bg-technique-flashcards-accent` #fcd34d
+  (pastel yellow, not amber), `bg-technique-recall-accent` #6ee7b7,
+  `bg-technique-exam-accent` #ef4444 (solid, vivid red), globals.css tokens
+  — for the calendar's technique bars and dots: `TechniqueChip`,
+  `CalendarReviewCard`, `TodayReviewRow`, `TechniqueStatusPill`'s dot and the
+  week card's dot counts. Accents never carry text; chip and pill
+  backgrounds keep the pastel pairs.
+- `TECHNIQUE_ACCENT_TEXT_CLASS`: the same accents as `text-*` classes, for
+  SVG strokes drawn with `currentColor` (`TechniqueRing`).
 
 - `controls?` (Phase 5 T5): options of the action rendered between the
   description and the button. No card passes it since Phase 6 T5b v2:
@@ -591,7 +770,8 @@ Route component, not an atom: it composes `Card` (`padding="md"`),
 `Pill` (`sm`, `error`, `dot`: "{N} pendientes") and `Button`
 (`asChild`, `size="sm"`, `variant="outline"`) around a `next/link`
 "Repasar" that opens `/flashcards/{notebookId}/{pageId}?repasar=1`.
-Rows reuse the ReadyToReview divider pattern. Nothing due shows
+Rows reuse the divider pattern of the former Home ReadyToReview panel
+(removed in Phase 8 H2-T5). Nothing due shows
 `EmptyState variant="success"` ("Estás al día"); a failed load shows one
 muted line instead.
 
@@ -1216,7 +1396,7 @@ Página, Autoevaluación, Resultado real, Brecha).
   "Actividad de repaso" — title, big value + delta line, a 3-dot legend row
   + `PeriodFilter` (7/15/30), then a stacked `BarChart` — one bar per day,
   MONOCHROME series (`neutral-900`/`neutral-500`/`neutral-300` for
-  Flashcards/Active recall/Exámenes), `radius=[4,4,0,0]` on the top
+  Flashcards/Recordación activa/Exámenes), `radius=[4,4,0,0]` on the top
   (Exámenes) segment only, a dashed `CartesianGrid`, and (15/30 días only)
   a light dashed `ReferenceLine` + "Sem N" label at every Monday so the
   chart reads day-by-day AND week-by-week. X-axis ticks: every day at 7
@@ -1344,30 +1524,199 @@ Used by: `techniques-panel.tsx` (Examen card `controls`).
 
 ## TechniqueChip (`technique-chip.tsx`)
 
-Calendar event chip (Phase 7 T1, calendar look decision 2026-10-12; the
-Untitled UI month calendar's event chips): one study technique of one page,
-coloured with the techniques panel's pastel pair — Flashcards yellow,
-Recordación activa green, Examen rose (`TECHNIQUE_PAIR_CLASS`).
+Calendar event chip (Phase 7 T1; Phase 8 H3, user reviews 2026-10-19): one
+study technique of one page on the month/week grid, drawn as an outlined
+card — `rounded-sm border border-border-default bg-card`, no tinted fill —
+with a 3px bar in the technique's accent on the left
+(`TECHNIQUE_ACCENT_CLASS`, `data-part="accent"`, `aria-hidden`), the page
+title in semibold black (`text-fg`) and an optional muted subline. The
+coloured side bar is a deliberate, approved exception to the "no coloured
+side borders" rule. No count on the chip: the caller's `aria-label` /
+`title` carries it.
 
-- Props: `tone` (`TechniqueTone`), `label`, `meta?` (trailing lighter detail,
-  tagged `data-part="meta"`: the due count on "Hoy"; a count or time on the
-  month/week grid in T2), `href?` (renders a `next/link` that opens the
-  technique's session; without it a `span`), plus any HTML attribute
-  (`aria-label`, `data-testid`, `className` merged via `cn()`).
-- Anatomy: `rounded-md border border-current/15 px-2 py-1 text-xs
-  font-semibold`, label truncates, meta `font-medium tabular-nums
-  opacity-80`. Linked chips add `hover:brightness-95` and the focus ring.
+- Props: `tone` (`TechniqueTone`), `label` (page title, 12px,
+  `data-part="label"`), `meta?` (11px `text-fg-muted` subline — the notebook
+  on the week grid, `data-part="meta"`), `compact?` (one truncated title
+  line for the month grid; default up to two lines, `line-clamp-2`),
+  `href?` (renders a `next/link`; without it a `span`), plus any HTML
+  attribute (`aria-label`, `title`, `className` merged via `cn()`).
+- Anatomy: `relative flex flex-col py-1.5 pr-2 pl-3.5`, bar `absolute
+  inset-y-1.5 left-1.5 w-[3px] rounded-full`. Linked chips firm the border
+  (`neutral-300`) and add a `neutral-50` wash on hover, plus the focus ring.
 - `collapse?: "dot-when-narrow"` (Phase 7 T2, narrow month grid): inside a
   container narrower than 42rem (`@max-2xl`, the `CalendarGrid` frame) the
-  chip shrinks to a 10px round dot filled with the technique's strong hue
-  (`bg-current`); label (`data-part="label"`) and meta become `sr-only`
-  there, so the link keeps its text for assistive tech. Sets
-  `data-collapse`.
+  chip shrinks to a 10px round dot in the technique's accent (borderless);
+  the bar hides and label / meta become `sr-only` there, so the link keeps
+  its text for assistive tech. Sets `data-collapse`.
 - `data-slot="technique-chip"`, `data-tone={tone}`.
 
+Used by: `calendario/_components/calendar-period.tsx` (week: title +
+notebook; month: compact title).
+
+## TechniqueStatusPill (`technique-status-pill.tsx`)
+
+Technique status pill (Phase 8 H3, reference "● Pendiente / ● Conectado /
+● Error"): `rounded-full px-2 py-0.5 text-xs font-medium` on the
+technique's pastel pair (`TECHNIQUE_PAIR_CLASS`: pale background, dark
+text in the same hue, ≥ 5.9:1) with a 6px dot in its accent
+(`TECHNIQUE_ACCENT_CLASS`, `aria-hidden`); the label truncates.
+
+- Props: `tone`, `size?` (`"md"` default; `"sm"`: 11px, `px-1.5 py-0`,
+  for height-capped rows), `children` (the technique name), `className?`.
+- `data-slot="technique-status-pill"`, `data-tone`, `data-size`; part `dot`.
+
+Used by: `technique-ring.tsx`, `calendar-review-card.tsx`.
+
+## TechniqueRing (`technique-ring.tsx`)
+
+One technique's week progress (Phase 8 H3-T2, Semana metric card option 1,
+user decision 2026-10-19). Client component (Motion). A 46px ring (5px
+stroke): `text-neutral-150` track and an arc in `TECHNIQUE_ACCENT_TEXT_CLASS`
+reading done / total clockwise from 12 o'clock (`pathLength={100}`, round
+cap), the share in the centre (11px bold tabular), and the technique's
+`TechniqueStatusPill size="sm"` below. A technique with nothing this week
+(total 0) shows the bare track and "—"; 0 of N shows the track and "0%"
+(no arc: a round cap would leave a dot). The arc draws in once
+(`strokeDasharray` "0 100" → percent, spring without bounce); under
+prefers-reduced-motion only the transition becomes `duration: 0`, never
+`initial`, so hydration matches. Accessibility: one sr-only sentence
+("Flashcards: 3 de 10 repasos (30%)" / "Examen: sin repasos esta semana");
+the drawing and digits are `aria-hidden`.
+
+- Props: `tone`, `label`, `done`, `total`, `className?`.
+- `data-slot="technique-ring"`, `data-tone`; parts `indicator`, `value`.
+- The static `ProgressRing` (Home's technique cards) stays as is: it is a
+  server component with no animation.
+
+Used by: `calendario/_components/week-summary.tsx`.
+
+## IllustratedEmptyState (`illustrated-empty-state.tsx`)
+
+Illustrated empty state (Phase 8 H3, the calendar's "Hoy"; user decision
+2026-10-19). Client component (Motion). A centred column on a calm glow
+(`empty-state-glow` utility: a violet radial — `primary-200` →
+`primary-100` → transparent — that stays around the illustration and
+fades out before the section's edges): a decorative `next/image`
+(`alt=""`, `sizes="(min-width: 768px) 480px, 90vw"`, up to 480px wide,
+scaling down on phones) with a transparent background, so every figure
+stays whole, inside `data-part="art"` on a blurred diagonal violet blob
+(`illustration-backdrop` utility: `primary-100` → `primary-300` in an
+ellipse, `blur(18px)`, 75% opacity), then a big title (`text-2xl md:text-3xl` semibold,
+`text-gradient-brand`, `h3`), a muted
+15px message and an optional quiet action. The block fades and rises 10px
+once; under prefers-reduced-motion only the transition becomes
+`duration: 0`, never `initial`, so hydration matches.
+
+- Props: exactly one of `image` (`{ src, width, height }`) or `art`
+  (`ReactNode`, Phase 8 H4-T3: a decorative CSS hero such as
+  `NotebookFan`, rendered full width in `data-part="art"` with no blob,
+  no `<img>`, and the title at `mt-4`), then `title`, `description`,
+  `action?` (rendered in `data-part="action"`), `steps?`
+  (`readonly string[]`), `entrance?` (`"block"` default | `"cascade"`),
+  `paper?`, `className?`.
+- `data-slot="illustrated-empty-state"`, `data-entrance="block" |
+  "cascade"`, `data-surface="paper"` when `paper`.
+- `steps` (Phase 8 H4, user decision 2026-10-20): an
+  `<ol data-part="steps">` of centred, wrapping pills between message and
+  action — white, 1px `border-default`, `rounded-pill`, 13px
+  `fg-secondary` text, the number in bold `primary-600`. With steps the
+  action moves to `mt-7`.
+- `entrance="cascade"` (Phase 8 H4-T2): instead of the whole block, art,
+  title, message, each step (0.06s apart) and the action fade and rise
+  10px in turn with `cubic-bezier(0.16, 1, 0.3, 1)`, 0.32s each, finishing
+  under 0.7s. Under prefers-reduced-motion only the transitions become
+  `duration: 0`; `initial` never changes, so hydration matches.
+- `paper` (Phase 8 H4-T2): the `dotted-paper` utility on the block —
+  `primary-200` dots on a 22px grid in a `::before` layer (`z-index: -1`,
+  `isolation: isolate` on the block, so it sits over the glow and under
+  the content), radially masked so they are strongest around the centre
+  and dissolve before the edges.
+- History (2026-10-20): a `backdrop={false}` plain variant (opaque white
+  illustration, later framed as a card on a violet aura) and a Three.js
+  floating-sheets layer were tried for the notebooks hub and dropped by
+  the user (no visible rectangle; performance); H4-T2 then gave the hub
+  the calendar's glow and blob around a keyed-out illustration at a
+  400px `artSize="sm"`. H4-T3 (user decision 2026-10-20) replaced that
+  illustration with the CSS `NotebookFan` through `art`, and `artSize`
+  was removed with its last user.
+
+Used by: `calendario/_components/today-list.tsx` ("¡Terminaste tus repasos
+de hoy!" / "Hoy estás al día", with "Próximo repaso: …" or "Ver la
+semana"), `calendario/_components/scheduled-list.tsx` ("Día libre de
+repasos", "Ver la semana"), with `/illustrations/calendar-empty.webp` (the
+source JPEG's flat grey background keyed out to transparency), both with
+the defaults; `notebooks/page.tsx` (zero notebooks: "Todas tus materias,
+en un solo lugar", three steps and `CreateNotebookTrigger variant="cta"`,
+`entrance="cascade"`, `paper`), with `art={<NotebookFan />}`; the glow and
+the dotted paper stay behind the fan.
+
+## CalendarReviewCard (`calendar-review-card.tsx`)
+
+Review card of the month's right panel (Phase 8 H3, approved mockup
+2026-10-19): one fixed size whatever its text — a 60px-high hairline
+`rounded-xl` link with a 3px bar in the technique's accent on the left
+(`data-part="accent"`, `aria-hidden`), the page title (13px semibold) on
+its own line across the card's full width, and below it
+(`data-part="meta"`) the notebook (12px muted) with the technique's
+`TechniqueStatusPill size="sm"` pushed right (`shrink-0 whitespace-nowrap`,
+never wraps). Title and notebook truncate to one line each with the full
+text as `title` tooltip. Width follows the panel. Hover and
+`focus-visible` share one gentle lift (200ms ease-out): `primary-300`
+border, a `primary-100/60` wash, a soft violet-tinted
+shadow and — only under `motion-safe:` — a 2px rise (`-translate-y-0.5`);
+under reduced motion just the colours change. The size never changes (the
+rise is a transform; focus adds a `primary-200` ring). No chevron.
+
+- Props: `href` (the page), `tone`, `title`, `detail`, `techniqueLabel`,
+  `aria-label` (technique, page and amount: "Examen de …: 2 ítems"),
+  `className?`.
+- `data-slot="calendar-review-card"`; parts `accent`, `title`, `detail`.
+
+Used by: `calendario/_components/month-day-panel.tsx` (the selected day's
+reviews and "Próximos repasos").
+
+## DaySelectLink (`day-select-link.tsx`)
+
+The cover link that selects a calendar day (Phase 8 H3, the month grid).
+Client component. An `absolute inset-0` `next/link` with `scroll={false}`
+(the selection lives in the URL, the page does not jump) that also
+activates with Space, like a button; inset focus ring. `CalendarDayCell`
+renders it when given `selectHref`.
+
+- Props: `href`, `aria-label` ("Ver martes, 20 de octubre"),
+  `aria-current?` (`"date"` on the selected day), `className?`.
+- `data-part="select"`.
+
+Used by: `calendar-grid.tsx` (`CalendarDayCell`).
+
+## TodayReviewRow (`today-review-row.tsx`)
+
+Review-today row (Phase 8 H3-T4, the calendar's "Hoy"; user-approved
+mockup 2026-10-19): ONE `next/link` for the whole row, `rounded-2xl`
+hairline border, `p-4` (`md:px-5`), hover `border-border-default` +
+`shadow-card`, focus-visible ring. md+: a grid `[140px wait] [4px solid
+technique bar] [title + pills] [Repasar + chevron]`; below md the wait sits
+above the title; below sm the "Repasar" cue moves under the pills so the
+title keeps the width. The title is 15px semibold (two lines max); the pills
+are `Pill size="md"`: technique in its pastel tone (yellow / mint / pink),
+notebook and amount neutral. "Repasar" is a `span` styled with
+`buttonVariants()` (dark primary) because the row is already the link.
+
+- Props: `href`, `aria-label` (the link's name, e.g. "Flashcards de
+  Mitocondria: 8 pendientes"), `tone`, `title`, `waitingTitle` ("Desde
+  ayer"), `waitingDetail` ("1 día esperando"), `techniqueLabel`,
+  `notebookTitle`, `amountLabel` ("8 tarjetas"), `data-testid?`,
+  `className?`.
+- `scheduled?` (Phase 8 H3-T4, a later day on "Hoy"): no wait column and no
+  "Repasar" cue; a muted 12px "Programado" marker (`data-part="status"`)
+  with the chevron instead, in a `[4px 1fr auto]` grid. `waitingTitle` /
+  `waitingDetail` are then optional. Sets `data-mode="scheduled"` (else
+  `"due"`).
+- `data-slot="today-review-row"`; parts `waiting`, `accent`, `action`,
+  `status`.
+
 Used by: `calendario/_components/today-list.tsx`,
-`calendario/_components/calendar-period.tsx` (month/week events: page title,
-item count, link to the page).
+`calendario/_components/scheduled-list.tsx` (`scheduled`).
 
 ## DateBadge (`date-badge.tsx`)
 
@@ -1380,41 +1729,72 @@ bold).
   runtime zone, like the rest of the shell), `className?` and span attributes.
 - The visible parts are `aria-hidden`; an `sr-only <time datetime="YYYY-MM-DD">`
   carries the long date ("lunes, 12 de octubre").
+- `size?` (Phase 8 H3): `"md"` (default, 56px wide, 18px day) or `"xl"`
+  for the calendar page header — 88px wide and `h-full`, so it is as tall
+  as its slot (the title + tabs stack, ~96px), with a 12px month strip and
+  a 34px day centred in the rest; `data-size`.
+- `tone?` (Phase 8 H3): `"neutral"` (default, `bg-neutral-50` muted month
+  strip) or `"brand"` — a Cogni-violet month strip (`bg-primary-600
+  text-white`, 5.7:1) so the badge reads as a calendar icon.
 - `data-slot="date-badge"`, parts `data-part="month"` / `"day"`.
 
-Used by: `calendario/_components/calendar-card-header.tsx`.
+Used by: `calendario/page.tsx` (`tone="brand"`, `size="xl"`, left of the
+"Calendario" title and tabs; it shows the day being viewed: Hoy's day,
+today or the week's Monday, today or the month's 1st).
 
 ## SegmentedTabs (`segmented-tabs.tsx`)
 
 Page-level segmented tabs (Phase 7 T1, the reference's "All events / Shared
-/ …" row): same container as `ViewToggle`/`PeriodFilter` (`rounded-input
-border bg-neutral-100 p-1`), text items `px-3 py-1.5 text-[13px]
-font-semibold`, the active one `bg-card text-fg shadow-xs`.
+/ …" row; Phase 8 H3 violet glass pill, user review 2026-10-19). Client
+component (Motion). Same container as `ViewToggle`/`PeriodFilter`
+(`rounded-input border bg-neutral-100 p-1`), text items `px-3 py-1.5
+text-[13px] font-semibold text-fg-muted`. The active item is white text on
+a solid `primary-600` pill (`data-part="active-pill"`, `aria-hidden`) with a
+glass edge: an inset top highlight, a faint inner bottom shade, a thin
+`ring-white/25` inner ring, a soft diagonal white sheen and a small violet
+drop shadow — the fill stays solid. The pill slides between items with a
+Motion `layoutId` (scoped with `useId`); under prefers-reduced-motion the
+transition is `duration: 0`.
 
 - Props: `aria-label` (names the `<nav>`), `items` (`{ value, label, href }`
   or `{ value, label, disabled: true, hint }`), `value`, `className?`.
-- Linked items are server-rendered `next/link`s (the view lives in the URL);
-  the active one gets `aria-current="page"`. A disabled item is a `span`
-  with `aria-disabled="true"`, `title={hint}` and `opacity-60`.
+- Linked items are `next/link`s (the view lives in the URL); the active one
+  gets `aria-current="page"`. A disabled item is a `span` with
+  `aria-disabled="true"`, `title={hint}` and `opacity-60`.
 - `data-slot="segmented-tabs"`.
 
-Used by: `calendario/page.tsx` ("Hoy" / "Semana" / "Mes", all linked since
-T2).
+Used by: `calendario/page.tsx` ("Hoy" / "Semana" / "Mes").
+
+## `text-gradient-brand` (globals.css utility)
+
+Cogni violet gradient text (Phase 8 H3): `linear-gradient(120deg,
+primary-600, primary-800)` clipped to the glyphs (`background-clip: text`,
+transparent `-webkit-text-fill-color`, so a `text-*` colour class on the
+same element never paints over it). Both ends meet AA on white (5.7:1,
+8.9:1); the accessible name is the plain text.
+
+Used by: `calendario/page.tsx` (the "Calendario" h1, via `SectionHeader`'s
+`titleClassName`).
 
 ## CalendarNav (`calendar-nav.tsx`)
 
-Calendar period navigation (Phase 7 T2, the reference's "← | Today | →"
-group): one bordered button group (`rounded-input border-border-default
-bg-card shadow-xs`, `divide-x`) of three server-rendered links, 36px high —
-arrow links 40px wide with Lucide `ArrowLeft`/`ArrowRight` (16px, 1.75
-stroke) and their label as accessible name, the middle link shows its label
-(13px semibold).
+Calendar period navigation (Phase 7 T2; Phase 8 H3, user reference
+`ref-arrows.png`): two bare muted chevrons — no container and no middle
+button, since the view tabs return to the current period. Each is a 32px
+round hit area (`rounded-full text-fg-muted`) with a 20px `ChevronLeft` /
+`ChevronRight` that darkens over a faint `neutral-100` wash on hover, plus
+the focus ring. A `disabled` arrow ("Día anterior" on today) is an inert
+`span` (no href, not focusable) with `aria-disabled="true"` at
+`opacity-35`, its name kept as sr-only text.
 
-- Props: `aria-label` (names the `<nav>`), `prev`, `today`, `next` (each
-  `{ href, label }`), `className?`.
+- Props: `aria-label` (names the `<nav>`), `prev`, `next` (each `{ href,
+  label, disabled? }`; the label is the arrow's accessible name),
+  `className?`.
 - `data-slot="calendar-nav"`.
 
-Used by: `calendario/_components/calendar-card-header.tsx`.
+Used by: `calendario/_components/period-header.tsx` ("Día anterior / Día
+siguiente", "Semana anterior / Semana siguiente", "Mes anterior / Mes
+siguiente").
 
 ## CalendarGrid / CalendarDayCell (`calendar-grid.tsx`)
 
@@ -1424,20 +1804,374 @@ muted, centred) over a `<ul>` of seven `minmax(0,1fr)` columns, so phones get
 narrow cells instead of a horizontal scroll. `CalendarDayCell` is one `<li>`:
 hairline `border-r border-b border-border-subtle`, `p-1.5` (`md:p-2`),
 min-height 72px (`md:` 128px); day number top-left in a 24px slot (12px
-semibold), today's in a dark circle (`rounded-full bg-fg text-card`), days
-outside the shown month on `bg-neutral-50` with a muted number; children
+semibold); today's number in a violet rounded square (`rounded-md
+bg-primary-600 text-white`) on a faint violet cell (`bg-primary-50`), days
+outside the shown month on `bg-neutral-50` with a muted number. The
+`variant="week"` cell (Phase 8 H3) shows today as a soft violet wash down
+the whole column (`bg-linear-to-b from-primary-100/70 via-primary-50/40
+to-transparent`) and shows its number row (`data-part="number-row"`) only where the
+days stack (`@2xl:hidden`): the week's numbers live in the grid's header
+("Lun 19"). The sr-only long name and "(hoy)" are always present. Children
 stack (`gap-1`) and wrap in a row when narrow; an optional "N más…" link
 (12px semibold muted, `+N` when narrow).
 
 - `CalendarGrid` props: `aria-label` (names the list), `weekdays` (seven
-  short names, Monday first), `stackWhenNarrow?` (week layout: one column and no
-  header when narrow), `className?`.
+  short names, Monday first), `weekdayNumbers?` (Phase 8 H3, the week:
+  `{ dayNumber, isToday }` per weekday, shown next to its name in the
+  header — `data-part="weekday-number"`, 20px, today's in a violet
+  rounded square), `stackWhenNarrow?` (week layout: one column and no
+  header when narrow), `fill?` (Phase 8 H3, the week: the frame becomes
+  `flex flex-1 flex-col` and the list `flex-1`, so the days stretch to the
+  bottom of a flex-column card), `className?`.
 - `CalendarDayCell` props: `day` (ISO, also `data-day` and the `<time
   dateTime>`), `dayNumber`, `label` (sr-only long name, "(hoy)" appended for
   today), `weekday?` (shown next to the number only below `md`), `isToday?`,
   `outside?`, `more?` (`{ count, href }`, accessible name "N más el …"),
-  `className?`, children (event chips).
+  `variant?` (`"month"` default / `"week"`), `selectHref?` (Phase 8 H3,
+  the month grid: a `DaySelectLink` cover selects the day; the number row
+  and chips sit above it, only the chips catching the pointer), `isSelected?`
+  (2px inset `ring-primary-600` outline, `data-selected`, the cover's
+  `aria-current="date"`), `className?`,
+  children (event chips).
 - `data-slot="calendar-grid"` / `"calendar-day"`, `data-today`,
   `data-outside`.
 
 Used by: `calendario/_components/calendar-period.tsx` ("Mes", "Semana").
+
+## Auth screens redesign (Phase 8 L1, 2026-10-15)
+
+Atoms added for the login/register/forgot/reset screens. They are generic
+and safe to reuse elsewhere.
+
+### TextDivider (`text-divider.tsx`)
+
+Horizontal rule with a short centred label: the "o" between "Iniciar sesión"
+and "Continuar con Google". Two `aria-hidden` 1px rules
+(`h-px flex-1 bg-border-default`) around a `text-xs text-fg-secondary`
+label, `flex items-center gap-3`.
+
+- Props: `children` (the label), any `div` prop, `className?`.
+- `data-slot="text-divider"`.
+
+Used by: `(public)/login/page.tsx`, `(public)/register/page.tsx`.
+
+### GoogleIcon (`google-icon.tsx`)
+
+Google's four-colour "G" as inline SVG (no external request), 18px by
+default, `aria-hidden` — the button carries the accessible name.
+
+- Props: any `svg` prop, `className?` (size override).
+- `data-slot="google-icon"`.
+
+Used by: `modules/identity/ui/google-button.tsx`.
+
+### TextLink (`text-link.tsx`)
+
+Inline `next/link` for links inside running copy ("¿No tienes cuenta? Crea
+una"): `font-medium text-fg-active` (violet, AA on the warm panels),
+`hover:underline hover:text-primary-800` with `underline-offset-4`, and a
+`focus-visible:ring-3 ring-ring/50` focus ring.
+
+- Props: every `next/link` prop, `className?`.
+- `data-slot="text-link"`.
+
+Used by: the four `(public)` auth pages and
+`modules/identity/ui/terms-notice.tsx`.
+
+### BrandMark / BrandGlyph (`brand-mark.tsx`)
+
+Single source of truth for the Cogni brand. `BrandGlyph` is the mark: a "C"
+arc (stroke 2.4, round caps) whose two ends are white knowledge nodes, with
+a violet (`--color-primary-400`) node at its centre — the memory the arc
+keeps reinforcing. `BrandMark` puts the glyph (22px) in a 36px tile
+(`rounded-[10px]`) next to the bold "Cogni" wordmark. Static copy of the
+light variant: `docs/design-system/assets/logo.svg`.
+
+- `tone`: `light` (default; `bg-neutral-900` tile, `text-fg` wordmark) ·
+  `dark` (glass tile `bg-white/10 border-white/15`, white wordmark) for the
+  near-black brand panel.
+- `size`: `md` (default, 16px wordmark) · `sm` (14px, app sidebar).
+- `wordmark`: `false` renders the tile alone (collapsed sidebar); the caller
+  then owns the accessible name.
+- Not a link; `data-slot="brand-mark"` / `"brand-glyph"`, `data-tone`.
+
+Used by: `(public)/layout.tsx` (dark tone on the brand panel; light tone
+above the form below `md`), `(app)/_components/logo.tsx` (wrapped in the home
+link).
+
+### SubmitButton (`submit-button.tsx`)
+
+`Button` (via `motion.create`) with `type="submit"`, a pressed scale of 0.98
+(spring, no bounce, 150ms) and a loading state: while pending it is
+disabled, sets `aria-busy` and shows a spinning `Loader2`
+(`data-slot="spinner"`, static under reduced motion). The label never
+changes, so its accessible name stays stable for tests and screen readers.
+
+- Props: every `Button` prop except `type`, plus `pending?` (e.g. from
+  `useActionState`). The enclosing form's `useFormStatus().pending` also
+  counts, so plain server-action forms get the loading state for free.
+
+Used by: `modules/identity/ui/auth-forms.tsx` (all four auth forms),
+`modules/identity/ui/google-button.tsx`.
+
+## Populated Home atoms (Phase 8 H2-T5, 2026-10-18)
+
+The Home with notebooks: hero with the review streak full width, then a
+main column (three technique count cards, "Continúa donde lo dejaste",
+"Temas débiles") and a 320px "Para repasar hoy" column on the right that
+starts at the cards' top (H2-T5j, user decision 2026-10-18; it replaced
+the earlier weak-topics-on-the-right layout). It is one CSS grid
+(`lg:grid-cols-[minmax(0,1fr)_320px] lg:grid-rows-[auto_auto_auto_1fr]`,
+the right column spanning all four rows so the `1fr` row absorbs its extra
+height); below `lg` it stacks in DOM order, today's work first: cards,
+"Para repasar hoy", "Continúa donde lo dejaste", "Temas débiles". References:
+`docs/new_design_fase_8` (capture 10.37.53 hero + stat cards, Uxcel Web 22
+day streak, capture 12.28.40 row). They replace the old Home `StatCard`,
+`StreakDots`, `ReadyToReview`, `NotebookGrid`, `RecentPages` and
+`HomeHeader` route components, which were deleted.
+
+Personality pass (v2, impeccable "Operate" mode: restraint, one authored
+moment): the hero has soft radial glows (`home-hero-glow`: violet top-left, pink behind the illustration) and the illustration sits on it
+directly, with no graph paper (user 2026-10-18; `mix-blend-multiply` drops
+the image's white box); the focal moment is the week's streak chain filling in one
+day at a time, followed by the flame; everything else is a quiet `RevealGroup`
+entrance and a pop on the count numbers. All motion runs once, ≤0.5s, and
+only its transitions change under reduced motion (never `initial`).
+
+### PopNumber (`pop-number.tsx`)
+
+Client atom: a `motion.span` that settles in once (opacity 0→1, scale
+0.82→1, y 4→0, spring bounce 0.3, 0.4s, optional `delay`). It always
+renders the final value, so server markup, tests and screen readers never
+see an intermediate count (chosen over a count-up for that reason). Props:
+`value: number | string`, `delay?` (seconds), `className?`.
+
+Used by: `TechniqueCountCard`.
+
+### TechniqueCountCard (`technique-count-card.tsx`)
+
+v2 (H2-T5f, 2026-10-18): today's progress per technique instead of a "due
+today" count, so the cards no longer repeat the "Para repasar hoy" rows.
+User constraint: compact, never taller than v1 (~125px); v2 is ~118px at
+1440px. The label never shares a row with the ring, so "Recordación activa"
+is never truncated (user 2026-10-18).
+
+One `next/link` card per technique, two rows:
+
+- Top row: `IconTile` 30 (`radius="md"`, the technique's pastel tone:
+  yellow / mint / pink), the full 14px label and a muted `ChevronRight`
+  that nudges right on hover.
+- Bottom row, left: a 28px-high value line. `emphasis="tone"`: a 26px bold
+  tabular `PopNumber` in the technique's 600 shade (`warning-600`,
+  `success-600`, `rose-600`) plus an optional 14px `text-fg-secondary` `valueSuffix`
+  ("de 8"). `emphasis="muted"`: a 17px semibold `text-fg-secondary` phrase
+  ("Sin repasos hoy", "Aún no generas", "—"). Under it the 12.5px `text-fg-secondary`
+  sub line (truncates); secondary text uses `fg-secondary`, not
+  `fg-muted`, for legibility (user 2026-10-18).
+- Bottom row, right: `ProgressRing` 46px (stroke 4) in the technique
+  shade. Centre: the percentage (11px semibold `text-fg`), a lucide `Check` (day
+  done, full ring) or a muted dash.
+
+Surface unchanged: `technique-glow-{yellow,mint,pink}` from the top-left,
+`rounded-xl`, `border-border-subtle`, `shadow-xs`; hover lifts
+(`-translate-y-0.5`, `shadow-card-hover`, `border-border-default`); visible
+focus ring.
+
+- Props: `href`, `icon` (lucide component), `tone: "yellow" | "green" |
+  "rose"`, `label`, `value: string`, `valueSuffix?: string | null`,
+  `emphasis: "tone" | "muted"`, `sub`, `ring: { percent; center:
+  "percent" | "check" | "dash" }`, `ariaLabel` (full link name; the ring
+  is aria-hidden), `delay?`, `className?`.
+
+Used by: `home/technique-counts.tsx` (Flashcards → `/flashcards`,
+Recordación activa → `/active-recall`, Exámenes → `/exams`), which maps
+`home/technique-progress.ts` onto the props. The counts are study UNITS
+(H2-T5i, user decision 2026-10-18): one unit is one page × technique, the
+same unit as a "Para repasar hoy" row, so five exams due read "0 de 5",
+never "0 de 100" questions. Pending = pages with an item of the technique
+due today; done = pages with a review of the technique logged today (local
+day of the profile zone) and nothing of it still due — a partially
+reviewed page stays pending only. Both come from scheduling
+`getTechniqueOverview` (`pendingUnits`, `doneUnits`). States (total = done
++ pending):
+
+| State | Value | Sub | Ring | Link name |
+|---|---|---|---|---|
+| progress (pending > 0) | "{done}" + "de {total}" | "repasos hechos hoy" | done/total (floored), % inside | "{Label}: {done} de {total} repasos hechos hoy" |
+| done (pending 0, done > 0) | "Al día" | "{done} de {done} repasos hechos hoy" | full, check | "{Label}: al día, {done} repasos hechos hoy" (singular at 1) |
+| none (nothing today, items exist) | "Sin repasos hoy" (muted) | "Próximo repaso: mañana" / "el lunes 20" / "Nada agendado" | empty, dash | "{Label}: sin repasos hoy, próximo repaso {label}" |
+| never (no items) | "Aún no generas" (muted) | "Genera desde una página" | empty, dash | "{Label}: aún no generas contenido" |
+| unknown (the overview read failed) | "—" (muted) | "No pudimos cargar tu progreso" | empty, dash | "{Label}: progreso no disponible" |
+
+Home renders the three cards under a visible "Tu progreso de hoy" heading
+(17px semibold `text-fg`, `mb-3.5`, same as "Continúa donde lo dejaste"),
+so progress reads apart from "Repasar hoy" (user 2026-10-18).
+
+### ProgressRing (`progress-ring.tsx`)
+
+Small static SVG progress ring (server-renderable, no motion): a track
+circle (`trackClassName`, default `text-neutral-150`) and an arc
+(`indicatorClassName`, a text-* token class; both stroke `currentColor`)
+that starts at 12 o'clock and reads clockwise. The arc uses
+`pathLength={100}` so `stroke-dasharray` is the percentage itself; no arc
+is drawn at 0 (a round cap would leave a dot). `value` is clamped to
+0–100 and NaN reads 0. Children are centred inside. Always `aria-hidden`:
+the surrounding control carries the accessible name.
+
+- Props: `value`, `size?` (px, default 46), `strokeWidth?` (default 4),
+  `indicatorClassName?`, `trackClassName?`, `className?`, `children?`.
+
+Used by: `TechniqueCountCard`. (The dashboard's `DashedRing` stays the
+large labelled gauge with its own `role="img"`.)
+
+### StreakWeek (`streak-week.tsx`)
+
+Client atom, the day-streak block at the bottom-left of the Home hero
+(v3, 2026-10-18). References: Duolingo's lit flame + week bar, habit
+check-in pills with a "today" marker, GitHub-style streak chains.
+
+- Header: a 40px flame tile, dormant at 0 (`neutral-100` / `neutral-400`)
+  and lit with a streak (`warning-100` → `pastel-orange` vertical gradient,
+  `warning-600` stroke, `warning-500/45` fill). Next to it a 28px bold
+  tabular streak number with "días seguidos" / "día seguido" (14px
+  `text-fg-secondary`; the full `streakLabel` is `sr-only`), and the 13px
+  helper line under it.
+- Week: `<ol aria-label="Últimos 7 días">`, a 7-column grid of 28px day
+  circles over 12px initials. A reviewed day is a `warning-500` circle with
+  a white `Check` (`data-part="check"`). Consecutive reviewed days are
+  joined by a 4px `warning-500/40` bar (`data-part="link"`), so a run reads
+  as a chain. A past day without reviews is `neutral-150`. Today without a
+  review is a dashed `warning-500/70` target ring; reviewed, it adds a
+  `ring-warning-500/30` halo. Each item has `sr-only` text ("domingo (hoy):
+  sin repasos").
+- Milestone: `milestoneHint(streakDays)` → "N días más para tu primera
+  semana" / "para llegar a 30" / "para llegar a 100" (12px `warning-700`),
+  hidden at 0 and past 100.
+- Card: `data-state="dormant" | "lit"`. Dormant: plain bordered card. Lit:
+  `border-warning-500/25`, a faint `warning-50` wash from the top-left and a
+  warm glow (`shadow-lg shadow-warning-500/15`). `px-4 py-3.5`,
+  `max-w-[380px]`.
+- Motion, once: reviewed days pop in left to right (50ms apart, spring) and
+  their links draw after them. Then the flame flickers on once (0.6s scale +
+  rotate keyframes), and today's target ring pulses outward twice and stops.
+  Under prefers-reduced-motion only the transitions change (zero duration),
+  never `initial`. No new colour tokens: the warm tones are `warning-*` plus
+  `pastel-orange`.
+- Props (unchanged contract): `streakDays`, `days: { key, initial, name,
+  studied, isToday }[]` (oldest first), `helper`, `className?`.
+
+Used by: `home/home-hero.tsx`, fed by analytics `getDashboardTechniqueMetrics`
+over the last 7 local days (`overall.streakDays` + `daily`), via
+`home/streak-week-days.ts` (Spanish initials L M M J V S D). The helper copy
+depends on the streak (`home/home-copy.ts`): none → start one; today not
+reviewed yet → keep it; 1 → good start; 2–6 → keep going; 7+ → great
+consistency.
+
+### ReviewRow (`review-row.tsx`)
+
+An action row: leading `icon` node, a 15px semibold `text-fg` title over a
+13px `text-fg-secondary` meta line (flex, truncating), an optional `badge`,
+and a solid near-black `Button` (`asChild` → `next/link`, `h-9`,
+`rounded-input`, 13px) on the right. Row: `rounded-xl`, bordered,
+`bg-card`, `px-4 py-3`, `shadow-xs`; hover lifts 1px and firms the border
+(`shadow-card`, `border-border-default`).
+
+`layout="tile"` (H2-T5n, user 2026-10-18, reference: a course list with a
+round logo, bold name, muted provider line and a chevron; replaces the
+earlier stacked/list/outlined looks): the whole tile is one `next/link`
+named by `actionAriaLabel` (`data-layout="tile"`), `rounded-2xl`, `py-3 pr-4 pl-3.5`, white
+`bg-card`, neutral `border-border-subtle` (`border-border-default` on
+hover), `shadow-xs`, hover lifts a pixel with `shadow-card`, visible focus
+ring. The `icon` (Home: a round `IconTile` 40, `radius="full"`, technique
+pastel), the page title (13.5px semibold, `line-clamp-2`) over the `meta`
+(12px `text-fg-muted`, one line, truncates: the notebook name) and a
+`ChevronRight` that nudges right on hover. `actionLabel` and `badge` are
+not rendered.
+
+- `icon`, `title`, `meta?` (node; required visually by `inline`), `badge?` (node), `href`, `actionLabel`,
+  `actionAriaLabel` (full name, since every row says "Repasar"),
+  `layout?: "inline" | "tile"`, `className?`.
+
+Used by: `home/review-today.tsx` — one row per page × technique due
+(`toReviewRows` in `calendario/_lib/today-rows.ts`, same `TECHNIQUES` hrefs
+as the calendar "Hoy" chips: flashcards `?repasar=1`, recall, exam), in the
+tile layout, one link tile per page × technique: the technique's round
+icon, the page title and its notebook, and a chevron (user 2026-10-18).
+The section is a bordered card (`rounded-xl`, `border-border-subtle`,
+`bg-card`, `p-5`, `shadow-xs`) headed "Repasar hoy" in 22px bold
+`text-primary-600`, sentence case like the other Home headings (capitals
+tried and dropped, user 2026-10-18), with the 13px subtitle "Los repasos programados para hoy
+que aún tienes pendientes. Elige uno y empieza." The tiles sit directly on
+the card (no grey panel: user 2026-10-18). On `lg` the card is
+absolutely positioned inside its grid cell (`lg:absolute lg:inset-0`, the
+cell spans the three left rows), so it ends exactly where Temas débiles
+ends and never sets the grid's height; a long list scrolls inside it. No footer message and no item total (user
+2026-10-18); the empty state is a compact tinted `EmptyState` (`px-4
+py-5`, `IconTile` 36).
+
+### ForgettingCurve (`forgetting-curve.tsx`)
+
+Decorative backdrop for Home's "Continúa donde lo dejaste" cards (Phase 8
+H2-T5r, user 2026-10-18; picked over seven other background studies). It
+draws the Ebbinghaus forgetting curve, the science behind spaced
+repetition: retention `e^(-t/40h)` over 7 days, left (just edited) to
+right, in a band from 8% to 95% of the card's height: it starts near the
+card's top-left corner and the card nudges its title right (`pl-7`) to
+clear it (no visible notebook since H2-T5s, user 2026-10-18). A 2.25px `primary-500` line at 55% opacity
+(`vector-effect: non-scaling-stroke`) over a `primary-100` fill fading
+down, and a "now" marker (`size-2.5` `bg-primary-500`, `ring-4
+ring-primary-200/70`) placed by the hours since the page was edited, kept
+5% from the card's sides. Motion: the curve wipes in left to right once
+(clip-path, 0.6s, `cubic-bezier(0.23,1,0.32,1)`; `pathLength` dashes break
+with the non-scaling stroke) and the marker springs in at 0.5s; under
+reduced motion only the transition changes. `aria-hidden`. Client leaf
+(`motion/react`); the pure `forgettingCurve(elapsedHours)` gives the
+points and marker in a 100 x 100 box.
+
+- Props: `elapsedHours`, `className?`.
+
+### PageLinkCard (`page-link-card.tsx`)
+
+A link card restyled in H2-T5q after kokonutui's "Widget Grid" cards (user
+2026-10-18, no icons): the whole card is one `next/link` with an explicit
+`ariaLabel` (page and notebook, since the visible text is split across
+lines). `rounded-2xl`, bordered `bg-card`, `p-4 pt-3`, `min-h-[96px]`,
+flex column: an optional `h-7` meta header (12px `text-fg-secondary`,
+`data-part="meta"`; Home shows none since H2-T5s, user 2026-10-18), the
+page title below it (or at the top, `pt-1`, without meta) (15px semibold `text-fg`,
+`line-clamp-2`), and an optional 11px `text-fg-muted` trailing label
+pinned to the bottom-right corner (`data-part="trailing"`, `mt-auto
+self-end`, tabular numbers). Hover lifts 2px with a soft layered shadow
+(`0 18px 36px -16px` at 16% + `0 6px 12px -8px` at 8%) and
+`border-border-default`, easing `cubic-bezier(0.23,1,0.32,1)` over 300ms;
+focus shows the shared `ring-3 ring-ring/50`.
+
+- `href`, `title`, `titleClassName?`, `meta?` (node), `trailing?` (node), `backdrop?` (node:
+  a decorative layer rendered `aria-hidden` behind the content, the card
+  being `relative isolate overflow-hidden`), `ariaLabel`,
+  `className?`.
+
+Used by: `home/continue-reading.tsx` — Home's "Continúa donde lo dejaste"
+(Phase 8 H2-T5h), under the technique cards in the main column (H2-T5j): up to 4 of
+notebooks' `getHomeOverview().recentPages` (newest edit first), each linking
+to `/notebooks/{nb}/pages/{id}`, with the notebook name as a neutral
+chip as meta (`bg-neutral-100 text-fg-secondary`, `rounded-full px-2
+py-0.5`, 11.5px medium, truncates; no notebook colour and no icons, user
+2026-10-18) and "Editada {formatTimeAgo}" as the trailing
+label in the bottom-right corner (`self-end`, so it never crowds the
+title); an empty title reads "Sin título". A 2-column grid from `lg`,
+stacked below. Empty: one muted line, "Aún no abriste ninguna página."
+
+### "Temas débiles" column (`home/weak-topics.tsx`)
+
+Route component, not an atom: a bordered `bg-card` `rounded-xl` `p-5`
+card (h2 + one-line description), last in Home's wide main column since
+H2-T5j, listing up to 5 weak pages as links in a two-column grid from `sm`
+(`/notebooks/{nb}/pages/{id}`): semibold title with the accuracy %, notebook
+dot + name, and a `ProgressBar` with an `aria-label` (% and number of
+answers). Two severities (`accuracySeverity`): under 40% → `error-600` text
+/ `error-500` fill; 40–69% → `warning-700` / `warning-500`. Empty: a small
+`IconTile` composition (neutral `Target` tile flanked by tilted mint
+`Brain` and pink `FileCheck` tiles — the two techniques that feed it) next
+to "Aún no hay temas débiles" and its hint, one compact `neutral-50` row
+(`data-part="empty"`, no tall empty area). Data: analytics `getHomeWeakTopics`.

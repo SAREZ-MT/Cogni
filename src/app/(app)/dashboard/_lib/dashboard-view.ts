@@ -174,7 +174,7 @@ const TECHNIQUES: Record<
   },
   recall: {
     key: "activeRecall",
-    label: "Active recall",
+    label: "Recordación activa",
     colorVar: "var(--color-success-600)",
     dotClass: "bg-success-600",
   },

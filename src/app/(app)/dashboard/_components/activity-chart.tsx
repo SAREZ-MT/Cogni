@@ -24,7 +24,10 @@ import type { ActivityView, DailyActivity } from "../_lib/dashboard-view";
 
 const CONFIG: ChartConfig = {
   flashcards: { label: "Flashcards", color: "var(--color-neutral-900)" },
-  activeRecall: { label: "Active recall", color: "var(--color-neutral-500)" },
+  activeRecall: {
+    label: "Recordación activa",
+    color: "var(--color-neutral-500)",
+  },
   exams: { label: "Exámenes", color: "var(--color-neutral-300)" },
 };
 
@@ -36,7 +39,7 @@ const LEGEND_ITEMS = [
   },
   {
     key: "activeRecall",
-    label: "Active recall",
+    label: "Recordación activa",
     colorVar: "var(--color-neutral-500)",
   },
   { key: "exams", label: "Exámenes", colorVar: "var(--color-neutral-300)" },
@@ -256,7 +259,7 @@ export function ActivityChart({
               />
               <Bar
                 dataKey="activeRecall"
-                name="Active recall"
+                name="Recordación activa"
                 stackId="activity"
                 fill="var(--color-neutral-500)"
                 isAnimationActive={false}

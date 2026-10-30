@@ -71,15 +71,43 @@ export async function deleteUserByEmail(email: string): Promise<void> {
   if (user) await admin.auth.admin.deleteUser(user.id);
 }
 
-export async function submitSignIn(page: Page, user: TestUser): Promise<void> {
+// The product tour (H2-T2) draws over the whole shell and blocks clicks for
+// an owner with no notebooks, so every signed-in spec starts with it marked
+// as seen, the same way the terms arrive accepted. The init script runs on
+// every navigation of this page; `{ tourSeen: false }` skips it so the tour
+// spec can exercise a browser that never saw the tour.
+export const TOUR_STORAGE_KEY = "cogni.tour.v1";
+
+export interface SignInOptions {
+  tourSeen?: boolean;
+}
+
+export async function submitSignIn(
+  page: Page,
+  user: TestUser,
+  { tourSeen = true }: SignInOptions = {},
+): Promise<void> {
+  if (tourSeen) {
+    await page.addInitScript((key) => {
+      try {
+        window.localStorage.setItem(key, "done");
+      } catch {
+        // Storage unavailable: the tour does not auto-launch either.
+      }
+    }, TOUR_STORAGE_KEY);
+  }
   await page.goto("/login");
   await page.getByLabel("Correo electrónico").fill(user.email);
-  await page.getByLabel("Contraseña").fill(user.password);
+  await page.getByLabel("Contraseña", { exact: true }).fill(user.password);
   await page.getByRole("button", { name: "Iniciar sesión" }).click();
 }
 
-export async function signIn(page: Page, user: TestUser): Promise<void> {
-  await submitSignIn(page, user);
+export async function signIn(
+  page: Page,
+  user: TestUser,
+  options: SignInOptions = {},
+): Promise<void> {
+  await submitSignIn(page, user, options);
   await expect(page).toHaveURL("/");
 }
 

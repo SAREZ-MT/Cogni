@@ -11,6 +11,9 @@ export {
   monthGridDays,
   monthOf,
   type OverdueCount,
+  startOfDayIn,
+  startOfTodayIn,
+  startOfTomorrowIn,
   weekDays,
   weekdayIndex,
 } from "./calendar";
@@ -22,7 +25,22 @@ export {
   type DueKind,
   type DueTodayPage,
   emptyDueCounts,
+  sumDueByKind,
   totalDueCount,
 } from "./due-today";
 export type { DueTodayReader } from "./due-today-reader";
 export { SCHEDULING_ERROR } from "./errors";
+export {
+  emptyTechniqueOverview,
+  emptyTechniqueSnapshot,
+  REVIEW_SESSION_KIND,
+  type TechniqueOverview,
+  type TechniqueReadout,
+  type TechniqueSnapshot,
+  type TechniqueTotals,
+  toTechniqueOverview,
+} from "./technique-overview";
+export type {
+  TechniqueOverviewReader,
+  TechniqueSnapshotBounds,
+} from "./technique-overview-reader";

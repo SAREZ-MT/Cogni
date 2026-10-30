@@ -91,6 +91,26 @@ export function dayKeyFormatter(timeZone: string): (instant: Date) => DayKey {
   };
 }
 
+// The first instant of the local day after the one `now` falls on in
+// `timeZone`: reviews are due per local day (user decision 2026-10-18), so
+// an item is pending today while its due_at is before this bound. Local
+// days only move forward in time and no day lasts longer than 48 h, so a
+// binary search over (now, now + 48 h] finds the first instant whose day
+// is no longer today, to the millisecond; DST days and skipped midnights
+// need no offset arithmetic. Mirrors scheduling's startOfTomorrowIn.
+export function startOfTomorrowIn(now: Date, timeZone: string): Date {
+  const dayOf = dayKeyFormatter(timeZone);
+  const today = dayOf(now);
+  let stillToday = now.getTime();
+  let later = stillToday + 2 * DAY_MS;
+  while (later - stillToday > 1) {
+    const middle = Math.floor((stillToday + later) / 2);
+    if (dayOf(new Date(middle)) === today) stillToday = middle;
+    else later = middle;
+  }
+  return new Date(later);
+}
+
 // [from, to) instants that contain every instant of the local days
 // [fromDay, toDay) in any zone.
 export function paddedWindow(

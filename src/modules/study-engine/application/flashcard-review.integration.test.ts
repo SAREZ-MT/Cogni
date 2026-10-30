@@ -19,6 +19,10 @@ const T0 = new Date("2026-01-01T00:00:00.000Z");
 const DAY_MS = 86_400_000;
 const day = (n: number) => new Date(T0.getTime() + n * DAY_MS);
 
+// Reviews are due per local day (UTC here): due before the next midnight.
+const dueCutoff = (now: Date) =>
+  new Date((Math.floor(now.getTime() / DAY_MS) + 1) * DAY_MS);
+
 class SettableClock implements Clock {
   current = T0;
   now() {
@@ -40,7 +44,14 @@ function harness() {
     clock.current = day(on);
     const started = await startFlashcardSession(
       { pageId: PAGE },
-      { pages, studyItems: uow.studyItems, sessions: uow.sessions, clock, ids },
+      {
+        pages,
+        studyItems: uow.studyItems,
+        sessions: uow.sessions,
+        clock,
+        dueCutoff,
+        ids,
+      },
       OWNER,
     );
     if (!started.ok) throw started.error;
@@ -50,7 +61,7 @@ function harness() {
       if (!rating) throw new Error(`no answer for due item ${itemId}`);
       const graded = await gradeFlashcard(
         { sessionId: started.value.session.id, itemId, rating },
-        { uow, clock, ids },
+        { uow, clock, dueCutoff, ids },
         OWNER,
       );
       if (!graded.ok) throw graded.error;

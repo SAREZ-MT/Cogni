@@ -1,38 +1,45 @@
 import * as Sentry from "@sentry/nextjs";
-import {
-  BookOpenCheck,
-  Flame,
-  Layers,
-  NotebookPen,
-  Target,
-} from "lucide-react";
-import Link from "next/link";
 import { redirect, unstable_rethrow } from "next/navigation";
-import { getCurrentUser } from "@/modules/identity";
-import { CreateNotebookTrigger, getHomeOverview } from "@/modules/notebooks";
-import { listDueTodayAction, totalDueCount } from "@/modules/scheduling";
-import { EmptyState } from "@/shared/ui/empty-state";
-import { IconTile } from "@/shared/ui/icon-tile";
-import { SectionTitle } from "@/shared/ui/section-header";
+import {
+  addDays,
+  dayKeyFormatter,
+  getDashboardTechniqueMetrics,
+  getHomeWeakTopics,
+} from "@/modules/analytics";
+import { getCurrentTimeZoneSetting, getCurrentUser } from "@/modules/identity";
+import { getHomeOverview } from "@/modules/notebooks";
+import {
+  getDueToday,
+  getTechniqueOverview,
+  type TechniqueOverview,
+} from "@/modules/scheduling";
+import { RevealGroup, RevealItem } from "@/shared/ui/reveal";
 import { displayNameFromEmail } from "./_components/account-name";
 import { SetBreadcrumb } from "./_components/breadcrumb";
-import { HomeHeader } from "./_components/home/home-header";
-import { NotebookGrid } from "./_components/home/notebook-grid";
-import { ReadyToReview } from "./_components/home/ready-to-review";
-import { RecentPages } from "./_components/home/recent-pages";
-import { StatCard } from "./_components/home/stat-card";
-import { StreakDots } from "./_components/home/streak-dots";
+import { ContinueReading } from "./_components/home/continue-reading";
+import { longDateLabel } from "./_components/home/home-copy";
+import { HomeEmptyState } from "./_components/home/home-empty-state";
+import { HomeHero, type HomeStreak } from "./_components/home/home-hero";
+import { ReviewToday } from "./_components/home/review-today";
+import { streakWeekDays } from "./_components/home/streak-week-days";
+import { TechniqueCounts } from "./_components/home/technique-counts";
 import { WeakTopics } from "./_components/home/weak-topics";
+import { toReviewRows } from "./calendario/_lib/today-rows";
 
-type DueTodayResult = Awaited<ReturnType<typeof listDueTodayAction>>;
+type DueTodayResult = Awaited<ReturnType<typeof getDueToday>>;
 
-// The due read feeds a single card, so a thrown rejection (not only the
-// typed { ok: false }) degrades just that card instead of failing Home.
-// Next.js control-flow errors (redirect, notFound) are rethrown to the
-// framework first.
-async function readDueToday(): Promise<DueTodayResult | null> {
+// The due read feeds the "Para repasar hoy" rows, so a thrown rejection
+// (not only the typed { ok: false }) degrades just those instead of
+// failing Home. Reviews are due per local day: everything due during the day of
+// `now` in the profile's zone counts, the same bound the practice
+// sessions use. Next.js control-flow errors (redirect, notFound) are
+// rethrown to the framework first.
+async function readDueToday(
+  timeZone: string,
+  now: Date,
+): Promise<DueTodayResult | null> {
   try {
-    return await listDueTodayAction();
+    return await getDueToday({ timeZone, now });
   } catch (error) {
     unstable_rethrow(error);
     Sentry.captureException(error);
@@ -40,32 +47,58 @@ async function readDueToday(): Promise<DueTodayResult | null> {
   }
 }
 
-// "Repasos pendientes hoy" card copy: the real total due now across the
-// three techniques (scheduling's listDueToday, Phase 7 T1), or an explicit
-// failure instead of a false zero.
-function dueTodayStat(dueResult: DueTodayResult | null) {
-  if (!dueResult?.ok) {
-    return { value: "—", unit: null, hint: "No pudimos cargar tus repasos" };
-  }
-  const total = totalDueCount(dueResult.value);
-  const pages = dueResult.value.length;
+// The analytics review metrics of the last 7 local days (today included)
+// in the profile's zone, like /dashboard: the hero's streak. The technique
+// cards no longer count individual reviews (H2-T5i): they read study units
+// from the technique overview.
+async function readReviewMetrics(
+  timeZone: string,
+  now: Date,
+): Promise<{ streak: HomeStreak } | null> {
+  const today = dayKeyFormatter(timeZone)(now);
+  const metrics = await getDashboardTechniqueMetrics({
+    fromDay: addDays(today, -6),
+    toDay: addDays(today, 1),
+    timeZone,
+    now,
+  });
+  if (!metrics.ok) return null;
   return {
-    value: String(total),
-    unit: total === 1 ? "repaso" : "repasos",
-    hint:
-      total === 0
-        ? "Estás al día"
-        : `en ${pages} ${pages === 1 ? "página" : "páginas"}`,
+    streak: {
+      streakDays: metrics.value.overall.streakDays,
+      days: streakWeekDays(metrics.value.daily, metrics.value.today),
+    },
   };
 }
 
-// Design pass 2 (odd/tasks, Home study-metrics decisions): Home shows real
-// study-progress metrics derived from page activity (readyToReview, streak,
-// weeklyGoal — all from getHomeOverview) and, since Phase 7 T1, the real
-// count of reviews due today, linking to the calendar's "Hoy" tab.
+// Per technique: today's study units (pages pending and pages done, the
+// cards' progress), live item totals and the next due date (the "never
+// generated" and "next review" states). Optional: a typed failure or a
+// thrown rejection degrades only the cards.
+async function readTechniqueOverview(
+  timeZone: string,
+  now: Date,
+): Promise<TechniqueOverview | null> {
+  try {
+    const result = await getTechniqueOverview({ timeZone, now });
+    return result.ok ? result.value : null;
+  } catch (error) {
+    unstable_rethrow(error);
+    Sentry.captureException(error);
+    return null;
+  }
+}
+
+// Populated Home (Phase 8 H2-T5, layout H2-T5j user decision 2026-10-18):
+// the hero with the review streak full width, then a main column — today's
+// progress per technique, "Continúa donde lo dejaste" (recent pages) and
+// "Temas débiles" — and "Para repasar hoy" in a 320px right column that
+// starts at the cards' top. Below lg everything stacks in DOM order, so
+// today's work comes first: cards, reviews, recent pages, weak topics.
+// Without notebooks it shows the first-run empty state (H2-T3).
 export default async function HomePage() {
   // The user is read first (and redirected on, same as layout.tsx) before
-  // touching getHomeOverview: running both in Promise.all let a session
+  // touching the owner-scoped reads: running them in parallel let a session
   // that disappeared mid-request (e.g. sign-out) reach requireOwnerId()
   // and throw "Debes iniciar sesión para continuar." instead of a clean
   // redirect to /login.
@@ -74,166 +107,67 @@ export default async function HomePage() {
     redirect("/login");
     return;
   }
-  const [overview, dueResult] = await Promise.all([
+  const [overview, timeZoneSetting] = await Promise.all([
     getHomeOverview(),
-    readDueToday(),
+    getCurrentTimeZoneSetting(),
   ]);
-  const displayName = displayNameFromEmail(user.email);
-  const now = new Date();
 
   if (overview.notebookCount === 0) {
     return (
       <>
         <SetBreadcrumb items={[{ label: "Inicio" }]} />
-        <EmptyState
-          as="section"
-          variant="plain"
-          fill
-          icon={
-            <IconTile size="56" radius="xl" tone="purple">
-              <NotebookPen aria-hidden="true" size={28} strokeWidth={1.5} />
-            </IconTile>
-          }
-          title="Tu espacio de estudio"
-          titleAs="h1"
-          titleClassName="text-xl"
-          description="Aún no tienes cuadernos. Crea uno para empezar."
-          descriptionClassName="max-w-sm text-fg-secondary"
-          action={<CreateNotebookTrigger variant="pill" />}
-        />
+        <HomeEmptyState />
       </>
     );
   }
 
-  const topReady = overview.readyToReview.items[0];
-  const readyProgress =
-    overview.readyToReview.totalRich > 0
-      ? (overview.readyToReview.totalReady / overview.readyToReview.totalRich) *
-        100
-      : undefined;
-  const streakProgress = (overview.streak.activeDays / 14) * 100;
-  const dueStat = dueTodayStat(dueResult);
-  const weeklyProgress =
-    (overview.weeklyGoal.activeDays / overview.weeklyGoal.goal) * 100;
+  // One instant for every read, so "today" agrees across the page.
+  const now = new Date();
+  const { timeZone } = timeZoneSetting;
+  const [dueResult, reviewMetrics, techniqueOverview, weakTopics] =
+    await Promise.all([
+      readDueToday(timeZone, now),
+      readReviewMetrics(timeZone, now),
+      readTechniqueOverview(timeZone, now),
+      getHomeWeakTopics({ now }),
+    ]);
+  const duePages = dueResult?.ok ? dueResult.value : null;
 
   return (
-    <section className="flex flex-1 flex-col gap-7">
+    <section className="flex flex-1 flex-col">
       <SetBreadcrumb items={[{ label: "Inicio" }]} />
-      <HomeHeader displayName={displayName} now={now} />
-
-      <div className="flex gap-3.5">
-        <StatCard
-          label="Notas listas para repasar"
-          icon={<BookOpenCheck aria-hidden="true" size={14} strokeWidth={2} />}
-          iconBgClass="bg-primary-100 text-primary-600"
-          value={overview.readyToReview.totalReady}
-          hint={
-            topReady
-              ? `la más urgente: ${topReady.title}`
-              : "Ninguna nota lista todavía"
-          }
-          progress={readyProgress}
-          action={
-            topReady && (
-              <Link
-                href={`/notebooks/${topReady.notebookId}/pages/${topReady.id}`}
-                className="font-medium text-[11.5px] text-primary-600 hover:underline"
-              >
-                Repasar →
-              </Link>
-            )
-          }
-        />
-        <StatCard
-          label="Índice de constancia"
-          icon={<Flame aria-hidden="true" size={14} strokeWidth={2} />}
-          iconBgClass="bg-pastel-green text-success-600"
-          value={`${overview.streak.activeDays}/14 días`}
-          hint="constancia en dos semanas"
-          progress={streakProgress}
-          progressClassName={
-            streakProgress >= 50 ? "gradient-streak" : undefined
-          }
-          footer={<StreakDots days={overview.streak.days} />}
-        />
-        <StatCard
-          label="Meta semanal de estudio"
-          icon={<Target aria-hidden="true" size={14} strokeWidth={2} />}
-          iconBgClass="bg-pastel-yellow text-warning-600"
-          value={
-            <>
-              {overview.weeklyGoal.activeDays}/{overview.weeklyGoal.goal}{" "}
-              <span className="font-normal text-[13px] text-fg-muted">
-                días
-              </span>
-            </>
-          }
-          hint={`meta: ${overview.weeklyGoal.goal} días por semana`}
-          progress={weeklyProgress}
-          action={
-            <button
-              type="button"
-              disabled
-              title="pronto"
-              className="font-medium text-[11.5px] text-fg-muted disabled:cursor-not-allowed"
-            >
-              Ajustar
-            </button>
-          }
-        />
-        <div data-testid="due-today-stat" className="flex flex-1">
-          <StatCard
-            label="Repasos pendientes hoy"
-            icon={<Layers aria-hidden="true" size={14} strokeWidth={2} />}
-            iconBgClass="bg-error-100 text-error-500"
-            value={
-              <>
-                {dueStat.value}
-                {dueStat.unit && (
-                  <>
-                    {" "}
-                    <span className="font-normal text-[13px] text-fg-muted">
-                      {dueStat.unit}
-                    </span>
-                  </>
-                )}
-              </>
-            }
-            hint={dueStat.hint}
-            action={
-              <Link
-                href="/calendario"
-                className="font-medium text-[11.5px] text-primary-600 hover:underline"
-              >
-                Ver calendario →
-              </Link>
-            }
+      {/* One quiet entrance: the blocks rise in, top to bottom (≤0.5s,
+          instant under reduced motion). */}
+      <RevealGroup className="flex flex-col gap-7">
+        <RevealItem>
+          <HomeHero
+            displayName={displayNameFromEmail(user.email)}
+            dateLabel={longDateLabel(now, timeZone)}
+            streak={reviewMetrics?.streak ?? null}
           />
+        </RevealItem>
+        {/* lg: the right column spans the three left rows and is sized by
+            them only (its card is absolutely positioned and scrolls), so it
+            ends exactly where Temas débiles ends (user 2026-10-18). */}
+        <div className="grid grid-cols-1 gap-x-6 gap-y-7 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <RevealItem className="min-w-0 lg:col-start-1 lg:row-start-1">
+            <TechniqueCounts
+              overview={techniqueOverview}
+              timeZone={timeZone}
+              now={now}
+            />
+          </RevealItem>
+          <RevealItem className="min-w-0 relative lg:col-start-2 lg:row-span-3 lg:row-start-1">
+            <ReviewToday rows={duePages ? toReviewRows(duePages) : null} />
+          </RevealItem>
+          <RevealItem className="min-w-0 lg:col-start-1 lg:row-start-2">
+            <ContinueReading pages={overview.recentPages} now={now} />
+          </RevealItem>
+          <RevealItem className="min-w-0 lg:col-start-1 lg:row-start-3">
+            <WeakTopics topics={weakTopics.ok ? weakTopics.value : null} />
+          </RevealItem>
         </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3.5">
-        <ReadyToReview readyToReview={overview.readyToReview} now={now} />
-        <WeakTopics />
-      </div>
-
-      <div>
-        <SectionTitle
-          action={
-            <Link
-              href="/notebooks"
-              className="font-medium text-[13px] text-primary-600 hover:underline"
-            >
-              Ver todos →
-            </Link>
-          }
-        >
-          Mis cuadernos
-        </SectionTitle>
-        <NotebookGrid notebooks={overview.notebooks.slice(0, 6)} now={now} />
-      </div>
-
-      <RecentPages pages={overview.recentPages} now={now} />
+      </RevealGroup>
     </section>
   );
 }

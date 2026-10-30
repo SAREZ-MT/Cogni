@@ -32,7 +32,17 @@ describe("SegmentedTabs", () => {
 
     const active = screen.getByRole("link", { name: "Hoy" });
     expect(active).toHaveAttribute("aria-current", "page");
-    expect(active).toHaveClass("bg-card", "text-fg");
+    // Solid Cogni violet glass pill behind the active label, white text.
+    expect(active).toHaveClass("text-white");
+    const pill = active.querySelector('[data-part="active-pill"]');
+    expect(pill).toHaveClass("bg-primary-600");
+    expect(pill).toHaveAttribute("aria-hidden", "true");
+    expect(screen.getAllByRole("link")).toHaveLength(2);
+    expect(
+      screen
+        .getByRole("link", { name: "Mes" })
+        .querySelector('[data-part="active-pill"]'),
+    ).toBeNull();
     const other = screen.getByRole("link", { name: "Mes" });
     expect(other).toHaveAttribute("href", "/calendario?vista=mes");
     expect(other).not.toHaveAttribute("aria-current");

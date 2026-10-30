@@ -44,16 +44,16 @@ export default async function ActiveRecallNotebookPage({
     <section className="flex flex-1 flex-col gap-6">
       <SetBreadcrumb
         items={[
-          { label: "Active recall", href: "/active-recall" },
+          { label: "Recordación activa", href: "/active-recall" },
           { label: notebookTitle },
         ]}
       />
 
       <div className="flex flex-col gap-3">
-        <BackLink href="/active-recall">Active recall</BackLink>
+        <BackLink href="/active-recall">Recordación activa</BackLink>
 
         <SectionHeader
-          eyebrow="Active recall"
+          eyebrow="Recordación activa"
           title={notebookTitle}
           titleClassName="text-xl"
           description={`${plural(totalSessions, "sesión", "sesiones")} · ${plural(pages.length, "página", "páginas")} con preguntas`}
@@ -72,7 +72,7 @@ export default async function ActiveRecallNotebookPage({
           titleClassName="text-base"
           description={
             result.ok
-              ? "Abre una página de este cuaderno y usa Técnicas → Active recall → Generar."
+              ? "Abre una página de este cuaderno y usa Técnicas → Recordación activa → Generar."
               : "No pudimos cargar tus sesiones. Intenta de nuevo."
           }
           descriptionClassName="max-w-[320px]"

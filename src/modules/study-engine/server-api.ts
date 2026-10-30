@@ -27,7 +27,7 @@ import type { PageMastery } from "./domain/page-mastery";
 import type { ReviewLogRepository } from "./domain/review-log-repository";
 import type { SessionFeedbackRepository } from "./domain/session-feedback-repository";
 import type { StudiedPage } from "./domain/studied-page-reader";
-import type { FlashcardRating } from "./domain/study-item";
+import type { DueCutoff, FlashcardRating } from "./domain/study-item";
 import type { StudyItemRepository } from "./domain/study-item-repository";
 import {
   DrizzleFlashcardSessionRepository,
@@ -74,13 +74,17 @@ export interface FlashcardSessionsServerApi {
   ): Promise<Result<FlashcardSession, DomainError>>;
 }
 
+// `dueCutoff` is the owner's per-day "due" bound (scheduling's
+// getCurrentDueCutoff): the session offers, and grading accepts, every card
+// due before the start of their next local day.
 export function createFlashcardSessionsServerApi(deps: {
   db: DbExecutor;
   pages: PageAccess;
   clock: Clock;
+  dueCutoff: DueCutoff;
   ids: { next(): string };
 }): FlashcardSessionsServerApi {
-  const { db, pages, clock, ids } = deps;
+  const { db, pages, clock, dueCutoff, ids } = deps;
   const sessions = new DrizzleFlashcardSessionRepository(db);
   return {
     start: (ownerId, input) =>
@@ -91,6 +95,7 @@ export function createFlashcardSessionsServerApi(deps: {
           studyItems: new DrizzleStudyItemRepository(db),
           sessions,
           clock,
+          dueCutoff,
           ids,
         },
         ownerId,
@@ -98,7 +103,7 @@ export function createFlashcardSessionsServerApi(deps: {
     grade: (ownerId, input) =>
       gradeFlashcard(
         input,
-        { uow: new DrizzleStudyUnitOfWork(db), clock, ids },
+        { uow: new DrizzleStudyUnitOfWork(db), clock, dueCutoff, ids },
         ownerId,
       ),
     finish: (ownerId, input) =>

@@ -3,6 +3,7 @@ import { createFixedClock } from "@/shared/kernel/clock";
 import { planRecallSession } from "./plan-recall-session";
 import { InMemoryRecallSessionUnitOfWork } from "./testing/in-memory-recall-session-unit-of-work";
 import {
+  dueCutoff,
   NOW,
   OTHER_OWNER,
   OWNER,
@@ -16,6 +17,7 @@ function setup() {
     questions: uow.repos.questions,
     studyItems: uow.repos.studyItems,
     clock: createFixedClock(NOW),
+    dueCutoff,
   };
   return { uow, deps };
 }

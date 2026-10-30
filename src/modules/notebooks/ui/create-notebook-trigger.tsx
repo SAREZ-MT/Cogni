@@ -5,18 +5,30 @@ import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/shared/ui/button";
 import { IconTile } from "@/shared/ui/icon-tile";
+import { cn } from "@/shared/ui/utils";
 import { createNotebook as createNotebookAction } from "../actions";
 import { CreateNotebookDialog } from "./create-notebook-dialog";
 import { SIDEBAR_TREE_QUERY_KEY } from "./sidebar-tree-query-key";
 
 interface CreateNotebookTriggerProps {
-  // "pill" (default): Home's "+ Nuevo cuaderno" primary button
-  // (ui_kits/app/Home Page.html .btn-primary). "tile": the dashed
-  // "Nuevo cuaderno" grid tile (.workspace-card.new).
-  variant?: "pill" | "tile";
+  // "tile": the notebooks hub's dashed "Nuevo cuaderno" grid tile
+  // (.workspace-card.new). Phase 8 H4-T4 removed the hub header's "pill",
+  // its last user, so there is no default. "hero": the large
+  // rounded primary button of Home's empty state. "cta": the notebooks hub
+  // empty state's large violet pill with a soft violet shadow and no plus
+  // icon (Phase 8 H4-T1, user mockup 2026-10-20).
+  variant: "tile" | "hero" | "cta";
+  // Button copy (and accessible name) for the hero/cta variants.
+  label?: string;
+  // Product tour anchor (`data-tour`), e.g. "crear-cuaderno".
+  tourId?: string;
+  // Open the new notebook instead of refreshing the current page. Home's
+  // empty state sets it: after the first notebook, the next step is its
+  // first page.
+  openAfterCreate?: boolean;
 }
 
-// Home's create-notebook entry points (header CTA and grid tile) share this
+// The create-notebook entry points (grid tile and empty-state CTAs) share this
 // one trigger instead of duplicating the dialog/mutation wiring
 // CreateNotebookIconButton and SidebarTreeClient already have. Unlike
 // those two (which only need to refresh the sidebar tree's own React
@@ -24,17 +36,21 @@ interface CreateNotebookTriggerProps {
 // server-rendered stats/grid/recent-pages update without a manual reload
 // (S4 review follow-up).
 export function CreateNotebookTrigger({
-  variant = "pill",
+  variant,
+  label = "Nuevo cuaderno",
+  tourId,
+  openAfterCreate = false,
 }: CreateNotebookTriggerProps) {
   const queryClient = useQueryClient();
   const router = useRouter();
   const createNotebook = useMutation({
     mutationFn: (title: string) => createNotebookAction({ title }),
-    onSuccess: () => {
+    onSuccess: (notebook) => {
       void queryClient.invalidateQueries({
         queryKey: SIDEBAR_TREE_QUERY_KEY,
       });
-      router.refresh();
+      if (openAfterCreate) router.push(`/notebooks/${notebook.id}`);
+      else router.refresh();
     },
   });
 
@@ -43,22 +59,44 @@ export function CreateNotebookTrigger({
       <button
         type="button"
         aria-label="Nuevo cuaderno"
-        className="flex min-h-[140px] flex-col items-center justify-center gap-2 rounded-xl border border-border-default border-dashed bg-white/40 text-fg-muted transition-colors hover:bg-white/70 hover:text-fg-secondary"
+        data-tour={tourId}
+        className="flex min-h-[140px] flex-1 flex-col items-center justify-center gap-2 rounded-xl border border-border-default border-dashed bg-white/40 text-fg-muted transition-colors hover:bg-white/70 hover:text-fg-secondary"
       >
         <IconTile size="36" radius="md" className="bg-neutral-150">
           <Plus aria-hidden="true" size={18} strokeWidth={1.75} />
         </IconTile>
         <span className="font-medium text-sm">Nuevo cuaderno</span>
       </button>
+    ) : variant === "cta" ? (
+      <Button
+        type="button"
+        size="lg"
+        data-tour={tourId}
+        className="rounded-pill bg-primary-600 px-6 font-semibold text-[15px] text-white shadow-[0_6px_18px_-6px_rgb(124_58_237/0.55)] hover:bg-primary-700"
+      >
+        {label}
+      </Button>
     ) : (
-      <Button type="button" aria-label="Nuevo cuaderno">
+      <Button
+        type="button"
+        size="lg"
+        data-tour={tourId}
+        className="rounded-pill px-6 text-[15px]"
+      >
         <Plus aria-hidden="true" size={16} strokeWidth={1.75} />
-        Nuevo cuaderno
+        {label}
       </Button>
     );
 
   return (
-    <div className="flex flex-col items-start gap-1">
+    <div
+      className={cn(
+        "flex flex-col gap-1",
+        // The tile fills its grid cell like the notebook cards beside it
+        // (it shrank to its content under the pill's `items-start`).
+        variant === "tile" ? "items-stretch" : "items-center",
+      )}
+    >
       <CreateNotebookDialog
         onCreate={(title) => createNotebook.mutate(title)}
         trigger={trigger}

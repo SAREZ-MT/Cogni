@@ -11,6 +11,7 @@ import {
   PAGE,
   pages,
   seedSessionQuestions,
+  utcDayCutoff,
 } from "./testing/fixtures";
 import { InMemoryExamSessionUnitOfWork } from "./testing/in-memory-exam-session-unit-of-work";
 
@@ -28,6 +29,7 @@ async function exam(answered: number, wrong: number) {
       pages,
       uow,
       clock: createFixedClock(LATER),
+      dueCutoff: utcDayCutoff,
       ids: { next: () => "session-1" },
     },
     OWNER,
@@ -52,7 +54,11 @@ async function exam(answered: number, wrong: number) {
     );
     if (!result.ok) throw result.error;
   }
-  const deps = { uow, clock: createFixedClock(FINISHED_AT) };
+  const deps = {
+    uow,
+    clock: createFixedClock(FINISHED_AT),
+    dueCutoff: utcDayCutoff,
+  };
   return { uow, deps, sessionId: session.id, questions };
 }
 
@@ -99,6 +105,8 @@ describe("completeExamSession", () => {
         sessionId,
         pageId: PAGE,
         now: FINISHED_AT,
+        // Reviews are due per local day: the bound at the finish time.
+        dueBefore: utcDayCutoff(FINISHED_AT),
         answers: questions.map((q, n) => ({
           rootId: q.rootId,
           correct: n >= 4,
@@ -152,6 +160,7 @@ describe("completeExamSession", () => {
         pages,
         uow,
         clock: createFixedClock(LATER),
+        dueCutoff: utcDayCutoff,
         ids: { next: () => "session-1" },
       },
       OWNER,
@@ -180,7 +189,7 @@ describe("completeExamSession", () => {
     }
     const result = await completeExamSession(
       { sessionId: session.id },
-      { uow, clock: createFixedClock(FINISHED_AT) },
+      { uow, clock: createFixedClock(FINISHED_AT), dueCutoff: utcDayCutoff },
       OWNER,
     );
     expect(result.ok && result.value.session).toMatchObject({

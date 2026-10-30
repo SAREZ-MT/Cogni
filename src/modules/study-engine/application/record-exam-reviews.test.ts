@@ -17,6 +17,9 @@ const SESSION = "exam-session-1";
 const CREATED = new Date("2026-10-04T08:00:00.000Z");
 const NOW = new Date("2026-10-05T09:00:00.000Z");
 const DAY_MS = 86_400_000;
+// The owner's local day (UTC here) ends at midnight: reviews are due per
+// day, so an item due before it was due when the exam finished.
+const TOMORROW = new Date("2026-10-06T00:00:00.000Z");
 
 // The study item of a root exam question, due at CREATED unless overridden.
 function rootItem(rootId: string, overrides: Partial<StudyItem> = {}) {
@@ -85,6 +88,7 @@ function input(answers: { rootId: string; correct: boolean }[]) {
     pageId: PAGE,
     answers,
     now: NOW,
+    dueBefore: TOMORROW,
   };
 }
 
@@ -142,14 +146,27 @@ describe("recordExamReviews", () => {
     expect(logs[0]).toMatchObject({ quality: 4, sessionKind: "exam" });
   });
 
-  it("treats an item due exactly now as due", async () => {
-    const { uow, deps } = await setup([rootItem("r1", { dueAt: NOW })]);
+  it("treats an item due later today as due: the whole local day is review time", async () => {
+    const { uow, deps } = await setup([
+      rootItem("r1", { dueAt: new Date(TOMORROW.getTime() - 1) }),
+    ]);
 
     await recordExamReviews(input([{ rootId: "r1", correct: true }]), deps);
 
     expect(await uow.studyItems.findById("item-r1", OWNER)).toMatchObject({
       lastQuality: 4,
     });
+  });
+
+  it("skips a correct answer to an item due at the start of tomorrow", async () => {
+    const { deps } = await setup([rootItem("r1", { dueAt: TOMORROW })]);
+
+    const result = await recordExamReviews(
+      input([{ rootId: "r1", correct: true }]),
+      deps,
+    );
+
+    expect(result.ok && result.value.skippedRootIds).toEqual(["r1"]);
   });
 
   it("skips a correct answer to an item that is not due: no SM-2 change, no log", async () => {

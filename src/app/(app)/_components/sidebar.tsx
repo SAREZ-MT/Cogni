@@ -34,9 +34,13 @@ const ONE_YEAR_IN_SECONDS = 60 * 60 * 24 * 365;
 // design/shell-look, studyplatform obs 140): used for the notebook tree's
 // "Cuadernos" label (sidebar-tree-client.tsx replicates these classes
 // locally to add its own "+" trigger) and every SECTIONS entry below.
+// The label is set apart from the rows by weight, tone and space rather
+// than size alone (impeccable typeset; user 2026-10-17: the 11px muted
+// labels were barely visible): semibold, the primary ink, and a wider gap
+// above each group.
 function SectionLabel({ children }: { children: ReactNode }) {
   return (
-    <p className="px-2.5 pt-3.5 pb-1 font-medium text-[11px] text-fg-muted">
+    <p className="px-2.5 pt-5 pb-1.5 font-semibold text-[12px] text-fg tracking-[0.01em]">
       {children}
     </p>
   );
@@ -49,7 +53,22 @@ function SectionLabel({ children }: { children: ReactNode }) {
 // design previews are disabled (nav-entries.ts); none is left. Dashboard
 // (Phase 7 T4), Calendario, Flashcards, Exámenes and Active recall run on
 // real data, so they are plain links.
-const MAIN_SECTION: { label: string; items: NavEntry[] } = {
+// Consecutive rows that the product tour highlights as one block: they are
+// wrapped in a `data-tour` element (step 4 shows Progreso and Calendario
+// together, user 2026-10-18).
+type NavGroup = { tourId: string; items: NavEntry[] };
+
+type NavSection = {
+  label: string;
+  items: (NavEntry | NavGroup)[];
+  tourId?: string;
+};
+
+function isGroup(item: NavEntry | NavGroup): item is NavGroup {
+  return "items" in item;
+}
+
+const MAIN_SECTION: NavSection = {
   label: "Menú principal",
   items: [
     {
@@ -57,55 +76,64 @@ const MAIN_SECTION: { label: string; items: NavEntry[] } = {
       icon: Home,
       label: "Inicio",
       isActive: (path) => path === "/",
-      shortcut: ["⌘", "H"],
     },
     {
       href: "/notebooks",
       icon: BookOpen,
       label: "Cuadernos",
+      tourId: "cuadernos",
       isActive: (path) => path.startsWith("/notebooks"),
     },
     {
-      href: "/dashboard",
-      icon: BarChart3,
-      label: "Dashboard",
-      isActive: (path) => path.startsWith("/dashboard"),
-    },
-    {
-      href: "/calendario",
-      icon: Calendar,
-      label: "Calendario",
-      isActive: (path) => path.startsWith("/calendario"),
+      tourId: "avance",
+      items: [
+        {
+          href: "/dashboard",
+          icon: BarChart3,
+          label: "Progreso",
+          isActive: (path) => path.startsWith("/dashboard"),
+        },
+        {
+          href: "/calendario",
+          icon: Calendar,
+          label: "Calendario",
+          isActive: (path) => path.startsWith("/calendario"),
+        },
+      ],
     },
   ],
 };
 
-const TECNICAS_SECTION: { label: string; items: NavEntry[] } = {
+const TECNICAS_SECTION: NavSection = {
   label: "Técnicas",
+  tourId: "tecnicas",
   items: [
     {
       href: "/flashcards",
       icon: Layers,
       label: "Flashcards",
+      tone: "yellow",
       isActive: (path) => path.startsWith("/flashcards"),
     },
     {
       href: "/active-recall",
       icon: Brain,
-      label: "Active recall",
+      label: "Recordación activa",
+      tone: "green",
       isActive: (path) => path.startsWith("/active-recall"),
     },
     {
       href: "/exams",
       icon: ClipboardList,
       label: "Exámenes",
+      tone: "rose",
       isActive: (path) => path.startsWith("/exams"),
     },
   ],
 };
 
-const CONFIGURACION_SECTION: { label: string; items: NavEntry[] } = {
-  label: "Configuración",
+const CONFIGURACION_SECTION: NavSection = {
+  label: "General",
   items: [
     // Live since Phase 7 T2a: the time-zone setting.
     {
@@ -117,7 +145,11 @@ const CONFIGURACION_SECTION: { label: string; items: NavEntry[] } = {
   ],
 };
 
-const SECTIONS = [MAIN_SECTION, TECNICAS_SECTION, CONFIGURACION_SECTION];
+const SECTIONS: NavSection[] = [
+  MAIN_SECTION,
+  TECNICAS_SECTION,
+  CONFIGURACION_SECTION,
+];
 
 type SidebarProps = {
   initialCollapsed: boolean;
@@ -152,6 +184,33 @@ export function Sidebar({
     document.cookie = `${SIDEBAR_COOKIE}=${value}; path=/; max-age=${ONE_YEAR_IN_SECONDS}; samesite=lax`;
   }
 
+  function renderEntry(entry: NavEntry) {
+    const item = resolveNavEntry(entry, previewsEnabled, pathname ?? "/");
+    return item.disabled ? (
+      <NavItem
+        key={item.label}
+        href="#"
+        icon={item.icon}
+        label={item.label}
+        disabled
+        hint={item.hint}
+        collapsed={collapsed}
+      />
+    ) : (
+      <NavItem
+        key={item.label}
+        href={item.href}
+        icon={item.icon}
+        label={item.label}
+        active={item.active}
+        shortcut={item.shortcut}
+        tone={item.tone}
+        tourId={item.tourId}
+        collapsed={collapsed}
+      />
+    );
+  }
+
   return (
     <nav
       aria-label="Barra lateral"
@@ -182,36 +241,25 @@ export function Sidebar({
 
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto pt-1">
         {SECTIONS.map((section) => (
-          <div key={section.label} className="flex flex-col gap-0.5">
+          <div
+            key={section.label}
+            data-tour={section.tourId}
+            className="flex flex-col gap-0.5"
+          >
             {!collapsed && <SectionLabel>{section.label}</SectionLabel>}
-            {section.items.map((entry) => {
-              const item = resolveNavEntry(
-                entry,
-                previewsEnabled,
-                pathname ?? "/",
-              );
-              return item.disabled ? (
-                <NavItem
-                  key={item.label}
-                  href="#"
-                  icon={item.icon}
-                  label={item.label}
-                  disabled
-                  hint={item.hint}
-                  collapsed={collapsed}
-                />
+            {section.items.map((entry) =>
+              isGroup(entry) ? (
+                <div
+                  key={entry.tourId}
+                  data-tour={entry.tourId}
+                  className="flex flex-col gap-0.5"
+                >
+                  {entry.items.map(renderEntry)}
+                </div>
               ) : (
-                <NavItem
-                  key={item.label}
-                  href={item.href}
-                  icon={item.icon}
-                  label={item.label}
-                  active={item.active}
-                  shortcut={item.shortcut}
-                  collapsed={collapsed}
-                />
-              );
-            })}
+                renderEntry(entry)
+              ),
+            )}
           </div>
         ))}
       </div>

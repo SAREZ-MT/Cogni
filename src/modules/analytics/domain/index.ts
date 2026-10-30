@@ -67,3 +67,10 @@ export {
   type Technique,
   type TechniqueCounts,
 } from "./technique";
+export {
+  rankWeakTopics,
+  WEAK_TOPIC_MAX_ACCURACY,
+  WEAK_TOPIC_MIN_ATTEMPTS,
+  WEAK_TOPICS_LIMIT,
+  type WeakTopic,
+} from "./weak-topics";

@@ -12,7 +12,7 @@ describe("Logo", () => {
     expect(screen.getByText("Cogni")).toHaveClass("font-bold", "text-fg");
   });
 
-  it("renders the mark as a 36px rounded-square with the aria-hidden three-circle glyph", () => {
+  it("renders the shared BrandMark: a 36px dark tile with the aria-hidden C glyph", () => {
     const { container } = render(<Logo />);
 
     const mark = container.querySelector("span.size-9");
@@ -21,7 +21,7 @@ describe("Logo", () => {
 
     const svg = mark?.querySelector("svg");
     expect(svg).toHaveAttribute("aria-hidden", "true");
-    expect(svg?.querySelectorAll("circle")).toHaveLength(3);
+    expect(svg).toHaveAttribute("data-slot", "brand-glyph");
   });
 
   it("hides the wordmark when collapsed and moves the accessible name to the link", () => {

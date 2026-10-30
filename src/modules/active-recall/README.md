@@ -94,7 +94,10 @@ Implementado:
   dominio de cada página y el promedio del hub vienen del dominio de página
   de `study-engine` (`createPageMasteryReader`, nunca una fórmula local; una
   página sin fila cuenta 0) y las preguntas vencidas hoy, de sus ítems de
-  estudio vencidos (`createStudyItemRepository().listDue`). Si el dominio o
+  estudio vencidos (`createStudyItemRepository().listDue` con el inicio del
+  día local siguiente del perfil: los repasos vencen por día, decisión
+  2026-10-18; la composición de la sesión y el registro SM-2 de la
+  evaluación usan el mismo límite, `getCurrentDueCutoff`). Si el dominio o
   los vencimientos no se pueden leer quedan desconocidos (`null`) y el
   error va a Sentry. `getRecallSessionReview` reconstruye una sesión
   terminada (pregunta, respuesta y autoevaluación en el orden en que se

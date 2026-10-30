@@ -1,6 +1,7 @@
 "use server";
 
 import { z } from "zod";
+import { getCurrentDueCutoff } from "@/modules/scheduling";
 import { getDb } from "@/shared/db/client";
 import { systemClock } from "@/shared/kernel/clock";
 import { type ActionError, toActionError } from "@/shared/kernel/domain-error";
@@ -88,8 +89,13 @@ export async function getRecallSessionResultsAction(
       calibration,
       evaluationRunNeeded,
     } = result.value;
-    if (evaluationRunNeeded)
-      scheduleRecallEvaluation(session.id, ownerId.value);
+    if (evaluationRunNeeded) {
+      scheduleRecallEvaluation(
+        session.id,
+        ownerId.value,
+        await getCurrentDueCutoff(),
+      );
+    }
     return ok({
       sessionId: session.id,
       startedAt: session.startedAt.toISOString(),
@@ -127,7 +133,11 @@ export async function retryRecallEvaluationAction(
       requeued > 0 ||
       (session.finishedAt !== null && session.evaluationStatus === "pending")
     ) {
-      scheduleRecallEvaluation(session.id, ownerId.value);
+      scheduleRecallEvaluation(
+        session.id,
+        ownerId.value,
+        await getCurrentDueCutoff(),
+      );
     }
     return ok({
       sessionId: session.id,

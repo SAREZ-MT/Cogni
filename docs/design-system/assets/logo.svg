@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 168 44" role="img" aria-label="Cogni">
+  <!-- Cogni mark: a "C" arc whose ends are knowledge nodes, with a violet
+       node at its centre (the memory the arc keeps reinforcing).
+       Light variant; on dark surfaces swap the tile for rgba(255,255,255,.1)
+       with a rgba(255,255,255,.15) border and the wordmark for #FFFFFF.
+       Source of truth in code: src/shared/ui/brand-mark.tsx. -->
+  <rect x="0" y="2" width="40" height="40" rx="11" fill="#1C1917"/>
+  <g transform="translate(7.8 9.8) scale(1.0167)">
+    <path d="M16.95 7.05A7 7 0 1 0 16.95 16.95" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round"/>
+    <circle cx="16.95" cy="7.05" r="2.2" fill="#FFFFFF"/>
+    <circle cx="16.95" cy="16.95" r="2.2" fill="#FFFFFF"/>
+    <circle cx="12" cy="12" r="2.3" fill="#A78BFA"/>
+  </g>
+  <text x="52" y="29.5" font-family="'DM Sans', system-ui, sans-serif" font-weight="700" font-size="21" letter-spacing="-0.4" fill="#1C1917">Cogni</text>
+</svg>

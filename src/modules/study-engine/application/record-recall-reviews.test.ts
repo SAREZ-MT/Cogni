@@ -13,6 +13,9 @@ const SESSION = "recall-session-1";
 const CREATED = new Date("2026-10-05T08:00:00.000Z");
 const NOW = new Date("2026-10-06T09:00:00.000Z");
 const DAY_MS = 86_400_000;
+// The owner's local day (UTC here) ends at midnight: reviews are due per
+// day, so an item due before it was due at evaluation time.
+const TOMORROW = new Date("2026-10-07T00:00:00.000Z");
 
 // The study item of a recall question, due at CREATED unless overridden.
 function questionItem(questionId: string, overrides: Partial<StudyItem> = {}) {
@@ -85,6 +88,7 @@ function input(
     pageId: PAGE,
     reviews,
     now,
+    dueBefore: TOMORROW,
   };
 }
 
@@ -172,14 +176,28 @@ describe("recordRecallReviews", () => {
     expect(await uow.reviewLogs.listByItem("item-q1", OWNER)).toEqual([]);
   });
 
-  it("treats an item due exactly now as due", async () => {
-    const { uow, deps } = await setup([questionItem("q1", { dueAt: NOW })]);
+  it("treats an item due later today as due: the whole local day is review time", async () => {
+    const { uow, deps } = await setup([
+      questionItem("q1", { dueAt: new Date(TOMORROW.getTime() - 1) }),
+    ]);
 
     await recordRecallReviews(input([{ questionId: "q1", quality: 4 }]), deps);
 
     expect(await uow.studyItems.findById("item-q1", OWNER)).toMatchObject({
       lastQuality: 4,
     });
+  });
+
+  it("skips a passing quality on an item due at the start of tomorrow", async () => {
+    const stored = questionItem("q1", { dueAt: TOMORROW });
+    const { deps } = await setup([stored]);
+
+    const result = await recordRecallReviews(
+      input([{ questionId: "q1", quality: 4 }]),
+      deps,
+    );
+
+    expect(result.ok && result.value.skippedQuestionIds).toEqual(["q1"]);
   });
 
   it("skips a suspended item, failing qualities included", async () => {

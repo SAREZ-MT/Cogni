@@ -255,7 +255,7 @@ export function ActiveRecallPlayer({
       <div className="flex items-start justify-between">
         <div>
           <p className="font-semibold text-[16px] text-fg">
-            Active recall — {notebookTitle}
+            Recordación activa — {notebookTitle}
           </p>
           <p className="mt-0.5 text-fg-muted text-xs">{pageTitle}</p>
         </div>

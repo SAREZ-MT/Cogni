@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { LOCAL_DAY_CUTOFFS } from "../../../../tests/unit/fixtures/local-day-cutoffs";
 import {
   addDays,
   dayKeyFormatter,
@@ -9,6 +10,7 @@ import {
   isTimeZone,
   LAST_ANALYTICS_DAY,
   paddedWindow,
+  startOfTomorrowIn,
   weekStartOf,
 } from "./local-day";
 
@@ -129,5 +131,56 @@ describe("isAnalyticsRange", () => {
         7,
       ),
     ).toBe(false);
+  });
+});
+
+// Reviews are due per local day (user decision 2026-10-18): "pending"
+// counts every item due before the start of the owner's next local day.
+describe("startOfTomorrowIn", () => {
+  it("is the next local midnight in the zone", () => {
+    // 22:00 on Monday 12 Oct in Bogotá (-05).
+    expect(
+      startOfTomorrowIn(new Date("2026-10-13T03:00:00.000Z"), "America/Bogota"),
+    ).toEqual(new Date("2026-10-13T05:00:00.000Z"));
+    expect(
+      startOfTomorrowIn(new Date("2026-10-04T16:00:00.000Z"), "Asia/Tokyo"),
+    ).toEqual(new Date("2026-10-05T15:00:00.000Z"));
+  });
+
+  it("is already tomorrow's start one millisecond before midnight", () => {
+    expect(
+      startOfTomorrowIn(new Date("2026-10-13T04:59:59.999Z"), "America/Bogota"),
+    ).toEqual(new Date("2026-10-13T05:00:00.000Z"));
+  });
+
+  it("follows a 25-hour day when the clocks fall back", () => {
+    // Madrid falls back on 25 Oct 2026: that day runs 22:00Z → 23:00Z.
+    expect(
+      startOfTomorrowIn(new Date("2026-10-25T10:00:00.000Z"), "Europe/Madrid"),
+    ).toEqual(new Date("2026-10-25T23:00:00.000Z"));
+  });
+
+  it("starts tomorrow at the transition when its midnight is skipped", () => {
+    // Santiago springs forward at 00:00 on 6 Sep 2026 (to 01:00, -03).
+    expect(
+      startOfTomorrowIn(
+        new Date("2026-09-05T20:00:00.000Z"),
+        "America/Santiago",
+      ),
+    ).toEqual(new Date("2026-09-06T04:00:00.000Z"));
+  });
+});
+
+// Shared table with the scheduling module's startOfTomorrowIn: both cut "today"
+// at the same instant, DST transitions included (H2-T6).
+describe("startOfTomorrowIn agrees with the shared cutoff table", () => {
+  it.each(LOCAL_DAY_CUTOFFS)("$timeZone at $now", ({
+    timeZone,
+    now,
+    startOfTomorrow,
+  }) => {
+    expect(startOfTomorrowIn(new Date(now), timeZone).toISOString()).toBe(
+      startOfTomorrow,
+    );
   });
 });

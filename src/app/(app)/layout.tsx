@@ -10,6 +10,7 @@ import { getActiveImports } from "@/modules/ingestion";
 import { designPreviewsEnabled } from "@/shared/config/design-previews";
 import { BreadcrumbProvider } from "./_components/breadcrumb";
 import { NotebookActions } from "./_components/notebook-actions";
+import { ProductTourProvider } from "./_components/product-tour/product-tour";
 import { QueryProvider } from "./_components/query-provider";
 import { Sidebar } from "./_components/sidebar";
 import {
@@ -59,40 +60,44 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   return (
     <QueryProvider>
       <BreadcrumbProvider>
-        {/* Shell canvas (design/shell-look, studyplatform obs 140): a flat
+        {/* H2-T2: start() for Home's "Ver tutorial" and Configuración's
+            replay row; the tour itself anchors on data-tour attributes. */}
+        <ProductTourProvider>
+          {/* Shell canvas (design/shell-look, studyplatform obs 140): a flat
             8px gutter/gap around two floating cards, replacing the old
             edge-to-edge sidebar + asymmetric content padding. h-dvh (not
             min-h-screen, which the reference uses) is kept on purpose: the
             sidebar's and main's own overflow-y-auto/overflow-auto areas
             need a bounded height to scroll internally instead of growing
             the whole shell past the viewport. */}
-        <div className="flex h-dvh gap-2 bg-canvas p-2">
-          <Sidebar
-            initialCollapsed={collapsed}
-            user={user}
-            previewsEnabled={designPreviewsEnabled()}
-          />
-          <div
-            data-testid="content-area"
-            className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl bg-card shadow-card"
-          >
-            <Topbar user={user} />
-            <main className="flex flex-1 flex-col overflow-auto p-(--content-padding)">
-              <NotebookActions initialPageIds={initialActiveImportPageIds}>
-                {children}
-              </NotebookActions>
-            </main>
-          </div>
-          {/* design/shell-look: portal target for the page-editor route's
+          <div className="flex h-dvh gap-2 bg-canvas p-2">
+            <Sidebar
+              initialCollapsed={collapsed}
+              user={user}
+              previewsEnabled={designPreviewsEnabled()}
+            />
+            <div
+              data-testid="content-area"
+              className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl bg-card shadow-card"
+            >
+              <Topbar user={user} />
+              <main className="flex flex-1 flex-col overflow-auto p-(--content-padding)">
+                <NotebookActions initialPageIds={initialActiveImportPageIds}>
+                  {children}
+                </NotebookActions>
+              </main>
+            </div>
+            {/* design/shell-look: portal target for the page-editor route's
               "Técnicas" panel (TechniquesPanel) — a sibling after the
               content card, at the same flex level as Sidebar, so a
               portaled panel renders as a third floating card. Empty/
               `contents` on every other route; see techniques-panel-slot.tsx
               for why this accepts a brief client-side reflow instead of
               server-detecting the active route here. */}
-          <TechniquesPanelSlot />
-        </div>
-        <TimeZoneDetection profile={profile} />
+            <TechniquesPanelSlot />
+          </div>
+          <TimeZoneDetection profile={profile} />
+        </ProductTourProvider>
       </BreadcrumbProvider>
     </QueryProvider>
   );

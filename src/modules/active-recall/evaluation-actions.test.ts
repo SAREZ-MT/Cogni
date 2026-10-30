@@ -17,6 +17,13 @@ const { scheduleRecallEvaluation } = vi.hoisted(() => ({
   scheduleRecallEvaluation: vi.fn(),
 }));
 vi.mock("./evaluation-runner", () => ({ scheduleRecallEvaluation }));
+// The owner's per-day "due" bound, as scheduling reads it from the profile.
+const { dueCutoff } = vi.hoisted(() => ({
+  dueCutoff: () => new Date("2026-10-08T05:00:00.000Z"),
+}));
+vi.mock("@/modules/scheduling", () => ({
+  getCurrentDueCutoff: async () => dueCutoff,
+}));
 
 const OWNER = "3d2f9a1e-5b6c-4d7e-8f90-1a2b3c4d5e6f";
 const PAGE = "0a1b2c3d-4e5f-4061-8798-a1b2c3d4e5f6";
@@ -136,7 +143,11 @@ describe("active recall evaluation actions", () => {
     expect(result.ok && result.value.answers).toHaveLength(2);
     // A run that died leaves answers pending: polling takes them over once
     // nothing touched them within the claim lease (review part 2 R3-001).
-    expect(scheduleRecallEvaluation).toHaveBeenCalledWith(SESSION, OWNER);
+    expect(scheduleRecallEvaluation).toHaveBeenCalledWith(
+      SESSION,
+      OWNER,
+      dueCutoff,
+    );
   });
 
   it("schedules no run from a poll while a run may still be live", async () => {
@@ -164,7 +175,11 @@ describe("active recall evaluation actions", () => {
       requeued: 0,
       evaluationStatus: "pending",
     });
-    expect(scheduleRecallEvaluation).toHaveBeenCalledWith(SESSION, OWNER);
+    expect(scheduleRecallEvaluation).toHaveBeenCalledWith(
+      SESSION,
+      OWNER,
+      dueCutoff,
+    );
   });
 
   it("never schedules an evaluation for an open or resolved session", async () => {
@@ -202,7 +217,11 @@ describe("active recall evaluation actions", () => {
       requeued: 1,
       evaluationStatus: "pending",
     });
-    expect(scheduleRecallEvaluation).toHaveBeenCalledWith(SESSION, OWNER);
+    expect(scheduleRecallEvaluation).toHaveBeenCalledWith(
+      SESSION,
+      OWNER,
+      dueCutoff,
+    );
   });
 
   it("schedules nothing when there is nothing to retry", async () => {

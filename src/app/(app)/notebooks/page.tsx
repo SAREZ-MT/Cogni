@@ -1,10 +1,10 @@
-import { NotebookPen } from "lucide-react";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/modules/identity";
 import { CreateNotebookTrigger, getHomeOverview } from "@/modules/notebooks";
 import { Card } from "@/shared/ui/card";
-import { EmptyState } from "@/shared/ui/empty-state";
-import { IconTile } from "@/shared/ui/icon-tile";
+import { IllustratedEmptyState } from "@/shared/ui/illustrated-empty-state";
+import { NotebookCover } from "@/shared/ui/notebook-cover";
+import { NotebookFan } from "@/shared/ui/notebook-fan";
 import { SectionHeader } from "@/shared/ui/section-header";
 import { ViewToggle } from "@/shared/ui/view-toggle";
 import { SetBreadcrumb } from "../_components/breadcrumb";
@@ -17,9 +17,11 @@ interface NotebooksPageProps {
 
 // New screen (design pass 2, user decision "Cuadernos ... abre una nueva
 // pantalla"): the full notebook library, replacing the sidebar's old
-// compact tree. Header anatomy matches studyplatform-style-report.md §7
-// (workspaces/page.tsx): eyebrow "Biblioteca", bold H1, count subtitle, a
-// primary create button, then a grid/list view toggle persisted in the
+// compact tree. Header (Phase 8 H4-T4, user decision 2026-10-20): the violet
+// notebook badge beside a gradient H1, like the Calendario header, and a
+// tagline · count subtitle; no eyebrow and no create button — the empty
+// state's CTA and the grid's tile create notebooks. Then a grid/list view
+// toggle persisted in the
 // `?view=` URL param (default grid) — a server-rendered toggle instead of
 // client state, so the choice survives a full page reload and needs no JS.
 export default async function NotebooksPage({
@@ -42,31 +44,45 @@ export default async function NotebooksPage({
       <SetBreadcrumb items={[{ label: "Cuadernos" }]} />
 
       <SectionHeader
-        eyebrow="Biblioteca"
+        icon={<NotebookCover size="sm" />}
+        leadingClassName="gap-4"
         title="Cuadernos"
-        description={
+        titleClassName="text-[32px] leading-tight tracking-tight text-gradient-brand"
+        description={[
+          "Tus materias, organizadas",
           notebooks.length === 0
-            ? "Aún no tienes cuadernos. Crea uno para empezar."
+            ? "Aún no tienes cuadernos"
             : notebooks.length === 1
               ? "1 cuaderno"
-              : `${notebooks.length} cuadernos`
-        }
-        actions={<CreateNotebookTrigger variant="pill" />}
+              : `${notebooks.length} cuadernos`,
+        ]}
       />
 
       {notebooks.length === 0 ? (
-        <EmptyState
-          variant="dashed"
-          fill
-          icon={
-            <IconTile size="56" tone="primary">
-              <NotebookPen aria-hidden="true" size={26} strokeWidth={1.5} />
-            </IconTile>
+        // Phase 8 H4-T1 (user-approved mockup 2026-10-20): an illustrated
+        // invitation with three steps; its CTA opens the create dialog (the
+        // only create control here since H4-T4 dropped the header's). H4-T2 (user decision
+        // 2026-10-20): the calendar's glow on the dotted paper, entering as
+        // a short cascade. H4-T3 (user decision 2026-10-20, option D
+        // palette 1): a CSS fan of three notebooks replaces the
+        // illustration.
+        <IllustratedEmptyState
+          entrance="cascade"
+          paper
+          art={<NotebookFan />}
+          title="Todas tus materias, en un solo lugar"
+          description="Crea un cuaderno para cada materia o tema que estudies. Ahí se juntan tus apuntes, los que escribes y los que importas desde PDF, para que todo quede ordenado y a mano cuando lo necesites."
+          steps={[
+            "Crea un cuaderno por materia",
+            "Escribe o importa tus apuntes",
+            "Repasa con las técnicas",
+          ]}
+          action={
+            <CreateNotebookTrigger
+              variant="cta"
+              label="Crear mi primer cuaderno"
+            />
           }
-          title="Crea tu primer cuaderno"
-          titleClassName="text-base"
-          description="Los cuadernos organizan tus apuntes por materia, semestre o proyecto."
-          descriptionClassName="max-w-sm"
         />
       ) : (
         <>

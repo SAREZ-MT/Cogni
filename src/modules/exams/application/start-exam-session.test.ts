@@ -10,6 +10,7 @@ import {
   PAGE,
   pages,
   seedSessionQuestions,
+  utcDayCutoff,
 } from "./testing/fixtures";
 import { InMemoryExamSessionUnitOfWork } from "./testing/in-memory-exam-session-unit-of-work";
 
@@ -20,6 +21,7 @@ function setup(now: Date = LATER) {
     pages,
     uow,
     clock: createFixedClock(now),
+    dueCutoff: utcDayCutoff,
     ids: { next: () => `session-${++n}` },
   };
   return { uow, deps };

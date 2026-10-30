@@ -2,7 +2,10 @@ import * as Sentry from "@sentry/nextjs";
 import { after } from "next/server";
 import { createAiServerApi } from "@/modules/ai";
 import { createNotebooksServerApi } from "@/modules/notebooks";
-import { createRecallReviewRecorder } from "@/modules/study-engine";
+import {
+  createRecallReviewRecorder,
+  type DueCutoff,
+} from "@/modules/study-engine";
 import { serverEnv } from "@/shared/config/env.server";
 import { getDb } from "@/shared/db/client";
 import { systemClock } from "@/shared/kernel/clock";
@@ -26,7 +29,12 @@ import {
 // short-lived, so no module-level singletons. Every repository works on the
 // pool directly (no transaction around model calls); study-engine records
 // the SM-2 reviews in its own unit of work.
-export function buildEvaluationDeps(): EvaluateRecallSessionDeps {
+// `dueCutoff` is the owner's per-day "due" bound (scheduling's
+// getCurrentDueCutoff), resolved by the scheduling action inside the
+// request: the deferred run has no session to read the profile zone from.
+export function buildEvaluationDeps(
+  dueCutoff: DueCutoff,
+): EvaluateRecallSessionDeps {
   const db = getDb();
   const env = serverEnv();
   const ids = { next: createId };
@@ -43,6 +51,7 @@ export function buildEvaluationDeps(): EvaluateRecallSessionDeps {
     limiter: ai.evaluationLimiter,
     reviews: createRecallReviewRecorder({ db, ids }),
     clock: systemClock,
+    dueCutoff,
     tokenCap: env.AI_PAGE_TOKEN_CAP,
     onError: (error) => Sentry.captureException(error),
   };
@@ -55,13 +64,16 @@ export function buildEvaluationDeps(): EvaluateRecallSessionDeps {
 export function scheduleRecallEvaluation(
   sessionId: string,
   ownerId: string,
-  build: () => EvaluateRecallSessionDeps = buildEvaluationDeps,
+  dueCutoff: DueCutoff,
+  build: (
+    dueCutoff: DueCutoff,
+  ) => EvaluateRecallSessionDeps = buildEvaluationDeps,
 ): void {
   after(async () => {
     try {
       const result = await evaluateRecallSession(
         { sessionId },
-        build(),
+        build(dueCutoff),
         ownerId,
       );
       if (!result.ok) Sentry.captureException(result.error);

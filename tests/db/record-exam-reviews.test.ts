@@ -35,6 +35,8 @@ if (process.env.DATABASE_URL) {
   let nextPagePosition = 1;
   const CREATED = new Date("2026-10-04T08:00:00.000Z");
   const NOW = new Date("2026-10-05T09:00:00.000Z");
+  // Reviews are due per local day (UTC here): due before the next midnight.
+  const TOMORROW = new Date("2026-10-06T00:00:00.000Z");
   const DAY_MS = 86_400_000;
   const ids = { next: () => randomUUID() };
 
@@ -112,6 +114,7 @@ if (process.env.DATABASE_URL) {
         pageId,
         answers: answersFor(roots),
         now: NOW,
+        dueBefore: TOMORROW,
       });
 
       expect(result.ok).toBe(true);
@@ -159,6 +162,7 @@ if (process.env.DATABASE_URL) {
             pageId,
             answers: answersFor(roots),
             now: NOW,
+            dueBefore: TOMORROW,
           },
           { uow: failing, ids },
         ),
@@ -186,6 +190,7 @@ if (process.env.DATABASE_URL) {
             pageId,
             answers: answersFor(roots),
             now: NOW,
+            dueBefore: TOMORROW,
           });
           expect(result.ok).toBe(true);
           throw new Error("finishing the exam failed");
@@ -223,6 +228,7 @@ if (process.env.DATABASE_URL) {
         pageId,
         answers: [{ rootId: roots[0] as string, correct: false }],
         now: NOW,
+        dueBefore: TOMORROW,
       });
       expect(first.ok).toBe(true);
       const before = await stored(pageId, sessionId);
@@ -233,6 +239,7 @@ if (process.env.DATABASE_URL) {
         pageId,
         answers: [{ rootId: roots[1] as string, correct: false }],
         now: new Date(NOW.getTime() + 60_000),
+        dueBefore: TOMORROW,
       });
 
       expect(!again.ok && again.error.code).toBe(

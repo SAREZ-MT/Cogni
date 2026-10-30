@@ -41,6 +41,29 @@ describe("LoginPage", () => {
     ).toHaveAttribute("href", "/terminos");
   });
 
+  it("separates the Google button with an 'o' divider and shows the Google G", async () => {
+    const { container } = render(
+      await LoginPage({ searchParams: Promise.resolve({}) } as never),
+    );
+
+    const divider = container.querySelector('[data-slot="text-divider"]');
+    expect(divider).toHaveTextContent("o");
+    const google = screen.getByRole("button", { name: "Continuar con Google" });
+    expect(google.querySelector('[data-slot="google-icon"]')).not.toBeNull();
+  });
+
+  it("styles the sign-up and recovery links as links", async () => {
+    render(await LoginPage({ searchParams: Promise.resolve({}) } as never));
+
+    expect(screen.getByRole("link", { name: "Crea una" })).toHaveAttribute(
+      "data-slot",
+      "text-link",
+    );
+    expect(
+      screen.getByRole("link", { name: "¿Olvidaste tu contraseña?" }),
+    ).toHaveAttribute("data-slot", "text-link");
+  });
+
   it("shows the Google copy only for error=google", async () => {
     render(
       await LoginPage({

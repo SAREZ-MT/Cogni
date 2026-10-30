@@ -151,7 +151,7 @@ describe("ActiveRecallResultsPage", () => {
     expect(SetBreadcrumb).toHaveBeenCalledWith(
       {
         items: [
-          { label: "Active recall", href: "/active-recall" },
+          { label: "Recordación activa", href: "/active-recall" },
           { label: "Biología celular", href: `/active-recall/${NOTEBOOK}` },
           { label: "Mitocondria", href: `/active-recall/${NOTEBOOK}/${PAGE}` },
           { label: "Resultados" },

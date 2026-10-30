@@ -274,6 +274,8 @@ export function runAnalyticsReadersContract(
   });
 
   describe("PageProgressReader contract", () => {
+    // The reader's "due" bound (getProgress passes the start of the
+    // owner's next local day): items due before it are due.
     const NOW = new Date("2026-10-13T12:00:00.000Z");
 
     it("describes each page with its notebook, mastery and live item counts", async () => {
@@ -282,9 +284,9 @@ export function runAnalyticsReadersContract(
       const page = await ctx.newPage();
       await ctx.setMastery(page, { level: "Consolidando", score: 0.5 });
       await ctx.addItem(page, { dueAt: new Date(NOW.getTime() - HOUR_MS) });
-      // Due exactly now counts as due.
+      // The last instant before the bound counts as due, the bound does not.
+      await ctx.addItem(page, { dueAt: new Date(NOW.getTime() - 1) });
       await ctx.addItem(page, { dueAt: NOW });
-      await ctx.addItem(page, { dueAt: new Date(NOW.getTime() + 1) });
       await ctx.addItem(page, {
         dueAt: new Date(NOW.getTime() - HOUR_MS),
         suspended: true,

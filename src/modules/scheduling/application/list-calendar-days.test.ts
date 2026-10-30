@@ -10,6 +10,7 @@ const item = (pageId: string, dueAt: string): CalendarItem => ({
   pageId,
   pageTitle: `Página ${pageId}`,
   notebookId: "nb-1",
+  notebookTitle: "Biología",
   kind: "flashcard",
   dueAt: new Date(dueAt),
 });
@@ -81,6 +82,7 @@ describe("listCalendarDays", () => {
           pageId: "old",
           pageTitle: "Página old",
           notebookId: "nb-1",
+          notebookTitle: "Biología",
           kind: "flashcard",
           count: 12,
           earliestDueAt: new Date("2025-01-01T00:00:00.000Z"),

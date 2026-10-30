@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { DueKind, DueTodayPage } from "../../domain/due-today";
-import type { DueTodayReader } from "../../domain/due-today-reader";
+import type {
+  DueTodayReader,
+  DueTodayReadOptions,
+} from "../../domain/due-today-reader";
 
 // A page created for a test, as the reader must describe it.
 export interface DuePageFixture {
@@ -26,11 +29,23 @@ export interface DueTodayReaderContractContext {
   readonly archiveNotebook: (page: DuePageFixture) => Promise<void>;
 }
 
-export interface DueTodayReaderContractOptions {
-  createReader(): DueTodayReader;
-  context: () => DueTodayReaderContractContext;
+// Exam sessions for the "exams done on a completed session" rule (H2-T6).
+export interface ExamSessionFixtures {
+  // Adds one exam session on the page, owned by the page's owner, finished
+  // at `finishedAt` (null: started and still open).
+  readonly addExamSession: (
+    page: DuePageFixture,
+    finishedAt: Date | null,
+  ) => Promise<void>;
 }
 
+export interface DueTodayReaderContractOptions {
+  createReader(): DueTodayReader;
+  context: () => DueTodayReaderContractContext & ExamSessionFixtures;
+}
+
+// The reader's bound: the start of the owner's next local day (the use
+// case computes it). Items due before it are due today.
 const NOW = new Date("2026-10-04T12:00:00.000Z");
 const HOUR_MS = 3_600_000;
 const hoursFromNow = (hours: number) =>
@@ -46,13 +61,16 @@ export function runDueTodayReaderContract(
     reader: DueTodayReader,
     ownerId: string,
     pages: readonly DuePageFixture[],
-    now: Date = NOW,
+    dueBefore: Date = NOW,
+    readOptions?: DueTodayReadOptions,
   ): Promise<DueTodayPage[]> => {
     const ids = new Set(pages.map((page) => page.pageId));
-    return (await reader.listDueToday(ownerId, now)).filter((row) =>
-      ids.has(row.pageId),
+    return (await reader.listDueToday(ownerId, dueBefore, readOptions)).filter(
+      (row) => ids.has(row.pageId),
     );
   };
+  // "Today" for the exam rule: [TODAY_FROM, NOW).
+  const TODAY_FROM = hoursFromNow(-24);
 
   describe("DueTodayReader contract", () => {
     it("describes a due page with its notebook, due counts per kind and earliest due", async () => {
@@ -79,19 +97,20 @@ export function runDueTodayReaderContract(
       ]);
     });
 
-    it("counts an item due exactly now and never one due later", async () => {
+    it("counts an item due just before the bound and never one due at or after it", async () => {
       const ctx = options.context();
       const reader = options.createReader();
       const page = await ctx.newPage();
       const later = await ctx.newPage();
+      const lastInstant = new Date(NOW.getTime() - 1);
+      await ctx.addItem(page, { dueAt: lastInstant });
       await ctx.addItem(page, { dueAt: NOW });
-      await ctx.addItem(page, { dueAt: hoursFromNow(1) });
-      await ctx.addItem(later, { dueAt: new Date(NOW.getTime() + 1) });
+      await ctx.addItem(later, { dueAt: hoursFromNow(1) });
 
       const rows = await listFor(reader, ctx.ownerId, [page, later]);
       expect(rows.map((row) => row.pageId)).toEqual([page.pageId]);
       expect(rows[0]?.due.flashcard).toBe(1);
-      expect(rows[0]?.earliestDueAt).toEqual(NOW);
+      expect(rows[0]?.earliestDueAt).toEqual(lastInstant);
     });
 
     it("orders pages by their earliest due item, oldest first", async () => {
@@ -102,7 +121,7 @@ export function runDueTodayReaderContract(
       const middle = await ctx.newPage();
       await ctx.addItem(recent, { dueAt: hoursFromNow(-1) });
       await ctx.addItem(oldest, { dueAt: hoursFromNow(-30) });
-      await ctx.addItem(oldest, { dueAt: hoursFromNow(0) });
+      await ctx.addItem(oldest, { dueAt: hoursFromNow(-0.5) });
       await ctx.addItem(middle, { dueAt: hoursFromNow(-10) });
 
       const rows = await listFor(reader, ctx.ownerId, [recent, oldest, middle]);
@@ -169,6 +188,74 @@ export function runDueTodayReaderContract(
           (row) => row.pageId,
         ),
       ).toEqual([theirs.pageId]);
+    });
+
+    it("keeps due exam questions of a page whose exam was completed today unless asked", async () => {
+      const ctx = options.context();
+      const reader = options.createReader();
+      const page = await ctx.newPage();
+      await ctx.addItem(page, {
+        kind: "exam_question",
+        dueAt: hoursFromNow(-2),
+      });
+      await ctx.addExamSession(page, hoursFromNow(-1));
+
+      const rows = await listFor(reader, ctx.ownerId, [page]);
+      expect(rows[0]?.due.exam_question).toBe(1);
+    });
+
+    it("drops the exam questions of a page whose exam was completed today when asked", async () => {
+      const ctx = options.context();
+      const reader = options.createReader();
+      const mixed = await ctx.newPage();
+      const examOnly = await ctx.newPage();
+      const yesterday = await ctx.newPage();
+      const open = await ctx.newPage();
+      await ctx.addItem(mixed, {
+        kind: "exam_question",
+        dueAt: hoursFromNow(-30),
+      });
+      await ctx.addItem(mixed, { dueAt: hoursFromNow(-2) });
+      await ctx.addExamSession(mixed, TODAY_FROM);
+      await ctx.addItem(examOnly, {
+        kind: "exam_question",
+        dueAt: hoursFromNow(-3),
+      });
+      await ctx.addExamSession(examOnly, new Date(NOW.getTime() - 1));
+      // Finished just before today started: not today's.
+      await ctx.addItem(yesterday, {
+        kind: "exam_question",
+        dueAt: hoursFromNow(-4),
+      });
+      await ctx.addExamSession(yesterday, new Date(TODAY_FROM.getTime() - 1));
+      // Started today and never finished.
+      await ctx.addItem(open, {
+        kind: "exam_question",
+        dueAt: hoursFromNow(-5),
+      });
+      await ctx.addExamSession(open, null);
+
+      const rows = await listFor(
+        reader,
+        ctx.ownerId,
+        [mixed, examOnly, yesterday, open],
+        NOW,
+        { examsCompletedFrom: TODAY_FROM },
+      );
+
+      expect(rows.map((row) => row.pageId)).toEqual([
+        open.pageId,
+        yesterday.pageId,
+        mixed.pageId,
+      ]);
+      const mixedRow = rows.find((row) => row.pageId === mixed.pageId);
+      expect(mixedRow?.due).toEqual({
+        flashcard: 1,
+        exam_question: 0,
+        recall_question: 0,
+      });
+      // The dropped exam question no longer sets the page's place.
+      expect(mixedRow?.earliestDueAt).toEqual(hoursFromNow(-2));
     });
   });
 }

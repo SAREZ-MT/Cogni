@@ -16,6 +16,11 @@ import { InMemoryExamSessionUnitOfWork } from "./application/testing/in-memory-e
 // providers; the transaction itself is covered by tests/db/exam-retake.
 const { getCurrentUser } = vi.hoisted(() => ({ getCurrentUser: vi.fn() }));
 vi.mock("@/modules/identity", () => ({ getCurrentUser }));
+// The owner's per-day "due" bound (UTC here): the next midnight.
+vi.mock("@/modules/scheduling", () => ({
+  getCurrentDueCutoff: async () => (now: Date) =>
+    new Date((Math.floor(now.getTime() / 86_400_000) + 1) * 86_400_000),
+}));
 vi.mock("@/shared/db/client", () => ({ getDb: () => ({}) }));
 vi.mock("@/shared/config/env.server", () => ({
   serverEnv: () => ({ AI_PAGE_TOKEN_CAP: 12000 }),

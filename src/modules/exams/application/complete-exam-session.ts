@@ -1,3 +1,4 @@
+import type { DueCutoff } from "@/modules/study-engine";
 import type { Clock } from "@/shared/kernel/clock";
 import { DomainError } from "@/shared/kernel/domain-error";
 import { err, ok, type Result } from "@/shared/kernel/result";
@@ -15,6 +16,9 @@ import { runExamWork } from "./exam-unit-of-work";
 export interface CompleteExamSessionDeps {
   uow: ExamSessionUnitOfWork;
   clock: Clock;
+  // The owner's per-day "due" bound (start of their next local day): a
+  // correct answer to a root due later today reviews it.
+  dueCutoff: DueCutoff;
 }
 
 export interface CompletedExamSession {
@@ -84,6 +88,7 @@ export async function completeExamSession(
         correct: answer.isCorrect,
       })),
       now,
+      dueBefore: deps.dueCutoff(now),
     });
     if (!reviews.ok) return reviews;
     return ok({
