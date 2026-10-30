@@ -119,7 +119,11 @@ test.describe("active recall hub", () => {
     await expect(
       page.getByText("Practica explicando con tus palabras"),
     ).toBeVisible();
-    await page.goBack();
+    // A full load of the page, not the browser back button: back restores
+    // the page's cached payload from before the typing, so the editor (and
+    // the panel's word count, H14's 150-word recall minimum) would read an
+    // empty page.
+    await page.goto(`/notebooks/${notebookId}/pages/${pageId}`);
 
     const panel = page.getByTestId("techniques-panel");
     await panel.getByTestId("generate-recall-questions").click();
