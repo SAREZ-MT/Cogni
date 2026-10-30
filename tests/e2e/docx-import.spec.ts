@@ -83,7 +83,10 @@ async function expectStructure(editable: Locator) {
     .toBe("function add(a, b) {\n  return a + b;\n}");
   // Word carries no code language, so the block is plain text: the picker
   // says "Texto sin formato" and nothing is syntax-coloured (T11b).
-  await expect(editable.getByTestId("code-block-language")).toHaveValue("");
+  await expect(editable.getByTestId("code-block-language")).toHaveAttribute(
+    "data-language",
+    "",
+  );
   await expect(editable.locator('pre code [class*="hljs-"]')).toHaveCount(0);
 
   await expect(editable.locator("blockquote")).toHaveText(
@@ -256,8 +259,8 @@ test.describe("docx import acceptance", () => {
     await expect(banner).toContainText(
       "Solo puedes importar archivos PDF, Word (.docx) o PowerPoint (.pptx).",
     );
-    // Still on the library: createNotebook opens it as /notebooks?view=grid
-    // since the Phase 8 hub, so the query string is allowed.
+    // Still on the library: createNotebook opens it as /notebooks; an
+    // optional query string is still allowed.
     await expect(page).toHaveURL(/\/notebooks(\?[^/]*)?$/);
   });
 });

@@ -50,6 +50,20 @@
   --color-pastel-mint:    #D1FAE5;
   --color-pastel-mint-fg: #065F46;
 
+  /* Page editor only (H7 + follow-up): pastel highlighter marks (+ swatch
+     -edge), callouts (tint / -edge border / -icon / deep -fg), code blocks */
+  --color-highlighter-yellow: #FDF3B0;  --color-highlighter-yellow-edge: #E6D36A;
+  --color-highlighter-green:  #D4F4DF;  --color-highlighter-green-edge:  #9FD9B3;
+  --color-highlighter-blue:   #D8E7FB;  --color-highlighter-blue-edge:   #A6C5EC;
+  --color-highlighter-pink:   #FBDDE1;  --color-highlighter-pink-edge:   #EEB1BA;
+  --color-highlighter-orange: #FDE3CF;  --color-highlighter-orange-edge: #EFBD94;
+  --color-highlighter-purple: #E9E1FB;  --color-highlighter-purple-edge: #C8B7EF;
+  --color-highlighter-mint:   #CFF3E4;  --color-highlighter-mint-edge:   #95D9BD;
+  --color-callout-idea:    #FEFAE6; --color-callout-idea-edge:    #F1D77A; --color-callout-idea-icon:    #B7791F; --color-callout-idea-fg:    #6B3D0E;
+  --color-callout-note:    #F6F3FF; --color-callout-note-edge:    #D3C6FB; --color-callout-note-icon:    #7C3AED; --color-callout-note-fg:    #4C1D95;
+  --color-callout-warning: #FFF3F4; --color-callout-warning-edge: #F7BCC6; --color-callout-warning-icon: #E11D48; --color-callout-warning-fg: #881337;
+  --color-code-block:         #F3F3F3;
+
   /* Semantic */
   --color-success-50:  #ECFDF5;
   --color-success-100: #D1FAE5;
@@ -176,6 +190,9 @@
   --space-16: 64px;
 
   /* ========== BORDERS & RADIUS ========== */
+  --radius-editor: 3px;   /* page editor surfaces and blocks only */
+  --radius-table:  8px;   /* page editor tables: their own, softer frame */
+  --radius-callout: 14px; /* page editor callouts (user reference) */
   --radius-sm:    6px;
   --radius-md:    8px;
   --radius-lg:    12px;

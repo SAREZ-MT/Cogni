@@ -1,5 +1,6 @@
 "use client";
 
+import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import {
   createContext,
@@ -90,8 +91,17 @@ export function SetBreadcrumb({ items }: SetBreadcrumbProps) {
 
 // Topbar's rendering of the current trail (comp-topbar.html `.breadcrumb`,
 // Engram obs 140): "Cogni" is always the root segment; the rest comes from
-// whatever the current route published. Muted segments with `›` separators
-// (decorative), last segment `text-fg` weight 500.
+// whatever the current route published.
+//
+// H6-E7 (odd/tasks/phase-8-design-flows.md): the trail is a key navigation
+// aid, so it reads larger and clearer than the old 14px muted line — 15px
+// secondary ink for the way back, medium-weight ink for the current page,
+// chevron separators, 32px-tall hover targets with an underline, and long
+// names truncated (the full name stays as a tooltip). The nav may shrink
+// inside the topbar (`min-w-0 flex-1`); the current page keeps more room
+// than the segments before it. In a narrow topbar (a container under 32rem)
+// only the parent and the current page stay, so neither collapses to
+// nothing.
 export function Breadcrumb() {
   const published = useBreadcrumb();
   const segments: BreadcrumbItem[] = [
@@ -100,26 +110,52 @@ export function Breadcrumb() {
   ];
 
   return (
-    <nav aria-label="Ruta de navegación">
-      <ol className="flex items-center gap-1.5 text-fg-muted text-sm">
+    <nav
+      aria-label="Ruta de navegación"
+      className="@container min-w-0 flex-1 pr-4"
+    >
+      <ol className="flex min-w-0 items-center gap-0.5 text-[15px] text-fg-secondary">
         {segments.map((segment, index) => {
           const isLast = index === segments.length - 1;
+          const isFar = index < segments.length - 2;
           return (
             <li
               key={`${segment.label}-${index}`}
-              className="flex items-center gap-1.5"
+              data-far={isFar || undefined}
+              className={cn(
+                "flex min-w-0 items-center gap-0.5",
+                isLast ? "shrink" : "shrink-[3]",
+                isFar && "hidden @lg:flex",
+              )}
             >
-              {index > 0 && <span aria-hidden="true">›</span>}
+              {index > 0 && (
+                <ChevronRight
+                  aria-hidden="true"
+                  size={15}
+                  strokeWidth={1.75}
+                  className={cn(
+                    "shrink-0 text-fg-muted",
+                    // The parent's chevron leads from segments a narrow
+                    // topbar hides.
+                    index === segments.length - 2 && "hidden @lg:block",
+                  )}
+                />
+              )}
               {!isLast && segment.href ? (
                 <Link
                   href={segment.href}
-                  className="rounded-sm transition-colors hover:text-fg"
+                  title={segment.label}
+                  className="block h-8 max-w-64 truncate rounded-md px-1.5 leading-8 underline-offset-4 transition-colors hover:bg-hover hover:text-fg hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                 >
                   {segment.label}
                 </Link>
               ) : (
                 <span
-                  className={cn(isLast && "font-medium text-fg")}
+                  title={segment.label}
+                  className={cn(
+                    "block truncate px-1.5 leading-8",
+                    isLast ? "font-medium text-fg" : "max-w-64",
+                  )}
                   aria-current={isLast ? "page" : undefined}
                 >
                   {segment.label}

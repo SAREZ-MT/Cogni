@@ -228,7 +228,7 @@ export function TableToolbarControls({ editor }: TableToolbarControlsProps) {
         role="toolbar"
         aria-label="Tabla"
         data-testid="table-toolbar"
-        className="flex items-center gap-0.5 rounded-lg border border-border-default bg-card p-1 shadow-md"
+        className="editor-surface flex items-center gap-0.5 border border-border-default bg-card p-1 shadow-md"
       >
         {ROW_COLUMN_BUTTONS.map((config) => (
           <TableToolbarButton key={config.id} config={config} editor={editor} />

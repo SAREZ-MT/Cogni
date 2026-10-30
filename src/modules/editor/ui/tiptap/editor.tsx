@@ -12,7 +12,10 @@ import { SaveStatus } from "../save-status";
 import { BlockHandle } from "./block-handle";
 import { collectBlockIds, isBlockIdOnlyChange } from "./block-ids";
 import { BubbleToolbar } from "./bubble-toolbar";
+import { withEditableStart } from "./editable-start";
 import { createEditorExtensions } from "./extensions";
+import { HistoryControls } from "./history-controls";
+import { MathEditor } from "./math-editor";
 import type { SlashCommandItem } from "./slash-command-items";
 import { TableToolbar } from "./table-toolbar";
 import { toPlainTiptapDoc } from "./to-plain-tiptap-doc";
@@ -111,7 +114,10 @@ export function Editor({
       mentionPort: mentionPort ?? null,
       extraSlashItems: extraSlashItems ?? [],
     }),
-    content: initialContent as unknown as Record<string, unknown>,
+    content: withEditableStart(initialContent) as unknown as Record<
+      string,
+      unknown
+    >,
     immediatelyRender: false,
     onUpdate: ({ editor: current, transaction }) => {
       // Opening a page is not editing it: the transaction UniqueID
@@ -136,9 +142,12 @@ export function Editor({
     if (!editor) return;
     if (appliedReconcileVersionRef.current === reconcileVersion) return;
     appliedReconcileVersionRef.current = reconcileVersion;
-    editor.commands.setContent(content as unknown as Record<string, unknown>, {
-      emitUpdate: false,
-    });
+    editor.commands.setContent(
+      withEditableStart(content) as unknown as Record<string, unknown>,
+      {
+        emitUpdate: false,
+      },
+    );
   }, [reconcileVersion, content, editor]);
 
   // specs/editor/spec.md's autosave requirement is debounce-driven; Mod+S
@@ -188,7 +197,14 @@ export function Editor({
     };
   }, [flush]);
 
-  const statusNode = <SaveStatus status={status} />;
+  // H7: the undo/redo arrows sit with the autosave status in the page's
+  // meta row ("Editada… · guardado ↶ ↷").
+  const statusNode = (
+    <span className="inline-flex items-center gap-2">
+      <SaveStatus status={status} />
+      {editor ? <HistoryControls editor={editor} /> : null}
+    </span>
+  );
 
   return (
     <div className="flex flex-col gap-2">
@@ -211,6 +227,9 @@ export function Editor({
           table-toolbar.tsx's shouldShowTableToolbar both key off
           table-selection.ts's isTableCellSelection). */}
       {editor ? <TableToolbar editor={editor} /> : null}
+      {/* H7: the LaTeX input with live preview for writing and editing
+          formulas (slash "Ecuación", a click or Enter on a formula). */}
+      {editor ? <MathEditor editor={editor} /> : null}
       {/* S6b (odd/tasks/app-shell-restyle.md): per-block "⋮⋮" drag handle +
           "+" insert in the left gutter, matching the Tiptap docs
           Notion-style editor. */}

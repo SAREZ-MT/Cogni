@@ -2,8 +2,8 @@ import { Editor } from "@tiptap/core";
 import { afterEach, describe, expect, it } from "vitest";
 import { createEditorExtensions } from "./index";
 
-// Math has no insert entry point yet, but content that already contains it
-// must keep rendering and round-trip unchanged.
+// Content that already contains math must keep rendering and round-trip
+// unchanged (H7 added the insert paths, see math-editing.test.ts).
 describe("existing math content", () => {
   let editor: Editor;
 

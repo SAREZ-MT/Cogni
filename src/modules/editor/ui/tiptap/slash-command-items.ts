@@ -14,12 +14,15 @@ import {
   Minus,
   Pilcrow,
   Quote,
+  Radical,
+  Sigma,
   SmilePlus,
   StickyNote,
   Table as TableIcon,
   TriangleAlert,
 } from "lucide-react";
 import type { CommandMenuItem } from "../command-menu";
+import { requestMathEdit } from "./extensions/math-editing";
 
 export interface SlashCommandItem extends CommandMenuItem {
   run: (editor: Editor, range: Range) => void;
@@ -233,6 +236,32 @@ export const SLASH_COMMAND_ITEMS: SlashCommandItem[] = [
     description: "Menciona una página",
     run: (editor, range) =>
       editor.chain().focus().deleteRange(range).insertContent("@").run(),
+  },
+  // H7: formulas. The typed command is removed and the LaTeX input opens
+  // (math-editor.tsx); nothing is inserted until it holds a formula.
+  {
+    id: "math-block",
+    label: "Ecuación",
+    keywords: ["ecuacion", "formula", "math", "latex", "katex"],
+    icon: Sigma,
+    group: "Contenido",
+    description: "Fórmula LaTeX en su propia línea",
+    run: (editor, range) => {
+      editor.chain().focus().deleteRange(range).run();
+      requestMathEdit(editor, { kind: "block", pos: null, latex: "" });
+    },
+  },
+  {
+    id: "math-inline",
+    label: "Ecuación en línea",
+    keywords: ["ecuacion", "formula", "math", "latex", "inline"],
+    icon: Radical,
+    group: "Contenido",
+    description: "Fórmula LaTeX dentro del texto",
+    run: (editor, range) => {
+      editor.chain().focus().deleteRange(range).run();
+      requestMathEdit(editor, { kind: "inline", pos: null, latex: "" });
+    },
   },
   // Callouts
   {

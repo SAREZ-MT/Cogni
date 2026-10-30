@@ -136,10 +136,12 @@ describe("Editor typography (T13b)", () => {
     expect(content.querySelector("h2")).toHaveTextContent("Sección");
     expect(content.querySelector("h3")).toHaveTextContent("Subsección");
 
-    // Paragraph + highlight mark (palette class, never inline style/hex).
+    // Paragraph + highlight mark (H7: the marker-pen hook and the palette
+    // name, never inline style/hex).
     const mark = content.querySelector("mark");
     expect(mark).toHaveTextContent("resaltado");
-    expect(mark?.className).toContain("bg-pastel-pink");
+    expect(mark?.className).toContain("cogni-highlighter");
+    expect(mark).toHaveAttribute("data-color", "pink");
 
     // Lists.
     expect(

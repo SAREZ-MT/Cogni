@@ -30,6 +30,25 @@ export const PALETTE_COLORS = [
 ] as const;
 export type PaletteColor = (typeof PALETTE_COLORS)[number];
 
+// H7 (editor polish round 2): the textStyle `fontFamily` / `fontSize`
+// values the editor's "Texto" menu writes. Families are CSS font stacks
+// (globals.css maps Inter, Bitter and JetBrains Mono to the self-hosted
+// next/font faces); sizes are the non-default steps (Normal = no size).
+// Imported content may carry other values within the textStyle checks.
+export const EDITOR_FONT_FAMILIES = [
+  "Inter, sans-serif",
+  "Bitter, serif",
+  "JetBrains Mono, monospace",
+  "Arial, Helvetica, sans-serif",
+  "Times New Roman, Times, serif",
+  "Georgia, serif",
+  "Verdana, Geneva, sans-serif",
+] as const;
+export type EditorFontFamily = (typeof EDITOR_FONT_FAMILIES)[number];
+
+export const EDITOR_FONT_SIZES = ["14px", "18px", "22px", "28px"] as const;
+export type EditorFontSize = (typeof EDITOR_FONT_SIZES)[number];
+
 export const TEXT_ALIGNS = ["left", "center", "right", "justify"] as const;
 export type TextAlign = (typeof TEXT_ALIGNS)[number];
 

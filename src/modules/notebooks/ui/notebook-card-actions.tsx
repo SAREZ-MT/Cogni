@@ -42,9 +42,8 @@ interface NotebookCardActionsProps {
   className?: string;
 }
 
-// "Acciones de {título}" kebab, reused by the /notebooks grid and list
-// screens and by Home's "Mis cuadernos" grid (notebook-card.tsx,
-// notebook-list-row.tsx): rename, change appearance and archive reuse the
+// "Acciones de {título}" kebab, reused by the /notebooks cover grid
+// (notebook-cover-card.tsx): rename, change appearance and archive reuse the
 // exact same Server Actions and ArchiveConfirmDialog the sidebar tree's
 // NotebookItem already used (design pass 2, "reuse the existing
 // components/actions ... rather than rewriting logic"). These screens are
@@ -147,8 +146,8 @@ export function NotebookCardActions({
             aria-label={`Acciones de ${notebook.title}`}
             className={className}
             onClick={(event) => {
-              // notebook-card.tsx/notebook-list-row.tsx render this inside a
-              // Link wrapping the whole card: stop the click from also
+              // notebook-cover-card.tsx renders this over a link that covers
+              // the whole card: stop the click from also
               // triggering navigation.
               event.preventDefault();
               event.stopPropagation();

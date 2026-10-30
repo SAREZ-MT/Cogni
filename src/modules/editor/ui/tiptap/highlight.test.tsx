@@ -36,7 +36,11 @@ describe("CogniHighlight", () => {
     }
   });
 
-  it("renders the purple/purple-fg design tokens, never a hex value", () => {
+  // H7 (editor polish round 2): a marker-pen look painted from the
+  // highlighter tokens in globals.css (`.editor-content
+  // mark.cogni-highlighter[data-color=…]`); the text keeps the ink colour,
+  // so the mark carries no pastel utility classes any more.
+  it("renders the highlighter marker hook for the colour, never a hex value", () => {
     const editor = createHeadlessEditor();
     // See the destroy() note above: must run on every path.
     try {
@@ -44,8 +48,10 @@ describe("CogniHighlight", () => {
       editor.commands.setHighlight({ color: "purple" });
 
       const html = editor.getHTML();
-      expect(html).toContain("bg-pastel-purple");
-      expect(html).toContain("text-pastel-purple-fg");
+      expect(html).toContain('data-color="purple"');
+      expect(html).toContain('class="cogni-highlighter"');
+      expect(html).not.toContain("bg-pastel");
+      expect(html).not.toContain("text-pastel");
       expect(html).not.toMatch(/#[0-9a-f]{3,6}/i);
     } finally {
       editor.destroy();

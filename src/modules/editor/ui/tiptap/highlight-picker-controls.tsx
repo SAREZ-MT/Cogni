@@ -10,10 +10,11 @@
 import type { Editor } from "@tiptap/core";
 import { focusEditorView } from "./focus-editor-view";
 import { HIGHLIGHT_PALETTE, type HighlightColor } from "./highlight-palette";
+import { applyHighlight } from "./quick-highlight";
 
 // Spanish labels for the seven Cogni palette colors (design.md, "Paleta de
 // resaltado de Cogni"; specs/editor/spec.md never asks for English names).
-const PALETTE_LABELS: Record<HighlightColor, string> = {
+export const PALETTE_LABELS: Record<HighlightColor, string> = {
   pink: "rosa",
   green: "verde",
   yellow: "amarillo",
@@ -24,13 +25,13 @@ const PALETTE_LABELS: Record<HighlightColor, string> = {
 };
 
 const SWATCH_CLASSES: Record<HighlightColor, string> = {
-  pink: "bg-pastel-pink",
-  green: "bg-pastel-green",
-  yellow: "bg-pastel-yellow",
-  purple: "bg-pastel-purple",
-  orange: "bg-pastel-orange",
-  blue: "bg-pastel-blue",
-  mint: "bg-pastel-mint",
+  pink: "border bg-highlighter-pink border-highlighter-pink-edge",
+  green: "border bg-highlighter-green border-highlighter-green-edge",
+  yellow: "border bg-highlighter-yellow border-highlighter-yellow-edge",
+  purple: "border bg-highlighter-purple border-highlighter-purple-edge",
+  orange: "border bg-highlighter-orange border-highlighter-orange-edge",
+  blue: "border bg-highlighter-blue border-highlighter-blue-edge",
+  mint: "border bg-highlighter-mint border-highlighter-mint-edge",
 };
 
 export interface HighlightPickerControlsProps {
@@ -45,7 +46,7 @@ export function HighlightPickerControls({
       role="toolbar"
       aria-label="Resaltado"
       data-testid="highlight-picker"
-      className="flex items-center gap-1 rounded-xl border border-border-default bg-card p-1 shadow-md"
+      className="editor-surface flex items-center gap-1 border border-border-default bg-card p-1 shadow-md"
     >
       {HIGHLIGHT_PALETTE.map((color) => (
         <button
@@ -55,7 +56,8 @@ export function HighlightPickerControls({
           data-testid={`highlight-swatch-${color}`}
           className={`size-6 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring ${SWATCH_CLASSES[color]}`}
           onClick={() => {
-            editor.chain().setHighlight({ color }).run();
+            // H6-E6: also becomes the toolbar highlighter's one-click colour.
+            applyHighlight(editor, color);
             focusEditorView(editor);
           }}
         />

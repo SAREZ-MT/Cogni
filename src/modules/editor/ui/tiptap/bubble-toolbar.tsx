@@ -39,6 +39,7 @@ import {
 } from "lucide-react";
 import {
   type KeyboardEvent,
+  type PointerEvent,
   type ReactElement,
   useEffect,
   useRef,
@@ -65,7 +66,9 @@ import {
 import { BLOCK_KIND_ITEMS, currentBlockKindLabel } from "./block-kind";
 import { focusEditorView } from "./focus-editor-view";
 import { HighlightPickerControls } from "./highlight-picker-controls";
+import { QuickHighlighter } from "./quick-highlighter";
 import { isTableCellSelection } from "./table-selection";
+import { TextStyleMenu } from "./text-style-menu";
 
 export interface BubbleToolbarProps {
   editor: Editor;
@@ -278,6 +281,18 @@ function ToolbarButton({
   );
 }
 
+// H7: the BubbleMenu keeps itself open across the editor's blur only when
+// it saw a `mousedown` on its own element first. A Radix dropdown trigger
+// ("Convertir en", "Texto", "Alineación") cancels its `pointerdown`, which
+// suppresses that compatibility `mousedown`, so the menu's focus move blurred
+// the editor, the toolbar was removed and the dropdown lost its anchor on
+// the first click. Re-dispatching the `mousedown` restores that signal.
+function keepBubbleMenuOnPointerDown(event: PointerEvent<HTMLDivElement>) {
+  event.currentTarget.dispatchEvent(
+    new MouseEvent("mousedown", { bubbles: true }),
+  );
+}
+
 export interface BubbleToolbarControlsProps {
   editor: Editor;
 }
@@ -386,7 +401,8 @@ export function BubbleToolbarControls({ editor }: BubbleToolbarControlsProps) {
         role="toolbar"
         aria-label="Formato de texto"
         data-testid="bubble-toolbar"
-        className="flex items-center gap-0.5 rounded-lg border border-border-default bg-card p-1 shadow-md"
+        className="editor-surface flex items-center gap-0.5 border border-border-default bg-card p-1 shadow-md"
+        onPointerDownCapture={keepBubbleMenuOnPointerDown}
       >
         {/* E2 scope B: "Convertir en" — same catalogue and commands as
             block-context-menu.tsx's own submenu, applied to whatever block
@@ -405,7 +421,7 @@ export function BubbleToolbarControls({ editor }: BubbleToolbarControlsProps) {
           </DropdownMenuTrigger>
           <DropdownMenuContent
             align="start"
-            className="min-w-48 rounded-xl p-1"
+            className="editor-surface min-w-48 p-1"
           >
             {BLOCK_KIND_ITEMS.map((kind) => (
               <DropdownMenuItem
@@ -422,6 +438,12 @@ export function BubbleToolbarControls({ editor }: BubbleToolbarControlsProps) {
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
+
+        {/* H7: "Texto" — font family and size of the selection. */}
+        <TextStyleMenu
+          editor={editor}
+          triggerClassName={`${BUTTON_CLASS} w-auto gap-1 px-1.5 text-fg-secondary hover:bg-hover`}
+        />
 
         <ToolbarSeparator />
 
@@ -478,6 +500,9 @@ export function BubbleToolbarControls({ editor }: BubbleToolbarControlsProps) {
 
         <ToolbarSeparator />
 
+        {/* H6-E6: one-click highlighter with the last colour used. */}
+        <QuickHighlighter editor={editor} />
+
         {/* E2 scope B: one popover, two swatch rows — "Texto" (inline
             Color/TextStyle mark, block-color-palette.ts) and
             "Fondo/Resaltado" (the existing CogniHighlight mark, unchanged
@@ -495,7 +520,10 @@ export function BubbleToolbarControls({ editor }: BubbleToolbarControlsProps) {
               <Baseline aria-hidden="true" size={16} strokeWidth={1.75} />
             </button>
           </PopoverTrigger>
-          <PopoverContent align="start" className="w-auto gap-2 p-2">
+          <PopoverContent
+            align="start"
+            className="editor-surface w-auto gap-2 p-2"
+          >
             <p className="px-0.5 text-fg-muted text-xs font-medium">Texto</p>
             <div className="flex flex-wrap gap-1 px-0.5">
               {TEXT_COLOR_SWATCHES.map((swatch) => (
@@ -546,7 +574,7 @@ export function BubbleToolbarControls({ editor }: BubbleToolbarControlsProps) {
           </DropdownMenuTrigger>
           <DropdownMenuContent
             align="start"
-            className="min-w-40 rounded-xl p-1"
+            className="editor-surface min-w-40 p-1"
           >
             {ALIGN_OPTIONS.map((option) => (
               <DropdownMenuItem
@@ -678,7 +706,7 @@ export function LinkPopover({ editor }: LinkPopoverProps) {
       role="dialog"
       aria-label="Enlace"
       data-testid="link-popover"
-      className="border-border-default bg-card flex items-center gap-1 rounded-lg border p-1.5 shadow-md"
+      className="editor-surface border-border-default bg-card flex items-center gap-1 border p-1.5 shadow-md"
     >
       {editing ? (
         <input

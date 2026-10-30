@@ -59,6 +59,46 @@
   --color-pastel-blue-fg: #1e40af;
   --color-pastel-mint: #d1fae5;
   --color-pastel-mint-fg: #065f46;
+  /* H7 follow-up (user reference highlight-ref.png): soft pastel fills
+     for the editor's highlight mark, ink text on top (≥ 12:1), and a
+     mid "-edge" step of the same hue for the picker's swatch borders.
+     Same seven names as the pastel palette (the content catalogue's), so
+     stored colours are unchanged; orange and mint still render although
+     the picker offers the reference's five. */
+  --color-highlighter-yellow: #fdf3b0;
+  --color-highlighter-yellow-edge: #e6d36a;
+  --color-highlighter-green: #d4f4df;
+  --color-highlighter-green-edge: #9fd9b3;
+  --color-highlighter-blue: #d8e7fb;
+  --color-highlighter-blue-edge: #a6c5ec;
+  --color-highlighter-pink: #fbdde1;
+  --color-highlighter-pink-edge: #eeb1ba;
+  --color-highlighter-orange: #fde3cf;
+  --color-highlighter-orange-edge: #efbd94;
+  --color-highlighter-purple: #e9e1fb;
+  --color-highlighter-purple-edge: #c8b7ef;
+  --color-highlighter-mint: #cff3e4;
+  --color-highlighter-mint-edge: #95d9bd;
+  /* H7 follow-up (user reference callout-ref.png, light theme): editor
+     callouts keep the landing band hues (idea yellow, note violet, warning
+     rose) as a light tint, a mid "-edge" border, a strong "-icon" step for
+     the outlined icon (≥ 3:1) and a deep "-fg" step for the text (≥ 7:1 on
+     the tint). */
+  --color-callout-idea: #fefae6;
+  --color-callout-idea-edge: #f1d77a;
+  --color-callout-idea-icon: #b7791f;
+  --color-callout-idea-fg: #6b3d0e;
+  --color-callout-note: #f6f3ff;
+  --color-callout-note-edge: #d3c6fb;
+  --color-callout-note-icon: #7c3aed;
+  --color-callout-note-fg: #4c1d95;
+  --color-callout-warning: #fff3f4;
+  --color-callout-warning-edge: #f7bcc6;
+  --color-callout-warning-icon: #e11d48;
+  --color-callout-warning-fg: #881337;
+  /* H7: a neutral grey for code blocks (the warm --muted read yellowish
+     behind code). */
+  --color-code-block: #f3f3f3;
   /* Technique accents (Phase 8 H3, user decisions 2026-10-19): soft but
      visible pastels for the calendar's technique bars, dots and progress
      fills (pastel yellow, not amber); Examen a solid, vivid red. Fills
@@ -131,6 +171,13 @@
   --leading-normal: 1.5;
 
   /* Radii */
+  /* H6-E3: the editor's square, professional corners (surfaces, menus,
+     callouts, code, tables, images, chips). */
+  --radius-editor: 3px;
+  /* H7: tables keep their own, softer frame (moderate, never round). */
+  --radius-table: 8px;
+  /* H7 follow-up: callouts are rounded too, after the user's reference. */
+  --radius-callout: 14px;
   --radius-sm: 6px;
   --radius-md: 8px;
   --radius-input: 10px;
@@ -282,26 +329,33 @@
     white-space: pre-wrap;
   }
 
+  /* H7 (editor polish round 2): three clearly separate heading rungs —
+     size, weight, tracking and the space above each step down together,
+     so H1/H2/H3 never read as the same style at different sizes. More
+     room above a heading than below it ties it to its section. */
   .editor-content h1 {
-    font-size: var(--text-3xl);
+    font-size: 2rem;
     font-weight: 700;
-    line-height: var(--leading-tight);
-    margin-top: 1.5rem;
-    margin-bottom: 0.75rem;
+    line-height: 1.15;
+    letter-spacing: -0.03em;
+    margin-top: 2.25rem;
+    margin-bottom: 0.5rem;
   }
   .editor-content h2 {
     font-size: var(--text-2xl);
-    font-weight: 600;
-    line-height: var(--leading-tight);
-    margin-top: 1.25rem;
-    margin-bottom: 0.5rem;
+    font-weight: 650;
+    line-height: 1.25;
+    letter-spacing: -0.02em;
+    margin-top: 1.75rem;
+    margin-bottom: 0.375rem;
   }
   .editor-content h3 {
-    font-size: var(--text-xl);
+    font-size: 1.1875rem;
     font-weight: 600;
     line-height: var(--leading-snug);
-    margin-top: 1rem;
-    margin-bottom: 0.5rem;
+    letter-spacing: -0.01em;
+    margin-top: 1.375rem;
+    margin-bottom: 0.25rem;
   }
   /* document-import T11b: imported documents (DOCX/PPTX) carry heading
      levels 4–6 too. They continue the h1–h3 scale downwards — always
@@ -313,14 +367,14 @@
     font-weight: 600;
     line-height: var(--leading-snug);
     margin-top: 1rem;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.125rem;
   }
   .editor-content h5 {
     font-size: var(--text-base);
     font-weight: 600;
     line-height: var(--leading-snug);
     margin-top: 0.875rem;
-    margin-bottom: 0.375rem;
+    margin-bottom: 0.125rem;
   }
   .editor-content h6 {
     font-size: var(--text-sm);
@@ -328,7 +382,7 @@
     line-height: var(--leading-snug);
     color: var(--color-fg-secondary);
     margin-top: 0.75rem;
-    margin-bottom: 0.375rem;
+    margin-bottom: 0.125rem;
   }
   .editor-content h1:first-child,
   .editor-content h2:first-child,
@@ -339,16 +393,22 @@
     margin-top: 0;
   }
 
+  /* H6-E2 (Notion density): blocks sit tight — 1.5 line height and 2px of
+     padding above and below each text block, so neighbours are ~4px apart
+     instead of a paragraph gap. Headings carry the breathing room above
+     them instead (see h1–h6). Padding, not margin, so the caret's hit area
+     covers the gap and adjacent blocks never collapse margins. */
   .editor-content p {
     font-size: var(--text-base);
     line-height: var(--leading-normal);
-    margin-bottom: 0.75rem;
+    margin: 0;
+    padding-block: 2px;
   }
 
   .editor-content ul,
   .editor-content ol {
-    margin-bottom: 0.75rem;
-    padding-left: 1.5rem;
+    margin-block: 0;
+    padding-left: 1.625rem;
   }
   .editor-content ul {
     list-style-type: disc;
@@ -357,15 +417,14 @@
     list-style-type: decimal;
   }
   .editor-content li {
-    margin-bottom: 0.25rem;
+    margin: 0;
   }
   .editor-content li::marker {
     color: var(--color-fg-secondary);
   }
   .editor-content li > ul,
   .editor-content li > ol {
-    margin-top: 0.25rem;
-    margin-bottom: 0;
+    margin-block: 0;
   }
 
   /* @tiptap/extension-task-list / -task-item render
@@ -381,9 +440,15 @@
     align-items: flex-start;
     gap: 0.5rem;
   }
+  /* The checkbox (16px) is centred on the first 24px line, below its
+     2px block padding. */
   .editor-content ul[data-type="taskList"] li > label {
-    margin-top: 0.2rem;
+    margin-top: 6px;
     user-select: none;
+  }
+  .editor-content ul[data-type="taskList"] li > div {
+    flex: 1;
+    min-width: 0;
   }
   .editor-content ul[data-type="taskList"] input[type="checkbox"] {
     accent-color: var(--color-primary-600);
@@ -395,24 +460,25 @@
     text-decoration: line-through;
   }
 
+  /* H6-E2: Notion's quote — a thick ink bar and normal, upright ink text. */
   .editor-content blockquote {
-    border-left: 3px solid var(--color-border-default);
-    padding-left: 1rem;
-    margin-bottom: 0.75rem;
-    color: var(--color-fg-secondary);
-    font-style: italic;
+    border-left: 3px solid var(--color-fg);
+    padding-left: 0.875rem;
+    margin-block: 4px;
+    color: var(--color-fg);
+    font-style: normal;
   }
 
   .editor-content hr {
     border: none;
     border-top: 1px solid var(--color-border-default);
-    margin: 1.5rem 0;
+    margin: 0.75rem 0;
   }
 
   .editor-content img {
     display: block;
     max-width: 100%;
-    border-radius: var(--radius-2xl);
+    border-radius: var(--radius-editor);
   }
 
   /* E2b scope D (image node polish): the rendered image node wraps its
@@ -432,7 +498,7 @@
      above. `-mx-2` compensates the `px-2` so the tint's left/right edges
      still line up with the untinted text either side of it. */
   .editor-content [data-node-background] {
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-editor);
     margin-inline: -0.5rem;
     padding-inline: 0.5rem;
     padding-block: 0.125rem;
@@ -444,13 +510,90 @@
     font-family: var(--font-mono);
     font-size: var(--text-sm);
     background-color: var(--color-muted);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-editor);
     padding: 0.125rem 0.375rem;
   }
 
+  /* H7 follow-up: inside a callout, inline code is a subtle chip of the
+     callout's own deep hue, and bold keeps that hue. */
+  .editor-content .callout :not(pre) > code {
+    background-color: color-mix(in oklch, currentColor 9%, transparent);
+    color: inherit;
+  }
+  .editor-content .callout strong {
+    color: inherit;
+  }
+
+  /* H7 (editor polish round 2): the highlight mark is a marker-pen stroke
+     instead of a flat box. A left-to-right ink gradient (light where the
+     pen lands, saturated through the middle, fading where it lifts), uneven
+     corner radii for the irregular edges, and a band over the full text
+     height. Negative inline margins let the stroke overrun the words
+     slightly without moving the text; `box-decoration-break: clone` paints
+     every line of a wrapped highlight as its own stroke. Ink text stays.
+     H7 follow-up: pastel fills and full height, per the user's reference. */
   .editor-content mark {
-    border-radius: var(--radius-sm);
-    padding: 0 0.15em;
+    --highlighter: var(--color-highlighter-yellow);
+    color: inherit;
+    background-color: transparent;
+    background-image: linear-gradient(
+      100deg,
+      color-mix(in oklch, var(--highlighter) 35%, transparent) 0%,
+      color-mix(in oklch, var(--highlighter) 90%, transparent) 6%,
+      var(--highlighter) 45%,
+      color-mix(in oklch, var(--highlighter) 80%, transparent) 94%,
+      color-mix(in oklch, var(--highlighter) 45%, transparent) 100%
+    );
+    background-repeat: no-repeat;
+    background-size: 100% 100%;
+    background-position: 0 0;
+    border-radius: 0.7em 0.25em 0.6em 0.3em / 0.35em 0.6em 0.3em 0.55em;
+    margin-inline: -0.12em;
+    padding-inline: 0.22em;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+  }
+  .editor-content mark[data-color="yellow"] {
+    --highlighter: var(--color-highlighter-yellow);
+  }
+  .editor-content mark[data-color="green"] {
+    --highlighter: var(--color-highlighter-green);
+  }
+  .editor-content mark[data-color="blue"] {
+    --highlighter: var(--color-highlighter-blue);
+  }
+  .editor-content mark[data-color="pink"] {
+    --highlighter: var(--color-highlighter-pink);
+  }
+  .editor-content mark[data-color="orange"] {
+    --highlighter: var(--color-highlighter-orange);
+  }
+  .editor-content mark[data-color="purple"] {
+    --highlighter: var(--color-highlighter-purple);
+  }
+  .editor-content mark[data-color="mint"] {
+    --highlighter: var(--color-highlighter-mint);
+  }
+
+  /* H7: the "Texto" menu stores plain font stacks ("Bitter, serif"); the
+     faces the app self-hosts through next/font have hashed family names, so
+     these rules point the stored stack at them. `!important` beats the
+     mark's inline style; the system stacks (Arial, Georgia…) need no rule.
+     `.editor-font-preview` is the menu item that previews each face. */
+  .editor-content [style*="font-family: Inter"],
+  .editor-font-preview[style*="font-family: Inter"] {
+    /* biome-ignore lint/complexity/noImportantStyles: must beat the mark's inline style */
+    font-family: var(--font-inter), Inter, sans-serif !important;
+  }
+  .editor-content [style*="font-family: Bitter"],
+  .editor-font-preview[style*="font-family: Bitter"] {
+    /* biome-ignore lint/complexity/noImportantStyles: must beat the mark's inline style */
+    font-family: var(--font-bitter), Bitter, Georgia, serif !important;
+  }
+  .editor-content [style*="font-family: JetBrains Mono"],
+  .editor-font-preview[style*="font-family: JetBrains Mono"] {
+    /* biome-ignore lint/complexity/noImportantStyles: must beat the mark's inline style */
+    font-family: var(--font-mono) !important;
   }
 
   .editor-content a {
@@ -489,7 +632,7 @@
   .editor-content .ProseMirror-selectednode,
   .editor-content .ProseMirror-selectednoderange {
     background-color: var(--color-active);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-editor);
     outline: none;
   }
 
@@ -522,6 +665,19 @@
   .editor-content [data-type="block-math"] .katex-display {
     margin: 0;
   }
+  /* H7: formulas are editable — a click (or Enter when selected) opens the
+     LaTeX input (math-editor.tsx), so they show a hover affordance. */
+  .editor-content .tiptap-mathematics-render--editable {
+    cursor: pointer;
+    border-radius: var(--radius-editor);
+    transition: background-color 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .editor-content .tiptap-mathematics-render--editable:hover {
+    background-color: var(--color-code-block);
+  }
+  .editor-content [data-type="block-math"].tiptap-mathematics-render--editable {
+    padding-block: 0.25rem;
+  }
 
   .editor-content span[data-type="emoji"] img {
     display: inline-block;
@@ -531,7 +687,7 @@
   }
 
   .editor-content [data-type="mention"] {
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-editor);
     padding: 0 0.25rem;
     background-color: var(--color-active);
     color: var(--color-fg-active);
@@ -552,7 +708,7 @@
   .editor-content [data-type="details"] {
     display: flex;
     gap: 0.25rem;
-    margin-bottom: 0.75rem;
+    margin-block: 2px;
   }
 
   .editor-content [data-type="details"] > button {
@@ -562,7 +718,7 @@
     flex-shrink: 0;
     width: 1.5rem;
     height: 1.75rem;
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-editor);
     color: var(--color-fg-muted);
     cursor: pointer;
   }
@@ -595,7 +751,7 @@
   }
 
   .editor-content [data-type="detailsContent"] {
-    margin-top: 0.25rem;
+    margin-top: 0;
   }
 
   /* document-import T3: YouTube embeds (extensions/youtube.ts). The iframe
@@ -610,7 +766,7 @@
     height: auto;
     aspect-ratio: 16 / 9;
     border: 0;
-    border-radius: var(--radius-2xl);
+    border-radius: var(--radius-editor);
     background-color: var(--color-neutral-100);
   }
 
@@ -625,28 +781,69 @@
      `resizable: false` (no drag affordance to show). */
   .editor-content .tableWrapper {
     overflow-x: auto;
-    margin: 12px 0;
+    margin: 8px 0;
   }
 
+  /* H7 (editor polish round 2): a softer table frame — an 8px outer
+     radius (`--radius-table`, the rest of the editor stays square), inner
+     hairlines only between cells, a quiet header row and roomier cells.
+     `border-collapse: separate` lets the corner cells carry the radius so
+     the header tint is clipped to the frame. Numbers line up: tabular
+     figures everywhere, and cells holding only a number (the `is-numeric`
+     decoration, extensions/table.ts) align right. */
   .editor-content table {
-    border-collapse: collapse;
+    border-collapse: separate;
+    border-spacing: 0;
     width: 100%;
     table-layout: fixed;
+    border: 1px solid var(--color-border-default);
+    border-radius: var(--radius-table);
+    font-variant-numeric: tabular-nums;
   }
 
   .editor-content th,
   .editor-content td {
-    border: 1px solid var(--color-border-default);
-    padding: 6px 10px;
+    border: 0;
+    border-right: 1px solid var(--color-border-default);
+    border-bottom: 1px solid var(--color-border-default);
+    padding: 6px 12px;
     min-width: 100px;
     vertical-align: top;
     position: relative;
   }
+  .editor-content tr > :last-child {
+    border-right: 0;
+  }
+  .editor-content tr:last-child > * {
+    border-bottom: 0;
+  }
+  .editor-content tr:first-child > :first-child {
+    border-top-left-radius: calc(var(--radius-table) - 1px);
+  }
+  .editor-content tr:first-child > :last-child {
+    border-top-right-radius: calc(var(--radius-table) - 1px);
+  }
+  .editor-content tr:last-child > :first-child {
+    border-bottom-left-radius: calc(var(--radius-table) - 1px);
+  }
+  .editor-content tr:last-child > :last-child {
+    border-bottom-right-radius: calc(var(--radius-table) - 1px);
+  }
 
   .editor-content th {
     background-color: var(--color-neutral-50);
+    color: var(--color-fg-secondary);
+    font-size: var(--text-sm);
     font-weight: 600;
     text-align: left;
+  }
+  .editor-content th p {
+    font-size: inherit;
+  }
+
+  .editor-content td.is-numeric,
+  .editor-content th.is-numeric {
+    text-align: right;
   }
 
   /* @tiptap/extension-table's own `.selectedCell` marker class (a cell/
@@ -671,6 +868,21 @@
   .editor-content .column-resize-handle {
     display: none;
   }
+}
+
+/* H6-E3 (odd/tasks/phase-8-design-flows.md): the editor's floating
+   surfaces — bubble and table toolbars, slash menu, block context menu,
+   colour and highlighter popovers, link popover, code-language menu — use
+   square, professional corners. They are built from shared atoms
+   (src/shared/ui DropdownMenuContent, PopoverContent) whose own rounded-xl
+   stays the app-wide default; the editor opts in with `editor-surface` on
+   each surface instead of changing the atoms. Unlayered on purpose: it
+   beats the atoms' Tailwind utilities (which live in a layer) without
+   `!important`. Inner rounded controls (buttons, menu items) follow; full
+   circles (`rounded-full` colour dots) stay round. */
+.editor-surface,
+.editor-surface [class*="rounded-"]:not([class*="rounded-full"]) {
+  border-radius: var(--radius-editor);
 }
 
 /* Violet glows for the public auth brand panel. */

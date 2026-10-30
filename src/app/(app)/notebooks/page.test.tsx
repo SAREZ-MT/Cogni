@@ -23,23 +23,22 @@ vi.mock("@/modules/notebooks", () => ({
     </button>
   ),
   getHomeOverview,
+  NotebookCardActions: ({ notebook }: { notebook: { title: string } }) => (
+    <button type="button">{`Acciones de ${notebook.title}`}</button>
+  ),
 }));
 
 vi.mock("../_components/breadcrumb", () => ({ SetBreadcrumb: () => null }));
-vi.mock("../_components/notebook-card", () => ({
-  NotebookCard: ({ notebook }: { notebook: { title: string } }) => (
-    <article>{notebook.title}</article>
-  ),
-}));
-vi.mock("../_components/notebook-list-row", () => ({
-  NotebookListRow: () => null,
-}));
-vi.mock("@/shared/ui/view-toggle", () => ({ ViewToggle: () => null }));
 
 import NotebooksPage from "./page";
 
-async function renderRoute() {
-  const ui = await NotebooksPage({ searchParams: Promise.resolve({}) });
+// Next.js still hands every page its `searchParams`; the hub reads none of
+// them since H4-T6, so the route is called the way Next calls it.
+async function renderRoute(searchParams: Record<string, string> = {}) {
+  const route = NotebooksPage as (props: {
+    searchParams: Promise<Record<string, string>>;
+  }) => Promise<unknown>;
+  const ui = await route({ searchParams: Promise.resolve(searchParams) });
   return render(ui as React.ReactElement);
 }
 
@@ -120,6 +119,31 @@ describe("notebooks hub route", () => {
     expect(creates[0]).toHaveAttribute("data-variant", "tile");
   });
 
+  // Phase 8 H5-T2 (user 2026-10-29): the create tile is the grid's first
+  // item, so many notebooks never push it down.
+  it("puts the create tile first in the grid, before every notebook cover", async () => {
+    getHomeOverview.mockResolvedValue({
+      notebooks: Array.from({ length: 6 }, (_, index) => ({
+        id: `nb${index}`,
+        title: `Cuaderno ${index}`,
+        color: null,
+        icon: null,
+        pageCount: 0,
+        updatedAt: new Date("2026-10-01T00:00:00.000Z"),
+      })),
+    });
+    await renderRoute();
+
+    const create = screen.getByRole("button", { name: "Nuevo cuaderno" });
+    const firstCover = screen.getAllByRole("article")[0];
+    const grid = firstCover.parentElement as HTMLElement;
+    expect(grid.firstElementChild?.contains(create)).toBe(true);
+    expect(
+      create.compareDocumentPosition(firstCover) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
   it("shows the illustrated empty state with its steps and the create CTA", async () => {
     const { container } = await renderRoute();
 
@@ -188,5 +212,93 @@ describe("notebooks hub route", () => {
     expect(
       container.querySelector('[data-slot="illustrated-empty-state"]'),
     ).toBeNull();
+  });
+
+  // Phase 8 H4-T5 (user request 2026-10-28): the grid shows each notebook
+  // as the empty state's closed notebook, not a flat card.
+  it("presents each notebook in the grid as a notebook cover", async () => {
+    getHomeOverview.mockResolvedValue({
+      notebooks: [
+        {
+          id: "nb1",
+          title: "Biología",
+          color: "green",
+          icon: "🧬",
+          pageCount: 1,
+          updatedAt: new Date("2026-10-01T00:00:00.000Z"),
+        },
+        {
+          id: "nb2",
+          title: "Cálculo",
+          color: null,
+          icon: null,
+          pageCount: 4,
+          updatedAt: new Date("2026-10-01T00:00:00.000Z"),
+        },
+      ],
+    });
+    const { container } = await renderRoute();
+
+    const cards = container.querySelectorAll(
+      '[data-slot="notebook-cover-card"]',
+    );
+    expect(cards).toHaveLength(2);
+    // User 2026-10-28 ("5 por fila"): columns follow the grid's own width
+    // and cap at five, so wide screens grow the covers instead of adding
+    // columns.
+    const grid = cards[0]?.parentElement as HTMLElement;
+    expect(grid).toHaveClass(
+      "grid-cols-1",
+      "@[300px]/grid:grid-cols-2",
+      "@[540px]/grid:grid-cols-3",
+      "@[680px]/grid:grid-cols-4",
+      "@[960px]/grid:grid-cols-5",
+    );
+    expect(grid.className).not.toMatch(/auto-fill/);
+    expect(grid.parentElement).toHaveClass("@container/grid");
+    const [biology, calculus] = Array.from(cards) as HTMLElement[];
+    expect(biology).toHaveAttribute("data-tone", "green");
+    expect(calculus).toHaveAttribute("data-tone", "purple");
+    expect(
+      within(biology).getByRole("link", { name: "Biología" }),
+    ).toHaveAttribute("href", "/notebooks/nb1");
+    expect(within(biology).getByText("1 página")).toBeInTheDocument();
+    // User correction 2026-10-28: no notebook icon on the cover.
+    expect(within(biology).queryByText("🧬")).toBeNull();
+    expect(within(calculus).getByText("4 páginas")).toBeInTheDocument();
+    expect(
+      within(calculus).getByRole("button", { name: "Acciones de Cálculo" }),
+    ).toBeInTheDocument();
+  });
+
+  // Phase 8 H4-T6 (user decision 2026-10-29): the hub drops the grid/list
+  // option and keeps only the cover grid; an old `?view=list` URL simply
+  // renders the grid.
+  it.each([
+    [{}],
+    [{ view: "list" }],
+    [{ view: "grid" }],
+  ])("renders no view toggle and the cover grid for %o", async (params) => {
+    getHomeOverview.mockResolvedValue({
+      notebooks: [
+        {
+          id: "nb1",
+          title: "Biología",
+          color: "green",
+          icon: null,
+          pageCount: 1,
+          updatedAt: new Date("2026-10-01T00:00:00.000Z"),
+        },
+      ],
+    });
+    const { container } = await renderRoute(params);
+
+    expect(
+      screen.queryByRole("link", { name: "Ver como cuadrícula" }),
+    ).toBeNull();
+    expect(screen.queryByRole("link", { name: "Ver como lista" })).toBeNull();
+    expect(
+      container.querySelectorAll('[data-slot="notebook-cover-card"]'),
+    ).toHaveLength(1);
   });
 });
