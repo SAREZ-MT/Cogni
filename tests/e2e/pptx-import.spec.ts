@@ -46,8 +46,14 @@ function editableOf(page: Page): Locator {
 }
 
 // The checks that must hold both right after the import and after a fresh
-// load of the page.
-async function expectStructure(editable: Locator) {
+// load of the page. The import closes every notes block; the editor keeps
+// a block the reader opened open after a save (`persist: true`,
+// modules/editor/ui/tiptap/extensions/details.ts), so the reload expects
+// the first one open.
+async function expectStructure(
+  editable: Locator,
+  { firstNotesOpen = false }: { firstNotesOpen?: boolean } = {},
+) {
   // One level-2 heading per slide, in deck order.
   await expect(editable.locator("h2")).toHaveText([
     "Slide 1 title",
@@ -102,16 +108,27 @@ async function expectStructure(editable: Locator) {
   await expect(editable.getByText(", evil", { exact: false })).toBeVisible();
   await expect(editable.locator('a[href^="javascript:" i]')).toHaveCount(0);
 
-  // Speaker notes: one closed "Notas del orador" block per slide; the
-  // slide number of the notes page is not imported.
+  // Speaker notes: one "Notas del orador" block per slide, imported
+  // closed; the slide number of the notes page is not imported.
   const notes = editable.locator('[data-type="details"]');
   await expect(notes).toHaveCount(5);
   await expect(notes.locator("summary")).toHaveText(
     Array.from({ length: 5 }, () => "Notas del orador"),
   );
-  await expect(notes.first()).not.toHaveClass(/is-open/);
+  if (firstNotesOpen) {
+    await expect(notes.first()).toHaveClass(/is-open/);
+    await expect(
+      notes.first().locator('[data-type="detailsContent"]'),
+    ).toHaveText("Speaker notes for slide 1.");
+  } else {
+    await expect(notes.first()).not.toHaveClass(/is-open/);
+    await expect(
+      notes.first().locator('[data-type="detailsContent"]'),
+    ).toBeHidden();
+  }
+  await expect(notes.nth(1)).not.toHaveClass(/is-open/);
   await expect(
-    notes.first().locator('[data-type="detailsContent"]'),
+    notes.nth(1).locator('[data-type="detailsContent"]'),
   ).toBeHidden();
 }
 
@@ -151,9 +168,15 @@ test.describe("pptx import acceptance", () => {
     await expect(content).toHaveText("Speaker notes for slide 1.");
     await expect(editable.getByText(/^1$/)).toHaveCount(0);
 
+    // Opening a block is a document change the editor saves; waiting for
+    // that save keeps the reload from racing the flush on leave.
+    await expect(page.getByTestId("autosave-status")).toHaveText("guardado", {
+      timeout: 10_000,
+    });
+
     // A fresh full load proves the content was persisted, not just shown.
     await page.goto(new URL(page.url()).pathname);
-    await expectStructure(editableOf(page));
+    await expectStructure(editableOf(page), { firstNotesOpen: true });
   });
 
   test("a corrupt PowerPoint deck fails cleanly and leaves a usable empty page", async ({
