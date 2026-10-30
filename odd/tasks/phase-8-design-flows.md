@@ -812,3 +812,26 @@ Also records s12 R3-unrun-e2e: the full e2e suite ran in V (129/133 first run; t
 
 - Checks (2026-10-29): `pnpm typecheck` clean; `pnpm exec biome ci .` clean (1549 files); `pnpm depcruise` no violations (1574 modules); vitest 5407/5407 (563 files); db `exam-edits` 3/3, `recall-edits` + recall contract + uow 43/43, `drizzle-deck-unit-of-work` + `recall-edits` + `exam-edits` 11/11, `content-deletion` 6/6; e2e (fake AI, alone, port 3000 free): `technique-edit-pages`, `editor-polish-3`, `flashcards-deck`, `technique-hub-return`, `flashcards-review`, `content-deletion`, `exams-questions`, `flashcards-due-today` 16/18 first run (both the new stronger assertions), then `technique-edit-pages` + `editor-polish-3` 7/7 minus the callout test, callout test 3/3 (`--repeat-each 3`) after the wait.
 - Open: s15 R3-001 needs a schema decision. Exam edits check the version without a page lock (small window, unlike flashcards and recall). RDD not run by the writer.
+
+## RDD and final checks (2026-10-30)
+- RDD 124eecc..1f41ba7 in 23 slices from a detached HEAD at each slice end (`--untracked-scope=exclude`), each granted, approved and acknowledged (one reliability lens per slice). Slice lineages: s1 review-778f9546939fc4c1 … s22 review-31c6d91b612c1249, s23 (V10) review-bb21940afc480276. Warnings triaged in V10; remaining V10 advisories: R3-exam-version-check-unlocked (WARNING), R3-deletes-skip-version-check, R3-recall-apply-lock-unasserted. Reviewed boundary: 1f41ba7. `7a2a8af` (test-only) assessed medium, under budget.
+- Final full run at 1f41ba7: typecheck, biome ci, depcruise clean; vitest 5407/5407; db 408/408; `next build` OK; audit 0 vulnerabilities; e2e 133/134 with `exams-create` flaky (10 s card wait raced the fake generation under load) → fixed in `7a2a8af`, 1/1.
+
+## Delivery (user, 2026-10-30): feature branch chain
+- Draft/no-merge tracker PR `release/phase-8` → `main`; 11 child PRs, each a `size:exception` (one cohesive, RDD-reviewed feature each; no cohesive split under 400 lines). A merge to `main` deploys production, so everything integrates first and ships in one final merge.
+
+| # | Branch | Range | Target |
+|---|---|---|---|
+| 1 | `p8/01-design-flows` | origin/main..fd75456 | `release/phase-8` |
+| 2 | `p8/02-landing` | fd75456..7730d87 | `p8/01-design-flows` |
+| 3 | `p8/03-legal-consent` | 7730d87..3f316e9 (migration 0015) | `p8/02-landing` |
+| 4 | `p8/04-landing-polish` | 3f316e9..528dda9 | `p8/03-legal-consent` |
+| 5 | `p8/05-notebook-editor` | 528dda9..124eecc | `p8/04-landing-polish` |
+| 6 | `p8/06-techniques-panel` | 124eecc..acbd9ea | `p8/05-notebook-editor` |
+| 7 | `p8/07-ai-only-creation` | acbd9ea..b483d85 | `p8/06-techniques-panel` |
+| 8 | `p8/08-flat-hubs` | b483d85..afe8bb2 | `p8/07-ai-only-creation` |
+| 9 | `p8/09-edit-pages` | afe8bb2..d0efed5 | `p8/08-flat-hubs` |
+| 10 | `p8/10-hard-delete` | d0efed5..642361c | `p8/09-edit-pages` |
+| 11 | `p8/11-final-verification` | 642361c..tip | `p8/10-hard-delete` |
+
+- Before the final merge to `main`: migration 0015 in production, the legal `[PENDIENTE]` data, and the security hardening S1–S9 (or the user's decision to defer it). Open product decision: s15 R3-001 (finished exams lose answers to a deleted question; keeping them needs a FK change).
