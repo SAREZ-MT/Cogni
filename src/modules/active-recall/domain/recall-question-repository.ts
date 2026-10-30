@@ -22,4 +22,8 @@ export interface RecallQuestionRepository {
   // its study item through RecallStudyItems.deleteBySource. Another
   // owner's question is left untouched.
   delete(id: string, ownerId: string): Promise<void>;
+  // Locks the page's question set until the surrounding transaction ends,
+  // so two saves cannot both count the same questions and delete the last
+  // one between them (V10).
+  lockPage(pageId: string, ownerId: string): Promise<void>;
 }

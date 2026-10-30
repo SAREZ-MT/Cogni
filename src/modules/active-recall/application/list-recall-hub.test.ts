@@ -256,6 +256,27 @@ describe("listRecallHub", () => {
     ]);
   });
 
+  it("lists a page with questions and no finished session, with no sessions and its question count", async () => {
+    const result = await listRecallHub(
+      {
+        reader: reader([page("p-1", [], { questionCount: 3 })]),
+        mastery: mastery({}),
+        due: due({ "p-1": 3 }),
+      },
+      OWNER,
+    );
+
+    expect(result.ok && result.value.pages).toEqual([
+      expect.objectContaining({
+        pageId: "p-1",
+        sessions: [],
+        questionCount: 3,
+        dueToday: 3,
+        mastery: 0,
+      }),
+    ]);
+  });
+
   it("keeps the reader's page order", async () => {
     const result = await listRecallHub(
       {

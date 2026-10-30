@@ -25,6 +25,7 @@ export async function deleteRecallQuestion(
     if (!question || question.archivedAt !== null) {
       return questionNotFound(input.questionId);
     }
+    await questions.lockPage(question.pageId, ownerId);
     const active = await questions.listActiveByPage(question.pageId, ownerId);
     if (active.length <= 1) {
       return err(

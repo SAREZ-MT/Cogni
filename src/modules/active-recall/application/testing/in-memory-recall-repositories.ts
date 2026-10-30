@@ -84,6 +84,9 @@ export class InMemoryRecallQuestionRepository
     if (this.rows.get(id)?.ownerId === ownerId) this.rows.delete(id);
   }
 
+  // One process, no concurrent transactions: nothing to wait for.
+  async lockPage(_pageId: string, _ownerId: string): Promise<void> {}
+
   private list(keep: (q: RecallQuestion) => boolean): RecallQuestion[] {
     return [...this.rows.values()].filter(keep).sort(oldestFirst);
   }

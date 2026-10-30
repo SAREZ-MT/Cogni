@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { newStudyItem } from "@/modules/study-engine";
 import { createFixedClock } from "@/shared/kernel/clock";
 import { DomainError } from "@/shared/kernel/domain-error";
@@ -168,6 +168,21 @@ describe("deleteRecallQuestion", () => {
 
     expect(!result.ok && result.error.code).toBe(RECALL_ERROR.LAST_QUESTION);
     expect(uow.questions.rows.has(only?.id ?? "")).toBe(true);
+  });
+
+  // Two saves deleting different questions at once must not both see two
+  // active questions and leave the page with none (V10).
+  it("locks the page before counting its active questions", async () => {
+    const [first] = await seed(uow, 2);
+    const lock = vi.spyOn(uow.questions, "lockPage");
+    const count = vi.spyOn(uow.questions, "listActiveByPage");
+
+    await deleteRecallQuestion({ questionId: first?.id ?? "" }, { uow }, OWNER);
+
+    expect(lock).toHaveBeenCalledWith(PAGE, OWNER);
+    expect(lock.mock.invocationCallOrder[0]).toBeLessThan(
+      count.mock.invocationCallOrder[0] ?? 0,
+    );
   });
 });
 
