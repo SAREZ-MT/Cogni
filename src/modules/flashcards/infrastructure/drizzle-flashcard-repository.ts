@@ -160,6 +160,27 @@ export class DrizzleFlashcardRepository implements FlashcardRepository {
       );
   }
 
+  async update(card: Flashcard): Promise<Flashcard | null> {
+    const [row] = await this.db
+      .update(flashcards)
+      .set({ front: card.front, back: card.back, updatedAt: card.updatedAt })
+      .where(
+        and(
+          eq(flashcards.id, card.id),
+          eq(flashcards.ownerId, card.ownerId),
+          isNull(flashcards.archivedAt),
+        ),
+      )
+      .returning();
+    return row ? toFlashcard(row) : null;
+  }
+
+  async delete(id: string, ownerId: string): Promise<void> {
+    await this.db
+      .delete(flashcards)
+      .where(and(eq(flashcards.id, id), eq(flashcards.ownerId, ownerId)));
+  }
+
   async lockDeck(pageId: string, ownerId: string): Promise<void> {
     // The page row is the deck's lock: every deck change of the page
     // queues behind it until the surrounding transaction ends.

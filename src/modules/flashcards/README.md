@@ -24,11 +24,20 @@ sessions are scheduled by `study-engine`; this module adds the card text.
   - `createManualFlashcard` checks the page through `PageTextReader`, enforces
     the trimmed side limit (`FLASHCARD_TOO_LONG`), and adds the card at the end
     of the deck with its due study item. A page without cards has no deck; its
-    first card starts it. Since Phase 8 H13 (user decision 2026-10-29) cards
-    are created by AI only: no Server Action or screen calls it any more; it
-    stays because the database tests of `DrizzleDeckUnitOfWork` drive the
-    deck lock and positions through it. Existing `origin = "manual"` cards
-    keep being listed, reviewed and archived.
+    first card starts it. Decks are born from AI (Phase 8 H13); since H18
+    (user decision 2026-10-29) the deck's edit page adds cards by hand
+    through it ("la creación nace con IA; la edición permite ajustar y
+    añadir").
+  - `editFlashcard` (H18) rewrites a card's sides in place (trimmed,
+    non-blank, at most 1000 each), keeping its study item and history.
+  - `deleteFlashcard` (H18) deletes a card for real: the row, its study item
+    (`DeckStudyItems.deleteBySource`) and, by cascade, its review logs, so
+    mastery and metrics stop counting it. The deck's last card is refused
+    with `FLASHCARD_LAST_CARD`, like archiving.
+  - `applyDeckEdits` (H18) applies the edit page's draft (`updates`,
+    `creates`, `deletes`) in ONE unit of work through the three single-card
+    use cases run on the open transaction: every side is validated first,
+    then edits, additions and deletions; any refusal rolls everything back.
   - `archiveFlashcard` archives the card and suspends its study item. The
     deck's last active card is refused with `FLASHCARD_LAST_CARD` (a deck is
     never empty); the deck is locked before counting.
@@ -72,12 +81,14 @@ sessions are scheduled by `study-engine`; this module adds the card text.
   by the same contract as the in-memory fake in `testing.ts`;
   `DrizzleDeckUnitOfWork` runs each deck change in one Postgres transaction
   and builds both repositories on it (`lockDeck` is `SELECT ... FOR UPDATE`
-  on the page row).
+  on the page row); its `deckStudyItems` adds `deleteBySource` to
+  study-engine's repository (`study_items` has no foreign key to its source).
 - `actions.ts` (`"use server"`): `generateFlashcardsAction`,
   `listFlashcardsAction`, `listDecksAction`, `getGenerationStatusAction`,
-  `archiveFlashcardAction` and `archiveDeckAction` (both revalidate the
-  `/flashcards` layout). There is no
-  manual creation action (AI only since Phase 8 H13). They
+  `archiveFlashcardAction`, `archiveDeckAction` and, since Phase 8 H18,
+  `saveDeckEditsAction` (`{ pageId, updates, creates, deletes }`, the edit
+  page's "Guardar"; answers the saved deck). All three revalidate the
+  `/flashcards` layout. They
   validate session and input, return `Result<T, ActionError>`, report failures
   to Sentry and emit the `generation_requested` event. `maxDuration` is declared
   on the page route that hosts the action.
@@ -115,9 +126,15 @@ earliest due date of the deck's active study items, read in the same
 grouped query), newest first (`latestCardAt`), filtered by `?cuaderno=`.
 Its menu deletes a deck with `archiveDeckAction` (every card archived and
 its study item suspended under the deck lock). `/flashcards/[notebookId]`
-redirects to the filtered hub. Cards are created by AI only (Phase 8 H13): the deck
-has no "Nueva tarjeta", and an empty deck links to its page, whose
-techniques panel generates cards.
+redirects to the filtered hub. Cards are born from AI (Phase 8 H13): an
+empty deck links to its page, whose techniques panel generates cards.
+Since Phase 8 H18 (user 2026-10-29) opening a deck starts its graded
+review at once; with nothing due it says "Estás al día con este mazo" with
+the next review and offers "Repasar igual", a practice pass
+(`?modo=practica`) that calls no review-session action, so the SM-2
+schedule, the review logs and the metrics stay as they were. The cards are
+listed on the edit page `/flashcards/{nb}/{page}/editar` (the hub menu's
+"Editar tarjetas"), which saves its draft through `saveDeckEditsAction`.
 
 ## Next phase
 

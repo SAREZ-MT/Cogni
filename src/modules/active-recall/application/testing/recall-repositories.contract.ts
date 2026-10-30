@@ -229,6 +229,45 @@ export function runRecallRepositoriesContract(
       ).toEqual([archived]);
       expect(await questions.listByIds([], ctx.ownerId)).toEqual([]);
     });
+
+    // Phase 8 H18: the edit page rewrites a question in place and deletes
+    // one for good.
+    it("update rewrites prompt, rubric and updatedAt of an active question only", async () => {
+      const ctx = options.context();
+      const { questions } = options.createRepositories();
+      const pageId = await ctx.newPageId();
+      const stored = question(ctx, pageId);
+      const archived = { ...question(ctx, pageId), archivedAt: T1 };
+      await questions.saveMany([stored, archived]);
+      const edited = {
+        ...stored,
+        prompt: "Pregunta editada",
+        rubric: { keyConcepts: ["Idea"], acceptableAnswerSummary: "Resumen" },
+        updatedAt: T2,
+      };
+      expect(await questions.update(edited)).toEqual(edited);
+      expect(await questions.listByIds([stored.id], ctx.ownerId)).toEqual([
+        edited,
+      ]);
+      expect(await questions.update({ ...archived, prompt: "X" })).toBeNull();
+      expect(
+        await questions.update({ ...stored, ownerId: ctx.otherOwnerId }),
+      ).toBeNull();
+    });
+
+    it("delete removes the owner's question for good, never another owner's", async () => {
+      const ctx = options.context();
+      const { questions } = options.createRepositories();
+      const pageId = await ctx.newPageId();
+      const gone = question(ctx, pageId);
+      const kept = question(ctx, pageId);
+      await questions.saveMany([gone, kept]);
+      await questions.delete(kept.id, ctx.otherOwnerId);
+      await questions.delete(gone.id, ctx.ownerId);
+      expect(
+        await questions.listByIds([gone.id, kept.id], ctx.ownerId),
+      ).toEqual([kept]);
+    });
   });
 
   describe("RecallSessionRepository contract", () => {

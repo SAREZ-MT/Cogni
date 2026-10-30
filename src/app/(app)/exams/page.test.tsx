@@ -239,6 +239,23 @@ describe("ExamsHubPage (flat since Phase 8 H17)", () => {
     ).toBeInTheDocument();
   });
 
+  // Phase 8 H18: "Ver preguntas" became "Editar preguntas", the edit page.
+  it("leads the menu's Editar preguntas to the page's edit page", async () => {
+    const user = (await import("@testing-library/user-event")).default.setup();
+    render(await ExamsHubPage(hub()));
+
+    await user.click(
+      screen.getByRole("button", { name: "Acciones de Mitocondria" }),
+    );
+
+    expect(
+      await screen.findByRole("menuitem", { name: /Editar preguntas/ }),
+    ).toHaveAttribute("href", expect.stringMatching(/\/editar\?desde=hub$/));
+    expect(
+      screen.queryByRole("menuitem", { name: /Ver preguntas/ }),
+    ).toBeNull();
+  });
+
   it("shows the empty state when no page has questions", async () => {
     listExamHubAction.mockResolvedValue({ ok: true, value: [] });
 

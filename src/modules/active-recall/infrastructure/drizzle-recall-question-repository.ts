@@ -84,4 +84,35 @@ export class DrizzleRecallQuestionRepository
       .orderBy(asc(recallQuestions.createdAt), asc(recallQuestions.id));
     return rows.map(toQuestion);
   }
+
+  async update(question: RecallQuestion): Promise<RecallQuestion | null> {
+    const [row] = await this.db
+      .update(recallQuestions)
+      .set({
+        prompt: question.prompt,
+        rubric: {
+          keyConcepts: [...question.rubric.keyConcepts],
+          acceptableAnswerSummary: question.rubric.acceptableAnswerSummary,
+        },
+        updatedAt: question.updatedAt,
+      })
+      .where(
+        and(
+          eq(recallQuestions.id, question.id),
+          eq(recallQuestions.ownerId, question.ownerId),
+          isNull(recallQuestions.archivedAt),
+        ),
+      )
+      .returning();
+    return row ? toQuestion(row) : null;
+  }
+
+  async delete(id: string, ownerId: string): Promise<void> {
+    // recall_answers_question_owner_fk cascades the question's answers.
+    await this.db
+      .delete(recallQuestions)
+      .where(
+        and(eq(recallQuestions.id, id), eq(recallQuestions.ownerId, ownerId)),
+      );
+  }
 }

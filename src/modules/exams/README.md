@@ -17,7 +17,7 @@ recorded in `docs/adr/0006-examenes-y-repeticion-con-variantes.md`
 | Adapters | `infrastructure/` | Drizzle repositories, unit-of-work adapters (one transaction each) and the hub reader. |
 | Server Actions | `actions.ts`, `session-actions.ts`, `retake-actions.ts`, `feedback-actions.ts`, `hub-actions.ts` | The only UI entry points; exported through `index.ts`. |
 | AI prompts | `src/modules/ai` | `generate_exam_questions/v1`, `generate_exam_variants/v1`, `session_feedback/v2` (exams never import the AI SDK). |
-| Screens | `src/app/(app)/exams/` | Hub (flat since Phase 8 H17), start, player, results, questions. |
+| Screens | `src/app/(app)/exams/` | Hub (flat since Phase 8 H17), start, player, results (they honour the hub's `?desde=hub` since H18), the questions' edit page `editar` (H18; `preguntas` redirects there). |
 
 ## Server Actions
 
@@ -26,7 +26,7 @@ throw (`action-support.ts`); errors come back as `{ code, message }`.
 
 | File | Actions |
 |---|---|
-| `actions.ts` | `listExamQuestionsAction`, `editExamQuestionAction`, `retireExamQuestionAction`, `generateExamQuestionsAction` |
+| `actions.ts` | `listExamQuestionsAction`, `editExamQuestionAction`, `retireExamQuestionAction`, `saveExamEditsAction` (H18 edit page), `generateExamQuestionsAction` |
 | `session-actions.ts` | `getExamStartAction`, `startExamSessionAction`, `getExamSessionAction`, `answerExamQuestionAction`, `finishExamSessionAction`, `getExamResultsAction` |
 | `retake-actions.ts` | `startExamRetakeAction` |
 | `feedback-actions.ts` | `requestExamFeedbackAction`, `getExamReviewNoticeAction` |
@@ -65,16 +65,27 @@ is dropped), and a feedback read failure in `getExamResultsAction` returns
 - `createExamQuestion` checks the page is the owner's (`PAGE_NOT_FOUND`),
   validates with `newExamQuestion` and saves the root together with its
   `StudyItem(kind = "exam_question", sourceId = rootId)` in one
-  `ExamUnitOfWork` run, so `recordExamReviews` always finds the item. No
-  Server Action calls it since Phase 8 H13; it stays because the database
-  tests (unit of work, session, retake) and `actions.test.ts` seed questions
-  through it, and `editExamQuestion` reuses its `ExamQuestionContent`.
+  `ExamUnitOfWork` run, so `recordExamReviews` always finds the item.
+  Questions are born from AI (Phase 8 H13); since H18 the edit page adds
+  questions by hand through it ("la creación nace con IA; la edición permite
+  ajustar y añadir").
 - `editExamQuestion` edits in place (same id, root, origin); a retired
   question answers `EXAMS_QUESTION_RETIRED`, another owner's
   `EXAMS_QUESTION_NOT_FOUND`.
 - `retireExamQuestion` retires (never deletes) and, when the root's lineage
   has no active question left, suspends the root's item in the same run.
   Idempotent: a second call keeps the first `retiredAt`.
+- `deleteExamQuestion` (Phase 8 H18) deletes for real the question's whole
+  lineage (root, variants and, by cascade, their answers), the root's study
+  item (`ExamStudyItems.deleteBySource`) and, by cascade, its review logs.
+  First `ExamLineageReferences.dropLineage` deletes the page's open exams
+  that show one of its questions and drops the root from the pending
+  retake's failed roots; finished exams keep their score. The page keeps
+  at least one root (`EXAMS_LAST_QUESTION`).
+- `applyExamEdits` (H18) applies the edit page's draft (`updates`,
+  `creates`, `deletes`) in ONE unit of work through `editExamQuestion`,
+  `createExamQuestion` and `deleteExamQuestion`; any refusal rolls
+  everything back. `saveExamEditsAction` is its Server Action.
 - `listPageExamQuestions` lists the page's active questions, oldest first.
 - `runExamWork` turns an err Result into a rollback (a unit of work only
   rolls back on a throw). `DrizzleExamUnitOfWork` runs one transaction with

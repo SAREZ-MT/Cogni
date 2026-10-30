@@ -14,4 +14,12 @@ export interface RecallQuestionRepository {
   // first (createdAt, then id); unknown ids and other owners' questions
   // are left out. A session reads the questions it showed with it.
   listByIds(ids: readonly string[], ownerId: string): Promise<RecallQuestion[]>;
+  // Writes an in-place edit of an active question: prompt, rubric and
+  // updatedAt. Returns the stored question, or null for another owner's,
+  // an archived or an unknown one (Phase 8 H18).
+  update(question: RecallQuestion): Promise<RecallQuestion | null>;
+  // Real delete (Phase 8 H18): its answers go with it (ON DELETE CASCADE);
+  // its study item through RecallStudyItems.deleteBySource. Another
+  // owner's question is left untouched.
+  delete(id: string, ownerId: string): Promise<void>;
 }

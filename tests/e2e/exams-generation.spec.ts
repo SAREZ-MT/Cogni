@@ -78,19 +78,19 @@ test.describe("exam questions generation", () => {
     await shot(page, "panel-after");
 
     // The questions live in the Exams section (Phase 8 H17: the flat hub,
-    // filtered by the notebook) → the page card's menu → Ver preguntas.
+    // filtered by the notebook) → the page card's menu → Editar preguntas.
     await page.goto(`/exams?cuaderno=${notebookId}`);
     await page.getByRole("button", { name: /^Acciones de / }).click();
-    await page.getByRole("menuitem", { name: "Ver preguntas" }).click();
-    await expect(page).toHaveURL(`/exams/${notebookId}/${pageId}/preguntas`);
-    const rows = page.getByTestId("exam-question-row");
+    await page.getByRole("menuitem", { name: "Editar preguntas" }).click();
+    await expect(page).toHaveURL(
+      new RegExp(`/exams/${notebookId}/${pageId}/editar`),
+    );
+    const rows = page.getByTestId("item-editor-entry");
     await expect(rows).toHaveCount(10);
-    await expect(rows.first()).toContainText("IA");
-    // Listed in generation order.
-    await expect(rows.first()).toContainText(
+    // Listed in generation order, each stem editable in place (Phase 8 H18).
+    await expect(rows.first().getByLabel("Enunciado")).toHaveValue(
       "Pregunta 1: ¿qué afirma el texto sobre «La mitocondria produce la»?",
     );
-    await expect(page.getByTestId("exam-questions-minimum")).toHaveCount(0);
     await shot(page, "preguntas");
   });
 });

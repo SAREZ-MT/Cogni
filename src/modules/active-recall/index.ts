@@ -2,9 +2,11 @@
 // No cross-module import may reach past this file (documento-maestro §5.3.5).
 export {
   generateRecallQuestionsAction,
+  listRecallQuestionsAction,
   type RecallGenerationActionError,
   type RecallGenerationView,
   type RecallQuestionView,
+  saveRecallEditsAction,
 } from "./actions";
 export * from "./domain";
 export {

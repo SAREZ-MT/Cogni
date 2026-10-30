@@ -123,6 +123,61 @@ describe("exams Server Actions", () => {
     };
   });
 
+  // Phase 8 H18: the edit page's "Guardar".
+  describe("saveExamEditsAction", () => {
+    it("rejects a malformed draft and an unauthenticated caller", async () => {
+      const { saveExamEditsAction } = await actions();
+      expect(
+        await saveExamEditsAction({ pageId: PAGE, creates: [{}] }).then(
+          (r) => !r.ok && r.error.code,
+        ),
+      ).toBe("EXAMS_INVALID_INPUT");
+      getCurrentUser.mockResolvedValue(null);
+      expect(
+        await saveExamEditsAction({
+          pageId: PAGE,
+          updates: [],
+          creates: [],
+          deletes: [],
+        }).then((r) => !r.ok && r.error.code),
+      ).toBe("EXAMS_SESSION_REQUIRED");
+    });
+
+    it("saves the draft, answers the questions and revalidates", async () => {
+      const a = await created();
+      const b = await created();
+      const { saveExamEditsAction } = await actions();
+
+      const result = await saveExamEditsAction({
+        pageId: PAGE,
+        updates: [{ id: a.id, ...QUESTION, stem: "Editada" }],
+        creates: [{ ...QUESTION, stem: "Nueva" }],
+        deletes: [b.id],
+      });
+
+      expect(result.ok && result.value.map((q) => q.stem)).toEqual([
+        "Editada",
+        "Nueva",
+      ]);
+      expect(revalidatePath).toHaveBeenCalledWith("/exams", "layout");
+    });
+
+    it("refuses a draft that deletes every question", async () => {
+      const a = await created();
+      const { saveExamEditsAction } = await actions();
+
+      const result = await saveExamEditsAction({
+        pageId: PAGE,
+        updates: [],
+        creates: [],
+        deletes: [a.id],
+      });
+
+      expect(!result.ok && result.error.code).toBe("EXAMS_LAST_QUESTION");
+      expect(revalidatePath).not.toHaveBeenCalled();
+    });
+  });
+
   describe("editExamQuestionAction", () => {
     it("edits the question in place", async () => {
       const view = await created();

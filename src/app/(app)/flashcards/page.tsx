@@ -137,9 +137,9 @@ export default async function FlashcardsHubPage({
           menu={
             <>
               <DropdownMenuItem asChild>
-                <Link href={fromHub(deckHref)}>
-                  <Layers aria-hidden="true" size={15} strokeWidth={1.75} />
-                  Ver tarjetas
+                <Link href={fromHub(`${deckHref}/editar`)}>
+                  <Pencil aria-hidden="true" size={15} strokeWidth={1.75} />
+                  Editar tarjetas
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
@@ -148,12 +148,6 @@ export default async function FlashcardsHubPage({
                 >
                   <FileText aria-hidden="true" size={15} strokeWidth={1.75} />
                   Abrir página
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href={fromHub(deckHref)}>
-                  <Pencil aria-hidden="true" size={15} strokeWidth={1.75} />
-                  Editar tarjetas
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />

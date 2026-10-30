@@ -974,6 +974,66 @@ technique-hub.ts`), which also filters the items on the server.
 3", "AL DÍA 4" in the flashcards hub): an `<h2>` 12px semibold uppercase
 muted label with the count in `--theme-ink`.
 
+## ItemEditor (`item-editor.tsx`, `item-draft.ts`)
+
+Phase 8 H18 (user 2026-10-29): the one edit page layout of the three
+techniques (deck, recall questions of a page, exam questions of a page),
+rendered inside the technique's `data-technique-theme`. Generic over the
+item value `T`: `items {id, value}[]`, `itemLabel` ("Tarjeta",
+"Pregunta"), `addLabel`, `lastItemMessage`, `emptyValue()`, `validate(value)
+→ {field: message}`, `renderFields({value, onChange, errors, idPrefix})`
+and `onSave(operations) → {ok, items} | {ok: false, message}`. Each item is
+a `Card padding="md"` in an `<ol>` (`data-testid="item-editor-entry"`,
+`data-state` stored / edited / new / deleted): a 13px semibold "{label}
+{n}" heading, a "Nueva" pill in `--theme-soft` or a neutral "Editada"
+pill, and a 36px ghost trash button ("Eliminar {label} {n}"); a new or
+edited card gets a `--theme-soft-edge` border. A deleted item collapses to
+its struck-through heading on a dashed `neutral-50` card with "Se
+eliminará al guardar" and an outline "Deshacer". Below the list a 48px
+dashed button ("Añadir …", `--theme-dash` border, `--theme-tint` fill,
+`--theme-ink` text) adds an entry and focuses its first field. Errors show
+only after a save attempt, inline under their field, plus a `FormMessage`
+("Revisa los campos marcados antes de guardar."); a draft that deletes
+every item shows `lastItemMessage` without calling the server. A sticky
+action bar (`Card padding="sm"`, `shadow-card-hover`, `bottom-4`) says
+"Sin cambios" / "N cambios sin guardar" with "Descartar cambios" (outline)
+and "Guardar" (`technique`; "Guardando…"). After a save the page stays,
+reset to the saved items, with a success `StatusBanner` ("Cambios
+guardados"). `item-draft.ts` holds the pure draft (`draftFrom`,
+`updateDraftEntry`, `addDraftEntry`, `removeDraftEntry`,
+`restoreDraftEntry`, `draftOperations` → `{updates, creates, deletes}`,
+`draftChangeCount`): an edit put back to the stored value is no change, a
+new entry removed before saving disappears, a deleted entry's edits are
+dropped. Used by `flashcards/_components/deck-editor.tsx`,
+`active-recall/_components/recall-questions-editor.tsx` and
+`exams/_components/exam-questions-editor.tsx`.
+
+## ItemEditorHeader (`item-editor-header.tsx`)
+
+Phase 8 H18: the head of the edit pages: `BackLink` to the hub, then a
+`SectionHeader` with the technique's 48px `PixelTile`, the eyebrow ("Editar
+mazo", "Editar preguntas"), the page title (`text-xl`), a description list
+(counts · "Los cambios se aplican al guardar") and an optional actions slot
+(an outline "Repasar" / "Practicar" / "Hacer examen" link).
+
+## ItemField (`item-field.tsx`)
+
+Phase 8 H18: one labelled field of an edit page entry: `FieldLabel`, the
+control, then the inline error (`text-destructive`, 12px, id from
+`errorId(id)`) or a muted hint. `invalidProps(id, error)` gives the control
+its `aria-invalid` and `aria-describedby` while the error shows.
+
+## UnsavedChangesGuard (`unsaved-changes-guard.tsx`)
+
+Phase 8 H18: while `when` is true, a reload, a closed tab or an external
+address get the browser's own `beforeunload` prompt, and an in-app link
+(same origin, same tab, no modifier key, not only a hash) is held in the
+document's capture phase and confirmed in an app `Dialog` ("¿Salir sin
+guardar?" · "Tienes cambios sin guardar. Si sales ahora, se pierden." ·
+outline "Seguir editando" · destructive "Salir sin guardar", which then
+`router.push`es). Never a native `confirm`. The browser's back button is
+not intercepted.
+
 ## NotebookDot (`notebook-dot.ts`)
 
 Phase 8 H17: `NOTEBOOK_DOT`, a notebook colour as a small dot (the 400
@@ -1323,7 +1383,7 @@ feedback only shows once every evaluation for the session has finished): a
 tone-tinted panel (`pending` warning / `success` / `error`) with an
 `IconTile` (a spinning `Loader2` for `pending`) + title + muted description.
 
-- `tone: "pending" | "success" | "error" | "rose"`, `title`, `description`
+- `tone: "pending" | "success" | "error" | "rose" | "info"`, `title`, `description`
   (`ReactNode`), `action?` (`ReactNode`, rendered below the description),
   `className?`, plus the rest of `React.ComponentProps<"div">` (e.g.
   `data-testid`) forwarded onto the root.
@@ -1339,6 +1399,12 @@ needed). Used by `exams/page.tsx` (hub retake banner, with `action` =
 "Repetir examen"), `exams/_components/exam-player.tsx` ("Examen de
 repetición" notice, no action) and `exams/_components/exam-results-view.tsx`
 (failed-exam banner, with `action` = "Repetir examen").
+
+**Extended for Phase 8 H18 (2026-10-29):** `info` tone (bg `info-50`, border
+`info-500/25`, `Info` icon on the `info` `IconTile` tone), a calm neutral
+notice. Used by `flashcards/_components/deck-review.tsx` above the player in
+practice mode ("Modo práctica · Tus respuestas no cambian tus próximos
+repasos.").
 
 ### QuestionFeedbackItem (`question-feedback-item.tsx`)
 
@@ -1589,6 +1655,12 @@ stays `exam-results` (reused).
 
 ### Question management — `/exams/[notebookId]/[pageId]/preguntas`
 
+**Replaced in Phase 8 H18 (user 2026-10-29):** the route redirects to the
+exam edit page `/exams/{nb}/{page}/editar` (`ItemEditor` with the exam
+fields in `exams/_components/exam-questions-editor.tsx`), and
+`exam-questions-view.tsx`, `ExamQuestionRow` and `QuestionFormDialog` were
+removed. The history below describes the screen before H18.
+
 Phase 8 H13 (user 2026-10-29): questions are created by AI only. The
 "Nueva pregunta" button and `createExamQuestionAction` are gone; the
 header count leaves out "· {K} manuales" when K is 0; the minimum note
@@ -1636,7 +1708,7 @@ with `variantOf` pointing at the original they replace, the 5th — the
 "topped up" extra question — with none). Every other page's management
 list is just its plain question set tagged `origin: "ai"`.
 
-#### ExamQuestionRow (`exam-question-row.tsx`)
+#### ExamQuestionRow (`exam-question-row.tsx`) — removed in Phase 8 H18
 
 Index + stem, a neutral "Concepto: …" `Pill`, an origin `Pill` ("IA"
 primary / "Manual" success / "Variante" rose), a muted "Retirada" `Pill` +
@@ -1650,7 +1722,10 @@ buttons (`onRetire` omitted, not just disabled, once already retired).
 
 Used by: `exams/_components/exam-questions-view.tsx`.
 
-#### QuestionFormDialog (`question-form-dialog.tsx`)
+#### QuestionFormDialog (`question-form-dialog.tsx`) — removed in Phase 8 H18
+
+Its option rows (bordered `answer-option`, rose tint on the correct one)
+live on in the exam edit page's fields.
 
 Built on Cogni's `Dialog` atom (same composition as `modules/notebooks/ui/
 create-notebook-dialog.tsx`): "Enunciado" `Textarea`, 4 "Opción A–D" rows
