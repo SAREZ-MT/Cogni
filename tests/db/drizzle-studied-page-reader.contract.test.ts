@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { afterAll } from "vitest";
+import { afterAll, describe } from "vitest";
 import { runStudiedPageReaderContract } from "@/modules/study-engine/application/testing/studied-page-reader.contract";
 import { newStudyItem } from "@/modules/study-engine/domain/study-item";
 import { DrizzlePageMasteryRepository } from "@/modules/study-engine/infrastructure/drizzle-page-mastery-repository";
@@ -41,50 +41,55 @@ if (process.env.DATABASE_URL) {
     notebookByOwner.set(ownerId, notebookId);
   }
 
-  runStudiedPageReaderContract({
-    context: async () => ({
-      ownerId: owner.id,
-      otherOwnerId: otherOwner.id,
-      reader: new DrizzleStudiedPageReader(db),
-      newPageId: async (ownerId) => {
-        const id = randomUUID();
-        await db.insert(pages).values({
-          id,
-          ownerId,
-          notebookId: notebookByOwner.get(ownerId) ?? "",
-          title: `Página ${id}`,
-          content: { type: "doc", content: [] },
-          position: nextPosition++,
-        });
-        return id;
-      },
-      addItem: async ({ ownerId, pageId, suspended }) => {
-        const now = new Date("2026-10-01T08:00:00.000Z");
-        const item = newStudyItem({
-          id: randomUUID(),
-          ownerId,
-          pageId,
-          kind: "flashcard",
-          sourceId: randomUUID(),
-          now,
-        });
-        await new DrizzleStudyItemRepository(db).save({
-          ...item,
-          suspendedAt: suspended ? now : null,
-        });
-      },
-      setMastery: async ({ ownerId, pageId, computedAt }) => {
-        await new DrizzlePageMasteryRepository(db).upsert({
-          id: randomUUID(),
-          ownerId,
-          pageId,
-          level: "Nuevo",
-          score: 0,
-          itemsTotal: 1,
-          itemsDue: 1,
-          computedAt,
-        });
-      },
-    }),
+  // The batch-ordering case seeds 7 pages, 7 items and 5 mastery rows one
+  // round trip at a time; against the remote database that exceeds the 5 s
+  // default, so the whole contract gets a longer budget.
+  describe("studied page reader on the database", { timeout: 30_000 }, () => {
+    runStudiedPageReaderContract({
+      context: async () => ({
+        ownerId: owner.id,
+        otherOwnerId: otherOwner.id,
+        reader: new DrizzleStudiedPageReader(db),
+        newPageId: async (ownerId) => {
+          const id = randomUUID();
+          await db.insert(pages).values({
+            id,
+            ownerId,
+            notebookId: notebookByOwner.get(ownerId) ?? "",
+            title: `Página ${id}`,
+            content: { type: "doc", content: [] },
+            position: nextPosition++,
+          });
+          return id;
+        },
+        addItem: async ({ ownerId, pageId, suspended }) => {
+          const now = new Date("2026-10-01T08:00:00.000Z");
+          const item = newStudyItem({
+            id: randomUUID(),
+            ownerId,
+            pageId,
+            kind: "flashcard",
+            sourceId: randomUUID(),
+            now,
+          });
+          await new DrizzleStudyItemRepository(db).save({
+            ...item,
+            suspendedAt: suspended ? now : null,
+          });
+        },
+        setMastery: async ({ ownerId, pageId, computedAt }) => {
+          await new DrizzlePageMasteryRepository(db).upsert({
+            id: randomUUID(),
+            ownerId,
+            pageId,
+            level: "Nuevo",
+            score: 0,
+            itemsTotal: 1,
+            itemsDue: 1,
+            computedAt,
+          });
+        },
+      }),
+    });
   });
 }
