@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { describe, expect, it, vi } from "vitest";
-import { config, proxy } from "./proxy";
+import { config, isOpenPath, proxy } from "./proxy";
 
 // The session refresh is Supabase's concern; here every request is
 // anonymous so the redirect rules are exercised on their own.
@@ -79,5 +79,26 @@ describe("proxy redirects for anonymous visitors", () => {
     expect(response.headers.get("location")).toBe(
       "http://localhost:3000/login",
     );
+  });
+});
+
+describe("proxy open paths", () => {
+  it("opens the terms gate and the four public legal pages", () => {
+    for (const path of [
+      "/terminos",
+      "/legal/terminos",
+      "/legal/privacidad",
+      "/legal/uso-aceptable",
+      "/legal/derechos-de-autor",
+    ]) {
+      expect(isOpenPath(path)).toBe(true);
+    }
+  });
+
+  it("matches exact paths only", () => {
+    expect(isOpenPath("/legal")).toBe(false);
+    expect(isOpenPath("/legal/subencargados")).toBe(false);
+    expect(isOpenPath("/legal/terminos/extra")).toBe(false);
+    expect(isOpenPath("/notebooks")).toBe(false);
   });
 });

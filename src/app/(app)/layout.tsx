@@ -28,8 +28,11 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   if (!user) redirect("/login");
   const profile = await ensureProfileForUser(user.id);
 
-  // Terms gate: an account that has not accepted the current terms version
-  // cannot use the shell. The proxy forwards the request path as
+  // Terms gate (fallback): an account that has not accepted the current
+  // terms version cannot use the shell. New accounts accept at sign-up (the
+  // consent notice; /auth/callback stamps the profile), so the gate catches
+  // accounts with no recorded acceptance and TERMS_VERSION bumps. The proxy
+  // forwards the request path as
   // `x-pathname` so the terms page can send the user back after accepting.
   // A null profile (transient failure, already reported to Sentry) fails
   // open and is re-checked on the next render — see termsRedirectFor.

@@ -30,15 +30,25 @@ describe("SignInForm", () => {
 });
 
 describe("LoginPage", () => {
-  it("reminds that creating an account requires accepting the terms, with a link to them", async () => {
+  it("shows the new-account consent notice right after the Google button", async () => {
     render(await LoginPage({ searchParams: Promise.resolve({}) } as never));
 
+    const google = screen.getByRole("button", { name: "Continuar con Google" });
+    const notice = screen.getByTestId("sign-up-consent-notice");
+
+    expect(notice).toHaveTextContent(
+      /^Si continúas con Google y aún no tienes cuenta, aceptas los Términos y condiciones/,
+    );
     expect(
-      screen.getByText(/Al crear una cuenta deberás aceptar los/),
-    ).toBeInTheDocument();
+      google.compareDocumentPosition(notice) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(google).toHaveAttribute("aria-describedby", notice.id);
     expect(
-      screen.getByRole("link", { name: "términos de uso" }),
-    ).toHaveAttribute("href", "/terminos");
+      screen.getByRole("link", { name: "Términos y condiciones" }),
+    ).toHaveAttribute("href", "/legal/terminos");
+    expect(
+      screen.getByRole("link", { name: "Política de privacidad" }),
+    ).toHaveAttribute("href", "/legal/privacidad");
   });
 
   it("separates the Google button with an 'o' divider and shows the Google G", async () => {

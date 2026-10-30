@@ -27,11 +27,15 @@ export class SupabaseAuthGateway implements AuthGateway {
     email: string;
     password: string;
     emailRedirectTo: string;
+    userMetadata: Record<string, string>;
   }): Promise<Result<SignUpResult, DomainError>> {
     const { data, error } = await this.auth.signUp({
       email: input.email,
       password: input.password,
-      options: { emailRedirectTo: input.emailRedirectTo },
+      options: {
+        emailRedirectTo: input.emailRedirectTo,
+        data: input.userMetadata,
+      },
     });
     if (error) {
       if (error.code === "user_already_exists")

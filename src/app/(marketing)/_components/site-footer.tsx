@@ -11,12 +11,13 @@ const PRODUCT: readonly FooterLink[] = [
   { href: "/landing#preguntas", label: "Preguntas" },
 ];
 
-// The /legal/* routes do not exist yet: the legal pages come from a
-// follow-up feature (moved out of landing-v1 by the user, 2026-10-28), and
-// /legal is not in the proxy OPEN_PATHS until then.
+// The four public legal pages (feature legal-consent); each one is listed
+// in the proxy OPEN_PATHS so anonymous visitors can read it.
 export const LEGAL: readonly FooterLink[] = [
   { href: "/legal/terminos", label: "Términos de uso" },
   { href: "/legal/privacidad", label: "Privacidad" },
+  { href: "/legal/uso-aceptable", label: "Uso aceptable" },
+  { href: "/legal/derechos-de-autor", label: "Derechos de autor" },
   { href: "/creditos", label: "Créditos" },
 ];
 

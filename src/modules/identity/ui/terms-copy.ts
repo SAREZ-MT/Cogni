@@ -1,11 +1,17 @@
-// Terms of use text (neutral Spanish, "tú"). Short clauses, no legal
-// boilerplate. Changing the meaning of any clause means bumping
-// TERMS_VERSION in ../domain/terms.ts so every account accepts again.
+// Copy for the terms gate (/terminos) and the sign-up consent notice
+// (neutral Spanish, "tú"). The clauses below are a short summary; the
+// binding texts are the public legal pages (src/content/legal, served under
+// /legal). Changing those documents means bumping TERMS_VERSION in
+// ../domain/terms.ts so every account accepts again.
 export const TERMS_COPY = {
   title: "Términos de uso",
   versionLabel: (version: string) => `Versión ${version}`,
   intro:
     "Cogni es una plataforma de estudio. Antes de usarla necesitamos que conozcas estas condiciones.",
+  fullDocuments: {
+    lead: "Este es un resumen. Los documentos que aceptas son los",
+    connector: "y la",
+  },
   sections: [
     {
       id: "edad",
@@ -49,7 +55,8 @@ export const TERMS_COPY = {
     register: "Crear cuenta",
   },
   accept: {
-    checkbox: "Confirmo que tengo 18 años o más y acepto los términos de uso",
+    checkbox:
+      "Confirmo que tengo 18 años o más, acepto los Términos y condiciones y autorizo el tratamiento de mis datos según la Política de privacidad",
     submit: "Aceptar y continuar",
   },
   accepted: {
@@ -59,10 +66,17 @@ export const TERMS_COPY = {
     back: "Volver a Cogni",
   },
   links: {
-    notice: "Al crear una cuenta deberás aceptar los",
-    signUpNotice: "Al crear tu cuenta aceptarás los",
-    signUpNoticeSuffix: "en el siguiente paso",
-    link: "términos de uso",
     menu: "Términos de uso",
+    terms: { label: "Términos y condiciones", href: "/legal/terminos" },
+    privacy: { label: "Política de privacidad", href: "/legal/privacidad" },
+  },
+  // Sign-in-wrap notice next to every account-creating button (feature
+  // legal-consent, user decision 2026-10-28: no checkbox). Pressing the
+  // button is the acceptance; the server stores the proof.
+  signUpConsent: {
+    register: "Al crear tu cuenta o continuar con Google, aceptas los",
+    login: "Si continúas con Google y aún no tienes cuenta, aceptas los",
+    afterTerms: ", autorizas el tratamiento de tus datos según la",
+    end: " y confirmas que eres mayor de 18 años.",
   },
 } as const;

@@ -1,27 +1,33 @@
 import { TextLink } from "@/shared/ui/text-link";
 import { TERMS_COPY } from "./terms-copy";
 
-// One-line reminder under the sign-in and sign-up forms. Acceptance itself
-// happens after sign-in (the (app) gate), so Google sign-ups are covered too.
-// The sign-up variant says it plainly: the terms come right after sign-up.
+// Sign-in-wrap consent notice (feature legal-consent L2): rendered right
+// next to every button that can create an account — the sign-up submit and
+// "Continuar con Google" on /register, "Continuar con Google" on /login —
+// and referenced by those buttons through aria-describedby (`id`). There is
+// no checkbox by design: pressing the button is the acceptance, and the
+// server records the proof before the account exists (signUp metadata for
+// email, the consent-intent cookie for Google; domain/terms-consent.ts).
+// The (app) gate on /terminos stays as the fallback.
 // Secondary but readable: fg-secondary on the warm form panel passes AA.
-export function TermsNotice({
-  variant = "sign-in",
+export function SignUpConsentNotice({
+  variant,
+  id,
 }: {
-  variant?: "sign-in" | "sign-up";
+  variant: "register" | "login";
+  id: string;
 }) {
-  const { links } = TERMS_COPY;
-  if (variant === "sign-up") {
-    return (
-      <p className="text-balance text-center text-fg-secondary text-xs leading-relaxed">
-        {links.signUpNotice} <TextLink href="/terminos">{links.link}</TextLink>{" "}
-        {links.signUpNoticeSuffix}.
-      </p>
-    );
-  }
+  const copy = TERMS_COPY.signUpConsent;
+  const { terms, privacy } = TERMS_COPY.links;
   return (
-    <p className="text-balance text-center text-fg-secondary text-xs leading-relaxed">
-      {links.notice} <TextLink href="/terminos">{links.link}</TextLink>.
+    <p
+      id={id}
+      data-testid="sign-up-consent-notice"
+      className="text-balance text-center text-fg-secondary text-xs leading-relaxed"
+    >
+      {copy[variant]} <TextLink href={terms.href}>{terms.label}</TextLink>
+      {copy.afterTerms} <TextLink href={privacy.href}>{privacy.label}</TextLink>
+      {copy.end}
     </p>
   );
 }

@@ -1,8 +1,12 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import type { Db } from "@/shared/db/client";
 import { type ProfileRow, profiles } from "@/shared/db/schema";
 import { DEFAULT_TIMEZONE, type Profile } from "../domain/profile";
-import type { ProfileRepository } from "../domain/profile-repository";
+import type {
+  AcceptTermsOptions,
+  ProfileRepository,
+} from "../domain/profile-repository";
+import type { TermsAcceptanceMethod } from "../domain/terms-consent";
 
 function toProfile(row: ProfileRow): Profile {
   return {
@@ -13,6 +17,8 @@ function toProfile(row: ProfileRow): Profile {
     onboardingCompletedAt: row.onboardingCompletedAt,
     termsAcceptedVersion: row.termsAcceptedVersion,
     termsAcceptedAt: row.termsAcceptedAt,
+    termsAcceptedMethod:
+      row.termsAcceptedMethod as TermsAcceptanceMethod | null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -52,6 +58,7 @@ export class DrizzleProfileRepository implements ProfileRepository {
         onboardingCompletedAt: profile.onboardingCompletedAt,
         termsAcceptedVersion: profile.termsAcceptedVersion,
         termsAcceptedAt: profile.termsAcceptedAt,
+        termsAcceptedMethod: profile.termsAcceptedMethod,
         createdAt: profile.createdAt,
         updatedAt: profile.updatedAt,
       })
@@ -62,15 +69,24 @@ export class DrizzleProfileRepository implements ProfileRepository {
     id: string,
     version: string,
     at: Date,
+    options: AcceptTermsOptions = {},
   ): Promise<Profile | null> {
+    // `onlyIfUnaccepted` is a conditional UPDATE (WHERE version IS NULL), so
+    // two concurrent callbacks can never overwrite the first proof.
+    const byId = eq(profiles.id, id);
     const [row] = await this.db
       .update(profiles)
       .set({
         termsAcceptedVersion: version,
         termsAcceptedAt: at,
+        termsAcceptedMethod: options.method ?? null,
         updatedAt: at,
       })
-      .where(eq(profiles.id, id))
+      .where(
+        options.onlyIfUnaccepted
+          ? and(byId, isNull(profiles.termsAcceptedVersion))
+          : byId,
+      )
       .returning();
     return row ? toProfile(row) : null;
   }

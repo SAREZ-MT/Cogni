@@ -2,17 +2,27 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // specs/observability-and-delivery/spec.md, "Evento `user_signed_in` en el
 // callback de OAuth", Scenario "Inicio de sesión con Google emite evento".
-const { exchangeCodeForSession, safeNext } = vi.hoisted(() => ({
-  exchangeCodeForSession: vi.fn(),
-  safeNext: vi.fn((next: string | null) => next ?? "/"),
-}));
+const { exchangeCodeForSession, safeNext, recordSignUpConsentForUser } =
+  vi.hoisted(() => ({
+    exchangeCodeForSession: vi.fn(),
+    safeNext: vi.fn((next: string | null) => next ?? "/"),
+    recordSignUpConsentForUser: vi.fn(
+      async (): Promise<{ stamped: boolean; method?: string }> => ({
+        stamped: false,
+      }),
+    ),
+  }));
 // The flow-cookie contract is pure (identity/domain/auth-flow.ts and
 // application/sign-up.ts), so the mock spreads the real values instead of
 // loading the server-only identity index.
 vi.mock("@/modules/identity", async () => ({
   exchangeCodeForSession,
   safeNext,
+  recordSignUpConsentForUser,
   ...(await import("@/modules/identity/domain/auth-flow")),
+  ...(await import("@/modules/identity/domain/terms-consent")),
+  TERMS_VERSION: (await import("@/modules/identity/domain/terms"))
+    .TERMS_VERSION,
   AUTH_CALLBACK_PATH: (await import("@/modules/identity/application/sign-up"))
     .AUTH_CALLBACK_PATH,
 }));

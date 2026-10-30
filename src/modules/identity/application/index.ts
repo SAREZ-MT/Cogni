@@ -11,6 +11,10 @@ export {
   type TimeZoneSetting,
 } from "./get-time-zone-setting";
 export {
+  type RecordedSignUpConsent,
+  recordSignUpConsent,
+} from "./record-sign-up-consent";
+export {
   RESET_PASSWORD_PATH,
   requestPasswordReset,
 } from "./request-password-reset";

@@ -14,6 +14,17 @@ describe("TermsOfUse", () => {
     expect(screen.getByText(`Versión ${TERMS_VERSION}`)).toBeInTheDocument();
   });
 
+  it("links the full legal documents that the acceptance covers", () => {
+    render(<TermsOfUse />);
+
+    expect(
+      screen.getByRole("link", { name: "Términos y condiciones" }),
+    ).toHaveAttribute("href", "/legal/terminos");
+    expect(
+      screen.getByRole("link", { name: "Política de privacidad" }),
+    ).toHaveAttribute("href", "/legal/privacidad");
+  });
+
   it("renders every clause as its own headed section", () => {
     render(<TermsOfUse />);
 

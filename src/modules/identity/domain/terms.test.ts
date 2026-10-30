@@ -21,7 +21,7 @@ function freshProfile(): Profile {
 
 describe("TERMS_VERSION", () => {
   it("is the date of the current terms text", () => {
-    expect(TERMS_VERSION).toBe("2026-10-04");
+    expect(TERMS_VERSION).toBe("2026-10-28");
   });
 });
 

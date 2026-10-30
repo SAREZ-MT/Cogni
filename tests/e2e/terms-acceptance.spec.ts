@@ -6,8 +6,10 @@ import {
   test,
 } from "./fixtures/auth";
 
-// The terms gate: an account without the current terms version is held on
-// /terminos until it accepts; afterwards the page shows the stored version.
+// Consent before the account exists (feature legal-consent): a sign-in-wrap
+// notice sits next to every account-creating button and links the public
+// legal pages. The /terminos gate stays as the fallback for accounts with
+// no recorded acceptance and for terms-version bumps.
 test.describe("terms of use", () => {
   test("serves the terms to an anonymous visitor", async ({ page }) => {
     const response = await page.goto("/terminos");
@@ -20,12 +22,47 @@ test.describe("terms of use", () => {
     await expect(
       page.getByRole("link", { name: "Iniciar sesión" }),
     ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Términos y condiciones" }),
+    ).toHaveAttribute("href", "/legal/terminos");
+  });
+
+  test("shows the consent notice next to the sign-up and Google buttons on /register", async ({
+    page,
+  }) => {
+    await page.goto("/register");
+
+    const notice = page.getByTestId("sign-up-consent-notice");
+    await expect(notice).toContainText(
+      "Al crear tu cuenta o continuar con Google, aceptas los Términos y condiciones",
+    );
+    await expect(notice).toContainText("mayor de 18 años");
+    await expect(page.getByRole("checkbox")).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "Crear cuenta" }),
+    ).toHaveAttribute("aria-describedby", "sign-up-consent");
+    await expect(
+      page.getByRole("button", { name: "Continuar con Google" }),
+    ).toHaveAttribute("aria-describedby", "sign-up-consent");
+
+    await notice.getByRole("link", { name: "Política de privacidad" }).click();
+    await expect(page).toHaveURL("/legal/privacidad");
+  });
+
+  test("shows the new-account notice next to the Google button on /login", async ({
+    page,
+  }) => {
+    await page.goto("/login");
+
+    await expect(page.getByTestId("sign-up-consent-notice")).toContainText(
+      "Si continúas con Google y aún no tienes cuenta",
+    );
   });
 
   test.describe("acceptance gate", () => {
     test.skip(!hasSupabaseEnv, "Supabase env (cogni-dev) is not configured");
 
-    test("holds a new account on the terms until it accepts", async ({
+    test("holds an account with no recorded acceptance until it accepts", async ({
       page,
       unacceptedUser,
     }) => {
@@ -49,8 +86,17 @@ test.describe("terms of use", () => {
       await page.goto("/terminos");
       await expect(page.getByTestId("terms-accepted-state")).toBeVisible();
       await expect(page.getByTestId("terms-accepted-state")).toContainText(
-        "Aceptaste la versión",
+        "Aceptaste la versión 2026-10-28",
       );
+    });
+
+    test("asks an account that accepted an older version to accept again", async ({
+      page,
+      staleTermsUser,
+    }) => {
+      await submitSignIn(page, staleTermsUser);
+      await expect(page).toHaveURL(/\/terminos\?next=/);
+      await expect(page.getByTestId("terms-accept-checkbox")).toBeVisible();
     });
   });
 });

@@ -7,7 +7,7 @@ import { createTestOwner, deleteTestOwner } from "./helpers/test-owner";
 
 // Same three behaviours as InMemoryProfileRepository.acceptTerms
 // (application/testing/in-memory-profile-repository.test.ts), against the
-// real table (0008_profiles_terms.sql).
+// real table (0008_profiles_terms.sql, 0015_profiles_terms_method.sql).
 if (process.env.DATABASE_URL) {
   const db = createTestDb();
   const repository = new DrizzleProfileRepository(db);
@@ -56,6 +56,25 @@ if (process.env.DATABASE_URL) {
       expect(await repository.findById(owner.id)).toMatchObject({
         termsAcceptedVersion: "2026-11-01",
         termsAcceptedAt: SECOND,
+      });
+    });
+
+    it("records the method and honours onlyIfUnaccepted (0015)", async () => {
+      await repository.acceptTerms(owner.id, "2026-11-01", SECOND, {
+        method: "gate",
+      });
+
+      const skipped = await repository.acceptTerms(
+        owner.id,
+        "2026-12-01",
+        SECOND,
+        { method: "email", onlyIfUnaccepted: true },
+      );
+
+      expect(skipped).toBeNull();
+      expect(await repository.findById(owner.id)).toMatchObject({
+        termsAcceptedVersion: "2026-11-01",
+        termsAcceptedMethod: "gate",
       });
     });
 

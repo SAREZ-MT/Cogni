@@ -19,7 +19,7 @@ describe("SiteFooter", () => {
     }
   });
 
-  it("links the science page and a small legal group", () => {
+  it("links the science page and the public legal pages", () => {
     render(<SiteFooter />);
     expect(
       screen.getByRole("link", { name: "La ciencia detrás de Cogni →" }),
@@ -27,11 +27,13 @@ describe("SiteFooter", () => {
     for (const [name, href] of [
       ["Términos de uso", "/legal/terminos"],
       ["Privacidad", "/legal/privacidad"],
+      ["Uso aceptable", "/legal/uso-aceptable"],
+      ["Derechos de autor", "/legal/derechos-de-autor"],
       ["Créditos", "/creditos"],
     ]) {
       expect(screen.getByRole("link", { name })).toHaveAttribute("href", href);
     }
-    expect(LEGAL).toHaveLength(3);
+    expect(LEGAL).toHaveLength(5);
   });
 
   it("carries the academic notice on the dark ground", () => {

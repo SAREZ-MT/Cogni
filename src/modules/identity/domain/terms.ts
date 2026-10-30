@@ -1,9 +1,11 @@
 import type { Clock } from "@/shared/kernel/clock";
 import type { Profile } from "./profile";
 
-// Date of the current terms text. Bumping it asks every account to accept
-// again on its next request (the gate compares against this constant).
-export const TERMS_VERSION = "2026-10-04";
+// Date of the current legal documents (src/content/legal, the terms and the
+// privacy policy accepted together at sign-up). Bumping it asks every
+// account to accept again on its next request (the gate compares against
+// this constant). 2026-10-28: the legal framework set (feature legal-consent).
+export const TERMS_VERSION = "2026-10-28";
 
 export const TERMS_PATH = "/terminos";
 

@@ -1,5 +1,8 @@
 import { DEFAULT_TIMEZONE, type Profile } from "../../domain/profile";
-import type { ProfileRepository } from "../../domain/profile-repository";
+import type {
+  AcceptTermsOptions,
+  ProfileRepository,
+} from "../../domain/profile-repository";
 
 // Test double for the ProfileRepository port. Upsert semantics mirror the
 // SQL adapter's `onConflictDoNothing`: insert-or-ignore, never overwrite an
@@ -21,13 +24,18 @@ export class InMemoryProfileRepository implements ProfileRepository {
     id: string,
     version: string,
     at: Date,
+    options: AcceptTermsOptions = {},
   ): Promise<Profile | null> {
     const existing = this.rows.get(id);
     if (!existing) return null;
+    if (options.onlyIfUnaccepted && existing.termsAcceptedVersion !== null) {
+      return null;
+    }
     const updated: Profile = {
       ...existing,
       termsAcceptedVersion: version,
       termsAcceptedAt: at,
+      termsAcceptedMethod: options.method ?? null,
       updatedAt: at,
     };
     this.rows.set(id, updated);
