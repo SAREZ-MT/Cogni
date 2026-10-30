@@ -87,31 +87,57 @@ test.describe("auth showcase", () => {
       const gl =
         element?.getContext("webgl2") ?? element?.getContext("webgl") ?? null;
       const extension = gl?.getExtension("WEBGL_lose_context") ?? null;
-      (window as unknown as { __loseExt: unknown }).__loseExt = extension;
+      const handle = window as unknown as {
+        __loseExt: unknown;
+        __lostAt: number;
+      };
+      handle.__loseExt = extension;
+      handle.__lostAt = performance.now();
       extension?.loseContext();
     });
 
     await expect(showcase(page)).toHaveAttribute("data-canvas-state", "lost");
-    await expectUsableForm(page);
-    // Fallback visible: the faded-out canvas leaves the static gradient,
-    // whose pixels no longer change.
-    await expect(canvas.locator("..")).toHaveClass(/opacity-0/);
-    await page.waitForTimeout(700);
+    // Fallback visible: the faded-out canvas (500 ms fade) leaves the static
+    // gradient, whose pixels no longer change.
+    const host = canvas.locator("..");
+    await expect(host).toHaveClass(/opacity-0/);
+    await expect(host).toHaveCSS("opacity", "0");
     const lostA = await page.screenshot({ clip: corner });
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(200);
     const lostB = await page.screenshot({ clip: corner });
     expect(lostA.equals(lostB)).toBe(true);
+    await expectUsableForm(page);
 
-    await page.evaluate(() =>
-      (
-        window as unknown as {
-          __loseExt: { restoreContext: () => void } | null;
-        }
-      ).__loseExt?.restoreContext(),
-    );
+    // The panel waits CONTEXT_RESTORE_TIMEOUT_MS (3 s, constellation-
+    // canvas.tsx) for a restore and then settles on the gradient for good.
+    // On a slow runner (CI run 41101107557: SwiftShader screenshots) the
+    // checks above can outlast that budget; then the give-up is the correct
+    // behaviour and there is no context left to restore. Checked and
+    // restored in one page task, so the timer cannot fire in between.
+    const restore = await page.evaluate(() => {
+      const handle = window as unknown as {
+        __loseExt: { restoreContext: () => void } | null;
+        __lostAt: number;
+      };
+      const elapsed = performance.now() - handle.__lostAt;
+      const state = document
+        .querySelector('[data-testid="public-showcase"]')
+        ?.getAttribute("data-canvas-state");
+      if (state === "unavailable") return { restored: false, elapsed };
+      handle.__loseExt?.restoreContext();
+      return { restored: true, elapsed };
+    });
+    if (!restore.restored) {
+      expect(restore.elapsed).toBeGreaterThanOrEqual(3000);
+      await expectUsableForm(page);
+      test.skip(
+        true,
+        `restore budget spent on the lost-state checks (${Math.round(restore.elapsed)} ms)`,
+      );
+    }
 
     await expect(showcase(page)).toHaveAttribute("data-canvas-state", "ready");
-    await expect(canvas.locator("..")).toHaveClass(/opacity-100/);
+    await expect(host).toHaveClass(/opacity-100/);
     // The restored context draws again (geometries and shaders re-uploaded).
     await page.waitForTimeout(1800);
     const restored = await page.screenshot({ clip: corner });

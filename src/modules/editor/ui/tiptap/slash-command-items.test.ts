@@ -189,6 +189,38 @@ describe("SLASH_COMMAND_ITEMS", () => {
     }
   });
 
+  // CI run 41101107557: clicking the item moves DOM focus to the menu, so a
+  // `focus()` in the chain would hand it back to the document a frame later
+  // (Tiptap defers it to requestAnimationFrame) — after the LaTeX input
+  // already took it, leaving the open input unfocused.
+  it.each([
+    "math-block",
+    "math-inline",
+  ])("%s leaves focus with the LaTeX input it opens", async (id) => {
+    const mount = document.body.appendChild(document.createElement("div"));
+    const menu = document.body.appendChild(document.createElement("div"));
+    menu.tabIndex = -1;
+    const input = document.body.appendChild(document.createElement("textarea"));
+    const editor = new Editor({
+      element: mount,
+      extensions: createEditorExtensions(),
+      content: "<p>/ecuacion</p>",
+    });
+    try {
+      editor.view.dom.addEventListener(MATH_EDIT_EVENT, () => input.focus());
+      menu.focus();
+      findItem(id).run(editor, { from: 1, to: 10 });
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      expect(document.activeElement).toBe(input);
+    } finally {
+      editor.destroy();
+      mount.remove();
+      menu.remove();
+      input.remove();
+    }
+  });
+
   it("gives every item an icon and a group", () => {
     for (const item of SLASH_COMMAND_ITEMS) {
       expect(item.icon, `missing icon on "${item.id}"`).toBeTruthy();
