@@ -1,0 +1,1122 @@
+/*
+ * Landing-local identity (docs/landing/descripcion.md: the landing does not
+ * use the app design system). Hex values live only here, scoped to .lp, and
+ * components consume them through var(--lp-*) utilities. Values come from
+ * the Pencil frame "Landing · Prototipo v1" (docs/landing/cogni-landing.pen).
+ */
+.lp {
+  --lp-ground: #1a1033;
+  --lp-violet: #7c3aed;
+  --lp-violet-deep: #6d28d9;
+  --lp-violet-400: #a78bfa;
+  --lp-violet-300: #c4b5fd;
+  --lp-violet-100: #ede9fe;
+  --lp-paper: #fbf8f3;
+  --lp-paper-2: #f3eee6;
+  --lp-yellow: #fcd34d;
+  --lp-mint: #6ee7b7;
+  --lp-rose: #fb7185;
+
+  /* Text on the dark ground (all AA or better on --lp-ground). */
+  --lp-on-dark-2: #cfc8e6;
+  --lp-on-dark-3: #9d94bc;
+
+  /* Text on the paper ground. */
+  --lp-ink: #1a1033;
+  --lp-ink-2: #3a3350;
+  --lp-ink-3: #5b5470;
+
+  /* Editor-like fragments in the pillar demos. */
+  --lp-editor-line: #ece8f3;
+  --lp-card-kicker: #6b6380;
+
+  /* Hero scene: near-black violet night ground, the login's tone. */
+  --lp-night: #0b0717;
+  --lp-night-ink: #edf0f5;
+  --lp-night-ink-2: #a3aab8;
+  --lp-night-ink-3: #6f7686;
+  /* The night's side vignette, shared by the hero veil and the seams. */
+  --lp-night-sides: linear-gradient(
+    to right,
+    rgb(6 4 14 / 0.6),
+    rgb(6 4 14 / 0) 22%,
+    rgb(6 4 14 / 0) 78%,
+    rgb(6 4 14 / 0.6)
+  );
+
+  /* Techniques zone: a lilac ground, clearly not the cream paper, and the
+     platform's exam red (globals.css --color-technique-exam-accent). */
+  --lp-lilac: #ece5fa;
+  --lp-red: #ef4444;
+  --lp-red-100: #fee2e2;
+  --lp-red-400: #f87171;
+  --lp-red-700: #b91c1c;
+
+  /* Study icons of the hero network: soft, saturated hues that read on
+     black, Cogni violet among them. */
+  --lp-net-0: #7c3aed;
+  --lp-net-1: #60a5fa;
+  --lp-net-2: #34d399;
+  --lp-net-3: #fbbf24;
+  --lp-net-4: #fb7185;
+  --lp-net-5: #fb923c;
+  --lp-net-6: #22d3ee;
+  --lp-net-7: #c084fc;
+
+  /* Techniques deck and pillars (Pencil frame v1, sections Técnicas and
+     Pilares 01–04). */
+  --lp-violet-200: #ddd6fe;
+  --lp-violet-800: #5b21b6;
+  --lp-ground-raise: #2a1d4d;
+  --lp-muted: #8a8399;
+  --lp-line: #e7e1f2;
+  --lp-soft: #f3f0fa;
+  --lp-sidebar: #f6f3fb;
+  --lp-grid: #f0ecf6;
+  --lp-grid-strong: #cfc6e4;
+  --lp-curve-off: #b8b0c9;
+  --lp-yellow-100: #fef3c7;
+  --lp-amber-500: #f59e0b;
+  --lp-amber-800: #92400e;
+  --lp-mint-50: #ecfdf5;
+  --lp-mint-100: #d1fae5;
+  --lp-green-500: #10b981;
+  --lp-green-700: #047857;
+  --lp-mint-800: #065f46;
+  --lp-rose-100: #ffe4e6;
+  --lp-rose-700: #be123c;
+  --lp-rose-950: #4c0519;
+  --lp-blue-100: #dbeafe;
+  --lp-orange-100: #ffedd5;
+
+  /* Comparación honesta (Pencil "Landing · Contenido propuesto v2"): the
+     generas-tus-técnicas chip ink and the sticky note of the usual way. */
+  --lp-amber-700: #b45309;
+  --lp-yellow-200: #fde68a;
+  /* Public pages (/ciencia, /creditos, /legal): the soft lilac step of
+     the alternating science blocks and the pending-data highlight. */
+  --lp-lilac-soft: #f6f2fc;
+
+  --lp-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+
+  --lp-font-display: var(--font-instrument-serif), Georgia, serif;
+  --lp-font-sans: var(--font-manrope), system-ui, sans-serif;
+  --lp-font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+  --lp-font-hand: var(--font-caveat), cursive;
+  --lp-font-head: var(--font-inter), var(--lp-font-sans);
+
+  /* Character texture (ascii-texture.tsx) and the headline object. */
+  --ascii-ink: var(--lp-violet-300);
+  --ascii-ink-paper: var(--lp-violet-800);
+  --ascii-alpha: 0.18;
+  --ascii-alpha-paper: 0.09;
+  --hobj-dark: var(--lp-violet-800);
+  --hobj-mid: var(--lp-violet);
+  --hobj-light: var(--lp-violet-300);
+
+  background: var(--lp-paper);
+  color: var(--lp-ink);
+  font-family: var(--lp-font-sans);
+}
+
+/*
+ * Fixed nav. Its colours are custom properties switched by data-theme
+ * (landing-nav.tsx) and cross-faded per property; the backdrop blur only
+ * toggles with data-solid and is never animated.
+ */
+.lp-nav {
+  --nav-ink: var(--lp-night-ink);
+  --nav-ink-2: var(--lp-night-ink-2);
+  --nav-surface: rgb(11 7 23 / 0.72);
+  --nav-line: rgb(255 255 255 / 0.08);
+}
+.lp-nav[data-theme="light"] {
+  --nav-ink: var(--lp-ink);
+  --nav-ink-2: var(--lp-ink-3);
+  --nav-surface: rgb(251 248 243 / 0.9);
+  --nav-line: rgb(26 16 51 / 0.08);
+}
+.lp-nav-bar {
+  background-color: transparent;
+  border-color: transparent;
+  transition:
+    background-color 320ms var(--lp-ease-out),
+    border-color 320ms var(--lp-ease-out);
+}
+.lp-nav[data-solid] .lp-nav-bar {
+  background-color: var(--nav-surface);
+  border-color: var(--nav-line);
+  backdrop-filter: blur(14px) saturate(1.4);
+}
+.lp-nav-ink,
+.lp-nav-link {
+  transition: color 320ms var(--lp-ease-out);
+}
+.lp-nav-ink {
+  color: var(--nav-ink);
+}
+.lp-nav-link {
+  color: var(--nav-ink-2);
+}
+.lp-nav-link:hover {
+  color: var(--nav-ink);
+}
+.lp-nav[data-theme="light"] :focus-visible {
+  outline-color: var(--lp-violet);
+}
+
+/*
+ * Dusk band: the hero's night carried down into the paper. The gradient
+ * passes through the brand violet instead of a grey midpoint, with a low
+ * dawn glow; the character texture on top dithers away as it goes.
+ */
+.lp-dusk {
+  height: clamp(380px, 64vh, 640px);
+  margin-top: -1px;
+  background:
+    radial-gradient(
+      70% 40% at 50% 60%,
+      rgb(167 139 250 / 0.2),
+      rgb(167 139 250 / 0) 70%
+    ),
+    linear-gradient(
+      in oklab to bottom,
+      var(--lp-night) 0%,
+      var(--lp-ground) 26%,
+      color-mix(in oklab, var(--lp-violet-800) 36%, var(--lp-ground)) 42%,
+      color-mix(in oklab, var(--lp-violet-400) 50%, var(--lp-violet-800)) 56%,
+      color-mix(in oklab, var(--lp-violet-300) 60%, var(--lp-paper)) 70%,
+      color-mix(in oklab, var(--lp-violet-100) 45%, var(--lp-paper)) 84%,
+      var(--lp-paper) 100%
+    );
+}
+/* Carries the hero's side vignette into the band and fades it out going
+   down, so the hero's darker corners blend instead of ending on a seam. */
+.lp-dusk::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: var(--lp-night-sides);
+  mask-image: linear-gradient(to bottom, #000 0%, transparent 60%);
+}
+/*
+ * Band from the cream paper into the lilac techniques zone: one soft
+ * oklab ramp, flat at both ends so neither seam shows, with the letter
+ * texture gathering toward the lilac in the paper's violet ink.
+ */
+.lp-dusk-out {
+  --ascii-ink: var(--lp-violet-800);
+  --ascii-alpha: 0.08;
+  height: clamp(110px, 14vh, 140px);
+  background: linear-gradient(
+    in oklab to bottom,
+    var(--lp-paper) 0%,
+    color-mix(in oklab, var(--lp-lilac) 50%, var(--lp-paper)) 50%,
+    var(--lp-lilac) 100%
+  );
+}
+/* Lilac back into the paper below the section, the same ramp reversed. */
+.lp-tech-out {
+  height: clamp(80px, 10vh, 100px);
+  background: linear-gradient(
+    in oklab to bottom,
+    var(--lp-lilac) 0%,
+    color-mix(in oklab, var(--lp-lilac) 50%, var(--lp-paper)) 50%,
+    var(--lp-paper) 100%
+  );
+}
+@media (max-width: 767px) {
+  .lp-dusk {
+    height: 52vh;
+  }
+  .lp-dusk-out {
+    height: 12vh;
+  }
+  .lp-tech-out {
+    height: 8vh;
+  }
+}
+
+/* Section headline: Inter display at poster size, one serif italic word. */
+
+.lp-headline {
+  font-family: var(--lp-font-head);
+  font-weight: 600;
+  font-size: clamp(44px, 7vw, 104px);
+  line-height: 1;
+  letter-spacing: -0.038em;
+  text-wrap: balance;
+}
+.lp-headline-accent {
+  font-family: var(--lp-font-display);
+  font-style: italic;
+  font-weight: 400;
+  /* The serif's smaller x-height, matched to the sans. */
+  font-size: 1.1em;
+  line-height: 0;
+  letter-spacing: -0.01em;
+  color: var(--lp-violet);
+}
+
+/*
+ * Inline headline object: square, about 1.35 cap heights, dipping a little
+ * below the baseline as an object resting on the line.
+ */
+.lp-hobj {
+  position: relative;
+  display: inline-block;
+  width: 0.98em;
+  height: 0.98em;
+  margin-inline: 0.02em;
+  vertical-align: -0.16em;
+}
+.lp-hobj-placeholder {
+  overflow: hidden;
+  border-radius: 0.22em;
+  box-shadow:
+    0 0 0 1px rgb(91 33 182 / 0.18) inset,
+    0 0.12em 0.3em -0.08em rgb(76 29 149 / 0.35);
+  transform: rotate(-6deg);
+  animation: lp-hobj-float 7s ease-in-out infinite;
+}
+.lp-hobj-dither {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  background: var(--hobj-mid);
+}
+/* Tile tones (headline-object.tsx): three dither steps and a glyph ink
+   that keeps contrast on the lighter tiles. */
+.lp-hobj[data-tone="yellow"] {
+  --hobj-dark: var(--lp-amber-500);
+  --hobj-mid: var(--lp-yellow);
+  --hobj-light: var(--lp-yellow-100);
+  --hobj-glyph: var(--lp-amber-800);
+}
+.lp-hobj[data-tone="mint"] {
+  --hobj-dark: var(--lp-green-500);
+  --hobj-mid: var(--lp-mint);
+  --hobj-light: var(--lp-mint-50);
+  --hobj-glyph: var(--lp-mint-800);
+}
+.lp-hobj[data-tone="red"] {
+  --hobj-dark: var(--lp-red-700);
+  --hobj-mid: var(--lp-red);
+  --hobj-light: var(--lp-red-400);
+  --hobj-glyph: var(--lp-paper);
+}
+.lp-hobj-glyph {
+  position: absolute;
+  inset: 21%;
+  width: 58%;
+  height: 58%;
+  color: var(--hobj-glyph, var(--lp-paper));
+  filter: drop-shadow(0 0.02em 0.03em rgb(46 16 101 / 0.35));
+}
+@keyframes lp-hobj-float {
+  0%,
+  100% {
+    transform: rotate(-6deg) translateY(0);
+  }
+  50% {
+    transform: rotate(-3deg) translateY(-0.05em);
+  }
+}
+
+/* Video placeholder: a night window on the paper, fine inner border. */
+.lp-video-slot {
+  --ascii-alpha: 0.16;
+  background:
+    radial-gradient(
+      60% 70% at 50% 50%,
+      rgb(124 58 237 / 0.3),
+      rgb(124 58 237 / 0) 70%
+    ),
+    var(--lp-night);
+  box-shadow:
+    0 0 0 1px rgb(26 16 51 / 0.1),
+    0 40px 80px -40px rgb(26 16 51 / 0.55);
+}
+.lp-video-slot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08);
+  pointer-events: none;
+}
+.lp-video-play {
+  background: var(--lp-violet);
+  color: #ffffff;
+  box-shadow:
+    inset 0 0 0 1px rgb(196 181 253 / 0.45),
+    0 18px 40px -12px rgb(124 58 237 / 0.75);
+}
+.lp-video-play::before {
+  content: "";
+  position: absolute;
+  inset: -14px;
+  border-radius: inherit;
+  border: 1px solid rgb(196 181 253 / 0.35);
+  animation: lp-play-ring 2.8s var(--lp-ease-out) infinite;
+}
+@keyframes lp-play-ring {
+  0% {
+    opacity: 0.9;
+    transform: scale(0.86);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.35);
+  }
+}
+
+/* Steps: a hairline with a short violet lead, number, then the step. */
+.lp-step {
+  border-top: 1px solid rgb(26 16 51 / 0.12);
+}
+.lp-step::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: 0;
+  width: 44px;
+  height: 1px;
+  background: var(--lp-violet);
+}
+
+/*
+ * Techniques (techniques.tsx): a pinned horizontal track on desktop. The
+ * section is one screen plus 70vh per frame travelled tall; the frame
+ * sticks and the rail (a narrower intro, then four technique frames)
+ * slides left as it scrolls. overflow: clip
+ * (not hidden) so focus or find-in-page can never scroll it sideways.
+ */
+.lp-tech {
+  background: var(--lp-lilac);
+}
+/* One screen for the frame plus 70vh of scroll per frame travelled: the
+   rail travels 3 technique frames plus the intro (INTRO in
+   techniques.tsx), so --lp-hintro must match it. */
+.lp-htrack {
+  --lp-hintro: 0.66;
+  height: calc(100vh + (3 + var(--lp-hintro)) * 70vh);
+}
+.lp-hframe {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow: clip;
+}
+.lp-hrail {
+  position: relative;
+  display: flex;
+  width: calc((4 + var(--lp-hintro)) * 100%);
+  height: 100%;
+}
+.lp-hpanel {
+  width: calc(100% / (4 + var(--lp-hintro)));
+  height: 100%;
+  flex-shrink: 0;
+}
+.lp-hpanel.lp-hintro {
+  width: calc(100% * var(--lp-hintro) / (4 + var(--lp-hintro)));
+}
+/* Letters held still in the frame while the panels pass over them. */
+.lp-hfield {
+  --ascii-ink: var(--lp-violet-800);
+  --ascii-ink-paper: var(--lp-violet-800);
+  --ascii-alpha: 0.07;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  mask-image: radial-gradient(80% 70% at 50% 55%, transparent 35%, #000 100%);
+}
+.lp-hcue {
+  color: var(--lp-violet-deep);
+  box-shadow: inset 0 0 0 1px rgb(91 33 182 / 0.22);
+  animation: lp-hcue 2.4s var(--lp-ease-out) infinite;
+}
+@keyframes lp-hcue {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(6px);
+  }
+}
+
+/* Technique tones: the platform colours, a pastel, an ink that passes AA
+   on the lilac and on white, and the cover edge. */
+[data-tone="yellow"] {
+  --tech: var(--lp-yellow);
+  --tech-soft: var(--lp-yellow-100);
+  --tech-ink: var(--lp-amber-800);
+  --tech-edge: var(--lp-amber-500);
+}
+[data-tone="mint"] {
+  --tech: var(--lp-mint);
+  --tech-soft: var(--lp-mint-100);
+  --tech-ink: var(--lp-mint-800);
+  --tech-edge: var(--lp-green-500);
+}
+[data-tone="red"] {
+  --tech: var(--lp-red-400);
+  --tech-soft: var(--lp-red-100);
+  --tech-ink: var(--lp-red-700);
+  --tech-edge: var(--lp-red);
+}
+/* Violet, Cogni's own colour, is the study companion's: it speaks about
+   every technique, so it takes none of theirs. */
+[data-tone="violet"] {
+  --tech: var(--lp-violet-400);
+  --tech-soft: var(--lp-violet-100);
+  --tech-ink: var(--lp-violet-800);
+  --tech-edge: var(--lp-violet);
+}
+
+.lp-tech-step,
+.lp-tech-lead {
+  color: var(--tech-ink);
+}
+/* The companion's session card, lifted like the placeholder's front card. */
+.lp-companion {
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--tech-edge) 30%, transparent),
+    0 1px 2px rgb(0 0 0 / 0.06),
+    0 24px 48px -24px rgb(26 16 51 / 0.4);
+}
+.lp-tech-dot {
+  width: 8px;
+  height: 8px;
+  background: var(--tech-edge);
+}
+.lp-tech-point {
+  border-top: 1px solid rgb(26 16 51 / 0.1);
+}
+.lp-tech-point:last-child {
+  border-bottom: 1px solid rgb(26 16 51 / 0.1);
+}
+.lp-tech-check {
+  color: var(--tech-ink);
+  background: var(--tech-soft);
+  box-shadow: inset 0 0 0 1px
+    color-mix(in oklab, var(--tech-edge) 45%, transparent);
+}
+
+/* Illustration placeholder, in the line of the platform's notebook fan:
+   160° gradient covers in the technique colour with a darker edge, fanned
+   behind one white card with an icon tile. Sizes follow the stage
+   (container units), so it scales as one drawing. */
+.lp-art-stage {
+  border-radius: 32px;
+  background:
+    radial-gradient(
+      60% 55% at 50% 55%,
+      color-mix(in oklab, var(--tech-soft) 85%, transparent),
+      transparent 75%
+    ),
+    rgb(255 255 255 / 0.35);
+  box-shadow: inset 0 0 0 1px rgb(91 33 182 / 0.1);
+}
+.lp-art-cover {
+  position: absolute;
+  top: 18%;
+  left: 21%;
+  width: 52%;
+  height: 64%;
+  border: 1px solid var(--tech-edge);
+  border-radius: 3cqw 5cqw 5cqw 3cqw;
+  background: linear-gradient(160deg, var(--tech-soft), var(--tech));
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.05),
+    0 4cqw 8cqw -4cqw rgb(26 16 51 / 0.3);
+}
+.lp-art-cover::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 5cqw;
+  border-radius: inherit;
+  background: rgb(0 0 0 / 0.07);
+}
+.lp-art-cover-back {
+  transform: translateX(-14%) rotate(-11deg);
+}
+.lp-art-cover-mid {
+  transform: translateX(16%) translateY(-3%) rotate(8deg);
+}
+.lp-art-ribbon {
+  position: absolute;
+  top: -1px;
+  right: 14%;
+  width: 6cqw;
+  height: 17cqw;
+  background: var(--lp-paper);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 82%, 0 100%);
+}
+.lp-art-card {
+  position: absolute;
+  top: 27%;
+  left: 24%;
+  width: 54%;
+  height: 54%;
+  display: flex;
+  flex-direction: column;
+  padding: 6cqw 5.5cqw;
+  border-radius: 4cqw;
+  background: #ffffff;
+  transform: rotate(-3deg);
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--tech-edge) 40%, transparent),
+    0 1px 2px rgb(0 0 0 / 0.06),
+    0 6cqw 12cqw -5cqw rgb(26 16 51 / 0.35);
+}
+.lp-art-tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 10cqw;
+  height: 10cqw;
+  border-radius: 2.6cqw;
+  color: var(--tech-ink);
+  background: var(--tech-soft);
+  box-shadow: inset 0 0 0 1px var(--tech-edge);
+}
+.lp-art-kicker {
+  margin-top: auto;
+  font-size: 2.3cqw;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--tech-ink);
+}
+.lp-art-text {
+  margin-top: 2cqw;
+  font-size: 3.9cqw;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: var(--lp-ink);
+}
+
+/* 01–04 progress at the foot of the frame: the nearest technique's line
+   fills in its colour. */
+.lp-hprogress {
+  position: absolute;
+  bottom: 32px;
+  left: 50%;
+  display: flex;
+  gap: 20px;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.lp-hprogress-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--lp-ink-3);
+  transition: color 240ms var(--lp-ease-out);
+}
+.lp-hprogress-step[data-active] {
+  color: var(--lp-ink);
+}
+.lp-hprogress-line {
+  position: relative;
+  width: 40px;
+  height: 2px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: rgb(26 16 51 / 0.12);
+}
+.lp-hprogress-line::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--tech-edge);
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+  transition: transform 320ms var(--lp-ease-out);
+}
+.lp-hprogress-step[data-active] .lp-hprogress-line::after {
+  transform: scaleX(1);
+}
+
+/* Phones and reduced motion: no pin, the frames stack and read in order. */
+@media (max-width: 767px), (prefers-reduced-motion: reduce) {
+  .lp-htrack {
+    height: auto;
+  }
+  .lp-hframe {
+    position: relative;
+    height: auto;
+    overflow: visible;
+  }
+  .lp-hrail {
+    flex-direction: column;
+    width: 100%;
+    height: auto;
+    /* biome-ignore lint/complexity/noImportantStyles: only !important beats the inline transform Motion writes */
+    transform: none !important;
+  }
+  .lp-hpanel,
+  .lp-hpanel.lp-hintro {
+    width: 100%;
+    height: auto;
+  }
+  .lp-hprogress,
+  .lp-hfield {
+    display: none;
+  }
+}
+
+.lp-shadow-float {
+  box-shadow: 0 30px 60px rgb(10 5 26 / 0.5);
+}
+
+.lp-shadow-card {
+  box-shadow: 0 8px 24px rgb(76 29 149 / 0.08);
+}
+
+.lp-shadow-window {
+  box-shadow: 0 24px 50px rgb(76 29 149 / 0.1);
+}
+
+/* In-page anchors glide; the hero waits for the glide to end before it
+   collapses its pin (shouldCollapsePin), so the jump is never cut short. */
+@media (prefers-reduced-motion: no-preference) {
+  html:has(.lp) {
+    scroll-behavior: smooth;
+  }
+}
+
+.lp :focus-visible {
+  outline: 2px solid var(--lp-violet-300);
+  outline-offset: 3px;
+}
+
+.lp-on-paper :focus-visible {
+  outline-color: var(--lp-violet);
+}
+
+/*
+ * Comparación honesta (comparison.tsx): the usual way on a warm paper step,
+ * the Cogni way on white, its route rail drawn in the step tones.
+ */
+.lp-way-usual {
+  background: var(--lp-paper-2);
+}
+.lp-way-cogni {
+  box-shadow: 0 24px 50px rgb(76 29 149 / 0.08);
+}
+.lp-pile-file {
+  box-shadow: 0 6px 16px rgb(26 16 51 / 0.06);
+}
+.lp-pile-note {
+  color: var(--lp-amber-800);
+  background: var(--lp-yellow-200);
+  box-shadow: 0 10px 24px -10px rgb(146 64 14 / 0.35);
+}
+.lp-route-step[data-tone="violet"] {
+  --route-soft: var(--lp-violet-100);
+  --route-ink: var(--lp-violet);
+}
+.lp-route-step[data-tone="yellow"] {
+  --route-soft: var(--lp-yellow-100);
+  --route-ink: var(--lp-amber-700);
+}
+.lp-route-step[data-tone="mint"] {
+  --route-soft: var(--lp-mint-100);
+  --route-ink: var(--lp-green-700);
+}
+.lp-route-step[data-tone="companion"] {
+  --route-soft: var(--lp-violet-100);
+  --route-ink: var(--lp-violet-800);
+}
+.lp-route-step[data-tone="rose"] {
+  --route-soft: var(--lp-rose-100);
+  --route-ink: var(--lp-rose-700);
+}
+.lp-route-node,
+.lp-route-chip {
+  color: var(--route-ink);
+  background: var(--route-soft);
+}
+.lp-route-line {
+  background: var(--lp-violet-200);
+  transform-origin: 50% 0;
+}
+
+/*
+ * Preguntas frecuentes (faq.tsx): the paper eases into the lilac at the
+ * top edge so the seam never shows; answers open on a grid-row track.
+ */
+.lp-faq {
+  background: linear-gradient(
+    in oklab to bottom,
+    var(--lp-paper) 0,
+    var(--lp-lilac) 120px
+  );
+}
+.lp-faq-field {
+  --ascii-ink: var(--lp-violet-800);
+  --ascii-ink-paper: var(--lp-violet-800);
+  --ascii-alpha: 0.06;
+  position: absolute;
+  inset: -40px -20px;
+  pointer-events: none;
+  mask-image: radial-gradient(70% 60% at 30% 40%, #000 0%, transparent 100%);
+}
+.lp-headline-compact {
+  font-size: clamp(44px, 5.4vw, 80px);
+}
+.lp-faq-item {
+  border-bottom: 1px solid rgb(26 16 51 / 0.12);
+}
+.lp-faq-icon {
+  transition: transform 240ms var(--lp-ease-out);
+}
+.lp-faq-button[aria-expanded="true"] .lp-faq-icon {
+  transform: rotate(45deg);
+}
+.lp-faq-panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 280ms var(--lp-ease-out);
+}
+.lp-faq-panel[data-open] {
+  grid-template-rows: 1fr;
+}
+@media (hover: hover) {
+  .lp-faq-button:hover .lp-faq-icon {
+    background: var(--lp-violet-100);
+  }
+}
+
+/*
+ * Empieza hoy (closing.tsx): the lilac sinks back into the hero's night,
+ * the dusk band in reverse, so the page closes where it opened.
+ */
+.lp-closing {
+  --ascii-ink: var(--lp-violet-300);
+  --ascii-ink-paper: var(--lp-violet-800);
+  --ascii-alpha: 0.14;
+  background: linear-gradient(
+    in oklab to bottom,
+    var(--lp-lilac) 0%,
+    color-mix(in oklab, var(--lp-violet-400) 70%, var(--lp-violet-800)) 22%,
+    color-mix(in oklab, var(--lp-violet-800) 40%, var(--lp-ground)) 45%,
+    var(--lp-ground) 70%,
+    var(--lp-night) 100%
+  );
+}
+.lp-accent-yellow {
+  color: var(--lp-yellow);
+}
+
+/*
+ * /ciencia (science-concepts.tsx): each idea takes one platform colour for
+ * its dot, its ink and the ground of its visual.
+ */
+.lp-sci[data-tone="yellow"] {
+  --sci-dot: var(--lp-amber-500);
+  --sci-ink: var(--lp-amber-800);
+  --sci-soft: var(--lp-yellow-100);
+}
+.lp-sci[data-tone="violet"] {
+  --sci-dot: var(--lp-violet);
+  --sci-ink: var(--lp-violet-800);
+  --sci-soft: var(--lp-violet-100);
+}
+.lp-sci[data-tone="mint"] {
+  --sci-dot: var(--lp-green-500);
+  --sci-ink: var(--lp-green-700);
+  --sci-soft: var(--lp-mint-100);
+}
+.lp-sci[data-tone="rose"] {
+  --sci-dot: var(--lp-rose);
+  --sci-ink: var(--lp-rose-700);
+  --sci-soft: var(--lp-rose-100);
+}
+.lp-sci[data-tone="companion"] {
+  --sci-dot: var(--lp-violet-400);
+  --sci-ink: var(--lp-violet-800);
+  --sci-soft: var(--lp-violet-100);
+}
+.lp-sci[data-tone="green"] {
+  --sci-dot: var(--lp-net-2);
+  --sci-ink: var(--lp-green-700);
+  --sci-soft: var(--lp-mint-100);
+}
+.lp-sci-dot {
+  background: var(--sci-dot);
+}
+.lp-sci-step,
+.lp-sci-ink {
+  color: var(--sci-ink);
+}
+.lp-sci-visual {
+  background: var(--sci-soft);
+}
+/* Secondary action on the night: an outline that fills on hover. */
+.lp-cta-ghost {
+  color: #ffffff;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.35);
+  transition:
+    background-color 160ms var(--lp-ease-out),
+    transform 160ms var(--lp-ease-out);
+}
+@media (hover: hover) {
+  .lp-cta-ghost:hover {
+    background: rgb(255 255 255 / 0.08);
+  }
+}
+/* /creditos rows. */
+.lp-credit + .lp-credit {
+  border-top: 1px solid var(--lp-line);
+}
+/* A visible "[PENDIENTE: …]": missing data or an open decision. */
+.lp-pending {
+  padding: 0.05em 0.35em;
+  border-radius: 0.3em;
+  color: var(--lp-amber-800);
+  background: var(--lp-yellow-200);
+  box-shadow: inset 0 0 0 1px rgb(146 64 14 / 0.25);
+  font-weight: 600;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+/* Shared footer (_components/site-footer.tsx). */
+.lp-footer-title {
+  font-family: var(--lp-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--lp-night-ink-3);
+}
+.lp-footer-link {
+  color: var(--lp-night-ink-2);
+  transition:
+    color 200ms ease,
+    text-decoration-color 200ms ease;
+}
+@media (hover: hover) {
+  .lp-footer-link:hover {
+    color: var(--lp-night-ink);
+  }
+}
+.lp-footer-base {
+  border-top: 1px solid rgb(255 255 255 / 0.1);
+}
+
+/* Inline text link: the underline draws in on hover (pointer devices). */
+.lp-link {
+  text-decoration-line: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.25em;
+  text-decoration-color: transparent;
+  transition: text-decoration-color 200ms ease;
+}
+@media (hover: hover) {
+  .lp-link:hover {
+    text-decoration-color: currentColor;
+  }
+}
+/* Press feedback for every pressable element on the landing. */
+.lp-press {
+  transition: transform 160ms var(--lp-ease-out);
+}
+.lp-press:active {
+  transform: scale(0.97);
+}
+
+/*
+ * Hero scene. The track is the scroll distance of the pin; the stage stays
+ * stuck to the viewport while it scrolls past.
+ */
+.lp-rise-track {
+  height: 360vh;
+}
+@media (max-width: 767px) {
+  .lp-rise-track {
+    height: 240vh;
+  }
+}
+
+.lp-rise ::selection {
+  background: rgb(124 58 237 / 0.55);
+  color: var(--lp-night-ink);
+}
+
+/* Layered violet nebula behind the web (the login showcase's haze). */
+.lp-rise-nebula {
+  background:
+    radial-gradient(45% 35% at 62% 40%, rgb(124 58 237 / 0.22), transparent 70%),
+    radial-gradient(
+      35% 30% at 30% 62%,
+      rgb(167 139 250 / 0.12),
+      transparent 70%
+    ),
+    radial-gradient(30% 25% at 80% 75%, rgb(190 24 93 / 0.08), transparent 70%),
+    var(--lp-night);
+}
+
+/* Vignette at the edges, plus a soft darkening behind the text so the
+   lines never fight the words (keeps the copy well above AA). */
+.lp-rise-veil {
+  background:
+    radial-gradient(
+      ellipse 46% 38% at 50% 54%,
+      rgb(11 7 23 / 0.8),
+      rgb(11 7 23 / 0.45) 55%,
+      rgb(11 7 23 / 0) 100%
+    ),
+    /* Sides and top only: a bottom vignette read as a black seam above the
+       dusk band, so the hero's lower edge keeps the plain night ground. */
+    var(--lp-night-sides),
+    linear-gradient(to bottom, rgb(6 4 14 / 0.55), rgb(6 4 14 / 0) 30%);
+}
+
+/* Passed and latched: the pin shrinks to one viewport (hero.tsx). */
+.lp-rise-track[data-collapsed] {
+  height: auto;
+}
+
+.lp-rise-title {
+  transform-origin: 50% 100%;
+}
+
+.lp-cta-primary {
+  background: var(--lp-violet);
+  color: #ffffff;
+  box-shadow:
+    0 0 0 1px rgb(196 181 253 / 0.25) inset,
+    0 10px 30px -8px rgb(124 58 237 / 0.6);
+  transition:
+    background-color 160ms var(--lp-ease-out),
+    transform 160ms var(--lp-ease-out);
+}
+.lp-cta-primary:hover {
+  background: var(--lp-violet-deep);
+}
+
+/* Keyboard users reach the actions without scrolling through the pin. */
+.lp-rise-outro:focus-within {
+  /* biome-ignore lint/complexity/noImportantStyles: only !important beats the inline style Motion writes */
+  opacity: 1 !important;
+  /* biome-ignore lint/complexity/noImportantStyles: same as above */
+  transform: none !important;
+  /* biome-ignore lint/complexity/noImportantStyles: same as above */
+  pointer-events: auto !important;
+}
+
+/* Network icons: one hue each, a soft glow, and depth blur on far nodes. */
+.lp-net-icon {
+  position: absolute;
+  line-height: 0;
+  will-change: opacity, transform;
+}
+.lp-net-glyph {
+  filter: drop-shadow(
+    0 0 6px color-mix(in srgb, currentColor 55%, transparent)
+  );
+}
+.lp-net-far {
+  opacity: 0.5;
+  filter: blur(1.6px);
+}
+.lp-net-mid {
+  opacity: 0.85;
+}
+.lp-net-hue-0 {
+  color: var(--lp-net-0);
+}
+.lp-net-hue-1 {
+  color: var(--lp-net-1);
+}
+.lp-net-hue-2 {
+  color: var(--lp-net-2);
+}
+.lp-net-hue-3 {
+  color: var(--lp-net-3);
+}
+.lp-net-hue-4 {
+  color: var(--lp-net-4);
+}
+.lp-net-hue-5 {
+  color: var(--lp-net-5);
+}
+.lp-net-hue-6 {
+  color: var(--lp-net-6);
+}
+.lp-net-hue-7 {
+  color: var(--lp-net-7);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-faq-icon,
+  .lp-faq-panel {
+    transition: none;
+  }
+  /* The closing headline shows sharp: no blur settles into it. */
+  .lp-closing h2 {
+    /* biome-ignore lint/complexity/noImportantStyles: only !important beats the inline style Motion writes */
+    filter: none !important;
+  }
+  .lp-press:active {
+    transform: none;
+  }
+  .lp-nav-bar,
+  .lp-nav-ink,
+  .lp-nav-link {
+    transition: none;
+  }
+  .lp-hobj-placeholder,
+  .lp-video-play::before,
+  .lp-hcue {
+    animation: none;
+  }
+  .lp-hprogress-step,
+  .lp-hprogress-line::after {
+    transition: none;
+  }
+  /* Overrides the scroll-linked inline transforms of the pillar bands and
+     the video slot. */
+  .lp-band-ground,
+  .lp-video-grow {
+    /* biome-ignore lint/complexity/noImportantStyles: only !important beats the inline style Motion writes */
+    transform: none !important;
+  }
+  /* Hero: no pin, no scrub; the full sharp sentence and actions show. */
+  .lp-rise-track {
+    height: auto;
+  }
+  .lp-rise-stage {
+    position: relative;
+    height: auto;
+    min-height: 100dvh;
+    padding-block: 120px 96px;
+  }
+  .lp-rise-block,
+  .lp-rise-title,
+  .lp-rise-outro,
+  .lp-rise-word {
+    /* biome-ignore lint/complexity/noImportantStyles: overrides the scroll-linked inline styles */
+    opacity: 1 !important;
+    /* biome-ignore lint/complexity/noImportantStyles: same as above */
+    filter: none !important;
+    /* biome-ignore lint/complexity/noImportantStyles: same as above */
+    transform: none !important;
+    /* biome-ignore lint/complexity/noImportantStyles: same as above */
+    pointer-events: auto !important;
+  }
+  /* The headline shows at its settled size: no scroll moves it there. */
+  .lp-rise-title {
+    /* biome-ignore lint/complexity/noImportantStyles: overrides the scroll-linked inline transform */
+    transform: scale(0.6) !important;
+  }
+}
