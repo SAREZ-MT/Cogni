@@ -407,8 +407,16 @@ if (process.env.DATABASE_URL) {
         sessions: 1,
       });
       expect(await deletion.preview(pageId, other.id)).toBeNull();
+      expect(await deletion.delete(pageId, other.id, NOW)).toBe(false);
+      expect((await ofPage(pageId)).recallQuestions).toBe(1);
+      const recallFeedback = async () =>
+        (await feedbackKinds()).filter((kind) => kind === "recall").length;
+      const feedbackBefore = await recallFeedback();
+
       expect(await deletion.delete(pageId, owner.id, NOW)).toBe(true);
 
+      // The page's finished session had one feedback row (no FK: erased).
+      expect(await recallFeedback()).toBe(feedbackBefore - 1);
       const left = await ofPage(pageId);
       expect(left.recallQuestions).toBe(0);
       expect(left.recallSessions).toBe(0);
