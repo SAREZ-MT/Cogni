@@ -29,6 +29,12 @@ import { ok } from "@/shared/kernel/result";
 import { createTestDb } from "./helpers/test-db";
 import { createTestOwner, deleteTestOwner } from "./helpers/test-owner";
 
+// Reviews are due per local day (UTC here): due before the next midnight.
+function utcDayCutoff(now: Date): Date {
+  const day = 86_400_000;
+  return new Date((Math.floor(now.getTime() / day) + 1) * day);
+}
+
 // An exam session against Postgres: the finish stores the result, the page
 // state and the SM-2 reviews in one transaction, rolls all of it back when
 // the reviews fail, and two concurrent finishes (or starts) of one page
@@ -114,6 +120,7 @@ if (process.env.DATABASE_URL) {
         pages: pageReader,
         uow: new DrizzleExamSessionUnitOfWork(connection, ids),
         clock: createFixedClock(STARTED),
+        dueCutoff: utcDayCutoff,
         ids,
       },
       owner.id,
@@ -236,6 +243,7 @@ if (process.env.DATABASE_URL) {
       {
         uow: new DrizzleExamSessionUnitOfWork(connection, ids),
         clock: createFixedClock(FINISHED),
+        dueCutoff: utcDayCutoff,
       },
       owner.id,
     );

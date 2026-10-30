@@ -4,6 +4,9 @@ import { EXAM_ERROR } from "./errors";
 
 const now = new Date("2026-10-05T10:00:00.000Z");
 const day = (n: number) => new Date(now.getTime() + n * 86_400_000);
+// The owner's "due" bound at `now`: the start of their next local day (UTC
+// here). Reviews are due per day, so anything due before it is due.
+const dueBefore = new Date("2026-10-06T00:00:00.000Z");
 
 function candidate(
   rootId: string,
@@ -44,7 +47,9 @@ describe("composeExam", () => {
     [12.5, EXAM_ERROR.INVALID_QUESTION_COUNT],
   ])("refuses N = %s", (requestedCount, code) => {
     expect(
-      errorCode(composeExam({ requestedCount, candidates: plain(40), now })),
+      errorCode(
+        composeExam({ requestedCount, candidates: plain(40), dueBefore }),
+      ),
     ).toBe(code);
   });
 
@@ -58,7 +63,7 @@ describe("composeExam", () => {
     const result = composeExam({
       requestedCount,
       candidates: plain(available),
-      now,
+      dueBefore,
     });
 
     expect(roots(result)).toHaveLength(length);
@@ -67,9 +72,31 @@ describe("composeExam", () => {
   it.each([0, 9])("refuses a page with %i active roots", (available) => {
     expect(
       errorCode(
-        composeExam({ requestedCount: 10, candidates: plain(available), now }),
+        composeExam({
+          requestedCount: 10,
+          candidates: plain(available),
+          dueBefore,
+        }),
       ),
     ).toBe(EXAM_ERROR.NOT_ENOUGH_QUESTIONS);
+  });
+
+  it("counts a root due later today as due and one due tomorrow as not", () => {
+    const candidates = [
+      candidate("due-tomorrow", { dueAt: dueBefore, lastSeenAt: day(-9) }),
+      candidate("due-tonight", {
+        dueAt: new Date(dueBefore.getTime() - 1),
+        lastSeenAt: day(-1),
+      }),
+      ...plain(8),
+    ];
+
+    expect(
+      roots(composeExam({ requestedCount: 10, candidates, dueBefore })).slice(
+        0,
+        2,
+      ),
+    ).toEqual(["due-tonight", "due-tomorrow"]);
   });
 
   it("orders failed roots first, then due roots, then least recently seen", () => {
@@ -85,7 +112,10 @@ describe("composeExam", () => {
     ];
 
     expect(
-      roots(composeExam({ requestedCount: 10, candidates, now })).slice(0, 7),
+      roots(composeExam({ requestedCount: 10, candidates, dueBefore })).slice(
+        0,
+        7,
+      ),
     ).toEqual([
       "failed",
       "due-old",
@@ -107,7 +137,10 @@ describe("composeExam", () => {
     ];
 
     expect(
-      roots(composeExam({ requestedCount: 10, candidates, now })).slice(0, 3),
+      roots(composeExam({ requestedCount: 10, candidates, dueBefore })).slice(
+        0,
+        3,
+      ),
     ).toEqual(["f-c", "f-a", "f-b"]);
   });
 
@@ -120,7 +153,10 @@ describe("composeExam", () => {
     ];
 
     expect(
-      roots(composeExam({ requestedCount: 10, candidates, now })).slice(0, 3),
+      roots(composeExam({ requestedCount: 10, candidates, dueBefore })).slice(
+        0,
+        3,
+      ),
     ).toEqual(["f-dated", "f-none-a", "f-none-b"]);
   });
 
@@ -132,7 +168,10 @@ describe("composeExam", () => {
     ];
 
     expect(
-      roots(composeExam({ requestedCount: 10, candidates, now })).slice(0, 3),
+      roots(composeExam({ requestedCount: 10, candidates, dueBefore })).slice(
+        0,
+        3,
+      ),
     ).toEqual(["new-a", "new-b", "r-00"]);
   });
 
@@ -143,7 +182,7 @@ describe("composeExam", () => {
       candidate("twin", { questionId: "q-a" }),
     ];
 
-    const result = composeExam({ requestedCount: 10, candidates, now });
+    const result = composeExam({ requestedCount: 10, candidates, dueBefore });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -156,9 +195,9 @@ describe("composeExam", () => {
   it("puts every root first when all failed last time", () => {
     const candidates = plain(12).map((c) => ({ ...c, failedLastTime: true }));
 
-    expect(roots(composeExam({ requestedCount: 10, candidates, now }))).toEqual(
-      plain(10).map((c) => c.rootId),
-    );
+    expect(
+      roots(composeExam({ requestedCount: 10, candidates, dueBefore })),
+    ).toEqual(plain(10).map((c) => c.rootId));
   });
 
   it("is stable regardless of the input order", () => {
@@ -166,8 +205,12 @@ describe("composeExam", () => {
     const reversed = [...candidates].reverse();
 
     expect(
-      roots(composeExam({ requestedCount: 10, candidates: reversed, now })),
-    ).toEqual(roots(composeExam({ requestedCount: 10, candidates, now })));
+      roots(
+        composeExam({ requestedCount: 10, candidates: reversed, dueBefore }),
+      ),
+    ).toEqual(
+      roots(composeExam({ requestedCount: 10, candidates, dueBefore })),
+    );
   });
 
   it("returns one question per root", () => {
@@ -176,7 +219,7 @@ describe("composeExam", () => {
       candidate("r-00", { questionId: "q-zz" }),
     ];
 
-    const result = composeExam({ requestedCount: 30, candidates, now });
+    const result = composeExam({ requestedCount: 30, candidates, dueBefore });
 
     expect(roots(result)).toHaveLength(10);
     if (!result.ok) return;
@@ -204,7 +247,7 @@ describe("composeRetake", () => {
       variantsByRoot,
       shownQuestionIds,
       otherCandidates,
-      now,
+      dueBefore,
     });
 
     expect(result.ok).toBe(true);
@@ -227,7 +270,7 @@ describe("composeRetake", () => {
       variantsByRoot,
       shownQuestionIds,
       otherCandidates: plain(40),
-      now,
+      dueBefore,
     });
 
     expect(result.ok && result.value.length).toBe(12);
@@ -241,7 +284,7 @@ describe("composeRetake", () => {
       variantsByRoot: new Map(many.map((id) => [id, `v-${id}`])),
       shownQuestionIds: [],
       otherCandidates: plain(10),
-      now,
+      dueBefore,
     });
 
     expect(result.ok).toBe(true);
@@ -260,7 +303,7 @@ describe("composeRetake", () => {
           variantsByRoot: new Map([["r-02", "v-02"]]),
           shownQuestionIds,
           otherCandidates: plain(12),
-          now,
+          dueBefore,
         }),
       ),
     ).toBe(EXAM_ERROR.RETAKE_VARIANT_MISSING);
@@ -278,7 +321,7 @@ describe("composeRetake", () => {
           ]),
           shownQuestionIds,
           otherCandidates: plain(12),
-          now,
+          dueBefore,
         }),
       ),
     ).toBe(EXAM_ERROR.RETAKE_VARIANT_MISSING);
@@ -293,7 +336,7 @@ describe("composeRetake", () => {
           variantsByRoot: new Map(),
           shownQuestionIds: [],
           otherCandidates: plain(12),
-          now,
+          dueBefore,
         }),
       ),
     ).toBe(EXAM_ERROR.NO_RETAKE_PENDING);
@@ -308,7 +351,7 @@ describe("composeRetake", () => {
           variantsByRoot,
           shownQuestionIds,
           otherCandidates: plain(40),
-          now,
+          dueBefore,
         }),
       ),
     ).toBe(EXAM_ERROR.INVALID_QUESTION_COUNT);
@@ -325,7 +368,7 @@ describe("composeRetake", () => {
           variantsByRoot: new Map(many.map((id) => [id, `v-${id}`])),
           shownQuestionIds: [],
           otherCandidates: [],
-          now,
+          dueBefore,
         }),
       ),
     ).toBe(EXAM_ERROR.INVALID_QUESTION_COUNT);
@@ -341,7 +384,7 @@ describe("composeRetake", () => {
           shownQuestionIds,
           // r-02 and r-07 are failed roots: 9 distinct roots in total.
           otherCandidates: plain(9),
-          now,
+          dueBefore,
         }),
       ),
     ).toBe(EXAM_ERROR.NOT_ENOUGH_QUESTIONS);

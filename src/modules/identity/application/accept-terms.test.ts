@@ -30,6 +30,7 @@ describe("acceptTerms use case", () => {
     expect(result.value).toMatchObject({
       termsAcceptedVersion: TERMS_VERSION,
       termsAcceptedAt: LATER,
+      termsAcceptedMethod: "gate",
     });
     expect(await profiles.findById(OWNER_ID)).toEqual(result.value);
   });

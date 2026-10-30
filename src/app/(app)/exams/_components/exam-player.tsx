@@ -28,6 +28,11 @@ export interface ExamPlayerProps {
   pageTitle: string;
   pageHref: string;
   session: ExamSessionView;
+  // Where the back link leads and what it says (Phase 8 H18: the hub when
+  // opened from it); defaults to the notebook page.
+  back?: { href: string; label: string };
+  // The hub query the results keep (`desde=hub&cuaderno=`), without "?".
+  keepQuery?: string;
 }
 
 function elapsedSeconds(startedAt: string): number {
@@ -65,6 +70,8 @@ export function ExamPlayer({
   pageTitle,
   pageHref,
   session,
+  back = { href: pageHref, label: "Volver a la página" },
+  keepQuery = "",
 }: ExamPlayerProps) {
   const router = useRouter();
   const [questions, setQuestions] = useState(session.questions);
@@ -139,7 +146,7 @@ export function ExamPlayer({
         return;
       }
       router.push(
-        `/exams/${notebookId}/${session.pageId}/resultados?sesion=${session.sessionId}`,
+        `/exams/${notebookId}/${session.pageId}/resultados?sesion=${session.sessionId}${keepQuery ? `&${keepQuery}` : ""}`,
       );
     });
   }
@@ -153,7 +160,7 @@ export function ExamPlayer({
       data-testid="exam-session"
       className="mx-auto flex w-full max-w-[720px] flex-1 flex-col gap-5 py-8"
     >
-      <BackLink href={pageHref}>Volver a la página</BackLink>
+      <BackLink href={back.href}>{back.label}</BackLink>
 
       <div className="flex items-start justify-between gap-3">
         <div>

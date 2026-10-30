@@ -8,6 +8,7 @@ import { Card } from "@/shared/ui/card";
 import { SectionHeader } from "@/shared/ui/section-header";
 import { StatusBanner } from "@/shared/ui/status-banner";
 import { SetBreadcrumb } from "../_components/breadcrumb";
+import { ReplayTourButton } from "./replay-tour-button";
 
 // Configuración (Phase 7 T2a, user decision 2026-10-12): a minimal settings
 // page in the Profile Settings style (ui_kits/app/Profile Settings.html:
@@ -62,6 +63,22 @@ export default async function SettingsPage() {
             initialTimeZone={current}
           />
         )}
+      </Card>
+
+      <Card
+        padding="none"
+        className="w-full max-w-[760px] overflow-hidden"
+        data-testid="product-tour-card"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-4 px-[22px] py-[18px]">
+          <div>
+            <h2 className="font-semibold text-fg text-sm">Ayuda</h2>
+            <p className="mt-0.5 text-fg-muted text-xs">
+              Vuelve a ver dónde está cada cosa en menos de un minuto.
+            </p>
+          </div>
+          <ReplayTourButton />
+        </div>
       </Card>
     </section>
   );

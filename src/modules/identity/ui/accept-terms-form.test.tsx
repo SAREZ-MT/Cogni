@@ -21,7 +21,7 @@ describe("AcceptTermsForm", () => {
     render(<AcceptTermsForm next="/" />);
 
     const box = screen.getByLabelText(
-      "Confirmo que tengo 18 años o más y acepto los términos de uso",
+      "Confirmo que tengo 18 años o más, acepto los Términos y condiciones y autorizo el tratamiento de mis datos según la Política de privacidad",
     );
     expect(box).toHaveAttribute("name", "accept");
     expect(box).toHaveAttribute("data-testid", "terms-accept-checkbox");

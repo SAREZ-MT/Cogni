@@ -1,6 +1,6 @@
 "use client";
 
-import { MoreHorizontal, X } from "lucide-react";
+import { MoreHorizontal, Trash2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { createPortal } from "react-dom";
@@ -9,17 +9,17 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu";
 import { StatusBanner } from "@/shared/ui/status-banner";
 import {
-  archiveNotebook as archiveNotebookAction,
   renameNotebook as renameNotebookAction,
   setNotebookAppearance as setNotebookAppearanceAction,
 } from "../actions";
 import type { NotebookColor } from "../domain/notebook";
-import { ArchiveConfirmDialog } from "./archive-confirm-dialog";
 import { ChangeAppearanceDialog } from "./change-appearance-dialog";
+import { DeleteNotebookDialog } from "./delete-content-dialogs";
 import { useNotebookActionsSlot } from "./notebook-actions-slot";
 import { RenameNotebookDialog } from "./rename-notebook-dialog";
 
@@ -29,7 +29,6 @@ import { RenameNotebookDialog } from "./rename-notebook-dialog";
 const FAILURE_COPY = {
   rename: "No se pudo renombrar el cuaderno",
   appearance: "No se pudo cambiar la apariencia del cuaderno",
-  archive: "No se pudo archivar el cuaderno",
 } as const;
 
 interface NotebookCardActionsProps {
@@ -42,11 +41,9 @@ interface NotebookCardActionsProps {
   className?: string;
 }
 
-// "Acciones de {título}" kebab, reused by the /notebooks grid and list
-// screens and by Home's "Mis cuadernos" grid (notebook-card.tsx,
-// notebook-list-row.tsx): rename, change appearance and archive reuse the
-// exact same Server Actions and ArchiveConfirmDialog the sidebar tree's
-// NotebookItem already used (design pass 2, "reuse the existing
+// "Acciones de {título}" kebab, reused by the /notebooks cover grid
+// (notebook-cover-card.tsx): rename and change appearance reuse the exact
+// same Server Actions the sidebar tree's NotebookItem already used (design pass 2, "reuse the existing
 // components/actions ... rather than rewriting logic"). These screens are
 // Server Components re-fetched on navigation, not a live TanStack Query
 // cache like the sidebar tree, so every mutation here just calls
@@ -73,6 +70,9 @@ export function NotebookCardActions({
   }
 
   const [failure, setFailure] = useState<string | null>(null);
+  // Phase 8 H19: "Eliminar" opens the delete confirmation outside the menu
+  // (it survives the menu closing); the cover grid then refreshes.
+  const [deleting, setDeleting] = useState(false);
 
   // Runs one mutation inside a transition; a rejection is shown, not thrown,
   // and only a success refreshes the Server Component data.
@@ -102,12 +102,6 @@ export function NotebookCardActions({
         icon: notebook.icon,
         color,
       }),
-    );
-  }
-
-  function archive() {
-    run(FAILURE_COPY.archive, () =>
-      archiveNotebookAction({ notebookId: notebook.id }),
     );
   }
 
@@ -147,8 +141,8 @@ export function NotebookCardActions({
             aria-label={`Acciones de ${notebook.title}`}
             className={className}
             onClick={(event) => {
-              // notebook-card.tsx/notebook-list-row.tsx render this inside a
-              // Link wrapping the whole card: stop the click from also
+              // notebook-cover-card.tsx renders this over a link that covers
+              // the whole card: stop the click from also
               // triggering navigation.
               event.preventDefault();
               event.stopPropagation();
@@ -188,21 +182,23 @@ export function NotebookCardActions({
               refreshTree: () => router.refresh(),
             },
           )}
-          <ArchiveConfirmDialog
-            itemLabel={`el cuaderno "${notebook.title}"`}
-            onConfirm={archive}
-            onOpenChange={closeMenuWhenDialogCloses}
-            trigger={
-              <DropdownMenuItem
-                variant="destructive"
-                onSelect={(event) => event.preventDefault()}
-              >
-                Archivar
-              </DropdownMenuItem>
-            }
-          />
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            variant="destructive"
+            data-testid="delete-notebook-item"
+            onSelect={() => setDeleting(true)}
+          >
+            <Trash2 aria-hidden="true" size={15} strokeWidth={1.75} />
+            Eliminar
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      <DeleteNotebookDialog
+        notebook={{ id: notebook.id, title: notebook.title }}
+        open={deleting}
+        onOpenChange={setDeleting}
+        onDeleted={() => router.refresh()}
+      />
     </>
   );
 }

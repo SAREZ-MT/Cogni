@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { expect, hasSupabaseEnv, signIn, test } from "./fixtures/auth";
+import { seedFlashcards } from "./helpers/flashcards";
 import {
   clickAndWaitForAction,
   createNotebookWithOpenPage,
@@ -12,14 +13,14 @@ import {
 // Optional: a directory to drop the screenshots in (visual check).
 const SCREENSHOT_DIR = process.env.E2E_SCREENSHOT_DIR;
 
-test.describe("Repasos de hoy", () => {
+test.describe("Flashcards due today (PARA HOY)", () => {
   test.skip(!hasSupabaseEnv, "Supabase env (cogni-dev) is not configured");
 
   test.beforeEach(async ({ page, verifiedUser }) => {
     await signIn(page, verifiedUser);
   });
 
-  test("lists a page with a due card, opens its session and drops it once reviewed", async ({
+  test("lists a deck with a due card under PARA HOY, reviews it and moves it to AL DÍA", async ({
     page,
   }) => {
     // The e2e user is shared per worker, so other pages may be due too: the
@@ -30,30 +31,20 @@ test.describe("Repasos de hoy", () => {
     await page.goto(`/flashcards/${notebookId}/${pageId}`);
 
     // A new card is due immediately (§6.1 defaults).
-    await page.getByTestId("new-flashcard-button").click();
-    const dialog = page.getByRole("dialog", { name: "Nueva tarjeta" });
-    await dialog.getByLabel("Anverso").fill("¿Qué es la fotosíntesis?");
-    await dialog.getByLabel("Reverso").fill("Luz en glucosa");
-    await clickAndWaitForAction(
-      page,
-      dialog.getByRole("button", { name: "Guardar tarjeta" }),
-      '"front"',
-    );
-    await expect(dialog).toBeHidden();
+    // Cards are created by AI only (Phase 8 H13): seed one straight in.
+    await seedFlashcards(pageId, [
+      { front: "¿Qué es la fotosíntesis?", back: "Luz en glucosa" },
+    ]);
 
-    await page.goto("/flashcards");
-    const dueToday = page.getByTestId("due-today");
-    await expect(
-      dueToday.getByRole("heading", { name: "Repasos de hoy" }),
-    ).toBeVisible();
-    const row = dueToday
-      .getByTestId("due-today-row")
+    // Phase 8 H17: the flat hub, filtered to this test's notebook (the
+    // user is shared per worker), lists the deck under PARA HOY.
+    await page.goto(`/flashcards?cuaderno=${notebookId}`);
+    const dueGroup = page.getByRole("region", { name: /^Para hoy/ });
+    const row = dueGroup
+      .getByRole("article")
       .filter({ hasText: notebookTitle });
     await expect(row).toHaveCount(1);
-    await expect(row).toContainText("1 pendiente");
-    await expect(
-      page.getByRole("link", { name: new RegExp(`^${notebookTitle}`) }),
-    ).toContainText("1 pendiente");
+    await expect(row).toContainText("1 para hoy");
     if (SCREENSHOT_DIR) {
       await page.waitForTimeout(600);
       await page.screenshot({
@@ -65,7 +56,11 @@ test.describe("Repasos de hoy", () => {
     await row.getByRole("link", { name: /Repasar/ }).click();
     const player = page.getByTestId("flashcard-player");
     await expect(player).toBeVisible();
-    await expect(page).toHaveURL(`/flashcards/${notebookId}/${pageId}`);
+    // "Repasar" opens the review at once from the hub; the URL keeps the
+    // hub marker and filter once `?repasar=1` is dropped.
+    await expect(page).toHaveURL(
+      `/flashcards/${notebookId}/${pageId}?desde=hub&cuaderno=${notebookId}`,
+    );
     await expect(player.getByText("Tarjeta 1 de 1")).toBeVisible();
     await expect(player.getByText("¿Qué es la fotosíntesis?")).toBeVisible();
 
@@ -80,14 +75,17 @@ test.describe("Repasos de hoy", () => {
     await summary.getByRole("button", { name: "Volver al mazo" }).click();
     await expect(page.getByTestId("flashcard-player")).toHaveCount(0);
 
-    // Graded "Bien": due tomorrow, so it leaves today's list.
-    await page.goto("/flashcards");
-    await expect(
-      page.getByRole("link", { name: new RegExp(`^${notebookTitle}`) }),
-    ).toContainText("al día");
-    await expect(
-      page.getByTestId("due-today-row").filter({ hasText: notebookTitle }),
-    ).toHaveCount(0);
+    // Graded "Bien": due tomorrow, so it moves to AL DÍA.
+    await page.goto(`/flashcards?cuaderno=${notebookId}`);
+    await expect(page.getByRole("region", { name: /^Para hoy/ })).toHaveCount(
+      0,
+    );
+    const upToDate = page
+      .getByRole("region", { name: /^Al día/ })
+      .getByRole("article")
+      .filter({ hasText: notebookTitle });
+    await expect(upToDate).toContainText("Al día");
+    await expect(upToDate).toContainText("repaso mañana");
     if (SCREENSHOT_DIR) {
       await page.screenshot({
         path: `${SCREENSHOT_DIR}/due-today-after-review.png`,

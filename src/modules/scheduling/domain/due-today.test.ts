@@ -4,6 +4,7 @@ import {
   DUE_KINDS,
   type DueTodayPage,
   emptyDueCounts,
+  sumDueByKind,
   totalDueCount,
 } from "./due-today";
 
@@ -56,5 +57,25 @@ describe("due today", () => {
 
     expect(totalDueCount(pages)).toBe(7);
     expect(totalDueCount([])).toBe(0);
+  });
+
+  it("sums the items due per technique across pages", () => {
+    const pages = [
+      {
+        ...page("a", "2026-10-04T09:00:00.000Z"),
+        due: { flashcard: 2, exam_question: 1, recall_question: 0 },
+      },
+      {
+        ...page("b", "2026-10-05T09:00:00.000Z"),
+        due: { flashcard: 0, exam_question: 4, recall_question: 3 },
+      },
+    ];
+
+    expect(sumDueByKind(pages)).toEqual({
+      flashcard: 2,
+      exam_question: 5,
+      recall_question: 3,
+    });
+    expect(sumDueByKind([])).toEqual(emptyDueCounts());
   });
 });

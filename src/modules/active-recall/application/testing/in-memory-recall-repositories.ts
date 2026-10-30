@@ -65,6 +65,28 @@ export class InMemoryRecallQuestionRepository
     return this.list((q) => wanted.has(q.id) && q.ownerId === ownerId);
   }
 
+  async update(question: RecallQuestion): Promise<RecallQuestion | null> {
+    const stored = this.rows.get(question.id);
+    if (!stored || stored.ownerId !== question.ownerId || stored.archivedAt) {
+      return null;
+    }
+    const updated = {
+      ...stored,
+      prompt: question.prompt,
+      rubric: question.rubric,
+      updatedAt: question.updatedAt,
+    };
+    this.rows.set(question.id, updated);
+    return updated;
+  }
+
+  async delete(id: string, ownerId: string): Promise<void> {
+    if (this.rows.get(id)?.ownerId === ownerId) this.rows.delete(id);
+  }
+
+  // One process, no concurrent transactions: nothing to wait for.
+  async lockPage(_pageId: string, _ownerId: string): Promise<void> {}
+
   private list(keep: (q: RecallQuestion) => boolean): RecallQuestion[] {
     return [...this.rows.values()].filter(keep).sort(oldestFirst);
   }

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { Page } from "@playwright/test";
 import { expect, hasSupabaseEnv, signIn, test } from "./fixtures/auth";
 import { createNotebookWithOpenPage } from "./helpers/notebooks";
+import { withStudyFiller } from "./helpers/study-text";
 
 // Phase 5 T7 retake (documento-maestro §7.5, user decision 2026-10-05): a
 // failed exam's "Repetir examen" generates one reformulated question per
@@ -112,7 +113,7 @@ test.describe("exam retake", () => {
     await editable.click();
     // Keys sent <15 ms after a click can precede Chrome's selectionchange.
     await page.waitForTimeout(100);
-    await page.keyboard.type(SENTENCES);
+    await page.keyboard.type(withStudyFiller(SENTENCES));
     await expect(page.getByTestId("autosave-status")).toHaveText("guardado", {
       timeout: 15000,
     });

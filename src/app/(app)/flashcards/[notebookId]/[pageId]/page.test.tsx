@@ -10,15 +10,20 @@ const { notFound } = vi.hoisted(() => ({
 }));
 vi.mock("next/navigation", () => ({
   notFound,
-  useRouter: () => ({ refresh: vi.fn() }),
+  useRouter: () => ({ refresh: vi.fn(), replace: vi.fn() }),
+  usePathname: () => "/flashcards/nb/pg",
 }));
 
-const { listFlashcardsAction } = vi.hoisted(() => ({
+const { listFlashcardsAction, listDecksAction } = vi.hoisted(() => ({
   listFlashcardsAction: vi.fn(),
+  listDecksAction: vi.fn(),
+}));
+vi.mock("@/modules/identity", () => ({
+  getCurrentTimeZoneSetting: vi.fn(async () => ({ timeZone: "UTC" })),
 }));
 vi.mock("@/modules/flashcards", () => ({
   listFlashcardsAction,
-  createFlashcardAction: vi.fn(),
+  listDecksAction,
   archiveFlashcardAction: vi.fn(),
   startFlashcardSessionAction: vi.fn(),
   gradeFlashcardAction: vi.fn(),
@@ -97,8 +102,9 @@ describe("FlashcardsSessionPage", () => {
     });
   });
 
-  describe("real deck (review list + graded review)", () => {
+  describe("real deck (direct practice)", () => {
     beforeEach(() => {
+      listDecksAction.mockResolvedValue({ ok: true, value: [] });
       getPageForRoute.mockResolvedValue({ id: PAGE, title: "Mitocondria" });
       listFlashcardsAction.mockResolvedValue({
         ok: true,
@@ -106,19 +112,40 @@ describe("FlashcardsSessionPage", () => {
       });
     });
 
-    it("shows the page's real cards as flip cards, ungraded until Repasar, in production too", async () => {
+    // Phase 8 H18 (user 2026-10-29): opening a deck practises it; the
+    // cards are listed and edited on the edit page, not here.
+    it("lists no cards and starts the graded review at once, in production too", async () => {
       vi.stubEnv("NODE_ENV", "production");
       vi.stubEnv("COGNI_DESIGN_PREVIEWS", "");
+      const { startFlashcardSessionAction } = await import(
+        "@/modules/flashcards"
+      );
+      vi.mocked(startFlashcardSessionAction).mockReset();
+      vi.mocked(startFlashcardSessionAction).mockResolvedValue({
+        ok: true,
+        value: {
+          sessionId: "7c1b2c3d-4e5f-4061-8798-a1b2c3d4e5f6",
+          cards: [
+            {
+              itemId: "i0",
+              flashcardId: "c0",
+              front: "Pregunta 0",
+              back: "Respuesta 0",
+              nextIntervalDays: { again: 1, hard: 1, good: 1, easy: 4 },
+            },
+          ],
+        },
+      });
 
       render(await FlashcardsSessionPage(props(NOTEBOOK, PAGE)));
 
+      expect(await screen.findByTestId("flashcard-player")).toBeInTheDocument();
       expect(
-        screen.getByRole("heading", { name: "Mitocondria" }),
-      ).toBeInTheDocument();
-      expect(screen.getByText("2 tarjetas")).toBeInTheDocument();
-      expect(screen.getAllByTestId("flip-card")).toHaveLength(2);
-      expect(screen.getByText("Pregunta 0")).toBeInTheDocument();
-      expect(screen.queryByText("Otra vez")).not.toBeInTheDocument();
+        screen.queryByRole("button", { name: "Archivar tarjeta" }),
+      ).toBeNull();
+      expect(startFlashcardSessionAction).toHaveBeenCalledWith({
+        pageId: PAGE,
+      });
       expect(getPageForRoute).toHaveBeenCalledWith(NOTEBOOK, PAGE);
       expect(listFlashcardsAction).toHaveBeenCalledWith({ pageId: PAGE });
     });
@@ -131,18 +158,7 @@ describe("FlashcardsSessionPage", () => {
       ).rejects.toThrow("NEXT_NOT_FOUND");
     });
 
-    it("offers Nueva tarjeta on the page deck and an archive action per card", async () => {
-      render(await FlashcardsSessionPage(props(NOTEBOOK, PAGE)));
-
-      expect(
-        screen.getByRole("button", { name: "Nueva tarjeta" }),
-      ).toBeInTheDocument();
-      expect(
-        screen.getAllByRole("button", { name: "Archivar tarjeta" }),
-      ).toHaveLength(2);
-    });
-
-    it("starts the review right away when opened from Repasos de hoy (?repasar=1)", async () => {
+    it("says the deck is up to date, with its next review, when nothing is due", async () => {
       const { startFlashcardSessionAction } = await import(
         "@/modules/flashcards"
       );
@@ -150,25 +166,43 @@ describe("FlashcardsSessionPage", () => {
         ok: false,
         error: { code: "STUDY_ENGINE_NOTHING_DUE", message: "x" },
       });
-
-      render(
-        await FlashcardsSessionPage(props(NOTEBOOK, PAGE, { repasar: "1" })),
-      );
-
-      expect(await screen.findByText("Estás al día")).toBeInTheDocument();
-      expect(startFlashcardSessionAction).toHaveBeenCalledWith({
-        pageId: PAGE,
+      listDecksAction.mockResolvedValue({
+        ok: true,
+        value: [
+          {
+            pageId: PAGE,
+            nextDueAt: new Date(Date.now() + 3 * 86_400_000).toISOString(),
+          },
+        ],
       });
+
+      render(await FlashcardsSessionPage(props(NOTEBOOK, PAGE)));
+
+      expect(
+        await screen.findByText("Estás al día con este mazo"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/Tu próximo repaso es en 3 días/),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Repasar igual" }),
+      ).toBeInTheDocument();
     });
 
-    it("waits for Repasar without ?repasar=1", async () => {
+    it("practises at once with ?modo=practica, starting no session", async () => {
       const { startFlashcardSessionAction } = await import(
         "@/modules/flashcards"
       );
       vi.mocked(startFlashcardSessionAction).mockClear();
 
-      render(await FlashcardsSessionPage(props(NOTEBOOK, PAGE)));
+      render(
+        await FlashcardsSessionPage(
+          props(NOTEBOOK, PAGE, { modo: "practica" }),
+        ),
+      );
 
+      expect(await screen.findByTestId("flashcard-player")).toBeInTheDocument();
+      expect(screen.getByText("Modo práctica")).toBeInTheDocument();
       expect(startFlashcardSessionAction).not.toHaveBeenCalled();
     });
 
@@ -180,7 +214,7 @@ describe("FlashcardsSessionPage", () => {
       ).toBeInTheDocument();
     });
 
-    it("lets a page without cards start its deck with the first card", async () => {
+    it("sends a page without cards to its techniques panel to generate them", async () => {
       listFlashcardsAction.mockResolvedValue({ ok: true, value: [] });
 
       render(await FlashcardsSessionPage(props(NOTEBOOK, PAGE)));
@@ -195,10 +229,47 @@ describe("FlashcardsSessionPage", () => {
       expect(
         screen.queryByRole("button", { name: /Repasar/ }),
       ).not.toBeInTheDocument();
+      expect(screen.queryByText("Nueva tarjeta")).not.toBeInTheDocument();
       expect(
-        screen.getAllByRole("button", { name: "Nueva tarjeta" }).length,
-      ).toBeGreaterThan(0);
+        screen.getByRole("link", { name: "Generar desde la página" }),
+      ).toHaveAttribute("href", `/notebooks/${NOTEBOOK}/pages/${PAGE}`);
       expect(notFound).not.toHaveBeenCalled();
+    });
+
+    // Phase 8 H17: no notebook level. Back leads to the hub, filtered by
+    // the deck's notebook, or as the hub was (?desde=hub&cuaderno=).
+    it("leads back to the hub filtered by the notebook by default", async () => {
+      render(await FlashcardsSessionPage(props(NOTEBOOK, PAGE)));
+
+      expect(screen.getByRole("link", { name: /Flashcards/ })).toHaveAttribute(
+        "href",
+        `/flashcards?cuaderno=${NOTEBOOK}`,
+      );
+    });
+
+    it("leads back to the hub as it was when opened from it", async () => {
+      const OTHER = "2b2c3d4e-5f60-4172-8899-b2c3d4e5f607";
+      render(
+        await FlashcardsSessionPage(
+          props(NOTEBOOK, PAGE, { desde: "hub", cuaderno: OTHER }),
+        ),
+      );
+      expect(screen.getByRole("link", { name: /Flashcards/ })).toHaveAttribute(
+        "href",
+        `/flashcards?cuaderno=${OTHER}`,
+      );
+    });
+
+    // Phase 8 H12 removed the H11 `?nueva=1` auto-open; H13 removed manual
+    // creation altogether, so the flag opens nothing.
+    it("opens no dialog with ?nueva=1", async () => {
+      listFlashcardsAction.mockResolvedValue({ ok: true, value: [] });
+
+      render(
+        await FlashcardsSessionPage(props(NOTEBOOK, PAGE, { nueva: "1" })),
+      );
+
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     });
 
     it("answers 404 when the cards cannot be loaded", async () => {

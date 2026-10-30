@@ -10,7 +10,6 @@ import {
   CommandList,
 } from "@/shared/ui/command";
 import { IconTile, type IconTileProps } from "@/shared/ui/icon-tile";
-import { cn } from "@/shared/ui/utils";
 
 export interface CommandMenuItem {
   id: string;
@@ -170,7 +169,9 @@ export function CommandMenu({
   return (
     <Command
       data-testid="command-menu"
-      className="min-w-64 max-h-80 overflow-y-auto rounded-lg border border-border-default bg-card p-1 shadow-md"
+      // H8-1: a narrow vertical panel (15rem wide, up to 26rem tall) that
+      // shows every label and description in full, wrapping when needed.
+      className="editor-surface rounded-(--radius-editor)! w-60 max-h-[26rem] overflow-y-auto border border-border-default bg-card p-1 shadow-md"
       // cmdk recomputes `data-selected` on its Item from this controlled
       // value, always overwriting a plain `data-selected` prop passed
       // straight to CommandItem — that was the bug (PR5b finding, flagged
@@ -183,7 +184,7 @@ export function CommandMenu({
         if (index !== -1) setSelectedIndex(index);
       }}
     >
-      <CommandList>
+      <CommandList className="max-h-[25rem]">
         {filtered.length === 0 ? (
           <CommandEmpty>{emptyText}</CommandEmpty>
         ) : (
@@ -191,42 +192,22 @@ export function CommandMenu({
             <CommandGroup
               key={group || "__ungrouped__"}
               heading={group || undefined}
+              className="**:[[cmdk-group-heading]]:pt-2 **:[[cmdk-group-heading]]:pb-1 **:[[cmdk-group-heading]]:text-[11.5px] **:[[cmdk-group-heading]]:text-fg-muted"
             >
               {groupItems.map((item) => (
                 <CommandItem
                   key={item.id}
                   value={item.id}
-                  className="data-[selected=true]:bg-active data-[selected=true]:text-fg-active gap-2"
+                  className="data-[selected=true]:bg-active data-[selected=true]:text-fg-active items-start gap-2.5 py-1.5 [&>svg:last-child]:hidden"
                   onSelect={() => onSelect(item)}
                 >
-                  {(item.icon || item.iconGlyph) && (
-                    <IconTile
-                      data-testid={`command-menu-item-icon-${item.id}`}
-                      size="28"
-                      radius="md"
-                      tone={item.iconTone}
-                      className={cn("shrink-0", !item.iconTone && "bg-hover")}
-                    >
-                      {item.icon ? (
-                        <item.icon
-                          aria-hidden="true"
-                          size={15}
-                          strokeWidth={1.75}
-                        />
-                      ) : (
-                        <span
-                          aria-hidden="true"
-                          className="text-[15px] leading-none"
-                        >
-                          {item.iconGlyph}
-                        </span>
-                      )}
-                    </IconTile>
-                  )}
-                  <span className="flex min-w-0 flex-col">
-                    <span className="text-[13.5px]">{item.label}</span>
+                  {(item.icon || item.iconGlyph) && <ItemIcon item={item} />}
+                  <span className="flex min-w-0 flex-1 flex-col gap-px">
+                    <span className="text-[13.5px] leading-5">
+                      {item.label}
+                    </span>
                     {item.description && (
-                      <span className="text-fg-muted truncate text-xs">
+                      <span className="text-fg-muted text-xs leading-4 text-pretty">
                         {item.description}
                       </span>
                     )}
@@ -238,5 +219,39 @@ export function CommandMenu({
         )}
       </CommandList>
     </Command>
+  );
+}
+
+// H8-1: the "/" menu's icons are just the glyph, with no grey tile behind
+// them. An item with a tone (the "@" menu tints each page by its notebook)
+// keeps its tinted tile, since the colour is information there.
+function ItemIcon({ item }: { item: CommandMenuItem }) {
+  const glyph = item.icon ? (
+    <item.icon aria-hidden="true" size={16} strokeWidth={1.75} />
+  ) : (
+    <span aria-hidden="true" className="text-[15px] leading-none">
+      {item.iconGlyph}
+    </span>
+  );
+  if (item.iconTone) {
+    return (
+      <IconTile
+        data-testid={`command-menu-item-icon-${item.id}`}
+        size="28"
+        radius="md"
+        tone={item.iconTone}
+        className="shrink-0"
+      >
+        {glyph}
+      </IconTile>
+    );
+  }
+  return (
+    <span
+      data-testid={`command-menu-item-icon-${item.id}`}
+      className="text-fg-secondary flex h-5 w-5 shrink-0 items-center justify-center"
+    >
+      {glyph}
+    </span>
   );
 }

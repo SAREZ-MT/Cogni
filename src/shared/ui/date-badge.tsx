@@ -7,6 +7,12 @@ export interface DateBadgeProps
   // IANA zone the day is read in; omitted, the runtime's own zone (the
   // shell's other dates do the same until the profile zone is wired).
   timeZone?: string;
+  // "brand" (the calendar header, Phase 8 H3): a Cogni-violet month
+  // strip with white text, so the badge reads as a calendar icon.
+  tone?: "neutral" | "brand";
+  // "xl" (the calendar page header, Phase 8 H3): 88px wide and the full
+  // height of its slot (the title + tabs stack).
+  size?: "md" | "xl";
 }
 
 function partsOf(date: Date, timeZone: string | undefined) {
@@ -26,6 +32,8 @@ function partsOf(date: Date, timeZone: string | undefined) {
 export function DateBadge({
   date,
   timeZone,
+  tone = "neutral",
+  size = "md",
   className,
   ...props
 }: DateBadgeProps) {
@@ -33,8 +41,10 @@ export function DateBadge({
   return (
     <span
       data-slot="date-badge"
+      data-size={size}
       className={cn(
-        "inline-flex w-14 shrink-0 flex-col overflow-hidden rounded-input border border-border-subtle bg-card text-center shadow-xs",
+        "inline-flex shrink-0 flex-col overflow-hidden rounded-input border border-border-subtle bg-card text-center shadow-xs",
+        size === "xl" ? "h-full w-[88px]" : "w-14",
         className,
       )}
       {...props}
@@ -45,14 +55,25 @@ export function DateBadge({
       <span
         aria-hidden="true"
         data-part="month"
-        className="bg-neutral-50 py-0.5 font-semibold text-[10.5px] text-fg-muted tracking-wide"
+        className={cn(
+          "py-0.5 font-semibold tracking-wide",
+          size === "xl" ? "py-1 text-xs" : "text-[10.5px]",
+          tone === "brand"
+            ? "bg-primary-600 text-white"
+            : "bg-neutral-50 text-fg-muted",
+        )}
       >
         {month}
       </span>
       <span
         aria-hidden="true"
         data-part="day"
-        className="py-1 font-bold text-fg text-lg leading-tight"
+        className={cn(
+          "py-1 font-bold text-fg leading-tight",
+          size === "xl"
+            ? "flex flex-1 items-center justify-center text-[34px]"
+            : "text-lg",
+        )}
       >
         {day}
       </span>

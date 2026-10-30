@@ -134,15 +134,17 @@ describe("ActiveRecallResultsPage", () => {
     ).toBeDisabled();
   });
 
-  it("links back to the notebook's sessions", async () => {
+  // Phase 8 H17: no notebook level; back is the hub filtered by the
+  // page's notebook.
+  it("links back to the hub filtered by the notebook", async () => {
     render(await ActiveRecallResultsPage(props(SESSION)));
 
     expect(
       screen.getByRole("link", { name: /Todas las sesiones/ }),
-    ).toHaveAttribute("href", `/active-recall/${NOTEBOOK}`);
+    ).toHaveAttribute("href", `/active-recall?cuaderno=${NOTEBOOK}`);
     expect(
       screen.getByRole("link", { name: "Volver a las sesiones" }),
-    ).toHaveAttribute("href", `/active-recall/${NOTEBOOK}`);
+    ).toHaveAttribute("href", `/active-recall?cuaderno=${NOTEBOOK}`);
   });
 
   it("sets a breadcrumb whose links all resolve", async () => {
@@ -151,8 +153,11 @@ describe("ActiveRecallResultsPage", () => {
     expect(SetBreadcrumb).toHaveBeenCalledWith(
       {
         items: [
-          { label: "Active recall", href: "/active-recall" },
-          { label: "Biología celular", href: `/active-recall/${NOTEBOOK}` },
+          { label: "Recordación activa", href: "/active-recall" },
+          {
+            label: "Biología celular",
+            href: `/active-recall?cuaderno=${NOTEBOOK}`,
+          },
           { label: "Mitocondria", href: `/active-recall/${NOTEBOOK}/${PAGE}` },
           { label: "Resultados" },
         ],

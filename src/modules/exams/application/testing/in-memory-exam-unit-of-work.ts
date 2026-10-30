@@ -4,6 +4,7 @@ import {
   type InMemoryGenerationFingerprints,
 } from "@/shared/kernel/testing/in-memory-generation-fingerprints";
 import type {
+  ExamLineageReferences,
   ExamQuestionRepositories,
   ExamStudyItems,
   ExamUnitOfWork,
@@ -66,6 +67,22 @@ export class InMemoryExamStudyItems implements ExamStudyItems {
     return suspended;
   }
 
+  async deleteBySource(
+    kind: StudyItemKind,
+    sourceId: string,
+    ownerId: string,
+  ): Promise<void> {
+    for (const [id, row] of this.rows) {
+      if (
+        row.kind === kind &&
+        row.sourceId === sourceId &&
+        row.ownerId === ownerId
+      ) {
+        this.rows.delete(id);
+      }
+    }
+  }
+
   // Test helpers.
   all(): StudyItem[] {
     return [...this.rows.values()];
@@ -81,6 +98,20 @@ export class InMemoryExamStudyItems implements ExamStudyItems {
   }
 }
 
+// Records every dropped lineage; the sessions and page state it cleans up
+// live in the session fakes, and the database test proves the cleanup.
+export class InMemoryExamLineageReferences implements ExamLineageReferences {
+  dropped: { pageId: string; rootId: string; questionIds: string[] }[] = [];
+
+  async dropLineage(input: {
+    pageId: string;
+    rootId: string;
+    questionIds: readonly string[];
+  }): Promise<void> {
+    this.dropped.push({ ...input, questionIds: [...input.questionIds] });
+  }
+}
+
 // Transactional fake: a run that throws puts both stores back as they were
 // before it, like the database transaction of DrizzleExamUnitOfWork.
 export class InMemoryExamUnitOfWork implements ExamUnitOfWork {
@@ -92,6 +123,7 @@ export class InMemoryExamUnitOfWork implements ExamUnitOfWork {
     readonly fingerprints: InMemoryGenerationFingerprints = new InMemoryGenerationFingerprintStore().forTechnique(
       "exam",
     ),
+    readonly lineageRefs = new InMemoryExamLineageReferences(),
   ) {}
 
   async run<T>(
@@ -101,13 +133,16 @@ export class InMemoryExamUnitOfWork implements ExamUnitOfWork {
     const questions = this.questions.snapshot();
     const items = this.studyItems.snapshot();
     const fingerprints = this.fingerprints.store.snapshot();
+    const dropped = [...this.lineageRefs.dropped];
     try {
       return await work({
         questions: this.questions,
         studyItems: this.studyItems,
         fingerprints: this.fingerprints,
+        lineageRefs: this.lineageRefs,
       });
     } catch (error) {
+      this.lineageRefs.dropped = dropped;
       this.questions.restore(questions);
       this.studyItems.restore(items);
       this.fingerprints.store.restore(fingerprints);

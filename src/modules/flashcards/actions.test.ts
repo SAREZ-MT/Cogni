@@ -5,7 +5,9 @@ import {
   AiGenerationFailedError,
   type GenerationRateLimit,
 } from "@/modules/ai";
+import { newStudyItem } from "@/modules/study-engine";
 import { DomainError } from "@/shared/kernel/domain-error";
+import { createId } from "@/shared/kernel/id";
 import { err, ok } from "@/shared/kernel/result";
 import {
   InMemoryGenerationFingerprintStore,
@@ -13,6 +15,7 @@ import {
 } from "@/shared/kernel/testing/in-memory-generation-fingerprints";
 import { InMemoryDeckStudyItems } from "./application/testing/in-memory-deck-unit-of-work";
 import { InMemoryFlashcardRepository } from "./application/testing/in-memory-flashcard-repository";
+import { createFlashcard } from "./domain/flashcard";
 
 // Session, composition roots and analytics are mocked so this proves the
 // Server Action boundary (session, Zod validation, ActionError mapping,
@@ -39,6 +42,7 @@ vi.mock("@/shared/observability/analytics", () => ({
 }));
 
 const RESET = new Date("2026-10-05T00:00:00.000Z");
+const LONG_TEXT = Array.from({ length: 150 }, (_, i) => `w${i}`).join(" ");
 const generation: AiGeneration = {
   id: "gen-1",
   ownerId: "o1",
@@ -91,7 +95,15 @@ vi.mock("@/modules/notebooks", () => ({
     },
   }),
 }));
+// Phase 8 H19: the deck's hard delete, faked per test.
+const deckDeletion = {
+  preview: vi.fn(),
+  delete: vi.fn(),
+};
 vi.mock("./infrastructure", () => ({
+  DrizzleDeckDeletion: vi.fn(function DrizzleDeckDeletion() {
+    return deckDeletion;
+  }),
   DrizzleFlashcardRepository: vi.fn(function DrizzleFlashcardRepository() {
     return current.flashcards;
   }),
@@ -134,7 +146,8 @@ describe("flashcards Server Actions", () => {
       ),
       limit: { allowed: true, remaining: 4, resetAt: RESET },
       checks: 0,
-      pageText: { title: "Tema", plainText: "uno dos tres" },
+      // 150 words: since Phase 8 H14 a generation needs 100.
+      pageText: { title: "Tema", plainText: LONG_TEXT },
       generate: async () =>
         ok({
           object: { cards: [{ front: "P", back: "R" }] },
@@ -183,8 +196,8 @@ describe("flashcards Server Actions", () => {
       expect(result.value).toMatchObject({
         remainingToday: 4,
         truncated: false,
-        wordsUsed: 3,
-        wordsTotal: 3,
+        wordsUsed: 150,
+        wordsTotal: 150,
       });
       expect(result.value.cards).toHaveLength(1);
       expect(result.value.cards[0]).toMatchObject({
@@ -232,6 +245,28 @@ describe("flashcards Server Actions", () => {
       const result = await generateFlashcardsAction({ pageId: PAGE });
 
       expect(!result.ok && result.error.code).toBe(AI_ERROR.PAGE_EMPTY);
+      expect(track).toHaveBeenCalledWith(
+        "generation_requested",
+        OWNER,
+        expect.objectContaining({ status: "empty" }),
+      );
+    });
+
+    // Phase 8 H14: a short page is refused with its counts, before the
+    // limiter, and tracked as empty.
+    it("maps a short page to AI_PAGE_TOO_SHORT with its word counts", async () => {
+      current.pageText = { title: "T", plainText: "pocas palabras aquí" };
+      const { generateFlashcardsAction } = await actions();
+
+      const result = await generateFlashcardsAction({ pageId: PAGE });
+
+      expect(!result.ok && result.error).toMatchObject({
+        code: "AI_PAGE_TOO_SHORT",
+        words: 3,
+        minWords: 100,
+        maxItems: 0,
+      });
+      expect(current.checks).toBe(0);
       expect(track).toHaveBeenCalledWith(
         "generation_requested",
         OWNER,
@@ -390,6 +425,10 @@ describe("flashcards Server Actions", () => {
             notebookTitle: "Biología",
             notebookColor: "purple",
             count: 1,
+            // ISO instants (Phase 8 H17): the newest card and, with no
+            // study item scheduled in memory, no next review.
+            latestCardAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+            nextDueAt: null,
           },
         ],
       });
@@ -410,136 +449,148 @@ describe("flashcards Server Actions", () => {
     });
   });
 
-  describe("createFlashcardAction", () => {
-    const input = { pageId: PAGE, front: " ¿Qué es X? ", back: "Y " };
-
-    it("rejects an unauthenticated caller before doing anything", async () => {
-      getCurrentUser.mockResolvedValue(null);
-      const { createFlashcardAction } = await actions();
-
-      const result = await createFlashcardAction(input);
-
-      expect(!result.ok && result.error.code).toBe(
-        "FLASHCARDS_SESSION_REQUIRED",
-      );
-      expect(await current.flashcards.countByPage(PAGE, OWNER)).toBe(0);
-    });
-
-    it.each([
-      ["a non-uuid page id", { ...input, pageId: "x" }],
-      ["a missing side", { pageId: PAGE, front: "X" }],
-      ["a non-string side", { ...input, back: 3 }],
-    ])("rejects %s as invalid input", async (_label, bad) => {
-      const { createFlashcardAction } = await actions();
-      const result = await createFlashcardAction(bad);
-      expect(!result.ok && result.error.code).toBe("FLASHCARDS_INVALID_INPUT");
-    });
-
-    it("creates the card and its study item, returns a plain view and revalidates", async () => {
-      const { createFlashcardAction } = await actions();
-
-      const result = await createFlashcardAction(input);
-
-      expect(result.ok).toBe(true);
-      if (!result.ok) return;
-      expect(result.value).toEqual({
-        id: expect.any(String),
-        pageId: PAGE,
-        front: "¿Qué es X?",
-        back: "Y",
-        position: 0,
-      });
-      expect(current.studyItems.all().map((item) => item.sourceId)).toEqual([
-        result.value.id,
-      ]);
-      expect(revalidatePath).toHaveBeenCalledWith("/flashcards", "layout");
-    });
-
-    it("maps a domain refusal to its ActionError code without revalidating", async () => {
-      const { createFlashcardAction } = await actions();
-
-      const result = await createFlashcardAction({ ...input, back: "   " });
-
-      expect(!result.ok && result.error.code).toBe("FLASHCARD_EMPTY");
-      expect(revalidatePath).not.toHaveBeenCalled();
-    });
-
-    it("maps an unknown page to PAGE_NOT_FOUND", async () => {
-      current.pageText = null;
-      const { createFlashcardAction } = await actions();
-
-      const result = await createFlashcardAction(input);
-
-      expect(!result.ok && result.error.code).toBe("PAGE_NOT_FOUND");
-    });
-  });
-
-  describe("archiveFlashcardAction", () => {
+  describe("deck actions", () => {
+    // Cards are created by AI only (Phase 8 H13): the deck is seeded straight
+    // into the fakes, each card with its study item.
     async function seedDeck(count: number): Promise<string[]> {
-      const { createFlashcardAction } = await actions();
       const ids: string[] = [];
       for (let i = 0; i < count; i += 1) {
-        const created = await createFlashcardAction({
-          pageId: PAGE,
-          front: `P${i}`,
-          back: `R${i}`,
-        });
-        if (!created.ok) throw new Error(created.error.code);
-        ids.push(created.value.id);
+        const card = createFlashcard(
+          {
+            id: createId(),
+            ownerId: OWNER,
+            pageId: PAGE,
+            generationId: null,
+            front: `P${i}`,
+            back: `R${i}`,
+            origin: "ai",
+            position: i,
+          },
+          RESET,
+        );
+        if (!card.ok) throw new Error(card.error.code);
+        await current.flashcards.insertMany([card.value]);
+        await current.studyItems.save(
+          newStudyItem({
+            id: createId(),
+            ownerId: OWNER,
+            pageId: PAGE,
+            kind: "flashcard",
+            sourceId: card.value.id,
+            now: RESET,
+          }),
+        );
+        ids.push(card.value.id);
       }
-      revalidatePath.mockClear();
       return ids;
     }
 
-    it("rejects an unauthenticated caller", async () => {
-      getCurrentUser.mockResolvedValue(null);
-      const { archiveFlashcardAction } = await actions();
-      const result = await archiveFlashcardAction({ flashcardId: PAGE });
-      expect(!result.ok && result.error.code).toBe(
-        "FLASHCARDS_SESSION_REQUIRED",
-      );
+    // Phase 8 H19: the flashcards hub's "Eliminar mazo" is a real delete.
+    describe("previewDeckDeletionAction / deleteDeckAction", () => {
+      beforeEach(() => {
+        deckDeletion.preview.mockReset();
+        deckDeletion.delete.mockReset();
+      });
+
+      it("rejects an unauthenticated caller and an invalid page id", async () => {
+        const { deleteDeckAction, previewDeckDeletionAction } = await actions();
+        expect(
+          await deleteDeckAction({ pageId: "x" }).then(
+            (result) => !result.ok && result.error.code,
+          ),
+        ).toBe("FLASHCARDS_INVALID_INPUT");
+        getCurrentUser.mockResolvedValue(null);
+        expect(
+          await previewDeckDeletionAction({ pageId: PAGE }).then(
+            (result) => !result.ok && result.error.code,
+          ),
+        ).toBe("FLASHCARDS_SESSION_REQUIRED");
+        expect(deckDeletion.delete).not.toHaveBeenCalled();
+      });
+
+      it("previews, then deletes the whole deck for the owner and revalidates", async () => {
+        deckDeletion.preview.mockResolvedValue({ cards: 2, reviews: 7 });
+        deckDeletion.delete.mockResolvedValue(true);
+        const { deleteDeckAction, previewDeckDeletionAction } = await actions();
+
+        expect(await previewDeckDeletionAction({ pageId: PAGE })).toEqual({
+          ok: true,
+          value: { cards: 2, reviews: 7 },
+        });
+        const result = await deleteDeckAction({ pageId: PAGE });
+
+        expect(result).toEqual({ ok: true, value: { pageId: PAGE } });
+        expect(deckDeletion.delete).toHaveBeenCalledWith(
+          PAGE,
+          OWNER,
+          expect.any(Date),
+        );
+        expect(revalidatePath).toHaveBeenCalledWith("/", "layout");
+      });
+
+      it("is not found for a foreign page, without revalidating", async () => {
+        deckDeletion.delete.mockResolvedValue(false);
+        const { deleteDeckAction } = await actions();
+
+        const result = await deleteDeckAction({ pageId: PAGE });
+
+        expect(!result.ok && result.error.code).toBe("FLASHCARD_NOT_FOUND");
+        expect(revalidatePath).not.toHaveBeenCalled();
+      });
     });
 
-    it("rejects an invalid flashcard id", async () => {
-      const { archiveFlashcardAction } = await actions();
-      const result = await archiveFlashcardAction({ flashcardId: "x" });
-      expect(!result.ok && result.error.code).toBe("FLASHCARDS_INVALID_INPUT");
-    });
+    // Phase 8 H18: the edit page's "Guardar".
+    describe("saveDeckEditsAction", () => {
+      it("rejects an unauthenticated caller and a malformed draft", async () => {
+        const { saveDeckEditsAction } = await actions();
+        expect(
+          await saveDeckEditsAction({ pageId: PAGE, updates: "x" }).then(
+            (result) => !result.ok && result.error.code,
+          ),
+        ).toBe("FLASHCARDS_INVALID_INPUT");
+        getCurrentUser.mockResolvedValue(null);
+        expect(
+          await saveDeckEditsAction({
+            pageId: PAGE,
+            updates: [],
+            creates: [],
+            deletes: [],
+          }).then((result) => !result.ok && result.error.code),
+        ).toBe("FLASHCARDS_SESSION_REQUIRED");
+      });
 
-    it("archives a card of a deck that keeps others and revalidates", async () => {
-      const [, second] = await seedDeck(2);
-      const { archiveFlashcardAction } = await actions();
+      it("saves edits, additions and deletions, answers the deck and revalidates", async () => {
+        const [a, b] = await seedDeck(2);
+        const { saveDeckEditsAction } = await actions();
 
-      const result = await archiveFlashcardAction({ flashcardId: second });
+        const result = await saveDeckEditsAction({
+          pageId: PAGE,
+          updates: [{ id: a, front: "Editada", back: "R" }],
+          creates: [{ front: "Nueva", back: "RN" }],
+          deletes: [b],
+        });
 
-      expect(result).toEqual({ ok: true, value: { remaining: 1 } });
-      expect(await current.flashcards.countByPage(PAGE, OWNER)).toBe(1);
-      expect(revalidatePath).toHaveBeenCalledWith("/flashcards", "layout");
-    });
+        expect(result.ok && result.value.cards.map((c) => c.front)).toEqual([
+          "Editada",
+          "Nueva",
+        ]);
+        expect(revalidatePath).toHaveBeenCalledWith("/flashcards", "layout");
+      });
 
-    it("refuses the last card with FLASHCARD_LAST_CARD", async () => {
-      const [only] = await seedDeck(1);
-      const { archiveFlashcardAction } = await actions();
+      it("refuses a draft that would leave the deck empty", async () => {
+        const [a] = await seedDeck(1);
+        const { saveDeckEditsAction } = await actions();
 
-      const result = await archiveFlashcardAction({ flashcardId: only });
+        const result = await saveDeckEditsAction({
+          pageId: PAGE,
+          updates: [],
+          creates: [],
+          deletes: [a],
+        });
 
-      expect(!result.ok && result.error.code).toBe("FLASHCARD_LAST_CARD");
-      expect(await current.flashcards.countByPage(PAGE, OWNER)).toBe(1);
-      expect(revalidatePath).not.toHaveBeenCalled();
-    });
-
-    it("never throws: an unexpected failure is reported to Sentry", async () => {
-      current.flashcards = {
-        findById: async () => {
-          throw new Error("db down");
-        },
-      } as unknown as InMemoryFlashcardRepository;
-      const { archiveFlashcardAction } = await actions();
-
-      const result = await archiveFlashcardAction({ flashcardId: PAGE });
-
-      expect(!result.ok && result.error.code).toBe("FLASHCARDS_UNEXPECTED");
-      expect(captureException).toHaveBeenCalledTimes(1);
+        expect(!result.ok && result.error.code).toBe("FLASHCARD_LAST_CARD");
+        expect(revalidatePath).not.toHaveBeenCalled();
+      });
     });
   });
 });

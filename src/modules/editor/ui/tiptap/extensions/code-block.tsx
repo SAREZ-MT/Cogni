@@ -28,6 +28,15 @@ import python from "highlight.js/lib/languages/python";
 import typescript from "highlight.js/lib/languages/typescript";
 import xml from "highlight.js/lib/languages/xml";
 import { createLowlight } from "lowlight";
+import { ChevronDown } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/shared/ui/dropdown-menu";
+import { createCodeBlockPastePlugin } from "./code-block-paste";
 
 const registry = createLowlight();
 registry.register({ bash, css, javascript, json, python, typescript, xml });
@@ -65,32 +74,61 @@ export const CODE_BLOCK_LANGUAGES: CodeBlockLanguageOption[] = [
   { value: "bash", label: "Bash" },
 ];
 
+// H6-E4 (odd/tasks/phase-8-design-flows.md): Notion's discreet language
+// control instead of a native select — a quiet label at the block's
+// top-right that shows on hover, while the caret is in the block, or on
+// keyboard focus, and opens a small menu of the registered languages. The
+// trigger stays in the tab order and Radix's menu handles Enter/arrows.
 function CodeBlockView({ node, updateAttributes }: ReactNodeViewProps) {
   const language =
     typeof node.attrs.language === "string" ? node.attrs.language : "";
+  const current =
+    CODE_BLOCK_LANGUAGES.find((option) => (option.value ?? "") === language) ??
+    CODE_BLOCK_LANGUAGES[0];
 
   return (
     <NodeViewWrapper
       data-testid="code-block"
-      className="not-prose relative my-2 overflow-hidden rounded-2xl bg-muted"
+      className="group/code not-prose relative my-1 overflow-hidden rounded-(--radius-editor) bg-code-block"
     >
-      <select
-        aria-label="Lenguaje"
-        contentEditable={false}
-        data-testid="code-block-language"
-        className="absolute top-2 right-2 rounded-md border border-border bg-background px-2 py-1 text-xs text-fg-muted outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        value={language}
-        onChange={(event) => {
-          updateAttributes({ language: event.target.value || null });
-        }}
-      >
-        {CODE_BLOCK_LANGUAGES.map((option) => (
-          <option key={option.label} value={option.value ?? ""}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-      <pre className="overflow-x-auto p-4 pr-28 font-mono text-sm">
+      <div contentEditable={false} className="absolute top-1.5 right-1.5">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              aria-label={`Lenguaje: ${current.label}`}
+              data-testid="code-block-language"
+              data-language={language}
+              className="flex items-center gap-1 rounded-(--radius-editor) px-1.5 py-0.5 text-xs text-fg-muted opacity-0 outline-none transition-opacity duration-150 hover:bg-hover hover:text-fg-secondary focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring group-hover/code:opacity-100 group-focus-within/code:opacity-100 data-[state=open]:opacity-100"
+            >
+              {current.label}
+              <ChevronDown aria-hidden="true" size={12} strokeWidth={1.75} />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            align="end"
+            className="editor-surface w-auto min-w-40 p-1"
+          >
+            <DropdownMenuRadioGroup
+              value={language}
+              onValueChange={(value) => {
+                updateAttributes({ language: value || null });
+              }}
+            >
+              {CODE_BLOCK_LANGUAGES.map((option) => (
+                <DropdownMenuRadioItem
+                  key={option.label}
+                  value={option.value ?? ""}
+                  className="text-[13px]"
+                >
+                  {option.label}
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+      <pre className="overflow-x-auto p-4 font-mono text-sm">
         <NodeViewContent<"code"> as="code" />
       </pre>
     </NodeViewWrapper>
@@ -98,6 +136,14 @@ function CodeBlockView({ node, updateAttributes }: ReactNodeViewProps) {
 }
 
 export const CodeBlock = CodeBlockLowlight.extend({
+  // H8-6: pasted code keeps its lines and indentation (code-block-paste.ts).
+  // Listed first so it runs before the parent's VS Code paste handler.
+  addProseMirrorPlugins() {
+    return [
+      createCodeBlockPastePlugin(this.editor, this.name),
+      ...(this.parent?.() ?? []),
+    ];
+  },
   addNodeView() {
     return ReactNodeViewRenderer(CodeBlockView);
   },

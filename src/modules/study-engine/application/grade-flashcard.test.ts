@@ -16,6 +16,9 @@ const OWNER = "owner-1";
 const CREATED = new Date("2026-10-04T08:00:00.000Z");
 const NOW = new Date("2026-10-04T09:00:00.000Z");
 const DAY_MS = 86_400_000;
+// The owner's local day (UTC here) ends at midnight: reviews are due per
+// day, so a card due before it can be graded now.
+const TOMORROW = new Date("2026-10-05T00:00:00.000Z");
 
 function card(id: string, overrides: Partial<StudyItem> = {}): StudyItem {
   return {
@@ -58,6 +61,8 @@ async function setup(sessionPageId: string | null = "page-1") {
   const deps = {
     uow,
     clock: createFixedClock(NOW),
+    dueCutoff: (now: Date) =>
+      now.getTime() === NOW.getTime() ? TOMORROW : new Date(Number.NaN),
     ids: { next: () => `id-${++n}` },
   };
   return { uow, deps, items: uow.studyItems as RecordingStudyItems };
@@ -180,6 +185,38 @@ describe("gradeFlashcard", () => {
 
     expect(!result.ok && result.error.code).toBe(
       STUDY_ENGINE_ERROR.ITEM_SUSPENDED,
+    );
+    await nothingWritten(uow, "a");
+  });
+
+  it("grades a card due later today: the whole local day is review time", async () => {
+    const { uow, deps } = await setup();
+    await uow.studyItems.save(
+      card("a", { dueAt: new Date(TOMORROW.getTime() - 1) }),
+    );
+
+    const result = await gradeFlashcard(
+      { sessionId: "s1", itemId: "a", rating: "good" },
+      deps,
+      OWNER,
+    );
+
+    expect(result.ok).toBe(true);
+    expect(await uow.reviewLogs.listByItem("a", OWNER)).toHaveLength(1);
+  });
+
+  it("refuses a card due tomorrow, writing nothing", async () => {
+    const { uow, deps } = await setup();
+    await uow.studyItems.save(card("a", { dueAt: TOMORROW }));
+
+    const result = await gradeFlashcard(
+      { sessionId: "s1", itemId: "a", rating: "good" },
+      deps,
+      OWNER,
+    );
+
+    expect(!result.ok && result.error.code).toBe(
+      STUDY_ENGINE_ERROR.ITEM_NOT_DUE,
     );
     await nothingWritten(uow, "a");
   });

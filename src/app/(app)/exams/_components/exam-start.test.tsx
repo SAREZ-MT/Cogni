@@ -29,7 +29,7 @@ function renderStart(overrides: Partial<ExamStartProps> = {}) {
       pageId={PAGE_ID}
       pageTitle="Mitocondria"
       pageHref="/notebooks/nb/pages/pg"
-      questionsHref="/exams/nb/pg/preguntas"
+      questionsHref="/exams/nb/pg/editar"
       activeQuestionCount={25}
       retakePending={false}
       failedRootCount={0}
@@ -193,7 +193,7 @@ describe("ExamStart", () => {
     );
     expect(screen.getByRole("link", { name: "Ver preguntas" })).toHaveAttribute(
       "href",
-      "/exams/nb/pg/preguntas",
+      "/exams/nb/pg/editar",
     );
     expect(
       screen.getByRole("link", { name: "Generar preguntas" }),

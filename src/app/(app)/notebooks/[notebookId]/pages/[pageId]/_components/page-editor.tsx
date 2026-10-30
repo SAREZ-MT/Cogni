@@ -22,7 +22,8 @@
 //   uploads, creates a new page in this page's own notebook, and navigates
 //   there. No upload logic is duplicated here.
 import { FileUp } from "lucide-react";
-import { useMemo, useRef } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Editor,
   type EditorProps,
@@ -43,6 +44,12 @@ import { useDocumentImport } from "@/modules/ingestion/ui/document-import-provid
 // safe and standard — Next replaces it with a client-callable RPC stub
 // instead of bundling its real implementation.
 import { listPagesForMention } from "@/modules/notebooks/actions";
+// Deep import of a pure function (no server dependency), same reasoning
+// as listPagesForMention above.
+import { extractPlainText } from "@/modules/notebooks/domain/plain-text";
+import { countWords } from "@/shared/kernel/words";
+import { publishPageWords } from "./page-words";
+import { freshestPage, rememberSavedPage } from "./saved-pages";
 
 const MAX_MENTION_RESULTS = 20;
 
@@ -50,8 +57,31 @@ interface PageEditorProps extends EditorProps {
   notebookId: string;
 }
 
-export function PageEditor({ notebookId, ...editorProps }: PageEditorProps) {
+export function PageEditor({
+  notebookId,
+  port,
+  ...editorProps
+}: PageEditorProps) {
   const { start } = useDocumentImport();
+  const router = useRouter();
+  // Phase 8 V9: browser back/forward reuses the router's cached payload,
+  // which may predate this session's saves (saved-pages.ts). The editor
+  // opens the freshest known document, read once: the editor and its
+  // autosave never follow later prop changes.
+  const [opened] = useState(() =>
+    freshestPage(
+      editorProps.pageId,
+      editorProps.initialContent,
+      editorProps.initialVersion,
+    ),
+  );
+  // A stale payload also carries a stale header (last edit time) and
+  // panel: one refresh brings the route up to date; fresh payloads cost
+  // nothing extra.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only the payload this editor opened with.
+  useEffect(() => {
+    if (opened.stale) router.refresh();
+  }, []);
   const candidatesRef = useRef<Promise<MentionCandidate[]> | null>(null);
 
   const mentionPort: MentionPort = useMemo(
@@ -106,9 +136,42 @@ export function PageEditor({ notebookId, ...editorProps }: PageEditorProps) {
     [notebookId, start],
   );
 
+  // Phase 8 H14: the loaded page's words, once, for the techniques panel.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the opened content only; later changes arrive through the saves below.
+  useEffect(() => {
+    publishPageWords(
+      editorProps.pageId,
+      countWords(extractPlainText(opened.content)),
+    );
+  }, [editorProps.pageId]);
+
+  // Phase 8 H14: after each successful save the page's word count goes to
+  // the techniques panel (page-words.ts), which disables "Generar" below
+  // the minimum; counted on the same plain text the server stores.
+  const savePort: EditorProps["port"] = useMemo(
+    () => ({
+      ...port,
+      async save(input) {
+        const result = await port.save(input);
+        if (result.ok) {
+          rememberSavedPage(input.pageId, input.content, result.value.version);
+          publishPageWords(
+            input.pageId,
+            countWords(extractPlainText(input.content)),
+          );
+        }
+        return result;
+      },
+    }),
+    [port],
+  );
+
   return (
     <Editor
       {...editorProps}
+      initialContent={opened.content}
+      initialVersion={opened.version}
+      port={savePort}
       mentionPort={mentionPort}
       extraSlashItems={[importDocumentItem]}
     />

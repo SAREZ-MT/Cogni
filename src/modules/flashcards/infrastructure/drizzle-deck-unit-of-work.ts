@@ -1,7 +1,13 @@
-import { createStudyItemRepository } from "@/modules/study-engine";
+import { and, eq } from "drizzle-orm";
+import {
+  createStudyItemRepository,
+  type StudyItemKind,
+} from "@/modules/study-engine";
 import type { DbExecutor } from "@/shared/db/client";
+import { studyItems } from "@/shared/db/schema";
 import type {
   DeckRepositories,
+  DeckStudyItems,
   DeckUnitOfWork,
 } from "../application/deck-unit-of-work";
 import { DrizzleFlashcardFingerprints } from "./drizzle-flashcard-fingerprints";
@@ -18,9 +24,38 @@ export class DrizzleDeckUnitOfWork implements DeckUnitOfWork {
     return this.db.transaction((tx) =>
       work({
         flashcards: new DrizzleFlashcardRepository(tx),
-        studyItems: createStudyItemRepository(tx),
+        studyItems: deckStudyItems(tx),
         fingerprints: new DrizzleFlashcardFingerprints(tx),
       }),
     );
   }
+}
+
+// study-engine's repository plus the delete the edit page needs (Phase 8
+// H18). study_items carries no foreign key to its source, so deleting a
+// card leaves its item behind unless this removes it; review_logs cascade
+// from the item.
+export function deckStudyItems(db: DbExecutor): DeckStudyItems {
+  const items = createStudyItemRepository(db);
+  return {
+    save: (item) => items.save(item),
+    findBySource: (kind, sourceId, ownerId) =>
+      items.findBySource(kind, sourceId, ownerId),
+    suspend: (id, ownerId, now) => items.suspend(id, ownerId, now),
+    async deleteBySource(
+      kind: StudyItemKind,
+      sourceId: string,
+      ownerId: string,
+    ): Promise<void> {
+      await db
+        .delete(studyItems)
+        .where(
+          and(
+            eq(studyItems.kind, kind),
+            eq(studyItems.sourceId, sourceId),
+            eq(studyItems.ownerId, ownerId),
+          ),
+        );
+    },
+  };
 }

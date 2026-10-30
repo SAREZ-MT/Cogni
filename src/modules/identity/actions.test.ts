@@ -41,13 +41,19 @@ vi.mock("./application", async (importOriginal) => {
 
 vi.mock("@/shared/db/client", () => ({ getDb: () => ({}) }));
 
-const { getUser, signInWithPasswordMock, signOutMock, signInWithOAuthMock } =
-  vi.hoisted(() => ({
-    getUser: vi.fn(),
-    signInWithPasswordMock: vi.fn(),
-    signOutMock: vi.fn(),
-    signInWithOAuthMock: vi.fn(),
-  }));
+const {
+  getUser,
+  signInWithPasswordMock,
+  signOutMock,
+  signInWithOAuthMock,
+  signUpMock,
+} = vi.hoisted(() => ({
+  getUser: vi.fn(),
+  signInWithPasswordMock: vi.fn(),
+  signOutMock: vi.fn(),
+  signInWithOAuthMock: vi.fn(),
+  signUpMock: vi.fn(),
+}));
 vi.mock("./infrastructure", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./infrastructure")>();
   return {
@@ -58,6 +64,7 @@ vi.mock("./infrastructure", async (importOriginal) => {
         signInWithPassword: signInWithPasswordMock,
         signOut: signOutMock,
         signInWithOAuth: signInWithOAuthMock,
+        signUp: signUpMock,
       },
     })),
   };
@@ -92,7 +99,7 @@ describe("signInAction", () => {
 
     expect(getUser).not.toHaveBeenCalled();
     expect(track).toHaveBeenCalledWith("user_signed_in", "u-42");
-    expect(redirect).toHaveBeenCalledWith("/");
+    expect(redirect).toHaveBeenCalledWith("/inicio");
   });
 });
 
@@ -135,6 +142,34 @@ describe("signInWithGoogleAction", () => {
     );
   });
 
+  it("sets the consent-intent cookie with the terms version and the server time", async () => {
+    setCookie.mockClear();
+    signInWithOAuthMock.mockResolvedValue({
+      data: { url: "https://accounts.google.test/o/oauth2" },
+      error: null,
+    });
+    const before = Date.now();
+    const { signInWithGoogleAction } = await import("./actions");
+
+    await signInWithGoogleAction();
+
+    const call = setCookie.mock.calls.find(
+      ([name]) => name === "cogni_terms_consent",
+    );
+    expect(call?.[2]).toEqual(
+      expect.objectContaining({
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/auth/callback",
+        maxAge: 600,
+      }),
+    );
+    const [version, millis] = String(call?.[1]).split("_");
+    expect(version).toBe("2026-10-28");
+    expect(Number(millis)).toBeGreaterThanOrEqual(before);
+    expect(Number(millis)).toBeLessThanOrEqual(Date.now());
+  });
+
   it("sets no flow cookie when Google sign-in cannot start", async () => {
     setCookie.mockClear();
     signInWithOAuthMock.mockResolvedValue({
@@ -165,16 +200,62 @@ describe.each([
     setCookie.mockClear();
   });
 
-  it("clears the Google flow cookie on the callback path", async () => {
+  it("clears the Google flow and consent cookies on the callback path", async () => {
     const actions = await import("./actions");
 
     await actions[action]({ status: "idle" } as never, formData({}));
 
-    expect(setCookie).toHaveBeenCalledWith(
-      "cogni_auth_flow",
-      "",
-      expect.objectContaining({ path: "/auth/callback", maxAge: 0 }),
+    for (const name of ["cogni_auth_flow", "cogni_terms_consent"]) {
+      expect(setCookie).toHaveBeenCalledWith(
+        name,
+        "",
+        expect.objectContaining({ path: "/auth/callback", maxAge: 0 }),
+      );
+    }
+  });
+});
+
+describe("signUpAction consent", () => {
+  beforeEach(() => {
+    track.mockClear();
+    signUpMock.mockReset();
+  });
+
+  const CREDENTIALS = { email: "ana@example.com", password: "secreta123" };
+
+  it("tracks one terms_accepted with source signup for a new account", async () => {
+    signUpMock.mockResolvedValue({
+      data: { user: { id: "u-7", identities: [{}] } },
+      error: null,
+    });
+    const { signUpAction } = await import("./actions");
+
+    await signUpAction({ status: "idle" }, formData(CREDENTIALS));
+
+    expect(signUpMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        options: expect.objectContaining({
+          data: expect.objectContaining({ terms_version: "2026-10-28" }),
+        }),
+      }),
     );
+    expect(track).toHaveBeenCalledWith("user_signed_up", "u-7");
+    expect(track).toHaveBeenCalledWith("terms_accepted", "u-7", {
+      version: "2026-10-28",
+      source: "signup",
+    });
+  });
+
+  it("tracks nothing for an email that is already registered", async () => {
+    signUpMock.mockResolvedValue({
+      data: { user: { id: "u-fake", identities: [] } },
+      error: null,
+    });
+    const { signUpAction } = await import("./actions");
+
+    await signUpAction({ status: "idle" }, formData(CREDENTIALS));
+
+    expect(track).not.toHaveBeenCalled();
   });
 });
 
@@ -278,6 +359,7 @@ describe("acceptTermsAction", () => {
     );
     expect(track).toHaveBeenCalledWith("terms_accepted", "u-42", {
       version: "2026-10-04",
+      source: "gate",
     });
     expect(redirect).toHaveBeenCalledWith("/notebooks");
   });
@@ -295,6 +377,6 @@ describe("acceptTermsAction", () => {
       formData({ accept: "on", next: "//evil.example" }),
     );
 
-    expect(redirect).toHaveBeenCalledWith("/");
+    expect(redirect).toHaveBeenCalledWith("/inicio");
   });
 });

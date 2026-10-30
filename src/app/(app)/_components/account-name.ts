@@ -1,4 +1,4 @@
-// Pure helpers shared by Server Components (app/(app)/page.tsx) and
+// Pure helpers shared by Server Components (app/(app)/inicio/page.tsx) and
 // "use client" components (user-menu.tsx, sidebar-user-card.tsx). They must
 // stay in a plain module: a function exported from a "use client" file
 // becomes a client reference, and calling it inside a Server Component

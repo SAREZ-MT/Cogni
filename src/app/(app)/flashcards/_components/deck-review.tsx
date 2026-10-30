@@ -1,6 +1,7 @@
 "use client";
 
-import { Play } from "lucide-react";
+import { CalendarCheck, Play } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   type ReactNode,
@@ -16,8 +17,11 @@ import {
   requestSessionFeedbackAction,
   startFlashcardSessionAction,
 } from "@/modules/flashcards";
+import { hubHref } from "@/shared/navigation/technique-hub";
 import { BackLink } from "@/shared/ui/back-link";
 import { Button } from "@/shared/ui/button";
+import { EmptyState } from "@/shared/ui/empty-state";
+import { IconTile } from "@/shared/ui/icon-tile";
 import type { RatingTone } from "@/shared/ui/rating-button";
 import { SectionHeader } from "@/shared/ui/section-header";
 import { StatusBanner } from "@/shared/ui/status-banner";
@@ -47,19 +51,55 @@ export interface DeckReviewProps {
   description: string;
   // A page without cards has no deck to review.
   canReview: boolean;
-  // Header actions next to "Repasar" ("Nueva tarjeta").
+  // Header actions next to "Repasar" (none on the deck route since H13).
   actions?: ReactNode;
-  // The deck itself (the review list or its empty state).
-  children: ReactNode;
+  // Below the header: the empty state of a page without cards (Phase 8
+  // H18: the deck route no longer lists the cards; the edit page does).
+  children?: ReactNode;
   // Opened from "Repasos de hoy" (`?repasar=1`): start the review right
   // away instead of waiting for "Repasar".
   autoStart?: boolean;
+  // Where the back links and "Todos los mazos" lead (Phase 8 H16/H17: the
+  // route's hubReturnHref); defaults to the hub filtered by the notebook.
+  backHref?: string;
+  // The query kept when `?repasar=1` is dropped (the `desde=hub` marker
+  // and the hub's filter), without the leading "?".
+  keepQuery?: string;
+  // Phase 8 H18: the deck's cards for "Repasar igual", the practice pass
+  // offered when nothing is due. Without them the up-to-date notice stays
+  // the plain banner.
+  practiceCards?: readonly PracticeCard[];
+  // When the next review falls ("mañana", "en 3 días"); null when unknown.
+  nextReview?: string | null;
+  // Opened with `?modo=practica`: practise at once, starting no session.
+  practice?: boolean;
 }
 
+export interface PracticeCard {
+  id: string;
+  front: string;
+  back: string;
+}
+
+// A graded session has its server id; a practice pass has none and never
+// reaches the review-session actions, so the SM-2 schedule, the review
+// logs and the metrics stay as they were.
 interface ActiveSession {
-  sessionId: string;
+  sessionId: string | null;
   cards: PlayerCard[];
 }
+
+export const PRACTICE_PARAM = "modo";
+export const PRACTICE_VALUE = "practica";
+
+// Under each rating in practice: nothing is scheduled, so no interval.
+const PRACTICE_HINT = "Práctica";
+const PRACTICE_HINTS = {
+  again: PRACTICE_HINT,
+  hard: PRACTICE_HINT,
+  good: PRACTICE_HINT,
+  easy: PRACTICE_HINT,
+};
 
 type Notice = "nothing-due" | "start-failed" | null;
 
@@ -106,7 +146,6 @@ function toPlayerCard(card: ReviewCardView): PlayerCard {
 // brings the refreshed deck back.
 export function DeckReview({
   notebookId,
-  notebookTitle,
   pageId,
   deckLabel,
   description,
@@ -114,6 +153,11 @@ export function DeckReview({
   actions,
   children,
   autoStart = false,
+  backHref = hubHref("/flashcards", notebookId),
+  keepQuery = "",
+  practiceCards,
+  nextReview = null,
+  practice = false,
 }: DeckReviewProps) {
   const router = useRouter();
   const autoStarted = useRef(false);
@@ -121,6 +165,40 @@ export function DeckReview({
   const [notice, setNotice] = useState<Notice>(null);
   const [feedback, setFeedback] = useState<Feedback>({ status: "loading" });
   const [starting, startTransition] = useTransition();
+  const deckPath = `/flashcards/${notebookId}/${pageId}`;
+
+  function startPractice() {
+    if (!practiceCards || practiceCards.length === 0) return;
+    setNotice(null);
+    window.history.replaceState(
+      null,
+      "",
+      `${deckPath}?${keepQuery ? `${keepQuery}&` : ""}${PRACTICE_PARAM}=${PRACTICE_VALUE}`,
+    );
+    setSession({
+      sessionId: null,
+      cards: practiceCards.map((card) => ({ ...card, hints: PRACTICE_HINTS })),
+    });
+  }
+
+  // "Volver al mazo" from the summary. Leaving a practice pass drops
+  // `?modo=practica` (a reload shows the deck instead of practising).
+  // Leaving either kind of pass asks for the deck's due cards again, so the
+  // deck says it is up to date only when the server says so (a practice
+  // opened by URL may have had cards due), or goes on with what is due.
+  function exitSession() {
+    const practised = session?.sessionId === null;
+    setSession(null);
+    router.refresh();
+    if (practised) {
+      window.history.replaceState(
+        null,
+        "",
+        `${deckPath}${keepQuery ? `?${keepQuery}` : ""}`,
+      );
+    }
+    startReview();
+  }
 
   function startReview() {
     setNotice(null);
@@ -156,15 +234,44 @@ export function DeckReview({
   // of starting another session.
   // biome-ignore lint/correctness/useExhaustiveDependencies: start once on mount, not on every render's new startReview
   useEffect(() => {
-    if (!autoStart || !canReview || autoStarted.current) return;
+    if (autoStarted.current) return;
+    if (practice && practiceCards && practiceCards.length > 0) {
+      autoStarted.current = true;
+      startPractice();
+      return;
+    }
+    if (!autoStart || !canReview) return;
     autoStarted.current = true;
     window.history.replaceState(
       null,
       "",
-      `/flashcards/${notebookId}/${pageId}`,
+      `${deckPath}${keepQuery ? `?${keepQuery}` : ""}`,
     );
     startReview();
-  }, [autoStart, canReview, notebookId, pageId]);
+  }, [autoStart, canReview, deckPath, keepQuery, practice]);
+
+  if (session?.sessionId === null) {
+    // Practice (H18): every rating is accepted locally, nothing is saved.
+    return (
+      <div className="flex flex-col">
+        <StatusBanner
+          tone="info"
+          title="Modo práctica"
+          description="Tus respuestas no cambian tus próximos repasos."
+          className="mx-auto w-full max-w-[660px]"
+        />
+        <FlashcardPlayer
+          notebookId={notebookId}
+          deckLabel={deckLabel}
+          cards={session.cards}
+          onRate={async () => ({ ok: true })}
+          feedback={null}
+          backHref={backHref}
+          onExit={exitSession}
+        />
+      </div>
+    );
+  }
 
   if (session) {
     const { sessionId } = session;
@@ -194,18 +301,19 @@ export function DeckReview({
           setFeedback(await finishWithFeedback(sessionId));
         }}
         feedback={feedback && <SessionFeedbackPanel state={feedback} />}
-        onExit={() => {
-          setSession(null);
-          router.refresh();
-        }}
+        backHref={backHref}
+        onExit={exitSession}
       />
     );
   }
 
+  const upToDate =
+    notice === "nothing-due" && practiceCards && practiceCards.length > 0;
+
   return (
     <>
       <div className="flex flex-col gap-3">
-        <BackLink href={`/flashcards/${notebookId}`}>{notebookTitle}</BackLink>
+        <BackLink href={backHref}>Flashcards</BackLink>
         <SectionHeader
           eyebrow="Flashcards"
           title={deckLabel}
@@ -214,7 +322,7 @@ export function DeckReview({
           actions={
             <div className="flex items-center gap-2">
               {actions}
-              {canReview && (
+              {canReview && !upToDate && (
                 <Button
                   type="button"
                   data-testid="start-review-button"
@@ -229,7 +337,36 @@ export function DeckReview({
           }
         />
       </div>
-      {notice === "nothing-due" && (
+      {upToDate && (
+        <EmptyState
+          fill
+          icon={
+            <IconTile size="56" tone="success">
+              <CalendarCheck aria-hidden="true" size={28} strokeWidth={1.75} />
+            </IconTile>
+          }
+          title="Estás al día con este mazo"
+          titleClassName="text-base"
+          description={
+            nextReview
+              ? `Tu próximo repaso es ${nextReview}. Si quieres, practica ahora: no cambia tus repasos.`
+              : "No hay tarjetas pendientes. Si quieres, practica ahora: no cambia tus repasos."
+          }
+          descriptionClassName="max-w-[380px]"
+          action={
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <Button type="button" onClick={startPractice}>
+                <Play aria-hidden="true" size={15} strokeWidth={2} />
+                Repasar igual
+              </Button>
+              <Button asChild variant="outline">
+                <Link href={backHref}>Volver a Flashcards</Link>
+              </Button>
+            </div>
+          }
+        />
+      )}
+      {notice === "nothing-due" && !upToDate && (
         <StatusBanner
           tone="success"
           title="Estás al día"

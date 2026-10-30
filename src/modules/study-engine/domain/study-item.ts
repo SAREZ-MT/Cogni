@@ -55,6 +55,20 @@ export function recallReviewQualityFor(answer: {
   return answer.wasDue ? answer.quality : null;
 }
 
+// Reviews are due per local day (user decision 2026-10-18: SM-2 schedules
+// days, and the whole day is review time). A DueCutoff maps an instant to
+// the start of the owner's next local day in their zone; an item is due
+// at that instant when its dueAt is before the cutoff. The composition
+// roots build it from the profile's zone; study-engine stays zone-agnostic.
+export type DueCutoff = (now: Date) => Date;
+
+export function isDueBefore(
+  item: Pick<StudyItem, "dueAt">,
+  dueBefore: Date,
+): boolean {
+  return item.dueAt.getTime() < dueBefore.getTime();
+}
+
 // §6.1: easiness is >= 1.3 and starts at 2.5.
 export const MIN_EASINESS = 1.3;
 export const INITIAL_EASINESS = 2.5;

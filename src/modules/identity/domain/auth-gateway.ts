@@ -13,10 +13,13 @@ export interface SignUpResult {
 // Every method translates provider failures into a DomainError with an
 // AUTH_ERROR code; nothing provider-specific crosses this boundary.
 export interface AuthGateway {
+  // `userMetadata` is stored on the new account by the provider; sign-up
+  // uses it for the server-side consent proof (domain/terms-consent.ts).
   signUp(input: {
     email: string;
     password: string;
     emailRedirectTo: string;
+    userMetadata: Record<string, string>;
   }): Promise<Result<SignUpResult, DomainError>>;
   signInWithPassword(input: {
     email: string;

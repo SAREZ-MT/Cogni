@@ -89,6 +89,8 @@ if (process.env.DATABASE_URL) {
   const deps = (uow: StudyUnitOfWork) => ({
     uow,
     clock: createFixedClock(NOW),
+    // Reviews are due per local day (UTC here): due before the next midnight.
+    dueCutoff: () => new Date("2026-10-05T00:00:00.000Z"),
     ids: { next: () => randomUUID() },
   });
 

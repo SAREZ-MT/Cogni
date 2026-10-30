@@ -19,6 +19,7 @@ describe("createProfile", () => {
       onboardingCompletedAt: null,
       termsAcceptedVersion: null,
       termsAcceptedAt: null,
+      termsAcceptedMethod: null,
       createdAt: NOW,
       updatedAt: NOW,
     });

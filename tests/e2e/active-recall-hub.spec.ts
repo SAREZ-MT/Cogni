@@ -3,6 +3,7 @@ import type { Page } from "@playwright/test";
 import postgres from "postgres";
 import { expect, hasSupabaseEnv, signIn, test } from "./fixtures/auth";
 import { createNotebookWithOpenPage } from "./helpers/notebooks";
+import { withStudyFiller } from "./helpers/study-text";
 
 // Phase 6 T7 (documento-maestro §3.3, §8.5): after a session the sidebar
 // opens the active recall hub on real data, the notebook view lists the
@@ -84,11 +85,6 @@ async function answer(page: Page, text: string, rating: number) {
   await page.getByTestId(`self-rate-${rating}`).click();
 }
 
-const SHORT_DATE = new Intl.DateTimeFormat("es-ES", {
-  day: "numeric",
-  month: "short",
-});
-
 test.describe("active recall hub", () => {
   test.skip(!hasSupabaseEnv, "Supabase env (cogni-dev) is not configured");
   test.skip(!process.env.DATABASE_URL, "needs DATABASE_URL (cogni-dev)");
@@ -109,7 +105,7 @@ test.describe("active recall hub", () => {
       .locator('[contenteditable="true"]');
     await editable.click();
     await page.waitForTimeout(100);
-    await page.keyboard.type(SENTENCES);
+    await page.keyboard.type(withStudyFiller(SENTENCES));
     await expect(page.getByTestId("autosave-status")).toHaveText("guardado", {
       timeout: 15000,
     });
@@ -118,9 +114,14 @@ test.describe("active recall hub", () => {
 
     // A new owner: the hub has no session yet.
     const sidebar = page.getByRole("navigation", { name: "Barra lateral" });
-    await sidebar.getByRole("link", { name: "Active recall" }).click();
+    await sidebar.getByRole("link", { name: "Recordación activa" }).click();
     await expect(page).toHaveURL(/\/active-recall$/);
-    await expect(page.getByText("Sin sesiones todavía")).toBeVisible();
+    await expect(
+      page.getByText("Practica explicando con tus palabras"),
+    ).toBeVisible();
+    // The browser back button again (V9): the editor opens the text saved
+    // on this visit, not the route's cached payload from before the typing,
+    // so the panel counts its words (H14's 150-word recall minimum).
     await page.goBack();
 
     const panel = page.getByTestId("techniques-panel");
@@ -147,65 +148,52 @@ test.describe("active recall hub", () => {
       timeout: 30000,
     });
 
-    // Hub: the notebook with its session, the study-engine mastery and a
-    // quick start on the page, which has recall questions due today (the
-    // seven it did not show yet are new, hence due).
-    await sidebar.getByRole("link", { name: "Active recall" }).click();
+    // Hub (Phase 8 H17, flat): the page's card with its questions, its
+    // session, the study-engine mastery with a bar, and — the page has
+    // recall questions due today (the seven it did not show yet are new,
+    // hence due) — the due pill and a filled Practicar.
+    await sidebar.getByRole("link", { name: "Recordación activa" }).click();
     await expect(page).toHaveURL(/\/active-recall$/);
     await expect(
-      sidebar.getByRole("link", { name: "Active recall" }),
+      sidebar.getByRole("link", { name: "Recordación activa" }),
     ).toHaveAttribute("aria-current", "page");
     const db = await stored(pageId as string);
     expect(db.dueRecallQuestions).toBeGreaterThan(0);
-    await expect(page.getByText("1 sesión · 1 cuaderno")).toBeVisible();
-    await expect(page.getByText("1 sesión guardada")).toBeVisible();
+    const mastery = Math.round((db.masteryScore ?? 0) * 100);
     await expect(
-      page.getByText(
-        `${Math.round((db.masteryScore ?? 0) * 100)} % dominio promedio`,
-      ),
+      page.getByText("1 sesión · 1 página · 1 cuaderno"),
     ).toBeVisible();
-    await expect(
-      page.getByRole("link", { name: /Nueva sesión/ }),
-    ).toHaveAttribute("href", `/active-recall/${notebookId}/${pageId}`);
-    const notebookCard = page.getByRole("link", {
-      name: new RegExp(notebookTitle),
-    });
-    await expect(notebookCard).toContainText("1 sesión · último dominio 33 %");
-    // The card's red due badge counts the notebook's recall questions due
-    // today (user decision 2026-10-08).
-    const dueBadge = notebookCard.locator("span.bg-error-500");
-    await expect(dueBadge).toHaveText(String(db.dueRecallQuestions));
+    await expect(page.getByText(/dominio promedio/)).toHaveCount(0);
+    await expect(page.getByRole("link", { name: /Nueva sesión/ })).toHaveCount(
+      0,
+    );
+    const pageCard = page
+      .getByRole("article")
+      .filter({ hasText: notebookTitle });
+    await expect(pageCard).toContainText(pageTitle);
+    await expect(pageCard).toContainText("10 preguntas");
+    await expect(pageCard).toContainText(`1 sesión · dominio ${mastery} %`);
+    await expect(pageCard).toContainText(
+      `${db.dueRecallQuestions} para repasar`,
+    );
+    const practise = pageCard.getByRole("link", { name: /^Practicar/ });
+    await expect(practise).toHaveAttribute("data-emphasis", "primary");
+    await expect(practise).toHaveAttribute(
+      "href",
+      `/active-recall/${notebookId}/${pageId}?desde=hub`,
+    );
     await shot(page, "hub");
-    await shot(page, "hub-due-badge");
 
-    // Nothing due (every recall item pushed to tomorrow): no badge.
+    // Nothing due (every recall item pushed to tomorrow): no pill, soft.
     await postponeRecallItems(pageId as string);
     await page.reload();
-    await expect(notebookCard).toContainText("1 sesión · último dominio 33 %");
-    await expect(dueBadge).toHaveCount(0);
-    await shot(page, "hub-no-due-badge");
+    await expect(pageCard).not.toContainText("para repasar");
+    await expect(practise).toHaveAttribute("data-emphasis", "soft");
+    await shot(page, "hub-no-due");
 
-    // Notebook view: the page with its latest session.
-    await notebookCard.click();
-    await expect(page).toHaveURL(new RegExp(`/active-recall/${notebookId}$`));
-    await expect(
-      page.getByRole("heading", { level: 1, name: notebookTitle }),
-    ).toBeVisible();
-    await expect(
-      page.getByText("1 sesión · 1 página con preguntas"),
-    ).toBeVisible();
-    const pageCard = page.getByRole("link", { name: new RegExp(pageTitle) });
-    await expect(pageCard).toContainText(SHORT_DATE.format(new Date()));
-    await expect(pageCard).toContainText("3 preguntas · 1 sesión");
-    await expect(pageCard).toContainText("Ver resultados →");
-    await expect(pageCard).not.toContainText("Repasar");
-    await expect(pageCard).toContainText("33%");
-    await expect(pageCard).toContainText("1✓ · 0~ · 2✗");
-    await shot(page, "notebook");
-    await shot(page, "notebook-v2");
-
-    // The card opens the past session's results.
-    await pageCard.click();
+    // The card's menu opens the latest session's results.
+    await pageCard.getByRole("button", { name: /^Acciones de / }).click();
+    await page.getByRole("menuitem", { name: "Ver último resultado" }).click();
     await expect(page).toHaveURL(
       new RegExp(`/active-recall/${notebookId}/${pageId}/resultados\\?sesion=`),
     );
@@ -260,10 +248,11 @@ test.describe("active recall hub", () => {
     await expect(results).toBeVisible();
 
     // Every link out of the results resolves: "Todas las sesiones" back to
-    // the notebook view, "Nueva sesión →" to the page's session.
+    // the hub filtered by the notebook (Phase 8 H17), "Nueva sesión →" to
+    // the page's session.
     await page.getByRole("link", { name: /Todas las sesiones/ }).click();
-    await expect(page).toHaveURL(new RegExp(`/active-recall/${notebookId}$`));
-    await expect(page.getByText("Sesiones por página")).toBeVisible();
+    await expect(page).toHaveURL(`/active-recall?cuaderno=${notebookId}`);
+    await expect(pageCard).toBeVisible();
     await page.goBack();
     await expect(results).toBeVisible();
     await page.getByRole("button", { name: /Nueva sesión/ }).click();

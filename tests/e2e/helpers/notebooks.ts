@@ -4,11 +4,14 @@ import { expect } from "../fixtures/auth";
 // Shared entry points of the notebook flows. Since design pass 2 the sidebar
 // is navigation only, so notebooks are created, opened and managed from the
 // /notebooks library and from the notebook's own route:
-// - "Nuevo cuaderno" (Home and /notebooks) opens the "Crear cuaderno" dialog;
+// - the /notebooks grid tile "Nuevo cuaderno" (or, with no notebooks yet,
+//   the empty state's "Crear mi primer cuaderno") opens the "Crear
+//   cuaderno" dialog;
 // - each notebook is a card ("article") with an "Acciones de {título}" kebab
-//   (Renombrar, Cambiar apariencia, Archivar);
-// - pages are created ("Nueva página") and archived ("Archivar página
-//   {título}") on /notebooks/[notebookId], and open from its page cards.
+//   (Renombrar, Cambiar apariencia, Eliminar);
+// - pages are created ("Nueva página") and deleted ("Eliminar página
+//   {título}", Phase 8 H19) on /notebooks/[notebookId], and open from its
+//   page cards.
 
 // Server Actions POST to the current pathname; `page.waitForLoadState
 // ("networkidle")` is unreliable here (background beacons/tunnels keep the
@@ -57,11 +60,17 @@ export function notebookCard(page: Page, title: string): Locator {
 }
 
 // Creates a notebook from the /notebooks library and waits until its card is
-// rendered. The header pill is the first "Nuevo cuaderno" button in the DOM
-// (the dashed grid tile carries the same name), hence `.first()`.
+// rendered. Since Phase 8 H4-T4 the hub has no header create button: an
+// owner without notebooks gets the empty state's "Crear mi primer cuaderno"
+// CTA, anyone else the grid's dashed "Nuevo cuaderno" tile — exactly one of
+// the two is on the page.
 export async function createNotebook(page: Page, title: string) {
   await page.goto("/notebooks");
-  await page.getByRole("button", { name: "Nuevo cuaderno" }).first().click();
+  await page
+    .getByRole("button", {
+      name: /^(Nuevo cuaderno|Crear mi primer cuaderno)$/,
+    })
+    .click();
   const dialog = page.getByRole("dialog");
   await dialog.getByLabel("Título").fill(title);
   await clickAndWaitForAction(
@@ -81,17 +90,17 @@ export async function openNotebook(page: Page, title: string) {
   return new URL(page.url()).pathname.split("/")[2] ?? "";
 }
 
-// Adds a page from "Nueva página" on the notebook's route (the notebook must
-// be the current page) and opens it from its card. A freshly created page is
-// titled "Sin título".
+// Adds a blank page from "Nueva página" on the notebook's route (the
+// notebook must be the current page). Since Phase 8 H5-T2 that control is
+// the grid's first item (or the empty state's button while the notebook
+// has no pages); since H5-T3 it opens the "Nueva página" dialog, whose
+// "Página en blanco" creates the page and lands in its editor right away.
+// A freshly created page is titled "Sin título".
 export async function createPageAndOpen(page: Page) {
-  await clickAndWaitForAction(
-    page,
-    page.getByRole("button", { name: "Nueva página" }),
-  );
-  const pageLink = page.getByRole("link", { name: /^Sin título/ });
-  await expect(pageLink).toBeVisible();
-  await pageLink.click();
+  await page.getByRole("button", { name: "Nueva página" }).click();
+  const dialog = page.getByRole("dialog", { name: "Nueva página" });
+  await dialog.getByRole("button", { name: /Página en blanco/ }).click();
+  await expect(page).toHaveURL(/\/notebooks\/[^/]+\/pages\/[^/?]+$/);
   await expect(page.getByTestId("editor-mount")).toBeVisible();
 }
 

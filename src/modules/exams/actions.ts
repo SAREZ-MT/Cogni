@@ -12,6 +12,11 @@ import {
   type DomainError,
   toActionError,
 } from "@/shared/kernel/domain-error";
+import {
+  PAGE_TOO_SHORT_CODE,
+  PageTooShortError,
+  pageTooShortDetails,
+} from "@/shared/kernel/generation-capacity";
 import { createId } from "@/shared/kernel/id";
 import { err, ok, type Result } from "@/shared/kernel/result";
 import {
@@ -25,12 +30,10 @@ import {
   withBoundary,
 } from "./action-support";
 import {
-  createExamQuestion,
+  applyExamEdits,
   ExamDailyLimitReachedError,
-  editExamQuestion,
   listPageExamQuestions,
   requestExamGeneration,
-  retireExamQuestion,
 } from "./application";
 import { EXAM_ERROR } from "./domain/errors";
 import {
@@ -66,10 +69,8 @@ export interface ExamQuestionView {
   explanation: string;
   concept: string;
   origin: ExamQuestionOrigin;
-}
-
-export interface RetiredExamQuestionView {
-  id: string;
+  // ISO; the edit page sends it back so a stale save is refused (V10).
+  updatedAt: string;
 }
 
 export interface ExamGenerationView {
@@ -88,6 +89,11 @@ export interface ExamGenerationView {
 // generation is available again (same shape as flashcards').
 export interface ExamGenerationActionError extends ActionError {
   readonly resetAt?: string;
+  // AI_PAGE_TOO_SHORT (Phase 8 H14): the new paragraphs' words, the words
+  // the request needs and the questions those words carry.
+  readonly words?: number;
+  readonly minWords?: number;
+  readonly maxItems?: number;
 }
 
 // The raw texts are only bounded here (twice the limit leaves room for
@@ -106,9 +112,22 @@ const content = {
   concept: text(MAX_CONCEPT_LENGTH),
 };
 const pageInput = z.object({ pageId: z.uuid() });
-const createInput = z.object({ pageId: z.uuid(), ...content });
-const editInput = z.object({ questionId: z.uuid(), ...content });
-const questionInput = z.object({ questionId: z.uuid() });
+// One edit page save (Phase 8 H18).
+const MAX_DRAFT_ITEMS = 200;
+const saveExamEditsInput = z.object({
+  pageId: z.uuid(),
+  updates: z
+    .array(
+      z.object({
+        id: z.uuid(),
+        expectedUpdatedAt: z.iso.datetime().optional(),
+        ...content,
+      }),
+    )
+    .max(MAX_DRAFT_ITEMS),
+  creates: z.array(z.object(content)).max(MAX_DRAFT_ITEMS),
+  deletes: z.array(z.uuid()).max(MAX_DRAFT_ITEMS),
+});
 const generateInput = z.object({
   pageId: z.uuid(),
   count: z
@@ -172,7 +191,9 @@ function statusFor(
 ): "limit" | "empty" | "no_new_content" | "failed" {
   if (error.code === AI_ERROR.DAILY_LIMIT_REACHED) return "limit";
   if (error.code === EXAM_ERROR.NO_NEW_CONTENT) return "no_new_content";
-  if (error.code === AI_ERROR.PAGE_EMPTY) return "empty";
+  // A page too short to generate from (H14) is tracked as empty.
+  if (error.code === AI_ERROR.PAGE_EMPTY || error.code === PAGE_TOO_SHORT_CODE)
+    return "empty";
   return "failed";
 }
 
@@ -186,6 +207,7 @@ function toView(question: ExamQuestion): ExamQuestionView {
     explanation: question.explanation,
     concept: question.concept,
     origin: question.origin,
+    updatedAt: question.updatedAt.toISOString(),
   };
 }
 
@@ -206,69 +228,6 @@ export async function listExamQuestionsAction(
     );
     if (!result.ok) return err(toActionError(result.error));
     return ok(result.value.map(toView));
-  });
-}
-
-export async function createExamQuestionAction(
-  input: unknown,
-): Promise<Result<ExamQuestionView, ActionError>> {
-  return withBoundary(async () => {
-    const ownerId = await requireOwnerId();
-    if (!ownerId.ok) return ownerId;
-    const parsed = parseInput(createInput, input);
-    if (!parsed.ok) return parsed;
-
-    const { pages, uow } = deps();
-    const result = await createExamQuestion(
-      parsed.value,
-      { pages, uow, clock: systemClock, ids: { next: createId } },
-      ownerId.value,
-    );
-    if (!result.ok) return err(toActionError(result.error));
-    revalidateExams();
-    return ok(toView(result.value));
-  });
-}
-
-export async function editExamQuestionAction(
-  input: unknown,
-): Promise<Result<ExamQuestionView, ActionError>> {
-  return withBoundary(async () => {
-    const ownerId = await requireOwnerId();
-    if (!ownerId.ok) return ownerId;
-    const parsed = parseInput(editInput, input);
-    if (!parsed.ok) return parsed;
-
-    const { uow } = deps();
-    const result = await editExamQuestion(
-      parsed.value,
-      { uow, clock: systemClock },
-      ownerId.value,
-    );
-    if (!result.ok) return err(toActionError(result.error));
-    revalidateExams();
-    return ok(toView(result.value));
-  });
-}
-
-export async function retireExamQuestionAction(
-  input: unknown,
-): Promise<Result<RetiredExamQuestionView, ActionError>> {
-  return withBoundary(async () => {
-    const ownerId = await requireOwnerId();
-    if (!ownerId.ok) return ownerId;
-    const parsed = parseInput(questionInput, input);
-    if (!parsed.ok) return parsed;
-
-    const { uow } = deps();
-    const result = await retireExamQuestion(
-      parsed.value,
-      { uow, clock: systemClock },
-      ownerId.value,
-    );
-    if (!result.ok) return err(toActionError(result.error));
-    revalidateExams();
-    return ok({ id: result.value.id });
   });
 }
 
@@ -317,6 +276,9 @@ export async function generateExamQuestionsAction(
         truncated: false,
       });
       const error: ExamGenerationActionError = toActionError(result.error);
+      if (result.error instanceof PageTooShortError) {
+        return err({ ...error, ...pageTooShortDetails(result.error) });
+      }
       return err(
         result.error instanceof ExamDailyLimitReachedError
           ? { ...error, resetAt: result.error.resetAt.toISOString() }
@@ -343,5 +305,30 @@ export async function generateExamQuestionsAction(
       wordsUsed: value.wordsUsed,
       wordsTotal: value.wordsTotal,
     });
+  });
+}
+
+// "Guardar" on the exam questions' edit page (Phase 8 H18): the draft's
+// edits, additions and real deletions (a deleted question takes its whole
+// lineage), applied together in one transaction (applyExamEdits) or not
+// at all. Answers the page's active questions.
+export async function saveExamEditsAction(
+  input: unknown,
+): Promise<Result<ExamQuestionView[], ActionError>> {
+  return withBoundary(async () => {
+    const ownerId = await requireOwnerId();
+    if (!ownerId.ok) return ownerId;
+    const parsed = parseInput(saveExamEditsInput, input);
+    if (!parsed.ok) return parsed;
+
+    const { pages, uow } = deps();
+    const result = await applyExamEdits(
+      parsed.value,
+      { pages, uow, clock: systemClock, ids: { next: createId } },
+      ownerId.value,
+    );
+    if (!result.ok) return err(toActionError(result.error));
+    revalidateExams();
+    return ok(result.value.questions.map(toView));
   });
 }

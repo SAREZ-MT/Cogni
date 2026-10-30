@@ -28,6 +28,7 @@ export class InMemoryExamHubReader implements ExamHubReader {
 
   async listExamPages(ownerId: string): Promise<ExamHubPage[]> {
     const roots = new Map<string, Set<string>>();
+    const newest = new Map<string, Date>();
     for (const question of this.repositories.questions.snapshot()) {
       if (question.ownerId !== ownerId || question.retiredAt !== null) {
         continue;
@@ -35,6 +36,10 @@ export class InMemoryExamHubReader implements ExamHubReader {
       const pageRoots = roots.get(question.pageId) ?? new Set<string>();
       pageRoots.add(question.rootId);
       roots.set(question.pageId, pageRoots);
+      const seen = newest.get(question.pageId);
+      if (!seen || question.createdAt > seen) {
+        newest.set(question.pageId, question.createdAt);
+      }
     }
     const sessions = this.repositories.sessions
       .snapshot()
@@ -55,6 +60,9 @@ export class InMemoryExamHubReader implements ExamHubReader {
             (a.id < b.id ? 1 : -1),
         );
       const last = finished[0];
+      const scores = finished
+        .filter((s) => s.total !== null && s.correct !== null && s.total > 0)
+        .map((s) => Math.floor(((s.correct ?? 0) * 100) / (s.total ?? 1)));
       const state = states.find((candidate) => candidate.pageId === pageId);
       rows.push({
         pageId,
@@ -73,6 +81,8 @@ export class InMemoryExamHubReader implements ExamHubReader {
                 passed: last.passed === true,
               }
             : null,
+        bestScore: scores.length > 0 ? Math.max(...scores) : null,
+        latestQuestionAt: newest.get(pageId) ?? null,
         retakePending: state?.retakePending ?? false,
         failedRootIds: [...(state?.failedRootIds ?? [])],
       });

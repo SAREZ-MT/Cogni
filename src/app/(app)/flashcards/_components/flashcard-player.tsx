@@ -25,6 +25,8 @@ export interface PlayerCard {
   hints?: Partial<Record<RatingTone, string>>;
 }
 
+import { hubHref } from "@/shared/navigation/technique-hub";
+
 export type RateOutcome =
   | { ok: true; masteryLevel?: string }
   | { ok: false; message: string };
@@ -45,6 +47,9 @@ export interface FlashcardPlayerProps {
   // The summary's feedback slot (the AI session feedback of a graded
   // session); null hides it. Without it the summary keeps its placeholder.
   feedback?: ReactNode;
+  // Where "Todos los mazos" leads: the hub filtered by the notebook by default (Phase 8 H17), the
+  // hub when the deck was opened from its create dialog (Phase 8 H16).
+  backHref?: string;
 }
 
 // Shown when onRate rejects instead of resolving an outcome (network drop,
@@ -106,6 +111,7 @@ export function FlashcardPlayer({
   onFinish,
   onExit,
   feedback,
+  backHref,
 }: FlashcardPlayerProps) {
   const [index, setIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
@@ -122,7 +128,7 @@ export function FlashcardPlayer({
   const reviewed = tally.again + tally.hard + tally.good + tally.easy;
   const progress = total > 0 ? Math.round((index / total) * 100) : 0;
   const card = cards[index];
-  const decksHref = `/flashcards/${notebookId}`;
+  const decksHref = backHref ?? hubHref("/flashcards", notebookId);
 
   const statDotItems: StatDotItem[] = TALLY_TONE.map(
     ({ tone, dotClassName }) => ({

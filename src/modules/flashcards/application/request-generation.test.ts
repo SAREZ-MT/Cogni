@@ -10,6 +10,10 @@ import {
 import type { PageTextReader } from "@/modules/notebooks";
 import { createFixedClock } from "@/shared/kernel/clock";
 import { DomainError } from "@/shared/kernel/domain-error";
+import {
+  PAGE_TOO_SHORT_CODE,
+  PageTooShortError,
+} from "@/shared/kernel/generation-capacity";
 import { fingerprintParagraph } from "@/shared/kernel/page-paragraphs";
 import { err, ok, type Result } from "@/shared/kernel/result";
 import { FLASHCARD_ERROR } from "../domain";
@@ -20,6 +24,14 @@ import {
   requestGeneration,
 } from "./request-generation";
 import { InMemoryDeckUnitOfWork } from "./testing/in-memory-deck-unit-of-work";
+
+// A paragraph of `n` distinct words tagged `tag`: since Phase 8 H14 a
+// generation needs 100 words of new paragraphs and about 15 per card.
+function para(tag: string, n: number): string {
+  return Array.from({ length: n }, (_, i) => `${tag}${i}`).join(" ");
+}
+// 150 words: room for the default 10 cards.
+const TEXT = para("p", 150);
 
 const OWNER = "owner-1";
 const PAGE = "page-1";
@@ -88,12 +100,18 @@ function makeAi(outcome: "ok" | "fail" | { cards: unknown[] } = "ok") {
     > => {
       calls.push(input);
       if (outcome === "fail") return err(new AiGenerationFailedError("gen-x"));
+      // "ok" answers as many cards as the prompt asks for.
+      const asked = Number(/exactly (\d+) cards/.exec(input.system)?.[1] ?? 2);
       const object =
         outcome === "ok"
           ? {
               cards: [
                 { front: "  P1 ", back: " R1 " },
                 { front: "P2", back: "R2" },
+                ...Array.from({ length: Math.max(0, asked - 2) }, (_, i) => ({
+                  front: `P${i + 3}`,
+                  back: `R${i + 3}`,
+                })),
               ],
             }
           : outcome;
@@ -112,7 +130,7 @@ function makeDeps(overrides: Partial<RequestGenerationDeps> = {}) {
     limiter,
     pages: stubPages({
       title: "Fotosíntesis",
-      plainText: "uno dos tres cuatro",
+      plainText: TEXT,
     }),
     ai,
     deck,
@@ -139,11 +157,12 @@ describe("requestGeneration", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(
-      result.value.cards.map((c) => [c.front, c.back, c.position]),
+      result.value.cards.slice(0, 2).map((c) => [c.front, c.back, c.position]),
     ).toEqual([
       ["P1", "R1", 0],
       ["P2", "R2", 1],
     ]);
+    expect(result.value.cards).toHaveLength(10);
     expect(result.value.cards.every((c) => c.generationId === "gen-1")).toBe(
       true,
     );
@@ -151,13 +170,13 @@ describe("requestGeneration", () => {
     expect(result.value).toMatchObject({
       remainingToday: 4,
       truncated: false,
-      wordsUsed: 4,
-      wordsTotal: 4,
+      wordsUsed: 150,
+      wordsTotal: 150,
       generationId: "gen-1",
       provider: "gemini",
       model: "gemini-3.5-flash-lite",
     });
-    expect(await flashcards.countByPage(PAGE, OWNER)).toBe(2);
+    expect(await flashcards.countByPage(PAGE, OWNER)).toBe(10);
   });
 
   it("creates one due study item per persisted card in the same unit of work", async () => {
@@ -222,7 +241,7 @@ describe("requestGeneration", () => {
   });
 
   it("truncates to the token cap and reports it", async () => {
-    const words = Array.from({ length: 100 }, (_, i) => `w${i}`).join(" ");
+    const words = Array.from({ length: 150 }, (_, i) => `w${i}`).join(" ");
     const { deps, ai } = makeDeps({
       pages: stubPages({ title: "Larga", plainText: words }),
       tokenCap: 40, // 30 words
@@ -233,7 +252,7 @@ describe("requestGeneration", () => {
     expect(result.ok && result.value).toMatchObject({
       truncated: true,
       wordsUsed: 30,
-      wordsTotal: 100,
+      wordsTotal: 150,
     });
     expect(ai.calls[0]?.prompt).toContain("w29");
     expect(ai.calls[0]?.prompt).not.toContain("w30");
@@ -258,7 +277,10 @@ describe("requestGeneration", () => {
     [1, 3],
     [99, 20],
   ])("count %i is sent as %i (clamped to 3..20)", async (count, sent) => {
-    const { deps, ai } = makeDeps();
+    // 300 words carry the 20 cards.
+    const { deps, ai } = makeDeps({
+      pages: stubPages({ title: "Fotosíntesis", plainText: para("q", 300) }),
+    });
 
     await requestGeneration({ pageId: PAGE, count }, deps, OWNER);
 
@@ -303,16 +325,17 @@ describe("requestGeneration", () => {
         ...deps,
         pages: stubPages({
           title: "Fotosíntesis",
-          plainText: "uno dos tres cuatro\ncinco seis",
+          plainText: `${TEXT}\n${para("n", 100)}`,
         }),
       },
       OWNER,
     );
 
+    // 100 new words: 6 cards after the first 10.
     expect(second.ok && second.value.cards.map((c) => c.position)).toEqual([
-      2, 3,
+      10, 11, 12, 13, 14, 15,
     ]);
-    expect(await flashcards.countByPage(PAGE, OWNER)).toBe(4);
+    expect(await flashcards.countByPage(PAGE, OWNER)).toBe(16);
   });
 });
 
@@ -328,38 +351,49 @@ describe("requestGeneration — incremental", () => {
   }
 
   it("stores the fingerprints of the sent paragraphs with the cards", async () => {
-    const { deps, deck } = makeDeps({ pages: withText("Uno dos\n\nTres") });
+    const [a, b] = [para("a", 75), para("b", 75)];
+    const { deps, deck } = makeDeps({ pages: withText(`${a}\n\n${b}`) });
 
     const result = await requestGeneration({ pageId: PAGE }, deps, OWNER);
 
     expect(result.ok).toBe(true);
     expect((await deck.fingerprints.listByPage(PAGE, OWNER)).sort()).toEqual(
-      [fingerprintParagraph("uno dos"), fingerprintParagraph("tres")].sort(),
+      [fingerprintParagraph(a), fingerprintParagraph(b)].sort(),
     );
   });
 
   it("answers NO_NEW_CONTENT without calling the AI nor consuming a unit", async () => {
+    const [a, b] = [para("Uno", 75), para("Dos", 75)];
     const { deps, deck, limiter, ai } = makeDeps({
-      pages: withText("Uno dos\nTres"),
+      pages: withText(`${a}\n${b}`),
     });
     await requestGeneration({ pageId: PAGE }, deps, OWNER);
     const checksBefore = limiter.checks;
 
     const again = await requestGeneration(
       { pageId: PAGE },
-      { ...deps, pages: withText("  UNO   dos \n\n tres ") },
+      {
+        ...deps,
+        pages: withText(`  ${a.toUpperCase().replace(/ /g, "   ")} \n\n ${b} `),
+      },
       OWNER,
     );
 
     expect(!again.ok && again.error.code).toBe(FLASHCARD_ERROR.NO_NEW_CONTENT);
     expect(ai.calls).toHaveLength(1);
     expect(limiter.checks).toBe(checksBefore);
-    expect(await deck.flashcards.countByPage(PAGE, OWNER)).toBe(2);
+    expect(await deck.flashcards.countByPage(PAGE, OWNER)).toBe(10);
   });
 
   it("sends only the added and the edited paragraphs, in page order", async () => {
+    const [first, second2, added, edited] = [
+      `Primero viejo ${para("v", 73)}`,
+      `Segundo viejo ${para("w", 73)}`,
+      `Nuevo inicio ${para("x", 48)}`,
+      `Segundo editado ${para("w", 48)}`,
+    ];
     const { deps, ai } = makeDeps({
-      pages: withText("Primero viejo\nSegundo viejo"),
+      pages: withText(`${first}\n${second2}`),
     });
     await requestGeneration({ pageId: PAGE }, deps, OWNER);
 
@@ -367,42 +401,43 @@ describe("requestGeneration — incremental", () => {
       { pageId: PAGE },
       {
         ...deps,
-        pages: withText("Nuevo inicio\nPrimero viejo\nSegundo editado"),
+        pages: withText(`${added}\n${first}\n${edited}`),
       },
       OWNER,
     );
 
     expect(second.ok).toBe(true);
     const prompt = ai.calls[1]?.prompt ?? "";
-    expect(prompt).toContain("Nuevo inicio\nSegundo editado");
+    expect(prompt).toContain(`${added}\n${edited}`);
     expect(prompt).not.toContain("Primero viejo");
     expect(second.ok && second.value).toMatchObject({
-      wordsUsed: 4,
-      wordsTotal: 4,
+      wordsUsed: 100,
+      wordsTotal: 100,
     });
   });
 
   it("keeps the paragraphs a truncation cut new for the next generation", async () => {
+    const [a, d, g] = [para("a", 100), para("d", 100), para("g", 100)];
     const { deps, deck, ai } = makeDeps({
-      pages: withText("a b c\nd e f\ng h i"),
-      tokenCap: 6, // 4 words: "a b c" whole, "d" of the second paragraph
+      pages: withText(`${a}\n${d}\n${g}`),
+      tokenCap: 160, // 120 words: the first paragraph whole, 20 of the second
     });
 
     const first = await requestGeneration({ pageId: PAGE }, deps, OWNER);
 
     expect(first.ok && first.value.truncated).toBe(true);
     expect(await deck.fingerprints.listByPage(PAGE, OWNER)).toEqual([
-      fingerprintParagraph("a b c"),
+      fingerprintParagraph(a),
     ]);
 
     await requestGeneration({ pageId: PAGE }, deps, OWNER);
-    expect(ai.calls[1]?.prompt).toContain("d e f");
-    expect(ai.calls[1]?.prompt).not.toContain("a b c");
+    expect(ai.calls[1]?.prompt).toContain(d);
+    expect(ai.calls[1]?.prompt).not.toContain(a);
   });
 
   it("uses a paragraph longer than the cap once: the next Generar has nothing new", async () => {
     const { deps, ai, limiter } = makeDeps({
-      pages: withText("a b c d e f"),
+      pages: withText(para("a", 150)),
       tokenCap: 4, // 3 words: only the start of the one paragraph fits
     });
     await requestGeneration({ pageId: PAGE }, deps, OWNER);
@@ -424,7 +459,8 @@ describe("requestGeneration — incremental", () => {
   });
 
   it("sends the whole page when cards exist but no fingerprint (generated before T5c)", async () => {
-    const { deps, deck, ai } = makeDeps({ pages: withText("Uno\nDos") });
+    const [u, d] = [para("u", 75), para("d", 75)];
+    const { deps, deck, ai } = makeDeps({ pages: withText(`${u}\n${d}`) });
     await requestGeneration({ pageId: PAGE }, deps, OWNER);
     // A page generated before the fingerprints existed: cards, no rows.
     deck.fingerprints.store.rows.clear();
@@ -432,7 +468,101 @@ describe("requestGeneration — incremental", () => {
     const again = await requestGeneration({ pageId: PAGE }, deps, OWNER);
 
     expect(again.ok).toBe(true);
-    expect(ai.calls[1]?.prompt).toContain("Uno\nDos");
-    expect(await deck.flashcards.countByPage(PAGE, OWNER)).toBe(4);
+    expect(ai.calls[1]?.prompt).toContain(`${u}\n${d}`);
+    expect(await deck.flashcards.countByPage(PAGE, OWNER)).toBe(20);
+  });
+});
+
+// Phase 8 H14 (user 2026-10-29): 100 words minimum, about 15 per card.
+describe("requestGeneration — page content thresholds", () => {
+  beforeEach(() => {
+    ids = 0;
+  });
+
+  function withText(plainText: string) {
+    return stubPages({ title: "Fotosíntesis", plainText });
+  }
+
+  it("answers AI_PAGE_TOO_SHORT under 100 words, before the limiter and the AI", async () => {
+    const { deps, limiter, ai } = makeDeps({ pages: withText(para("c", 99)) });
+
+    const result = await requestGeneration({ pageId: PAGE }, deps, OWNER);
+
+    expect(!result.ok && result.error.code).toBe(PAGE_TOO_SHORT_CODE);
+    expect(!result.ok && result.error).toBeInstanceOf(PageTooShortError);
+    expect(!result.ok && result.error).toMatchObject({
+      words: 99,
+      minWords: 100,
+      maxItems: 6,
+    });
+    expect(limiter.checks).toBe(0);
+    expect(ai.calls).toHaveLength(0);
+  });
+
+  it("counts only the new paragraphs", async () => {
+    const old = para("o", 150);
+    const { deps, limiter } = makeDeps({ pages: withText(old) });
+    await requestGeneration({ pageId: PAGE }, deps, OWNER);
+    const checks = limiter.checks;
+
+    const again = await requestGeneration(
+      { pageId: PAGE },
+      { ...deps, pages: withText(`${old}\n${para("n", 40)}`) },
+      OWNER,
+    );
+
+    expect(!again.ok && again.error).toMatchObject({
+      code: PAGE_TOO_SHORT_CODE,
+      words: 40,
+    });
+    expect(limiter.checks).toBe(checks);
+  });
+
+  it("refuses a requested count the words cannot carry", async () => {
+    const { deps, limiter } = makeDeps({ pages: withText(para("c", 120)) });
+
+    const result = await requestGeneration(
+      { pageId: PAGE, count: 10 },
+      deps,
+      OWNER,
+    );
+
+    expect(!result.ok && result.error).toMatchObject({
+      code: PAGE_TOO_SHORT_CODE,
+      words: 120,
+      minWords: 150,
+      maxItems: 8,
+    });
+    expect(limiter.checks).toBe(0);
+  });
+
+  it("asks for one card per 15 words: a 100-word page yields 6", async () => {
+    const { deps, ai } = makeDeps({ pages: withText(para("c", 100)) });
+
+    const result = await requestGeneration({ pageId: PAGE }, deps, OWNER);
+
+    expect(result.ok && result.value.cards).toHaveLength(6);
+    expect(ai.calls[0]?.system).toContain("exactly 6 cards");
+  });
+
+  it("marks only the share of the sent paragraphs the returned cards cover", async () => {
+    const [a, b] = [para("a", 75), para("b", 75)];
+    const { deps, deck } = makeDeps({
+      pages: withText(`${a}\n${b}`),
+      // 5 of the 10 cards asked for come back: half the words.
+      ai: makeAi({
+        cards: Array.from({ length: 5 }, (_, i) => ({
+          front: `F${i}`,
+          back: `B${i}`,
+        })),
+      }),
+    });
+
+    const result = await requestGeneration({ pageId: PAGE }, deps, OWNER);
+
+    expect(result.ok && result.value.cards).toHaveLength(5);
+    expect(await deck.fingerprints.listByPage(PAGE, OWNER)).toEqual([
+      fingerprintParagraph(a),
+    ]);
   });
 });

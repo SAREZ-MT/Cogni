@@ -54,7 +54,7 @@ function AcceptedState({ profile }: { profile: Profile }) {
       >
         {message}
       </p>
-      <Link href="/" className="text-sm">
+      <Link href="/inicio" className="text-sm">
         {TERMS_COPY.accepted.back}
       </Link>
     </div>

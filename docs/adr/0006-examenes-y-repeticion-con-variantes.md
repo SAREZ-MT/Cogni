@@ -4,6 +4,7 @@
 |---|---|
 | Fecha | 2026-10-06 |
 | Estado | Aceptado |
+| Enmiendas | 2026-10-29 (Fase 8, H13, H14, H17, H18 y H19): ver "Enmienda del 2026-10-29" al final; las decisiones 9, 17 y la consecuencia sobre el retiro quedan precisadas allí |
 | Reemplaza | §7.5, punto 3 ("se completan hasta 5"), del documento maestro 1.3.1. Precisa §3.3, §6.1, §7.2, §8.4 y §13 (Fase 5); recogido en la versión 1.4.0 |
 
 ## Contexto
@@ -82,3 +83,14 @@ Observaciones de las revisiones, no bloqueantes, para una limpieza posterior:
 - **Llamar a la IA y luego comprobar si la repetición se puede armar**: una página imposible gastaba llamadas al proveedor en cada intento.
 - **Dejar la repetición pendiente cuando ya no queda ninguna raíz fallada**: la página quedaba bloqueada, sin examen normal ni repetición.
 - **Retroalimentación nueva en cada aprobación**: costo de IA sin información nueva; se reutiliza la de la aprobación anterior.
+
+## Enmienda del 2026-10-29 (Fase 8)
+
+Las decisiones de arriba se conservan como registro de la Fase 5. Desde la Fase 8 el código hace lo siguiente; donde choca con lo anterior, manda esta enmienda (`docs/documento-maestro.md` §3.3 y §8).
+
+- **Creación solo con IA (H13).** Ya no hay "Nueva pregunta" ni creación manual de un examen: las preguntas nacen de "Generar" en el panel de técnicas de la página o de "Crear examen" en `/exams`. `create-exam-question.ts` queda solo para la página de edición.
+- **Contenido mínimo (H14).** Una generación necesita al menos 100 palabras de contenido nuevo y unas 15 por pregunta, así que el examen más pequeño (10 preguntas) pide 150 palabras y 30 preguntas piden 450 (`examCountsForWords`, `src/shared/kernel/generation-capacity.ts`). El diálogo solo ofrece las cantidades que caben; una página corta responde `AI_PAGE_TOO_SHORT` antes del límite diario, sin llamar a la IA.
+- **Centro plano (H17), reemplaza la decisión 17.** `/exams` lista cada página con preguntas como una tarjeta, filtrada en el servidor con `?cuaderno=<id>`; la vista por cuaderno desapareció y `/exams/[notebookId]` redirige a `/exams?cuaderno=<id>`. "Hacer examen" y "Repetir examen" abren `/exams/{cuaderno}/{página}?desde=hub`; la pantalla de inicio, el reproductor y los resultados conservan la marca (y `cuaderno`) y regresan a `/exams` (H18).
+- **Página de edición (H18), reemplaza la decisión 9.** `/exams/{cuaderno}/{página}/editar` edita en el lugar (enunciado, 4 opciones, la correcta, concepto y explicación), añade preguntas a mano (`origin = manual`) y borra, como borrador local que "Guardar" aplica en una transacción (`applyExamEdits`). La antigua ruta `/preguntas` redirige aquí. Ya no hay "Retirar": **borrar una pregunta es un borrado real de su linaje completo** (raíz y variantes), del `StudyItem` de la raíz y de sus respuestas; antes, `ExamLineageReferences.dropLineage` la quita de los exámenes abiertos que la muestran y de la repetición pendiente. Los exámenes terminados conservan su nota. La página conserva al menos una pregunta (`EXAMS_LAST_QUESTION`); con menos de 10, no se puede iniciar un examen hasta generar o añadir más.
+- **Borrado del conjunto (H19).** "Eliminar examen" en la tarjeta del centro borra, tras un diálogo con el recuento del servidor (`previewExamSetDeletionAction`, `deleteExamSetAction`), todas las preguntas de la página en cualquier estado, las sesiones y respuestas, la retroalimentación, los `StudyItem` (con su historial), `exam_page_state` y las huellas de generación del examen, y recalcula el dominio de la página en la misma transacción.
+- **Consecuencia que cambia.** "Las preguntas solo se retiran" deja de valer: la lista guardada de un examen abierto se mantiene estable porque `dropLineage` actúa antes del borrado, no porque las filas sobrevivan. Las preguntas retiradas antes de la Fase 8 siguen como filas retiradas y cuentan para la regla de "nunca una redacción anterior de su linaje".

@@ -16,6 +16,9 @@ export interface ExamResultsViewProps {
   questionsHref: string;
   examHref: string;
   results: ExamResults;
+  // Where the back link leads and what it says (Phase 8 H18: the hub when
+  // opened from it); defaults to the notebook page.
+  back?: { href: string; label: string };
 }
 
 const OPTION_LETTERS = ["A", "B", "C", "D"] as const;
@@ -48,6 +51,7 @@ export function ExamResultsView({
   questionsHref,
   examHref,
   results,
+  back = { href: pageHref, label: "Volver a la página" },
 }: ExamResultsViewProps) {
   const incorrect = results.total - results.correct;
 
@@ -56,7 +60,7 @@ export function ExamResultsView({
       data-testid="exam-results"
       className="mx-auto flex w-full max-w-[720px] flex-1 flex-col gap-6 py-8"
     >
-      <BackLink href={pageHref}>Volver a la página</BackLink>
+      <BackLink href={back.href}>{back.label}</BackLink>
 
       <ScoreCard
         score={results.scorePercent}

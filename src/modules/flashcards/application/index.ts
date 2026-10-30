@@ -1,4 +1,10 @@
 export {
+  type ApplyDeckEditsDeps,
+  applyDeckEdits,
+  type DeckEdits,
+  type DeckEditsResult,
+} from "./apply-deck-edits";
+export {
   type ArchiveFlashcardResult,
   archiveFlashcard,
 } from "./archive-flashcard";
@@ -6,11 +12,18 @@ export {
   type CreateManualFlashcardDeps,
   createManualFlashcard,
 } from "./create-manual-flashcard";
+export type { DeckDeletion, DeckDeletionPreview } from "./deck-deletion";
 export type {
   DeckRepositories,
   DeckStudyItems,
   DeckUnitOfWork,
 } from "./deck-unit-of-work";
+export { deleteDeck, previewDeckDeletion } from "./delete-deck";
+export {
+  type DeleteFlashcardResult,
+  deleteFlashcard,
+} from "./delete-flashcard";
+export { editFlashcard } from "./edit-flashcard";
 export { getGenerationStatus } from "./get-generation-status";
 export { listDecks } from "./list-decks";
 export { listFlashcardsByPage } from "./list-flashcards-by-page";

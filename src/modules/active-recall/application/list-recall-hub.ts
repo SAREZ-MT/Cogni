@@ -46,6 +46,10 @@ export interface RecallHubEntry {
   mastery: number | null;
   // The page's recall questions due today; null when unknown.
   dueToday: number | null;
+  // Active recall questions of the page and the newest one's creation
+  // (Phase 8 H17: the flat hub's "N preguntas" and recency).
+  questionCount: number;
+  latestQuestionAt: Date | null;
 }
 
 export interface RecallHub {
@@ -69,7 +73,8 @@ function toSessionEntry(session: RecallHubSession): RecallHubSessionEntry {
 }
 
 // The active recall hub and notebook view (documento-maestro §3.3): every
-// page of the owner with a finished session, its sessions with their
+// page of the owner with recall questions or a finished session, its
+// finished sessions (none yet for a page that only has questions) with their
 // scores (decision in force: average combined × 20 and AI score buckets),
 // the page mastery from study-engine — never a recall-local formula — and
 // its recall questions due today, in the reader's order.
@@ -98,6 +103,8 @@ export async function listRecallHub(
         ? null
         : Math.round((masteryByPage.get(page.pageId) ?? 0) * 100),
     dueToday: due === null ? null : (due.get(page.pageId) ?? 0),
+    questionCount: page.questionCount,
+    latestQuestionAt: page.latestQuestionAt,
   }));
   const averageMastery =
     masteryByPage === null || pages.length === 0

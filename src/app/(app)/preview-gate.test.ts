@@ -25,11 +25,13 @@ const REAL_DATA_PAGES = new Set([
   "active-recall/[notebookId]/page.tsx",
   "active-recall/[notebookId]/[pageId]/page.tsx",
   "active-recall/[notebookId]/[pageId]/resultados/page.tsx",
+  "active-recall/[notebookId]/[pageId]/editar/page.tsx",
   "dashboard/page.tsx",
   "exams/page.tsx",
   "exams/[notebookId]/page.tsx",
   "exams/[notebookId]/[pageId]/page.tsx",
   "exams/[notebookId]/[pageId]/preguntas/page.tsx",
+  "exams/[notebookId]/[pageId]/editar/page.tsx",
   "exams/[notebookId]/[pageId]/resultados/page.tsx",
 ]);
 

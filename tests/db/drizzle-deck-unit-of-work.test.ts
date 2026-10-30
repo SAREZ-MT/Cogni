@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { afterAll, describe, expect, it } from "vitest";
+import { applyDeckEdits } from "@/modules/flashcards/application/apply-deck-edits";
 import { archiveFlashcard } from "@/modules/flashcards/application/archive-flashcard";
 import { createManualFlashcard } from "@/modules/flashcards/application/create-manual-flashcard";
 import { FLASHCARD_ERROR } from "@/modules/flashcards/domain/errors";
@@ -13,6 +14,7 @@ import {
   notebooks,
   pages,
   profiles,
+  reviewLogs,
   studyItems,
 } from "@/shared/db/schema";
 import { createFixedClock } from "@/shared/kernel/clock";
@@ -238,6 +240,97 @@ if (process.env.DATABASE_URL) {
       expect(refused && !refused.ok && refused.error.code).toBe(
         FLASHCARD_ERROR.LAST_CARD,
       );
+    });
+
+    // Phase 8 H18: the edit page saves its whole draft in one transaction;
+    // a deleted card takes its study item and review history with it.
+    describe("applyDeckEdits", () => {
+      async function seedCard(pageId: string, front: string) {
+        const created = await createManualFlashcard(
+          { pageId, front, back: `${front} reverso` },
+          createDeps(),
+          owner.id,
+        );
+        if (!created.ok) throw new Error("seed failed");
+        const item = await itemFor(created.value.id);
+        if (!item) throw new Error("no study item");
+        await db.insert(reviewLogs).values({
+          id: randomUUID(),
+          ownerId: owner.id,
+          itemId: item.id,
+          quality: 4,
+          reviewedAt: NOW,
+          intervalBefore: 0,
+          intervalAfter: 1,
+          easinessAfter: 2.5,
+          sessionKind: "flashcards",
+          sessionId: randomUUID(),
+        });
+        return { card: created.value, item };
+      }
+
+      it("edits, adds and deletes for real: the deleted card's item and logs are gone", async () => {
+        const pageId = await newPage();
+        const kept = await seedCard(pageId, "Queda");
+        const gone = await seedCard(pageId, "Se va");
+
+        const result = await applyDeckEdits(
+          {
+            pageId,
+            updates: [{ id: kept.card.id, front: "Queda editada", back: "r" }],
+            creates: [{ front: "Nueva", back: "n" }],
+            deletes: [gone.card.id],
+          },
+          createDeps(),
+          owner.id,
+        );
+
+        expect(result.ok && result.value.cards.map((c) => c.front)).toEqual([
+          "Queda editada",
+          "Nueva",
+        ]);
+        const goneRows = await db
+          .select()
+          .from(flashcards)
+          .where(eq(flashcards.id, gone.card.id));
+        expect(goneRows).toHaveLength(0);
+        expect(await itemFor(gone.card.id)).toBeUndefined();
+        const goneLogs = await db
+          .select()
+          .from(reviewLogs)
+          .where(eq(reviewLogs.itemId, gone.item.id));
+        expect(goneLogs).toHaveLength(0);
+        const keptLogs = await db
+          .select()
+          .from(reviewLogs)
+          .where(eq(reviewLogs.itemId, kept.item.id));
+        expect(keptLogs).toHaveLength(1);
+        expect((await itemFor(kept.card.id))?.id).toBe(kept.item.id);
+      });
+
+      it("rolls the whole save back when a deletion would empty the deck", async () => {
+        const pageId = await newPage();
+        const only = await seedCard(pageId, "Única");
+
+        const result = await applyDeckEdits(
+          {
+            pageId,
+            updates: [{ id: only.card.id, front: "Cambiada", back: "r" }],
+            creates: [],
+            deletes: [only.card.id],
+          },
+          createDeps(),
+          owner.id,
+        );
+
+        expect(!result.ok && result.error.code).toBe(FLASHCARD_ERROR.LAST_CARD);
+        const [row] = await db
+          .select()
+          .from(flashcards)
+          .where(eq(flashcards.id, only.card.id));
+        expect(row?.front).toBe("Única");
+        expect(await itemFor(only.card.id)).toBeDefined();
+      });
     });
   });
 }

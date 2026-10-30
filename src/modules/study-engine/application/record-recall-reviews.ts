@@ -5,6 +5,7 @@ import { computeMastery } from "../domain/mastery";
 import type { PageMastery } from "../domain/page-mastery";
 import { applySm2 } from "../domain/sm2";
 import {
+  isDueBefore,
   type Quality,
   recallReviewQualityFor,
   type StudyItem,
@@ -26,8 +27,12 @@ export interface RecordRecallReviewsInput {
   sessionId: string;
   pageId: string;
   reviews: readonly RecallReview[];
-  // The evaluation time: review time and due comparison.
+  // The evaluation time: the review time.
   now: Date;
+  // The owner's "due" bound at `now` (the start of their next local day,
+  // a DueCutoff): an item due before it was due, so a passing quality on
+  // an item due later today reviews it.
+  dueBefore: Date;
 }
 
 export interface RecordRecallReviewsDeps {
@@ -71,7 +76,7 @@ export async function recordRecallReviews(
   input: RecordRecallReviewsInput,
   deps: RecordRecallReviewsDeps,
 ): Promise<Result<RecordedRecallReviews, DomainError>> {
-  const { ownerId, pageId, sessionId, now } = input;
+  const { ownerId, pageId, sessionId, now, dueBefore } = input;
   const questions = new Set(input.reviews.map((review) => review.questionId));
   if (questions.size !== input.reviews.length) {
     return fail(
@@ -135,7 +140,7 @@ export async function recordRecallReviews(
         alreadyRecordedQuestionIds.push(review.questionId);
         continue;
       }
-      const quality = qualityFor(review.quality as Quality, item, now);
+      const quality = qualityFor(review.quality as Quality, item, dueBefore);
       if (quality === null) {
         skippedQuestionIds.push(review.questionId);
         continue;
@@ -193,12 +198,12 @@ export async function recordRecallReviews(
 function qualityFor(
   quality: Quality,
   item: StudyItem,
-  now: Date,
+  dueBefore: Date,
 ): Quality | null {
   if (item.suspendedAt !== null) return null;
   return recallReviewQualityFor({
     quality,
-    wasDue: item.dueAt.getTime() <= now.getTime(),
+    wasDue: isDueBefore(item, dueBefore),
   });
 }
 

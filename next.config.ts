@@ -21,6 +21,12 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];
   },
+  // The landing moved from /landing to the domain root (landing-v1 T5).
+  // Permanent (308) so shared links and crawlers follow it to /. Exact
+  // source: the landing's images under public/landing/ are not affected.
+  async redirects() {
+    return [{ source: "/landing", destination: "/", permanent: true }];
+  },
 };
 
 // Source maps upload only when SENTRY_AUTH_TOKEN, SENTRY_ORG and

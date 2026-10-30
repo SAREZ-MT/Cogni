@@ -10,6 +10,7 @@ import {
 } from "@/modules/ai";
 import type { PageTextReader } from "@/modules/notebooks";
 import type {
+  DueCutoff,
   RecordedRecallReviews,
   RecordRecallReviewsInput,
 } from "@/modules/study-engine";
@@ -93,6 +94,10 @@ export interface EvaluateRecallSessionDeps {
     ): Promise<Result<RecordedRecallReviews, DomainError>>;
   };
   clock: Clock;
+  // The owner's per-day "due" bound (start of their next local day),
+  // resolved in the request that scheduled the run: a passing quality on
+  // a question due later today reviews it.
+  dueCutoff: DueCutoff;
   // AI_PAGE_TOKEN_CAP: the page fragment is trimmed to it.
   tokenCap: number;
   // Told about every unexpected failure (the action reports it to Sentry);
@@ -255,6 +260,7 @@ async function recordReviews(
         pageId: session.pageId,
         reviews: batch,
         now,
+        dueBefore: deps.dueCutoff(now),
       });
       return result.ok ? null : result.error;
     } catch (error) {

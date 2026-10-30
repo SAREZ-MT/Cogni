@@ -17,7 +17,10 @@ export {
   type NewProfile,
   type Profile,
 } from "./profile";
-export type { ProfileRepository } from "./profile-repository";
+export type {
+  AcceptTermsOptions,
+  ProfileRepository,
+} from "./profile-repository";
 export {
   acceptTerms,
   hasAcceptedCurrentTerms,
@@ -25,6 +28,17 @@ export {
   TERMS_VERSION,
   termsRedirectFor,
 } from "./terms";
+export {
+  consentAppliesToNewAccount,
+  consentCookieValue,
+  consentFromCookie,
+  consentFromMetadata,
+  signUpConsentMetadata,
+  TERMS_CONSENT_COOKIE,
+  TERMS_CONSENT_COOKIE_MAX_AGE_SECONDS,
+  type TermsAcceptanceMethod,
+  type TermsConsent,
+} from "./terms-consent";
 export {
   EXPLICIT_UTC,
   hasChosenTimeZone,

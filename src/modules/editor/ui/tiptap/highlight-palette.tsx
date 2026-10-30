@@ -1,7 +1,7 @@
 // Cogni highlight palette (specs/editor/spec.md, "Paleta de resaltado de
 // Cogni y callouts"): the mark MUST store one of the seven Cogni palette
-// color names, never a hex code, and MUST render with the design-system
-// `-fg` token pair. `@tiptap/extension-highlight`'s own `multicolor`
+// color names, never a hex code, and MUST render with design-system tokens
+// (H7: the highlighter tokens, see HIGHLIGHTER_CLASS below). `@tiptap/extension-highlight`'s own `multicolor`
 // attribute (node_modules/@tiptap/extension-highlight) stores an arbitrary
 // CSS color string and renders an inline `background-color` style — this
 // extension replaces that attribute entirely with a closed palette and
@@ -26,19 +26,11 @@ export function isHighlightColor(value: unknown): value is HighlightColor {
   );
 }
 
-// Same pattern as src/modules/notebooks/ui/notebook-item.tsx's
-// SWATCH_CLASSES: Tailwind v4 needs literal class names to keep them in
-// the generated CSS, so a template-interpolated `bg-pastel-${color}`
-// string would be invisible to its scanner.
-const HIGHLIGHT_CLASSES: Record<HighlightColor, string> = {
-  pink: "bg-pastel-pink text-pastel-pink-fg",
-  green: "bg-pastel-green text-pastel-green-fg",
-  yellow: "bg-pastel-yellow text-pastel-yellow-fg",
-  purple: "bg-pastel-purple text-pastel-purple-fg",
-  orange: "bg-pastel-orange text-pastel-orange-fg",
-  blue: "bg-pastel-blue text-pastel-blue-fg",
-  mint: "bg-pastel-mint text-pastel-mint-fg",
-};
+// H7 (editor polish round 2): the mark is painted as a marker-pen stroke
+// by `.editor-content mark.cogni-highlighter[data-color=…]` in globals.css
+// (highlighter tokens, uneven edges, `box-decoration-break: clone`), so the
+// text keeps the editor's ink colour and the mark only carries the hook.
+const HIGHLIGHTER_CLASS = "cogni-highlighter";
 
 export const CogniHighlight = Highlight.extend({
   addAttributes() {
@@ -53,7 +45,7 @@ export const CogniHighlight = Highlight.extend({
           if (!isHighlightColor(attributes.color)) return {};
           return {
             "data-color": attributes.color,
-            class: HIGHLIGHT_CLASSES[attributes.color],
+            class: HIGHLIGHTER_CLASS,
           };
         },
       },

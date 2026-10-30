@@ -38,11 +38,14 @@ export function uniqueEmail(prefix: string): string {
 // row is written through the service-role client (RLS has no policies and
 // the service role bypasses it); the app's own ensureProfile then finds it
 // and leaves it untouched. `{ acceptTerms: false }` skips this so the
-// terms-acceptance spec can exercise the gate with a brand-new account.
+// terms-acceptance spec can exercise the gate with a brand-new account, and
+// `termsVersion` records an older version so it can check the re-ask after
+// a TERMS_VERSION bump. Accounts made here skip the sign-up notice (the
+// admin API creates them), so they carry no sign-up consent proof.
 export async function createVerifiedUser(
-  options: { acceptTerms?: boolean } = {},
+  options: { acceptTerms?: boolean; termsVersion?: string } = {},
 ): Promise<TestUser> {
-  const { acceptTerms = true } = options;
+  const { acceptTerms = true, termsVersion = TERMS_VERSION } = options;
   const email = uniqueEmail("verified");
   const password = "Secreta-123";
   const admin = adminClient();
@@ -56,7 +59,7 @@ export async function createVerifiedUser(
   if (acceptTerms) {
     const { error: profileError } = await admin.from("profiles").upsert({
       id: data.user.id,
-      terms_accepted_version: TERMS_VERSION,
+      terms_accepted_version: termsVersion,
       terms_accepted_at: new Date().toISOString(),
     });
     if (profileError) throw profileError;
@@ -71,23 +74,51 @@ export async function deleteUserByEmail(email: string): Promise<void> {
   if (user) await admin.auth.admin.deleteUser(user.id);
 }
 
-export async function submitSignIn(page: Page, user: TestUser): Promise<void> {
+// The product tour (H2-T2) draws over the whole shell and blocks clicks for
+// an owner with no notebooks, so every signed-in spec starts with it marked
+// as seen, the same way the terms arrive accepted. The init script runs on
+// every navigation of this page; `{ tourSeen: false }` skips it so the tour
+// spec can exercise a browser that never saw the tour.
+export const TOUR_STORAGE_KEY = "cogni.tour.v1";
+
+export interface SignInOptions {
+  tourSeen?: boolean;
+}
+
+export async function submitSignIn(
+  page: Page,
+  user: TestUser,
+  { tourSeen = true }: SignInOptions = {},
+): Promise<void> {
+  if (tourSeen) {
+    await page.addInitScript((key) => {
+      try {
+        window.localStorage.setItem(key, "done");
+      } catch {
+        // Storage unavailable: the tour does not auto-launch either.
+      }
+    }, TOUR_STORAGE_KEY);
+  }
   await page.goto("/login");
   await page.getByLabel("Correo electrónico").fill(user.email);
-  await page.getByLabel("Contraseña").fill(user.password);
+  await page.getByLabel("Contraseña", { exact: true }).fill(user.password);
   await page.getByRole("button", { name: "Iniciar sesión" }).click();
 }
 
-export async function signIn(page: Page, user: TestUser): Promise<void> {
-  await submitSignIn(page, user);
-  await expect(page).toHaveURL("/");
+export async function signIn(
+  page: Page,
+  user: TestUser,
+  options: SignInOptions = {},
+): Promise<void> {
+  await submitSignIn(page, user, options);
+  await expect(page).toHaveURL("/inicio");
 }
 
 // Worker-scoped verified user shared by every shell test in that worker,
 // plus a test-scoped one for scenarios that need an owner with no data at
 // all (the worker user accumulates notebooks across specs).
 export const test = base.extend<
-  { freshUser: TestUser; unacceptedUser: TestUser },
+  { freshUser: TestUser; unacceptedUser: TestUser; staleTermsUser: TestUser },
   { verifiedUser: TestUser }
 >({
   // biome-ignore lint/correctness/noEmptyPattern: Playwright fixture signature
@@ -100,6 +131,13 @@ export const test = base.extend<
   // biome-ignore lint/correctness/noEmptyPattern: Playwright fixture signature
   unacceptedUser: async ({}, use) => {
     const user = await createVerifiedUser({ acceptTerms: false });
+    await use(user);
+    await deleteUserByEmail(user.email);
+  },
+  // Verified account that accepted the terms BEFORE the current version.
+  // biome-ignore lint/correctness/noEmptyPattern: Playwright fixture signature
+  staleTermsUser: async ({}, use) => {
+    const user = await createVerifiedUser({ termsVersion: "2026-10-04" });
     await use(user);
     await deleteUserByEmail(user.email);
   },

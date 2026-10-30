@@ -5,13 +5,14 @@ import { runDueTodayReaderContract } from "@/modules/scheduling/application/test
 import { DrizzleDueTodayReader } from "@/modules/scheduling/infrastructure/drizzle-due-today-reader";
 import { newStudyItem } from "@/modules/study-engine/domain/study-item";
 import { DrizzleStudyItemRepository } from "@/modules/study-engine/infrastructure/drizzle-study-item-repository";
-import { notebooks, pages, profiles } from "@/shared/db/schema";
+import { examSessions, notebooks, pages, profiles } from "@/shared/db/schema";
 import { createTestDb } from "./helpers/test-db";
 import { createTestOwner, deleteTestOwner } from "./helpers/test-owner";
 
 // Top-level await: the contract builds its `it()` closures at collection
 // time, so the fixtures must exist before it is called. Deleting the owners
-// cascades to every notebook, page and study item created here.
+// cascades to every notebook, page, study item and exam session created
+// here.
 if (process.env.DATABASE_URL) {
   const db = createTestDb();
   const owner = await createTestOwner("due-today-owner");
@@ -75,6 +76,23 @@ if (process.env.DATABASE_URL) {
           ...item,
           dueAt: input.dueAt,
           suspendedAt: input.suspended ? input.dueAt : null,
+        });
+      },
+      addExamSession: async (page, finishedAt) => {
+        const ownerId = pageOwners.get(page.pageId) ?? owner.id;
+        const done = finishedAt !== null;
+        await db.insert(examSessions).values({
+          id: randomUUID(),
+          ownerId,
+          pageId: page.pageId,
+          requestedCount: 10,
+          questionIds: [randomUUID()],
+          startedAt: finishedAt ?? new Date(),
+          finishedAt,
+          total: done ? 1 : null,
+          correct: done ? 1 : null,
+          score: done ? 1 : null,
+          passed: done ? true : null,
         });
       },
       archivePage: async (page) => {

@@ -44,7 +44,7 @@ function setup(canReview = true) {
       deckLabel="Mitocondria"
       description="2 tarjetas"
       canReview={canReview}
-      actions={<button type="button">Nueva tarjeta</button>}
+      actions={<button type="button">Otra acción</button>}
     >
       <p>lista del mazo</p>
     </DeckReview>,
@@ -82,13 +82,15 @@ describe("DeckReview", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("2 tarjetas")).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Nueva tarjeta" }),
+      screen.getByRole("button", { name: "Otra acción" }),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Repasar/ })).toBeInTheDocument();
     expect(screen.getByText("lista del mazo")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Biología/ })).toHaveAttribute(
+    // Phase 8 H17: no notebook level; back is the hub filtered by the
+    // deck's notebook.
+    expect(screen.getByRole("link", { name: /Flashcards/ })).toHaveAttribute(
       "href",
-      "/flashcards/nb",
+      "/flashcards?cuaderno=nb",
     );
   });
 
@@ -152,10 +154,15 @@ describe("DeckReview", () => {
   });
 
   it("grades each card, finishes the session and returns to a refreshed deck", async () => {
-    actions.startFlashcardSessionAction.mockResolvedValue({
-      ok: true,
-      value: { sessionId: SESSION, cards: [card(1)] },
-    });
+    actions.startFlashcardSessionAction
+      .mockResolvedValueOnce({
+        ok: true,
+        value: { sessionId: SESSION, cards: [card(1)] },
+      })
+      .mockResolvedValue({
+        ok: false,
+        error: { code: "STUDY_ENGINE_NOTHING_DUE", message: "x" },
+      });
     const user = setup();
     await start(user);
 
@@ -182,6 +189,9 @@ describe("DeckReview", () => {
     expect(screen.queryByTestId("flashcard-player")).not.toBeInTheDocument();
     expect(screen.getByText("lista del mazo")).toBeInTheDocument();
     expect(refresh).toHaveBeenCalled();
+    // Leaving a graded session always asks what is still due (V10).
+    expect(await screen.findByText("Estás al día")).toBeInTheDocument();
+    expect(actions.startFlashcardSessionAction).toHaveBeenCalledTimes(2);
   });
 
   it("moves on when the card was already graded (a double submit)", async () => {
@@ -287,10 +297,15 @@ describe("DeckReview", () => {
 
   describe("session feedback", () => {
     async function finishOneCard(user: ReturnType<typeof userEvent.setup>) {
-      actions.startFlashcardSessionAction.mockResolvedValue({
-        ok: true,
-        value: { sessionId: SESSION, cards: [card(1)] },
-      });
+      actions.startFlashcardSessionAction
+        .mockResolvedValueOnce({
+          ok: true,
+          value: { sessionId: SESSION, cards: [card(1)] },
+        })
+        .mockResolvedValue({
+          ok: false,
+          error: { code: "STUDY_ENGINE_NOTHING_DUE", message: "x" },
+        });
       await start(user);
       await user.click(await screen.findByTestId("flip-card"));
       await user.click(screen.getByTestId("rate-good"));
@@ -453,5 +468,217 @@ describe("DeckReview", () => {
       await act(async () => {});
       expect(actions.startFlashcardSessionAction).not.toHaveBeenCalled();
     });
+  });
+
+  // Phase 8 H16/H17: opened from the hub (the create dialog or a card):
+  // the route hands the hub to return to and the query to keep.
+  describe("opened from the hub", () => {
+    function renderFromHub() {
+      render(
+        <DeckReview
+          notebookId="nb"
+          notebookTitle="Biología"
+          pageId={PAGE}
+          deckLabel="Mitocondria"
+          description="2 tarjetas"
+          canReview
+          autoStart
+          backHref="/flashcards?cuaderno=nb2"
+          keepQuery="desde=hub&cuaderno=nb2"
+        >
+          <p>lista del mazo</p>
+        </DeckReview>,
+      );
+    }
+
+    beforeEach(() => {
+      window.history.replaceState(
+        null,
+        "",
+        `/flashcards/nb/${PAGE}?repasar=1&desde=hub&cuaderno=nb2`,
+      );
+    });
+
+    it("plays at once, keeps the hub marker and filter, and leads «Todos los mazos» back to the hub", async () => {
+      actions.startFlashcardSessionAction.mockResolvedValue({
+        ok: true,
+        value: { sessionId: SESSION, cards: [card(1)] },
+      });
+
+      renderFromHub();
+
+      expect(await screen.findByTestId("flashcard-player")).toBeInTheDocument();
+      expect(window.location.search).toBe("?desde=hub&cuaderno=nb2");
+      expect(
+        screen.getByRole("link", { name: /Todos los mazos/ }),
+      ).toHaveAttribute("href", "/flashcards?cuaderno=nb2");
+    });
+
+    it("leads the deck's back link to the hub", async () => {
+      actions.startFlashcardSessionAction.mockResolvedValue({
+        ok: false,
+        error: { code: "STUDY_ENGINE_NOTHING_DUE", message: "x" },
+      });
+
+      renderFromHub();
+
+      expect(await screen.findByText("Estás al día")).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: /Flashcards/ })).toHaveAttribute(
+        "href",
+        "/flashcards?cuaderno=nb2",
+      );
+    });
+  });
+});
+
+// Phase 8 H18 (user 2026-10-29): a deck with nothing due says so with its
+// next review and offers "Repasar igual", a practice pass that never
+// touches the SM-2 schedule (no grade, no session, no feedback).
+describe("DeckReview, up to date and practice mode", () => {
+  const deck = [
+    { id: "c1", front: "Pregunta 1", back: "Respuesta 1" },
+    { id: "c2", front: "Pregunta 2", back: "Respuesta 2" },
+  ];
+
+  function renderDeck(practice = false) {
+    render(
+      <DeckReview
+        notebookId="nb"
+        notebookTitle="Biología"
+        pageId={PAGE}
+        deckLabel="Mitocondria"
+        description="2 tarjetas"
+        canReview
+        autoStart
+        practiceCards={deck}
+        nextReview="mañana"
+        practice={practice}
+        backHref="/flashcards"
+        keepQuery="desde=hub"
+      />,
+    );
+  }
+
+  beforeEach(() => {
+    for (const action of Object.values(actions)) action.mockReset();
+    window.history.replaceState(null, "", `/flashcards/nb/${PAGE}?desde=hub`);
+    actions.startFlashcardSessionAction.mockResolvedValue({
+      ok: false,
+      error: { code: "STUDY_ENGINE_NOTHING_DUE", message: "x" },
+    });
+  });
+
+  it("says the deck is up to date with its next review and offers Repasar igual", async () => {
+    renderDeck();
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "Estás al día con este mazo",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Tu próximo repaso es mañana/)).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Repasar igual" }),
+    ).toBeInTheDocument();
+  });
+
+  it("practises every card without grading, closing a session or asking for feedback", async () => {
+    const user = userEvent.setup();
+    renderDeck();
+
+    await user.click(
+      await screen.findByRole("button", { name: "Repasar igual" }),
+    );
+
+    expect(screen.getByTestId("flashcard-player")).toBeInTheDocument();
+    expect(
+      screen.getByText(/no cambian tus próximos repasos/),
+    ).toBeInTheDocument();
+    expect(window.location.search).toBe("?desde=hub&modo=practica");
+    for (let i = 0; i < deck.length; i += 1) {
+      await user.click(
+        screen.getByRole("button", { name: /Mostrar respuesta/ }),
+      );
+      await user.click(screen.getByRole("button", { name: /Bien/ }));
+    }
+    expect(await screen.findByText("¡Sesión completada!")).toBeInTheDocument();
+    expect(actions.gradeFlashcardAction).not.toHaveBeenCalled();
+    expect(actions.finishFlashcardSessionAction).not.toHaveBeenCalled();
+    expect(actions.requestSessionFeedbackAction).not.toHaveBeenCalled();
+    expect(actions.startFlashcardSessionAction).toHaveBeenCalledTimes(1);
+  });
+
+  it("asks for the due cards again after a graded session, so the deck says it is up to date", async () => {
+    actions.startFlashcardSessionAction
+      .mockResolvedValueOnce({
+        ok: true,
+        value: { sessionId: SESSION, cards: [card(1)] },
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        error: { code: "STUDY_ENGINE_NOTHING_DUE", message: "x" },
+      });
+    actions.gradeFlashcardAction.mockResolvedValue({
+      ok: true,
+      value: { reviewedCount: 1, againCount: 0, masteryLevel: "Aprendiendo" },
+    });
+    actions.finishFlashcardSessionAction.mockResolvedValue({
+      ok: true,
+      value: { reviewedCount: 1, againCount: 0 },
+    });
+    actions.requestSessionFeedbackAction.mockResolvedValue({
+      ok: false,
+      error: { code: "X", message: "x" },
+    });
+    const user = userEvent.setup();
+    renderDeck();
+
+    await user.click(
+      await screen.findByRole("button", { name: /Mostrar respuesta/ }),
+    );
+    await user.click(screen.getByRole("button", { name: /Bien/ }));
+    await user.click(
+      await screen.findByRole("button", { name: "Volver al mazo" }),
+    );
+
+    expect(
+      await screen.findByText("Estás al día con este mazo"),
+    ).toBeInTheDocument();
+    expect(actions.startFlashcardSessionAction).toHaveBeenCalledTimes(2);
+  });
+
+  it("asks what is due after a practice pass opened with ?modo=practica, never claiming an up-to-date deck", async () => {
+    actions.startFlashcardSessionAction.mockResolvedValue({
+      ok: true,
+      value: { sessionId: SESSION, cards: [card(1)] },
+    });
+    const user = userEvent.setup();
+    renderDeck(true);
+
+    for (let i = 0; i < deck.length; i += 1) {
+      await user.click(
+        await screen.findByRole("button", { name: /Mostrar respuesta/ }),
+      );
+      await user.click(screen.getByRole("button", { name: /Bien/ }));
+    }
+    await user.click(
+      await screen.findByRole("button", { name: "Volver al mazo" }),
+    );
+
+    expect(actions.startFlashcardSessionAction).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText("Tarjeta 1 de 1")).toBeInTheDocument();
+    expect(screen.queryByText("Modo práctica")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Estás al día con este mazo"),
+    ).not.toBeInTheDocument();
+    expect(window.location.search).toBe("?desde=hub");
+  });
+
+  it("opens straight into practice with ?modo=practica, starting no session", async () => {
+    renderDeck(true);
+
+    expect(await screen.findByTestId("flashcard-player")).toBeInTheDocument();
+    await act(async () => {});
+    expect(actions.startFlashcardSessionAction).not.toHaveBeenCalled();
   });
 });

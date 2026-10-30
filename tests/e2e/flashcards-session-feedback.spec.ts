@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { expect, hasSupabaseEnv, signIn, test } from "./fixtures/auth";
+import { seedFlashcards } from "./helpers/flashcards";
 import {
   clickAndWaitForAction,
   createNotebookWithOpenPage,
@@ -29,24 +30,14 @@ test.describe("flashcard session feedback", () => {
       `Cuaderno feedback ${randomUUID().slice(0, 8)}`,
     );
     const [, , notebookId, , pageId] = new URL(page.url()).pathname.split("/");
+
+    // Cards are created by AI only (Phase 8 H13): seed one straight in.
+    await seedFlashcards(pageId, [
+      { front: "¿Qué es la meiosis?", back: "División reductora" },
+    ]);
+    // Phase 8 H18: opening the deck plays its due cards at once.
     await page.goto(`/flashcards/${notebookId}/${pageId}`);
 
-    await page.getByTestId("new-flashcard-button").click();
-    const dialog = page.getByRole("dialog", { name: "Nueva tarjeta" });
-    await dialog.getByLabel("Anverso").fill("¿Qué es la meiosis?");
-    await dialog.getByLabel("Reverso").fill("División reductora");
-    await clickAndWaitForAction(
-      page,
-      dialog.getByRole("button", { name: "Guardar tarjeta" }),
-      '"front"',
-    );
-    await expect(dialog).toBeHidden();
-
-    await clickAndWaitForAction(
-      page,
-      page.getByTestId("start-review-button"),
-      "pageId",
-    );
     const player = page.getByTestId("flashcard-player");
     await expect(player).toBeVisible();
     await player.getByRole("button", { name: "Mostrar respuesta" }).click();
@@ -80,11 +71,6 @@ test.describe("flashcard session feedback", () => {
     // The session is closed: back on the deck, nothing is left to review.
     await summary.getByRole("button", { name: "Volver al mazo" }).click();
     await expect(page.getByTestId("flashcard-player")).toHaveCount(0);
-    await clickAndWaitForAction(
-      page,
-      page.getByTestId("start-review-button"),
-      "pageId",
-    );
-    await expect(page.getByText("Estás al día")).toBeVisible();
+    await expect(page.getByText("Estás al día con este mazo")).toBeVisible();
   });
 });

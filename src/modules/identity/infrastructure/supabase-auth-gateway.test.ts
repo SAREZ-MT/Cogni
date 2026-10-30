@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { AUTH_ERROR } from "../domain/auth-errors";
 import { SupabaseAuthGateway } from "./supabase-auth-gateway";
 
@@ -24,9 +24,39 @@ const INPUT = {
   email: "ana@example.com",
   password: "secreta123",
   emailRedirectTo: "x",
+  userMetadata: {
+    terms_version: "2026-10-28",
+    consented_at: "2026-10-28T15:00:00.000Z",
+    consent_method: "email",
+  },
 };
 
 describe("SupabaseAuthGateway", () => {
+  it("passes the consent proof to Supabase as user metadata (options.data)", async () => {
+    const signUp = vi.fn(async () => ({
+      data: { user: { id: "u-1", identities: [{}] } },
+      error: null,
+    }));
+    const gateway = new SupabaseAuthGateway({
+      signUp,
+    } as unknown as ConstructorParameters<typeof SupabaseAuthGateway>[0]);
+
+    await gateway.signUp(INPUT);
+
+    expect(signUp).toHaveBeenCalledWith({
+      email: "ana@example.com",
+      password: "secreta123",
+      options: {
+        emailRedirectTo: "x",
+        data: {
+          terms_version: "2026-10-28",
+          consented_at: "2026-10-28T15:00:00.000Z",
+          consent_method: "email",
+        },
+      },
+    });
+  });
+
   it("reports verification_sent for a brand new user", async () => {
     const gateway = fakeAuth({
       signUp: {

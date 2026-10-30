@@ -25,6 +25,108 @@ describe("CalendarGrid", () => {
   });
 });
 
+describe("CalendarGrid header numbers", () => {
+  it("puts each day's number next to its weekday, today's in a violet square", () => {
+    render(
+      <CalendarGrid
+        aria-label="Semana"
+        weekdays={WEEKDAYS}
+        weekdayNumbers={WEEKDAYS.map((_, index) => ({
+          dayNumber: 12 + index,
+          isToday: index === 1,
+        }))}
+      >
+        <CalendarDayCell day="2026-10-12" dayNumber={12} label="lunes" />
+      </CalendarGrid>,
+    );
+
+    const header = screen.getByTestId("calendar-weekdays");
+    expect(header).toHaveAttribute("aria-hidden", "true");
+    expect(header).toHaveTextContent("Lun12Mar13Mié14");
+    const numbers = header.querySelectorAll('[data-part="weekday-number"]');
+    expect(numbers).toHaveLength(7);
+    expect(numbers[1]).toHaveClass("bg-primary-600", "text-white");
+    expect(numbers[0]).not.toHaveClass("bg-primary-600");
+  });
+});
+
+describe("CalendarDayCell selection", () => {
+  it("covers a selectable day with a link that selects it, keeping its chips clickable", () => {
+    render(
+      <ul>
+        <CalendarDayCell
+          day="2026-10-20"
+          dayNumber={20}
+          label="martes, 20 de octubre"
+          selectHref="/calendario?view=mes&date=2026-10-20"
+        >
+          <a href="/chip">chip</a>
+        </CalendarDayCell>
+      </ul>,
+    );
+
+    const select = screen.getByRole("link", {
+      name: "Ver martes, 20 de octubre",
+    });
+    expect(select).toHaveAttribute(
+      "href",
+      "/calendario?view=mes&date=2026-10-20",
+    );
+    expect(select).toHaveAttribute("data-part", "select");
+    expect(select).not.toHaveAttribute("aria-current");
+    // Chips sit above the cover, so they stay their own links.
+    expect(
+      screen
+        .getByRole("link", { name: "chip" })
+        .closest("[data-part='events']"),
+    ).toHaveClass("relative");
+  });
+
+  it("outlines the selected day in violet and marks it as the current date", () => {
+    render(
+      <ul>
+        <CalendarDayCell
+          day="2026-10-20"
+          dayNumber={20}
+          label="martes, 20 de octubre"
+          selectHref="/x"
+          isSelected
+        />
+      </ul>,
+    );
+
+    const cell = screen.getByRole("listitem");
+    expect(cell).toHaveAttribute("data-selected", "true");
+    expect(cell).toHaveClass("ring-2", "ring-inset", "ring-primary-600");
+    expect(
+      screen.getByRole("link", { name: "Ver martes, 20 de octubre" }),
+    ).toHaveAttribute("aria-current", "date");
+  });
+
+  it("has no selection cover without a selectHref", () => {
+    render(
+      <ul>
+        <CalendarDayCell day="2026-09-30" dayNumber={30} label="x" outside />
+      </ul>,
+    );
+    expect(screen.queryByRole("link")).toBeNull();
+  });
+});
+
+describe("CalendarGrid fill", () => {
+  it("grows to fill its flex parent when asked, so the days reach the bottom", () => {
+    const { container } = render(
+      <CalendarGrid aria-label="Semana" weekdays={WEEKDAYS} fill>
+        <CalendarDayCell day="2026-10-12" dayNumber={12} label="lunes" />
+      </CalendarGrid>,
+    );
+
+    const frame = container.querySelector('[data-slot="calendar-grid-frame"]');
+    expect(frame).toHaveClass("flex", "flex-1", "flex-col");
+    expect(screen.getByRole("list")).toHaveClass("flex-1");
+  });
+});
+
 describe("CalendarDayCell", () => {
   it("shows the day number and names the day for assistive tech", () => {
     render(
@@ -53,7 +155,7 @@ describe("CalendarDayCell", () => {
     expect(cell).not.toHaveAttribute("data-outside");
   });
 
-  it("marks today with a dark circle and announces it", () => {
+  it("marks today with a violet square on a faint violet cell and announces it", () => {
     render(
       <ul>
         <CalendarDayCell
@@ -67,12 +169,41 @@ describe("CalendarDayCell", () => {
 
     const cell = screen.getByRole("listitem");
     expect(cell).toHaveAttribute("data-today", "true");
+    expect(cell).toHaveClass("bg-primary-50");
     expect(cell.querySelector("[data-part='number']")).toHaveClass(
-      "bg-fg",
-      "text-card",
-      "rounded-full",
+      "bg-primary-600",
+      "text-white",
+      "rounded-md",
     );
     expect(cell).toHaveTextContent("(hoy)");
+  });
+
+  it("in the week variant shows the number only where the days stack, with no background", () => {
+    render(
+      <ul>
+        <CalendarDayCell
+          day="2026-10-12"
+          dayNumber={12}
+          label="lunes, 12 de octubre"
+          weekday="Lun"
+          isToday
+          variant="week"
+        />
+      </ul>,
+    );
+
+    const cell = screen.getByRole("listitem");
+    expect(cell).toHaveAttribute("data-today", "true");
+    expect(cell).toHaveTextContent("(hoy)");
+    // A soft violet wash fading down the whole of today's column.
+    expect(cell).toHaveClass("bg-linear-to-b", "from-primary-100/70");
+    expect(cell).not.toHaveClass("bg-primary-50");
+    expect(cell.querySelector('[data-part="number-row"]')).toHaveClass(
+      "@2xl:hidden",
+    );
+    expect(cell.querySelector("[data-part='number']")).toHaveClass(
+      "bg-primary-600",
+    );
   });
 
   it("greys a day outside the shown month", () => {

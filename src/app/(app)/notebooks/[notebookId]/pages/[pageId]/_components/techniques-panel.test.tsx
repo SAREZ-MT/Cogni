@@ -8,6 +8,7 @@ import {
   TECHNIQUES_PANEL_SLOT_ID,
   TechniquesPanelSlot,
 } from "../../../../../_components/techniques-panel-slot";
+import { forgetPageWords, publishPageWords } from "./page-words";
 import { TechniquesPanel, type TechniquesPanelProps } from "./techniques-panel";
 
 const { generateFlashcardsAction, listFlashcardsAction } = vi.hoisted(() => ({
@@ -50,6 +51,7 @@ function card(n: number): FlashcardView {
     front: `Pregunta ${n}`,
     back: `Respuesta ${n}`,
     position: n,
+    updatedAt: "2026-10-01T10:00:00.000Z",
   };
 }
 
@@ -136,7 +138,8 @@ describe("TechniquesPanel", () => {
   it("shows the 'Técnicas de estudio' header and the three techniques, all three Generar live", async () => {
     await renderPanel(false);
 
-    expect(screen.getByText("Técnicas de estudio")).toBeInTheDocument();
+    // H9-T2: a noticeably larger panel title.
+    expect(screen.getByText("Técnicas de estudio")).toHaveClass("text-[17px]");
     expect(
       screen.getByText("Genera contenido de estudio con IA"),
     ).toBeInTheDocument();
@@ -148,26 +151,59 @@ describe("TechniquesPanel", () => {
     expect(screen.getByTestId("generate-exam-questions")).toBeEnabled();
     const generate = screen.getAllByRole("button", { name: "Generar" });
     expect(generate).toHaveLength(3);
+    // H9-T1 (user, 2026-10-29): no description lines under the names.
+    for (const gone of [
+      "Tarjetas con repetición espaciada",
+      "Preguntas abiertas de memoria",
+      "Opción múltiple con retroalimentación",
+    ]) {
+      expect(screen.queryByText(gone)).not.toBeInTheDocument();
+    }
     expect(
       generate.filter((b) => (b as HTMLButtonElement).disabled),
     ).toHaveLength(0);
   });
 
-  it("colours each Generar with its technique: Flashcards yellow, Recordación activa green, Examen red", async () => {
+  it("colours each tile and its Generar with its technique: Flashcards yellow, Recordación activa green, Examen red", async () => {
     await renderPanel(false);
 
-    expect(screen.getByTestId("generate-flashcards")).toHaveClass(
-      "bg-pastel-yellow",
-      "text-pastel-yellow-fg",
+    for (const [testId, pair] of [
+      ["generate-flashcards", "pastel-yellow"],
+      ["generate-recall-questions", "pastel-mint"],
+      ["generate-exam-questions", "pastel-pink"],
+    ] as const) {
+      const button = screen.getByTestId(testId);
+      expect(button).toHaveClass(`text-${pair}-fg`);
+      expect(button).toHaveClass("bg-transparent", `hover:bg-${pair}`);
+      expect(button.closest("[data-part=technique-card]")).toHaveClass(
+        `technique-glow-${pair.replace("pastel-", "")}`,
+      );
+    }
+  });
+
+  // H9-T3 (user, 2026-10-29): the toggle matches the technique icons —
+  // 36px in the expanded header (the tile icons), 48px when collapsed (the
+  // rail tiles) — neutral, with its accessible name as the tooltip.
+  it("sizes the toggle like the technique icons in both states", async () => {
+    await renderPanel(false);
+    const expanded = screen.getByTestId("techniques-panel-toggle");
+    expect(expanded).toHaveClass("size-9");
+    expect(expanded).toHaveAttribute("title", "Colapsar panel de técnicas");
+    expect(expanded).toHaveAttribute(
+      "aria-label",
+      "Colapsar panel de técnicas",
     );
-    expect(screen.getByTestId("generate-recall-questions")).toHaveClass(
-      "bg-pastel-mint",
-      "text-pastel-mint-fg",
+    await userEvent.click(expanded);
+
+    const collapsedToggle = screen.getByTestId("techniques-panel-toggle");
+    expect(collapsedToggle).toHaveClass("size-12");
+    expect(collapsedToggle).toHaveAttribute(
+      "title",
+      "Expandir panel de técnicas",
     );
-    expect(screen.getByTestId("generate-exam-questions")).toHaveClass(
-      "bg-pastel-pink",
-      "text-pastel-pink-fg",
-    );
+    expect(screen.getByTestId("techniques-panel")).toHaveStyle({
+      width: "64px",
+    });
   });
 
   it("shows every collapsed technique icon as available", async () => {
@@ -231,6 +267,13 @@ describe("TechniquesPanel", () => {
         "Te quedan 4 generaciones hoy",
       );
     }
+    // H9-T2: the remaining line sits below "Generar".
+    expect(
+      screen
+        .getByTestId("generate-flashcards")
+        .compareDocumentPosition(screen.getByTestId("generation-remaining")) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it("hides every remaining line when the status is unknown", async () => {
@@ -257,13 +300,26 @@ describe("TechniquesPanel", () => {
       );
     }
 
-    it("shows an empty state under its label when nothing was generated", async () => {
+    it("explains the section in its empty state when nothing was generated", async () => {
       await renderPanel(false);
 
       expect(screen.getByText("Generado en esta página")).toBeInTheDocument();
       expect(
-        screen.getByText("Aún no generaste nada en esta página"),
+        screen.getByText("Aquí verás todo lo que generes"),
       ).toBeInTheDocument();
+      expect(
+        screen.getByText("Empieza con una técnica de arriba."),
+      ).toBeInTheDocument();
+      // H9-T3: a plain neutral card — no technique colours, no gradient.
+      const empty = screen
+        .getByText("Aquí verás todo lo que generes")
+        .closest("div");
+      expect(empty?.className).not.toMatch(/gradient|glow|pastel/);
+      expect(empty).toHaveClass("bg-card", "border-border-subtle");
+      expect(document.querySelector("[data-part=technique-layer]")).toBeNull();
+      expect(
+        screen.queryByText("Aún no generaste nada en esta página"),
+      ).not.toBeInTheDocument();
       expect(screen.queryByRole("link", { name: /Flashcards/ })).toBeNull();
     });
 
@@ -303,7 +359,7 @@ describe("TechniquesPanel", () => {
         "generated-item-exam",
       ]);
       expect(
-        screen.queryByText("Aún no generaste nada en esta página"),
+        screen.queryByText("Aquí verás todo lo que generes"),
       ).not.toBeInTheDocument();
     });
 
@@ -1094,6 +1150,102 @@ describe("TechniquesPanel", () => {
       "false",
     );
     expect(document.cookie).toContain(`${TECHNIQUES_PANEL_COOKIE}=expanded`);
+  });
+});
+
+// Phase 8 H14 (user 2026-10-29): 100 words to generate cards, 150 for the
+// ten recall questions and the smallest exam, about 15 per item; the
+// editor's saves publish the page's current word count.
+describe("TechniquesPanel — page content thresholds", () => {
+  beforeEach(() => {
+    forgetPageWords();
+    generateFlashcardsAction.mockReset();
+    generateExamQuestionsAction.mockReset();
+    generateRecallQuestionsAction.mockReset();
+    getExamStartAction.mockResolvedValue(err({ code: "X", message: "x" }));
+    getRecallPageSummaryAction.mockResolvedValue(
+      ok({ pageId: PAGE_ID, questionCount: 0 }),
+    );
+  });
+
+  it("disables Generar on a short page with the reason", async () => {
+    await renderPanel(false, { initialWords: 120 });
+
+    expect(screen.getByTestId("generate-flashcards")).toBeEnabled();
+    expect(screen.getByTestId("generate-recall-questions")).toBeDisabled();
+    expect(screen.getByTestId("generate-exam-questions")).toBeDisabled();
+    expect(screen.getByTestId("recall-generation-short")).toHaveTextContent(
+      "Muy poco contenido (120 palabras): escribe al menos 150",
+    );
+    expect(screen.getByTestId("exam-generation-short")).toHaveTextContent(
+      "Muy poco contenido (120 palabras): escribe al menos 150",
+    );
+    expect(screen.queryByTestId("generation-short")).not.toBeInTheDocument();
+  });
+
+  it("disables every Generar under 100 words", async () => {
+    await renderPanel(false, { initialWords: 30 });
+
+    expect(screen.getByTestId("generate-flashcards")).toBeDisabled();
+    expect(screen.getByTestId("generation-short")).toHaveTextContent(
+      "Muy poco contenido (30 palabras): escribe al menos 100",
+    );
+  });
+
+  it("follows the word count the editor publishes", async () => {
+    await renderPanel(false, { initialWords: 30 });
+
+    act(() => publishPageWords(PAGE_ID, 400));
+
+    expect(screen.getByTestId("generate-flashcards")).toBeEnabled();
+    expect(screen.getByTestId("generate-exam-questions")).toBeEnabled();
+    expect(screen.queryByTestId("generation-short")).not.toBeInTheDocument();
+  });
+
+  it("ignores the word count of another page", async () => {
+    await renderPanel(false, { initialWords: 30 });
+
+    act(() => publishPageWords("another-page", 400));
+
+    expect(screen.getByTestId("generate-flashcards")).toBeDisabled();
+  });
+
+  it("limits the exam count to what the page supports", async () => {
+    const user = userEvent.setup();
+    await renderPanel(false, { initialWords: 240 });
+
+    await user.click(screen.getByTestId("generate-exam-questions"));
+    const more = screen.getByRole("button", {
+      name: "Más preguntas a generar",
+    });
+    await user.click(more);
+
+    expect(screen.getByTestId("exam-count-value")).toHaveTextContent("15");
+    expect(more).toBeDisabled();
+    expect(
+      screen.getByText("Esta página admite hasta 15 preguntas"),
+    ).toBeInTheDocument();
+  });
+
+  it("explains AI_PAGE_TOO_SHORT with the words the server asks for", async () => {
+    const user = userEvent.setup();
+    generateFlashcardsAction.mockResolvedValue(
+      err({
+        code: "AI_PAGE_TOO_SHORT",
+        message: "x",
+        words: 80,
+        minWords: 100,
+        maxItems: 5,
+      }),
+    );
+    await renderPanel(false);
+
+    await user.click(screen.getByTestId("generate-flashcards"));
+
+    await waitForText(
+      "generation-error",
+      "Esta página tiene poco contenido para generar. Agrega más texto (mínimo 100 palabras).",
+    );
   });
 });
 

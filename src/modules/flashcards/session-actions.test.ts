@@ -40,9 +40,23 @@ let current: {
   };
 };
 
+// The owner's per-day "due" bound, as scheduling reads it from the profile.
+const { dueCutoff, getCurrentDueCutoff, sessionsDeps } = vi.hoisted(() => {
+  const dueCutoff = () => new Date("2026-10-05T05:00:00.000Z");
+  return {
+    dueCutoff,
+    getCurrentDueCutoff: vi.fn(async () => dueCutoff),
+    sessionsDeps: [] as unknown[],
+  };
+});
+vi.mock("@/modules/scheduling", () => ({ getCurrentDueCutoff }));
+
 vi.mock("@/modules/study-engine", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/modules/study-engine")>()),
-  createFlashcardSessionsServerApi: () => current.sessions,
+  createFlashcardSessionsServerApi: (deps: unknown) => {
+    sessionsDeps.push(deps);
+    return current.sessions;
+  },
   createSessionFeedbackSources: () => ({}),
 }));
 vi.mock("./infrastructure", () => ({
@@ -99,6 +113,7 @@ describe("flashcard review session Server Actions", () => {
     captureException.mockClear();
     revalidatePath.mockClear();
     requestSessionFeedback.mockReset();
+    sessionsDeps.length = 0;
     current = {
       flashcards: new InMemoryFlashcardRepository(),
       sessions: { start: vi.fn(), grade: vi.fn(), finish: vi.fn() },
@@ -186,6 +201,18 @@ describe("flashcard review session Server Actions", () => {
           ],
         }),
       );
+    });
+
+    it("bounds the session at the owner's per-day due cutoff, read server-side", async () => {
+      current.sessions.start.mockResolvedValue(
+        ok({ session: session(), items: [] }),
+      );
+      const { startFlashcardSessionAction } = await actions();
+
+      await startFlashcardSessionAction({ pageId: PAGE });
+
+      expect(getCurrentDueCutoff).toHaveBeenCalled();
+      expect(sessionsDeps).toEqual([expect.objectContaining({ dueCutoff })]);
     });
 
     it("maps NOTHING_DUE to an ActionError", async () => {

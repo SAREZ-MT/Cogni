@@ -1,6 +1,10 @@
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import type { DbExecutor } from "@/shared/db/client";
-import { type RecallQuestionRow, recallQuestions } from "@/shared/db/schema";
+import {
+  pages,
+  type RecallQuestionRow,
+  recallQuestions,
+} from "@/shared/db/schema";
 import type { RecallQuestion } from "../domain/recall-question";
 import type { RecallQuestionRepository } from "../domain/recall-question-repository";
 
@@ -83,5 +87,46 @@ export class DrizzleRecallQuestionRepository
       )
       .orderBy(asc(recallQuestions.createdAt), asc(recallQuestions.id));
     return rows.map(toQuestion);
+  }
+
+  async update(question: RecallQuestion): Promise<RecallQuestion | null> {
+    const [row] = await this.db
+      .update(recallQuestions)
+      .set({
+        prompt: question.prompt,
+        rubric: {
+          keyConcepts: [...question.rubric.keyConcepts],
+          acceptableAnswerSummary: question.rubric.acceptableAnswerSummary,
+        },
+        updatedAt: question.updatedAt,
+      })
+      .where(
+        and(
+          eq(recallQuestions.id, question.id),
+          eq(recallQuestions.ownerId, question.ownerId),
+          isNull(recallQuestions.archivedAt),
+        ),
+      )
+      .returning();
+    return row ? toQuestion(row) : null;
+  }
+
+  async delete(id: string, ownerId: string): Promise<void> {
+    // recall_answers_question_owner_fk cascades the question's answers.
+    await this.db
+      .delete(recallQuestions)
+      .where(
+        and(eq(recallQuestions.id, id), eq(recallQuestions.ownerId, ownerId)),
+      );
+  }
+
+  async lockPage(pageId: string, ownerId: string): Promise<void> {
+    // The page row is the lock (as the flashcards deck lock): every
+    // question change of the page queues behind it.
+    await this.db
+      .select({ id: pages.id })
+      .from(pages)
+      .where(and(eq(pages.id, pageId), eq(pages.ownerId, ownerId)))
+      .for("update");
   }
 }

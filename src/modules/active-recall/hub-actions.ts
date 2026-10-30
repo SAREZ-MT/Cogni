@@ -2,6 +2,7 @@
 
 import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
+import { getCurrentDueCutoff } from "@/modules/scheduling";
 import {
   createPageMasteryReader,
   createStudyItemRepository,
@@ -35,8 +36,13 @@ export type RecallHubSessionView = Omit<RecallHubSessionEntry, "finishedAt"> & {
   finishedAt: string;
 };
 
-export type RecallHubPageView = Omit<RecallHubEntry, "sessions"> & {
+export type RecallHubPageView = Omit<
+  RecallHubEntry,
+  "sessions" | "latestQuestionAt"
+> & {
   sessions: RecallHubSessionView[];
+  // ISO instant of the newest active question; null without any.
+  latestQuestionAt: string | null;
 };
 
 export interface RecallHubView {
@@ -48,11 +54,12 @@ export type RecallSessionReviewView = RecallSessionReview;
 
 const reviewInput = z.object({ pageId: z.uuid(), sessionId: z.uuid() });
 
-// Page mastery and the recall questions due now, both from study-engine
+// Page mastery and the recall questions due today, both from study-engine
 // (the module's declared dependency; the due items are the same "due" as
-// scheduling's "Repasos de hoy": dueAt <= now, not suspended, page and
-// notebook not archived). A failing read never hides the hub: it degrades
-// to unknown (null) and goes to Sentry.
+// scheduling's "Repasos de hoy": due before the start of the owner's next
+// local day in their profile zone, not suspended, page and notebook not
+// archived). A failing read never hides the hub: it degrades to unknown
+// (null) and goes to Sentry.
 function hubSources(db: ReturnType<typeof getDb>): {
   mastery: RecallPageMasterySource;
   due: RecallDueCounts;
@@ -74,7 +81,11 @@ function hubSources(db: ReturnType<typeof getDb>): {
     due: {
       async recallQuestionsDueByPage(ownerId) {
         try {
-          const items = await studyItems.listDue(ownerId, systemClock.now());
+          const dueCutoff = await getCurrentDueCutoff();
+          const items = await studyItems.listDue(
+            ownerId,
+            dueCutoff(systemClock.now()),
+          );
           const counts = new Map<string, number>();
           for (const item of items) {
             if (item.kind !== "recall_question") continue;
@@ -90,8 +101,8 @@ function hubSources(db: ReturnType<typeof getDb>): {
   };
 }
 
-// The caller's pages with a finished recall session (archived pages and
-// notebooks left out), ordered by notebook title then page title, and the
+// The caller's pages with recall questions or a finished recall session
+// (archived pages and notebooks left out), ordered by notebook title then page title, and the
 // average page mastery of those pages.
 export async function listRecallHubAction(): Promise<
   Result<RecallHubView, ActionError>
@@ -110,6 +121,7 @@ export async function listRecallHubAction(): Promise<
       averageMastery: result.value.averageMastery,
       pages: result.value.pages.map((page) => ({
         ...page,
+        latestQuestionAt: page.latestQuestionAt?.toISOString() ?? null,
         sessions: page.sessions.map((session) => ({
           ...session,
           finishedAt: session.finishedAt.toISOString(),

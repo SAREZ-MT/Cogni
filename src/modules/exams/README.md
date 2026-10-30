@@ -17,7 +17,7 @@ recorded in `docs/adr/0006-examenes-y-repeticion-con-variantes.md`
 | Adapters | `infrastructure/` | Drizzle repositories, unit-of-work adapters (one transaction each) and the hub reader. |
 | Server Actions | `actions.ts`, `session-actions.ts`, `retake-actions.ts`, `feedback-actions.ts`, `hub-actions.ts` | The only UI entry points; exported through `index.ts`. |
 | AI prompts | `src/modules/ai` | `generate_exam_questions/v1`, `generate_exam_variants/v1`, `session_feedback/v2` (exams never import the AI SDK). |
-| Screens | `src/app/(app)/exams/` | Hub, notebook view, start, player, results, questions. |
+| Screens | `src/app/(app)/exams/` | Hub (flat since Phase 8 H17), start, player, results (they honour the hub's `?desde=hub` since H18), the questions' edit page `editar` (H18; `preguntas` redirects there). |
 
 ## Server Actions
 
@@ -26,7 +26,7 @@ throw (`action-support.ts`); errors come back as `{ code, message }`.
 
 | File | Actions |
 |---|---|
-| `actions.ts` | `listExamQuestionsAction`, `createExamQuestionAction`, `editExamQuestionAction`, `retireExamQuestionAction`, `generateExamQuestionsAction` |
+| `actions.ts` | `listExamQuestionsAction`, `editExamQuestionAction`, `retireExamQuestionAction`, `saveExamEditsAction` (H18 edit page), `generateExamQuestionsAction` |
 | `session-actions.ts` | `getExamStartAction`, `startExamSessionAction`, `getExamSessionAction`, `answerExamQuestionAction`, `finishExamSessionAction`, `getExamResultsAction` |
 | `retake-actions.ts` | `startExamRetakeAction` |
 | `feedback-actions.ts` | `requestExamFeedbackAction`, `getExamReviewNoticeAction` |
@@ -45,6 +45,9 @@ is dropped), and a feedback read failure in `getExamResultsAction` returns
 - The study-engine hook — done (T3, in study-engine: `recordExamReviews`).
 - Manual questions — done (T4): use cases in `application/`, Server Actions
   in `actions.ts`, the `/exams/[notebookId]/[pageId]/preguntas` screen.
+  Since Phase 8 H13 (user decision 2026-10-29) questions are created by AI
+  only: `createExamQuestionAction` and the screen's "Nueva pregunta" are
+  gone; editing and retiring stay, for AI and older manual questions alike.
 - AI generation — done (T5): `requestExamGeneration` +
   `generateExamQuestionsAction`, "Examen → Generar" in the page's
   techniques panel (since Phase 6 it opens a count dialog, 10–30 in steps
@@ -63,12 +66,26 @@ is dropped), and a feedback read failure in `getExamResultsAction` returns
   validates with `newExamQuestion` and saves the root together with its
   `StudyItem(kind = "exam_question", sourceId = rootId)` in one
   `ExamUnitOfWork` run, so `recordExamReviews` always finds the item.
+  Questions are born from AI (Phase 8 H13); since H18 the edit page adds
+  questions by hand through it ("la creación nace con IA; la edición permite
+  ajustar y añadir").
 - `editExamQuestion` edits in place (same id, root, origin); a retired
   question answers `EXAMS_QUESTION_RETIRED`, another owner's
   `EXAMS_QUESTION_NOT_FOUND`.
 - `retireExamQuestion` retires (never deletes) and, when the root's lineage
   has no active question left, suspends the root's item in the same run.
   Idempotent: a second call keeps the first `retiredAt`.
+- `deleteExamQuestion` (Phase 8 H18) deletes for real the question's whole
+  lineage (root, variants and, by cascade, their answers), the root's study
+  item (`ExamStudyItems.deleteBySource`) and, by cascade, its review logs.
+  First `ExamLineageReferences.dropLineage` deletes the page's open exams
+  that show one of its questions and drops the root from the pending
+  retake's failed roots; finished exams keep their score. The page keeps
+  at least one root (`EXAMS_LAST_QUESTION`).
+- `applyExamEdits` (H18) applies the edit page's draft (`updates`,
+  `creates`, `deletes`) in ONE unit of work through `editExamQuestion`,
+  `createExamQuestion` and `deleteExamQuestion`; any refusal rolls
+  everything back. `saveExamEditsAction` is its Server Action.
 - `listPageExamQuestions` lists the page's active questions, oldest first.
 - `runExamWork` turns an err Result into a rollback (a unit of work only
   rolls back on a throw). `DrizzleExamUnitOfWork` runs one transaction with
@@ -90,6 +107,12 @@ is dropped), and a feedback read failure in `getExamResultsAction` returns
   sent; their fingerprints are stored with the questions. Nothing new
   answers `EXAMS_NO_NEW_CONTENT` before the limiter (no AI call, no unit); a
   page generated before T5c sends every paragraph once.
+- Page content thresholds (Phase 8 H14, user 2026-10-29, kernel
+  `generation-capacity.ts`): the new paragraphs need 100 words and about 15
+  per question, so 10 questions need 150 and 30 need 450. Otherwise
+  `AI_PAGE_TOO_SHORT` (`words`, `minWords`, `maxItems`, also on the action
+  error) before the limiter. Only the share of the sent paragraphs the
+  saved questions cover is fingerprinted (`consumedParagraphs`).
 - Prompt `generate_exam_questions/v1` (ai module) receives the truncated
   page text, the count and the page's active questions (`[concept] stem`,
   last 60) so the model avoids duplicates.
@@ -195,18 +218,29 @@ is dropped), and a feedback read failure in `getExamResultsAction` returns
   `application/testing/exam-hub-reader.contract.ts` (fake + `pnpm test:db`).
 - `listExamHub` adds the whole-percent last score (rounded down, as on the
   results screen) and `dueToday`, the page's
-  exam questions due now from scheduling's "Repasos de hoy"
-  (`createSchedulingServerApi().listDueToday`, `due.exam_question`). A
+  exam questions due today from scheduling's "Repasos de hoy"
+  (`createSchedulingServerApi().listDueToday(ownerId, { timeZone })`,
+  `due.exam_question`; reviews are due per local day of the profile's zone,
+  user decision 2026-10-18). A
   failing due list degrades to `dueToday: null` (reported to Sentry), never
   hiding the hub.
 - `failedDueNow` drives the retake banner copy: whether a failed root of
-  the last exam has its item due now (study-engine `listDue` filtered to
+  the last exam has its item due today (study-engine `listDue` with the
+  start of the owner's next local day as the bound, filtered to
   those roots through the `ExamDueCounts` port, built in `hub-actions.ts`);
   `null` when unreadable, and the banner falls back to neutral copy.
-- The hub's header offers only "Crear examen" (Phase 6 T5b): pick a
-  notebook and a page, then generate the questions with AI or write them on
-  the page's `/preguntas` screen; the former "Nuevo examen" quick start was
-  removed.
+- "Crear examen" (Phase 6 T5b) picks a notebook and a page and generates
+  the questions with AI; since Phase 8 H13 it is the grid's first tile and
+  the empty state's CTA, not a header button.
+- Flat hub (Phase 8 H17, 2026-10-29): the reader also returns `bestScore`
+  (best whole percent over the finished exams, a window next to the
+  attempts count) and `latestQuestionAt` (newest active question, in the
+  grouped questions read). `/exams` shows one card per page ("Mejor nota X %
+  · último Y %", "Sin intentos" or the pending retake), filtered by
+  `?cuaderno=` on the server; "Hacer examen" / "Repetir examen" open the
+  page's exam route. The retake banner (and so `failedDueNow`'s copy) and
+  the summary pills are no longer shown; `/exams/[notebookId]` redirects to
+  the filtered hub.
 
 ## Domain
 
@@ -232,7 +266,8 @@ is dropped), and a feedback read failure in `getExamResultsAction` returns
   (`EXAMS_DUPLICATE_ANSWER`). A failure leaves a retake pending with the failed roots and
   keeps the last pass; a pass clears it and records the session.
 - `composition.ts`: `composeExam` orders roots failed last time first, then
-  due roots (oldest first), then least recently seen (never seen first), one
+  due roots (due before `dueBefore`, the start of the owner's next local
+  day, oldest first), then least recently seen (never seen first), one
   question per root, ties broken by id. `composeRetake` puts one fresh
   variant per failed root first, then the rest in the same order.
 - `exam-quality.ts`: `examQualityFor` — wrong → review with q = 1 always;

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { displayNameFromEmail, initialsFrom } from "./account-name";
 
-// These helpers are consumed by a Server Component (app/(app)/page.tsx) as
+// These helpers are consumed by a Server Component (app/(app)/inicio/page.tsx) as
 // well as by "use client" components. They must therefore live in a plain
 // module: importing a function from a "use client" file into a Server
 // Component turns it into a client reference and calling it on the server

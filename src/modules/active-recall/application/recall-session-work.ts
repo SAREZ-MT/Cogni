@@ -1,4 +1,4 @@
-import type { StudyItemRepository } from "@/modules/study-engine";
+import { isDueBefore, type StudyItemRepository } from "@/modules/study-engine";
 import { DomainError } from "@/shared/kernel/domain-error";
 import { err, ok, type Result } from "@/shared/kernel/result";
 import { composeRecallSession } from "../domain/composition";
@@ -22,16 +22,18 @@ export interface RecallSessionRepositories {
 // One transaction over everything a recall session reads and writes.
 export type RecallSessionUnitOfWork = UnitOfWorkOf<RecallSessionRepositories>;
 
-// The questions of a new session on a page at `now`, in the order shown:
+// The questions of a new session on a page, in the order shown:
 // composeRecallSession over the page's active questions and their study
 // items. Suspended items never enter a session. An item counts as:
-//   - due when it was reviewed and dueAt <= now (oldest due first, the
-//     engine's listDue order);
+//   - due when it was reviewed and dueAt < dueBefore, the owner's "due"
+//     bound (the start of their next local day: reviews are due per day,
+//     user decision 2026-10-18), oldest due first (the engine's listDue
+//     order);
 //   - new when it was never reviewed (study-engine creates it already due);
 //   - reviewed otherwise, filling the session least recently reviewed
 //     first (user decision 2026-10-06: a session can start any time).
 export async function composeRecallQuestions(
-  input: { pageId: string; now: Date },
+  input: { pageId: string; dueBefore: Date },
   ownerId: string,
   repos: Pick<RecallSessionRepositories, "questions" | "studyItems">,
 ): Promise<RecallQuestion[]> {
@@ -45,13 +47,12 @@ export async function composeRecallQuestions(
     .sort(
       (a, b) => a.dueAt.getTime() - b.dueAt.getTime() || (a.id < b.id ? -1 : 1),
     );
-  const now = input.now.getTime();
   const dueIds: string[] = [];
   const newIds: string[] = [];
   const reviewed: { id: string; lastReviewedAt: Date }[] = [];
   for (const item of items) {
     if (item.lastReviewedAt === null) newIds.push(item.sourceId);
-    else if (item.dueAt.getTime() <= now) dueIds.push(item.sourceId);
+    else if (isDueBefore(item, input.dueBefore)) dueIds.push(item.sourceId);
     else
       reviewed.push({ id: item.sourceId, lastReviewedAt: item.lastReviewedAt });
   }

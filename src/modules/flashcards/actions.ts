@@ -12,6 +12,11 @@ import {
   type DomainError,
   toActionError,
 } from "@/shared/kernel/domain-error";
+import {
+  PAGE_TOO_SHORT_CODE,
+  PageTooShortError,
+  pageTooShortDetails,
+} from "@/shared/kernel/generation-capacity";
 import { createId } from "@/shared/kernel/id";
 import { err, ok, type Result } from "@/shared/kernel/result";
 import {
@@ -21,23 +26,27 @@ import {
 import {
   parseInput,
   requireOwnerId,
+  revalidateAfterDelete,
   revalidateDecks,
   withBoundary,
 } from "./action-support";
 import {
-  archiveFlashcard as archiveFlashcardUseCase,
-  createManualFlashcard as createManualFlashcardUseCase,
+  applyDeckEdits as applyDeckEditsUseCase,
   DailyLimitReachedError,
+  type DeckDeletionPreview,
+  deleteDeck as deleteDeckUseCase,
   getGenerationStatus as getGenerationStatusUseCase,
   listDecks as listDecksUseCase,
   listFlashcardsByPage as listFlashcardsByPageUseCase,
   MAX_CARD_COUNT,
   MIN_CARD_COUNT,
+  previewDeckDeletion as previewDeckDeletionUseCase,
   requestGeneration as requestGenerationUseCase,
 } from "./application";
 import { FLASHCARD_ERROR } from "./domain/errors";
-import { type Flashcard, MAX_FLASHCARD_SIDE_LENGTH } from "./domain/flashcard";
+import type { Flashcard } from "./domain/flashcard";
 import {
+  DrizzleDeckDeletion,
   DrizzleDeckUnitOfWork,
   DrizzleFlashcardFingerprints,
   DrizzleFlashcardRepository,
@@ -57,6 +66,8 @@ export interface FlashcardView {
   front: string;
   back: string;
   position: number;
+  // ISO; the edit page sends it back so a stale save is refused (V10).
+  updatedAt: string;
 }
 
 export interface GenerationView {
@@ -67,12 +78,8 @@ export interface GenerationView {
   wordsTotal: number;
 }
 
-export interface ArchiveView {
-  // Active cards left in the page's deck (always >= 1).
-  remaining: number;
-}
-
-// One deck = one page with cards (no due count until the Phase 4 scheduler).
+// One deck = one page with cards; its due count comes from scheduling's
+// "Repasos de hoy".
 export interface DeckView {
   pageId: string;
   notebookId: string;
@@ -80,6 +87,10 @@ export interface DeckView {
   notebookTitle: string;
   notebookColor: string | null;
   count: number;
+  // ISO instant of the newest active card (Phase 8 H17: hub recency).
+  latestCardAt: string;
+  // ISO instant of the deck's earliest scheduled review; null when none.
+  nextDueAt: string | null;
 }
 
 export interface GenerationStatusView {
@@ -92,6 +103,11 @@ export interface GenerationStatusView {
 // generation is available again.
 export interface GenerationActionError extends ActionError {
   readonly resetAt?: string;
+  // AI_PAGE_TOO_SHORT (Phase 8 H14): the new paragraphs' words, the words
+  // the request needs and the items those words carry.
+  readonly words?: number;
+  readonly minWords?: number;
+  readonly maxItems?: number;
 }
 
 const pageInput = z.object({ pageId: z.uuid() });
@@ -100,12 +116,25 @@ const generateInput = z.object({
   count: z.number().int().min(MIN_CARD_COUNT).max(MAX_CARD_COUNT).optional(),
 });
 
-// The raw sides are only bounded here (twice the limit leaves room for
-// surrounding whitespace); createManualFlashcard applies the real limit to
-// the trimmed text and answers FLASHCARD_TOO_LONG.
-const side = z.string().max(MAX_FLASHCARD_SIDE_LENGTH * 2);
-const createInput = z.object({ pageId: z.uuid(), front: side, back: side });
-const archiveInput = z.object({ flashcardId: z.uuid() });
+// One edit page save (Phase 8 H18). The bounds only keep the payload sane;
+// the domain trims and checks each side (non-blank, at most 1000).
+const MAX_DRAFT_ITEMS = 200;
+const sideText = z.string().max(4000);
+const cardSides = z.object({ front: sideText, back: sideText });
+const saveDeckEditsInput = z.object({
+  pageId: z.uuid(),
+  updates: z
+    .array(
+      cardSides.extend({
+        id: z.uuid(),
+        expectedUpdatedAt: z.iso.datetime().optional(),
+      }),
+    )
+    .max(MAX_DRAFT_ITEMS),
+  creates: z.array(cardSides).max(MAX_DRAFT_ITEMS),
+  deletes: z.array(z.uuid()).max(MAX_DRAFT_ITEMS),
+});
+const deckInput = z.object({ pageId: z.uuid() });
 
 // Adapters are built per call, like ingestion/actions.ts: serverless
 // functions are short-lived, so no module-level singletons.
@@ -124,6 +153,7 @@ function deps() {
     pages: createNotebooksServerApi({ db, clock: systemClock }),
     flashcards: new DrizzleFlashcardRepository(db),
     deck: new DrizzleDeckUnitOfWork(db),
+    deckDeletion: new DrizzleDeckDeletion(db),
     fingerprints: new DrizzleFlashcardFingerprints(db),
     analytics: createServerAnalytics({
       key: env.NEXT_PUBLIC_POSTHOG_KEY,
@@ -139,6 +169,7 @@ function toView(card: Flashcard): FlashcardView {
     front: card.front,
     back: card.back,
     position: card.position,
+    updatedAt: card.updatedAt.toISOString(),
   };
 }
 
@@ -160,7 +191,9 @@ function statusFor(
 ): "limit" | "empty" | "no_new_content" | "failed" {
   if (error.code === AI_ERROR.DAILY_LIMIT_REACHED) return "limit";
   if (error.code === FLASHCARD_ERROR.NO_NEW_CONTENT) return "no_new_content";
-  if (error.code === AI_ERROR.PAGE_EMPTY) return "empty";
+  // A page too short to generate from (H14) is tracked as empty.
+  if (error.code === AI_ERROR.PAGE_EMPTY || error.code === PAGE_TOO_SHORT_CODE)
+    return "empty";
   return "failed";
 }
 
@@ -199,6 +232,9 @@ export async function generateFlashcardsAction(
         truncated: false,
       });
       const error: GenerationActionError = toActionError(result.error);
+      if (result.error instanceof PageTooShortError) {
+        return err({ ...error, ...pageTooShortDetails(result.error) });
+      }
       return err(
         result.error instanceof DailyLimitReachedError
           ? { ...error, resetAt: result.error.resetAt.toISOString() }
@@ -274,48 +310,86 @@ export async function listDecksAction(): Promise<
     const { flashcards } = deps();
     const result = await listDecksUseCase({ flashcards }, ownerId.value);
     if (!result.ok) return err(toActionError(result.error));
-    return ok(result.value.map((deck) => ({ ...deck })));
+    return ok(
+      result.value.map((deck) => ({
+        ...deck,
+        latestCardAt: deck.latestCardAt.toISOString(),
+        nextDueAt: deck.nextDueAt?.toISOString() ?? null,
+      })),
+    );
   });
 }
 
-export async function createFlashcardAction(
+export type DeckDeletionView = DeckDeletionPreview;
+
+// "Eliminar mazo" (Phase 8 H19): the confirmation dialog reads what goes
+// right before the user confirms.
+export async function previewDeckDeletionAction(
   input: unknown,
-): Promise<Result<FlashcardView, ActionError>> {
+): Promise<Result<DeckDeletionView, ActionError>> {
   return withBoundary(async () => {
     const ownerId = await requireOwnerId();
     if (!ownerId.ok) return ownerId;
-    const parsed = parseInput(createInput, input);
+    const parsed = parseInput(deckInput, input);
     if (!parsed.ok) return parsed;
 
-    const { pages, deck } = deps();
-    const result = await createManualFlashcardUseCase(
+    const result = await previewDeckDeletionUseCase(
+      parsed.value,
+      { deletion: deps().deckDeletion },
+      ownerId.value,
+    );
+    return result.ok ? result : err(toActionError(result.error));
+  });
+}
+
+// Deletes the page's whole deck for real: every card, its study item and
+// review history, the deck's sessions and feedback; the page's mastery is
+// rewritten from what is left.
+export async function deleteDeckAction(
+  input: unknown,
+): Promise<Result<{ pageId: string }, ActionError>> {
+  return withBoundary(async () => {
+    const ownerId = await requireOwnerId();
+    if (!ownerId.ok) return ownerId;
+    const parsed = parseInput(deckInput, input);
+    if (!parsed.ok) return parsed;
+
+    const result = await deleteDeckUseCase(
+      parsed.value,
+      { deletion: deps().deckDeletion, clock: systemClock },
+      ownerId.value,
+    );
+    if (!result.ok) return err(toActionError(result.error));
+    revalidateAfterDelete();
+    return result;
+  });
+}
+
+export interface DeckEditsView {
+  // The deck after saving, by position.
+  cards: FlashcardView[];
+}
+
+// "Guardar" on the deck's edit page (Phase 8 H18): the draft's edits,
+// additions and real deletions, applied together in one transaction
+// (applyDeckEdits) or not at all.
+export async function saveDeckEditsAction(
+  input: unknown,
+): Promise<Result<DeckEditsView, ActionError>> {
+  return withBoundary(async () => {
+    const ownerId = await requireOwnerId();
+    if (!ownerId.ok) return ownerId;
+    const parsed = parseInput(saveDeckEditsInput, input);
+    if (!parsed.ok) return parsed;
+
+    const { deck, pages } = deps();
+    const result = await applyDeckEditsUseCase(
       parsed.value,
       { pages, deck, clock: systemClock, ids: { next: createId } },
       ownerId.value,
     );
     if (!result.ok) return err(toActionError(result.error));
     revalidateDecks();
-    return ok(toView(result.value));
-  });
-}
-
-export async function archiveFlashcardAction(
-  input: unknown,
-): Promise<Result<ArchiveView, ActionError>> {
-  return withBoundary(async () => {
-    const ownerId = await requireOwnerId();
-    if (!ownerId.ok) return ownerId;
-    const parsed = parseInput(archiveInput, input);
-    if (!parsed.ok) return parsed;
-
-    const { deck } = deps();
-    const result = await archiveFlashcardUseCase(
-      parsed.value,
-      { deck, clock: systemClock },
-      ownerId.value,
-    );
-    if (!result.ok) return err(toActionError(result.error));
-    revalidateDecks();
-    return ok({ remaining: result.value.remaining });
+    return ok({ cards: result.value.cards.map(toView) });
   });
 }

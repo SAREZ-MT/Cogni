@@ -18,7 +18,7 @@
 // dependencies.
 import type { AnyExtension } from "@tiptap/core";
 import Emoji from "@tiptap/extension-emoji";
-import { BlockMath, InlineMath } from "@tiptap/extension-mathematics";
+import { BlockMath } from "@tiptap/extension-mathematics";
 import { NodeRange } from "@tiptap/extension-node-range";
 import Subscript from "@tiptap/extension-subscript";
 import Superscript from "@tiptap/extension-superscript";
@@ -61,12 +61,15 @@ import { createEmojiSuggestion } from "../emoji-suggestion";
 import { CogniHighlight } from "../highlight-palette";
 import { ImageBlock } from "../image-node";
 import { CogniMention, createMentionSuggestion } from "../mention-node";
+import { QuickHighlightShortcut } from "../quick-highlight";
 import { SlashCommand } from "../slash-command";
 import type { SlashCommandItem } from "../slash-command-items";
 import { TocBlock } from "../toc-node";
 import { BlockShortcuts } from "./block-shortcuts";
 import { CodeBlock } from "./code-block";
 import { createDetailsExtensions } from "./details";
+import { MarkdownShortcuts, withoutQuoteChevron } from "./markdown-shortcuts";
+import { CogniInlineMath, MathEditing } from "./math-editing";
 import { NodeBackground } from "./node-background";
 import { createTableExtensions } from "./table";
 import { CogniYoutube } from "./youtube";
@@ -121,7 +124,13 @@ export function createEditorExtensions(
   const mentionPort = options.mentionPort ?? null;
   const extraSlashItems = options.extraSlashItems ?? [];
   return [
-    StarterKit.configure({
+    // H6-E5: StarterKit's quote loses its `>` rule to the toggle shortcut
+    // (markdown-shortcuts.ts); `"` + space opens a quote instead.
+    StarterKit.extend({
+      addExtensions() {
+        return withoutQuoteChevron(this.parent?.() ?? []);
+      },
+    }).configure({
       // Replaced below by `CodeBlock` (`@tiptap/extension-code-block-
       // lowlight`), which adds syntax highlighting and a language
       // selector (design.md, "Tiptap y ProseMirror solo en editor/ui").
@@ -140,6 +149,8 @@ export function createEditorExtensions(
     TaskList,
     TaskItem.configure({ nested: true }),
     CogniHighlight,
+    // H6-E6: Mod+Shift+H highlights with the last colour used.
+    QuickHighlightShortcut,
     Callout,
     CodeBlock,
     ImageBlock.configure({ pageId, imagePort }),
@@ -176,6 +187,8 @@ export function createEditorExtensions(
     // Mod-Backspace): the context menu's own row handlers and these
     // shortcuts share one implementation (block-actions.ts).
     BlockShortcuts,
+    // H6-E5: Notion's `>` toggle and `"` quote markdown shortcuts.
+    MarkdownShortcuts,
     // E1 (goal doc §2): ":" emoji popup. `emoji-suggestion.ts` only adds the
     // `items`/`render` pair on top of the extension's own default
     // char/command/allow (a `.configure()` deep-merge — see its own header
@@ -189,9 +202,10 @@ export function createEditorExtensions(
     CogniMention.configure({
       suggestion: createMentionSuggestion(mentionPort),
     }),
-    // E1: KaTeX-rendered inline `$…$` / block `$$…$$` math. Kept
-    // registered so existing math content renders and round-trips; there is
-    // no insert entry point until a math editing UI exists.
+    // E1: KaTeX-rendered inline / block math. H7: formulas can now be
+    // written — `$…$` (CogniInlineMath), the slash menu's "Ecuación" items
+    // and a click or Enter on a formula open the LaTeX input
+    // (math-editing.ts, math-editor.tsx).
     //
     // document-import T11b: registered as the two node extensions instead
     // of the `Mathematics` bundle, because the bundle hands one shared
@@ -201,9 +215,10 @@ export function createEditorExtensions(
     BlockMath.configure({
       katexOptions: { throwOnError: false, displayMode: true },
     }),
-    InlineMath.configure({
+    CogniInlineMath.configure({
       katexOptions: { throwOnError: false, displayMode: false },
     }),
+    MathEditing,
     // E1: heading-tracking utility extension (see toc-node.tsx's header
     // comment for why the TOC *node view* computes its own heading list
     // directly from the document instead of depending on this extension's

@@ -4,7 +4,10 @@ import {
   AUTH_FLOW_COOKIE,
   exchangeCodeForSession,
   isGoogleAuthFlow,
+  recordSignUpConsentForUser,
   safeNext,
+  TERMS_CONSENT_COOKIE,
+  TERMS_VERSION,
 } from "@/modules/identity";
 import { clientEnv } from "@/shared/config/env.client";
 import { createServerAnalytics } from "@/shared/observability/analytics";
@@ -31,11 +34,17 @@ function analytics() {
 // password-reset link (no cookie) gets `error=link`, the invalid/expired
 // link copy. Every response clears the cookie so it never outlives this
 // callback.
+// Sign-up consent (feature legal-consent): a successful exchange copies the
+// proof given before the account existed — the TERMS_CONSENT_COOKIE set
+// next to the Google button, or the email sign-up metadata — into a
+// brand-new profile before the redirect, so the (app) gate lets it in.
+// Only the Google stamp emits `terms_accepted` here (source
+// `oauth_callback`); the email one was tracked at sign-up. The consent
+// cookie is cleared with the flow cookie.
 function clearFlowCookie(response: NextResponse): NextResponse {
-  response.cookies.set(AUTH_FLOW_COOKIE, "", {
-    path: AUTH_CALLBACK_PATH,
-    maxAge: 0,
-  });
+  for (const name of [AUTH_FLOW_COOKIE, TERMS_CONSENT_COOKIE]) {
+    response.cookies.set(name, "", { path: AUTH_CALLBACK_PATH, maxAge: 0 });
+  }
   return response;
 }
 
@@ -49,7 +58,22 @@ export async function GET(request: Request) {
     if (result.ok) {
       if (result.userId) {
         const userId = result.userId;
-        after(() => analytics().track("user_signed_in", userId));
+        const consent = await recordSignUpConsentForUser({
+          userId,
+          accountCreatedAt: result.createdAt,
+          userMetadata: result.userMetadata,
+          cookieHeader: request.headers.get("cookie"),
+        });
+        after(() => {
+          const events = analytics();
+          events.track("user_signed_in", userId);
+          if (consent.stamped && consent.method === "google") {
+            events.track("terms_accepted", userId, {
+              version: TERMS_VERSION,
+              source: "oauth_callback",
+            });
+          }
+        });
       }
       return clearFlowCookie(NextResponse.redirect(`${origin}${next}`));
     }

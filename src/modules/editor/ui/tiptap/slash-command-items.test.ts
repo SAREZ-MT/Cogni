@@ -1,6 +1,7 @@
 import { Editor } from "@tiptap/core";
 import { describe, expect, it } from "vitest";
 import { createEditorExtensions } from "./extensions";
+import { MATH_EDIT_EVENT } from "./extensions/math-editing";
 import { SLASH_COMMAND_ITEMS } from "./slash-command-items";
 
 // specs/editor/spec.md, "Menú de comandos `/`" and "Conjunto completo de
@@ -81,6 +82,26 @@ describe("SLASH_COMMAND_ITEMS", () => {
     }
   });
 
+  // H8-5: the important (blue) and tip (green) callouts.
+  it.each([
+    ["callout-important", "Callout importante", "important"],
+    ["callout-tip", "Callout de consejo", "tip"],
+  ] as const)("inserts the %s item as its callout kind", (id, label, kind) => {
+    const item = findItem(id);
+    expect(item.label).toBe(label);
+    expect(item.group).toBe("Callouts");
+    const editor = createHeadlessEditor();
+    try {
+      item.run(editor, { from: 1, to: 1 });
+      const callout = editor
+        .getJSON()
+        .content?.find((node) => node.type === "callout");
+      expect(callout?.attrs?.kind).toBe(kind);
+    } finally {
+      editor.destroy();
+    }
+  });
+
   // E1 template block set: each "/" entry replaces the typed "/xyz" range
   // and inserts its block (or trigger character) in its place.
   describe("template block entries", () => {
@@ -140,15 +161,32 @@ describe("SLASH_COMMAND_ITEMS", () => {
   // S6a (odd/tasks/app-shell-restyle.md), Editor directive: the restyled
   // "/" menu renders an icon tile and a group heading per item (command-
   // menu.tsx), so every entry here must declare both.
-  // No math editing UI exists yet: an entry whose insert command is a no-op
-  // (empty LaTeX is rejected by the Mathematics extension) must not be offered.
-  it("does not offer a math entry until math can be edited", () => {
-    expect(SLASH_COMMAND_ITEMS.some((item) => item.id === "math-block")).toBe(
-      false,
-    );
-    expect(
-      SLASH_COMMAND_ITEMS.some((item) => /f[óo]rmula|math/i.test(item.label)),
-    ).toBe(false);
+  // H7 (editor polish round 2): "Ecuación" and "Ecuación en línea" remove
+  // the typed command and ask the editor's LaTeX input to open
+  // (math-editor.tsx); the formula is only inserted once it has LaTeX.
+  it.each([
+    ["math-block", "Ecuación", "block"],
+    ["math-inline", "Ecuación en línea", "inline"],
+  ] as const)("%s opens the LaTeX input for a new %s formula", (id, label, kind) => {
+    const item = findItem(id);
+    expect(item.label).toBe(label);
+    expect(item.group).toBe("Contenido");
+    const editor = new Editor({
+      extensions: createEditorExtensions(),
+      content: "<p>/ecuacion</p>",
+    });
+    try {
+      const requests: unknown[] = [];
+      editor.view.dom.addEventListener(MATH_EDIT_EVENT, (event) =>
+        requests.push((event as CustomEvent).detail),
+      );
+      item.run(editor, { from: 1, to: 10 });
+      expect(editor.getText()).toBe("");
+      expect(requests).toEqual([{ kind, pos: null, latex: "" }]);
+      expect(JSON.stringify(editor.getJSON())).not.toContain("Math");
+    } finally {
+      editor.destroy();
+    }
   });
 
   it("gives every item an icon and a group", () => {
@@ -216,9 +254,13 @@ describe("SLASH_COMMAND_ITEMS", () => {
       toc: "Tabla de contenidos",
       emoji: "Emoji",
       mention: "Mención",
+      "math-block": "Ecuación",
+      "math-inline": "Ecuación en línea",
       "callout-idea": "Callout de idea",
       "callout-note": "Callout de nota",
       "callout-warning": "Callout de advertencia",
+      "callout-important": "Callout importante",
+      "callout-tip": "Callout de consejo",
       image: "Imagen",
     };
 

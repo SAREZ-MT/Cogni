@@ -13,8 +13,15 @@ import type { PageTextReader } from "@/modules/notebooks";
 import { newStudyItem } from "@/modules/study-engine";
 import type { Clock } from "@/shared/kernel/clock";
 import { DomainError } from "@/shared/kernel/domain-error";
+import {
+  MIN_GENERATION_WORDS,
+  maxItemsForWords,
+  PageTooShortError,
+  requiredWordsFor,
+} from "@/shared/kernel/generation-capacity";
 import type { GenerationFingerprintRepository } from "@/shared/kernel/generation-fingerprints";
 import {
+  consumedParagraphs,
   joinParagraphs,
   paragraphsWithinWords,
   selectNewParagraphs,
@@ -162,6 +169,22 @@ export async function requestRecallGeneration(
     );
   }
 
+  // Phase 8 H14 (user 2026-10-29): at least 100 words of new paragraphs and
+  // about 15 per question, so the 10 questions need 150; checked before the
+  // peek, so a short page never touches the limit.
+  const words = newParagraphs.reduce((sum, p) => sum + p.words, 0);
+  if (
+    words < MIN_GENERATION_WORDS ||
+    RECALL_GENERATION_COUNT > maxItemsForWords(words)
+  ) {
+    return err(
+      new PageTooShortError({
+        words,
+        minWords: requiredWordsFor(RECALL_GENERATION_COUNT),
+      }),
+    );
+  }
+
   const limit = await deps.limiter.peek(ownerId);
   if (!limit.allowed) {
     return err(new RecallDailyLimitReachedError(limit.resetAt));
@@ -261,7 +284,13 @@ export async function requestRecallGeneration(
       await fingerprints.addMany({
         ownerId,
         pageId: input.pageId,
-        fingerprints: sent.map((p) => p.fingerprint),
+        // Only the share of the sent paragraphs the saved questions cover
+        // (H14): a short answer leaves the rest new for the next Generar.
+        fingerprints: consumedParagraphs(
+          sent,
+          fresh.length,
+          RECALL_GENERATION_COUNT,
+        ).map((p) => p.fingerprint),
         now,
       });
       return ok(fresh);

@@ -63,6 +63,8 @@ describe("BubbleToolbarControls", () => {
 
     for (const name of [
       "Convertir en",
+      "Fuente",
+      "Tamaño de texto: Normal",
       "Deshacer",
       "Rehacer",
       "Negrita",
@@ -73,6 +75,7 @@ describe("BubbleToolbarControls", () => {
       "Superíndice",
       "Subíndice",
       "Color de texto",
+      "Resaltar en amarillo",
       "Alineación",
       "Enlace",
     ]) {
@@ -188,22 +191,77 @@ describe("BubbleToolbarControls", () => {
     expect(screen.getByTestId("bubble-toolbar-link-input")).toHaveValue("");
   });
 
-  // E2: "Resaltar" is now one row ("Fondo / Resaltado") inside the
-  // combined color popover opened by "Color de texto" — HighlightPickerControls
-  // itself is unchanged (same `highlight-picker` testid, same "Resaltar en
-  // <color>" swatch names).
-  it("opens the color popover and applies a highlight through its Fondo/Resaltado row", async () => {
+  // H8-4: "Color de texto" only colours the text; highlighting lives in
+  // its own highlighter, so the two controls never overlap.
+  it("keeps the colour popover to text colours, with no highlight row", async () => {
     editor = createHeadlessEditor();
     render(<BubbleToolbarControls editor={editor} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Color de texto" }));
-    fireEvent.click(await screen.findByTestId("highlight-swatch-purple"));
+    await screen.findByTestId("bubble-toolbar-text-color-purple");
+    expect(screen.queryByTestId("highlight-picker")).not.toBeInTheDocument();
+  });
 
-    const json = editor.getJSON();
-    const mark = json.content?.[0]?.content?.[0]?.marks?.find(
-      (m) => m.type === "highlight",
+  // H8-4: same picker look as the highlighter — circular swatches with a
+  // thin border, a divider and a circle-slash "Quitar color".
+  it("removes the text colour with 'Quitar color' and shows the colour on its bar", async () => {
+    editor = createHeadlessEditor();
+    render(<BubbleToolbarControls editor={editor} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Color de texto" }));
+    const purple = await screen.findByTestId(
+      "bubble-toolbar-text-color-purple",
     );
-    expect(mark?.attrs).toEqual({ color: "purple" });
+    expect(purple.querySelector("span")?.className).toMatch(
+      /rounded-full.*border|border.*rounded-full/,
+    );
+    fireEvent.click(purple);
+    const trigger = screen.getByRole("button", { name: "Color de texto" });
+    expect(trigger).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("bubble-toolbar-color-bar")).toHaveStyle({
+      backgroundColor: "var(--color-pastel-purple-fg)",
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Color de texto" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Quitar color" }),
+    );
+    expect(editor.getAttributes("textStyle").color ?? null).toBeNull();
+    expect(trigger).toHaveAttribute("aria-pressed", "false");
+  });
+
+  // H8-4: every control explains itself in a tooltip.
+  it.each([
+    ["Color de texto", "Color de texto"],
+    ["Resaltar en amarillo", "Resaltar · ⇧⌘H"],
+    ["Negrita", "Negrita · ⌘B"],
+  ])("shows a tooltip on the '%s' button", async (name, tooltip) => {
+    editor = createHeadlessEditor();
+    render(<BubbleToolbarControls editor={editor} />);
+
+    act(() => {
+      screen.getByRole("button", { name }).focus();
+    });
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(tooltip);
+  });
+
+  // H8-3: the bold glyph is drawn bold; italic, underline and strike keep
+  // the regular weight and read by their own shape.
+  it("draws the bold glyph heavier than the other mark glyphs", () => {
+    editor = createHeadlessEditor();
+    render(<BubbleToolbarControls editor={editor} />);
+    const strokeOf = (mark: string) =>
+      Number(
+        screen
+          .getByTestId(`bubble-toolbar-${mark}`)
+          .querySelector("svg")
+          ?.getAttribute("stroke-width"),
+      );
+
+    expect(strokeOf("bold")).toBeGreaterThanOrEqual(2.75);
+    for (const mark of ["italic", "underline", "strike"]) {
+      expect(strokeOf(mark), mark).toBeLessThan(strokeOf("bold"));
+    }
   });
 
   // E2: the "Texto" row of the same popover applies the inline Color mark
@@ -248,6 +306,87 @@ describe("BubbleToolbarControls", () => {
     fireEvent.click(await screen.findByRole("menuitem", { name: /Cita/ }));
 
     expect(editor.isActive("blockquote")).toBe(true);
+  });
+
+  // H7: the BubbleMenu only survives the editor's blur after a mousedown on
+  // its element; Radix dropdown triggers cancel pointerdown (and with it the
+  // mousedown), so the toolbar re-signals it.
+  it("signals a mousedown to the bubble menu when a dropdown trigger is pressed", () => {
+    editor = createHeadlessEditor();
+    const { container } = render(<BubbleToolbarControls editor={editor} />);
+    const onMouseDown = vi.fn();
+    container.addEventListener("mousedown", onMouseDown);
+
+    fireEvent.pointerDown(screen.getByTestId("bubble-toolbar-text-style"), {
+      button: 0,
+      ctrlKey: false,
+    });
+
+    expect(onMouseDown).toHaveBeenCalled();
+  });
+
+  // H7: the "Texto" menu sets the font family of the selection. H8-2: the
+  // size moved to its own compact menu right next to it.
+  it("sets the font family through the 'Texto' menu, which no longer lists sizes", async () => {
+    editor = createHeadlessEditor();
+    render(<BubbleToolbarControls editor={editor} />);
+
+    const openMenu = () =>
+      fireEvent.pointerDown(screen.getByTestId("bubble-toolbar-text-style"), {
+        button: 0,
+        ctrlKey: false,
+      });
+    openMenu();
+    const bitter = await screen.findByRole("menuitemradio", { name: "Bitter" });
+    expect(bitter).toHaveStyle({ fontFamily: "Bitter, serif" });
+    expect(
+      screen.getByRole("menuitemradio", { name: "Predeterminada" }),
+    ).toHaveAttribute("aria-checked", "true");
+    expect(
+      screen.queryByRole("menuitemradio", { name: /^Grande/ }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(bitter);
+    expect(editor.getAttributes("textStyle").fontFamily).toBe("Bitter, serif");
+
+    openMenu();
+    expect(
+      await screen.findByRole("menuitemradio", { name: "Bitter" }),
+    ).toHaveAttribute("aria-checked", "true");
+  });
+
+  it("sets the font size through its own menu and shows the current size", async () => {
+    editor = createHeadlessEditor();
+    render(<BubbleToolbarControls editor={editor} />);
+
+    const trigger = screen.getByTestId("bubble-toolbar-font-size");
+    expect(trigger).toHaveTextContent("16");
+    const openMenu = () =>
+      fireEvent.pointerDown(screen.getByTestId("bubble-toolbar-font-size"), {
+        button: 0,
+        ctrlKey: false,
+      });
+    openMenu();
+    const sizes = await screen.findAllByRole("menuitemradio");
+    expect(sizes.map((item) => item.textContent)).toEqual([
+      "Pequeño14",
+      "Normal16",
+      "Mediano18",
+      "Grande22",
+      "Muy grande28",
+    ]);
+    expect(
+      screen.queryByRole("menuitemradio", { name: "Bitter" }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("menuitemradio", { name: /^Grande/ }));
+    expect(editor.getAttributes("textStyle").fontSize).toBe("22px");
+    expect(trigger).toHaveTextContent("22");
+    expect(trigger).toHaveAccessibleName("Tamaño de texto: Grande");
+
+    openMenu();
+    fireEvent.click(
+      await screen.findByRole("menuitemradio", { name: /^Normal/ }),
+    );
+    expect(editor.getAttributes("textStyle").fontSize ?? null).toBeNull();
   });
 
   it("disables undo/redo until there is history, then undoes and redoes", () => {

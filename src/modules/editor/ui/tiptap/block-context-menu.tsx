@@ -267,7 +267,7 @@ export function BlockContextMenu({
       <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
       <DropdownMenuContent
         align="start"
-        className="min-w-56 rounded-xl p-1 shadow-md"
+        className="editor-surface min-w-56 p-1 shadow-md"
         onCloseAutoFocus={handleCloseAutoFocus}
       >
         <DropdownMenuSub>
@@ -275,7 +275,7 @@ export function BlockContextMenu({
             <Type aria-hidden="true" size={16} strokeWidth={1.75} />
             Convertir en
           </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className="min-w-48 rounded-xl p-1">
+          <DropdownMenuSubContent className="editor-surface min-w-48 p-1">
             {BLOCK_KIND_ITEMS.map((kind) => (
               <DropdownMenuItem
                 key={kind.id}
@@ -302,7 +302,7 @@ export function BlockContextMenu({
             <Palette aria-hidden="true" size={16} strokeWidth={1.75} />
             Colores
           </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className="min-w-56 rounded-xl p-2">
+          <DropdownMenuSubContent className="editor-surface min-w-56 p-2">
             <DropdownMenuLabel className="px-0.5">Texto</DropdownMenuLabel>
             <div className="mb-2 flex flex-wrap gap-1 px-0.5">
               {TEXT_COLOR_SWATCHES.map((swatch) => (

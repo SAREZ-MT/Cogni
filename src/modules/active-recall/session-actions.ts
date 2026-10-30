@@ -2,6 +2,7 @@
 
 import { z } from "zod";
 import { createNotebooksServerApi } from "@/modules/notebooks";
+import { getCurrentDueCutoff } from "@/modules/scheduling";
 import { createStudyItemRepository } from "@/modules/study-engine";
 import { getDb } from "@/shared/db/client";
 import { systemClock } from "@/shared/kernel/clock";
@@ -108,6 +109,8 @@ export async function getRecallSessionPlanAction(
         questions: new DrizzleRecallQuestionRepository(db),
         studyItems: createStudyItemRepository(db),
         clock: systemClock,
+        // Reviews are due per local day of the profile zone (server-side).
+        dueCutoff: await getCurrentDueCutoff(),
       },
       ownerId.value,
     );
@@ -147,7 +150,13 @@ export async function startRecallSessionAction(
     const { pages, uow } = deps();
     const result = await startRecallSession(
       parsed.value,
-      { pages, uow, clock: systemClock, ids: { next: createId } },
+      {
+        pages,
+        uow,
+        clock: systemClock,
+        dueCutoff: await getCurrentDueCutoff(),
+        ids: { next: createId },
+      },
       ownerId.value,
     );
     if (!result.ok) return err(toActionError(result.error));
@@ -207,7 +216,11 @@ export async function finishRecallSessionAction(
     if (!result.ok) return err(toActionError(result.error));
     const { session } = result.value;
     if (session.evaluationStatus === "pending") {
-      scheduleRecallEvaluation(session.id, ownerId.value);
+      scheduleRecallEvaluation(
+        session.id,
+        ownerId.value,
+        await getCurrentDueCutoff(),
+      );
     }
     revalidateActiveRecall();
     return ok({

@@ -4,10 +4,10 @@ import { FLASHCARD_ERROR } from "./errors";
 
 export type FlashcardOrigin = "ai" | "manual";
 
-// Upper bound per side for hand-written cards, counted after trimming
-// (createManualFlashcard; the dialog's textareas use it too). AI cards have
-// no bound of their own; this one keeps a manual card readable on the flip
-// card and the payload small.
+// Upper bound per side for hand-written or hand-edited cards, counted after
+// trimming (createManualFlashcard and editFlashcard, both reached from the
+// Phase 8 H18 edit page). AI cards have no bound of their own; this one
+// keeps a card readable on the flip card and the payload small.
 export const MAX_FLASHCARD_SIDE_LENGTH = 1000;
 
 // One card of a page's deck (documento-maestro §6.1). `generationId` links
@@ -63,4 +63,36 @@ export function createFlashcard(
     updatedAt: now,
     archivedAt: null,
   });
+}
+
+// A manual edit (Phase 8 H18 edit page): same id, origin and position, new
+// sides, trimmed and non-blank, so the card's study item and its history
+// stay attached.
+export function editFlashcard(
+  card: Flashcard,
+  sides: { front: string; back: string },
+  now: Date,
+): Result<Flashcard, DomainError> {
+  const front = sides.front.trim();
+  const back = sides.back.trim();
+  if (front === "" || back === "") {
+    return err(
+      new DomainError(
+        FLASHCARD_ERROR.EMPTY,
+        "A flashcard needs a non-empty front and back",
+      ),
+    );
+  }
+  if (
+    front.length > MAX_FLASHCARD_SIDE_LENGTH ||
+    back.length > MAX_FLASHCARD_SIDE_LENGTH
+  ) {
+    return err(
+      new DomainError(
+        FLASHCARD_ERROR.TOO_LONG,
+        `Each side holds at most ${MAX_FLASHCARD_SIDE_LENGTH} characters`,
+      ),
+    );
+  }
+  return ok({ ...card, front, back, updatedAt: now });
 }

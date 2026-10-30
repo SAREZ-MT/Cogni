@@ -8,9 +8,10 @@ export interface ExamDueCounts {
   examQuestionsDueByPage(
     ownerId: string,
   ): Promise<ReadonlyMap<string, number> | null>;
-  // The roots whose exam study item is due now (same "due" as "Hoy":
-  // dueAt <= now, not suspended, page and notebook not archived); null
-  // when the due items could not be read.
+  // The roots whose exam study item is due today (same "due" as "Hoy":
+  // due before the start of the owner's next local day, not suspended,
+  // page and notebook not archived); null when the due items could not be
+  // read.
   examRootsDueNow(ownerId: string): Promise<ReadonlySet<string> | null>;
 }
 
@@ -37,6 +38,11 @@ export interface ExamHubEntry {
   // (the retake banner's "ya están para repasar"); false when the page has
   // no failed questions, null when unknown.
   failedDueNow: boolean | null;
+  // The best finished exam's whole percent; null when never examined
+  // (Phase 8 H17: "Mejor nota").
+  bestScore: number | null;
+  // When the newest active question was created (the hub's recency).
+  latestQuestionAt: Date | null;
 }
 
 // The exams hub and notebook view (documento-maestro §3.3): every page of
@@ -79,6 +85,8 @@ export async function listExamHub(
       retakePending: page.retakePending,
       dueToday: due === null ? null : (due.get(page.pageId) ?? 0),
       failedDueNow: failedDueNow(page),
+      bestScore: page.bestScore,
+      latestQuestionAt: page.latestQuestionAt,
     })),
   );
 }

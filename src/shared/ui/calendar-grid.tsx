@@ -1,14 +1,21 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { DaySelectLink } from "@/shared/ui/day-select-link";
 import { cn } from "@/shared/ui/utils";
 
 export interface CalendarGridProps {
   "aria-label": string;
   // Seven short weekday names, Monday first.
   weekdays: readonly string[];
+  // Week (Phase 8 H3): each weekday's day number shown next to its name
+  // ("Lun 19"), today's in a small violet square. Same order as weekdays.
+  weekdayNumbers?: readonly { dayNumber: number; isToday: boolean }[];
   // Week layout: in a narrow grid the days stack in one column (each cell
   // shows its weekday) instead of seven narrow columns.
   stackWhenNarrow?: boolean;
+  // Grow to fill a flex-column parent (the week, Phase 8 H3): the day row
+  // stretches down to the bottom of the card.
+  fill?: boolean;
   className?: string;
   children: ReactNode;
 }
@@ -22,14 +29,20 @@ export interface CalendarGridProps {
 export function CalendarGrid({
   "aria-label": ariaLabel,
   weekdays,
+  weekdayNumbers,
   stackWhenNarrow = false,
+  fill = false,
   className,
   children,
 }: CalendarGridProps) {
   return (
     <div
       data-slot="calendar-grid-frame"
-      className={cn("@container w-full", className)}
+      className={cn(
+        "@container w-full",
+        fill && "flex flex-1 flex-col",
+        className,
+      )}
     >
       <div
         aria-hidden="true"
@@ -39,20 +52,35 @@ export function CalendarGrid({
           stackWhenNarrow && "@max-2xl:hidden",
         )}
       >
-        {weekdays.map((weekday) => (
-          <span
-            key={weekday}
-            className="truncate px-1 py-2.5 text-center font-semibold text-fg-muted text-xs"
-          >
-            {weekday}
-          </span>
-        ))}
+        {weekdays.map((weekday, index) => {
+          const number = weekdayNumbers?.[index];
+          return (
+            <span
+              key={weekday}
+              className="flex min-w-0 items-center justify-center gap-1.5 truncate px-1 py-2.5 font-semibold text-fg-muted text-xs"
+            >
+              {weekday}
+              {number && (
+                <span
+                  data-part="weekday-number"
+                  className={cn(
+                    "inline-flex h-5 min-w-5 items-center justify-center rounded-md px-1 tabular-nums",
+                    number.isToday ? "bg-primary-600 text-white" : "text-fg",
+                  )}
+                >
+                  {number.dayNumber}
+                </span>
+              )}
+            </span>
+          );
+        })}
       </div>
       <ul
         aria-label={ariaLabel}
         data-slot="calendar-grid"
         className={cn(
           "-mb-px grid grid-cols-7 @2xl:[&>li:nth-child(7n)]:border-r-0",
+          fill && "flex-1",
           stackWhenNarrow
             ? "@max-2xl:grid-cols-1 @max-2xl:[&>li]:border-r-0"
             : "@max-2xl:[&>li:nth-child(7n)]:border-r-0",
@@ -78,14 +106,27 @@ export interface CalendarDayCellProps {
   outside?: boolean;
   // Events that did not fit: "N más…" linking to where all are listed.
   more?: { count: number; href: string };
+  // "month" (default): the number on top of the cell, today's cell tinted.
+  // "week" (Phase 8 H3): the number lives in CalendarGrid's header row, so
+  // the cell shows it only where the days stack (narrow), and today's
+  // column gets a soft violet wash fading downwards.
+  variant?: "month" | "week";
+  // Selectable day (Phase 8 H3, the month grid): a cover link to its
+  // selection; the chips stay their own links above it.
+  selectHref?: string;
+  // The selected day: a 2px inset violet outline and aria-current="date".
+  isSelected?: boolean;
   className?: string;
   children?: ReactNode;
 }
 
-// One day of CalendarGrid: number top-left (today's in a dark circle),
-// greyed when outside the shown month, then its event chips and an
-// optional "N más…" link. In a narrow grid the chips wrap in a row
-// (TechniqueChip collapse="dot-when-narrow" turns them into dots).
+// One day of CalendarGrid: number top-left (today's in a violet rounded
+// square on a faint violet cell, Phase 8 H3; the week variant shows the
+// number only where the days stack), greyed when outside the shown month,
+// then its event chips and an optional "N más…" link. In a narrow grid the
+// chips wrap in a row (TechniqueChip collapse="dot-when-narrow" turns them
+// into dots). A selectable day (the month grid) is covered by a link that
+// selects it; the selected one has a 2px inset violet outline.
 export function CalendarDayCell({
   day,
   dayNumber,
@@ -94,22 +135,53 @@ export function CalendarDayCell({
   isToday = false,
   outside = false,
   more,
+  variant = "month",
+  selectHref,
+  isSelected = false,
   className,
   children,
 }: CalendarDayCellProps) {
+  const week = variant === "week";
+  const selectable = selectHref !== undefined;
   return (
     <li
       data-slot="calendar-day"
       data-day={day}
       data-today={isToday ? "true" : undefined}
       data-outside={outside ? "true" : undefined}
+      data-selected={isSelected ? "true" : undefined}
       className={cn(
         "flex min-h-[72px] min-w-0 flex-col gap-1 border-border-subtle border-r border-b p-1.5 @2xl:min-h-[128px] @2xl:p-2",
         outside && "bg-neutral-50",
+        isToday &&
+          (week
+            ? "bg-linear-to-b from-primary-100/70 via-primary-50/40 to-transparent"
+            : "bg-primary-50"),
+        selectable && "relative transition-colors hover:bg-neutral-50",
+        selectable && isToday && "hover:bg-primary-50",
+        isSelected && "ring-2 ring-primary-600 ring-inset",
         className,
       )}
     >
-      <span className="flex items-center gap-1.5">
+      {selectable && (
+        <DaySelectLink
+          href={selectHref}
+          aria-label={`Ver ${label}`}
+          aria-current={isSelected ? "date" : undefined}
+        />
+      )}
+      <span className="sr-only">
+        {label}
+        {isToday && " (hoy)"}
+      </span>
+      <span
+        data-part="number-row"
+        className={cn(
+          "flex items-center gap-1.5",
+          week && "@2xl:hidden",
+          selectable && "pointer-events-none relative",
+        )}
+      >
         {weekday && (
           <span
             aria-hidden="true"
@@ -125,7 +197,7 @@ export function CalendarDayCell({
           className={cn(
             "inline-flex size-6 shrink-0 items-center justify-center font-semibold text-xs tabular-nums",
             isToday
-              ? "rounded-full bg-fg text-card"
+              ? "rounded-md bg-primary-600 text-white"
               : outside
                 ? "text-fg-muted"
                 : "text-fg",
@@ -133,19 +205,23 @@ export function CalendarDayCell({
         >
           {dayNumber}
         </time>
-        <span className="sr-only">
-          {label}
-          {isToday && " (hoy)"}
-        </span>
       </span>
-      <div className="flex min-w-0 flex-col gap-1 @max-2xl:flex-row @max-2xl:flex-wrap">
+      <div
+        data-part="events"
+        className={cn(
+          "flex min-w-0 flex-col gap-1 @max-2xl:flex-row @max-2xl:flex-wrap",
+          // Above the cover link, but only the chips catch the pointer.
+          selectable &&
+            "pointer-events-none relative [&>*]:pointer-events-auto",
+        )}
+      >
         {children}
       </div>
       {more && (
         <Link
           href={more.href}
           aria-label={`${more.count} más el ${label}`}
-          className="w-fit rounded-sm px-1 font-semibold text-fg-muted text-xs hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="relative w-fit rounded-sm px-1 font-semibold text-fg-muted text-xs hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <span className="@max-2xl:hidden">{more.count} más…</span>
           <span aria-hidden="true" className="@2xl:hidden">

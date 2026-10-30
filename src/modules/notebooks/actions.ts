@@ -1,5 +1,6 @@
 "use server";
 
+import * as Sentry from "@sentry/nextjs";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getCurrentUser } from "@/modules/identity";
@@ -13,16 +14,20 @@ import {
 import { isValidId } from "@/shared/kernel/id";
 import { err, ok, type Result } from "@/shared/kernel/result";
 import {
-  archiveNotebook as archiveNotebookUseCase,
-  archivePage as archivePageUseCase,
   createNotebook as createNotebookUseCase,
   createPage as createPageUseCase,
+  deleteNotebook as deleteNotebookUseCase,
+  deletePage as deletePageUseCase,
   getAssetReadUrl as getAssetReadUrlUseCase,
   getHomeOverview as getHomeOverviewUseCase,
   getPage as getPageUseCase,
   type HomeOverview,
   type ImageUploadGrant,
+  listPagePickerTree,
   listSidebar,
+  type PagePickerNotebookEntry,
+  previewNotebookDeletion as previewNotebookDeletionUseCase,
+  previewPageDeletion as previewPageDeletionUseCase,
   registerPageAsset as registerPageAssetUseCase,
   renameNotebook as renameNotebookUseCase,
   renamePage as renamePageUseCase,
@@ -31,15 +36,21 @@ import {
   savePage as savePageUseCase,
   setNotebookAppearance as setNotebookAppearanceUseCase,
 } from "./application";
+import type {
+  NotebookDeletionPreview,
+  PageDeletionPreview,
+} from "./domain/content-deletion";
 import { NOTEBOOKS_ERROR } from "./domain/errors";
 import type { Notebook, NotebookColor } from "./domain/notebook";
 import type { Page } from "./domain/page";
 import type { PageAsset } from "./domain/page-asset-repository";
 import type { TiptapDoc } from "./domain/plain-text";
 import {
+  DrizzleContentDeletion,
   DrizzleNotebookRepository,
   DrizzlePageAssetRepository,
   DrizzlePageRepository,
+  SupabaseImportSourceStorage,
   SupabaseStorageGateway,
 } from "./infrastructure";
 import {
@@ -98,6 +109,8 @@ function deps() {
     pages: new DrizzlePageRepository(db),
     assets: new DrizzlePageAssetRepository(db),
     storage: new SupabaseStorageGateway(),
+    importSources: new SupabaseImportSourceStorage(),
+    deletion: new DrizzleContentDeletion(db),
     clock: systemClock,
   };
 }
@@ -137,13 +150,6 @@ export async function setNotebookAppearance(input: unknown): Promise<Notebook> {
   return notebook;
 }
 
-export async function archiveNotebook(input: unknown): Promise<Notebook> {
-  const ownerId = await requireOwnerId();
-  const notebook = unwrap(await archiveNotebookUseCase(input, deps(), ownerId));
-  revalidateSidebar();
-  return notebook;
-}
-
 export async function createPage(input: unknown): Promise<Page> {
   const ownerId = await requireOwnerId();
   const page = unwrap(await createPageUseCase(input, deps(), ownerId));
@@ -158,11 +164,81 @@ export async function renamePage(input: unknown): Promise<Page> {
   return page;
 }
 
-export async function archivePage(input: unknown): Promise<Page> {
-  const ownerId = await requireOwnerId();
-  const page = unwrap(await archivePageUseCase(input, deps(), ownerId));
-  revalidateSidebar();
-  return page;
+// Phase 8 H19: "Eliminar" of a notebook or a page is a real delete with
+// everything below it. The confirmation dialog reads the preview right
+// before the user confirms; both return Results so the dialog can show
+// the reason in Spanish, and an unexpected failure is reported, never
+// thrown at the client. Deleting revalidates every route (the sidebar,
+// Cuadernos, the hubs and the dashboard all read the deleted rows).
+
+async function guarded<T>(
+  run: () => Promise<Result<T, ActionError>>,
+): Promise<Result<T, ActionError>> {
+  try {
+    return await run();
+  } catch (error) {
+    Sentry.captureException(error);
+    return err({
+      code: NOTEBOOKS_ERROR.UNEXPECTED,
+      message: NOTEBOOKS_COPY.unexpected,
+    });
+  }
+}
+
+export async function previewNotebookDeletion(
+  input: unknown,
+): Promise<Result<NotebookDeletionPreview, ActionError>> {
+  return guarded(async () => {
+    const ownerId = await requireOwnerIdResult();
+    if (!ownerId.ok) return ownerId;
+    const result = await previewNotebookDeletionUseCase(
+      input,
+      deps(),
+      ownerId.value,
+    );
+    return result.ok ? result : err(toActionError(result.error));
+  });
+}
+
+export async function deleteNotebook(
+  input: unknown,
+): Promise<Result<{ notebookId: string }, ActionError>> {
+  return guarded(async () => {
+    const ownerId = await requireOwnerIdResult();
+    if (!ownerId.ok) return ownerId;
+    const result = await deleteNotebookUseCase(input, deps(), ownerId.value);
+    if (!result.ok) return err(toActionError(result.error));
+    revalidateSidebar();
+    return result;
+  });
+}
+
+export async function previewPageDeletion(
+  input: unknown,
+): Promise<Result<PageDeletionPreview, ActionError>> {
+  return guarded(async () => {
+    const ownerId = await requireOwnerIdResult();
+    if (!ownerId.ok) return ownerId;
+    const result = await previewPageDeletionUseCase(
+      input,
+      deps(),
+      ownerId.value,
+    );
+    return result.ok ? result : err(toActionError(result.error));
+  });
+}
+
+export async function deletePage(
+  input: unknown,
+): Promise<Result<{ pageId: string }, ActionError>> {
+  return guarded(async () => {
+    const ownerId = await requireOwnerIdResult();
+    if (!ownerId.ok) return ownerId;
+    const result = await deletePageUseCase(input, deps(), ownerId.value);
+    if (!result.ok) return err(toActionError(result.error));
+    revalidateSidebar();
+    return result;
+  });
 }
 
 // The sidebar tree Server Component's only data dependency: no input, no
@@ -171,6 +247,15 @@ export async function getSidebarTree(): Promise<SidebarNotebook[]> {
   const ownerId = await requireOwnerId();
   const { notebooks, pages } = deps();
   return listSidebar({ notebooks, pages }, ownerId);
+}
+
+// Phase 8 H14: the technique hubs' page pickers, with each page's word
+// count (never its text) so a page under 100 words can be disabled. No
+// DomainError possible, same as getSidebarTree above.
+export async function getPagePickerTree(): Promise<PagePickerNotebookEntry[]> {
+  const ownerId = await requireOwnerId();
+  const { notebooks, pages } = deps();
+  return listPagePickerTree({ notebooks, pages }, ownerId);
 }
 
 // E1 (editor pass, goal doc §2, "@" mentions): the mention popup's data

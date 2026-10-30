@@ -14,6 +14,7 @@ function profile(overrides: { displayName?: string | null; updatedAt?: Date }) {
     onboardingCompletedAt: null,
     termsAcceptedVersion: null,
     termsAcceptedAt: null,
+    termsAcceptedMethod: null,
     createdAt: NOW,
     updatedAt: overrides.updatedAt ?? NOW,
   };
@@ -82,6 +83,40 @@ describe("InMemoryProfileRepository.acceptTerms", () => {
     expect(await repository.findById(OWNER_ID)).toMatchObject({
       termsAcceptedVersion: "2026-11-01",
       termsAcceptedAt: later,
+    });
+  });
+
+  it("records the acceptance method", async () => {
+    const repository = new InMemoryProfileRepository();
+    await repository.upsert(profile({}));
+
+    await repository.acceptTerms(OWNER_ID, "2026-10-28", AT, {
+      method: "google",
+    });
+
+    expect(await repository.findById(OWNER_ID)).toMatchObject({
+      termsAcceptedMethod: "google",
+    });
+  });
+
+  it("skips the write with onlyIfUnaccepted once an acceptance exists", async () => {
+    const repository = new InMemoryProfileRepository();
+    await repository.upsert(profile({}));
+    await repository.acceptTerms(OWNER_ID, "2026-10-04", AT, {
+      method: "gate",
+    });
+
+    const skipped = await repository.acceptTerms(
+      OWNER_ID,
+      "2026-10-28",
+      new Date("2026-10-28T00:00:00.000Z"),
+      { method: "email", onlyIfUnaccepted: true },
+    );
+
+    expect(skipped).toBeNull();
+    expect(await repository.findById(OWNER_ID)).toMatchObject({
+      termsAcceptedVersion: "2026-10-04",
+      termsAcceptedMethod: "gate",
     });
   });
 

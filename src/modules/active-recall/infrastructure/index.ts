@@ -9,6 +9,7 @@ export { DrizzleRecallHubReader } from "./drizzle-recall-hub-reader";
 export { DrizzleRecallQuestionRepository } from "./drizzle-recall-question-repository";
 export { DrizzleRecallSessionRepository } from "./drizzle-recall-session-repository";
 export { DrizzleRecallSessionUnitOfWork } from "./drizzle-recall-session-unit-of-work";
+export { DrizzleRecallSetDeletion } from "./drizzle-recall-set-deletion";
 export { DrizzleRecallUnitOfWork } from "./drizzle-recall-unit-of-work";
 
 // Every active-recall repository on one executor. `db` may be an open

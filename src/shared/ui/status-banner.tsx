@@ -1,10 +1,21 @@
-import { AlertCircle, CheckCircle2, Loader2, RotateCcw } from "lucide-react";
+import {
+  AlertCircle,
+  CheckCircle2,
+  Info,
+  Loader2,
+  RotateCcw,
+} from "lucide-react";
 import type * as React from "react";
 import type { ReactNode } from "react";
 import { IconTile } from "@/shared/ui/icon-tile";
 import { cn } from "@/shared/ui/utils";
 
-export type StatusBannerTone = "pending" | "success" | "error" | "rose";
+export type StatusBannerTone =
+  | "pending"
+  | "success"
+  | "error"
+  | "rose"
+  | "info";
 
 const TONE_CONFIG: Record<
   StatusBannerTone,
@@ -14,7 +25,7 @@ const TONE_CONFIG: Record<
     // of the default text-fg) — every other tone keeps the original plain
     // title color.
     titleClassName?: string;
-    iconTone: "warning" | "success" | "error" | "pink";
+    iconTone: "warning" | "success" | "error" | "pink" | "info";
     icon: ReactNode;
   }
 > = {
@@ -46,6 +57,13 @@ const TONE_CONFIG: Record<
   // tones — reuses the existing `pink` IconTile tone (pastel-pink/-fg is
   // already an exact match for the style source's wine `#9B2C4A`) paired
   // with the new rose-500 border.
+  // Phase 8 H18: a calm, neutral notice (the flashcards practice mode:
+  // "your answers do not change your reviews").
+  info: {
+    panelClassName: "border border-info-500/25 bg-info-50",
+    iconTone: "info",
+    icon: <Info aria-hidden="true" size={15} strokeWidth={1.75} />,
+  },
   rose: {
     panelClassName: "border border-rose-500/25 bg-pastel-pink/50",
     titleClassName: "text-pastel-pink-fg",

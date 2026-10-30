@@ -7,17 +7,27 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // password reset. Only a failed Google flow may show the "Google cancelled"
 // copy; a failed or expired email link gets the link copy instead. The
 // marker cookie is always cleared on the way out.
-const { exchangeCodeForSession, safeNext } = vi.hoisted(() => ({
-  exchangeCodeForSession: vi.fn(),
-  safeNext: vi.fn((next: string | null) => next ?? "/"),
-}));
+const { exchangeCodeForSession, safeNext, recordSignUpConsentForUser } =
+  vi.hoisted(() => ({
+    exchangeCodeForSession: vi.fn(),
+    safeNext: vi.fn((next: string | null) => next ?? "/"),
+    recordSignUpConsentForUser: vi.fn(
+      async (): Promise<{ stamped: boolean; method?: string }> => ({
+        stamped: false,
+      }),
+    ),
+  }));
 // The flow-cookie contract is pure (identity/domain/auth-flow.ts and
 // application/sign-up.ts), so the mock spreads the real values instead of
 // loading the server-only identity index.
 vi.mock("@/modules/identity", async () => ({
   exchangeCodeForSession,
   safeNext,
+  recordSignUpConsentForUser,
   ...(await import("@/modules/identity/domain/auth-flow")),
+  ...(await import("@/modules/identity/domain/terms-consent")),
+  TERMS_VERSION: (await import("@/modules/identity/domain/terms"))
+    .TERMS_VERSION,
   AUTH_CALLBACK_PATH: (await import("@/modules/identity/application/sign-up"))
     .AUTH_CALLBACK_PATH,
 }));
@@ -158,5 +168,107 @@ describe("GET /auth/callback error selection", () => {
     expect(
       clearsFlowCookie(await callbackResponse("", GOOGLE_FLOW_COOKIE)),
     ).toBe(true);
+  });
+});
+
+describe("GET /auth/callback sign-up consent", () => {
+  const CREATED_AT = new Date("2026-10-28T15:00:03Z");
+  const CONSENT_COOKIE = "cogni_terms_consent=2026-10-28_1793199600000";
+
+  beforeEach(() => {
+    exchangeCodeForSession.mockReset();
+    recordSignUpConsentForUser.mockReset();
+    recordSignUpConsentForUser.mockResolvedValue({ stamped: false });
+    track.mockClear();
+  });
+
+  it("hands the account, its metadata and the request cookies to the consent stamp before redirecting", async () => {
+    const metadata = { terms_version: "2026-10-28" };
+    exchangeCodeForSession.mockResolvedValue({
+      ok: true,
+      userId: "u-1",
+      createdAt: CREATED_AT,
+      userMetadata: metadata,
+    });
+    const cookie = `${GOOGLE_FLOW_COOKIE}; ${CONSENT_COOKIE}`;
+
+    expect(await callback("?code=abc", cookie)).toBe("https://cogni.test/");
+    expect(recordSignUpConsentForUser).toHaveBeenCalledWith({
+      userId: "u-1",
+      accountCreatedAt: CREATED_AT,
+      userMetadata: metadata,
+      cookieHeader: cookie,
+    });
+  });
+
+  it("tracks terms_accepted with source oauth_callback once a Google account is stamped", async () => {
+    exchangeCodeForSession.mockResolvedValue({
+      ok: true,
+      userId: "u-1",
+      createdAt: CREATED_AT,
+      userMetadata: {},
+    });
+    recordSignUpConsentForUser.mockResolvedValue({
+      stamped: true,
+      method: "google",
+    });
+
+    await callback("?code=abc", `${GOOGLE_FLOW_COOKIE}; ${CONSENT_COOKIE}`);
+
+    expect(track).toHaveBeenCalledWith("terms_accepted", "u-1", {
+      version: "2026-10-28",
+      source: "oauth_callback",
+    });
+  });
+
+  it("does not repeat terms_accepted for an email account (already tracked at sign-up)", async () => {
+    exchangeCodeForSession.mockResolvedValue({
+      ok: true,
+      userId: "u-1",
+      createdAt: CREATED_AT,
+      userMetadata: {},
+    });
+    recordSignUpConsentForUser.mockResolvedValue({
+      stamped: true,
+      method: "email",
+    });
+
+    await callback("?code=abc");
+
+    expect(track).toHaveBeenCalledWith("user_signed_in", "u-1");
+    expect(track).not.toHaveBeenCalledWith(
+      "terms_accepted",
+      expect.anything(),
+      expect.anything(),
+    );
+  });
+
+  it("never stamps on a failed exchange", async () => {
+    exchangeCodeForSession.mockResolvedValue({ ok: false, userId: null });
+
+    await callback("?code=bad", CONSENT_COOKIE);
+
+    expect(recordSignUpConsentForUser).not.toHaveBeenCalled();
+  });
+
+  it("clears the consent cookie on success and failure", async () => {
+    const clears = (response: Response) =>
+      /cogni_terms_consent=;[^,]*Path=\/auth\/callback/i.test(
+        response.headers.get("set-cookie") ?? "",
+      );
+    exchangeCodeForSession.mockResolvedValue({
+      ok: true,
+      userId: "u-1",
+      createdAt: CREATED_AT,
+      userMetadata: {},
+    });
+    expect(clears(await callbackResponse("?code=abc", CONSENT_COOKIE))).toBe(
+      true,
+    );
+
+    exchangeCodeForSession.mockResolvedValue({ ok: false, userId: null });
+    expect(clears(await callbackResponse("?code=bad", CONSENT_COOKIE))).toBe(
+      true,
+    );
   });
 });

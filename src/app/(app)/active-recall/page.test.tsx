@@ -1,12 +1,34 @@
 import { render, screen, within } from "@testing-library/react";
+import { createElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+// Phase 8 H19: the card's delete provider is client code with its own test.
+vi.mock("../_components/delete-technique-set", () => ({
+  DeleteTechniqueSetProvider: ({ children }: { children: unknown }) => children,
+  DeleteTechniqueSetMenuItem: () => null,
+}));
 vi.mock("server-only", () => ({}));
 
 const { listRecallHubAction } = vi.hoisted(() => ({
   listRecallHubAction: vi.fn(),
 }));
 vi.mock("@/modules/active-recall", () => ({ listRecallHubAction }));
+const {
+  getGenerationStatusAction,
+  CreateFromPageDialog,
+  loadCreateExamNotebooks,
+} = vi.hoisted(() => ({
+  getGenerationStatusAction: vi.fn(),
+  CreateFromPageDialog: vi.fn(),
+  loadCreateExamNotebooks: vi.fn(),
+}));
+vi.mock("@/modules/flashcards", () => ({ getGenerationStatusAction }));
+vi.mock("../flashcards/_components/create-from-page-dialog", () => ({
+  CreateFromPageDialog,
+}));
+vi.mock("../exams/_lib/create-exam-notebooks", () => ({
+  loadCreateExamNotebooks,
+}));
 
 import ActiveRecallHubPage from "./page";
 
@@ -44,32 +66,84 @@ function entry(
     sessions,
     mastery: 50,
     dueToday: 0,
+    questionCount: 8,
+    latestQuestionAt: "2026-09-10T12:00:00.000Z",
     ...overrides,
   };
 }
 
-// Biología: two pages, three sessions (latest of the notebook: 22 sept,
-// 80 %); Cálculo: one page, one session.
+const NB_A = "11111111-1111-4111-8111-111111111111";
+const NB_B = "22222222-2222-4222-8222-222222222222";
+
+function hub(cuaderno?: string) {
+  return {
+    searchParams: Promise.resolve(cuaderno === undefined ? {} : { cuaderno }),
+  };
+}
+
+// Cuaderno A: a practised page (2 sessions, 86 % mastery), one never
+// practised, one with questions due; Cuaderno B: one practised page.
 const PAGES = [
-  entry("membrana", "biologia", "Biología Celular", [
-    session("s-3", "2026-09-18T12:00:00.000Z", 58),
-  ]),
-  entry("mitocondria", "biologia", "Biología Celular", [
-    session("s-2", "2026-09-22T12:00:00.000Z", 80),
-    session("s-1", "2026-09-20T12:00:00.000Z", 70),
-  ]),
-  entry("derivadas", "calculo", "Cálculo III", [
-    session("s-4", "2026-09-21T12:00:00.000Z", 33),
-  ]),
+  entry(
+    "practicada",
+    NB_A,
+    "Cuaderno A",
+    [
+      session("s-2", "2026-09-22T12:00:00.000Z", 80),
+      session("s-1", "2026-09-20T12:00:00.000Z", 70),
+    ],
+    { mastery: 86 },
+  ),
+  entry("nueva", NB_A, "Cuaderno A", [], {
+    questionCount: 10,
+    mastery: 0,
+    latestQuestionAt: "2026-09-01T12:00:00.000Z",
+  }),
+  entry(
+    "pendiente",
+    NB_A,
+    "Cuaderno A",
+    [session("s-3", "2026-09-01T12:00:00.000Z", 50)],
+    { dueToday: 2, mastery: 64 },
+  ),
+  entry(
+    "otra",
+    NB_B,
+    "Cuaderno B",
+    [session("s-4", "2026-09-25T12:00:00.000Z", 33)],
+    { mastery: 40, questionCount: 1 },
+  ),
 ];
 
-describe("ActiveRecallHubPage", () => {
+const titles = () =>
+  screen
+    .queryAllByRole("heading", { level: 3 })
+    .map((heading) => heading.textContent);
+
+const cardOf = (title: string) =>
+  screen
+    .getByRole("heading", { level: 3, name: title })
+    .closest("article") as HTMLElement;
+
+describe("ActiveRecallHubPage (flat since Phase 8 H17)", () => {
   beforeEach(() => {
     listRecallHubAction.mockReset();
     listRecallHubAction.mockResolvedValue({
       ok: true,
       value: { pages: PAGES, averageMastery: 47 },
     });
+    getGenerationStatusAction.mockReset();
+    getGenerationStatusAction.mockResolvedValue({
+      ok: true,
+      value: { remainingToday: 3, resetAt: "2026-10-30T00:00:00.000Z" },
+    });
+    loadCreateExamNotebooks.mockReset();
+    loadCreateExamNotebooks.mockResolvedValue([]);
+    CreateFromPageDialog.mockReset();
+    CreateFromPageDialog.mockImplementation(((props: { trigger: string }) =>
+      createElement("div", {
+        "data-testid": `create-recall-${props.trigger}`,
+      })) as never);
   });
 
   afterEach(() => {
@@ -80,160 +154,160 @@ describe("ActiveRecallHubPage", () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("COGNI_DESIGN_PREVIEWS", "");
 
-    render(await ActiveRecallHubPage());
+    render(await ActiveRecallHubPage(hub()));
 
     expect(
-      screen.getByRole("heading", { name: "Active recall" }),
+      screen.getByRole("heading", { name: "Recordación activa" }),
     ).toBeInTheDocument();
-    expect(screen.queryByText("Vista previa")).toBeNull();
   });
 
-  it("totals the real sessions and notebooks in the header", async () => {
-    render(await ActiveRecallHubPage());
+  it("lists every recall page as its own card after the create tile, with the counts in the header", async () => {
+    render(await ActiveRecallHubPage(hub()));
 
-    expect(screen.getByText("4 sesiones · 2 cuadernos")).toBeInTheDocument();
-  });
-
-  it("summarises sessions, the study-engine average mastery and notebooks in pills", async () => {
-    render(await ActiveRecallHubPage());
-
-    expect(screen.getByText("4 sesiones guardadas")).toBeInTheDocument();
-    expect(screen.getByText("47 % dominio promedio")).toBeInTheDocument();
-    expect(screen.getByText("2 cuadernos activos")).toBeInTheDocument();
-  });
-
-  it("uses the singular for one session and one notebook", async () => {
-    listRecallHubAction.mockResolvedValue({
-      ok: true,
-      value: { pages: [PAGES[2]], averageMastery: 0 },
-    });
-
-    render(await ActiveRecallHubPage());
-
-    expect(screen.getByText("1 sesión · 1 cuaderno")).toBeInTheDocument();
-    expect(screen.getByText("1 sesión guardada")).toBeInTheDocument();
-    expect(screen.getByText("1 cuaderno activo")).toBeInTheDocument();
-    expect(screen.getByText("1 página con preguntas")).toBeInTheDocument();
-  });
-
-  it("shows 0 % average mastery when the mastery is unknown", async () => {
-    listRecallHubAction.mockResolvedValue({
-      ok: true,
-      value: { pages: PAGES, averageMastery: null },
-    });
-
-    render(await ActiveRecallHubPage());
-
-    expect(screen.getByText("0 % dominio promedio")).toBeInTheDocument();
-  });
-
-  it("offers a quick start into the first page that has questions", async () => {
-    render(await ActiveRecallHubPage());
-
-    const quickStart = screen.getByRole("link", { name: /Nueva sesión/ });
-    expect(quickStart).toHaveAttribute(
-      "href",
-      "/active-recall/biologia/membrana",
+    expect(screen.getAllByRole("article")).toHaveLength(4);
+    expect(
+      screen.getByText("4 sesiones · 4 páginas · 2 cuadernos"),
+    ).toBeInTheDocument();
+    const grid = screen.getByTestId("create-recall-tile").parentElement;
+    expect(grid?.firstElementChild).toBe(
+      screen.getByTestId("create-recall-tile"),
     );
-    expect(quickStart).toHaveTextContent("3 páginas con preguntas");
+    // No average-mastery pills, no quick start, no notebook cards.
+    expect(screen.queryByText(/dominio promedio/)).toBeNull();
+    expect(screen.queryByRole("link", { name: /Nueva sesión/ })).toBeNull();
   });
 
-  it("starts the quick session on the first page with recall questions due today", async () => {
-    listRecallHubAction.mockResolvedValue({
-      ok: true,
-      value: {
-        pages: [
-          PAGES[0],
-          { ...PAGES[1], dueToday: 2 },
-          { ...PAGES[2], dueToday: 5 },
-        ],
-        averageMastery: 47,
-      },
+  it("orders pending pages first, then never practised, then the most recent", async () => {
+    render(await ActiveRecallHubPage(hub()));
+
+    expect(titles()).toEqual([
+      "Página pendiente",
+      "Página nueva",
+      "Página otra",
+      "Página practicada",
+    ]);
+  });
+
+  it("fills Practicar and shows the questions due on a pending page", async () => {
+    render(await ActiveRecallHubPage(hub()));
+
+    const card = cardOf("Página pendiente");
+    expect(within(card).getByText("2 para repasar")).toBeInTheDocument();
+    expect(within(card).getByText(/1 sesión · dominio/)).toHaveTextContent(
+      "1 sesión · dominio 64 %",
+    );
+    expect(within(card).getByRole("progressbar")).toHaveAttribute(
+      "aria-valuenow",
+      "64",
+    );
+    const practise = within(card).getByRole("link", {
+      name: "Practicar: Página pendiente",
     });
-
-    render(await ActiveRecallHubPage());
-
-    expect(screen.getByRole("link", { name: /Nueva sesión/ })).toHaveAttribute(
+    expect(practise).toHaveAttribute("data-emphasis", "primary");
+    expect(practise).toHaveAttribute(
       "href",
-      "/active-recall/biologia/mitocondria",
+      `/active-recall/${NB_A}/pendiente?desde=hub`,
     );
   });
 
-  it("links each notebook card to its sessions with the latest session's percentage", async () => {
-    render(await ActiveRecallHubPage());
+  it("shows the sessions and mastery of a practised page, softly", async () => {
+    render(await ActiveRecallHubPage(hub()));
 
-    expect(
-      screen.getByRole("link", { name: /Biología Celular/ }),
-    ).toHaveAttribute("href", "/active-recall/biologia");
-    expect(
-      screen.getByText("3 sesiones · último dominio 80 %"),
-    ).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Cálculo III/ })).toHaveAttribute(
-      "href",
-      "/active-recall/calculo",
+    const card = cardOf("Página practicada");
+    expect(within(card).getByTestId("technique-item-metric")).toHaveTextContent(
+      "8 preguntas",
+    );
+    expect(within(card).getByText(/2 sesiones · dominio/)).toHaveTextContent(
+      "2 sesiones · dominio 86 %",
     );
     expect(
-      screen.getByText("1 sesión · último dominio 33 %"),
+      within(card).getByRole("link", { name: "Practicar: Página practicada" }),
+    ).toHaveAttribute("data-emphasis", "soft");
+    expect(
+      within(cardOf("Página otra")).getByTestId("technique-item-metric"),
+    ).toHaveTextContent("1 pregunta");
+  });
+
+  it("says a page with questions has no finished session yet, without a bar", async () => {
+    render(await ActiveRecallHubPage(hub()));
+
+    const card = cardOf("Página nueva");
+    expect(
+      within(card).getByText("Sin sesiones terminadas"),
     ).toBeInTheDocument();
+    expect(within(card).queryByRole("progressbar")).toBeNull();
   });
 
-  it("badges each notebook card with its recall questions due today", async () => {
+  it("filters by notebook on the server and keeps the filter in the practice links", async () => {
+    render(await ActiveRecallHubPage(hub(NB_B)));
+
+    expect(titles()).toEqual(["Página otra"]);
+    expect(
+      screen.getByRole("link", { name: "Practicar: Página otra" }),
+    ).toHaveAttribute(
+      "href",
+      `/active-recall/${NB_B}/otra?desde=hub&cuaderno=${NB_B}`,
+    );
+    const filter = screen.getByRole("navigation", {
+      name: "Filtrar por cuaderno",
+    });
+    expect(
+      within(filter).getByRole("link", { current: "page" }),
+    ).toHaveTextContent("Cuaderno B");
+  });
+
+  it("says so inline, with the create tile, when the chosen notebook has no recall pages", async () => {
+    render(
+      await ActiveRecallHubPage(hub("33333333-3333-4333-8333-333333333333")),
+    );
+
+    expect(screen.queryAllByRole("article")).toHaveLength(0);
+    expect(
+      screen.getByText("Este cuaderno aún no tiene preguntas para practicar."),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("create-recall-tile")).toBeInTheDocument();
+  });
+
+  it("shows no due pill and no mastery when those counts are unknown", async () => {
     listRecallHubAction.mockResolvedValue({
       ok: true,
       value: {
-        pages: [
-          { ...PAGES[0], dueToday: 4 },
-          { ...PAGES[1], dueToday: 3 },
-          { ...PAGES[2], dueToday: 0 },
-        ],
-        averageMastery: 47,
+        pages: [{ ...PAGES[2], dueToday: null, mastery: null }],
+        averageMastery: null,
       },
     });
 
-    render(await ActiveRecallHubPage());
+    render(await ActiveRecallHubPage(hub()));
 
-    const biologia = screen.getByRole("link", { name: /Biología Celular/ });
-    expect(within(biologia).getByText("7")).toBeInTheDocument();
-    const calculo = screen.getByRole("link", { name: /Cálculo III/ });
-    expect(calculo.querySelector(".bg-error-500")).toBeNull();
+    expect(screen.queryByText(/para repasar/)).toBeNull();
+    expect(screen.getByText("1 sesión")).toBeInTheDocument();
+    expect(screen.queryByRole("progressbar")).toBeNull();
   });
 
-  it("shows no due badge when the due counts are unknown", async () => {
-    listRecallHubAction.mockResolvedValue({
-      ok: true,
-      value: {
-        pages: PAGES.map((page) => ({ ...page, dueToday: null })),
-        averageMastery: 47,
-      },
-    });
-
-    render(await ActiveRecallHubPage());
-
-    for (const link of screen.getAllByRole("link", {
-      name: /Biología|Cálculo/,
-    })) {
-      expect(link.querySelector(".bg-error-500")).toBeNull();
-    }
-  });
-
-  it("reads 0 % for a latest session still being evaluated", async () => {
-    listRecallHubAction.mockResolvedValue({
-      ok: true,
-      value: {
-        pages: [
-          entry("p", "nb", "Cuaderno", [
-            session("s", "2026-09-22T12:00:00.000Z", null),
-          ]),
-        ],
-        averageMastery: 0,
-      },
-    });
-
-    render(await ActiveRecallHubPage());
+  it("offers the page and its latest results in the card menu", async () => {
+    render(await ActiveRecallHubPage(hub()));
 
     expect(
-      screen.getByText("1 sesión · último dominio 0 %"),
+      screen.getByRole("button", { name: "Acciones de Página practicada" }),
     ).toBeInTheDocument();
+  });
+
+  // Phase 8 H18: the card practises; the menu's "Editar preguntas" opens
+  // the page's recall edit page, keeping the hub marker.
+  it("leads the menu's Editar preguntas to the page's edit page", async () => {
+    const user = (await import("@testing-library/user-event")).default.setup();
+    render(await ActiveRecallHubPage(hub()));
+
+    await user.click(
+      screen.getByRole("button", { name: "Acciones de Página practicada" }),
+    );
+
+    expect(
+      await screen.findByRole("menuitem", { name: /Editar preguntas/ }),
+    ).toHaveAttribute(
+      "href",
+      `/active-recall/${NB_A}/practicada/editar?desde=hub`,
+    );
   });
 
   it("shows the empty state when no page has a session", async () => {
@@ -242,16 +316,44 @@ describe("ActiveRecallHubPage", () => {
       value: { pages: [], averageMastery: null },
     });
 
-    render(await ActiveRecallHubPage());
+    render(await ActiveRecallHubPage(hub()));
 
-    expect(screen.getByText("Sin sesiones todavía")).toBeInTheDocument();
+    // Phase 8 H10: the illustrated empty state (stacked prompt cards,
+    // gradient headline) leads to the notebooks, where questions are made.
+    expect(
+      screen.getByRole("heading", {
+        name: "Practica explicando con tus palabras",
+      }),
+    ).toBeInTheDocument();
     expect(
       screen.getByText(
-        "Abre una página en el editor y usa Técnicas → Active recall → Generar.",
+        "Elige una página de tus cuadernos: la IA crea preguntas abiertas y las respondes aquí.",
       ),
     ).toBeInTheDocument();
+    expect(
+      document.querySelector('[data-slot="technique-empty-art"]'),
+    ).toHaveAttribute("data-technique", "recall");
+    // Phase 8 H11: the technique theme on the header and the empty state.
+    expect(
+      document.querySelector('[data-slot="technique-hub-header"]'),
+    ).toHaveAttribute("data-technique-theme", "recall");
+    expect(
+      document.querySelector('[data-slot="illustrated-empty-state"]'),
+    ).toHaveAttribute("data-technique-theme", "recall");
+    // Phase 8 H11: the CTA opens the "pick a page" dialog.
+    const empty = document.querySelector(
+      '[data-slot="illustrated-empty-state"]',
+    ) as HTMLElement;
+    expect(
+      empty.querySelector('[data-testid="create-recall-cta"]'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Ir a mis cuadernos" }),
+    ).toBeNull();
     expect(screen.queryByRole("link", { name: /Nueva sesión/ })).toBeNull();
-    expect(screen.getByText("0 sesiones · 0 cuadernos")).toBeInTheDocument();
+    expect(
+      screen.getByText("0 sesiones · 0 páginas · 0 cuadernos"),
+    ).toBeInTheDocument();
   });
 
   it("shows the load error in the empty state when the sessions cannot load", async () => {
@@ -260,9 +362,13 @@ describe("ActiveRecallHubPage", () => {
       error: { code: "RECALL_UNEXPECTED", message: "x" },
     });
 
-    render(await ActiveRecallHubPage());
+    render(await ActiveRecallHubPage(hub()));
 
-    expect(screen.getByText("Sin sesiones todavía")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", {
+        name: "Practica explicando con tus palabras",
+      }),
+    ).toBeInTheDocument();
     expect(
       screen.getByText("No pudimos cargar tus sesiones. Intenta de nuevo."),
     ).toBeInTheDocument();

@@ -14,8 +14,16 @@ import type { PageTextReader } from "@/modules/notebooks";
 import { newStudyItem } from "@/modules/study-engine";
 import type { Clock } from "@/shared/kernel/clock";
 import { DomainError } from "@/shared/kernel/domain-error";
+import {
+  flashcardCountForWords,
+  MIN_GENERATION_WORDS,
+  maxItemsForWords,
+  PageTooShortError,
+  requiredWordsFor,
+} from "@/shared/kernel/generation-capacity";
 import type { GenerationFingerprintRepository } from "@/shared/kernel/generation-fingerprints";
 import {
+  consumedParagraphs,
   joinParagraphs,
   paragraphsWithinWords,
   selectNewParagraphs,
@@ -89,7 +97,10 @@ function clampCount(count: number): number {
 // (no call, no unit). The used paragraphs (paragraphsWithinWords) are
 // stored with the cards. A page with cards but no fingerprints (generated
 // before T5c) sends every paragraph once. Removed paragraphs never remove
-// cards.
+// cards. Phase 8 H14: a page whose new paragraphs hold under 100 words, or
+// fewer than 15 per requested card, answers AI_PAGE_TOO_SHORT before the
+// limiter; when fewer cards come back than were asked for, only the share
+// of the sent paragraphs they cover is marked used.
 export async function requestGeneration(
   input: { pageId: string; count?: number },
   deps: RequestGenerationDeps,
@@ -111,6 +122,24 @@ export async function requestGeneration(
     );
   }
 
+  // Phase 8 H14 (user 2026-10-29): at least 100 words of new paragraphs,
+  // and about 15 per card. Without an explicit count the cards follow the
+  // words (one per 15, 3 to 10, never over the configured default). Checked
+  // before the limiter: a short page never costs a generation.
+  const words = newParagraphs.reduce((sum, p) => sum + p.words, 0);
+  const count =
+    input.count !== undefined
+      ? clampCount(input.count)
+      : Math.max(
+          MIN_CARD_COUNT,
+          Math.min(deps.defaultCount, flashcardCountForWords(words)),
+        );
+  if (words < MIN_GENERATION_WORDS || count > maxItemsForWords(words)) {
+    return err(
+      new PageTooShortError({ words, minWords: requiredWordsFor(count) }),
+    );
+  }
+
   const limit = await deps.limiter.check(ownerId);
   if (!limit.allowed) return err(new DailyLimitReachedError(limit.resetAt));
 
@@ -122,7 +151,7 @@ export async function requestGeneration(
   const prompt = buildGenerateFlashcardsPrompt({
     pageTitle: page.value.title,
     pageText: truncation.text,
-    count: clampCount(input.count ?? deps.defaultCount),
+    count,
   });
 
   const generated = await deps.ai.generateStructured(
@@ -190,7 +219,10 @@ export async function requestGeneration(
       await fingerprints.addMany({
         ownerId,
         pageId: input.pageId,
-        fingerprints: sent.map((p) => p.fingerprint),
+        // Only the share of the sent paragraphs the cards cover (H14).
+        fingerprints: consumedParagraphs(sent, valid.length, count).map(
+          (p) => p.fingerprint,
+        ),
         now,
       });
       return valid;

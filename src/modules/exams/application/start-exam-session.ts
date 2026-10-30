@@ -1,4 +1,5 @@
 import type { PageTextReader } from "@/modules/notebooks";
+import type { DueCutoff } from "@/modules/study-engine";
 import type { Clock } from "@/shared/kernel/clock";
 import { DomainError } from "@/shared/kernel/domain-error";
 import { err, ok, type Result } from "@/shared/kernel/result";
@@ -19,6 +20,9 @@ export interface StartExamSessionDeps {
   pages: PageTextReader;
   uow: ExamSessionUnitOfWork;
   clock: Clock;
+  // The owner's per-day "due" bound (start of their next local day): a
+  // root due later today is among the due ones of the composition.
+  dueCutoff: DueCutoff;
   ids: { next(): string };
 }
 
@@ -74,7 +78,7 @@ export async function startExamSession(
       if (open) return ok({ session: open, resumed: true });
 
       const questionIds = await composeNormalExam(
-        { ...input, now },
+        { ...input, now, dueBefore: deps.dueCutoff(now) },
         ownerId,
         repos,
       );

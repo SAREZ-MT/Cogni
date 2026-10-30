@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { LOCAL_DAY_CUTOFFS } from "../../../../tests/unit/fixtures/local-day-cutoffs";
 import {
   addDays,
   type CalendarItem,
@@ -12,6 +13,9 @@ import {
   monthGridDays,
   monthOf,
   paddedRange,
+  startOfDayIn,
+  startOfTodayIn,
+  startOfTomorrowIn,
   weekDays,
   weekdayIndex,
 } from "./calendar";
@@ -171,6 +175,7 @@ const item = (
   pageId,
   pageTitle: `Página ${pageId}`,
   notebookId: `nb-${pageId}`,
+  notebookTitle: `Cuaderno ${pageId}`,
   kind,
   dueAt: new Date(dueAt),
 });
@@ -193,6 +198,7 @@ describe("groupCalendarDays", () => {
         pageId: "p1",
         pageTitle: "Página p1",
         notebookId: "nb-p1",
+        notebookTitle: "Cuaderno p1",
         due: { flashcard: 2, exam_question: 1, recall_question: 0 },
       },
       {
@@ -200,6 +206,7 @@ describe("groupCalendarDays", () => {
         pageId: "p2",
         pageTitle: "Página p2",
         notebookId: "nb-p2",
+        notebookTitle: "Cuaderno p2",
         due: { flashcard: 0, exam_question: 0, recall_question: 1 },
       },
     ]);
@@ -264,6 +271,7 @@ describe("groupCalendarDays", () => {
             pageId: "p1",
             pageTitle: "Página p1",
             notebookId: "nb-p1",
+            notebookTitle: "Cuaderno p1",
             kind: "exam_question",
             count: 4,
             earliestDueAt: new Date("2026-09-01T10:00:00.000Z"),
@@ -272,6 +280,7 @@ describe("groupCalendarDays", () => {
             pageId: "p3",
             pageTitle: "Página p3",
             notebookId: "nb-p3",
+            notebookTitle: "Cuaderno p3",
             kind: "flashcard",
             count: 7,
             earliestDueAt: new Date("2026-10-10T10:00:00.000Z"),
@@ -314,5 +323,111 @@ describe("groupCalendarDays", () => {
     expect(
       groupCalendarDays([], { timeZone: "UTC", today: "2026-10-12" }),
     ).toEqual([]);
+  });
+});
+
+describe("startOfDayIn", () => {
+  it("is the instant local midnight begins in a fixed-offset zone", () => {
+    expect(startOfDayIn("2026-10-19", "America/Bogota")).toEqual(
+      new Date("2026-10-19T05:00:00.000Z"),
+    );
+    expect(startOfDayIn("2026-10-19", "Asia/Tokyo")).toEqual(
+      new Date("2026-10-18T15:00:00.000Z"),
+    );
+    expect(startOfDayIn("2026-10-19", "UTC")).toEqual(
+      new Date("2026-10-19T00:00:00.000Z"),
+    );
+  });
+
+  it("follows the offset in force that day across DST", () => {
+    // Madrid: CEST (+2) until 25 Oct 2026, CET (+1) after.
+    expect(startOfDayIn("2026-10-25", "Europe/Madrid")).toEqual(
+      new Date("2026-10-24T22:00:00.000Z"),
+    );
+    expect(startOfDayIn("2026-10-26", "Europe/Madrid")).toEqual(
+      new Date("2026-10-25T23:00:00.000Z"),
+    );
+  });
+
+  it("starts at the transition when local midnight is skipped", () => {
+    // Santiago springs forward at 00:00 on 6 Sep 2026: the day begins at
+    // 01:00 local (-03), the instant the clocks jump.
+    const start = startOfDayIn("2026-09-06", "America/Santiago");
+    expect(start).toEqual(new Date("2026-09-06T04:00:00.000Z"));
+    expect(dayKeyIn(start, "America/Santiago")).toBe("2026-09-06");
+    expect(dayKeyIn(new Date(start.getTime() - 1), "America/Santiago")).toBe(
+      "2026-09-05",
+    );
+  });
+});
+
+// Reviews are due per local day (user decision 2026-10-18): an item is due
+// today while its due_at is before the start of the owner's next local day.
+describe("startOfTomorrowIn", () => {
+  it("is the next local midnight, however late or early today it is", () => {
+    // 07:00 and 23:59 local in Bogotá (-05) both end at 5 Oct 00:00 local.
+    expect(
+      startOfTomorrowIn(new Date("2026-10-04T12:00:00.000Z"), "America/Bogota"),
+    ).toEqual(new Date("2026-10-05T05:00:00.000Z"));
+    expect(
+      startOfTomorrowIn(new Date("2026-10-05T04:59:59.999Z"), "America/Bogota"),
+    ).toEqual(new Date("2026-10-05T05:00:00.000Z"));
+    // The same instant is already 5 Oct in Tokyo (+09).
+    expect(
+      startOfTomorrowIn(new Date("2026-10-04T16:00:00.000Z"), "Asia/Tokyo"),
+    ).toEqual(new Date("2026-10-05T15:00:00.000Z"));
+  });
+
+  it("follows a 25-hour day when the clocks fall back", () => {
+    // Madrid falls back on 25 Oct 2026: that day runs 22:00Z → 23:00Z.
+    expect(
+      startOfTomorrowIn(new Date("2026-10-25T10:00:00.000Z"), "Europe/Madrid"),
+    ).toEqual(new Date("2026-10-25T23:00:00.000Z"));
+  });
+
+  it("starts tomorrow at the transition when its midnight is skipped", () => {
+    // Santiago springs forward at 00:00 on 6 Sep 2026.
+    expect(
+      startOfTomorrowIn(
+        new Date("2026-09-05T20:00:00.000Z"),
+        "America/Santiago",
+      ),
+    ).toEqual(new Date("2026-09-06T04:00:00.000Z"));
+  });
+});
+
+// Home's study units (H2-T5i): reviews logged since the start of today
+// count as done today.
+describe("startOfTodayIn", () => {
+  it("is the local midnight that opened the day of `now`", () => {
+    // 23:30 local on 4 Oct in Bogotá (-05) is 5 Oct in UTC.
+    expect(
+      startOfTodayIn(new Date("2026-10-05T04:30:00.000Z"), "America/Bogota"),
+    ).toEqual(new Date("2026-10-04T05:00:00.000Z"));
+    // The same instant is already the afternoon of 5 Oct in Tokyo (+09).
+    expect(
+      startOfTodayIn(new Date("2026-10-05T04:30:00.000Z"), "Asia/Tokyo"),
+    ).toEqual(new Date("2026-10-04T15:00:00.000Z"));
+  });
+
+  it("starts at the transition when the day's midnight is skipped", () => {
+    // Santiago springs forward at 00:00 on 6 Sep 2026.
+    expect(
+      startOfTodayIn(new Date("2026-09-06T15:00:00.000Z"), "America/Santiago"),
+    ).toEqual(new Date("2026-09-06T04:00:00.000Z"));
+  });
+});
+
+// Shared table with the analytics module's startOfTomorrowIn: both cut "today"
+// at the same instant, DST transitions included (H2-T6).
+describe("startOfTomorrowIn agrees with the shared cutoff table", () => {
+  it.each(LOCAL_DAY_CUTOFFS)("$timeZone at $now", ({
+    timeZone,
+    now,
+    startOfTomorrow,
+  }) => {
+    expect(startOfTomorrowIn(new Date(now), timeZone).toISOString()).toBe(
+      startOfTomorrow,
+    );
   });
 });

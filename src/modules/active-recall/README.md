@@ -36,7 +36,13 @@ Implementado:
   `generation_fingerprints`, migración `0013`) y sus huellas se guardan con
   las preguntas; sin nada nuevo responde `RECALL_NO_NEW_CONTENT` sin llamar
   a la IA ni consumir unidad. Una página generada antes de T5c envía todos
-  sus párrafos una vez.
+  sus párrafos una vez. Contenido mínimo (Fase 8, H14, decisión del usuario
+  del 2026-10-29, `generation-capacity.ts` del kernel): los párrafos nuevos
+  necesitan 100 palabras y unas 15 por pregunta, es decir 150 para las 10;
+  si no, responde `AI_PAGE_TOO_SHORT` (`words`, `minWords`, `maxItems`,
+  también en el error de la acción) antes de consultar el límite. Solo se
+  guardan las huellas de la parte de los párrafos enviados que cubren las
+  preguntas guardadas (`consumedParagraphs`).
 - Sesión (`application/`): `planRecallSession` (lectura de la ruta, no
   escribe), `startRecallSession` (hasta 10 preguntas: vencidas, nuevas y
   las repasadas hace más tiempo; `RECALL_NO_QUESTIONS` si la página no
@@ -94,13 +100,40 @@ Implementado:
   dominio de cada página y el promedio del hub vienen del dominio de página
   de `study-engine` (`createPageMasteryReader`, nunca una fórmula local; una
   página sin fila cuenta 0) y las preguntas vencidas hoy, de sus ítems de
-  estudio vencidos (`createStudyItemRepository().listDue`). Si el dominio o
+  estudio vencidos (`createStudyItemRepository().listDue` con el inicio del
+  día local siguiente del perfil: los repasos vencen por día, decisión
+  2026-10-18; la composición de la sesión y el registro SM-2 de la
+  evaluación usan el mismo límite, `getCurrentDueCutoff`). Si el dominio o
   los vencimientos no se pueden leer quedan desconocidos (`null`) y el
   error va a Sentry. `getRecallSessionReview` reconstruye una sesión
   terminada (pregunta, respuesta y autoevaluación en el orden en que se
   respondió) para volver a abrir sus resultados; una sesión ajena, abierta
   o de otra página es `RECALL_SESSION_NOT_FOUND`.
 - `hub-actions.ts`: `listRecallHubAction` y `getRecallSessionReviewAction`.
+- Centro plano (Fase 8, H17, 2026-10-29): `RecallHubPage` suma
+  `questionCount` (preguntas activas) y `latestQuestionAt` (creación de la
+  más nueva), como subconsultas correlacionadas de la misma lectura de
+  páginas. `/active-recall` muestra una tarjeta por página (preguntas,
+  sesiones, dominio, vencidas hoy), filtra por `?cuaderno=` en el servidor
+  y ordena lo vencido, luego lo nunca practicado, luego lo más reciente; la
+  vista por cuaderno redirige al centro filtrado y ya no hay promedio de
+  dominio en pantalla.
+- Página de edición (Fase 8, H18, 2026-10-29): "la creación nace con IA; la
+  edición permite ajustar y añadir". `editRecallQuestion` reescribe en su
+  lugar el enunciado y la rúbrica (conceptos clave y respuesta esperada),
+  con las mismas reglas que una pregunta nueva; `createRecallQuestion`
+  añade una pregunta `manual` con su ítem de estudio; `deleteRecallQuestion`
+  la borra de verdad: la fila, sus respuestas (`ON DELETE CASCADE`), su
+  ítem de estudio (`RecallStudyItems.deleteBySource`, que el adaptador
+  Drizzle añade al repositorio de study-engine) y, en cascada, su historial
+  de repasos, así las métricas no la cuentan. La página conserva al menos
+  una pregunta (`RECALL_LAST_QUESTION`). `applyRecallEdits` aplica el
+  borrador de "Guardar" (`updates`, `creates`, `deletes`) en UNA unidad de
+  trabajo a través de esos tres casos de uso; cualquier rechazo deshace
+  todo. Acciones: `listRecallQuestionsAction` y `saveRecallEditsAction`
+  (`actions.ts`, revalida `/active-recall`). Las sesiones no dependen de lo
+  vencido (siempre componen preguntas), así que la recordación no tiene
+  estado "al día".
 
 ## Pendientes
 

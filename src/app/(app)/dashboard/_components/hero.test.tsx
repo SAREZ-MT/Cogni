@@ -27,7 +27,7 @@ describe("DashboardHero", () => {
 
     expect(
       screen.getByRole("link", { name: /Ver repasos de hoy/ }),
-    ).toHaveAttribute("href", "/");
+    ).toHaveAttribute("href", "/inicio");
   });
 
   it("keeps the illustration decorative", () => {

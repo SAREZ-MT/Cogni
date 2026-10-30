@@ -55,6 +55,7 @@
 - **Scale:** 14px base body, headings 20-36px
 - **Weights:** 400 (body), 500 (labels/nav), 600 (subheadings), 700 (headings/display)
 - **Section labels:** 11px, weight 500, uppercase, muted color (#A8A29E)
+- **Editor density (Notion-like):** `.editor-content` keeps the type scale above (no new tokens) but sits tight: 1.5 line height and 2px of padding above and below each text block (~4px between neighbours), lists and task items with no extra margins, and the room above headings instead (h1 2rem, h2 1.5rem, h3 1.25rem). Quotes are a 3px ink bar with upright ink text; callouts are a soft tint of their pastel with ink text and a kind-coloured icon.
 
 ### Layout & Structure (from reference)
 - **Outer background:** Warm gray (#F5F3EF) — the "canvas" behind the content
@@ -79,6 +80,8 @@
 - **Avatars:** Full circle (9999px)
 - **Sidebar items:** 10px radius for hover/active background
 - **Border color:** Warm gray (#E5E2DC light, #EDEAE4 subtle)
+- **Editor (exception):** the page editor uses square, professional corners — `--radius-editor` (3px) — on its surfaces and blocks: bubble and table toolbars, slash menu, block menu, colour and highlighter popovers, callouts, code blocks, tables, images, mentions, inline code and highlights. Shared atoms keep their app-wide radius; the editor opts in with the `editor-surface` class (`src/app/globals.css`).
+- **Editor content (H7):** highlights are a hand-drawn marker band in soft pastels (`--color-highlighter-*`, full text height, ink text on top, uneven edges, `box-decoration-break: clone`) picked from circular swatches with a same-hue `-edge` border; callouts are a light tint of their hue with a 1px `-edge` border, a 14px frame (`--radius-callout`), the icon in the `-icon` step and text in the deep `-fg` step, with the italic kind label inline at the start of the text (idea yellow "Idea clave", note violet "Nota", warning rose "Cuidado", important blue "Importante", tip green "Consejo"); code blocks sit on neutral grey (`--color-code-block`); tables (`--radius-table`, 8px) and callouts are the rounded editor blocks; tables have with tabular figures and right-aligned numeric cells; H1/H2/H3 step down in size, weight, tracking and space above. The "Texto" menu offers Inter, Bitter, JetBrains Mono (self-hosted via `next/font`) and Arial, Times New Roman, Georgia, Verdana (system stacks) at 14/16/18/22/28px.
 
 ### Shadows
 - **Very subtle** — almost no visible shadows in the reference

@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import type { Page } from "@playwright/test";
 import { expect, hasSupabaseEnv, signIn, test } from "./fixtures/auth";
 import { createNotebookWithOpenPage } from "./helpers/notebooks";
+import { chooseOption } from "./helpers/select";
+import { withStudyFiller } from "./helpers/study-text";
 
 // Phase 6 T5b "Crear examen" (user decision 2026-10-07): from the exams
 // hub the student picks a notebook and a page, generates the exam with AI
@@ -38,7 +40,6 @@ test.describe("Crear examen", () => {
     test.setTimeout(120_000);
     const notebookTitle = `Cuaderno crear examen ${randomUUID().slice(0, 8)}`;
     await createNotebookWithOpenPage(page, notebookTitle);
-    const [, , notebookId] = new URL(page.url()).pathname.split("/");
 
     // Generation reads the persisted page text: wait for the autosave.
     const editable = page
@@ -47,46 +48,43 @@ test.describe("Crear examen", () => {
     await editable.click();
     // Keys sent <15 ms after a click can precede Chrome's selectionchange.
     await page.waitForTimeout(100);
-    await page.keyboard.type(SENTENCES);
+    await page.keyboard.type(withStudyFiller(SENTENCES));
     await expect(page.getByTestId("autosave-status")).toHaveText("guardado", {
       timeout: 15000,
     });
 
     await page.goto("/exams");
-    await expect(page.getByText("Aún no tienes exámenes")).toBeVisible();
+    await expect(page.getByText("Pon a prueba lo que sabes")).toBeVisible();
     await expect(
       page.getByText(
-        "Usa «Crear examen» para elegir una página y generar o escribir sus preguntas.",
+        "Elige una página y la IA crea un examen de opción múltiple desde su texto.",
       ),
     ).toBeVisible();
-    // Only "Crear examen" in the header: the "Nuevo examen" quick start is gone.
+    // No "Nuevo examen" quick start, and since H13 no header button: the
+    // empty state's CTA opens "Crear examen".
     await expect(page.getByText("Nuevo examen")).toHaveCount(0);
+    await expect(page.getByTestId("create-exam-button")).toHaveCount(0);
     await shot(page, "exams-hub-empty-v2");
-    await page.getByTestId("create-exam-button").click();
+    await page.getByTestId("create-exam-cta").click();
 
     const create = page.getByRole("dialog", { name: "Crear examen" });
-    await create
-      .getByRole("combobox", { name: "Cuaderno" })
-      .selectOption({ label: notebookTitle });
+    await chooseOption(create, "Cuaderno", notebookTitle);
     await expect(create.getByTestId("create-exam-submit")).toBeDisabled();
-    await create
-      .getByRole("combobox", { name: "Página" })
-      .selectOption({ label: "Sin título" });
-    await expect(
-      create.getByRole("radio", { name: /Generar con IA/ }),
-    ).toBeChecked();
+    await chooseOption(create, "Página", "Sin título");
+    // AI only (Phase 8 H12): no manual path in the dialog.
+    await expect(create.getByRole("radio")).toHaveCount(0);
     await expect(create.getByTestId("exam-count-value")).toHaveText("10");
     await shot(page, "exams-create-modal");
     await create.getByTestId("create-exam-submit").click();
 
-    await expect(page).toHaveURL(`/exams/${notebookId}`, { timeout: 30000 });
-    await expect(page.getByRole("link", { name: "Sin título" })).toBeVisible();
-    await expect(page.getByText("10 preguntas · 0 intentos")).toBeVisible();
-
-    await page.goto("/exams");
-    await expect(
-      page.getByRole("link", { name: new RegExp(notebookTitle) }),
-    ).toBeVisible();
+    // Phase 8 H17: back on the flat hub, which lists the new exam page.
+    // The dialog already lives on /exams, so the URL check passes before the
+    // generation ends: wait for the dialog to close and the card to appear.
+    await expect(page).toHaveURL("/exams", { timeout: 30000 });
+    await expect(create).toBeHidden({ timeout: 30000 });
+    const card = page.getByRole("article").filter({ hasText: notebookTitle });
+    await expect(card).toContainText("10 preguntas", { timeout: 30000 });
+    await expect(card).toContainText("Sin intentos");
     await expect(page.getByText("Nuevo examen")).toHaveCount(0);
     await shot(page, "exams-hub-with-exams");
   });

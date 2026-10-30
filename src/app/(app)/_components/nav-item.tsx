@@ -3,6 +3,10 @@ import Link from "next/link";
 import { Keycap } from "@/shared/ui/keycap";
 import { Pill } from "@/shared/ui/pill";
 import {
+  TECHNIQUE_PAIR_CLASS,
+  type TechniqueTone,
+} from "@/shared/ui/technique-card";
+import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -25,12 +29,25 @@ type NavItemProps = {
   // Keycap hint at the right of the row (comp-sidebar.html .shortcut):
   // "Inicio" is the only entry that gets one.
   shortcut?: string[];
+  // Study techniques highlight in their own pastel pair when active
+  // (Flashcards yellow, Recordación activa mint, Exámenes pink), the same
+  // colours as the techniques panel and the calendar chips.
+  tone?: TechniqueTone;
+  // Product tour anchor (`data-tour`), e.g. "cuadernos".
+  tourId?: string;
 };
 
 // Shared row styling for the link and the disabled-row variants (13.5px,
 // 10px radius, 150ms transition — comp-sidebar.html .nav-item).
 const ROW_CLASS =
   "flex items-center gap-2.5 rounded-[10px] px-2.5 py-2 text-[13.5px] transition-colors duration-200 ease-default";
+
+// Hover keeps the fill so the active technique row does not flash grey.
+const TONE_ACTIVE_CLASS: Record<TechniqueTone, string> = {
+  yellow: `${TECHNIQUE_PAIR_CLASS.yellow} hover:bg-pastel-yellow hover:text-pastel-yellow-fg`,
+  green: `${TECHNIQUE_PAIR_CLASS.green} hover:bg-pastel-mint hover:text-pastel-mint-fg`,
+  rose: `${TECHNIQUE_PAIR_CLASS.rose} hover:bg-pastel-pink hover:text-pastel-pink-fg`,
+};
 
 export function NavItem({
   href,
@@ -41,6 +58,8 @@ export function NavItem({
   hint,
   collapsed = false,
   shortcut,
+  tone,
+  tourId,
 }: NavItemProps) {
   const icon = (
     <Icon
@@ -79,11 +98,15 @@ export function NavItem({
       href={href}
       aria-current={active ? "page" : undefined}
       aria-label={collapsed ? label : undefined}
+      data-tone={tone}
+      data-tour={tourId}
       className={cn(
         ROW_CLASS,
-        "text-fg-secondary hover:bg-neutral-100/90 hover:text-fg",
+        "text-fg-secondary hover:bg-hover hover:text-fg",
         active &&
+          !tone &&
           "bg-active-strong/90 font-medium text-fg-active hover:bg-active-strong/90 hover:text-fg-active",
+        active && tone && cn("font-medium", TONE_ACTIVE_CLASS[tone]),
         collapsed && "justify-center px-0",
       )}
     >

@@ -20,6 +20,13 @@ const { scheduleRecallEvaluation } = vi.hoisted(() => ({
   scheduleRecallEvaluation: vi.fn(),
 }));
 vi.mock("./evaluation-runner", () => ({ scheduleRecallEvaluation }));
+// The owner's per-day "due" bound, as scheduling reads it from the profile.
+const { dueCutoff } = vi.hoisted(() => ({
+  dueCutoff: () => new Date("2026-10-08T05:00:00.000Z"),
+}));
+vi.mock("@/modules/scheduling", () => ({
+  getCurrentDueCutoff: async () => dueCutoff,
+}));
 
 const OWNER = "3d2f9a1e-5b6c-4d7e-8f90-1a2b3c4d5e6f";
 const PAGE = "0a1b2c3d-4e5f-4061-8798-a1b2c3d4e5f6";
@@ -162,7 +169,11 @@ describe("active recall session actions", () => {
     expect(revalidatePath).toHaveBeenCalledWith("/active-recall", "layout");
     // The evaluation runs after the response (§8.5): closing never waits.
     expect(scheduleRecallEvaluation).toHaveBeenCalledOnce();
-    expect(scheduleRecallEvaluation).toHaveBeenCalledWith(sessionId, OWNER);
+    expect(scheduleRecallEvaluation).toHaveBeenCalledWith(
+      sessionId,
+      OWNER,
+      dueCutoff,
+    );
   });
 
   it("schedules no evaluation for a session closed without answers", async () => {

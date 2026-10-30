@@ -176,6 +176,28 @@ describe("extractPlainText", () => {
     expect(extractPlainText(doc)).toBe("cuidado");
   });
 
+  // H8-5: the important and tip callouts read like any other kind, and the
+  // label shown by the editor is never part of the text.
+  it("reads the content of important and tip callouts without a label", () => {
+    const doc: TiptapDoc = {
+      type: "doc",
+      content: [
+        {
+          type: "callout",
+          attrs: { kind: "important" },
+          content: [{ type: "paragraph", content: [text("revisa esto")] }],
+        },
+        {
+          type: "callout",
+          attrs: { kind: "tip" },
+          content: [{ type: "paragraph", content: [text("usa un esquema")] }],
+        },
+      ],
+    };
+
+    expect(extractPlainText(doc)).toBe("revisa esto\nusa un esquema");
+  });
+
   // specs/editor/spec.md, "Paleta de resaltado de Cogni y callouts": marks
   // (including highlight) never affect the extracted text.
   it("ignores the highlight mark's color attribute", () => {
@@ -195,6 +217,33 @@ describe("extractPlainText", () => {
     };
 
     expect(extractPlainText(doc)).toBe("importante");
+  });
+
+  // H7: the "Texto" menu's font family and size live in a textStyle mark;
+  // the AI reads only the words.
+  it("ignores textStyle font family and size", () => {
+    const doc: TiptapDoc = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            {
+              ...text("Bitter grande"),
+              marks: [
+                {
+                  type: "textStyle",
+                  attrs: { fontFamily: "Bitter, serif", fontSize: "22px" },
+                },
+              ],
+            },
+            text(" y normal"),
+          ],
+        },
+      ],
+    };
+
+    expect(extractPlainText(doc)).toBe("Bitter grande y normal");
   });
 
   // Fingerprint stability (shared/kernel/page-paragraphs.ts): a page that

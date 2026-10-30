@@ -34,6 +34,7 @@ vi.mock("@/shared/observability/analytics", () => ({
 }));
 
 const RESET = new Date("2026-10-07T00:00:00.000Z");
+const LONG_TEXT = `La mitocondria produce ATP. ${Array.from({ length: 146 }, (_, i) => `w${i}`).join(" ")}`;
 const generation: AiGeneration = {
   id: "0b1c2d3e-4f50-4617-8899-aabbccddeeff",
   ownerId: "o1",
@@ -128,7 +129,8 @@ describe("generateRecallQuestionsAction", () => {
       uow: new InMemoryRecallUnitOfWork(),
       limit: { allowed: true, remaining: 4, resetAt: RESET },
       checks: 0,
-      pageText: "La mitocondria produce ATP.",
+      // 150 words: since Phase 8 H14 the 10 questions need them.
+      pageText: LONG_TEXT,
       generate: async () =>
         ok({ object: { questions: questions(10) }, generation }),
       throwOnPageRead: false,
@@ -156,6 +158,7 @@ describe("generateRecallQuestionsAction", () => {
       keyConcepts: ["ATP", "Concepto 1"],
       acceptableAnswerSummary: "Resumen aceptable.",
       origin: "ai",
+      updatedAt: expect.any(String),
     });
     expect(current.uow.studyItems.all()).toHaveLength(10);
     expect(current.checks).toBe(1);
@@ -236,7 +239,7 @@ describe("generateRecallQuestionsAction", () => {
 
     current.pageText = "   ";
     const empty = await generate({ pageId: PAGE });
-    current.pageText = "Texto";
+    current.pageText = LONG_TEXT;
     current.generate = async () => err(new AiGenerationFailedError("g"));
     const failed = await generate({ pageId: PAGE });
 
@@ -254,6 +257,28 @@ describe("generateRecallQuestionsAction", () => {
     );
     expect(current.uow.studyItems.all()).toHaveLength(0);
     expect(current.checks).toBe(0);
+  });
+
+  // Phase 8 H14: a short page is refused with its counts, before the limit,
+  // and tracked as empty.
+  it("maps a short page to AI_PAGE_TOO_SHORT with its word counts", async () => {
+    current.pageText = "La mitocondria produce ATP.";
+    const generate = await action();
+
+    const result = await generate({ pageId: PAGE });
+
+    expect(!result.ok && result.error).toMatchObject({
+      code: "AI_PAGE_TOO_SHORT",
+      words: 4,
+      minWords: 150,
+      maxItems: 0,
+    });
+    expect(current.checks).toBe(0);
+    expect(track).toHaveBeenCalledWith(
+      "generation_requested",
+      OWNER,
+      expect.objectContaining({ status: "empty" }),
+    );
   });
 
   it("answers RECALL_NO_NEW_CONTENT for an unchanged page, consuming nothing", async () => {
@@ -290,5 +315,116 @@ describe("generateRecallQuestionsAction", () => {
 
     expect(!result.ok && result.error.code).toBe("RECALL_UNEXPECTED");
     expect(captureException).toHaveBeenCalledTimes(1);
+  });
+});
+
+// Phase 8 H18: the edit page lists the page's questions and saves its
+// draft in one transaction.
+describe("recall edit page actions", () => {
+  const QUESTION = "5b6c7d8e-9f00-4112-8233-445566778899";
+  const OTHER_QUESTION = "6c7d8e9f-0011-4223-8344-556677889900";
+
+  beforeEach(async () => {
+    getCurrentUser.mockReset();
+    getCurrentUser.mockResolvedValue({ id: OWNER });
+    revalidatePath.mockClear();
+    current = {
+      uow: new InMemoryRecallUnitOfWork(),
+      limit: { allowed: true, remaining: 4, resetAt: RESET },
+      checks: 0,
+      pageText: LONG_TEXT,
+      generate: async () => ok({ object: { questions: [] }, generation }),
+      throwOnPageRead: false,
+      checkFails: false,
+    };
+    for (const [id, prompt] of [
+      [QUESTION, "Primera"],
+      [OTHER_QUESTION, "Segunda"],
+    ] as const) {
+      await current.uow.questions.saveMany([
+        {
+          id,
+          ownerId: OWNER,
+          pageId: PAGE,
+          prompt,
+          rubric: { keyConcepts: ["Idea"], acceptableAnswerSummary: "Resumen" },
+          origin: "manual",
+          generationId: null,
+          archivedAt: null,
+          createdAt: new Date(prompt === "Primera" ? 1 : 2),
+          updatedAt: new Date(1),
+        },
+      ]);
+    }
+  });
+
+  it("lists the page's questions with their rubric", async () => {
+    const { listRecallQuestionsAction } = await import("./actions");
+
+    const result = await listRecallQuestionsAction({ pageId: PAGE });
+
+    expect(result.ok && result.value.map((q) => q.prompt)).toEqual([
+      "Primera",
+      "Segunda",
+    ]);
+    expect(result.ok && result.value[0]?.keyConcepts).toEqual(["Idea"]);
+  });
+
+  it("rejects a malformed draft and an unauthenticated caller", async () => {
+    const { saveRecallEditsAction } = await import("./actions");
+    expect(
+      await saveRecallEditsAction({ pageId: PAGE, creates: [{}] }).then(
+        (r) => !r.ok && r.error.code,
+      ),
+    ).toBe("RECALL_INVALID_INPUT");
+    getCurrentUser.mockResolvedValue(null);
+    expect(
+      await saveRecallEditsAction({
+        pageId: PAGE,
+        updates: [],
+        creates: [],
+        deletes: [],
+      }).then((r) => !r.ok && r.error.code),
+    ).toBe("RECALL_SESSION_REQUIRED");
+  });
+
+  it("saves the draft, answers the questions and revalidates", async () => {
+    const { saveRecallEditsAction } = await import("./actions");
+
+    const result = await saveRecallEditsAction({
+      pageId: PAGE,
+      updates: [
+        {
+          id: QUESTION,
+          prompt: "Primera editada",
+          keyConcepts: ["A", "B"],
+          acceptableAnswerSummary: "R",
+        },
+      ],
+      creates: [
+        { prompt: "Nueva", keyConcepts: ["C"], acceptableAnswerSummary: "R" },
+      ],
+      deletes: [OTHER_QUESTION],
+    });
+
+    expect(result.ok && result.value.map((q) => q.prompt)).toEqual([
+      "Primera editada",
+      "Nueva",
+    ]);
+    expect(revalidatePath).toHaveBeenCalledWith("/active-recall", "layout");
+  });
+
+  it("refuses a draft that deletes every question", async () => {
+    const { saveRecallEditsAction } = await import("./actions");
+
+    const result = await saveRecallEditsAction({
+      pageId: PAGE,
+      updates: [],
+      creates: [],
+      deletes: [QUESTION, OTHER_QUESTION],
+    });
+
+    expect(!result.ok && result.error.code).toBe("RECALL_LAST_QUESTION");
+    expect(revalidatePath).not.toHaveBeenCalled();
   });
 });

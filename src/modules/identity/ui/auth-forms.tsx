@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { Button } from "@/shared/ui/button";
+import { SubmitButton } from "@/shared/ui/submit-button";
 import {
   requestPasswordResetAction,
   signInAction,
@@ -34,14 +34,15 @@ export function SignInForm() {
         autoComplete="current-password"
         required
       />
-      <Button type="submit" size="lg" className="w-full" disabled={pending}>
+      <SubmitButton size="lg" className="w-full" pending={pending}>
         Iniciar sesión
-      </Button>
+      </SubmitButton>
     </form>
   );
 }
 
-export function SignUpForm() {
+// `describedBy` points the submit at the sign-up consent notice.
+export function SignUpForm({ describedBy }: { describedBy?: string } = {}) {
   const [state, action, pending] = useActionState(
     signUpAction,
     IDLE_FORM_STATE,
@@ -63,11 +64,17 @@ export function SignUpForm() {
         type="password"
         autoComplete="new-password"
         minLength={8}
+        hint="Mínimo 8 caracteres"
         required
       />
-      <Button type="submit" size="lg" className="w-full" disabled={pending}>
+      <SubmitButton
+        size="lg"
+        className="w-full"
+        pending={pending}
+        aria-describedby={describedBy}
+      >
         Crear cuenta
-      </Button>
+      </SubmitButton>
     </form>
   );
 }
@@ -87,9 +94,9 @@ export function ForgotPasswordForm() {
         autoComplete="email"
         required
       />
-      <Button type="submit" size="lg" className="w-full" disabled={pending}>
+      <SubmitButton size="lg" className="w-full" pending={pending}>
         Enviar enlace
-      </Button>
+      </SubmitButton>
     </form>
   );
 }
@@ -108,11 +115,12 @@ export function ResetPasswordForm() {
         type="password"
         autoComplete="new-password"
         minLength={8}
+        hint="Mínimo 8 caracteres"
         required
       />
-      <Button type="submit" size="lg" className="w-full" disabled={pending}>
+      <SubmitButton size="lg" className="w-full" pending={pending}>
         Guardar contraseña
-      </Button>
+      </SubmitButton>
     </form>
   );
 }

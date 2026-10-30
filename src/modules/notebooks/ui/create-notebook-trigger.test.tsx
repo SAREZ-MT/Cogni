@@ -8,8 +8,11 @@ import { CreateNotebookTrigger } from "./create-notebook-trigger";
 const { createNotebook } = vi.hoisted(() => ({ createNotebook: vi.fn() }));
 vi.mock("../actions", () => ({ createNotebook }));
 
-const { refresh } = vi.hoisted(() => ({ refresh: vi.fn() }));
-vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
+const { refresh, push } = vi.hoisted(() => ({
+  refresh: vi.fn(),
+  push: vi.fn(),
+}));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh, push }) }));
 
 function Wrapper({ children }: { children: ReactNode }) {
   const client = new QueryClient({
@@ -37,14 +40,31 @@ describe("CreateNotebookTrigger", () => {
     createNotebook.mockReset();
     createNotebook.mockResolvedValue({ id: "notebook-1" });
     refresh.mockReset();
+    push.mockReset();
   });
 
-  it("renders the pill variant with the '+ Nuevo cuaderno' accessible name by default", () => {
-    render(<CreateNotebookTrigger />, { wrapper: Wrapper });
+  // H2: the first notebook (Home empty state) opens the new notebook so the
+  // user can create its first page right away.
+  it("opens the new notebook after creating it when openAfterCreate is set", async () => {
+    const user = userEvent.setup();
+    render(
+      <CreateNotebookTrigger
+        variant="hero"
+        label="Crea tu primer cuaderno"
+        openAfterCreate
+      />,
+      { wrapper: Wrapper },
+    );
 
-    expect(
-      screen.getByRole("button", { name: "Nuevo cuaderno" }),
-    ).toBeInTheDocument();
+    await user.click(
+      screen.getByRole("button", { name: "Crea tu primer cuaderno" }),
+    );
+    await submitDialog(user);
+
+    await waitFor(() => {
+      expect(push).toHaveBeenCalledWith("/notebooks/notebook-1");
+    });
+    expect(refresh).not.toHaveBeenCalled();
   });
 
   it("renders the tile variant with a dashed 'Nuevo cuaderno' tile", () => {
@@ -53,6 +73,77 @@ describe("CreateNotebookTrigger", () => {
     expect(
       screen.getByRole("button", { name: "Nuevo cuaderno" }),
     ).toBeInTheDocument();
+  });
+
+  // Phase 8 H4-T4: the tile fills its grid cell instead of shrinking to
+  // its content.
+  it("stretches the tile to its grid cell", () => {
+    render(<CreateNotebookTrigger variant="tile" />, { wrapper: Wrapper });
+
+    const tile = screen.getByRole("button", { name: "Nuevo cuaderno" });
+    expect(tile).toHaveClass("flex-1");
+    expect(tile.parentElement).toHaveClass("items-stretch");
+  });
+
+  // Phase 8 H4-T5 (user 2026-10-28): the tile is a violet-tinted cover in
+  // the grid's book shape, with a violet plus disc, a violet label and a
+  // hint, lifting on hover like the notebook covers.
+  it("renders the tile as an inviting violet notebook-shaped cover", () => {
+    render(<CreateNotebookTrigger variant="tile" />, { wrapper: Wrapper });
+
+    const tile = screen.getByRole("button", { name: "Nuevo cuaderno" });
+    expect(tile).toHaveClass("aspect-[4/5]", "group/new");
+    const face = tile.querySelector<HTMLElement>('[data-part="face"]');
+    expect(face).toHaveClass(
+      "border-dashed",
+      "border-primary-300",
+      "bg-primary-50",
+      "group-hover/new:-translate-y-1",
+      "motion-reduce:transform-none",
+    );
+    expect(tile.querySelector('[data-part="plus"]')).toHaveClass(
+      "rounded-full",
+      "bg-primary-600",
+    );
+    expect(screen.getByText("Nuevo cuaderno")).toHaveClass(
+      "font-semibold",
+      "text-primary-700",
+    );
+    expect(
+      screen.getByText("Crea un cuaderno para una materia"),
+    ).toBeInTheDocument();
+  });
+
+  // H2-T3: Home's empty state reuses this trigger with its own label and the
+  // product tour's data-tour anchor.
+  it("renders the hero variant with a custom label and a tour anchor", () => {
+    render(
+      <CreateNotebookTrigger
+        variant="hero"
+        label="Crea tu primer cuaderno"
+        tourId="crear-cuaderno"
+      />,
+      { wrapper: Wrapper },
+    );
+
+    expect(
+      screen.getByRole("button", { name: "Crea tu primer cuaderno" }),
+    ).toHaveAttribute("data-tour", "crear-cuaderno");
+  });
+
+  // Phase 8 H4-T1: the notebooks hub's empty state CTA, a large violet pill
+  // with a soft violet shadow and no plus icon (user mockup 2026-10-20).
+  it("renders the cta variant as a violet pill without the plus icon", () => {
+    render(
+      <CreateNotebookTrigger variant="cta" label="Crear mi primer cuaderno" />,
+      { wrapper: Wrapper },
+    );
+
+    const button = screen.getByRole("button", {
+      name: "Crear mi primer cuaderno",
+    });
+    expect(button).toHaveClass("bg-primary-600", "rounded-pill");
+    expect(button.querySelector("svg")).toBeNull();
   });
 
   it("submits the same createNotebook mutation both variants share", async () => {
@@ -69,7 +160,7 @@ describe("CreateNotebookTrigger", () => {
 
   it("refreshes the router after a successful create, so Home's server data updates", async () => {
     const user = userEvent.setup();
-    render(<CreateNotebookTrigger />, { wrapper: Wrapper });
+    render(<CreateNotebookTrigger variant="tile" />, { wrapper: Wrapper });
 
     await user.click(screen.getByRole("button", { name: "Nuevo cuaderno" }));
     await submitDialog(user);
@@ -82,7 +173,7 @@ describe("CreateNotebookTrigger", () => {
   it("surfaces a mutation error instead of failing silently", async () => {
     const user = userEvent.setup();
     createNotebook.mockRejectedValue(new Error("network down"));
-    render(<CreateNotebookTrigger />, { wrapper: Wrapper });
+    render(<CreateNotebookTrigger variant="tile" />, { wrapper: Wrapper });
 
     await user.click(screen.getByRole("button", { name: "Nuevo cuaderno" }));
     await submitDialog(user);

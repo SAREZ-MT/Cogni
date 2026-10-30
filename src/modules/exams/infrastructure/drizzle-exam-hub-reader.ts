@@ -7,6 +7,7 @@ import {
   inArray,
   isNotNull,
   isNull,
+  max,
   sql,
 } from "drizzle-orm";
 import type { DbExecutor } from "@/shared/db/client";
@@ -21,8 +22,9 @@ import type { ExamHubPage, ExamHubReader } from "../domain/exam-hub-reader";
 
 // Drizzle implementation of ExamHubReader: two owner-wide reads, never one
 // per page. The first groups the active questions by page (with the page's
-// notebook and retake state); the second takes each page's latest finished
-// session and the count of finished sessions.
+// notebook, retake state and newest question); the second takes each
+// page's latest finished session, the count of finished sessions and the
+// best score.
 export class DrizzleExamHubReader implements ExamHubReader {
   constructor(private readonly db: DbExecutor) {}
 
@@ -35,6 +37,7 @@ export class DrizzleExamHubReader implements ExamHubReader {
         notebookTitle: notebooks.title,
         notebookColor: notebooks.color,
         activeQuestionCount: countDistinct(examQuestions.rootId),
+        latestQuestionAt: max(examQuestions.createdAt),
         retakePending: sql<boolean>`coalesce(${examPageState.retakePending}, false)`,
         failedRootIds: examPageState.failedRootIds,
       })
@@ -74,6 +77,11 @@ export class DrizzleExamHubReader implements ExamHubReader {
         correct: examSessions.correct,
         passed: examSessions.passed,
         attempts: sql<number>`count(*) over (partition by ${examSessions.pageId})::int`,
+        // The best whole percent over the page's finished exams, rounded
+        // down like the results screen (Phase 8 H17: "Mejor nota").
+        bestScore: sql<
+          number | null
+        >`max(floor(${examSessions.correct} * 100.0 / nullif(${examSessions.total}, 0))) over (partition by ${examSessions.pageId})::int`,
       })
       .from(examSessions)
       .where(
@@ -100,6 +108,7 @@ export class DrizzleExamHubReader implements ExamHubReader {
         // No page state row yet (never examined): no failed roots.
         failedRootIds: row.failedRootIds ?? [],
         attempts: session?.attempts ?? 0,
+        bestScore: session?.bestScore ?? null,
         // A finished session always carries its result (0010 CHECK).
         lastSession:
           session?.finishedAt &&

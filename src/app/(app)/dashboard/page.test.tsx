@@ -75,7 +75,7 @@ describe("DashboardPage", () => {
 
     expect(screen.getByTestId("dashboard")).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: "Dashboard" }),
+      screen.getByRole("heading", { name: "Progreso" }),
     ).toBeInTheDocument();
     expect(screen.queryByText("Vista previa")).toBeNull();
     for (const id of [

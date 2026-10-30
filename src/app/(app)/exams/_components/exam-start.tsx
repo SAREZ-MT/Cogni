@@ -59,6 +59,9 @@ export interface ExamStartProps {
   failedRootCount: number;
   // Results of the page's last finished exam, when there is one.
   lastResultsHref: string | null;
+  // Where the back link leads and what it says (Phase 8 H18: the hub when
+  // opened from it); defaults to the notebook page.
+  back?: { href: string; label: string };
 }
 
 // Start of a page's exam (documento-maestro §3.3: N questions, 10 by
@@ -83,6 +86,7 @@ export function ExamStart({
   retakePending,
   failedRootCount,
   lastResultsHref,
+  back = { href: pageHref, label: "Volver a la página" },
 }: ExamStartProps) {
   const router = useRouter();
   // The stepper never offers more questions than the page has (the exam
@@ -158,7 +162,7 @@ export function ExamStart({
       data-testid="exam-start"
       className="mx-auto flex w-full max-w-[560px] flex-1 flex-col gap-5 py-8"
     >
-      <BackLink href={pageHref}>Volver a la página</BackLink>
+      <BackLink href={back.href}>{back.label}</BackLink>
 
       <Card className="flex flex-col items-center gap-4 p-8 text-center">
         <IconTile size="56" tone="pink">

@@ -8,6 +8,14 @@ import { NotebookActionsSlotProvider } from "./notebook-actions-slot";
 import { NotebookItem } from "./notebook-item";
 import { SIDEBAR_TREE_QUERY_KEY } from "./sidebar-tree-query-key";
 
+// Phase 8 H19: the delete dialogs call the notebooks Server Actions.
+vi.mock("../actions", () => ({
+  previewNotebookDeletion: vi.fn(),
+  deleteNotebook: vi.fn(),
+  previewPageDeletion: vi.fn(),
+  deletePage: vi.fn(),
+}));
+
 const notebook: SidebarNotebook = {
   id: "n1",
   title: "Biología",
@@ -36,10 +44,10 @@ function notebookItemElement() {
       notebook={notebook}
       onRename={noop}
       onSetAppearance={noop}
-      onArchive={noop}
+      onDeleted={noop}
       onCreatePage={noop}
       onRenamePage={noop}
-      onArchivePage={noop}
+      onPageDeleted={noop}
     />
   );
 }
@@ -57,7 +65,7 @@ describe("NotebookItem", () => {
       screen.getByRole("button", { name: "Crear página en Biología" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Archivar cuaderno Biología" }),
+      screen.getByRole("button", { name: "Eliminar cuaderno Biología" }),
     ).toBeInTheDocument();
   });
 
@@ -75,7 +83,7 @@ describe("NotebookItem", () => {
     expect(title.className).toContain("flex-1");
 
     const actions = screen
-      .getByRole("button", { name: "Archivar cuaderno Biología" })
+      .getByRole("button", { name: "Eliminar cuaderno Biología" })
       .closest('[data-slot="notebook-item-actions"]');
     expect(actions).not.toBeNull();
     // Actions stay in flow but hidden until hover/focus-within: they must
@@ -128,7 +136,7 @@ describe("NotebookItem", () => {
   it("renders without a QueryClientProvider when no slot is mounted (R3-hard-queryclient-dependency)", () => {
     expect(() => render(notebookItemElement())).not.toThrow();
     expect(
-      screen.getByRole("button", { name: "Archivar cuaderno Biología" }),
+      screen.getByRole("button", { name: "Eliminar cuaderno Biología" }),
     ).toBeInTheDocument();
   });
 

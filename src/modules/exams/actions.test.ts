@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { systemClock } from "@/shared/kernel/clock";
 import { DomainError } from "@/shared/kernel/domain-error";
+import { createId } from "@/shared/kernel/id";
 import { err, ok } from "@/shared/kernel/result";
+import { createExamQuestion } from "./application/create-exam-question";
 import { InMemoryExamUnitOfWork } from "./application/testing/in-memory-exam-unit-of-work";
 
 // Session, composition roots and Sentry are mocked so this proves the
@@ -70,7 +73,6 @@ const { FINGERPRINTS } = vi.hoisted(() => ({
 }));
 const OWNER = "3d2f9a1e-5b6c-4d7e-8f90-1a2b3c4d5e6f";
 const PAGE = "0a1b2c3d-4e5f-4061-8798-a1b2c3d4e5f6";
-const MISSING = "9f8e7d6c-5b4a-4392-8180-7f6e5d4c3b2a";
 
 const QUESTION = {
   stem: "¿Qué produce la mitocondria?",
@@ -84,9 +86,22 @@ async function actions() {
   return import("./actions");
 }
 
+// Questions are created by AI only (Phase 8 H13): there is no create action,
+// so a question is seeded straight into the fakes through the use case,
+// with its study item.
 async function created() {
-  const { createExamQuestionAction } = await actions();
-  const result = await createExamQuestionAction({ pageId: PAGE, ...QUESTION });
+  const result = await createExamQuestion(
+    { pageId: PAGE, ...QUESTION },
+    {
+      pages: {
+        getPageText: async () => ok({ title: "Mitocondria", plainText: "x" }),
+      },
+      uow: current.uow,
+      clock: systemClock,
+      ids: { next: createId },
+    },
+    OWNER,
+  );
   if (!result.ok) throw new Error(result.error.code);
   return result.value;
 }
@@ -107,159 +122,58 @@ describe("exams Server Actions", () => {
     };
   });
 
-  describe("createExamQuestionAction", () => {
-    it("creates a manual question with its study item and revalidates the exams routes", async () => {
-      const view = await created();
+  // Phase 8 H18: the edit page's "Guardar".
+  describe("saveExamEditsAction", () => {
+    it("rejects a malformed draft and an unauthenticated caller", async () => {
+      const { saveExamEditsAction } = await actions();
+      expect(
+        await saveExamEditsAction({ pageId: PAGE, creates: [{}] }).then(
+          (r) => !r.ok && r.error.code,
+        ),
+      ).toBe("EXAMS_INVALID_INPUT");
+      getCurrentUser.mockResolvedValue(null);
+      expect(
+        await saveExamEditsAction({
+          pageId: PAGE,
+          updates: [],
+          creates: [],
+          deletes: [],
+        }).then((r) => !r.ok && r.error.code),
+      ).toBe("EXAMS_SESSION_REQUIRED");
+    });
 
-      expect(view).toMatchObject({
+    it("saves the draft, answers the questions and revalidates", async () => {
+      const a = await created();
+      const b = await created();
+      const { saveExamEditsAction } = await actions();
+
+      const result = await saveExamEditsAction({
         pageId: PAGE,
-        ...QUESTION,
-        origin: "manual",
+        updates: [{ id: a.id, ...QUESTION, stem: "Editada" }],
+        creates: [{ ...QUESTION, stem: "Nueva" }],
+        deletes: [b.id],
       });
-      expect(current.uow.studyItems.all()).toEqual([
-        expect.objectContaining({ kind: "exam_question", sourceId: view.id }),
+
+      expect(result.ok && result.value.map((q) => q.stem)).toEqual([
+        "Editada",
+        "Nueva",
       ]);
       expect(revalidatePath).toHaveBeenCalledWith("/exams", "layout");
     });
 
-    it("rejects an unauthenticated caller before doing anything", async () => {
-      getCurrentUser.mockResolvedValue(null);
-      const { createExamQuestionAction } = await actions();
+    it("refuses a draft that deletes every question", async () => {
+      const a = await created();
+      const { saveExamEditsAction } = await actions();
 
-      const result = await createExamQuestionAction({
+      const result = await saveExamEditsAction({
         pageId: PAGE,
-        ...QUESTION,
+        updates: [],
+        creates: [],
+        deletes: [a.id],
       });
 
-      expect(!result.ok && result.error.code).toBe("EXAMS_SESSION_REQUIRED");
-      expect(current.uow.runs).toBe(0);
-    });
-
-    it.each([
-      ["a non-uuid page", { pageId: "x" }],
-      ["a missing concept", { concept: undefined }],
-      ["five options", { options: ["a", "b", "c", "d", "e"] }],
-      ["a fractional index", { correctIndex: 1.5 }],
-    ])("rejects %s as invalid input", async (_, patch) => {
-      const { createExamQuestionAction } = await actions();
-
-      const result = await createExamQuestionAction({
-        pageId: PAGE,
-        ...QUESTION,
-        ...patch,
-      });
-
-      expect(!result.ok && result.error.code).toBe("EXAMS_INVALID_INPUT");
-    });
-
-    it("maps domain refusals to their codes", async () => {
-      const { createExamQuestionAction } = await actions();
-
-      const repeated = await createExamQuestionAction({
-        pageId: PAGE,
-        ...QUESTION,
-        options: ["ATP", "atp", "B", "C"],
-      });
-      current.pageFound = false;
-      const noPage = await createExamQuestionAction({
-        pageId: MISSING,
-        ...QUESTION,
-      });
-
-      expect(!repeated.ok && repeated.error.code).toBe(
-        "EXAMS_INVALID_QUESTION",
-      );
-      expect(!noPage.ok && noPage.error.code).toBe("PAGE_NOT_FOUND");
-    });
-
-    it("never throws: an unexpected failure is reported and answered generically", async () => {
-      current.throwOnPageRead = true;
-      const { createExamQuestionAction } = await actions();
-
-      const result = await createExamQuestionAction({
-        pageId: PAGE,
-        ...QUESTION,
-      });
-
-      expect(!result.ok && result.error.code).toBe("EXAMS_UNEXPECTED");
-      expect(captureException).toHaveBeenCalledOnce();
-    });
-  });
-
-  describe("editExamQuestionAction", () => {
-    it("edits the question in place", async () => {
-      const view = await created();
-      const { editExamQuestionAction } = await actions();
-
-      const result = await editExamQuestionAction({
-        questionId: view.id,
-        ...QUESTION,
-        stem: "¿Qué molécula produce?",
-      });
-
-      expect(result.ok && result.value).toMatchObject({
-        id: view.id,
-        stem: "¿Qué molécula produce?",
-      });
-    });
-
-    it("maps a retired or foreign question to its code", async () => {
-      const view = await created();
-      const { editExamQuestionAction, retireExamQuestionAction } =
-        await actions();
-      await retireExamQuestionAction({ questionId: view.id });
-
-      const retired = await editExamQuestionAction({
-        questionId: view.id,
-        ...QUESTION,
-      });
-      const missing = await editExamQuestionAction({
-        questionId: MISSING,
-        ...QUESTION,
-      });
-
-      expect(!retired.ok && retired.error.code).toBe("EXAMS_QUESTION_RETIRED");
-      expect(!missing.ok && missing.error.code).toBe(
-        "EXAMS_QUESTION_NOT_FOUND",
-      );
-    });
-
-    it("rejects an unauthenticated caller", async () => {
-      getCurrentUser.mockResolvedValue(null);
-      const { editExamQuestionAction } = await actions();
-
-      const result = await editExamQuestionAction({
-        questionId: MISSING,
-        ...QUESTION,
-      });
-
-      expect(!result.ok && result.error.code).toBe("EXAMS_SESSION_REQUIRED");
-    });
-  });
-
-  describe("retireExamQuestionAction", () => {
-    it("retires the question, suspends its item and revalidates", async () => {
-      const view = await created();
-      revalidatePath.mockClear();
-      const { retireExamQuestionAction } = await actions();
-
-      const result = await retireExamQuestionAction({ questionId: view.id });
-
-      expect(result).toEqual({ ok: true, value: { id: view.id } });
-      expect(current.uow.studyItems.all()[0]?.suspendedAt).not.toBeNull();
-      expect(revalidatePath).toHaveBeenCalledWith("/exams", "layout");
-    });
-
-    it("rejects invalid input and unknown questions", async () => {
-      const { retireExamQuestionAction } = await actions();
-
-      const invalid = await retireExamQuestionAction({ questionId: 3 });
-      const missing = await retireExamQuestionAction({ questionId: MISSING });
-
-      expect(!invalid.ok && invalid.error.code).toBe("EXAMS_INVALID_INPUT");
-      expect(!missing.ok && missing.error.code).toBe(
-        "EXAMS_QUESTION_NOT_FOUND",
-      );
+      expect(!result.ok && result.error.code).toBe("EXAMS_LAST_QUESTION");
+      expect(revalidatePath).not.toHaveBeenCalled();
     });
   });
 
@@ -267,9 +181,13 @@ describe("exams Server Actions", () => {
     it("lists the page's active questions", async () => {
       const first = await created();
       const second = await created();
-      const { listExamQuestionsAction, retireExamQuestionAction } =
-        await actions();
-      await retireExamQuestionAction({ questionId: first.id });
+      const { listExamQuestionsAction, saveExamEditsAction } = await actions();
+      await saveExamEditsAction({
+        pageId: PAGE,
+        updates: [],
+        creates: [],
+        deletes: [first.id],
+      });
 
       const result = await listExamQuestionsAction({ pageId: PAGE });
 

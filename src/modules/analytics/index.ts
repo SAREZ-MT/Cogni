@@ -19,6 +19,7 @@ export {
   getDashboardCalibration,
   getDashboardProgress,
   getDashboardTechniqueMetrics,
+  getHomeWeakTopics,
   MAX_RANGE_DAYS,
   MAX_TREND_WEEKS,
   type ProgressInput,

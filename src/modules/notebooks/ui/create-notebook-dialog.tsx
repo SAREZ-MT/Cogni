@@ -6,11 +6,14 @@ import { Button } from "@/shared/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/shared/ui/dialog";
+import { FieldLabel } from "@/shared/ui/field-label";
+import { Input } from "@/shared/ui/input";
 
 interface CreateNotebookDialogProps {
   onCreate: (title: string) => void;
@@ -48,12 +51,13 @@ export function CreateNotebookDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Nuevo cuaderno</DialogTitle>
+          <DialogDescription>
+            Uno por materia o tema: ahí se juntan sus páginas.
+          </DialogDescription>
         </DialogHeader>
-        <div className="flex flex-col gap-2">
-          <label htmlFor={titleId} className="text-fg-secondary text-sm">
-            Título
-          </label>
-          <input
+        <div className="flex flex-col gap-1.5">
+          <FieldLabel htmlFor={titleId}>Título</FieldLabel>
+          <Input
             id={titleId}
             autoFocus
             value={title}
@@ -61,7 +65,7 @@ export function CreateNotebookDialog({
             onKeyDown={(event) => {
               if (event.key === "Enter") submit();
             }}
-            className="h-10 rounded-input border border-border-default bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            className="h-11 rounded-input px-3.5"
             placeholder="Nombre del cuaderno"
           />
         </div>
@@ -69,7 +73,11 @@ export function CreateNotebookDialog({
           <Button variant="outline" onClick={() => setOpen(false)}>
             Cancelar
           </Button>
-          <Button onClick={submit} disabled={title.trim().length === 0}>
+          <Button
+            variant="brand"
+            onClick={submit}
+            disabled={title.trim().length === 0}
+          >
             Crear cuaderno
           </Button>
         </DialogFooter>

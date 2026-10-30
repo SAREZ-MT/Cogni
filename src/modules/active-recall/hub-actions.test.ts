@@ -60,6 +60,14 @@ vi.mock("./infrastructure", async (importOriginal) => ({
     },
   }),
 }));
+// The owner's per-day "due" bound, as scheduling reads it from the profile:
+// the counts include what is due later today.
+const { DAY_END } = vi.hoisted(() => ({
+  DAY_END: new Date("2026-10-08T05:00:00.000Z"),
+}));
+vi.mock("@/modules/scheduling", () => ({
+  getCurrentDueCutoff: async () => () => DAY_END,
+}));
 vi.mock("@/modules/study-engine", () => ({
   createPageMasteryReader: () => ({
     async listByOwner(ownerId: string) {
@@ -68,8 +76,8 @@ vi.mock("@/modules/study-engine", () => ({
     },
   }),
   createStudyItemRepository: () => ({
-    async listDue(ownerId: string, now: Date) {
-      expect(now).toBeInstanceOf(Date);
+    async listDue(ownerId: string, dueBefore: Date) {
+      expect(dueBefore).toEqual(DAY_END);
       state.dueOwners.push(ownerId);
       return state.due();
     },
@@ -88,6 +96,8 @@ function hubPage(overrides: Partial<RecallHubPage> = {}): RecallHubPage {
     notebookId: "nb-1",
     notebookTitle: "Biología",
     notebookColor: "green",
+    questionCount: 8,
+    latestQuestionAt: new Date("2026-10-05T10:00:00.000Z"),
     sessions: [
       {
         id: "s-1",
@@ -163,6 +173,8 @@ describe("listRecallHubAction", () => {
             notebookColor: "green",
             mastery: 42,
             dueToday: 3,
+            questionCount: 8,
+            latestQuestionAt: "2026-10-05T10:00:00.000Z",
             sessions: [
               {
                 id: "s-1",

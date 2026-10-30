@@ -5,6 +5,7 @@ import { studyItems } from "@/shared/db/schema";
 import { createTestDb } from "../db/helpers/test-db";
 import { expect, hasSupabaseEnv, signIn, test } from "./fixtures/auth";
 import { createNotebookWithOpenPage } from "./helpers/notebooks";
+import { withStudyFiller } from "./helpers/study-text";
 
 // Phase 5 T9 exams hub on real data (documento-maestro §3.3, §7.5): a page
 // with 10 fake AI questions shows up under its notebook in the hub opened
@@ -43,7 +44,7 @@ async function pageWithQuestions(
   await editable.click();
   // Keys sent <15 ms after a click can precede Chrome's selectionchange.
   await page.waitForTimeout(100);
-  await page.keyboard.type(SENTENCES);
+  await page.keyboard.type(withStudyFiller(SENTENCES));
   await expect(page.getByTestId("autosave-status")).toHaveText("guardado", {
     timeout: 15000,
   });
@@ -130,79 +131,55 @@ test.describe("exams hub", () => {
     // The empty hub first.
     await sidebar(page).getByRole("link", { name: "Exámenes" }).click();
     await expect(page).toHaveURL("/exams");
-    await expect(page.getByText("Aún no tienes exámenes")).toBeVisible();
+    await expect(page.getByText("Pon a prueba lo que sabes")).toBeVisible();
     await shot(page, "after-hub-empty");
 
     // A page with 10 generated questions.
     const { notebookId, pageId } = await pageWithQuestions(page, notebookTitle);
 
-    // Sidebar → hub → notebook → page card → exam.
+    // Sidebar → hub → the page's card → exam (Phase 8 H17: flat hub, no
+    // notebook level).
     await sidebar(page).getByRole("link", { name: "Exámenes" }).click();
     await expect(page).toHaveURL("/exams");
     await expect(
       sidebar(page).getByRole("link", { name: "Exámenes" }),
     ).toHaveAttribute("aria-current", "page");
-    await expect(page.getByText("0 exámenes · 1 cuaderno")).toBeVisible();
-    await expect(page.getByText("0 exámenes · sin intentar")).toBeVisible();
-    await shot(page, "after-hub-untried");
-    await page.getByRole("link", { name: new RegExp(notebookTitle) }).click();
-    await expect(page).toHaveURL(`/exams/${notebookId}`);
     await expect(
-      page.getByText("0 exámenes · 1 página con preguntas"),
+      page.getByText("0 exámenes · 1 página · 1 cuaderno"),
     ).toBeVisible();
-    await expect(page.getByText("10 preguntas · 0 intentos")).toBeVisible();
-    await expect(page.getByText("Sin intentar")).toBeVisible();
-    await shot(page, "after-notebook-untried");
-    await expect(page.getByText("Presentar examen →")).toBeVisible();
-    // The whole card is the page title's (stretched) link.
-    await page.getByRole("link", { name: "Sin título" }).click();
-    await expect(page).toHaveURL(`/exams/${notebookId}/${pageId}`);
+    const card = page.getByRole("article").filter({ hasText: notebookTitle });
+    await expect(card).toContainText("10 preguntas");
+    await expect(card).toContainText("Sin intentos");
+    await shot(page, "after-hub-untried");
+    await card.getByRole("link", { name: /^Hacer examen/ }).click();
+    await expect(page).toHaveURL(`/exams/${notebookId}/${pageId}?desde=hub`);
 
     // Fail it: 4 of 10 wrong.
     await takeExam(page, WRONG_QUESTIONS);
 
-    // The hub now offers the retake of that page.
+    // The hub now offers the retake of that page, on its card.
     await sidebar(page).getByRole("link", { name: "Exámenes" }).click();
     await expect(page).toHaveURL("/exams");
     await expect(
-      page.getByText("Tienes 1 página pendiente de repetir examen"),
+      page.getByText("1 examen · 1 página · 1 cuaderno"),
     ).toBeVisible();
-    await expect(
-      page.getByRole("link", { name: "Repetir examen" }),
-    ).toHaveAttribute("href", `/exams/${notebookId}/${pageId}?retake=1`);
-    await expect(page.getByText("1 examen presentado")).toBeVisible();
-    await expect(page.getByText("1 pendiente de repetir")).toBeVisible();
-    await expect(page.getByText("1 examen · última nota 60 %")).toBeVisible();
+    await expect(card).toContainText("Repetir cuando estés listo");
+    await expect(card).toContainText("Último intento 60 %");
     await expect(page.getByText("Vista previa")).toHaveCount(0);
-    await expect(
-      page.getByText(
-        "Fallaste el último examen de Sin título; las preguntas falladas vencen mañana.",
-      ),
-    ).toBeVisible();
     await shot(page, "after-hub-v2");
-
-    await page.getByRole("link", { name: new RegExp(notebookTitle) }).click();
-    await expect(page.getByText("Repetir pendiente")).toBeVisible();
-    await expect(page.getByText("60 %")).toBeVisible();
-    await expect(page.getByText("Repetir examen →")).toBeVisible();
-    await expect(page.getByText("Vista previa")).toHaveCount(0);
-    await shot(page, "after-notebook-v2");
-
-    await page.getByRole("link", { name: "Sin título" }).click();
-    await expect(page).toHaveURL(`/exams/${notebookId}/${pageId}?retake=1`);
+    const retake = card.getByRole("link", { name: /^Repetir examen/ });
+    await expect(retake).toHaveAttribute("data-emphasis", "primary");
+    await retake.click();
+    await expect(page).toHaveURL(`/exams/${notebookId}/${pageId}?desde=hub`);
     await expect(page.getByTestId("exam-retake")).toBeVisible();
 
-    // The next day the failed questions are due: the banner says so.
-    await makeExamItemsDue(pageId);
-    await page.goto("/exams");
-    await expect(
-      page.getByText(
-        "Fallaste el último examen de Sin título; las preguntas falladas ya están para repasar.",
-      ),
-    ).toBeVisible();
+    // The old notebook view redirects to the hub filtered by it.
+    await page.goto(`/exams/${notebookId}`);
+    await expect(page).toHaveURL(`/exams?cuaderno=${notebookId}`);
+    await expect(card).toBeVisible();
   });
 
-  test("marks a passed page with exam questions due today", async ({
+  test("shows a passed page's best and last score, with a soft action", async ({
     page,
   }) => {
     test.setTimeout(240_000);
@@ -215,14 +192,15 @@ test.describe("exams hub", () => {
     await makeExamItemsDue(pageId);
 
     await sidebar(page).getByRole("link", { name: "Exámenes" }).click();
-    await expect(page.getByText("1 aprobado")).toBeVisible();
-    await page.getByRole("link", { name: new RegExp(notebookTitle) }).click();
-    await expect(page).toHaveURL(`/exams/${notebookId}`);
-    await expect(page.getByText("Vence hoy")).toBeVisible();
-    await expect(page.getByText("Rendir examen →")).toBeVisible();
+    // Phase 8 H17: a passed page reads its best and last score; only a
+    // retake fills the action.
+    const card = page.getByRole("article").filter({ hasText: notebookTitle });
+    await expect(card).toContainText("Mejor nota 90 % · último 90 %");
+    const take = card.getByRole("link", { name: /^Hacer examen/ });
+    await expect(take).toHaveAttribute("data-emphasis", "soft");
     await shot(page, "after-hub-due");
-    await page.getByRole("link", { name: "Sin título" }).click();
-    await expect(page).toHaveURL(`/exams/${notebookId}/${pageId}`);
+    await take.click();
+    await expect(page).toHaveURL(`/exams/${notebookId}/${pageId}?desde=hub`);
     await expect(page.getByTestId("start-exam-button")).toBeVisible();
   });
 });

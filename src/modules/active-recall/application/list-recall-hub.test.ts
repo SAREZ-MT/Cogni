@@ -39,6 +39,8 @@ function page(
     notebookTitle: "Biología celular",
     notebookColor: "green",
     sessions,
+    questionCount: 6,
+    latestQuestionAt: new Date("2026-10-05T10:00:00.000Z"),
     ...overrides,
   };
 }
@@ -117,6 +119,9 @@ describe("listRecallHub", () => {
         notebookColor: "green",
         mastery: 50,
         dueToday: 0,
+        // Phase 8 H17: the page's active questions and newest one.
+        questionCount: 6,
+        latestQuestionAt: new Date("2026-10-05T10:00:00.000Z"),
         sessions: [
           {
             id: "s-2",
@@ -248,6 +253,27 @@ describe("listRecallHub", () => {
     expect(unknown.ok && unknown.value.pages.map((p) => p.dueToday)).toEqual([
       null,
       null,
+    ]);
+  });
+
+  it("lists a page with questions and no finished session, with no sessions and its question count", async () => {
+    const result = await listRecallHub(
+      {
+        reader: reader([page("p-1", [], { questionCount: 3 })]),
+        mastery: mastery({}),
+        due: due({ "p-1": 3 }),
+      },
+      OWNER,
+    );
+
+    expect(result.ok && result.value.pages).toEqual([
+      expect.objectContaining({
+        pageId: "p-1",
+        sessions: [],
+        questionCount: 3,
+        dueToday: 3,
+        mastery: 0,
+      }),
     ]);
   });
 

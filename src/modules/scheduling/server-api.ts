@@ -15,9 +15,13 @@ import {
 } from "./infrastructure";
 
 export interface SchedulingServerApi {
-  // The owner's pages with study items due now, the page that has waited
-  // longest first (same read as listDueTodayAction).
-  listDueToday(ownerId: string): Promise<DueTodayPage[]>;
+  // The owner's pages with study items due today in `timeZone` (the
+  // profile's zone), the page that has waited longest first (same read as
+  // listDueTodayAction; the zone is trusted here).
+  listDueToday(
+    ownerId: string,
+    day: { timeZone: string },
+  ): Promise<DueTodayPage[]>;
   // The owner's pages per local day of [fromDay, toDay) in `timeZone`
   // (same read as listCalendarDaysAction; the range is trusted here).
   listCalendarDays(
@@ -34,7 +38,8 @@ export function createSchedulingServerApi(deps: {
   const rangeReader = new DrizzleDueInRangeReader(deps.db);
   const clock = deps.clock ?? systemClock;
   return {
-    listDueToday: (ownerId) => listDueToday(ownerId, { reader, clock }),
+    listDueToday: (ownerId, day) =>
+      listDueToday({ ownerId, timeZone: day.timeZone }, { reader, clock }),
     listCalendarDays: (ownerId, range) =>
       listCalendarDays({ ownerId, ...range }, { reader: rangeReader, clock }),
   };

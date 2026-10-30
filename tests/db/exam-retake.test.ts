@@ -35,6 +35,12 @@ import { ok } from "@/shared/kernel/result";
 import { createTestDb } from "./helpers/test-db";
 import { createTestOwner, deleteTestOwner } from "./helpers/test-owner";
 
+// Reviews are due per local day (UTC here): due before the next midnight.
+function utcDayCutoff(now: Date): Date {
+  const day = 86_400_000;
+  return new Date((Math.floor(now.getTime() / day) + 1) * day);
+}
+
 // A retake against Postgres (§7.5): the variants, the retired wordings and
 // the retake session commit in one transaction (or not at all), and the
 // retake is finished like any exam.
@@ -165,7 +171,11 @@ if (process.env.DATABASE_URL) {
     }
     const done = await completeExamSession(
       { sessionId },
-      { uow, clock: createFixedClock(new Date(at.getTime() + 60_000)) },
+      {
+        uow,
+        clock: createFixedClock(new Date(at.getTime() + 60_000)),
+        dueCutoff: utcDayCutoff,
+      },
       owner.id,
     );
     if (!done.ok) throw done.error;
@@ -180,6 +190,7 @@ if (process.env.DATABASE_URL) {
         pages: pageReader,
         uow: new DrizzleExamSessionUnitOfWork(db, ids),
         clock: createFixedClock(STARTED),
+        dueCutoff: utcDayCutoff,
         ids,
       },
       owner.id,
@@ -202,6 +213,7 @@ if (process.env.DATABASE_URL) {
         ai,
         uow: new DrizzleExamSessionUnitOfWork(db, ids),
         clock: createFixedClock(RETAKE),
+        dueCutoff: utcDayCutoff,
         ids: sessionIds,
         tokenCap: 12_000,
       },

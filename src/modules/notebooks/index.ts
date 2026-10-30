@@ -5,19 +5,22 @@
 // unico puerto de persistencia hacia el editor").
 
 export {
-  archiveNotebook as archiveNotebookAction,
-  archivePage as archivePageAction,
   createNotebook as createNotebookAction,
   createPage as createPageAction,
+  deleteNotebook as deleteNotebookAction,
+  deletePage as deletePageAction,
   getAssetReadUrl,
   getCurrentContent,
   getHomeOverview,
   getNotebookForRoute,
   getNotebookTitleForRoute,
   getPageForRoute,
+  getPagePickerTree,
   getSidebarTree,
   listPagesForMention,
   type MentionPageCandidate,
+  previewNotebookDeletion as previewNotebookDeletionAction,
+  previewPageDeletion as previewPageDeletionAction,
   registerPageAsset,
   renameNotebook as renameNotebookAction,
   renamePage as renamePageAction,
@@ -26,10 +29,6 @@ export {
   setNotebookAppearance as setNotebookAppearanceAction,
 } from "./actions";
 export {
-  archiveNotebook,
-  archiveNotebookSchema,
-  archivePage,
-  archivePageSchema,
   createNotebook,
   createNotebookSchema,
   createPage,
@@ -44,7 +43,10 @@ export {
   type HomeReadyToReview,
   type HomeRecentPage,
   type ImageUploadGrant,
+  listPagePickerTree,
   listSidebar,
+  type PagePickerNotebookEntry,
+  type PagePickerPage,
   registerPageAssetSchema,
   renameNotebook,
   renameNotebookSchema,
@@ -91,9 +93,13 @@ export {
   createNotebooksServerApi,
   type NotebooksServerApi,
 } from "./server-api";
-export { ArchivePageButton } from "./ui/archive-page-button";
 export { CreateNotebookIconButton } from "./ui/create-notebook-icon-button";
 export { CreateNotebookTrigger } from "./ui/create-notebook-trigger";
+export {
+  DeleteNotebookDialog,
+  DeletePageButton,
+  DeletePageDialog,
+} from "./ui/delete-content-dialogs";
 export {
   type NotebookActionsHelpers,
   NotebookActionsSlotProvider,

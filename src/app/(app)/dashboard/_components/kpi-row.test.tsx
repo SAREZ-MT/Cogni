@@ -57,7 +57,7 @@ describe("KpiRow", () => {
 
     const links = screen.getAllByRole("link", { name: /Ver detalle/ });
     expect(links.map((l) => l.getAttribute("href"))).toEqual([
-      "/",
+      "/inicio",
       "/notebooks",
       "/notebooks",
     ]);

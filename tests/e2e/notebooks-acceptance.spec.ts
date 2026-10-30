@@ -20,7 +20,7 @@ import {
 } from "./helpers/notebooks";
 
 // Task 2.12 skeleton: create notebook -> create page -> rename -> icon/color
-// -> archive -> disappears from the library -> route not found. Extended in
+// -> delete (Phase 8 H19) -> disappears from the library -> route not found. Extended in
 // PR4 (specs/notebooks/spec.md, §13 acceptance flow) once the editor is
 // wired for real content. Since design pass 2 the sidebar is navigation only:
 // notebooks live on /notebooks (cards with an "Acciones de {título}" kebab)
@@ -81,14 +81,12 @@ test.describe("notebooks acceptance", () => {
 
     // Cambiar color: the starting color is random, so pick a target that
     // differs from the current one (otherwise the check proves nothing). The
-    // card's tile must switch without a reload, and the dialog must highlight
-    // the new color after one (it was persisted, not just updated on screen).
-    const tile = notebookCard(page, "Cuaderno renombrado")
-      .locator("span")
-      .first();
-    const currentColor = (await tile.getAttribute("class"))?.match(
-      /bg-pastel-(\w+)/,
-    )?.[1];
+    // card's cover tone must switch without a reload (since Phase 8 H4-T5
+    // the card is a notebook cover carrying `data-tone`), and the dialog must
+    // highlight the new color after one (it was persisted, not just updated
+    // on screen).
+    const card = notebookCard(page, "Cuaderno renombrado");
+    const currentColor = await card.getAttribute("data-tone");
     const targetColor = currentColor === "purple" ? "mint" : "purple";
     await page
       .getByRole("button", { name: "Acciones de Cuaderno renombrado" })
@@ -101,7 +99,7 @@ test.describe("notebooks acceptance", () => {
         .getByRole("button", { name: `Color ${targetColor}` }),
       `"color":"${targetColor}"`,
     );
-    await expect(tile).toHaveClass(new RegExp(`bg-pastel-${targetColor}`));
+    await expect(card).toHaveAttribute("data-tone", targetColor);
     await page.reload();
     await page
       .getByRole("button", { name: "Acciones de Cuaderno renombrado" })
@@ -119,39 +117,35 @@ test.describe("notebooks acceptance", () => {
     const notebookId = await openNotebook(page, "Cuaderno renombrado");
     await createPageAndOpen(page);
 
-    // Archivar (Scenario "Archivar desde el sidebar", now the card's
-    // "Archivar" item plus its confirmation dialog).
+    // Eliminar (Phase 8 H19: a real delete, replacing archiving): the
+    // card's "Eliminar" item opens the app dialog with the server's counts.
     await page.goto("/notebooks");
     await page
       .getByRole("button", { name: "Acciones de Cuaderno renombrado" })
       .click();
-    await page.getByRole("menuitem", { name: "Archivar" }).click();
+    await page.getByRole("menuitem", { name: "Eliminar" }).click();
+    const confirm = page.getByRole("dialog", {
+      name: "¿Eliminar el cuaderno «Cuaderno renombrado»?",
+    });
+    await expect(confirm.getByText("Se eliminará 1 página.")).toBeVisible();
     await clickAndWaitForAction(
       page,
-      page.getByRole("dialog").getByRole("button", {
-        name: "Archivar",
-        exact: true,
-      }),
+      confirm.getByRole("button", { name: "Eliminar cuaderno" }),
       '"notebookId"',
     );
     await expect(notebookCard(page, "Cuaderno renombrado")).toHaveCount(0);
 
-    // Archiving is not just an optimistic client update: it must survive a
-    // reload (Scenario "Archivado lógico sin restauración" reads from the
-    // server on every request).
+    // Deleting is not just an optimistic client update: it survives a
+    // reload, and the notebook's own route is gone.
     await page.reload();
     await expect(notebookCard(page, "Cuaderno renombrado")).toHaveCount(0);
-
-    // The archived notebook's own route is gone too (Scenario "Ruta de
-    // página ajena" applies to archived ids as well).
-    const archivedRoute = await page.goto(`/notebooks/${notebookId}`);
-    expect(archivedRoute?.status()).toBe(404);
+    const deletedRoute = await page.goto(`/notebooks/${notebookId}`);
+    expect(deletedRoute?.status()).toBe(404);
   });
 
-  // New entry point (design pass 2): pages are archived from their card on
-  // the notebook's route ("Archivar página {título}"), replacing the sidebar
-  // tree row's trash button.
-  test("archives a page from the notebook route and it stays gone after a reload", async ({
+  // Pages are deleted from their card on the notebook's route ("Eliminar
+  // página {título}"; Phase 8 H19, a real delete replacing archiving).
+  test("deletes a page from the notebook route and it stays gone after a reload", async ({
     page,
   }) => {
     const title = `Cuaderno de páginas ${randomUUID().slice(0, 8)}`;
@@ -164,14 +158,17 @@ test.describe("notebooks acceptance", () => {
     // The trash button only opens the confirmation dialog; the mutation
     // fires when it is confirmed.
     await page
-      .getByRole("button", { name: "Archivar página Sin título" })
+      .getByRole("button", { name: "Eliminar página Sin título" })
       .click();
+    const confirm = page.getByRole("dialog", {
+      name: "¿Eliminar la página «Sin título»?",
+    });
+    await expect(
+      confirm.getByText("Se eliminarán la página y sus apuntes."),
+    ).toBeVisible();
     await clickAndWaitForAction(
       page,
-      page.getByRole("dialog").getByRole("button", {
-        name: "Archivar",
-        exact: true,
-      }),
+      confirm.getByRole("button", { name: "Eliminar página" }),
       '"pageId"',
     );
     await expect(page.getByRole("link", { name: /^Sin título/ })).toHaveCount(
@@ -398,11 +395,10 @@ test.describe("notebooks acceptance", () => {
     await applyMarkTo("codigoinline", "ControlOrMeta+e");
 
     // Cogni highlight mark: S6a folded the standalone highlight-picker
-    // BubbleMenu into the shared bubble toolbar (bubble-toolbar.tsx) — the
-    // palette (highlight-picker-controls.tsx) now only appears after
-    // opening the toolbar's color popover ("Color de texto", whose
-    // "Fondo/Resaltado" row reuses it unchanged), instead of floating on its
-    // own on selection. Same triple-click selection as the inline marks
+    // BubbleMenu into the shared bubble toolbar (bubble-toolbar.tsx); since
+    // H8-4 the palette is the highlighter's own swatch row (its chevron,
+    // "Más colores de resaltado"), and "Color de texto" only colours text.
+    // Same triple-click selection as the inline marks
     // above; a keyboard-only Home/Shift+End does not reliably make the
     // toolbar appear.
     await editable
@@ -410,9 +406,11 @@ test.describe("notebooks acceptance", () => {
       .click({ clickCount: 3 });
     const bubbleToolbar = page.getByTestId("bubble-toolbar");
     await expect(bubbleToolbar).toBeVisible();
-    await bubbleToolbar.getByRole("button", { name: "Color de texto" }).click();
+    await bubbleToolbar
+      .getByRole("button", { name: "Más colores de resaltado" })
+      .click();
     await page
-      .getByTestId("highlight-picker")
+      .getByRole("group", { name: "Colores de resaltado" })
       .getByRole("button", { name: "Resaltar en verde" })
       .click();
     await expect(editable.locator('mark[data-color="green"]')).toContainText(

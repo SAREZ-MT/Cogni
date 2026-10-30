@@ -6,6 +6,7 @@ import type { PageMastery } from "../domain/page-mastery";
 import { applySm2 } from "../domain/sm2";
 import {
   examReviewQualityFor,
+  isDueBefore,
   type Quality,
   type StudyItem,
 } from "../domain/study-item";
@@ -25,8 +26,12 @@ export interface RecordExamReviewsInput {
   sessionId: string;
   pageId: string;
   answers: readonly ExamReviewAnswer[];
-  // The exam's finish time: review time and due comparison.
+  // The exam's finish time: the review time.
   now: Date;
+  // The owner's "due" bound at `now` (the start of their next local day,
+  // a DueCutoff): an item due before it was due, so a correct answer to an
+  // item due later today reviews it.
+  dueBefore: Date;
 }
 
 export interface RecordExamReviewsDeps {
@@ -64,7 +69,7 @@ export async function recordExamReviews(
   input: RecordExamReviewsInput,
   deps: RecordExamReviewsDeps,
 ): Promise<Result<RecordedExamReviews, DomainError>> {
-  const { ownerId, pageId, now } = input;
+  const { ownerId, pageId, now, dueBefore } = input;
   const roots = new Set(input.answers.map((answer) => answer.rootId));
   if (roots.size !== input.answers.length) {
     return fail(
@@ -122,7 +127,7 @@ export async function recordExamReviews(
     for (const answer of input.answers) {
       const item = locked.get(itemIdByRoot.get(answer.rootId) ?? "");
       if (!item) return fail(STUDY_ENGINE_ERROR.ITEM_NOT_FOUND, answer.rootId);
-      const quality = qualityFor(answer.correct, item, now);
+      const quality = qualityFor(answer.correct, item, dueBefore);
       if (quality === null) {
         skippedRootIds.push(answer.rootId);
         continue;
@@ -175,12 +180,12 @@ export async function recordExamReviews(
 function qualityFor(
   correct: boolean,
   item: StudyItem,
-  now: Date,
+  dueBefore: Date,
 ): Quality | null {
   if (item.suspendedAt !== null) return null;
   return examReviewQualityFor({
     correct,
-    wasDue: item.dueAt.getTime() <= now.getTime(),
+    wasDue: isDueBefore(item, dueBefore),
   });
 }
 

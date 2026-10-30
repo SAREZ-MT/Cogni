@@ -39,8 +39,15 @@ import ActiveRecallSessionPage, { maxDuration } from "./page";
 const NOTEBOOK = "5e6f7a8b-9c0d-4e1f-8a2b-3c4d5e6f7a8b";
 const PAGE = "0a1b2c3d-4e5f-4061-8798-a1b2c3d4e5f6";
 
-function props(notebookId = NOTEBOOK, pageId = PAGE) {
-  return { params: Promise.resolve({ notebookId, pageId }) };
+function props(
+  notebookId = NOTEBOOK,
+  pageId = PAGE,
+  search: Record<string, string> = {},
+) {
+  return {
+    params: Promise.resolve({ notebookId, pageId }),
+    searchParams: Promise.resolve(search),
+  };
 }
 
 describe("ActiveRecallSessionPage", () => {
@@ -79,9 +86,42 @@ describe("ActiveRecallSessionPage", () => {
       screen.getByText("¿Qué produce la mitocondria?"),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("Active recall — Biología celular"),
+      screen.getByText("Recordación activa — Biología celular"),
     ).toBeInTheDocument();
     expect(screen.getByText("Mitocondria")).toBeInTheDocument();
+  });
+
+  // Phase 8 H17: no notebook level; back is the hub filtered by the
+  // page's notebook.
+  it("goes back to the hub filtered by the notebook by default", async () => {
+    render(await ActiveRecallSessionPage(props()));
+
+    expect(
+      screen.getByRole("link", { name: /Todas las sesiones/ }),
+    ).toHaveAttribute("href", `/active-recall?cuaderno=${NOTEBOOK}`);
+  });
+
+  it("goes back to the hub with its filter when opened from a filtered hub", async () => {
+    render(
+      await ActiveRecallSessionPage(
+        props(NOTEBOOK, PAGE, { desde: "hub", cuaderno: NOTEBOOK }),
+      ),
+    );
+
+    expect(
+      screen.getByRole("link", { name: /Todas las sesiones/ }),
+    ).toHaveAttribute("href", `/active-recall?cuaderno=${NOTEBOOK}`);
+  });
+
+  // Phase 8 H16: opened from the hub's create dialog, back returns there.
+  it("goes back to the hub when opened from it", async () => {
+    render(
+      await ActiveRecallSessionPage(props(NOTEBOOK, PAGE, { desde: "hub" })),
+    );
+
+    expect(
+      screen.getByRole("link", { name: /Todas las sesiones/ }),
+    ).toHaveAttribute("href", "/active-recall");
   });
 
   it("shows the existing empty state for a page without questions", async () => {
@@ -118,7 +158,9 @@ describe("ActiveRecallSessionPage", () => {
 
     render(await ActiveRecallSessionPage(props()));
 
-    expect(screen.getByText("Active recall — Cuaderno")).toBeInTheDocument();
+    expect(
+      screen.getByText("Recordación activa — Cuaderno"),
+    ).toBeInTheDocument();
   });
 
   // ADR 0003: the evaluation scheduled with after() by the finish action

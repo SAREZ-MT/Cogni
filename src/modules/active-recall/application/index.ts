@@ -1,4 +1,23 @@
 export {
+  type ApplyRecallEditsDeps,
+  applyRecallEdits,
+  type RecallEdits,
+  type RecallEditsResult,
+} from "./apply-recall-edits";
+export {
+  type CreateRecallQuestionDeps,
+  createRecallQuestion,
+} from "./create-recall-question";
+export {
+  type DeleteRecallQuestionResult,
+  deleteRecallQuestion,
+} from "./delete-recall-question";
+export { deleteRecallSet, previewRecallSetDeletion } from "./delete-recall-set";
+export {
+  editRecallQuestion,
+  type RecallQuestionContent,
+} from "./edit-recall-question";
+export {
   EVALUATION_CLAIM_LEASE_MS,
   type EvaluatedRecallSession,
   type EvaluateRecallSessionDeps,
@@ -44,6 +63,10 @@ export {
   type RecallSessionRepositories,
   type RecallSessionUnitOfWork,
 } from "./recall-session-work";
+export type {
+  RecallSetDeletion,
+  RecallSetDeletionPreview,
+} from "./recall-set-deletion";
 export {
   type RecallQuestionRepositories,
   type RecallStudyItems,

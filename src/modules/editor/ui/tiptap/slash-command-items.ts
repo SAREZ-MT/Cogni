@@ -1,6 +1,8 @@
 import type { Editor, Range } from "@tiptap/core";
 import {
   AtSign,
+  CircleAlert,
+  CircleCheck,
   Code2,
   Heading1,
   Heading2,
@@ -14,12 +16,15 @@ import {
   Minus,
   Pilcrow,
   Quote,
+  Radical,
+  Sigma,
   SmilePlus,
   StickyNote,
   Table as TableIcon,
   TriangleAlert,
 } from "lucide-react";
 import type { CommandMenuItem } from "../command-menu";
+import { requestMathEdit } from "./extensions/math-editing";
 
 export interface SlashCommandItem extends CommandMenuItem {
   run: (editor: Editor, range: Range) => void;
@@ -234,6 +239,32 @@ export const SLASH_COMMAND_ITEMS: SlashCommandItem[] = [
     run: (editor, range) =>
       editor.chain().focus().deleteRange(range).insertContent("@").run(),
   },
+  // H7: formulas. The typed command is removed and the LaTeX input opens
+  // (math-editor.tsx); nothing is inserted until it holds a formula.
+  {
+    id: "math-block",
+    label: "Ecuación",
+    keywords: ["ecuacion", "formula", "math", "latex", "katex"],
+    icon: Sigma,
+    group: "Contenido",
+    description: "Fórmula LaTeX en su propia línea",
+    run: (editor, range) => {
+      editor.chain().focus().deleteRange(range).run();
+      requestMathEdit(editor, { kind: "block", pos: null, latex: "" });
+    },
+  },
+  {
+    id: "math-inline",
+    label: "Ecuación en línea",
+    keywords: ["ecuacion", "formula", "math", "latex", "inline"],
+    icon: Radical,
+    group: "Contenido",
+    description: "Fórmula LaTeX dentro del texto",
+    run: (editor, range) => {
+      editor.chain().focus().deleteRange(range).run();
+      requestMathEdit(editor, { kind: "inline", pos: null, latex: "" });
+    },
+  },
   // Callouts
   {
     id: "callout-idea",
@@ -288,6 +319,45 @@ export const SLASH_COMMAND_ITEMS: SlashCommandItem[] = [
         .insertContent({
           type: "callout",
           attrs: { kind: "warning" },
+          content: [{ type: "paragraph" }],
+        })
+        .run(),
+  },
+  // H8: important (blue) and tip (green).
+  {
+    id: "callout-important",
+    label: "Callout importante",
+    keywords: ["importante", "important", "alerta", "callout"],
+    icon: CircleAlert,
+    group: "Callouts",
+    description: "Señala algo importante",
+    run: (editor, range) =>
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertContent({
+          type: "callout",
+          attrs: { kind: "important" },
+          content: [{ type: "paragraph" }],
+        })
+        .run(),
+  },
+  {
+    id: "callout-tip",
+    label: "Callout de consejo",
+    keywords: ["consejo", "tip", "sugerencia", "callout"],
+    icon: CircleCheck,
+    group: "Callouts",
+    description: "Comparte un consejo",
+    run: (editor, range) =>
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertContent({
+          type: "callout",
+          attrs: { kind: "tip" },
           content: [{ type: "paragraph" }],
         })
         .run(),

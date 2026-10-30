@@ -1,3 +1,4 @@
+import type { DueCutoff } from "@/modules/study-engine";
 import type { Clock } from "@/shared/kernel/clock";
 import {
   composeRecallQuestions,
@@ -8,6 +9,8 @@ import type { RecallSessionQuestion } from "./start-recall-session";
 export interface PlanRecallSessionDeps
   extends Pick<RecallSessionRepositories, "questions" | "studyItems"> {
   clock: Clock;
+  // The owner's per-day "due" bound (start of their next local day).
+  dueCutoff: DueCutoff;
 }
 
 export interface RecallSessionPlan {
@@ -26,7 +29,7 @@ export async function planRecallSession(
   ownerId: string,
 ): Promise<RecallSessionPlan> {
   const questions = await composeRecallQuestions(
-    { pageId: input.pageId, now: deps.clock.now() },
+    { pageId: input.pageId, dueBefore: deps.dueCutoff(deps.clock.now()) },
     ownerId,
     deps,
   );

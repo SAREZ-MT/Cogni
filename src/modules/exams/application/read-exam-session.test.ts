@@ -12,6 +12,7 @@ import {
   PAGE,
   pages,
   seedSessionQuestions,
+  utcDayCutoff,
 } from "./testing/fixtures";
 import { InMemoryExamSessionUnitOfWork } from "./testing/in-memory-exam-session-unit-of-work";
 
@@ -22,7 +23,13 @@ async function setup(questionCount = 12) {
   const start = () =>
     startExamSession(
       { pageId: PAGE, requestedCount: 10 },
-      { pages, uow, clock, ids: { next: () => "session-1" } },
+      {
+        pages,
+        uow,
+        clock,
+        dueCutoff: utcDayCutoff,
+        ids: { next: () => "session-1" },
+      },
       OWNER,
     );
   return { uow, clock, start };
@@ -69,7 +76,11 @@ describe("readExamSession", () => {
         OWNER,
       );
     }
-    await completeExamSession({ sessionId }, { uow, clock }, OWNER);
+    await completeExamSession(
+      { sessionId },
+      { uow, clock, dueCutoff: utcDayCutoff },
+      OWNER,
+    );
     // A question retired later still shows in the stored results.
     await uow.repos.questions.retire("q-10", OWNER, LATER);
     const view = await readExamSession({ sessionId }, { uow }, OWNER);
@@ -128,7 +139,7 @@ describe("getExamPageOverview", () => {
     }
     await completeExamSession(
       { sessionId: "session-1" },
-      { uow, clock },
+      { uow, clock, dueCutoff: utcDayCutoff },
       OWNER,
     );
     const done = await getExamPageOverview({ pageId: PAGE }, { uow }, OWNER);

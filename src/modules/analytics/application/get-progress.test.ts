@@ -15,9 +15,17 @@ describe("getProgress", () => {
       dueAt: new Date(NOW.getTime() - 1),
       suspended: false,
     });
+    // Due later today (22:00 → 23:59 local): reviews are due per local
+    // day, so it is already pending.
     store.addItem({
       pageId: "p-1",
       dueAt: new Date(NOW.getTime() + 1),
+      suspended: false,
+    });
+    // 00:00 on Tuesday 13 Oct in Bogotá: tomorrow, not due yet.
+    store.addItem({
+      pageId: "p-1",
+      dueAt: new Date("2026-10-13T05:00:00.000Z"),
       suspended: false,
     });
     // Sunday 4 Oct in Bogotá: before the first week.
@@ -59,8 +67,8 @@ describe("getProgress", () => {
         notebookId: "nb-1",
         level: "Consolidando",
         score: 0.5,
-        itemsTotal: 2,
-        itemsDue: 1,
+        itemsTotal: 3,
+        itemsDue: 2,
         trend,
       },
       {
@@ -83,8 +91,8 @@ describe("getProgress", () => {
         title: "Biología",
         color: "green",
         pages: 2,
-        itemsTotal: 2,
-        itemsDue: 1,
+        itemsTotal: 3,
+        itemsDue: 2,
         averageScore: 0.5,
         trend,
       },

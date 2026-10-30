@@ -6,7 +6,15 @@ import type { ExamHubPage } from "./domain/exam-hub-reader";
 // scheduling, view mapping, degraded due list, never-throw) without a
 // database; listExamHub and the reader are covered by their own tests.
 const { getCurrentUser } = vi.hoisted(() => ({ getCurrentUser: vi.fn() }));
-vi.mock("@/modules/identity", () => ({ getCurrentUser }));
+// Reviews are due per local day of the profile's zone (Bogotá, -05).
+vi.mock("@/modules/identity", () => ({
+  getCurrentUser,
+  getCurrentTimeZoneSetting: async () => ({
+    status: "ok",
+    timeZone: "America/Bogota",
+    chosen: true,
+  }),
+}));
 vi.mock("@/shared/db/client", () => ({ getDb: () => ({}) }));
 const { captureException } = vi.hoisted(() => ({ captureException: vi.fn() }));
 vi.mock("@sentry/nextjs", () => ({ captureException }));
@@ -35,9 +43,11 @@ vi.mock("./infrastructure", async (importOriginal) => ({
     };
   }),
 }));
-vi.mock("@/modules/scheduling", () => ({
+vi.mock("@/modules/scheduling", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/modules/scheduling")>()),
   createSchedulingServerApi: () => ({
-    async listDueToday(ownerId: string) {
+    async listDueToday(ownerId: string, day: { timeZone: string }) {
+      expect(day).toEqual({ timeZone: "America/Bogota" });
       state.dueOwners.push(ownerId);
       return state.due();
     },
@@ -46,8 +56,10 @@ vi.mock("@/modules/scheduling", () => ({
 
 vi.mock("@/modules/study-engine", () => ({
   createStudyItemRepository: () => ({
-    async listDue(ownerId: string, now: Date) {
-      expect(now).toBeInstanceOf(Date);
+    async listDue(ownerId: string, dueBefore: Date) {
+      // The start of the owner's next local day: 05:00 UTC in Bogotá.
+      expect(dueBefore.getUTCHours()).toBe(5);
+      expect(dueBefore.getUTCMinutes()).toBe(0);
       state.dueItemOwners.push(ownerId);
       return state.dueItems();
     },
@@ -66,6 +78,8 @@ function hubPage(overrides: Partial<ExamHubPage> = {}): ExamHubPage {
     activeQuestionCount: 12,
     attempts: 2,
     lastSession: { finishedAt: FINISHED, total: 10, correct: 6, passed: false },
+    bestScore: 70,
+    latestQuestionAt: new Date("2026-10-01T10:00:00.000Z"),
     retakePending: true,
     failedRootIds: ["root-failed"],
     ...overrides,
@@ -136,6 +150,8 @@ describe("listExamHubAction", () => {
           retakePending: true,
           dueToday: 3,
           failedDueNow: false,
+          bestScore: 70,
+          latestQuestionAt: "2026-10-01T10:00:00.000Z",
         },
         expect.objectContaining({
           pageId: "page-2",

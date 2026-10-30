@@ -1,4 +1,7 @@
-import type { StudyItemRepository } from "@/modules/study-engine";
+import type {
+  StudyItemKind,
+  StudyItemRepository,
+} from "@/modules/study-engine";
 import type { GenerationFingerprintRepository } from "@/shared/kernel/generation-fingerprints";
 import type { Result } from "@/shared/kernel/result";
 import type { ExamQuestionRepository } from "../domain/exam-question-repository";
@@ -10,7 +13,30 @@ import type { ExamQuestionRepository } from "../domain/exam-question-repository"
 export type ExamStudyItems = Pick<
   StudyItemRepository,
   "save" | "findBySource" | "suspend"
->;
+> & {
+  // Removes the source's study item; its review logs cascade with it
+  // (Phase 8 H18 deletes; study-engine has no delete of its own, so the
+  // exams adapter adds it).
+  deleteBySource(
+    kind: StudyItemKind,
+    sourceId: string,
+    ownerId: string,
+  ): Promise<void>;
+};
+
+// What else points at a lineage that is deleted (Phase 8 H18): an open
+// exam showing one of its questions (its stored list would point at
+// nothing, and it could never be finished) and the page's pending retake
+// (its failed roots). dropLineage removes those open sessions, with their
+// answers, and the root from the retake (a retake left with no failed
+// root is no longer pending); finished exams keep their score as the
+// record of that attempt.
+export interface ExamLineageReferences {
+  dropLineage(
+    input: { pageId: string; rootId: string; questionIds: readonly string[] },
+    ownerId: string,
+  ): Promise<void>;
+}
 
 export interface ExamQuestionRepositories {
   readonly questions: ExamQuestionRepository;
@@ -18,6 +44,7 @@ export interface ExamQuestionRepositories {
   // The "exam" paragraph fingerprints of a generation (Phase 6 T5c), stored
   // with its questions.
   readonly fingerprints: GenerationFingerprintRepository;
+  readonly lineageRefs: ExamLineageReferences;
 }
 
 // Unit of work over a page's questions and their study items: everything

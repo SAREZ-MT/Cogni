@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { getRecallSessionPlanAction } from "@/modules/active-recall";
 import { getNotebookTitleForRoute, getPageForRoute } from "@/modules/notebooks";
+import { hubHref, hubReturnHref } from "@/shared/navigation/technique-hub";
 import { SetBreadcrumb } from "../../../_components/breadcrumb";
 import { ActiveRecallPlayer } from "../../_components/active-recall-player";
 
@@ -12,6 +13,7 @@ export const maxDuration = 300;
 
 interface ActiveRecallSessionPageProps {
   params: Promise<{ notebookId: string; pageId: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
 // Active recall session route on real data (Phase 6 T5). One page owns at
@@ -25,8 +27,19 @@ interface ActiveRecallSessionPageProps {
 // design-preview gate in T5; the hub and notebook views follow in T7.
 export default async function ActiveRecallSessionPage({
   params,
+  searchParams,
 }: ActiveRecallSessionPageProps) {
   const { notebookId, pageId } = await params;
+  // Phase 8 H16/H17: opened from the hub (its create dialog or a card),
+  // the back links and "Terminar"'s results lead back to the hub as it was
+  // (`?desde=hub&cuaderno=`); otherwise to the hub filtered by the
+  // notebook (the notebook view is gone).
+  const { desde, cuaderno } = await searchParams;
+  const backHref = hubReturnHref(
+    "/active-recall",
+    { desde, cuaderno },
+    notebookId,
+  );
   const page = await getPageForRoute(notebookId, pageId);
   if (!page) notFound();
   const plan = await getRecallSessionPlanAction({ pageId: page.id });
@@ -38,8 +51,8 @@ export default async function ActiveRecallSessionPage({
     <section className="flex flex-1 flex-col">
       <SetBreadcrumb
         items={[
-          { label: "Active recall", href: "/active-recall" },
-          { label: notebookTitle, href: `/active-recall/${notebookId}` },
+          { label: "Recordación activa", href: "/active-recall" },
+          { label: notebookTitle, href: hubHref("/active-recall", notebookId) },
           { label: page.title },
         ]}
       />
@@ -49,6 +62,7 @@ export default async function ActiveRecallSessionPage({
         pageTitle={page.title}
         pageId={page.id}
         questions={plan.value.questions}
+        backHref={backHref}
       />
     </section>
   );

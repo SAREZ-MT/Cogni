@@ -94,10 +94,31 @@ describe("/terminos page", () => {
     identity.ensureProfileForUser.mockResolvedValue(profile());
     const { container } = await renderPage("//evil.test");
 
-    expect(container.querySelector('input[name="next"]')).toHaveValue("/");
+    expect(container.querySelector('input[name="next"]')).toHaveValue(
+      "/inicio",
+    );
   });
 
   it("shows the accepted version and date with a way back once accepted", async () => {
+    identity.getCurrentUser.mockResolvedValue(USER);
+    identity.ensureProfileForUser.mockResolvedValue(
+      profile({
+        termsAcceptedVersion: "2026-10-28",
+        termsAcceptedAt: new Date("2026-10-29T15:00:00Z"),
+      }),
+    );
+    await renderPage();
+
+    expect(screen.getByTestId("terms-accepted-state")).toHaveTextContent(
+      "Aceptaste la versión 2026-10-28 el 29 de octubre de 2026.",
+    );
+    expect(
+      screen.getByRole("link", { name: "Volver a Cogni" }),
+    ).toHaveAttribute("href", "/inicio");
+    expect(screen.queryByTestId("terms-accept-checkbox")).toBeNull();
+  });
+
+  it("asks an account that accepted an older version to accept again", async () => {
     identity.getCurrentUser.mockResolvedValue(USER);
     identity.ensureProfileForUser.mockResolvedValue(
       profile({
@@ -107,13 +128,20 @@ describe("/terminos page", () => {
     );
     await renderPage();
 
-    expect(screen.getByTestId("terms-accepted-state")).toHaveTextContent(
-      "Aceptaste la versión 2026-10-04 el 5 de octubre de 2026.",
-    );
+    expect(screen.getByTestId("terms-accept-checkbox")).toBeInTheDocument();
+    expect(screen.queryByTestId("terms-accepted-state")).toBeNull();
+  });
+
+  it("links the full terms and privacy policy", async () => {
+    identity.getCurrentUser.mockResolvedValue(null);
+    await renderPage();
+
     expect(
-      screen.getByRole("link", { name: "Volver a Cogni" }),
-    ).toHaveAttribute("href", "/");
-    expect(screen.queryByTestId("terms-accept-checkbox")).toBeNull();
+      screen.getByRole("link", { name: "Términos y condiciones" }),
+    ).toHaveAttribute("href", "/legal/terminos");
+    expect(
+      screen.getByRole("link", { name: "Política de privacidad" }),
+    ).toHaveAttribute("href", "/legal/privacidad");
   });
 
   it("still offers the form when the profile could not be loaded", async () => {

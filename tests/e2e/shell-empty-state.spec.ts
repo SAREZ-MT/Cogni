@@ -1,4 +1,16 @@
+import type { Page } from "@playwright/test";
 import { expect, hasSupabaseEnv, signIn, test } from "./fixtures/auth";
+
+const SCREENSHOT_DIR = process.env.E2E_SCREENSHOT_DIR;
+
+async function shot(page: Page, name: string) {
+  if (!SCREENSHOT_DIR) return;
+  await page.waitForTimeout(400);
+  await page.screenshot({
+    path: `${SCREENSHOT_DIR}/${name}.png`,
+    fullPage: true,
+  });
+}
 
 // Task 2.6: the authenticated shell renders an empty state, the sidebar
 // collapses and the choice survives navigation. Since PR3 the shell needs
@@ -13,10 +25,10 @@ test.describe("app shell", () => {
   test("renders canvas, content area, sidebar and topbar with the declared sizes", async ({
     page,
   }) => {
-    await page.goto("/");
+    await page.goto("/inicio");
 
     const body = page.locator("body");
-    await expect(body).toHaveCSS("background-color", "rgb(237, 234, 228)");
+    await expect(body).toHaveCSS("background-color", "rgb(232, 232, 232)");
     await expect(body).toHaveCSS("font-family", /DM.?Sans/i);
 
     const sidebar = page.getByRole("navigation", { name: "Barra lateral" });
@@ -32,10 +44,10 @@ test.describe("app shell", () => {
 
   // Scenario "Reescritura de shell-empty-state.spec.ts"
   // (specs/design-tokens-and-shell/spec.md): a fresh owner without
-  // notebooks sees the empty-state message and a control to create the
-  // first one. Since design pass 2 the sidebar is navigation only, so both
-  // live in Home's content area (the "Nuevo cuaderno" pill, whose dialog
-  // confirms with "Crear cuaderno").
+  // notebooks sees the empty state and a control to create the first one.
+  // Since Phase 8 H2-T3 it is the "Tu inicio está vacío por ahora" screen:
+  // one primary "Crea tu primer cuaderno" (whose dialog confirms with
+  // "Crear cuaderno"), the "Ver tutorial" link and three static previews.
   test("home shows the empty state and a control to create the first notebook", async ({
     page,
     freshUser,
@@ -46,21 +58,154 @@ test.describe("app shell", () => {
     // away from /login.
     await page.context().clearCookies();
     await signIn(page, freshUser);
-    await page.goto("/");
+    await page.goto("/inicio");
 
     const content = page.getByTestId("content-area");
     await expect(
-      content.getByText("Aún no tienes cuadernos. Crea uno para empezar."),
+      content.getByRole("heading", {
+        level: 1,
+        name: "Tu inicio está vacío por ahora",
+      }),
+    ).toBeVisible();
+    const create = content.getByRole("button", {
+      name: "Crea tu primer cuaderno",
+    });
+    await expect(create).toBeVisible();
+    await expect(create).toHaveAttribute("data-tour", "crear-cuaderno");
+    await expect(
+      content.getByRole("button", { name: "Ver tutorial", exact: true }),
     ).toBeVisible();
     await expect(
-      content.getByRole("button", { name: "Nuevo cuaderno" }),
+      content
+        .getByRole("region", { name: "Lo que verás aquí" })
+        .getByRole("heading", { level: 3 }),
+    ).toHaveText(["Para hoy", "Continúa donde lo dejaste", "Temas débiles"]);
+
+    await create.click();
+    await expect(
+      page.getByRole("dialog").getByRole("button", { name: "Crear cuaderno" }),
     ).toBeVisible();
 
     // The sidebar no longer carries the notebook tree or its empty state.
     const sidebar = page.getByRole("navigation", { name: "Barra lateral" });
     await expect(
-      sidebar.getByText("Aún no tienes cuadernos. Crea uno para empezar."),
+      sidebar.getByText("Tu inicio está vacío por ahora"),
     ).toHaveCount(0);
+  });
+
+  // Phase 8 H4-T1 (user-approved mockup 2026-10-20): a brand-new owner's
+  // /notebooks shows the illustrated invitation, without the old
+  // "Biblioteca" eyebrow, and its CTA opens the create-notebook dialog.
+  test("notebooks hub shows the illustrated empty state for a new owner", async ({
+    page,
+    freshUser,
+  }) => {
+    await page.context().clearCookies();
+    await signIn(page, freshUser);
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.goto("/notebooks");
+
+    const content = page.getByTestId("content-area");
+    await expect(
+      content.getByRole("heading", { level: 1, name: "Cuadernos" }),
+    ).toBeVisible();
+    await expect(content.getByText("Aún no tienes cuadernos")).toBeVisible();
+    await expect(content.getByText("Biblioteca")).toHaveCount(0);
+    await expect(
+      content.getByRole("heading", {
+        name: "Todas tus materias, en un solo lugar",
+      }),
+    ).toBeVisible();
+    // Scoped to the empty state: the breadcrumb is a list too.
+    const empty = content.locator('[data-slot="illustrated-empty-state"]');
+    await expect(empty.getByRole("listitem")).toHaveText([
+      "1Crea un cuaderno por materia",
+      "2Escribe o importa tus apuntes",
+      "3Repasa con las técnicas",
+    ]);
+    // Phase 8 H4-T3: a CSS notebook fan instead of an illustration.
+    await expect(empty.locator('[data-slot="notebook-fan"]')).toBeVisible();
+    await expect(empty.locator("img")).toHaveCount(0);
+    await shot(page, "real-1440");
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.reload();
+    await expect(
+      empty.getByRole("button", { name: "Crear mi primer cuaderno" }),
+    ).toBeVisible();
+    await shot(page, "real-390");
+
+    await empty
+      .getByRole("button", { name: "Crear mi primer cuaderno" })
+      .click();
+    await expect(
+      page.getByRole("dialog").getByRole("button", { name: "Crear cuaderno" }),
+    ).toBeVisible();
+  });
+
+  // Phase 8 H10/H11 (user request 2026-10-29): a brand-new owner's
+  // technique hubs show their illustrated empty state, each with its own
+  // art, technique theme and a CTA that opens the hub's create dialog;
+  // without notebooks that dialog links to the notebooks hub. No AI is
+  // involved.
+  test("technique hubs show their illustrated empty states for a new owner", async ({
+    page,
+    freshUser,
+  }) => {
+    await page.context().clearCookies();
+    await signIn(page, freshUser);
+    await page.setViewportSize({ width: 1440, height: 1000 });
+
+    for (const hub of [
+      {
+        path: "/flashcards",
+        technique: "flashcards",
+        heading: "Tus primeras flashcards te esperan",
+        cta: "Crear mis primeras flashcards",
+      },
+      {
+        path: "/active-recall",
+        technique: "recall",
+        heading: "Practica explicando con tus palabras",
+        cta: "Generar mis primeras preguntas",
+      },
+      {
+        path: "/exams",
+        technique: "exams",
+        heading: "Pon a prueba lo que sabes",
+        cta: "Crear mi primer examen",
+      },
+    ]) {
+      await page.goto(hub.path);
+      const empty = page
+        .getByTestId("content-area")
+        .locator('[data-slot="illustrated-empty-state"]');
+      await expect(
+        empty.getByRole("heading", { name: hub.heading }),
+      ).toBeVisible();
+      await expect(
+        empty.locator(
+          `[data-slot="technique-empty-art"][data-technique="${hub.technique}"]`,
+        ),
+      ).toBeVisible();
+      await expect(
+        page
+          .getByTestId("content-area")
+          .locator(`[data-technique-theme="${hub.technique}"]`)
+          .first(),
+      ).toBeVisible();
+      await expect(empty.getByRole("button", { name: hub.cta })).toBeVisible();
+    }
+
+    // The exams CTA's dialog leads to the notebooks hub.
+    await page
+      .getByTestId("content-area")
+      .getByRole("button", { name: "Crear mi primer examen" })
+      .click();
+    await page
+      .getByRole("dialog", { name: "Crear examen" })
+      .getByRole("link", { name: "Crear un cuaderno" })
+      .click();
+    await expect(page).toHaveURL("/notebooks");
   });
 
   // Every sidebar area runs on real data, so each one is a live link:
@@ -68,7 +213,7 @@ test.describe("app shell", () => {
   // Calendario (Phase 7 T1), Configuración (Phase 7 T2a) and Dashboard
   // (Phase 7 T4). No disabled "pronto" row is left.
   test("sidebar lists every area as a live link", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/inicio");
 
     const sidebar = page.getByRole("navigation", { name: "Barra lateral" });
     await expect(
@@ -78,7 +223,7 @@ test.describe("app shell", () => {
       sidebar.getByRole("link", { name: "Exámenes" }),
     ).toHaveAttribute("href", "/exams");
     await expect(
-      sidebar.getByRole("link", { name: "Active recall" }),
+      sidebar.getByRole("link", { name: "Recordación activa" }),
     ).toHaveAttribute("href", "/active-recall");
     // Phase 7 T1: the old "Horarios" row is the live "Calendario" entry.
     await expect(
@@ -88,9 +233,9 @@ test.describe("app shell", () => {
     await expect(
       sidebar.getByRole("link", { name: /Configuración/ }),
     ).toHaveAttribute("href", "/configuracion");
-    // Phase 7 T4: "Dashboard" runs on analytics data.
+    // Phase 7 T4: "Progreso" runs on analytics data.
     await expect(
-      sidebar.getByRole("link", { name: "Dashboard", exact: true }),
+      sidebar.getByRole("link", { name: "Progreso", exact: true }),
     ).toHaveAttribute("href", "/dashboard");
     await expect(sidebar.locator('[aria-disabled="true"]')).toHaveCount(0);
     await expect(
@@ -134,7 +279,7 @@ test.describe("app shell", () => {
     const hub = await page.goto("/active-recall");
     expect(hub?.status()).toBe(200);
     await expect(
-      page.getByRole("heading", { level: 1, name: "Active recall" }),
+      page.getByRole("heading", { level: 1, name: "Recordación activa" }),
     ).toBeVisible();
     await expect(page.getByText("Biología Celular")).toHaveCount(0);
     await expect(page.getByText("Vista previa")).toHaveCount(0);
@@ -147,7 +292,9 @@ test.describe("app shell", () => {
       const response = await page.goto(path);
 
       expect(response?.status(), path).toBe(404);
-      await expect(page.getByText("Active recall — Biología")).toHaveCount(0);
+      await expect(page.getByText("Recordación activa — Biología")).toHaveCount(
+        0,
+      );
       await expect(page.getByText("Pregunta 1 de")).toHaveCount(0);
       await expect(page.getByText("Sesiones por página")).toHaveCount(0);
     }
@@ -196,14 +343,14 @@ test.describe("app shell", () => {
 
     expect(response?.status()).toBe(200);
     await expect(
-      page.getByRole("heading", { name: "Dashboard", level: 1 }),
+      page.getByRole("heading", { name: "Progreso", level: 1 }),
     ).toBeVisible();
   });
 
   test("collapses the sidebar to 64px and keeps the choice after navigating", async ({
     page,
   }) => {
-    await page.goto("/");
+    await page.goto("/inicio");
 
     const sidebar = page.getByRole("navigation", { name: "Barra lateral" });
     await page.getByRole("button", { name: "Contraer barra lateral" }).click();
@@ -217,7 +364,7 @@ test.describe("app shell", () => {
   });
 
   test("exposes sign-out inside the user menu", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/inicio");
 
     await page.getByRole("button", { name: "Menú de usuario" }).click();
     await expect(
@@ -240,7 +387,7 @@ test.describe("public auth layout", () => {
     );
     await expect(page.getByTestId("public-panel-form")).toHaveCSS(
       "background-color",
-      "rgb(250, 250, 248)",
+      "rgb(245, 243, 239)",
     );
     await expect(
       page.getByRole("button", { name: "Iniciar sesión" }),
@@ -252,7 +399,7 @@ test.describe("public auth layout", () => {
   }) => {
     await page.goto("/login");
     await page.getByLabel("Correo electrónico").fill("ana@example.com");
-    await page.getByLabel("Contraseña").fill("secreta123");
+    await page.getByLabel("Contraseña", { exact: true }).fill("secreta123");
 
     const [request] = await Promise.all([
       page.waitForRequest((candidate) => candidate.url().includes("/login")),

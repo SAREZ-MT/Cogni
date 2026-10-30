@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import type { Locator, Page } from "@playwright/test";
 import { expect, hasSupabaseEnv, signIn, test } from "./fixtures/auth";
 import { createNotebookWithOpenPage } from "./helpers/notebooks";
+import { chooseOption } from "./helpers/select";
+import { withStudyFiller } from "./helpers/study-text";
 
 // Phase 6 T5c (user decision 2026-10-06): "Generar" only sends the page
 // paragraphs a technique has not used yet. Unchanged page: no AI call, no
@@ -41,7 +43,7 @@ async function writeFirstParagraph(page: Page) {
   await editor(page).click();
   // Keys sent <15 ms after a click can precede Chrome's selectionchange.
   await page.waitForTimeout(100);
-  await page.keyboard.type(FIRST);
+  await page.keyboard.type(withStudyFiller(FIRST));
   await waitForSaved(page);
 }
 
@@ -64,10 +66,13 @@ async function addSecondParagraph(page: Page) {
   // ProseMirror reads the DOM selection on selectionchange.
   await page.waitForTimeout(100);
   await page.keyboard.press("Enter");
-  await page.keyboard.type(SECOND);
+  await page.keyboard.type(withStudyFiller(SECOND));
   // The first paragraph must stay as it was: an edit to it makes it new
   // again and it would be re-sent (correctly), breaking this spec's counts.
-  await expect(editor(page).locator("p")).toHaveText([FIRST, SECOND]);
+  await expect(editor(page).locator("p")).toHaveText([
+    withStudyFiller(FIRST),
+    withStudyFiller(SECOND),
+  ]);
   await waitForSaved(page);
 }
 
@@ -83,10 +88,13 @@ test.describe("incremental generation", () => {
   test("flashcards and active recall generate only from new paragraphs and say when nothing is new", async ({
     page,
   }) => {
+    // Four fake generations plus the edit page read.
+    test.setTimeout(120_000);
     await createNotebookWithOpenPage(
       page,
       `Cuaderno incremental ${randomUUID().slice(0, 8)}`,
     );
+    const [, , notebookId, , pageId] = new URL(page.url()).pathname.split("/");
     await writeFirstParagraph(page);
     const panel = page.getByTestId("techniques-panel");
     await expect(panel).toBeVisible();
@@ -120,19 +128,36 @@ test.describe("incremental generation", () => {
     expect(await rowCount(cardsRow)).toBe(cards);
     expect(await rowCount(recallRow)).toBe(questions);
 
-    // A new paragraph: both generate again and add to what exists. The fake
-    // provider makes one card per sentence it is sent, so exactly one new
-    // card proves only the new one-sentence paragraph was sent.
+    // A new paragraph: both generate again and add to what exists.
     await addSecondParagraph(page);
     await panel.getByTestId("generate-flashcards").click();
     await expect
       .poll(() => rowCount(cardsRow), { timeout: 30000 })
-      .toBe(cards + 1);
+      .toBeGreaterThan(cards);
     await panel.getByTestId("generate-recall-questions").click();
     await expect
       .poll(() => rowCount(recallRow), { timeout: 30000 })
       .toBeGreaterThan(questions);
     await expect.poll(() => remainingToday(page)).toBe(start - 4);
+
+    // The fake provider makes one card per sentence it is sent, from the
+    // first one, up to the count the page's words allow (H14: the study
+    // filler fills each paragraph, so a paragraph gives the full count). The
+    // second generation was sent only the new paragraph: exactly one card
+    // tells its first sentence, and the first paragraph's sentence is still
+    // on one card only (re-sending the whole page would have repeated it
+    // and never reached the second paragraph).
+    const deckSize = await rowCount(cardsRow);
+    await page.goto(`/flashcards/${notebookId}/${pageId}/editar`);
+    const entries = page.getByTestId("item-editor-entry");
+    await expect(entries).toHaveCount(deckSize);
+    const backs = await entries
+      .getByLabel("Reverso")
+      .evaluateAll((fields) =>
+        fields.map((field) => (field as HTMLTextAreaElement).value),
+      );
+    expect(backs.filter((back) => back === FIRST)).toHaveLength(1);
+    expect(backs.filter((back) => back === SECOND)).toHaveLength(1);
   });
 
   test("exams send only the new paragraph, and Crear examen says when nothing is new", async ({
@@ -171,24 +196,36 @@ test.describe("incremental generation", () => {
     );
     expect(await remainingToday(page)).toBe(start - 2);
 
-    // The second generation was sent only the new paragraph: its ten stems
-    // quote the second paragraph, the first ten the first one.
-    await page.goto(`/exams/${notebookId}/${pageId}/preguntas`);
-    const rows = page.getByTestId("exam-question-row");
+    // The fake provider cycles over the sentences it is sent from the first
+    // one, so each generation quotes its paragraph's own sentence once and
+    // the study filler (H14) for the rest. The second generation was sent
+    // only the new paragraph: one stem quotes each paragraph's sentence
+    // (re-sending the whole page would have quoted the first one twice and
+    // never the second).
+    await page.goto(`/exams/${notebookId}/${pageId}/editar`);
+    const rows = page.getByTestId("item-editor-entry");
     await expect(rows).toHaveCount(20);
-    await expect(rows.filter({ hasText: "«La mitocondria" })).toHaveCount(10);
-    await expect(rows.filter({ hasText: "«El ribosoma" })).toHaveCount(10);
+    // The stems live in the edit page's fields (Phase 8 H18).
+    const stems = await rows
+      .getByLabel("Enunciado")
+      .evaluateAll((fields) =>
+        fields.map((field) => (field as HTMLTextAreaElement).value),
+      );
+    expect(
+      stems.filter((stem) => stem.includes("«La mitocondria")),
+    ).toHaveLength(1);
+    expect(stems.filter((stem) => stem.includes("«El ribosoma"))).toHaveLength(
+      1,
+    );
 
     // "Crear examen" in AI mode says the same in the dialog.
     await page.goto("/exams");
-    await page.getByTestId("create-exam-button").click();
+    // The hub lists this page, so its grid's first tile opens the dialog
+    // (Phase 8 H13: no header button).
+    await page.getByTestId("create-exam-tile").click();
     const create = page.getByRole("dialog", { name: "Crear examen" });
-    await create
-      .getByRole("combobox", { name: "Cuaderno" })
-      .selectOption({ label: notebookTitle });
-    await create
-      .getByRole("combobox", { name: "Página" })
-      .selectOption({ label: "Sin título" });
+    await chooseOption(create, "Cuaderno", notebookTitle);
+    await chooseOption(create, "Página", "Sin título");
     await create.getByTestId("create-exam-submit").click();
     await expect(create.getByTestId("create-exam-notice")).toHaveText(
       NOTHING_NEW,

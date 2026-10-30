@@ -21,6 +21,18 @@ export const RECALL_ERROR = {
   QUESTION_NOT_IN_SESSION: "RECALL_QUESTION_NOT_IN_SESSION",
   // The owner has no such answer ("No estoy de acuerdo").
   ANSWER_NOT_FOUND: "RECALL_ANSWER_NOT_FOUND",
+  // The owner has no such active question on the page (Phase 8 H18 edit
+  // page).
+  QUESTION_NOT_FOUND: "RECALL_QUESTION_NOT_FOUND",
+  // Deleting it would leave the page without questions (Phase 8 H18: the
+  // edit page keeps at least one; the whole set goes with a separate
+  // action).
+  LAST_QUESTION: "RECALL_LAST_QUESTION",
+  // An edit page save over a newer change of the item (another tab saved
+  // it after this page loaded; V10): nothing is written.
+  CHANGED: "RECALL_QUESTION_CHANGED",
+  // The owner has no such page to delete the recall set of (Phase 8 H19).
+  SET_NOT_FOUND: "RECALL_SET_NOT_FOUND",
   // "Generar" found no paragraph active recall has not used yet on the page
   // (Phase 6 T5c incremental generation): no AI call, no unit consumed.
   NO_NEW_CONTENT: "RECALL_NO_NEW_CONTENT",

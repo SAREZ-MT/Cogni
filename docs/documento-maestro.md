@@ -108,14 +108,14 @@ Notas de implementación de la Fase 6 (ADR 0007):
 
 #### Flashcards
 
-- Anverso y reverso, generadas por IA desde la página o creadas manualmente.
+- Anverso y reverso, generadas por IA desde la página. La creación es solo con IA por decisión del usuario del 2026-10-29 (Fase 8, H13): no hay "Nueva tarjeta". Las tarjetas creadas a mano antes de esa fecha (`origin = manual`) se siguen mostrando, repasando y archivando.
 - Sesión de repaso: se muestran los ítems vencidos de la página (o de todas las páginas, en la vista "Repasos de hoy").
 - Calificación por el estudiante en escala SM-2 simplificada de 4 botones: Otra vez (q=1), Difícil (q=3), Bien (q=4), Fácil (q=5).
 - Retroalimentación con IA al final de la sesión: resumen de qué se recordó bien y qué conviene reforzar.
 
 #### Exámenes
 
-- Preguntas de opción múltiple con 4 opciones y una correcta, generadas por IA desde la página o creadas manualmente.
+- Preguntas de opción múltiple con 4 opciones y una correcta, generadas por IA desde la página. La creación es solo con IA por decisión del usuario del 2026-10-29 (Fase 8, H13): la pantalla de preguntas no ofrece "Nueva pregunta", pero conserva "Editar" y "Retirar" para corregir lo generado. Las preguntas creadas a mano antes de esa fecha (`origin = manual`) se siguen mostrando, rindiendo, editando y retirando.
 - Sesión: N preguntas (configurable, por defecto 10). Corrección determinista.
 - Cada pregunta es un ítem del motor. Correcta → q=4. Incorrecta → q=1.
 - Si la nota del examen es menor a 70 %, la página queda marcada para repetir examen; el motor reprograma las preguntas falladas y el calendario lo muestra.
@@ -131,7 +131,7 @@ Notas de implementación de la Fase 5 (ADR 0006):
 - **Repasar antes de repetir.** Un resultado fallado ofrece "Repasar contenido", que abre la página del cuaderno con un aviso de los conceptos fallados y la acción "Repetir examen".
 - Editar una pregunta la cambia en el lugar y conserva su raíz; retirarla suspende el ítem de la raíz cuando su linaje no tiene otra pregunta activa. No hay límite de tiempo y una sesión abandonada queda abierta (como en flashcards).
 
-Nota de implementación de la Fase 6 (ADR 0007): `/exams` y la vista por cuaderno siguen listando solo las páginas con preguntas. Su encabezado ofrece "Crear examen" (en lugar del inicio rápido "Nuevo examen"): se elige cuaderno y página y luego "Generar con IA" (N de 10 a 30) o "Crear mis preguntas", que abre la pantalla de preguntas de la página; es la entrada para la primera pregunta manual de una página sin preguntas.
+Nota de implementación de la Fase 6 (ADR 0007): `/exams` y la vista por cuaderno siguen listando solo las páginas con preguntas. Ofrecen "Crear examen" (en lugar del inicio rápido "Nuevo examen"); desde el 2026-10-29 (Fase 8, H13, decisión del usuario) ya no está en el encabezado, sino en la llamada a la acción del estado vacío y en el primer recuadro fijo de la cuadrícula, como en los demás centros de técnicas. Se elige cuaderno y página y luego "Generar con IA" (N de 10 a 30). Desde el 2026-10-29 (Fase 8, H12 y H13, decisión del usuario) la creación es solo con IA: ya no existe "Crear mis preguntas" ni una entrada para escribir la primera pregunta a mano.
 
 #### Recordación activa
 
@@ -148,7 +148,51 @@ Notas de implementación de la Fase 6 (ADR 0007):
 - **Evaluación y resultados.** Al cerrar, la evaluación corre después de responder al navegador; la vista de resultados consulta el estado y muestra la calidad combinada, la calibración y, por pregunta, el puntaje de la IA y su justificación cuando todas las evaluaciones terminaron. Una evaluación fallida queda marcada y "Reintentar" la vuelve a pedir. "No estoy de acuerdo" se registra y no cambia el puntaje.
 - **Puntaje por sesión.** Porcentaje = promedio de la calidad combinada × 20; aciertos, parciales y fallos según el puntaje de la IA (≥ 4, 2–3, ≤ 1). El dominio de cada página viene del motor (§7.3).
 - **Sin resumen de IA de la sesión.** La retroalimentación del final es la justificación por pregunta más la calidad combinada y la calibración; no se crea `SessionFeedback` para recordación activa.
-- **Hub.** `/active-recall` y la vista por cuaderno muestran las páginas con sesiones terminadas, el porcentaje de cada sesión y el contador de preguntas vencidas hoy por cuaderno. La tarjeta de una página abre los resultados de su sesión más reciente ("Ver resultados →"), desde donde "Nueva sesión →" inicia otra.
+- **Hub.** (Reemplazado en la Fase 8, H17: ver "Centros de técnica planos".) `/active-recall` y la vista por cuaderno mostraban las páginas con sesiones terminadas, el porcentaje de cada sesión y el contador de preguntas vencidas hoy por cuaderno. La tarjeta de una página abre los resultados de su sesión más reciente ("Ver resultados →"), desde donde "Nueva sesión →" inicia otra. Desde el 2026-10-29 (Fase 8, H16, reporte del usuario) también muestran las páginas con preguntas de recordación activas que todavía no tienen una sesión terminada (recién generadas o con la sesión abandonada): su tarjeta dice "Practicar →" y abre la sesión.
+- **Volver al centro.** (Desde la Fase 8, H17, ver "Centros de técnica planos" más abajo: ya no hay vista por cuaderno.) Una práctica abierta desde el diálogo "crear desde una página" de un centro de técnica (recordación activa o flashcards) lleva `?desde=hub`: sus enlaces de regreso y el final de la sesión vuelven a ese centro (`/active-recall`, `/flashcards`), no a la vista por cuaderno. Sin la marca, el regreso sigue siendo la vista por cuaderno. La marca no es una URL: cada ruta elige su propio centro. Flashcards abre el repaso de inmediato (`?repasar=1`).
+
+#### Centros de técnica planos (Fase 8, H17, decisión del usuario del 2026-10-29)
+
+Desde el 2026-10-29 los tres centros (`/flashcards`, `/active-recall`, `/exams`) ya no tienen nivel de cuaderno: cada uno lista directamente cada ítem generado, uno por página (un mazo, una página con preguntas de recordación, una página con examen). Esto reemplaza lo dicho arriba sobre "Repasos de hoy", el hub de recordación activa y la vista por cuaderno de exámenes.
+
+- **Tarjeta por ítem.** Cada ítem es una tarjeta con la etiqueta de su cuaderno (con su color), el título de la página (dos líneas como máximo), una métrica, un estado y una acción. La acción va llena solo cuando hay algo pendiente; si no, va suave.
+  - Flashcards: "N tarjetas"; "N para hoy" o "Al día · repaso mañana / en N días" (días del calendario en la zona horaria del estudiante); "Repasar" abre el repaso del mazo de inmediato. El menú ofrece "Editar tarjetas" (la página de edición, H18; "Ver tarjetas" se quitó), "Abrir página" y "Eliminar mazo", que pide confirmación en un diálogo propio y borra el mazo completo (borrado real desde H19, ver "Eliminar de verdad" más abajo).
+  - Recordación activa: "N preguntas"; "N sesiones · dominio X %" con su barra (dominio de página del motor, §7.3), con "N para repasar" si hay preguntas vencidas hoy, o "Sin sesiones terminadas"; "Practicar" abre la sesión. El menú ofrece "Editar preguntas" (H18), "Abrir página" y "Ver último resultado".
+  - Exámenes: "N preguntas"; "Mejor nota X % · último Y %" con la barra de la mejor nota, "Sin intentos", o, con una repetición pendiente, "Repetir cuando estés listo", el último intento y "Repetir examen". "Hacer examen" abre la ruta del examen de la página, cuya pantalla de inicio elige N (10 a 30), ofrece la repetición pendiente o retoma un examen abierto. El menú ofrece "Editar preguntas" (H18, antes "Ver preguntas") y "Abrir página".
+- **Agrupación y orden.** Primero lo pendiente (tarjetas para hoy, preguntas vencidas, examen por repetir), luego lo nunca practicado (sin sesiones ni intentos) y luego lo más reciente. Flashcards separa los grupos "Para hoy" y "Al día"; los otros dos centros usan una sola cuadrícula.
+- **Filtro por cuaderno.** Bajo el encabezado, "Todos n" y un chip por cuaderno con su color y su cantidad, como enlaces a `?cuaderno=<id>`. El filtro se aplica en el servidor. Si un cuaderno no tiene ítems, el centro lo dice en una línea y mantiene el recuadro de crear.
+- **Crear.** El primer recuadro sigue siendo el de crear ("Crear flashcards", "Generar preguntas", "Crear examen"), ahora con el color de la técnica, y abre los mismos diálogos. Los estados vacíos de un centro sin ítems no cambian.
+- **Sin avisos redundantes.** Desaparecen las píldoras de dominio promedio y el inicio rápido de recordación activa, y el aviso de repetición y las píldoras de resumen de exámenes: las tarjetas llevan ese estado. El encabezado conserva los totales ("80 tarjetas · 7 mazos · 3 cuadernos").
+- **Rutas.** `/<centro>/[notebookId]` redirige a `/<centro>?cuaderno=<id>`. Las rutas de práctica `/<centro>/[notebookId]/[pageId]` siguen igual. Abiertas desde el centro llevan `?desde=hub` (y `cuaderno` si había filtro), y su regreso vuelve al centro tal como estaba; sin la marca, vuelven al centro filtrado por el cuaderno de la página. "Crear examen" termina en `/exams`.
+- **Datos.** Solo lecturas y una acción nueva, sin cambio de esquema: el mazo lee la creación de su tarjeta más nueva y el vencimiento más próximo de sus ítems; la recordación activa y los exámenes leen la cantidad de preguntas y la creación de la más nueva, y exámenes la mejor nota. Cada centro mantiene una consulta agrupada, sin una consulta por página.
+
+#### Práctica directa y páginas de edición (Fase 8, H18, decisión del usuario del 2026-10-29)
+
+**La creación nace con IA; la edición permite ajustar y añadir.** Los mazos y las preguntas se crean con IA desde la página (H13). Una vez creados, el estudiante puede corregirlos, añadir ítems a mano y borrarlos en la página de edición de cada técnica. Esto reemplaza lo dicho arriba sobre "Editar" y "Retirar" en la pantalla de preguntas de exámenes y sobre archivar tarjetas desde el mazo.
+
+- **Práctica directa.** La tarjeta de un ítem en su centro lleva directo a practicarlo, y terminar o volver regresa a ese centro, con su filtro (`?desde=hub&cuaderno=`).
+  - Flashcards: abrir un mazo inicia su repaso. El mazo ya no muestra la lista de tarjetas.
+  - Recordación activa: abre la sesión. Sus sesiones no dependen de lo vencido (siempre componen preguntas), así que no hay estado "al día".
+  - Exámenes: abre la pantalla de inicio (N de 10 a 30, la repetición pendiente o el examen abierto). La ruta del examen, su reproductor y sus resultados respetan la marca: el regreso lleva a `/exams` y los resultados, "Repetir examen" y "Nuevo examen" la conservan.
+- **Mazo al día.** Si el mazo no tiene tarjetas vencidas, dice "Estás al día con este mazo", con la fecha del próximo repaso ("Tu próximo repaso es mañana / en N días"), y ofrece "Repasar igual" y "Volver a Flashcards".
+  - "Repasar igual" abre un modo práctica (`?modo=practica`) en el mismo reproductor, sin cambiar su diseño (congelamiento de la Fase 6). Un aviso dice "Modo práctica · Tus respuestas no cambian tus próximos repasos".
+  - Las respuestas no se guardan: no se abre sesión, no se actualiza `study_items`, no se escribe `review_logs` ni se pide retroalimentación. No cuenta como repaso completado en las métricas.
+  - Al volver de una sesión calificada, el mazo vuelve a consultar lo vencido: dice que está al día o sigue con lo que queda.
+- **Página de edición.** `/flashcards/{cuaderno}/{página}/editar`, `/active-recall/{cuaderno}/{página}/editar` y `/exams/{cuaderno}/{página}/editar` comparten un mismo diseño, con el color de la técnica. Se llega desde "Editar" en el menú de la tarjeta del centro; en exámenes, también desde la pantalla de inicio y los resultados. La antigua ruta `/preguntas` redirige aquí.
+  - Se edita en el lugar: en flashcards, el anverso y el reverso; en recordación activa, la pregunta, los conceptos clave (uno por línea) y la respuesta esperada; en exámenes, el enunciado, las 4 opciones, la correcta, el concepto y la explicación.
+  - "Añadir" crea un ítem a mano (`origin = manual`) con su ítem del motor.
+  - Eliminar es un **borrado real**: se borran el ítem, su `StudyItem` y su historial de repasos (y, en recordación activa y exámenes, sus respuestas), para que las métricas sigan siendo honestas. En exámenes se borra el linaje completo de la pregunta (raíz y variantes), se cierran los exámenes abiertos que la muestran y sale de la repetición pendiente; los exámenes terminados conservan su nota. No hay archivo. Hasta guardar, un ítem eliminado se puede recuperar con "Deshacer".
+  - Todo queda como borrador local hasta "Guardar", que lo aplica en una sola Server Action y en una transacción, a través de los casos de uso existentes y de los nuevos casos de uso de borrado. "Descartar cambios" vuelve a lo guardado. Los errores se muestran debajo de cada campo.
+  - Al guardar, la página se queda con lo guardado y el aviso "Cambios guardados" (igual en las tres técnicas).
+  - Salir con cambios sin guardar pide confirmación: el navegador avisa al recargar o cerrar, y un enlace de la aplicación abre un diálogo propio ("¿Salir sin guardar?"), nunca un `confirm` nativo.
+  - Un mazo o una página con preguntas conserva al menos un ítem en la página de edición. El conjunto completo se borra desde su tarjeta (H19).
+
+**Eliminar de verdad (Fase 8, H19).** "Eliminar" en el menú de una tarjeta de cuaderno (Cuadernos y barra lateral), de página (vista del cuaderno y barra lateral) y de las tarjetas de los centros de técnica ("Eliminar mazo", "Eliminar repaso", "Eliminar examen") es un **borrado real**; ya no existe "Archivar".
+  - Antes de confirmar, un diálogo propio (nunca un `confirm` nativo) lee del servidor lo que se borrará, por ejemplo "Se eliminarán 4 páginas, 2 mazos, 1 repaso activo y 1 examen.", y recuerda que no se puede deshacer. El botón destructivo se habilita cuando llegan los números.
+  - Un cuaderno se borra con todas sus páginas; una página, con sus apuntes, imágenes, documentos importados y el material de las tres técnicas; un conjunto de técnica, con todos sus ítems de esa página. Con cada ítem se borran su `StudyItem`, su historial de repasos, las sesiones, respuestas y retroalimentación con IA, el estado de examen de la página y las huellas de generación, para que ninguna métrica siga contando lo borrado. Al borrar un conjunto, el dominio de la página se recalcula en la misma transacción con lo que queda (sin ítems, la página deja de tener dominio).
+  - Las imágenes y los documentos importados se borran de Storage con su API después de confirmar la transacción; si Storage falla, se registra y el borrado sigue siendo un éxito. Las filas de `ai_generations` quedan sin página (cuentan para el límite diario).
+  - Después de borrar, la pantalla se queda donde estaba sin la tarjeta; si la ruta abierta mostraba lo borrado, se vuelve al cuaderno (página borrada) o a Cuadernos (cuaderno borrado).
+  - Las columnas `archived_at` siguen en el esquema y las lecturas siguen ocultando filas archivadas antes de H19.
 
 ### 3.4 El motor de repetición espaciada (transversal)
 
@@ -375,7 +419,7 @@ Usuario califica una tarjeta
 
 ### 6.1 Entidades principales
 
-Convenciones comunes a todas las entidades de usuario: `id` (UUID v7), `owner_id`, `created_at`, `updated_at`. Se omiten de la tabla para no repetirlos. El borrado es lógico (`archived_at`) en todo lo que el usuario crea a mano.
+Convenciones comunes a todas las entidades de usuario: `id` (UUID v7), `owner_id`, `created_at`, `updated_at`. Se omiten de la tabla para no repetirlos. Desde la Fase 8 (H19) el borrado desde la interfaz es real (§3.3, "Eliminar de verdad"); `archived_at` se conserva para las filas archivadas antes.
 
 | Entidad | Módulo | Campos clave |
 |---|---|---|
@@ -437,7 +481,7 @@ Nota de implementación de la Fase 7 (ADR 0008): `Profile.timezone` ya se usa. S
 - El servidor se conecta con la cadena de conexión de Supabase (pooler) y omite RLS; la autorización es explícita en `application`.
 - RLS permanece activo en Storage y en cualquier acceso desde el cliente con `supabase-js`.
 - `content` de página es JSON de Tiptap. `plain_text` se recalcula en cada guardado y es lo que consume la IA.
-- Borrado lógico (`archived_at`) para cuadernos y páginas. Borrado físico solo por job de limpieza.
+- Cuadernos y páginas se borran de verdad desde la interfaz (Fase 8, H19), con todo lo que cuelga de ellos; `archived_at` queda para las filas archivadas antes.
 
 ---
 
@@ -608,6 +652,8 @@ En la Fase 3 solo `generate_flashcards` está cableado de extremo a extremo (pro
 Nota de implementación de la Fase 5 (ADR 0006): quedan cableados `generate_exam_questions/v1` (recibe además las preguntas activas de la página para no duplicarlas), `generate_exam_variants/v1` (recibe el id de cada raíz fallada, su concepto, su respuesta correcta y todas sus redacciones anteriores) y `session_feedback/v2` (exámenes: hasta 10 preguntas falladas con concepto, enunciado, opción elegida, opción correcta y explicación, más el texto de la página dentro de `AI_PAGE_TOKEN_CAP`; `session_feedback/v1` sigue sirviendo a flashcards). Cada llamada al modelo pide como máximo 15 preguntas o variantes; una solicitud mayor se reparte en varias llamadas y sigue costando una sola generación.
 
 Nota de implementación de la Fase 6 (ADR 0007): quedan cableados `generate_recall_questions/v1` (10 preguntas con rúbrica por llamada, temperatura 0,7; recibe además hasta 60 preguntas activas de la página para no repetirlas) y `evaluate_recall_answer/v1` (escala 0–5 explícita, fragmento y respuesta enviados como datos delimitados, justificación en español con "tú", nunca inventa contenido, temperatura 0,2). Con la generación incremental (§3.1), el `plain_text` que reciben los propósitos de generación son solo los párrafos nuevos o editados de la página, recortados a `AI_PAGE_TOKEN_CAP`. No se usa `session_feedback` para recordación activa.
+
+Contenido mínimo para generar (Fase 8, H14, decisión del usuario del 2026-10-29): toda generación con IA necesita al menos 100 palabras de página y unas 15 palabras por ítem generado (tarjeta o pregunta). Se cuentan las palabras de los párrafos que la generación enviaría de verdad, es decir, los nuevos o editados de la generación incremental (§3.1). Así, flashcards pide una tarjeta por cada 15 palabras, entre 3 y 10 (una página de 100 palabras da 6); recordación activa, con sus 10 preguntas, necesita 150 palabras; y un examen admite solo las cantidades que caben (10 preguntas desde 150 palabras, 30 desde 450). Una página por debajo responde `AI_PAGE_TOO_SHORT` con las palabras que tiene, las que necesita y los ítems que admite, antes del límite diario, sin llamar a la IA ni consumir generación; `AI_PAGE_EMPTY` sigue para la página en blanco. Los selectores de página de los hubs y el panel de técnicas desactivan "Generar" en las páginas cortas con el aviso "Muy poco contenido (N palabras): escribe al menos M", usando el conteo de toda la página como aproximación. Si la IA devuelve menos ítems de los pedidos, solo se marca como usada la parte de los párrafos enviados que esos ítems cubren, en proporción, y el resto queda disponible para el siguiente "Generar".
 
 | Propósito | Entrada | Salida (Zod) |
 |---|---|---|

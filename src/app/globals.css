@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./product-tour.css";
 
 /*
  * Cogni design tokens (docs/design-system/colors_and_type.css) exposed to
@@ -23,13 +24,22 @@
   --color-neutral-0: #ffffff;
   --color-neutral-50: #fafaf8;
   --color-neutral-100: #f5f3ef;
-  --color-neutral-150: #edeae4;
+  /* Dry gray (no warm cast), user 2026-10-16: replaces the warm #edeae4 as
+     the app canvas, hovers, subtle borders and neutral tiles/pills. */
+  --color-neutral-150: #e8e8e8;
   --color-neutral-200: #e5e2dc;
   --color-neutral-300: #d4d0c8;
   --color-neutral-400: #a8a29e;
   --color-neutral-500: #78716c;
   --color-neutral-600: #57534e;
   --color-neutral-700: #44403c;
+  /* Soft blacks for secondary and muted text (user, 2026-10-16): the warm
+     greys #78716c / #a8a29e were hard to read on white (muted was ~2.5:1). */
+  --color-ink-soft: #404040;
+  --color-ink-muted: #575757;
+  /* Placeholders stay lighter than real text so an empty field never looks
+     filled in. */
+  --color-ink-placeholder: #8c8c8c;
   --color-neutral-800: #292524;
   --color-neutral-900: #1c1917;
   --color-neutral-950: #0c0a09;
@@ -49,6 +59,136 @@
   --color-pastel-blue-fg: #1e40af;
   --color-pastel-mint: #d1fae5;
   --color-pastel-mint-fg: #065f46;
+  /* H7 follow-up (user reference highlight-ref.png): soft pastel fills
+     for the editor's highlight mark, ink text on top (≥ 12:1), and a
+     mid "-edge" step of the same hue for the picker's swatch borders.
+     Same seven names as the pastel palette (the content catalogue's), so
+     stored colours are unchanged; orange and mint still render although
+     the picker offers the reference's five. */
+  --color-highlighter-yellow: #fdf3b0;
+  --color-highlighter-yellow-edge: #e6d36a;
+  --color-highlighter-green: #d4f4df;
+  --color-highlighter-green-edge: #9fd9b3;
+  --color-highlighter-blue: #d8e7fb;
+  --color-highlighter-blue-edge: #a6c5ec;
+  --color-highlighter-pink: #fbdde1;
+  --color-highlighter-pink-edge: #eeb1ba;
+  --color-highlighter-orange: #fde3cf;
+  --color-highlighter-orange-edge: #efbd94;
+  --color-highlighter-purple: #e9e1fb;
+  --color-highlighter-purple-edge: #c8b7ef;
+  --color-highlighter-mint: #cff3e4;
+  --color-highlighter-mint-edge: #95d9bd;
+  /* H7 follow-up (user reference callout-ref.png, light theme): editor
+     callouts keep the landing band hues (idea yellow, note violet, warning
+     rose; H8 adds important blue and tip green) as a light tint, a mid "-edge" border, a strong "-icon" step for
+     the outlined icon (≥ 3:1) and a deep "-fg" step for the text (≥ 7:1 on
+     the tint). */
+  --color-callout-idea: #fefae6;
+  --color-callout-idea-edge: #f1d77a;
+  --color-callout-idea-icon: #b7791f;
+  --color-callout-idea-fg: #6b3d0e;
+  --color-callout-note: #f6f3ff;
+  --color-callout-note-edge: #d3c6fb;
+  --color-callout-note-icon: #7c3aed;
+  --color-callout-note-fg: #4c1d95;
+  --color-callout-warning: #fff3f4;
+  --color-callout-warning-edge: #f7bcc6;
+  --color-callout-warning-icon: #e11d48;
+  --color-callout-warning-fg: #881337;
+  /* H8: important (blue) and tip (green), same steps — icon 4.8:1, text
+     9.5:1 and 8.7:1 on the tint. */
+  --color-callout-important: #eff6ff;
+  --color-callout-important-edge: #bfdbfe;
+  --color-callout-important-icon: #2563eb;
+  --color-callout-important-fg: #1e3a8a;
+  --color-callout-tip: #f0fdf4;
+  --color-callout-tip-edge: #bbf7d0;
+  --color-callout-tip-icon: #15803d;
+  --color-callout-tip-fg: #14532d;
+  /* H7: a neutral grey for code blocks (the warm --muted read yellowish
+     behind code). */
+  --color-code-block: #f3f3f3;
+  /* Technique accents (Phase 8 H3, user decisions 2026-10-19): soft but
+     visible pastels for the calendar's technique bars, dots and progress
+     fills (pastel yellow, not amber); Examen a solid, vivid red. Fills
+     carry no text; chips and pills keep their pastel pairs. */
+  --color-technique-flashcards-accent: #fcd34d;
+  --color-technique-recall-accent: #6ee7b7;
+  --color-technique-exam-accent: #ef4444;
+  /* "Generar" outlines (Phase 8 H9-T3, user 2026-10-29): a UI-component
+     border ≥ 3:1 on the technique tile (measured on the faded tile:
+     flashcards 4.76:1, recall 3.54:1, exam 4.25:1). warning-600 is only
+     2.86:1 on pastel-yellow, hence amber-700 for Flashcards. */
+  --color-technique-flashcards-outline: #b45309;
+  --color-technique-recall-outline: var(--color-success-600);
+  --color-technique-exam-outline: var(--color-rose-600);
+  /* Pixel tile (PixelTile, H9-T3): the landing's pixel-motif dither
+     colours (landing.css .lp-ptile), app-side. Only the rose tile needs
+     colours the app had no token for. */
+  --color-pixel-rose-dark: #be123c;
+  --color-pixel-rose-light: #fecdd3;
+  --color-pixel-rose-shadow: #881337;
+  --color-pixel-paper: #fbf8f3;
+  /* Technique hub themes (Phase 8 H11, user-approved v2 mock 2026-10-29):
+     the empty state's glow pair and paper dots, the headline/title
+     gradient (both ends AA on white and on the glow: amber 5.0/7.1:1,
+     emerald 5.5/7.6:1, rose 6.3/8.0:1) and the CTA (fill, ink, inner edge,
+     shadow; ink on fill amber 6.3:1, emerald 5.5:1, rose 6.3:1). Read
+     through [data-technique-theme]. */
+  --color-technique-flashcards-glow: #fde68a;
+  --color-technique-flashcards-glow-soft: #fef3c7;
+  --color-technique-flashcards-dot: #f5c451;
+  --color-technique-flashcards-ink: #b45309;
+  --color-technique-flashcards-ink-deep: #92400e;
+  --color-technique-flashcards-cta: #fcd34d;
+  --color-technique-flashcards-cta-fg: #78350f;
+  --color-technique-flashcards-cta-edge: #f59e0b;
+  --color-technique-flashcards-cta-shadow: #d97706;
+  --color-technique-recall-glow: #a7f3d0;
+  --color-technique-recall-glow-soft: #d1fae5;
+  --color-technique-recall-dot: #6fd3a8;
+  --color-technique-recall-ink: #047857;
+  --color-technique-recall-ink-deep: #065f46;
+  --color-technique-recall-cta: #047857;
+  --color-technique-recall-cta-fg: #ffffff;
+  --color-technique-recall-cta-edge: #047857;
+  --color-technique-recall-cta-shadow: #047857;
+  --color-technique-exam-glow: #fecdd3;
+  --color-technique-exam-glow-soft: #ffe4e6;
+  --color-technique-exam-dot: #f4a3b3;
+  --color-technique-exam-ink: #be123c;
+  --color-technique-exam-ink-deep: #9f1239;
+  --color-technique-exam-cta: #be123c;
+  --color-technique-exam-cta-fg: #ffffff;
+  --color-technique-exam-cta-edge: #be123c;
+  --color-technique-exam-cta-shadow: #be123c;
+  /* Technique item cards (Phase 8 H17, user-approved flat hubs
+     2026-10-29): the soft action and status pill (fill, edge, ink), the
+     progress fill, the card's corner tint and the create tile's dashes.
+     Soft ink on soft fill: amber 6.4:1, emerald 7.0:1, rose 7.0:1. */
+  --color-technique-flashcards-soft: var(
+    --color-technique-flashcards-glow-soft
+  );
+  --color-technique-flashcards-soft-edge: var(--color-technique-flashcards-cta);
+  --color-technique-flashcards-soft-fg: var(
+    --color-technique-flashcards-ink-deep
+  );
+  --color-technique-flashcards-fill: var(--color-technique-flashcards-cta-edge);
+  --color-technique-flashcards-tint: #fffbeb;
+  --color-technique-flashcards-dash: var(--color-technique-flashcards-dot);
+  --color-technique-recall-soft: var(--color-technique-recall-glow-soft);
+  --color-technique-recall-soft-edge: var(--color-technique-recall-accent);
+  --color-technique-recall-soft-fg: var(--color-technique-recall-ink-deep);
+  --color-technique-recall-fill: #10b981;
+  --color-technique-recall-tint: #f0fdf6;
+  --color-technique-recall-dash: var(--color-technique-recall-dot);
+  --color-technique-exam-soft: var(--color-technique-exam-glow-soft);
+  --color-technique-exam-soft-edge: #fda4af;
+  --color-technique-exam-soft-fg: var(--color-technique-exam-ink-deep);
+  --color-technique-exam-fill: var(--color-rose-500);
+  --color-technique-exam-tint: #fff5f6;
+  --color-technique-exam-dash: var(--color-technique-exam-dot);
 
   /* Semantic status: *-50 stays the near-white tint, *-100 is the stronger
      pastel tint used for metric/stat icon tiles and badges (design pass 2,
@@ -114,6 +254,13 @@
   --leading-normal: 1.5;
 
   /* Radii */
+  /* H6-E3: the editor's square, professional corners (surfaces, menus,
+     callouts, code, tables, images, chips). */
+  --radius-editor: 3px;
+  /* H7: tables keep their own, softer frame (moderate, never round). */
+  --radius-table: 8px;
+  /* H7 follow-up: callouts are rounded too, after the user's reference. */
+  --radius-callout: 14px;
   --radius-sm: 6px;
   --radius-md: 8px;
   --radius-input: 10px;
@@ -162,7 +309,7 @@
   --bg-page: var(--color-neutral-0);
   --bg-card: var(--color-neutral-0);
   --bg-sidebar: var(--color-neutral-50);
-  --bg-hover: var(--color-neutral-50);
+  --bg-hover: var(--color-neutral-150);
   --bg-active: var(--color-primary-50);
   --bg-muted: var(--color-neutral-100);
   /* Topbar glass (design/shell-look, studyplatform obs 140): 0.92 opacity,
@@ -170,8 +317,9 @@
   --bg-glass: rgb(255 255 255 / 0.92);
 
   --fg-default: var(--color-neutral-900);
-  --fg-secondary: var(--color-neutral-500);
-  --fg-muted: var(--color-neutral-400);
+  --fg-secondary: var(--color-ink-soft);
+  --fg-muted: var(--color-ink-muted);
+  --fg-placeholder: var(--color-ink-placeholder);
   --fg-on-primary: var(--color-neutral-0);
   --fg-active: var(--color-primary-700);
 
@@ -214,6 +362,7 @@
   --color-fg: var(--fg-default);
   --color-fg-secondary: var(--fg-secondary);
   --color-fg-muted: var(--fg-muted);
+  --color-fg-placeholder: var(--fg-placeholder);
   --color-fg-active: var(--fg-active);
   --color-active-strong: var(--bg-active-strong);
   --color-border-default: var(--border-default);
@@ -263,26 +412,33 @@
     white-space: pre-wrap;
   }
 
+  /* H7 (editor polish round 2): three clearly separate heading rungs —
+     size, weight, tracking and the space above each step down together,
+     so H1/H2/H3 never read as the same style at different sizes. More
+     room above a heading than below it ties it to its section. */
   .editor-content h1 {
-    font-size: var(--text-3xl);
+    font-size: 2rem;
     font-weight: 700;
-    line-height: var(--leading-tight);
-    margin-top: 1.5rem;
-    margin-bottom: 0.75rem;
+    line-height: 1.15;
+    letter-spacing: -0.03em;
+    margin-top: 2.25rem;
+    margin-bottom: 0.5rem;
   }
   .editor-content h2 {
     font-size: var(--text-2xl);
-    font-weight: 600;
-    line-height: var(--leading-tight);
-    margin-top: 1.25rem;
-    margin-bottom: 0.5rem;
+    font-weight: 650;
+    line-height: 1.25;
+    letter-spacing: -0.02em;
+    margin-top: 1.75rem;
+    margin-bottom: 0.375rem;
   }
   .editor-content h3 {
-    font-size: var(--text-xl);
+    font-size: 1.1875rem;
     font-weight: 600;
     line-height: var(--leading-snug);
-    margin-top: 1rem;
-    margin-bottom: 0.5rem;
+    letter-spacing: -0.01em;
+    margin-top: 1.375rem;
+    margin-bottom: 0.25rem;
   }
   /* document-import T11b: imported documents (DOCX/PPTX) carry heading
      levels 4–6 too. They continue the h1–h3 scale downwards — always
@@ -294,14 +450,14 @@
     font-weight: 600;
     line-height: var(--leading-snug);
     margin-top: 1rem;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.125rem;
   }
   .editor-content h5 {
     font-size: var(--text-base);
     font-weight: 600;
     line-height: var(--leading-snug);
     margin-top: 0.875rem;
-    margin-bottom: 0.375rem;
+    margin-bottom: 0.125rem;
   }
   .editor-content h6 {
     font-size: var(--text-sm);
@@ -309,7 +465,7 @@
     line-height: var(--leading-snug);
     color: var(--color-fg-secondary);
     margin-top: 0.75rem;
-    margin-bottom: 0.375rem;
+    margin-bottom: 0.125rem;
   }
   .editor-content h1:first-child,
   .editor-content h2:first-child,
@@ -320,16 +476,22 @@
     margin-top: 0;
   }
 
+  /* H6-E2 (Notion density): blocks sit tight — 1.5 line height and 2px of
+     padding above and below each text block, so neighbours are ~4px apart
+     instead of a paragraph gap. Headings carry the breathing room above
+     them instead (see h1–h6). Padding, not margin, so the caret's hit area
+     covers the gap and adjacent blocks never collapse margins. */
   .editor-content p {
     font-size: var(--text-base);
     line-height: var(--leading-normal);
-    margin-bottom: 0.75rem;
+    margin: 0;
+    padding-block: 2px;
   }
 
   .editor-content ul,
   .editor-content ol {
-    margin-bottom: 0.75rem;
-    padding-left: 1.5rem;
+    margin-block: 0;
+    padding-left: 1.625rem;
   }
   .editor-content ul {
     list-style-type: disc;
@@ -338,15 +500,14 @@
     list-style-type: decimal;
   }
   .editor-content li {
-    margin-bottom: 0.25rem;
+    margin: 0;
   }
   .editor-content li::marker {
     color: var(--color-fg-secondary);
   }
   .editor-content li > ul,
   .editor-content li > ol {
-    margin-top: 0.25rem;
-    margin-bottom: 0;
+    margin-block: 0;
   }
 
   /* @tiptap/extension-task-list / -task-item render
@@ -362,9 +523,15 @@
     align-items: flex-start;
     gap: 0.5rem;
   }
+  /* The checkbox (16px) is centred on the first 24px line, below its
+     2px block padding. */
   .editor-content ul[data-type="taskList"] li > label {
-    margin-top: 0.2rem;
+    margin-top: 6px;
     user-select: none;
+  }
+  .editor-content ul[data-type="taskList"] li > div {
+    flex: 1;
+    min-width: 0;
   }
   .editor-content ul[data-type="taskList"] input[type="checkbox"] {
     accent-color: var(--color-primary-600);
@@ -376,24 +543,25 @@
     text-decoration: line-through;
   }
 
+  /* H6-E2: Notion's quote — a thick ink bar and normal, upright ink text. */
   .editor-content blockquote {
-    border-left: 3px solid var(--color-border-default);
-    padding-left: 1rem;
-    margin-bottom: 0.75rem;
-    color: var(--color-fg-secondary);
-    font-style: italic;
+    border-left: 3px solid var(--color-fg);
+    padding-left: 0.875rem;
+    margin-block: 4px;
+    color: var(--color-fg);
+    font-style: normal;
   }
 
   .editor-content hr {
     border: none;
     border-top: 1px solid var(--color-border-default);
-    margin: 1.5rem 0;
+    margin: 0.75rem 0;
   }
 
   .editor-content img {
     display: block;
     max-width: 100%;
-    border-radius: var(--radius-2xl);
+    border-radius: var(--radius-editor);
   }
 
   /* E2b scope D (image node polish): the rendered image node wraps its
@@ -413,7 +581,7 @@
      above. `-mx-2` compensates the `px-2` so the tint's left/right edges
      still line up with the untinted text either side of it. */
   .editor-content [data-node-background] {
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-editor);
     margin-inline: -0.5rem;
     padding-inline: 0.5rem;
     padding-block: 0.125rem;
@@ -425,13 +593,90 @@
     font-family: var(--font-mono);
     font-size: var(--text-sm);
     background-color: var(--color-muted);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-editor);
     padding: 0.125rem 0.375rem;
   }
 
+  /* H7 follow-up: inside a callout, inline code is a subtle chip of the
+     callout's own deep hue, and bold keeps that hue. */
+  .editor-content .callout :not(pre) > code {
+    background-color: color-mix(in oklch, currentColor 9%, transparent);
+    color: inherit;
+  }
+  .editor-content .callout strong {
+    color: inherit;
+  }
+
+  /* H7 (editor polish round 2): the highlight mark is a marker-pen stroke
+     instead of a flat box. A left-to-right ink gradient (light where the
+     pen lands, saturated through the middle, fading where it lifts), uneven
+     corner radii for the irregular edges, and a band over the full text
+     height. Negative inline margins let the stroke overrun the words
+     slightly without moving the text; `box-decoration-break: clone` paints
+     every line of a wrapped highlight as its own stroke. Ink text stays.
+     H7 follow-up: pastel fills and full height, per the user's reference. */
   .editor-content mark {
-    border-radius: var(--radius-sm);
-    padding: 0 0.15em;
+    --highlighter: var(--color-highlighter-yellow);
+    color: inherit;
+    background-color: transparent;
+    background-image: linear-gradient(
+      100deg,
+      color-mix(in oklch, var(--highlighter) 35%, transparent) 0%,
+      color-mix(in oklch, var(--highlighter) 90%, transparent) 6%,
+      var(--highlighter) 45%,
+      color-mix(in oklch, var(--highlighter) 80%, transparent) 94%,
+      color-mix(in oklch, var(--highlighter) 45%, transparent) 100%
+    );
+    background-repeat: no-repeat;
+    background-size: 100% 100%;
+    background-position: 0 0;
+    border-radius: 0.7em 0.25em 0.6em 0.3em / 0.35em 0.6em 0.3em 0.55em;
+    margin-inline: -0.12em;
+    padding-inline: 0.22em;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+  }
+  .editor-content mark[data-color="yellow"] {
+    --highlighter: var(--color-highlighter-yellow);
+  }
+  .editor-content mark[data-color="green"] {
+    --highlighter: var(--color-highlighter-green);
+  }
+  .editor-content mark[data-color="blue"] {
+    --highlighter: var(--color-highlighter-blue);
+  }
+  .editor-content mark[data-color="pink"] {
+    --highlighter: var(--color-highlighter-pink);
+  }
+  .editor-content mark[data-color="orange"] {
+    --highlighter: var(--color-highlighter-orange);
+  }
+  .editor-content mark[data-color="purple"] {
+    --highlighter: var(--color-highlighter-purple);
+  }
+  .editor-content mark[data-color="mint"] {
+    --highlighter: var(--color-highlighter-mint);
+  }
+
+  /* H7: the "Texto" menu stores plain font stacks ("Bitter, serif"); the
+     faces the app self-hosts through next/font have hashed family names, so
+     these rules point the stored stack at them. `!important` beats the
+     mark's inline style; the system stacks (Arial, Georgia…) need no rule.
+     `.editor-font-preview` is the menu item that previews each face. */
+  .editor-content [style*="font-family: Inter"],
+  .editor-font-preview[style*="font-family: Inter"] {
+    /* biome-ignore lint/complexity/noImportantStyles: must beat the mark's inline style */
+    font-family: var(--font-inter), Inter, sans-serif !important;
+  }
+  .editor-content [style*="font-family: Bitter"],
+  .editor-font-preview[style*="font-family: Bitter"] {
+    /* biome-ignore lint/complexity/noImportantStyles: must beat the mark's inline style */
+    font-family: var(--font-bitter), Bitter, Georgia, serif !important;
+  }
+  .editor-content [style*="font-family: JetBrains Mono"],
+  .editor-font-preview[style*="font-family: JetBrains Mono"] {
+    /* biome-ignore lint/complexity/noImportantStyles: must beat the mark's inline style */
+    font-family: var(--font-mono) !important;
   }
 
   .editor-content a {
@@ -448,7 +693,7 @@
     float: left;
     height: 0;
     pointer-events: none;
-    color: var(--color-fg-muted);
+    color: var(--color-fg-placeholder);
   }
 
   /* S6a defect fix: the global `:focus-visible` rule below draws a ring
@@ -470,7 +715,7 @@
   .editor-content .ProseMirror-selectednode,
   .editor-content .ProseMirror-selectednoderange {
     background-color: var(--color-active);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-editor);
     outline: none;
   }
 
@@ -503,6 +748,19 @@
   .editor-content [data-type="block-math"] .katex-display {
     margin: 0;
   }
+  /* H7: formulas are editable — a click (or Enter when selected) opens the
+     LaTeX input (math-editor.tsx), so they show a hover affordance. */
+  .editor-content .tiptap-mathematics-render--editable {
+    cursor: pointer;
+    border-radius: var(--radius-editor);
+    transition: background-color 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .editor-content .tiptap-mathematics-render--editable:hover {
+    background-color: var(--color-code-block);
+  }
+  .editor-content [data-type="block-math"].tiptap-mathematics-render--editable {
+    padding-block: 0.25rem;
+  }
 
   .editor-content span[data-type="emoji"] img {
     display: inline-block;
@@ -512,7 +770,7 @@
   }
 
   .editor-content [data-type="mention"] {
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-editor);
     padding: 0 0.25rem;
     background-color: var(--color-active);
     color: var(--color-fg-active);
@@ -533,7 +791,7 @@
   .editor-content [data-type="details"] {
     display: flex;
     gap: 0.25rem;
-    margin-bottom: 0.75rem;
+    margin-block: 2px;
   }
 
   .editor-content [data-type="details"] > button {
@@ -543,7 +801,7 @@
     flex-shrink: 0;
     width: 1.5rem;
     height: 1.75rem;
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-editor);
     color: var(--color-fg-muted);
     cursor: pointer;
   }
@@ -576,7 +834,7 @@
   }
 
   .editor-content [data-type="detailsContent"] {
-    margin-top: 0.25rem;
+    margin-top: 0;
   }
 
   /* document-import T3: YouTube embeds (extensions/youtube.ts). The iframe
@@ -591,7 +849,7 @@
     height: auto;
     aspect-ratio: 16 / 9;
     border: 0;
-    border-radius: var(--radius-2xl);
+    border-radius: var(--radius-editor);
     background-color: var(--color-neutral-100);
   }
 
@@ -606,28 +864,69 @@
      `resizable: false` (no drag affordance to show). */
   .editor-content .tableWrapper {
     overflow-x: auto;
-    margin: 12px 0;
+    margin: 8px 0;
   }
 
+  /* H7 (editor polish round 2): a softer table frame — an 8px outer
+     radius (`--radius-table`, the rest of the editor stays square), inner
+     hairlines only between cells, a quiet header row and roomier cells.
+     `border-collapse: separate` lets the corner cells carry the radius so
+     the header tint is clipped to the frame. Numbers line up: tabular
+     figures everywhere, and cells holding only a number (the `is-numeric`
+     decoration, extensions/table.ts) align right. */
   .editor-content table {
-    border-collapse: collapse;
+    border-collapse: separate;
+    border-spacing: 0;
     width: 100%;
     table-layout: fixed;
+    border: 1px solid var(--color-border-default);
+    border-radius: var(--radius-table);
+    font-variant-numeric: tabular-nums;
   }
 
   .editor-content th,
   .editor-content td {
-    border: 1px solid var(--color-border-default);
-    padding: 6px 10px;
+    border: 0;
+    border-right: 1px solid var(--color-border-default);
+    border-bottom: 1px solid var(--color-border-default);
+    padding: 6px 12px;
     min-width: 100px;
     vertical-align: top;
     position: relative;
   }
+  .editor-content tr > :last-child {
+    border-right: 0;
+  }
+  .editor-content tr:last-child > * {
+    border-bottom: 0;
+  }
+  .editor-content tr:first-child > :first-child {
+    border-top-left-radius: calc(var(--radius-table) - 1px);
+  }
+  .editor-content tr:first-child > :last-child {
+    border-top-right-radius: calc(var(--radius-table) - 1px);
+  }
+  .editor-content tr:last-child > :first-child {
+    border-bottom-left-radius: calc(var(--radius-table) - 1px);
+  }
+  .editor-content tr:last-child > :last-child {
+    border-bottom-right-radius: calc(var(--radius-table) - 1px);
+  }
 
   .editor-content th {
     background-color: var(--color-neutral-50);
+    color: var(--color-fg-secondary);
+    font-size: var(--text-sm);
     font-weight: 600;
     text-align: left;
+  }
+  .editor-content th p {
+    font-size: inherit;
+  }
+
+  .editor-content td.is-numeric,
+  .editor-content th.is-numeric {
+    text-align: right;
   }
 
   /* @tiptap/extension-table's own `.selectedCell` marker class (a cell/
@@ -652,6 +951,53 @@
   .editor-content .column-resize-handle {
     display: none;
   }
+
+  /* PixelTile (src/shared/ui/pixel-tile.tsx, H9-T3): the dither reads
+     --pt-dark / --pt-mid / --pt-light per tone, the glyph --pt-ink with a
+     1px offset shadow in --pt-shadow (landing .lp-ptile recipe). */
+  .pixel-tile {
+    box-shadow: 0 5px 10px -6px var(--pt-dark);
+  }
+  .pixel-tile[data-tone="yellow"] {
+    --pt-dark: var(--color-warning-500);
+    --pt-mid: var(--color-technique-flashcards-accent);
+    --pt-light: var(--color-pastel-yellow);
+    --pt-ink: var(--color-pastel-yellow-fg);
+    --pt-shadow: var(--color-pastel-yellow);
+  }
+  .pixel-tile[data-tone="green"] {
+    --pt-dark: var(--color-success-500);
+    --pt-mid: var(--color-technique-recall-accent);
+    --pt-light: var(--color-success-50);
+    --pt-ink: var(--color-pastel-mint-fg);
+    --pt-shadow: var(--color-success-50);
+  }
+  .pixel-tile[data-tone="rose"] {
+    --pt-dark: var(--color-pixel-rose-dark);
+    --pt-mid: var(--color-rose-400);
+    --pt-light: var(--color-pixel-rose-light);
+    --pt-ink: var(--color-pixel-paper);
+    --pt-shadow: var(--color-pixel-rose-shadow);
+  }
+  .pixel-tile-glyph {
+    color: var(--pt-ink);
+    filter: drop-shadow(1px 1px 0 var(--pt-shadow));
+  }
+}
+
+/* H6-E3 (odd/tasks/phase-8-design-flows.md): the editor's floating
+   surfaces — bubble and table toolbars, slash menu, block context menu,
+   colour and highlighter popovers, link popover, code-language menu — use
+   square, professional corners. They are built from shared atoms
+   (src/shared/ui DropdownMenuContent, PopoverContent) whose own rounded-xl
+   stays the app-wide default; the editor opts in with `editor-surface` on
+   each surface instead of changing the atoms. Unlayered on purpose: it
+   beats the atoms' Tailwind utilities (which live in a layer) without
+   `!important`. Inner rounded controls (buttons, menu items) follow; full
+   circles (`rounded-full` colour dots) stay round. */
+.editor-surface,
+.editor-surface [class*="rounded-"]:not([class*="rounded-full"]) {
+  border-radius: var(--radius-editor);
 }
 
 /* Violet glows for the public auth brand panel. */
@@ -667,6 +1013,698 @@
       color-mix(in oklch, var(--color-primary-500) 35%, transparent),
       transparent 70%
     );
+}
+
+/* Populated Home surfaces (Phase 8 H2-T5): soft radial glows instead of
+   flat diagonal washes. The hero has a violet glow behind the greeting and
+   a pink one behind the illustration, echoing its blobs; each technique
+   card glows from its icon corner in the technique's pastel. Glows fade to
+   transparent over the card background, so text always sits on white. */
+@utility home-hero-glow {
+  background-image:
+    radial-gradient(
+      55% 85% at 0% 0%,
+      color-mix(in oklch, var(--color-primary-100) 85%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      35% 70% at 82% 55%,
+      color-mix(in oklch, var(--color-pastel-pink) 55%, transparent),
+      transparent 75%
+    ),
+    radial-gradient(
+      30% 60% at 100% 100%,
+      color-mix(in oklch, var(--color-primary-50) 90%, transparent),
+      transparent 70%
+    );
+}
+
+/* Cogni violet gradient text (Phase 8 H3, the calendar title): the glyphs
+   are filled with a primary-600 → primary-800 diagonal via background-clip;
+   text-fill-color (not color) is made transparent so a text-* colour class
+   on the same element never paints over it. Both ends meet WCAG AA on
+   white (5.7:1 and 8.9:1). */
+@utility text-gradient-brand {
+  background-image: linear-gradient(
+    120deg,
+    var(--theme-ink, var(--color-primary-600)),
+    var(--theme-ink-deep, var(--color-primary-800))
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Illustrated empty states (Phase 8 H3, user decisions 2026-10-19): a
+   soft, wide violet glow only (Cogni primary, low alpha, a long falloff
+   with no visible edge) behind the illustration, fading to the card; and a
+   gentle elliptical mask that dissolves an illustration's rectangular
+   background into whatever is behind it. */
+@utility empty-state-glow {
+  background-image: radial-gradient(
+    70% 62% at 50% 34%,
+    var(
+      --theme-glow,
+      color-mix(in oklch, var(--color-primary-200) 55%, transparent)
+    ),
+    var(
+        --theme-glow-soft,
+        color-mix(in oklch, var(--color-primary-100) 45%, transparent)
+      )
+      45%,
+    transparent 78%
+  );
+}
+
+/* A soft, blurred violet blob behind an illustration with a transparent
+   background: a diagonal primary-100 → primary-300 gradient in an ellipse. */
+@utility illustration-backdrop {
+  &::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 52%;
+    width: 92%;
+    height: 82%;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background-image: linear-gradient(
+      135deg,
+      var(--color-primary-100),
+      var(--color-primary-200) 45%,
+      var(--color-primary-300)
+    );
+    opacity: 0.75;
+    filter: blur(18px);
+    pointer-events: none;
+  }
+}
+
+/* Dotted notebook paper (Phase 8 H4-T2, notebooks hub; user decision
+   2026-10-20): primary-200 dots
+   on a 22px grid that are strongest around the centre and dissolve before
+   the edges (radial mask on a ::before layer, so content is never masked).
+   Children that must sit above the dots need `position: relative`. */
+@utility dotted-paper {
+  position: relative;
+  isolation: isolate;
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background-image: radial-gradient(
+      circle at center,
+      var(
+          --theme-dot,
+          color-mix(in oklch, var(--color-primary-200) 85%, transparent)
+        )
+        1.1px,
+      transparent 1.6px
+    );
+    background-size: 22px 22px;
+    background-position: center top;
+    mask-image: radial-gradient(
+      62% 58% at 50% 42%,
+      #000 0%,
+      rgb(0 0 0 / 0.55) 55%,
+      transparent 100%
+    );
+    pointer-events: none;
+  }
+}
+
+/* Technique hub themes (Phase 8 H11): an element tagged
+   data-technique-theme re-points text-gradient-brand, empty-state-glow,
+   dotted-paper and technique-cta at its technique's colours; without the
+   attribute they keep the Cogni violet. */
+[data-technique-theme="flashcards"] {
+  --theme-soft: var(--color-technique-flashcards-soft);
+  --theme-soft-edge: var(--color-technique-flashcards-soft-edge);
+  --theme-soft-fg: var(--color-technique-flashcards-soft-fg);
+  --theme-fill: var(--color-technique-flashcards-fill);
+  --theme-tint: var(--color-technique-flashcards-tint);
+  --theme-dash: var(--color-technique-flashcards-dash);
+  --theme-ink: var(--color-technique-flashcards-ink);
+  --theme-ink-deep: var(--color-technique-flashcards-ink-deep);
+  --theme-glow: color-mix(
+    in oklch,
+    var(--color-technique-flashcards-glow) 50%,
+    transparent
+  );
+  --theme-glow-soft: color-mix(
+    in oklch,
+    var(--color-technique-flashcards-glow-soft) 45%,
+    transparent
+  );
+  --theme-dot: color-mix(
+    in oklch,
+    var(--color-technique-flashcards-dot) 80%,
+    transparent
+  );
+  --theme-cta: var(--color-technique-flashcards-cta);
+  --theme-cta-hover: color-mix(
+    in oklch,
+    var(--color-technique-flashcards-cta) 88%,
+    black
+  );
+  --theme-cta-fg: var(--color-technique-flashcards-cta-fg);
+  --theme-cta-edge: var(--color-technique-flashcards-cta-edge);
+  --theme-cta-shadow: color-mix(
+    in oklch,
+    var(--color-technique-flashcards-cta-shadow) 45%,
+    transparent
+  );
+}
+[data-technique-theme="recall"] {
+  --theme-soft: var(--color-technique-recall-soft);
+  --theme-soft-edge: var(--color-technique-recall-soft-edge);
+  --theme-soft-fg: var(--color-technique-recall-soft-fg);
+  --theme-fill: var(--color-technique-recall-fill);
+  --theme-tint: var(--color-technique-recall-tint);
+  --theme-dash: var(--color-technique-recall-dash);
+  --theme-ink: var(--color-technique-recall-ink);
+  --theme-ink-deep: var(--color-technique-recall-ink-deep);
+  --theme-glow: color-mix(
+    in oklch,
+    var(--color-technique-recall-glow) 50%,
+    transparent
+  );
+  --theme-glow-soft: color-mix(
+    in oklch,
+    var(--color-technique-recall-glow-soft) 45%,
+    transparent
+  );
+  --theme-dot: color-mix(
+    in oklch,
+    var(--color-technique-recall-dot) 80%,
+    transparent
+  );
+  --theme-cta: var(--color-technique-recall-cta);
+  --theme-cta-hover: color-mix(
+    in oklch,
+    var(--color-technique-recall-cta) 88%,
+    black
+  );
+  --theme-cta-fg: var(--color-technique-recall-cta-fg);
+  --theme-cta-edge: var(--color-technique-recall-cta-edge);
+  --theme-cta-shadow: color-mix(
+    in oklch,
+    var(--color-technique-recall-cta-shadow) 45%,
+    transparent
+  );
+}
+[data-technique-theme="exams"] {
+  --theme-soft: var(--color-technique-exam-soft);
+  --theme-soft-edge: var(--color-technique-exam-soft-edge);
+  --theme-soft-fg: var(--color-technique-exam-soft-fg);
+  --theme-fill: var(--color-technique-exam-fill);
+  --theme-tint: var(--color-technique-exam-tint);
+  --theme-dash: var(--color-technique-exam-dash);
+  --theme-ink: var(--color-technique-exam-ink);
+  --theme-ink-deep: var(--color-technique-exam-ink-deep);
+  --theme-glow: color-mix(
+    in oklch,
+    var(--color-technique-exam-glow) 50%,
+    transparent
+  );
+  --theme-glow-soft: color-mix(
+    in oklch,
+    var(--color-technique-exam-glow-soft) 45%,
+    transparent
+  );
+  --theme-dot: color-mix(
+    in oklch,
+    var(--color-technique-exam-dot) 80%,
+    transparent
+  );
+  --theme-cta: var(--color-technique-exam-cta);
+  --theme-cta-hover: color-mix(
+    in oklch,
+    var(--color-technique-exam-cta) 88%,
+    black
+  );
+  --theme-cta-fg: var(--color-technique-exam-cta-fg);
+  --theme-cta-edge: var(--color-technique-exam-cta-edge);
+  --theme-cta-shadow: color-mix(
+    in oklch,
+    var(--color-technique-exam-cta-shadow) 42%,
+    transparent
+  );
+}
+
+/* The technique's empty-state CTA (EmptyStateCta tone="technique"): a 1px
+   inner edge and a soft coloured shadow; the fill, ink and hover fill are
+   bg-/text-(--theme-cta*) on the element. Only used inside a theme. */
+@utility technique-cta {
+  box-shadow:
+    0 8px 20px -8px var(--theme-cta-shadow),
+    inset 0 0 0 1px var(--theme-cta-edge);
+}
+
+/* TechniqueEmptyArt (src/shared/ui/technique-empty-art.tsx, Phase 8 H11):
+   the approved v2 mock's CSS (scratchpad technique-empty/v2-mock/build.mjs).
+   The stage keeps its design size and zooms down in steps with its column
+   (container queries), so it never overflows a narrow column. */
+@layer components {
+  .tea {
+    container-type: inline-size;
+    width: 100%;
+  }
+  .tea-stage {
+    display: flex;
+    justify-content: center;
+  }
+  @container (max-width: 379px) {
+    .tea-stage {
+      zoom: 0.82;
+    }
+  }
+  @container (max-width: 309px) {
+    .tea-stage {
+      zoom: 0.66;
+    }
+  }
+  @container (max-width: 249px) {
+    .tea-stage {
+      zoom: 0.5;
+    }
+  }
+  @container (max-width: 189px) {
+    .tea-stage {
+      zoom: 0.36;
+    }
+  }
+  .tea-kicker {
+    display: block;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .tea[data-technique="flashcards"] .tea-kicker {
+    color: var(--color-warning-700);
+  }
+  .tea[data-technique="recall"] .tea-kicker {
+    color: var(--color-success-700);
+  }
+  .tea[data-technique="exams"] .tea-kicker {
+    color: var(--color-technique-exam-ink-deep);
+  }
+
+  /* Flashcards: a tidy deck. */
+  .tea-deck {
+    position: relative;
+    width: 316px;
+    height: 206px;
+    margin: 34px 28px 0 0;
+    text-align: left;
+  }
+  .tea-deck-card {
+    position: absolute;
+    inset: 0;
+    border-radius: 18px;
+  }
+  .tea-deck-back {
+    border: 1px solid #e9b949;
+    box-shadow: 0 1px 0 rgb(255 255 255 / 0.6) inset;
+  }
+  .tea-deck-back[data-depth="4"] {
+    transform: translate(28px, -32px);
+    background: var(--color-pastel-yellow);
+    z-index: 1;
+  }
+  .tea-deck-back[data-depth="3"] {
+    transform: translate(21px, -24px);
+    background: var(--color-technique-flashcards-glow);
+    z-index: 2;
+  }
+  .tea-deck-back[data-depth="2"] {
+    transform: translate(14px, -16px);
+    background: var(--color-technique-flashcards-accent);
+    z-index: 3;
+  }
+  .tea-deck-back[data-depth="1"] {
+    transform: translate(7px, -8px);
+    background: #fbbf24;
+    z-index: 4;
+  }
+  .tea-deck-front {
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    padding: 18px 20px;
+    background: white;
+    border: 1px solid var(--color-technique-flashcards-accent);
+    box-shadow:
+      0 14px 30px -14px rgb(146 64 14 / 0.35),
+      0 2px 6px rgb(120 53 15 / 0.06);
+  }
+  .tea-deck-top,
+  .tea-deck-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .tea-counter {
+    border-radius: 9999px;
+    padding: 3px 9px;
+    font-size: 12px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-technique-flashcards-cta-fg);
+    background: var(--color-pastel-yellow);
+  }
+  .tea-deck-q {
+    margin: 14px 0 0;
+    font-size: 19px;
+    line-height: 1.3;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+    color: var(--fg-default);
+  }
+  .tea-deck-foot {
+    margin-top: auto;
+  }
+  .tea-flip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--color-warning-700);
+  }
+  .tea-deck-dots {
+    display: flex;
+    gap: 4px;
+  }
+  .tea-deck-dots i {
+    width: 6px;
+    height: 6px;
+    border-radius: 9999px;
+    background: var(--color-technique-flashcards-glow);
+  }
+  .tea-deck-dots i[data-on] {
+    width: 16px;
+    background: var(--color-warning-600);
+  }
+  .tea-deck-shadow {
+    position: absolute;
+    left: 8%;
+    right: 8%;
+    bottom: -16px;
+    z-index: 0;
+    height: 18px;
+    border-radius: 50%;
+    background: rgb(146 64 14 / 0.12);
+    filter: blur(8px);
+  }
+
+  /* Recordación activa: an open question over a ruled answer sheet. */
+  .tea-recall {
+    position: relative;
+    width: 360px;
+    text-align: left;
+  }
+  .tea-bubble {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin: 0 46px 14px 0;
+    padding: 12px 14px;
+    border: 1px solid var(--color-technique-recall-glow);
+    border-radius: 18px 18px 18px 6px;
+    background: var(--color-success-50);
+    box-shadow: 0 6px 16px -10px rgb(6 95 70 / 0.35);
+  }
+  .tea-bubble::after {
+    content: "";
+    position: absolute;
+    left: 18px;
+    bottom: -7px;
+    width: 12px;
+    height: 12px;
+    background: var(--color-success-50);
+    border-right: 1px solid var(--color-technique-recall-glow);
+    border-bottom: 1px solid var(--color-technique-recall-glow);
+    transform: rotate(45deg) skew(8deg, 8deg);
+  }
+  .tea-bubble-icon {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 8px;
+    background: var(--color-technique-recall-ink);
+    color: white;
+  }
+  .tea-bubble-q {
+    margin: 3px 0 0;
+    font-size: 15px;
+    line-height: 1.35;
+    font-weight: 700;
+    text-wrap: balance;
+    color: var(--fg-default);
+  }
+  .tea-sheet {
+    margin-left: 34px;
+    overflow: hidden;
+    border: 1px solid #d6efe3;
+    border-radius: 16px;
+    background: white;
+    box-shadow:
+      0 14px 30px -16px rgb(6 95 70 / 0.35),
+      0 2px 6px rgb(0 0 0 / 0.04);
+  }
+  .tea-sheet-head {
+    padding: 10px 14px 0;
+  }
+  .tea-memory {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 9999px;
+    padding: 3px 9px;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--color-success-700);
+    background: var(--color-success-100);
+  }
+  .tea-lines {
+    min-height: 78px;
+    margin: 8px 14px 0;
+    padding-left: 12px;
+    border-left: 2px solid var(--color-technique-recall-glow);
+    background-image: repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent 25px,
+      #e7e5e4 25px,
+      #e7e5e4 26px
+    );
+    background-position: 0 2px;
+  }
+  .tea-hand {
+    margin: 0;
+    font-family: var(--font-handwriting), cursive;
+    font-size: 21px;
+    line-height: 26px;
+    font-weight: 500;
+    color: #1f3b33;
+  }
+  .tea-caret {
+    display: inline-block;
+    width: 2px;
+    height: 20px;
+    margin-left: 2px;
+    vertical-align: -3px;
+    border-radius: 1px;
+    background: var(--color-technique-recall-ink);
+    animation: tea-blink 1.05s steps(1) infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .tea-caret {
+      animation: none;
+    }
+  }
+  .tea-sheet-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 6px;
+    padding: 10px 14px 12px;
+    border-top: 1px solid #f0efed;
+  }
+  .tea-wc {
+    font-size: 11.5px;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-neutral-600);
+  }
+  .tea-rate {
+    display: flex;
+    gap: 4px;
+  }
+  .tea-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 3px 8px;
+    border: 1px solid #e7e5e4;
+    border-radius: 9999px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--color-neutral-600);
+    background: white;
+  }
+  .tea-chip[data-on] {
+    border-color: var(--color-technique-recall-accent);
+    color: var(--color-success-700);
+    background: var(--color-success-100);
+  }
+
+  /* Exámenes: a clean test sheet. */
+  .tea-exam {
+    position: relative;
+    width: 300px;
+    margin-top: 6px;
+    text-align: left;
+  }
+  .tea-paper {
+    position: relative;
+    z-index: 2;
+    padding: 16px 18px 18px;
+    border: 1px solid #f5d0d8;
+    border-radius: 14px;
+    background: white;
+    box-shadow:
+      0 16px 32px -18px rgb(159 18 57 / 0.35),
+      0 2px 6px rgb(0 0 0 / 0.04);
+  }
+  .tea-paper-under {
+    position: absolute;
+    inset: 8px -8px -8px 8px;
+    z-index: 1;
+    padding: 0;
+    border-color: #fbd5dc;
+    background: #fff1f3;
+  }
+  .tea-exam-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding-bottom: 12px;
+    border-bottom: 1px dashed #f3c4cf;
+  }
+  .tea-exam-sub {
+    margin: 3px 0 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-neutral-700);
+  }
+  .tea-score {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 1px;
+    padding: 4px 9px;
+    border: 1.5px solid #fda4af;
+    border-radius: 10px;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-technique-exam-ink-deep);
+    background: white;
+    transform: rotate(-6deg);
+  }
+  .tea-score b {
+    font-size: 16px;
+  }
+  .tea-score small {
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .tea-exam-steps {
+    display: flex;
+    gap: 5px;
+    margin: 12px 0 0;
+  }
+  .tea-exam-steps i {
+    flex: 1;
+    height: 5px;
+    border-radius: 9999px;
+    background: #f5f5f4;
+  }
+  .tea-exam-steps i[data-state="done"] {
+    background: var(--color-rose-400);
+  }
+  .tea-exam-steps i[data-state="now"] {
+    background: var(--color-technique-exam-ink);
+  }
+  .tea-exam-q {
+    margin: 12px 0 10px;
+    font-size: 15px;
+    line-height: 1.35;
+    font-weight: 700;
+    color: var(--fg-default);
+  }
+  .tea-opts {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .tea-opts li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 10px;
+    border: 1px solid #e7e5e4;
+    border-radius: 10px;
+    font-size: 13px;
+    color: var(--color-neutral-700);
+  }
+  .tea-opts li[data-selected] {
+    border-color: var(--color-rose-600);
+    font-weight: 600;
+    color: var(--fg-default);
+    background: #fff1f2;
+    box-shadow: 0 0 0 3px rgb(225 29 72 / 0.08);
+  }
+  .tea-opt-key {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 9999px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--color-neutral-600);
+    background: #f5f5f4;
+  }
+  .tea-opts li[data-selected] .tea-opt-key {
+    color: white;
+    background: var(--color-technique-exam-ink);
+  }
+}
+
+@keyframes tea-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+@utility technique-glow-* {
+  background-image: radial-gradient(
+    130% 150% at 0% 0%,
+    color-mix(in oklch, --value(--color-pastel-*) 95%, transparent),
+    color-mix(in oklch, --value(--color-pastel-*) 35%, transparent) 38%,
+    transparent 72%
+  );
 }
 
 @layer base {

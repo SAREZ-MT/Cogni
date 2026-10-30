@@ -11,7 +11,7 @@ import {
 // Phase 7 T4 (documento-maestro §3.6): /dashboard reads the analytics
 // module instead of sample data. A user who has studied sees their real
 // numbers; a brand-new user sees one empty state; the sidebar's
-// "Dashboard" entry is a plain link. Every scenario runs on its own fresh
+// "Progreso" entry is a plain link. Every scenario runs on its own fresh
 // account (the worker user accumulates reviews across specs), in the
 // profile's default UTC zone.
 
@@ -31,7 +31,7 @@ async function shot(page: Page, name: string) {
   });
 }
 
-test.describe("Dashboard", () => {
+test.describe("Progreso", () => {
   test.skip(!hasSupabaseEnv, "Supabase env (cogni-dev) is not configured");
   // A fresh account adopts the browser's time zone, and the reviews are
   // seeded on UTC days. Pin the browser to UTC so local days match the
@@ -44,13 +44,13 @@ test.describe("Dashboard", () => {
   }) => {
     await signIn(page, freshUser);
 
-    const link = page.getByRole("link", { name: "Dashboard", exact: true });
+    const link = page.getByRole("link", { name: "Progreso", exact: true });
     await expect(link).toHaveAttribute("href", "/dashboard");
     await link.click();
     await expect(page).toHaveURL("/dashboard");
 
     await expect(
-      page.getByRole("heading", { name: "Dashboard", exact: true }),
+      page.getByRole("heading", { name: "Progreso", exact: true }),
     ).toBeVisible();
     const empty = page.getByTestId("dashboard-empty");
     await expect(
@@ -95,8 +95,8 @@ test.describe("Dashboard", () => {
     ]);
     await seedDueItems(pageId, { flashcard: 1 });
 
-    await page.goto("/");
-    await page.getByRole("link", { name: "Dashboard", exact: true }).click();
+    await page.goto("/inicio");
+    await page.getByRole("link", { name: "Progreso", exact: true }).click();
     await expect(page).toHaveURL("/dashboard");
 
     await expect(page.getByTestId("dashboard-empty")).toHaveCount(0);

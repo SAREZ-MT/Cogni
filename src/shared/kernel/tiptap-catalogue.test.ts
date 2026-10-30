@@ -3,10 +3,13 @@ import { CATALOGUE_SAMPLE_DOC } from "./testing/catalogue-sample-doc";
 import * as catalogue from "./tiptap-catalogue";
 import {
   BLOCK_NODES,
+  CALLOUT_KINDS,
   CATALOGUE_MARK_ATTRS,
   CATALOGUE_MARKS,
   CATALOGUE_NODE_ATTRS,
   CATALOGUE_NODES,
+  EDITOR_FONT_FAMILIES,
+  EDITOR_FONT_SIZES,
   findCatalogueViolations,
   INLINE_NODES,
 } from "./tiptap-catalogue";
@@ -37,6 +40,38 @@ function collectTypes(
 }
 
 describe("tiptap content catalogue", () => {
+  // H7 (editor polish round 2): the editor's "Texto" menu writes these
+  // textStyle values, so import validation must accept every one of them,
+  // alone and combined in one mark.
+  it("accepts every font family and size the editor offers", () => {
+    for (const fontFamily of EDITOR_FONT_FAMILIES) {
+      for (const fontSize of [...EDITOR_FONT_SIZES, null]) {
+        const value = doc(
+          paragraph(
+            text("a", [{ type: "textStyle", attrs: { fontFamily, fontSize } }]),
+          ),
+        );
+        expect(findCatalogueViolations(value)).toEqual([]);
+      }
+    }
+  });
+
+  it("offers seven font families and four non-default sizes", () => {
+    expect(EDITOR_FONT_FAMILIES).toHaveLength(7);
+    expect(EDITOR_FONT_SIZES).toEqual(["14px", "18px", "22px", "28px"]);
+  });
+
+  it("accepts block and inline math with their LaTeX source", () => {
+    const value = doc(
+      paragraph(text("a "), {
+        type: "inlineMath",
+        attrs: { latex: "E = h\\nu" },
+      }),
+      { type: "blockMath", attrs: { latex: "\\frac{1}{3}" } },
+    );
+    expect(findCatalogueViolations(value)).toEqual([]);
+  });
+
   it("lists every block and inline node as a catalogue node", () => {
     for (const name of [...BLOCK_NODES, ...INLINE_NODES]) {
       expect(CATALOGUE_NODES).toContain(name);
@@ -350,6 +385,37 @@ describe("tiptap content catalogue", () => {
   ])("accepts the youtube src %s", (src) => {
     expect(
       findCatalogueViolations(doc({ type: "youtube", attrs: { src } })),
+    ).toEqual([]);
+  });
+});
+
+// H8-5 (odd/tasks/phase-8-design-flows.md): the editor offers five callout
+// kinds; import accepts exactly those.
+describe("callout kinds", () => {
+  it("lists the five editor kinds", () => {
+    expect([...CALLOUT_KINDS]).toEqual([
+      "idea",
+      "note",
+      "warning",
+      "important",
+      "tip",
+    ]);
+  });
+
+  it.each(["important", "tip"])("accepts a %s callout", (kind) => {
+    expect(
+      findCatalogueViolations({
+        type: "doc",
+        content: [
+          {
+            type: "callout",
+            attrs: { kind },
+            content: [
+              { type: "paragraph", content: [{ type: "text", text: "a" }] },
+            ],
+          },
+        ],
+      }),
     ).toEqual([]);
   });
 });

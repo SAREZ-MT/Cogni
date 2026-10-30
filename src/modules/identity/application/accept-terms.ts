@@ -38,6 +38,7 @@ export async function acceptTerms(
     ownerId,
     TERMS_VERSION,
     stamped.updatedAt,
+    { method: "gate" },
   );
   if (!saved) {
     return err(new DomainError("PROFILE_NOT_FOUND", "profile does not exist"));

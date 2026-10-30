@@ -36,11 +36,13 @@ export type {
   StudiedPageReader,
 } from "./studied-page-reader";
 export {
+  type DueCutoff,
   EXAM_REVIEW_QUALITY,
   examReviewQualityFor,
   FLASHCARD_QUALITY,
   type FlashcardRating,
   INITIAL_EASINESS,
+  isDueBefore,
   MIN_EASINESS,
   type NewStudyItemInput,
   newStudyItem,

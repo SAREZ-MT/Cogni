@@ -10,7 +10,8 @@ sessions are scheduled by `study-engine`; this module adds the card text.
 - `domain/`
   - `flashcard.ts` `Flashcard` entity (`archivedAt` is the logical delete),
     `createFlashcard` (trims, rejects an empty front or back with
-    `FLASHCARD_EMPTY`) and `MAX_FLASHCARD_SIDE_LENGTH` (1000, manual cards).
+    `FLASHCARD_EMPTY`) and `MAX_FLASHCARD_SIDE_LENGTH` (1000, hand-written
+    cards of `createManualFlashcard`).
   - `flashcard-repository.ts` `FlashcardRepository` port: `insertMany`,
     `findById`, `listByPage`, `countByPage`, `nextPosition`,
     `countByOwnerGroupedByPage`, `archive`, `lockDeck`. Every read except
@@ -23,7 +24,20 @@ sessions are scheduled by `study-engine`; this module adds the card text.
   - `createManualFlashcard` checks the page through `PageTextReader`, enforces
     the trimmed side limit (`FLASHCARD_TOO_LONG`), and adds the card at the end
     of the deck with its due study item. A page without cards has no deck; its
-    first card starts it.
+    first card starts it. Decks are born from AI (Phase 8 H13); since H18
+    (user decision 2026-10-29) the deck's edit page adds cards by hand
+    through it ("la creación nace con IA; la edición permite ajustar y
+    añadir").
+  - `editFlashcard` (H18) rewrites a card's sides in place (trimmed,
+    non-blank, at most 1000 each), keeping its study item and history.
+  - `deleteFlashcard` (H18) deletes a card for real: the row, its study item
+    (`DeckStudyItems.deleteBySource`) and, by cascade, its review logs, so
+    mastery and metrics stop counting it. The deck's last card is refused
+    with `FLASHCARD_LAST_CARD`, like archiving.
+  - `applyDeckEdits` (H18) applies the edit page's draft (`updates`,
+    `creates`, `deletes`) in ONE unit of work through the three single-card
+    use cases run on the open transaction: every side is validated first,
+    then edits, additions and deletions; any refusal rolls everything back.
   - `archiveFlashcard` archives the card and suspends its study item. The
     deck's last active card is refused with `FLASHCARD_LAST_CARD` (a deck is
     never empty); the deck is locked before counting.
@@ -40,6 +54,14 @@ sessions are scheduled by `study-engine`; this module adds the card text.
     `generation_fingerprints`) are sent; their fingerprints are stored with
     the cards. Nothing new answers `FLASHCARDS_NO_NEW_CONTENT` with no AI call
     and no unit; a page generated before T5c sends every paragraph once.
+    Page content thresholds (Phase 8 H14, user 2026-10-29, kernel
+    `generation-capacity.ts`): the new paragraphs need 100 words and about
+    15 per card; without an explicit count the cards follow the words (3 to
+    10, a 100-word page yields 6). Below that, `AI_PAGE_TOO_SHORT`
+    (`PageTooShortError`: `words`, `minWords`, `maxItems`, also on the
+    action error) before the limiter. When fewer cards come back than were
+    asked for, only that share of the sent paragraphs is fingerprinted
+    (`consumedParagraphs`).
   - `listFlashcardsByPage`, `listDecks` (one deck per page, count derived from
     its cards), `getGenerationStatus` (remaining generations, does not consume).
   - `requestSessionFeedback` (§3.3, §8.4) asks the AI for feedback on a
@@ -59,11 +81,14 @@ sessions are scheduled by `study-engine`; this module adds the card text.
   by the same contract as the in-memory fake in `testing.ts`;
   `DrizzleDeckUnitOfWork` runs each deck change in one Postgres transaction
   and builds both repositories on it (`lockDeck` is `SELECT ... FOR UPDATE`
-  on the page row).
+  on the page row); its `deckStudyItems` adds `deleteBySource` to
+  study-engine's repository (`study_items` has no foreign key to its source).
 - `actions.ts` (`"use server"`): `generateFlashcardsAction`,
   `listFlashcardsAction`, `listDecksAction`, `getGenerationStatusAction`,
-  `createFlashcardAction`, `archiveFlashcardAction` (both revalidate the
-  `/flashcards` layout). They
+  `archiveFlashcardAction`, `archiveDeckAction` and, since Phase 8 H18,
+  `saveDeckEditsAction` (`{ pageId, updates, creates, deletes }`, the edit
+  page's "Guardar"; answers the saved deck). All three revalidate the
+  `/flashcards` layout. They
   validate session and input, return `Result<T, ActionError>`, report failures
   to Sentry and emit the `generation_requested` event. `maxDuration` is declared
   on the page route that hosts the action.
@@ -93,9 +118,23 @@ that exercises real providers.
 
 `src/app/(app)/flashcards/`: the deck page reviews in place (`DeckReview`,
 `FlashcardPlayer` with the four SM-2 buttons, `SessionFeedbackPanel` at the
-end) and starts once when opened with `?repasar=1`; `/flashcards` shows
-"Repasos de hoy" (`DueTodayList`, from the `scheduling` module) and the due
-count of every deck; `NewFlashcardDialog` adds manual cards.
+end) and starts once when opened with `?repasar=1`. Since Phase 8 H17
+(flat hub, 2026-10-29) `/flashcards` lists every deck as its own card: the
+decks with cards due today (scheduling's "Repasos de hoy") under "Para hoy",
+the rest under "Al día" with the next review (`DeckSummary.nextDueAt`, the
+earliest due date of the deck's active study items, read in the same
+grouped query), newest first (`latestCardAt`), filtered by `?cuaderno=`.
+Its menu deletes a deck with `archiveDeckAction` (every card archived and
+its study item suspended under the deck lock). `/flashcards/[notebookId]`
+redirects to the filtered hub. Cards are born from AI (Phase 8 H13): an
+empty deck links to its page, whose techniques panel generates cards.
+Since Phase 8 H18 (user 2026-10-29) opening a deck starts its graded
+review at once; with nothing due it says "Estás al día con este mazo" with
+the next review and offers "Repasar igual", a practice pass
+(`?modo=practica`) that calls no review-session action, so the SM-2
+schedule, the review logs and the metrics stay as they were. The cards are
+listed on the edit page `/flashcards/{nb}/{page}/editar` (the hub menu's
+"Editar tarjetas"), which saves its draft through `saveDeckEditsAction`.
 
 ## Next phase
 

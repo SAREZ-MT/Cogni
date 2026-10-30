@@ -1,10 +1,11 @@
-import { and, asc, eq, isNull, max, sql } from "drizzle-orm";
+import { and, asc, eq, isNull, max, min, sql } from "drizzle-orm";
 import type { DbExecutor } from "@/shared/db/client";
 import {
   type FlashcardRow,
   flashcards,
   notebooks,
   pages,
+  studyItems,
 } from "@/shared/db/schema";
 import type { Flashcard } from "../domain/flashcard";
 import type {
@@ -101,7 +102,11 @@ export class DrizzleFlashcardRepository implements FlashcardRepository {
 
   async countByOwnerGroupedByPage(ownerId: string): Promise<DeckSummary[]> {
     const count = sql<number>`count(${flashcards.id})::int`;
-    return this.db
+    // One grouped read (Phase 8 H17): each active card has at most one
+    // flashcard study item (unique kind + source), so the left join keeps
+    // the count and adds the deck's earliest due date; suspended items
+    // never count.
+    const rows = await this.db
       .select({
         pageId: pages.id,
         notebookId: notebooks.id,
@@ -109,10 +114,21 @@ export class DrizzleFlashcardRepository implements FlashcardRepository {
         notebookTitle: notebooks.title,
         notebookColor: notebooks.color,
         count,
+        latestCardAt: max(flashcards.createdAt),
+        nextDueAt: min(studyItems.dueAt),
       })
       .from(flashcards)
       .innerJoin(pages, eq(pages.id, flashcards.pageId))
       .innerJoin(notebooks, eq(notebooks.id, pages.notebookId))
+      .leftJoin(
+        studyItems,
+        and(
+          eq(studyItems.kind, "flashcard"),
+          eq(studyItems.sourceId, flashcards.id),
+          eq(studyItems.ownerId, ownerId),
+          isNull(studyItems.suspendedAt),
+        ),
+      )
       .where(
         and(
           eq(flashcards.ownerId, ownerId),
@@ -123,6 +139,11 @@ export class DrizzleFlashcardRepository implements FlashcardRepository {
       )
       .groupBy(pages.id, notebooks.id)
       .orderBy(asc(notebooks.title), asc(pages.title), asc(pages.id));
+    // A deck holds at least one active card, so max() is never null.
+    return rows.map((row) => ({
+      ...row,
+      latestCardAt: row.latestCardAt ?? new Date(0),
+    }));
   }
 
   async archive(id: string, ownerId: string, now: Date): Promise<void> {
@@ -137,6 +158,27 @@ export class DrizzleFlashcardRepository implements FlashcardRepository {
           isNull(flashcards.archivedAt),
         ),
       );
+  }
+
+  async update(card: Flashcard): Promise<Flashcard | null> {
+    const [row] = await this.db
+      .update(flashcards)
+      .set({ front: card.front, back: card.back, updatedAt: card.updatedAt })
+      .where(
+        and(
+          eq(flashcards.id, card.id),
+          eq(flashcards.ownerId, card.ownerId),
+          isNull(flashcards.archivedAt),
+        ),
+      )
+      .returning();
+    return row ? toFlashcard(row) : null;
+  }
+
+  async delete(id: string, ownerId: string): Promise<void> {
+    await this.db
+      .delete(flashcards)
+      .where(and(eq(flashcards.id, id), eq(flashcards.ownerId, ownerId)));
   }
 
   async lockDeck(pageId: string, ownerId: string): Promise<void> {

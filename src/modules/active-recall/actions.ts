@@ -12,6 +12,11 @@ import {
   type DomainError,
   toActionError,
 } from "@/shared/kernel/domain-error";
+import {
+  PAGE_TOO_SHORT_CODE,
+  PageTooShortError,
+  pageTooShortDetails,
+} from "@/shared/kernel/generation-capacity";
 import { createId } from "@/shared/kernel/id";
 import { err, ok, type Result } from "@/shared/kernel/result";
 import {
@@ -25,6 +30,7 @@ import {
   withBoundary,
 } from "./action-support";
 import {
+  applyRecallEdits,
   RecallDailyLimitReachedError,
   requestRecallGeneration,
 } from "./application";
@@ -50,6 +56,8 @@ export interface RecallQuestionView {
   keyConcepts: string[];
   acceptableAnswerSummary: string;
   origin: RecallQuestionOrigin;
+  // ISO; the edit page sends it back so a stale save is refused (V10).
+  updatedAt: string;
 }
 
 export interface RecallGenerationView {
@@ -68,9 +76,39 @@ export interface RecallGenerationView {
 // generation is available again (same shape as exams' and flashcards').
 export interface RecallGenerationActionError extends ActionError {
   readonly resetAt?: string;
+  // AI_PAGE_TOO_SHORT (Phase 8 H14): the new paragraphs' words, the words
+  // the 10 questions need and the questions those words carry.
+  readonly words?: number;
+  readonly minWords?: number;
+  readonly maxItems?: number;
 }
 
 const generateInput = z.object({ pageId: z.uuid() });
+const pageInput = z.object({ pageId: z.uuid() });
+
+// One edit page save (Phase 8 H18). The bounds only keep the payload sane;
+// the domain trims and checks every field (non-blank prompt, at least one
+// non-blank key concept, a non-blank summary).
+const MAX_DRAFT_ITEMS = 200;
+const fieldText = z.string().max(4000);
+const questionContent = z.object({
+  prompt: fieldText,
+  keyConcepts: z.array(z.string().max(500)).max(30),
+  acceptableAnswerSummary: fieldText,
+});
+const saveRecallEditsInput = z.object({
+  pageId: z.uuid(),
+  updates: z
+    .array(
+      questionContent.extend({
+        id: z.uuid(),
+        expectedUpdatedAt: z.iso.datetime().optional(),
+      }),
+    )
+    .max(MAX_DRAFT_ITEMS),
+  creates: z.array(questionContent).max(MAX_DRAFT_ITEMS),
+  deletes: z.array(z.uuid()).max(MAX_DRAFT_ITEMS),
+});
 
 // Adapters are built per call, like exams/actions.ts: serverless functions
 // are short-lived, so no module-level singletons.
@@ -114,7 +152,9 @@ function statusFor(
 ): "limit" | "empty" | "no_new_content" | "failed" {
   if (error.code === AI_ERROR.DAILY_LIMIT_REACHED) return "limit";
   if (error.code === RECALL_ERROR.NO_NEW_CONTENT) return "no_new_content";
-  if (error.code === AI_ERROR.PAGE_EMPTY) return "empty";
+  // A page too short to generate from (H14) is tracked as empty.
+  if (error.code === AI_ERROR.PAGE_EMPTY || error.code === PAGE_TOO_SHORT_CODE)
+    return "empty";
   return "failed";
 }
 
@@ -126,6 +166,7 @@ function toView(question: RecallQuestion): RecallQuestionView {
     keyConcepts: [...question.rubric.keyConcepts],
     acceptableAnswerSummary: question.rubric.acceptableAnswerSummary,
     origin: question.origin,
+    updatedAt: question.updatedAt.toISOString(),
   };
 }
 
@@ -173,6 +214,9 @@ export async function generateRecallQuestionsAction(
         truncated: false,
       });
       const error: RecallGenerationActionError = toActionError(result.error);
+      if (result.error instanceof PageTooShortError) {
+        return err({ ...error, ...pageTooShortDetails(result.error) });
+      }
       return err(
         result.error instanceof RecallDailyLimitReachedError
           ? { ...error, resetAt: result.error.resetAt.toISOString() }
@@ -199,5 +243,49 @@ export async function generateRecallQuestionsAction(
       wordsUsed: value.wordsUsed,
       wordsTotal: value.wordsTotal,
     });
+  });
+}
+
+// The page's active questions with their rubric, oldest first: what the
+// recall edit page edits (Phase 8 H18). Another owner's page reads empty.
+export async function listRecallQuestionsAction(
+  input: unknown,
+): Promise<Result<RecallQuestionView[], ActionError>> {
+  return withBoundary(async () => {
+    const ownerId = await requireOwnerId();
+    if (!ownerId.ok) return ownerId;
+    const parsed = parseInput(pageInput, input);
+    if (!parsed.ok) return parsed;
+
+    const { questions } = generationDeps();
+    const listed = await questions.listActiveByPage(
+      parsed.value.pageId,
+      ownerId.value,
+    );
+    return ok(listed.map(toView));
+  });
+}
+
+// "Guardar" on the recall edit page (Phase 8 H18): the draft's edits,
+// additions and real deletions, applied together in one transaction
+// (applyRecallEdits) or not at all. Answers the page's questions.
+export async function saveRecallEditsAction(
+  input: unknown,
+): Promise<Result<RecallQuestionView[], ActionError>> {
+  return withBoundary(async () => {
+    const ownerId = await requireOwnerId();
+    if (!ownerId.ok) return ownerId;
+    const parsed = parseInput(saveRecallEditsInput, input);
+    if (!parsed.ok) return parsed;
+
+    const { pages, uow } = generationDeps();
+    const result = await applyRecallEdits(
+      parsed.value,
+      { pages, uow, clock: systemClock, ids: { next: createId } },
+      ownerId.value,
+    );
+    if (!result.ok) return err(toActionError(result.error));
+    revalidateActiveRecall();
+    return ok(result.value.questions.map(toView));
   });
 }

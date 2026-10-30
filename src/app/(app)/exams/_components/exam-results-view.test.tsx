@@ -67,7 +67,7 @@ function renderView(value: Results) {
       notebookTitle="Biología"
       pageTitle="Mitocondria"
       pageHref="/notebooks/nb/pages/pg"
-      questionsHref="/exams/nb/pg/preguntas"
+      questionsHref="/exams/nb/pg/editar"
       examHref="/exams/nb/pg"
       results={value}
     />,

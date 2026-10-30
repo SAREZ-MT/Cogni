@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { Page } from "@playwright/test";
 import { expect, hasSupabaseEnv, signIn, test } from "./fixtures/auth";
 import { createNotebookWithOpenPage } from "./helpers/notebooks";
+import { withStudyFiller } from "./helpers/study-text";
 
 // Phase 5 T5 AI exam questions (documento-maestro §3.3 "generadas por IA"):
 // the student writes a page, presses "Técnicas → Examen → Generar" with the
@@ -50,7 +51,7 @@ test.describe("exam questions generation", () => {
     await editable.click();
     // Keys sent <15 ms after a click can precede Chrome's selectionchange.
     await page.waitForTimeout(100);
-    await page.keyboard.type(SENTENCES);
+    await page.keyboard.type(withStudyFiller(SENTENCES));
     await expect(page.getByTestId("autosave-status")).toHaveText("guardado", {
       timeout: 15000,
     });
@@ -76,19 +77,20 @@ test.describe("exam questions generation", () => {
     );
     await shot(page, "panel-after");
 
-    // The questions live in the Exams section: Exámenes → cuaderno →
-    // página → Preguntas.
-    await page.goto(`/exams/${notebookId}`);
-    await page.getByRole("link", { name: "Preguntas (10)" }).click();
-    await expect(page).toHaveURL(`/exams/${notebookId}/${pageId}/preguntas`);
-    const rows = page.getByTestId("exam-question-row");
+    // The questions live in the Exams section (Phase 8 H17: the flat hub,
+    // filtered by the notebook) → the page card's menu → Editar preguntas.
+    await page.goto(`/exams?cuaderno=${notebookId}`);
+    await page.getByRole("button", { name: /^Acciones de / }).click();
+    await page.getByRole("menuitem", { name: "Editar preguntas" }).click();
+    await expect(page).toHaveURL(
+      new RegExp(`/exams/${notebookId}/${pageId}/editar`),
+    );
+    const rows = page.getByTestId("item-editor-entry");
     await expect(rows).toHaveCount(10);
-    await expect(rows.first()).toContainText("IA");
-    // Listed in generation order.
-    await expect(rows.first()).toContainText(
+    // Listed in generation order, each stem editable in place (Phase 8 H18).
+    await expect(rows.first().getByLabel("Enunciado")).toHaveValue(
       "Pregunta 1: ¿qué afirma el texto sobre «La mitocondria produce la»?",
     );
-    await expect(page.getByTestId("exam-questions-minimum")).toHaveCount(0);
     await shot(page, "preguntas");
   });
 });

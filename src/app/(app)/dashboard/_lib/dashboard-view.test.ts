@@ -196,7 +196,7 @@ describe("buildDashboardView", () => {
       }),
       expect.objectContaining({
         key: "activeRecall",
-        label: "Active recall",
+        label: "Recordación activa",
         accuracyPct: 50,
         deltaPts: null,
       }),

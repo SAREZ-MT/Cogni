@@ -71,7 +71,7 @@ describe("ActivityChart", () => {
     renderChart(7);
 
     const chart = screen.getByTestId("activity-chart");
-    for (const name of ["Flashcards", "Active recall", "Exámenes"]) {
+    for (const name of ["Flashcards", "Recordación activa", "Exámenes"]) {
       expect(within(chart).getByText(name)).toBeInTheDocument();
     }
   });

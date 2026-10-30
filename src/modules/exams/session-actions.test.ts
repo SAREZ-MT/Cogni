@@ -11,6 +11,11 @@ import { InMemorySessionFeedback } from "./application/testing/in-memory-session
 // database; the transaction itself is covered by tests/db/exam-session.test.ts.
 const { getCurrentUser } = vi.hoisted(() => ({ getCurrentUser: vi.fn() }));
 vi.mock("@/modules/identity", () => ({ getCurrentUser }));
+// The owner's per-day "due" bound (UTC here): the next midnight.
+vi.mock("@/modules/scheduling", () => ({
+  getCurrentDueCutoff: async () => (now: Date) =>
+    new Date((Math.floor(now.getTime() / 86_400_000) + 1) * 86_400_000),
+}));
 vi.mock("@/shared/db/client", () => ({ getDb: () => ({}) }));
 const { captureException } = vi.hoisted(() => ({ captureException: vi.fn() }));
 vi.mock("@sentry/nextjs", () => ({ captureException }));

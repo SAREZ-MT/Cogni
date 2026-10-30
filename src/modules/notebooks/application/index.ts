@@ -1,7 +1,11 @@
-export { archiveNotebook, archiveNotebookSchema } from "./archive-notebook";
-export { archivePage, archivePageSchema } from "./archive-page";
 export { createNotebook, createNotebookSchema } from "./create-notebook";
 export { createPage, createPageSchema } from "./create-page";
+export {
+  deleteNotebook,
+  deletePage,
+  previewNotebookDeletion,
+  previewPageDeletion,
+} from "./delete-content";
 export { deleteImportedAssets } from "./delete-imported-assets";
 export {
   getAssetReadUrl,
@@ -17,6 +21,11 @@ export {
   type HomeRecentPage,
 } from "./get-home-overview";
 export { getPage, getPageSchema } from "./get-page";
+export {
+  listPagePickerTree,
+  type PagePickerNotebookEntry,
+  type PagePickerPage,
+} from "./list-page-picker-tree";
 export {
   listSidebar,
   type SidebarNotebook,

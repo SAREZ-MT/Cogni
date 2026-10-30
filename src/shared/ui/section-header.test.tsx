@@ -72,6 +72,37 @@ describe("SectionHeader", () => {
     expect(root.querySelector(".gap-3")).toBeNull();
   });
 
+  // Phase 8 H4-T4: the notebooks hub's subtitle is two phrases joined by a
+  // small violet dot.
+  it("joins a list description with decorative dots", () => {
+    const { container } = render(
+      <SectionHeader title="Cuadernos" description={["Uno", "Dos", "Tres"]} />,
+    );
+
+    expect(screen.getByText("Uno")).toBeInTheDocument();
+    expect(screen.getByText("Tres")).toBeInTheDocument();
+    const dots = container.querySelectorAll('[data-part="separator"]');
+    expect(dots).toHaveLength(2);
+    for (const dot of dots) {
+      expect(dot).toHaveAttribute("aria-hidden", "true");
+      expect(dot).toHaveClass("bg-primary-300", "rounded-full");
+    }
+  });
+
+  it("lets the leading row's spacing be overridden", () => {
+    render(
+      <SectionHeader
+        title="Cuadernos"
+        icon={<span data-testid="icon" />}
+        leadingClassName="gap-4"
+      />,
+    );
+
+    const row = screen.getByTestId("icon").parentElement;
+    expect(row).toHaveClass("gap-4");
+    expect(row).not.toHaveClass("gap-3");
+  });
+
   it("forwards className, titleClassName and descriptionClassName", () => {
     const { container } = render(
       <SectionHeader

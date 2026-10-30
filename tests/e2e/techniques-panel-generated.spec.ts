@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { Page } from "@playwright/test";
 import { expect, hasSupabaseEnv, signIn, test } from "./fixtures/auth";
 import { createNotebookWithOpenPage } from "./helpers/notebooks";
+import { withStudyFiller } from "./helpers/study-text";
 
 // Phase 6 T5b (user decision 2026-10-06, NotebookLM Studio model): the
 // "Técnicas de estudio" panel's cards only generate; each technique with
@@ -54,7 +55,7 @@ test.describe("techniques panel generated list", () => {
     await editable.click();
     // Keys sent <15 ms after a click can precede Chrome's selectionchange.
     await page.waitForTimeout(100);
-    await page.keyboard.type(SENTENCES);
+    await page.keyboard.type(withStudyFiller(SENTENCES));
     await expect(page.getByTestId("autosave-status")).toHaveText("guardado", {
       timeout: 15000,
     });
@@ -62,7 +63,7 @@ test.describe("techniques panel generated list", () => {
     const panel = page.getByTestId("techniques-panel");
     await expect(panel.getByText("Técnicas de estudio")).toBeVisible();
     await expect(
-      panel.getByText("Aún no generaste nada en esta página"),
+      panel.getByText("Aquí verás todo lo que generes"),
     ).toBeVisible();
     await shot(page, "panel-empty");
 

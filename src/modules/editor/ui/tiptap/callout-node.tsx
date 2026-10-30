@@ -2,8 +2,10 @@
 
 // Callout block (specs/editor/spec.md, "Conjunto completo de bloques de
 // §3.2" and "Paleta de resaltado de Cogni y callouts"): a block-level node
-// with a `kind` attribute in `idea | note | warning`, mapped to the
-// `yellow | blue | orange` design tokens and a matching Lucide icon.
+// with a `kind` attribute in `idea | note | warning | important | tip`,
+// mapped to the callout design tokens (H7: yellow | violet | rose; H8: blue |
+// green), a matching Lucide icon
+// and an italic label by kind, inline at the start of the text.
 // `content: "block+"` so a callout can hold any number of paragraphs/
 // lists, like blockquote in @tiptap/starter-kit.
 import { mergeAttributes, Node } from "@tiptap/core";
@@ -13,7 +15,13 @@ import {
   type ReactNodeViewProps,
   ReactNodeViewRenderer,
 } from "@tiptap/react";
-import { Info, Lightbulb, TriangleAlert } from "lucide-react";
+import {
+  CircleAlert,
+  CircleCheck,
+  Info,
+  Lightbulb,
+  TriangleAlert,
+} from "lucide-react";
 import {
   CALLOUT_KINDS,
   type CalloutKind,
@@ -30,17 +38,49 @@ export function isCalloutKind(value: unknown): value is CalloutKind {
   );
 }
 
-// specs/editor/spec.md: "idea" → yellow, "note" → blue, "warning" → orange.
+// H7 follow-up (user reference callout-ref.png, translated to the light
+// theme): each kind is a light tint of its hue with a 1px border in the mid
+// step and a rounded frame (`--radius-callout`, the editor's one rounded
+// block besides tables); the outlined icon takes the strong step and the
+// text the deep step, so bold and inline code stay legible (globals.css
+// `--color-callout-*`). Idea yellow, note violet, warning rose.
 const CALLOUT_CLASSES: Record<CalloutKind, string> = {
-  idea: "bg-pastel-yellow text-pastel-yellow-fg",
-  note: "bg-pastel-blue text-pastel-blue-fg",
-  warning: "bg-pastel-orange text-pastel-orange-fg",
+  idea: "bg-callout-idea border-callout-idea-edge text-callout-idea-fg",
+  note: "bg-callout-note border-callout-note-edge text-callout-note-fg",
+  warning:
+    "bg-callout-warning border-callout-warning-edge text-callout-warning-fg",
+  important:
+    "bg-callout-important border-callout-important-edge text-callout-important-fg",
+  tip: "bg-callout-tip border-callout-tip-edge text-callout-tip-fg",
+};
+
+const CALLOUT_ICON_CLASSES: Record<CalloutKind, string> = {
+  idea: "text-callout-idea-icon",
+  note: "text-callout-note-icon",
+  warning: "text-callout-warning-icon",
+  important: "text-callout-important-icon",
+  tip: "text-callout-tip-icon",
 };
 
 const CALLOUT_ICONS: Record<CalloutKind, typeof Lightbulb> = {
   idea: Lightbulb,
   note: Info,
   warning: TriangleAlert,
+  // H8: an exclamation in a circle (user reference callout-ref.png) and a
+  // check in a circle — the "this works" mark of a tip.
+  important: CircleAlert,
+  tip: CircleCheck,
+};
+
+// The label is rendered by kind, outside the editable content, so the
+// stored document, the plain text the AI reads and the content catalogue
+// never see it.
+export const CALLOUT_LABELS: Record<CalloutKind, string> = {
+  idea: "Idea clave",
+  note: "Nota",
+  warning: "Cuidado",
+  important: "Importante",
+  tip: "Consejo",
 };
 
 function CalloutView({ node }: ReactNodeViewProps) {
@@ -53,14 +93,26 @@ function CalloutView({ node }: ReactNodeViewProps) {
     <NodeViewWrapper
       data-testid="callout"
       data-kind={kind}
-      className={`flex gap-2 rounded-2xl p-4 ${CALLOUT_CLASSES[kind]}`}
+      className={`callout my-1.5 flex gap-3 rounded-(--radius-callout) border px-4 py-2.5 ${CALLOUT_CLASSES[kind]}`}
     >
       <Icon
         data-testid="callout-icon"
-        className="mt-0.5 size-5 shrink-0"
-        strokeWidth={1.75}
+        aria-hidden="true"
+        className={`mt-[5px] size-[18px] shrink-0 ${CALLOUT_ICON_CLASSES[kind]}`}
+        strokeWidth={2}
       />
-      <NodeViewContent className="flex-1" />
+      {/* The label floats at the start of the first text row ("Idea clave ·
+          Sin luz…"); flow-root contains the float. */}
+      <div className="flow-root min-w-0 flex-1">
+        <span
+          data-testid="callout-label"
+          contentEditable={false}
+          className="float-left mr-1.5 select-none pt-[2px] text-base font-semibold italic leading-6"
+        >
+          {CALLOUT_LABELS[kind]} ·
+        </span>
+        <NodeViewContent className="min-w-0" />
+      </div>
     </NodeViewWrapper>
   );
 }

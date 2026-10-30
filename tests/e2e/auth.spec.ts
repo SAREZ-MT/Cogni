@@ -15,7 +15,7 @@ test.describe("authentication", () => {
   test("sends an anonymous visitor from the shell to /login", async ({
     page,
   }) => {
-    await page.goto("/");
+    await page.goto("/inicio");
 
     await expect(page).toHaveURL("/login");
   });
@@ -27,7 +27,7 @@ test.describe("authentication", () => {
     try {
       await page.goto("/register");
       await page.getByLabel("Correo electrónico").fill(email);
-      await page.getByLabel("Contraseña").fill("Secreta-123");
+      await page.getByLabel("Contraseña", { exact: true }).fill("Secreta-123");
       await page.getByRole("button", { name: "Crear cuenta" }).click();
       await expect(page.getByRole("status")).toContainText(
         "Te enviamos un correo de verificación",
@@ -35,7 +35,7 @@ test.describe("authentication", () => {
 
       await page.goto("/login");
       await page.getByLabel("Correo electrónico").fill(email);
-      await page.getByLabel("Contraseña").fill("Secreta-123");
+      await page.getByLabel("Contraseña", { exact: true }).fill("Secreta-123");
       await page.getByRole("button", { name: "Iniciar sesión" }).click();
       await expect(formAlert(page)).toContainText(
         "Aún no has verificado tu correo",
@@ -51,7 +51,7 @@ test.describe("authentication", () => {
   }) => {
     await page.goto("/register");
     await page.getByLabel("Correo electrónico").fill(verifiedUser.email);
-    await page.getByLabel("Contraseña").fill("Otra-clave-123");
+    await page.getByLabel("Contraseña", { exact: true }).fill("Otra-clave-123");
     await page.getByRole("button", { name: "Crear cuenta" }).click();
 
     await expect(formAlert(page)).toContainText("El email ya está registrado");
@@ -62,7 +62,7 @@ test.describe("authentication", () => {
   }) => {
     await page.goto("/login");
     await page.getByLabel("Correo electrónico").fill("nadie@cogni-e2e.test");
-    await page.getByLabel("Contraseña").fill("Secreta-123");
+    await page.getByLabel("Contraseña", { exact: true }).fill("Secreta-123");
     await page.getByRole("button", { name: "Iniciar sesión" }).click();
 
     await expect(formAlert(page)).toContainText(
@@ -80,19 +80,20 @@ test.describe("authentication", () => {
       // navigation only since design pass 2); scoping to it keeps the
       // assertion independent of any other surface that may repeat the copy.
       await expect(
-        page
-          .getByTestId("content-area")
-          .getByText("Aún no tienes cuadernos. Crea uno para empezar."),
+        page.getByTestId("content-area").getByRole("heading", {
+          level: 1,
+          name: "Tu inicio está vacío por ahora",
+        }),
       ).toBeVisible();
 
       await page.goto("/login");
-      await expect(page).toHaveURL("/");
+      await expect(page).toHaveURL("/inicio");
 
       await page.getByRole("button", { name: "Menú de usuario" }).click();
       await page.getByRole("menuitem", { name: "Cerrar sesión" }).click();
       await expect(page).toHaveURL("/login");
 
-      await page.goto("/");
+      await page.goto("/inicio");
       await expect(page).toHaveURL("/login");
     } finally {
       await deleteUserByEmail(user.email);
