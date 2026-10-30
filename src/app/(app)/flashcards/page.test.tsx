@@ -1,8 +1,25 @@
 import { render, screen, within } from "@testing-library/react";
+import { createElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { listDecksAction } = vi.hoisted(() => ({ listDecksAction: vi.fn() }));
-vi.mock("@/modules/flashcards", () => ({ listDecksAction }));
+const { listDecksAction, getGenerationStatusAction } = vi.hoisted(() => ({
+  listDecksAction: vi.fn(),
+  getGenerationStatusAction: vi.fn(),
+}));
+vi.mock("@/modules/flashcards", () => ({
+  listDecksAction,
+  getGenerationStatusAction,
+}));
+const { CreateFromPageDialog, loadCreateExamNotebooks } = vi.hoisted(() => ({
+  CreateFromPageDialog: vi.fn(),
+  loadCreateExamNotebooks: vi.fn(),
+}));
+vi.mock("./_components/create-from-page-dialog", () => ({
+  CreateFromPageDialog,
+}));
+vi.mock("../exams/_lib/create-exam-notebooks", () => ({
+  loadCreateExamNotebooks,
+}));
 const { listDueTodayAction } = vi.hoisted(() => ({
   listDueTodayAction: vi.fn(),
 }));
@@ -65,6 +82,20 @@ describe("FlashcardsHubPage (real data)", () => {
     listDecksAction.mockReset();
     listDueTodayAction.mockReset();
     listDueTodayAction.mockResolvedValue({ ok: true, value: [] });
+    getGenerationStatusAction.mockReset();
+    getGenerationStatusAction.mockResolvedValue({
+      ok: true,
+      value: { remainingToday: 3, resetAt: "2026-10-30T00:00:00.000Z" },
+    });
+    loadCreateExamNotebooks.mockReset();
+    loadCreateExamNotebooks.mockResolvedValue([
+      { id: "n1", title: "Biología", pages: [] },
+    ]);
+    CreateFromPageDialog.mockReset();
+    CreateFromPageDialog.mockImplementation(((props: { trigger: string }) =>
+      createElement("div", {
+        "data-testid": `create-flashcards-${props.trigger}`,
+      })) as never);
   });
 
   it("is not behind the design-preview gate: it renders in production", async () => {
@@ -197,12 +228,76 @@ describe("FlashcardsHubPage (real data)", () => {
     expect(screen.getByRole("link", { name: /Sin color/ })).toBeInTheDocument();
   });
 
+  // Phase 8 H11: with decks listed, the dialog also opens from a tile
+  // fixed first in the grid; an unreadable limit passes as unknown.
+  it("puts the create tile first in the decks grid", async () => {
+    listDecksAction.mockResolvedValue({
+      ok: true,
+      value: [deck("p1", "n1", "Biología", 2)],
+    });
+    getGenerationStatusAction.mockResolvedValue({
+      ok: false,
+      error: { code: "X", message: "x" },
+    });
+
+    render(await FlashcardsHubPage());
+
+    const tile = screen.getByTestId("create-flashcards-tile");
+    expect(tile.parentElement?.firstElementChild).toBe(tile);
+    expect(CreateFromPageDialog).toHaveBeenCalledWith(
+      expect.objectContaining({ trigger: "tile", remaining: null }),
+      undefined,
+    );
+    expect(screen.queryByTestId("create-flashcards-cta")).toBeNull();
+  });
+
   it("shows the empty state when there are no decks", async () => {
     listDecksAction.mockResolvedValue({ ok: true, value: [] });
 
     render(await FlashcardsHubPage());
 
-    expect(screen.getByText("Sin mazos todavía")).toBeInTheDocument();
+    // Phase 8 H10: the illustrated empty state (fanned flashcards, gradient
+    // headline) leads to the notebooks, where cards are generated.
+    expect(
+      screen.getByRole("heading", {
+        name: "Tus primeras flashcards te esperan",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Elige una página de tus cuadernos y crea tarjetas con IA o a mano para repasarlas aquí.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      document.querySelector('[data-slot="technique-empty-art"]'),
+    ).toHaveAttribute("data-technique", "flashcards");
+    // Phase 8 H11: the technique theme on the header and the empty state.
+    expect(
+      document.querySelector('[data-slot="technique-hub-header"]'),
+    ).toHaveAttribute("data-technique-theme", "flashcards");
+    expect(
+      document.querySelector('[data-slot="illustrated-empty-state"]'),
+    ).toHaveAttribute("data-technique-theme", "flashcards");
+    // Phase 8 H11: the CTA opens the "pick a page" dialog with the
+    // notebooks and the generations left today.
+    const empty = document.querySelector(
+      '[data-slot="illustrated-empty-state"]',
+    ) as HTMLElement;
+    expect(
+      empty.querySelector('[data-testid="create-flashcards-cta"]'),
+    ).toBeInTheDocument();
+    expect(CreateFromPageDialog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        technique: "flashcards",
+        trigger: "cta",
+        remaining: 3,
+        notebooks: [{ id: "n1", title: "Biología", pages: [] }],
+      }),
+      undefined,
+    );
+    expect(
+      screen.queryByRole("link", { name: "Ir a mis cuadernos" }),
+    ).toBeNull();
     // Nothing can be due without cards: no Repasos de hoy section.
     expect(screen.queryByTestId("due-today")).not.toBeInTheDocument();
   });
@@ -217,6 +312,11 @@ describe("FlashcardsHubPage (real data)", () => {
 
     expect(
       screen.getByText("No pudimos cargar tus mazos. Intenta de nuevo."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", {
+        name: "Tus primeras flashcards te esperan",
+      }),
     ).toBeInTheDocument();
   });
 });

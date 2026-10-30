@@ -82,6 +82,26 @@ describe("SLASH_COMMAND_ITEMS", () => {
     }
   });
 
+  // H8-5: the important (blue) and tip (green) callouts.
+  it.each([
+    ["callout-important", "Callout importante", "important"],
+    ["callout-tip", "Callout de consejo", "tip"],
+  ] as const)("inserts the %s item as its callout kind", (id, label, kind) => {
+    const item = findItem(id);
+    expect(item.label).toBe(label);
+    expect(item.group).toBe("Callouts");
+    const editor = createHeadlessEditor();
+    try {
+      item.run(editor, { from: 1, to: 1 });
+      const callout = editor
+        .getJSON()
+        .content?.find((node) => node.type === "callout");
+      expect(callout?.attrs?.kind).toBe(kind);
+    } finally {
+      editor.destroy();
+    }
+  });
+
   // E1 template block set: each "/" entry replaces the typed "/xyz" range
   // and inserts its block (or trigger character) in its place.
   describe("template block entries", () => {
@@ -239,6 +259,8 @@ describe("SLASH_COMMAND_ITEMS", () => {
       "callout-idea": "Callout de idea",
       "callout-note": "Callout de nota",
       "callout-warning": "Callout de advertencia",
+      "callout-important": "Callout importante",
+      "callout-tip": "Callout de consejo",
       image: "Imagen",
     };
 

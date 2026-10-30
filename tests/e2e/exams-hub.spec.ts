@@ -130,7 +130,7 @@ test.describe("exams hub", () => {
     // The empty hub first.
     await sidebar(page).getByRole("link", { name: "Exámenes" }).click();
     await expect(page).toHaveURL("/exams");
-    await expect(page.getByText("Aún no tienes exámenes")).toBeVisible();
+    await expect(page.getByText("Pon a prueba lo que sabes")).toBeVisible();
     await shot(page, "after-hub-empty");
 
     // A page with 10 generated questions.

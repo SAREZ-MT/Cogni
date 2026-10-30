@@ -116,7 +116,9 @@ title element tag.
 Used by: `home/home-empty-state.tsx` (zero-notebooks Home, `plain`, Phase 8
 H2-T3), `home/ready-to-review.tsx` (`success`), `home/weak-topics.tsx`
 (`tinted`). The notebook page's zero-pages `dashed` state became an
-`IllustratedEmptyState` in Phase 8 H5-T4.
+`IllustratedEmptyState` in Phase 8 H5-T4, and the `/flashcards`,
+`/active-recall` and `/exams` hubs' empty states in H10 (the notebook
+views `[notebookId]` still use `EmptyState`).
 
 ## FeaturePreviewCard (`feature-preview-card.tsx`)
 
@@ -346,6 +348,85 @@ that pulses (`motion-safe:animate-pulse`, still under reduced motion). The
 Decorative (`aria-hidden`, `data-slot="page-sheet-fan"`,
 `data-part="fan-sheet"`, `data-sheet`). Props: `tone?`, `className?`.
 
+## TechniqueEmptyArt (`technique-empty-art.tsx`)
+
+Phase 8 H11 (the user-approved v2 mock of 2026-10-29, replacing H10's
+fanned cards): the technique hubs' empty-state hero shows each technique
+at work. Server component, no client JavaScript; the look is the mock's
+CSS ported to globals.css (`.tea-*`, `@layer components`). One
+parameterised atom, `technique: TechniqueTheme` (`"flashcards" | "recall"
+| "exams"`, `technique-theme.ts`).
+
+- Flashcards: a tidy deck (no rotation), 316×206, four cards behind the
+  front stepping 7px right and 8px up (`data-part="deck-back"`,
+  `data-depth` 4→1) from `pastel-yellow` to amber-400; the white front
+  (`deck-front`) shows "Pregunta", a "1 / 12" counter, "¿Qué describe el
+  concepto clave de esta página?", "Toca para voltear" (`RotateCw`) and
+  five position dots (`deck-dot`, the first `data-on`).
+- Recordación activa: a mint speech bubble with a `Sparkle` tile,
+  "Pregunta abierta" and "¿Cómo le explicarías esta idea a alguien que no
+  la conoce?", over a ruled answer sheet: the "De memoria, sin mirar tu
+  apunte" chip (`EyeOff`), a handwritten answer (`data-part="handwriting"`,
+  `.tea-hand`, Caveat 500 through `--font-handwriting`, root layout,
+  self-hosted and not preloaded) ending in a blinking emerald caret
+  (`.tea-caret`, still under reduced motion), "24 palabras" and the
+  self-rating chips "Me faltó", "A medias" (`data-on`, check) and "Lo
+  recordé" (`rating-chip`).
+- Exámenes: a clean test sheet over a pink under-sheet: "Examen · 10
+  preguntas", "Pregunta 3", a score badge "8/10" tilted -6deg
+  (`data-part="score"`), a ten-step strip (`exam-step`, `data-state`
+  done/done/now/todo…) and options A–D (`option`), B chosen
+  (`data-selected`, rose border and tint, check in a rose disc).
+- Content is generic by rule. The stage keeps its design size and zooms
+  down in steps with its column (`container-type: inline-size` on `.tea`,
+  `zoom` 0.82/0.66/0.5/0.36 below 380/310/250/190px), so it never
+  overflows.
+- Decorative (`aria-hidden`, `data-slot="technique-empty-art"`,
+  `data-technique`). Props: `technique`, `className?`.
+- Used by the `/flashcards`, `/active-recall` and `/exams` hubs inside
+  `IllustratedEmptyState` (`entrance="cascade"`, `paper`, `technique`).
+
+## Technique themes (`technique-theme.ts`, globals.css)
+
+Phase 8 H11: `TechniqueTheme` and `TECHNIQUE_THEME` (pixel tile tone and
+Lucide icon per technique: flashcards `yellow`/`Layers`, recall
+`green`/`Brain`, exams `rose`/`ClipboardList`). An element tagged
+`data-technique-theme` sets `--theme-ink`/`-ink-deep`, `--theme-glow`/
+`-glow-soft`, `--theme-dot` and `--theme-cta`/`-cta-fg`/`-cta-edge`/
+`-cta-shadow`/`-cta-hover` from the `--color-technique-{flashcards,recall,
+exam}-*` tokens; `text-gradient-brand`, `empty-state-glow` and
+`dotted-paper` read them with the violet as fallback, so the same
+utilities turn amber (CTA amber-300 with amber-900 ink), emerald
+(emerald-700, white ink) or rose (rose-700, white ink) inside a theme.
+
+## TechniqueHubHeader (`technique-hub-header.tsx`)
+
+Phase 8 H11: the page head of the three technique hubs, empty or not.
+`SectionHeader` with the technique's 48px `PixelTile` (top-aligned,
+`mt-1.5`, gap 16px), the "Técnicas de estudio" eyebrow, a 32px bold title
+in the technique gradient (`text-gradient-brand` under
+`data-technique-theme`; 26px below `sm`, tracking -0.02em) and the counts
+in `fg-secondary`; below `sm` the actions drop under the title. Props:
+`technique`, `title`, `description`, `actions?`
+(`data-slot="technique-hub-header"`).
+
+## EmptyStateCta (`empty-state-cta.tsx`)
+
+Phase 8 H10: the illustrated empty states' pill as a link (`Button
+asChild` + `next/link`), 15px semibold, `max-w-full whitespace-normal
+min-h-12 h-auto` so a narrow column wraps the label instead of clipping
+it. `tone="brand"` (default): `bg-primary-600`, white, the soft violet
+shadow of H4-T1's "Crear mi primer cuaderno", `hover:bg-primary-700`.
+`tone="technique"` (H11): `bg-(--theme-cta) text-(--theme-cta-fg)
+hover:bg-(--theme-cta-hover)` plus `technique-cta` (1px inner edge and a
+coloured shadow), inside a `data-technique-theme`. Props: `href`,
+`children`, `tone?`, `className?`. Without `href` it is a `type="button"`
+that forwards button props (a `DialogTrigger asChild` target): the
+technique hubs' "Crear mis primeras flashcards", "Generar mis primeras
+preguntas" and "Crear mi primer examen" open their create dialogs. The
+shape and tone class lists are exported (`EMPTY_STATE_CTA_SHAPE`,
+`EMPTY_STATE_CTA_TONE`).
+
 Used by: `notebooks/[notebookId]/page.tsx` (the zero-pages
 `IllustratedEmptyState` `art`).
 
@@ -557,8 +638,12 @@ zero-visual-change (same classes/DOM, only the icon and aria attributes now
 come in as props).
 
 - `icon`: any `LucideIcon`. `size`/`strokeWidth`: default `15`/`1.75`
-  (Sidebar's size); the techniques panel passes `size={12}` to match its
-  smaller reference chrome.
+  (Sidebar's size). The techniques panel (H9-T3, user 2026-10-29) sizes it
+  through `className` to match the technique icons: `size-9 rounded-[9px]`
+  with a 16px icon in the expanded header (the tiles' 36px icons) and
+  `size-12 rounded-lg` with a 20px icon when collapsed, centred in the same
+  column as the rail's 48px tiles; neutral chrome, `title` = its
+  `aria-label`.
 - Forwards `onClick`, `aria-expanded`, `aria-label`, `data-testid`, etc. via
   `React.ComponentProps<"button">` (minus `children`/`type`, which the atom
   owns).
@@ -598,40 +683,52 @@ its collapsed icon strip (design/shell-look, studyplatform `StudyPanel.tsx`
 anatomy; simplified per user decision 2026-09-24 — a card has **only** a
 "Generar" action, no navigation).
 
-- `TechniqueCard` props: `icon`, `tone`, `name`, `description`, `disabled?`
-  (default `true` — no technique is built yet), `className?`. `href`,
-  `meta`, and `actionLabel` were removed: no card links anywhere anymore,
-  there's no meta line, and the action's label is a fixed "Generar".
+- `TechniqueCard` props: `icon`, `tone`, `name`, `disabled?`
+  (default `true` — no technique is built yet), `className?`. `href`, the
+  old stats line and `actionLabel` were removed long ago; H9-T1 (user,
+  2026-10-29) also removed `description` — users already know each
+  technique, so a tile is only icon + name + "Generar" + remaining
+  generations.
 - Wired variant (Phase 3, Flashcards): pass `onGenerate` and the card becomes
   live — the button is enabled by default (`disabled` can still force it
   off, e.g. quota exhausted, without the "Disponible pronto" title, which is
   reserved for unwired cards), `pending` disables it, sets `aria-busy` and
   swaps the label to "Generando…", `generateTestId` tags the button and
-  `children` render under it inside the card (the caller owns quota/notice/
-  error copy). Without `onGenerate` the card behaves exactly as before.
-- Anatomy: icon tile (`IconTile` size `"30"` — closest existing token to the
-  reference's 32px — radius `"md"`) + name + description, then one
-  full-width `Button` reading "Generar" with a leading `Sparkles` icon
-  (12px, strokeWidth 2). The three buttons share every class
-  (`w-full font-semibold text-[11.5px] hover:brightness-95`) except the
-  technique's **soft pastel pair** (Phase 6 T5b, user decision 2026-10-06 —
-  solid fills were too strong): yellow `bg-pastel-yellow` +
-  `text-pastel-yellow-fg` (6.4:1), green `bg-pastel-mint` +
-  `text-pastel-mint-fg` (6.8:1; chosen over `pastel-green-fg`, 4.6:1) and
-  rose `bg-pastel-pink` + `text-pastel-pink-fg` (5.9:1) — every label meets
-  WCAG AA at 11.5px; hover darkens the same pair (`brightness-95`), kept
-  at `disabled:opacity-60` + `disabled:cursor-not-allowed` (explicit
-  `disabled:` variants so they replace, not stack with, Button's own
-  `disabled:opacity-50`) instead of going fully gray, so the panel still
-  "reads colourful and alive" while every action is inert. Disabled cards
-  also get `aria-disabled` and `title="Disponible pronto"`.
-- `TechniqueIconStrip`: the collapsed-state 36x36 tinted tile (`IconTile`
-  size `"36"` radius `"input"`) with a native `title` tooltip; `opacity-35`
-  when `available` is false (default).
+  `children` render under it inside the card (the caller owns the
+  remaining-generations, notice and error copy). Without `onGenerate` the
+  card behaves exactly as before.
+- Anatomy (H9-T2, refined in H9-T3, user 2026-10-29): Home's "Tu progreso
+  de hoy" look (`TechniqueCountCard`) — a white bordered `rounded-lg`
+  (12px, was 16 in H9-T2) card (`px-3.5 pt-3.5 pb-3`, `shadow-xs`) with the
+  technique's pastel fading in from the icon corner (`TECHNIQUE_GLOW_CLASS`
+  → globals.css `technique-glow-yellow|mint|pink`), tagged
+  `data-part="technique-card"` + `data-tone`. Row 1: a 36px `PixelTile`
+  (`data-part="technique-icon"`) and the name as a one-line 15px semibold
+  title (`truncate`) vertically centred with it. Row 2: one full-width 36px
+  **outlined** "Generar" (`rounded-md`, `border-[1.5px]`, `bg-transparent`,
+  13px semibold, leading `Sparkles` 12px): the label in the technique's
+  dark ink (`text-pastel-*-fg`; measured on the faded tile yellow 6.72:1,
+  mint 7.21:1, pink 6.65:1) and the border in its outline token
+  (`border-technique-flashcards|recall|exam-outline` = `#b45309` /
+  success-600 / rose-600; UI component 4.76:1 / 3.54:1 / 4.25:1). Hover
+  fills it with the technique pastel (`hover:bg-pastel-*`, ink ≥ 5.88:1).
+  The three buttons share every class except the colour ones. Then
+  `children` (the panel puts "Te quedan N generaciones hoy" there, centred
+  11px). Disabled keeps the colour at `disabled:opacity-60` +
+  `disabled:cursor-not-allowed`; disabled unwired cards also get
+  `aria-disabled` and `title="Disponible pronto"`. (Rejected: H9-T1's flat
+  pastel surface with a white button; H9-T2's filled pastel button.)
+- `TECHNIQUE_GLOW_CLASS`: the faded glow per `TechniqueTone`, same
+  utilities as `TechniqueCountCard`. (H9-T2's `TECHNIQUE_TRIO_GLOW_CLASS`
+  and H9-T1's `TechniqueStack` were removed in H9-T3: the empty state is
+  plain now.)
+- `TechniqueIconStrip`: the collapsed-state 48px `PixelTile` (H9-T3; was a
+  40px `IconTile`) with a native `title` tooltip; the panel's collapsed
+  width is 64; `opacity-35` when `available` is false (default).
 - `TechniqueTone`: `"yellow" | "green" | "rose"` (Flashcards / Recordación
-  activa / Examen) — mapped onto the **existing** pastel `IconTile` tones
-  `yellow` / `mint` / `pink`, the same pairs as the button, for the icon tile
-  (tagged `data-part="technique-icon"`). No new token was needed.
+  activa / Examen) — mapped onto the pastel pairs `yellow` / `mint` /
+  `pink` (the glow, the button ink and hover fill) and onto `PixelTile`'s
+  tones of the same names.
 - `TECHNIQUE_PAIR_CLASS` (Phase 7 T1): the pastel pair per `TechniqueTone`
   (`bg-pastel-yellow text-pastel-yellow-fg`, `bg-pastel-mint
   text-pastel-mint-fg`, `bg-pastel-pink text-pastel-pink-fg`), exported so
@@ -649,7 +746,7 @@ anatomy; simplified per user decision 2026-09-24 — a card has **only** a
   SVG strokes drawn with `currentColor` (`TechniqueRing`).
 
 - `controls?` (Phase 5 T5): options of the action rendered between the
-  description and the button. No card passes it since Phase 6 T5b v2:
+  header and the button. No card passes it since Phase 6 T5b v2:
   Examen's question count moved into `ExamGenerateDialog` (page route
   component composing `Dialog` + `CountStepper` + `Button`), so the three
   cards look the same.
@@ -663,7 +760,34 @@ content on the page (NotebookLM Studio model). Cards only generate — no
 practice button or deck/exam link inside a card; Examen's "Preguntas" link
 was removed too (manual questions live in Exámenes → cuaderno → página).
 `SavedStudySection` keys rows by tone + href + label, so rows sharing a label
-need distinct hrefs.
+need distinct hrefs. Its empty state (H9-T3) is a plain neutral card:
+`EmptyState` `tinted` restyled as `rounded-lg border-border-subtle bg-card`,
+no icon, no colour or gradient, "Aquí verás todo lo que generes" +
+"Empieza con una técnica de arriba." The panel is 280px wide since H9-T2
+(was 264).
+
+## PixelTile (`pixel-tile.tsx`)
+
+The landing's pixel motif (`landing/_components/pixel-tile.tsx`), ported
+app-side in H9-T3 (user 2026-10-29) so the app never imports from
+`src/app/(marketing)`: a square in a technique colour filled with a coarse
+4×4 Bayer dither (dark / mid / light, light in the top left), at 2 CSS px
+per cell, under a crisp Lucide glyph (stroke 2.1) with a 1px offset shadow.
+
+- Props: `tone` (`"yellow" | "green" | "rose"`), `icon` (`LucideIcon`),
+  `size` (`36` → 9px radius, 19px glyph; `48` → `rounded-lg`, 24px glyph),
+  `title?` (native tooltip), `className?`, `data-part?`. Always
+  `aria-hidden`; tagged `data-slot="pixel-tile"` + `data-tone`.
+- Colours: globals.css `.pixel-tile[data-tone]` sets `--pt-dark/-mid/-light/
+  -ink/-shadow` — yellow warning-500 / flashcards-accent / pastel-yellow,
+  ink pastel-yellow-fg; green success-500 / recall-accent / success-50, ink
+  pastel-mint-fg; rose `--color-pixel-rose-dark` #be123c / rose-400 /
+  `--color-pixel-rose-light` #fecdd3, ink `--color-pixel-paper` with a
+  `--color-pixel-rose-shadow` shadow (the landing's values). The tile casts
+  a soft `0 5px 10px -6px` shadow in its dark tone.
+- `ditherLevel(grid, col, row)` is exported (pure, tested). Dither paths
+  are computed once per grid size.
+- Used by: `TechniqueCard` (36), `TechniqueIconStrip` (48).
 
 ## StudyItemRow (`study-item-row.tsx`)
 
@@ -723,13 +847,45 @@ A single-choice list of bordered rows with radio semantics
 (`role="radiogroup"` + `role="radio"`/`aria-checked`), each with a label and
 an optional muted description. Unchecked rows use `OptionRow`'s default
 palette (`border-neutral-200/80 bg-card`), the checked row its selected
-palette (`border-rose-500 bg-pastel-pink/30`).
+palette: `tone="rose"` (default, `border-rose-500 bg-pastel-pink/30`) or
+`tone="amber"` (Phase 8 H11, `border-warning-500 bg-pastel-yellow/40`).
 
 - `options: { value, label, description? }[]`, `value`, `onChange`,
-  `aria-label`, `testId?` (each row gets `${testId}-${value}`), `className?`.
+  `aria-label`, `testId?` (each row gets `${testId}-${value}`), `tone?`,
+  `className?`.
 
 Used by: `exams/_components/create-exam-dialog.tsx` ("Generar con IA" /
-"Crear mis preguntas").
+"Crear mis preguntas") and `flashcards/_components/create-from-page-dialog.tsx`
+(amber; "Generar con IA" / "Crear a mano").
+
+## PagePicker (`page-picker.tsx`)
+
+Phase 8 H11: the "which page?" step of every create dialog that starts
+from a technique hub (all study content belongs to a page). Client
+component: a "Cuaderno" `NativeSelect`, then a "Página" one ("Elige una
+página" placeholder, required) with that notebook's pages. Never a dead
+end: no notebooks reads "Aún no tienes cuadernos. Crea uno para empezar."
+with a "Crear un cuaderno" link to `/notebooks`; a notebook without pages
+reads "Este cuaderno aún no tiene páginas." with "Crear una página" to
+`/notebooks/{id}`; `notebooks === null` is a load-error alert. Props:
+`notebooks` (`PagePickerNotebook[] | null`), `notebookId`, `pageId`,
+`onNotebookChange`, `onPageChange`, `disabled?`, `testIdPrefix`
+(`-notebook` / `-page`). Used by `CreateExamDialog` and
+`CreateFromPageDialog`; fed by `exams/_lib/create-exam-notebooks.ts`
+(`getSidebarTree`).
+
+## TechniqueCreateTile (`technique-create-tile.tsx`)
+
+Phase 8 H11: the first, fixed item of a technique hub's notebooks grid, in
+the "Nuevo cuaderno" / "Nueva página" create-tile language: `primary-50`
+fill, 2px dashed `primary-300` border, a 44px `primary-600` plus disc, a
+14px semibold `primary-700` label and a 12px hint. Shaped like
+`DeckSummaryCard` (18px radius, `h-full min-h-[156px]`); lifts 2px and
+deepens its tint on hover, presses to 0.98, still under reduced motion.
+A plain `<button>` (`type="button"` default) for `DialogTrigger asChild`.
+Props: `label` (also the accessible name), `hint?`, button props. Used by
+the `/flashcards` ("Crear flashcards"), `/active-recall` ("Generar
+preguntas") and `/exams` ("Crear examen") grids.
 
 ## ViewToggle (`view-toggle.tsx`)
 
@@ -1851,6 +2007,12 @@ once; under prefers-reduced-motion only the transition becomes
   `entrance="cascade"`, `paper`, title "Tu cuaderno está listo para su
   primera página", and the hub's violet pill CTA "Nueva página" (a
   `Button` that opens `NewPageDialog`).
+- Since Phase 8 H10 also the `/flashcards`, `/active-recall` and `/exams`
+  hubs: `art={<TechniqueEmptyArt technique />}`, `entrance="cascade"`,
+  `paper`, titles "Tus primeras flashcards te esperan" / "Practica
+  explicando con tus palabras" / "Pon a prueba lo que sabes", the load
+  error as the message when the hub cannot read, and `EmptyStateCta` "Ir a
+  mis cuadernos".
 - `data-slot="illustrated-empty-state"`, `data-entrance="block" |
   "cascade"`, `data-surface="paper"` when `paper`.
 - `steps` (Phase 8 H4, user decision 2026-10-20): an

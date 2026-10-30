@@ -400,12 +400,37 @@ describe("CommandMenu", () => {
       expect(tile.className).not.toMatch(/(^|\s)bg-hover(\s|$)/);
     });
 
-    it("falls back to the neutral tile when the item has no tone", () => {
+    // H8-1: without a tone the icon is just the glyph — no grey tile.
+    it("shows the bare glyph, with no tile background, when the item has no tone", () => {
       renderItems([{ id: "plain", label: "Plano", icon: Quote }]);
 
-      expect(
-        screen.getByTestId("command-menu-item-icon-plain").className,
-      ).toMatch(/(^|\s)bg-hover(\s|$)/);
+      const glyph = screen.getByTestId("command-menu-item-icon-plain");
+      expect(glyph.querySelector("svg")).not.toBeNull();
+      expect(glyph.className).not.toMatch(/(^|\s)bg-/);
+    });
+
+    // H8-1: a narrow, vertical panel that shows every label and description
+    // in full, wrapping instead of truncating.
+    it("is a narrow panel that wraps long descriptions instead of truncating them", () => {
+      renderItems([
+        {
+          id: "long",
+          label: "Tabla de contenidos",
+          icon: Quote,
+          description: "Índice de los encabezados de la página",
+        },
+      ]);
+
+      expect(screen.getByTestId("command-menu").className).toMatch(
+        /(^|\s)w-60(\s|$)/,
+      );
+      const description = screen.getByText(
+        "Índice de los encabezados de la página",
+      );
+      expect(description.className).not.toMatch(/(^|\s)truncate(\s|$)/);
+      expect(screen.getByText("Tabla de contenidos").className).not.toMatch(
+        /(^|\s)truncate(\s|$)/,
+      );
     });
 
     it("renders no tile for an item without icon or glyph", () => {

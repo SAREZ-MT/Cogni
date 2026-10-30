@@ -10,7 +10,8 @@ const { notFound } = vi.hoisted(() => ({
 }));
 vi.mock("next/navigation", () => ({
   notFound,
-  useRouter: () => ({ refresh: vi.fn() }),
+  useRouter: () => ({ refresh: vi.fn(), replace: vi.fn() }),
+  usePathname: () => "/flashcards/nb/pg",
 }));
 
 const { listFlashcardsAction } = vi.hoisted(() => ({
@@ -199,6 +200,20 @@ describe("FlashcardsSessionPage", () => {
         screen.getAllByRole("button", { name: "Nueva tarjeta" }).length,
       ).toBeGreaterThan(0);
       expect(notFound).not.toHaveBeenCalled();
+    });
+
+    // Phase 8 H11: a technique hub's "Crear a mano" lands here with
+    // ?nueva=1, which opens "Nueva tarjeta" at once for the first card.
+    it("opens Nueva tarjeta at once with ?nueva=1", async () => {
+      listFlashcardsAction.mockResolvedValue({ ok: true, value: [] });
+
+      render(
+        await FlashcardsSessionPage(props(NOTEBOOK, PAGE, { nueva: "1" })),
+      );
+
+      expect(
+        screen.getByRole("dialog", { name: "Nueva tarjeta" }),
+      ).toBeInTheDocument();
     });
 
     it("answers 404 when the cards cannot be loaded", async () => {

@@ -1,4 +1,4 @@
-import { Brain, Zap } from "lucide-react";
+import { Zap } from "lucide-react";
 import Link from "next/link";
 import {
   listRecallHubAction,
@@ -6,12 +6,21 @@ import {
 } from "@/modules/active-recall";
 import { COLOR_PALETTE, type NotebookColor } from "@/modules/notebooks";
 import { DeckSummaryCard } from "@/shared/ui/deck-summary-card";
-import { EmptyState } from "@/shared/ui/empty-state";
 import { IconTile } from "@/shared/ui/icon-tile";
+import { IllustratedEmptyState } from "@/shared/ui/illustrated-empty-state";
 import { Pill } from "@/shared/ui/pill";
-import { SectionHeader } from "@/shared/ui/section-header";
+import { TechniqueEmptyArt } from "@/shared/ui/technique-empty-art";
+import { TechniqueHubHeader } from "@/shared/ui/technique-hub-header";
 import { SetBreadcrumb } from "../_components/breadcrumb";
+import { loadCreateExamNotebooks } from "../exams/_lib/create-exam-notebooks";
+import { CreateFromPageDialog } from "../flashcards/_components/create-from-page-dialog";
 import { plural } from "../flashcards/_lib/plural";
+import { readRemainingGenerations } from "../flashcards/_lib/remaining-generations";
+
+// ADR 0003 (no queue): Next applies a Server Action's maxDuration from the
+// page segment hosting it, and this hub's create dialog generates recall
+// questions (Phase 8 H11) — the recall session route's budget.
+export const maxDuration = 300;
 
 const DEFAULT_TONE: NotebookColor = "purple";
 
@@ -62,8 +71,21 @@ function latestPercentageOf(pages: readonly RecallHubPageView[]): number {
 // card badges its recall questions due today, and the quick start opens the first page with recall questions due today (the
 // first page otherwise). The layout is the design preview's (Phase 6 UI
 // freeze: the screens keep their look; the data adapts to them).
+//
+// Phase 8 H11: recall questions are generated from here too (AI only),
+// through a "pick a page" dialog opened by the empty state's CTA or the
+// grid's first, fixed tile.
 export default async function ActiveRecallHubPage() {
-  const result = await listRecallHubAction();
+  const [result, createNotebooks, remaining] = await Promise.all([
+    listRecallHubAction(),
+    loadCreateExamNotebooks(),
+    readRemainingGenerations(),
+  ]);
+  const createProps = {
+    technique: "recall",
+    notebooks: createNotebooks,
+    remaining,
+  } as const;
   const hub = result.ok ? result.value : { pages: [], averageMastery: null };
   const notebooksWithPages = groupByNotebook(hub.pages);
   const allPages = hub.pages;
@@ -85,10 +107,9 @@ export default async function ActiveRecallHubPage() {
     <section className="flex flex-1 flex-col gap-6">
       <SetBreadcrumb items={[{ label: "Recordación activa" }]} />
 
-      <SectionHeader
-        eyebrow="Técnicas de estudio"
+      <TechniqueHubHeader
+        technique="recall"
         title="Recordación activa"
-        titleClassName="text-[26px]"
         description={`${plural(totalSessions, "sesión", "sesiones")} · ${plural(activeNotebookCount, "cuaderno", "cuadernos")}`}
         actions={
           quickStartHref && (
@@ -138,24 +159,28 @@ export default async function ActiveRecallHubPage() {
       )}
 
       {notebooksWithPages.length === 0 ? (
-        <EmptyState
-          fill
-          icon={
-            <IconTile size="56" tone="success">
-              <Brain aria-hidden="true" size={28} strokeWidth={1.75} />
-            </IconTile>
-          }
-          title="Sin sesiones todavía"
-          titleClassName="text-base"
+        // Phase 8 H10/H11 (explicit go-ahead past the Phase 6 UI freeze for
+        // this empty state only): the illustrated empty state — the open
+        // question and answer sheet on the emerald dotted paper, a cascade
+        // entrance, the technique-gradient headline and the emerald CTA,
+        // which opens the "pick a page" dialog (AI only). A failed read
+        // keeps the load error as the message.
+        <IllustratedEmptyState
+          entrance="cascade"
+          paper
+          technique="recall"
+          art={<TechniqueEmptyArt technique="recall" />}
+          title="Practica explicando con tus palabras"
           description={
             result.ok
-              ? "Abre una página en el editor y usa Técnicas → Recordación activa → Generar."
+              ? "Elige una página de tus cuadernos: la IA crea preguntas abiertas y las respondes aquí."
               : "No pudimos cargar tus sesiones. Intenta de nuevo."
           }
-          descriptionClassName="max-w-[340px]"
+          action={<CreateFromPageDialog {...createProps} trigger="cta" />}
         />
       ) : (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3.5">
+          <CreateFromPageDialog {...createProps} trigger="tile" />
           {notebooksWithPages.map(({ notebook, pages }) => {
             const sessionCount = pages.reduce(
               (sum, page) => sum + page.sessions.length,

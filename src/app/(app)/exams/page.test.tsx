@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import { createElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { listExamHubAction } = vi.hoisted(() => ({
@@ -79,6 +80,12 @@ describe("ExamsHubPage (real data)", () => {
     getSidebarTree.mockReset();
     getSidebarTree.mockResolvedValue([]);
     CreateExamDialog.mockClear();
+    // Each instance renders a marker named after its trigger, so the
+    // tests can see where the dialog's entry points sit.
+    CreateExamDialog.mockImplementation(((props: { trigger?: string }) =>
+      createElement("div", {
+        "data-testid": `create-exam-${props.trigger ?? "button"}`,
+      })) as never);
     listExamHubAction.mockReset();
     listExamHubAction.mockResolvedValue({ ok: true, value: ENTRIES });
   });
@@ -96,6 +103,18 @@ describe("ExamsHubPage (real data)", () => {
     expect(
       screen.getByRole("heading", { name: "Exámenes" }),
     ).toBeInTheDocument();
+  });
+
+  // Phase 8 H11: with exams listed, "Crear examen" also opens from a tile
+  // fixed first in the grid, before the notebooks.
+  it("puts the create tile first in the notebooks grid", async () => {
+    render(await ExamsHubPage());
+
+    const tile = screen.getByTestId("create-exam-tile");
+    const grid = tile.parentElement as HTMLElement;
+    expect(grid.firstElementChild).toBe(tile);
+    expect(grid.querySelectorAll("a")).toHaveLength(2);
+    expect(screen.queryByTestId("create-exam-cta")).toBeNull();
   });
 
   it("derives the totals from the real pages", async () => {
@@ -184,12 +203,40 @@ describe("ExamsHubPage (real data)", () => {
 
     render(await ExamsHubPage());
 
-    expect(screen.getByText("Aún no tienes exámenes")).toBeInTheDocument();
+    // Phase 8 H10: the illustrated empty state (a stacked exam sheet,
+    // gradient headline). "Crear examen" stays in the header; the CTA leads
+    // to the notebooks, since the dialog has nothing to offer without one.
+    expect(
+      screen.getByRole("heading", { name: "Pon a prueba lo que sabes" }),
+    ).toBeInTheDocument();
     expect(
       screen.getByText(
-        "Usa «Crear examen» para elegir una página y generar o escribir sus preguntas.",
+        "Elige una página y crea un examen con IA o con tus propias preguntas.",
       ),
     ).toBeInTheDocument();
+    expect(
+      document.querySelector('[data-slot="technique-empty-art"]'),
+    ).toHaveAttribute("data-technique", "exams");
+    // Phase 8 H11: the technique theme on the header and the empty state.
+    expect(
+      document.querySelector('[data-slot="technique-hub-header"]'),
+    ).toHaveAttribute("data-technique-theme", "exams");
+    expect(
+      document.querySelector('[data-slot="illustrated-empty-state"]'),
+    ).toHaveAttribute("data-technique-theme", "exams");
+    // Phase 8 H11: the CTA opens "Crear examen" itself (the header keeps
+    // its button); there is no grid, so no create tile.
+    const empty = document.querySelector(
+      '[data-slot="illustrated-empty-state"]',
+    ) as HTMLElement;
+    expect(
+      empty.querySelector('[data-testid="create-exam-cta"]'),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("create-exam-button")).toBeInTheDocument();
+    expect(screen.queryByTestId("create-exam-tile")).toBeNull();
+    expect(
+      screen.queryByRole("link", { name: "Ir a mis cuadernos" }),
+    ).toBeNull();
     expect(screen.queryByText(/Técnicas → Examen/)).toBeNull();
   });
 
@@ -204,8 +251,10 @@ describe("ExamsHubPage (real data)", () => {
     expect(
       screen.getByText("No pudimos cargar tus exámenes. Intenta de nuevo."),
     ).toBeInTheDocument();
-    // Same EmptyState as Flashcards' load error: its title stays.
-    expect(screen.getByText("Aún no tienes exámenes")).toBeInTheDocument();
+    // Same empty state as Flashcards' load error: its headline stays.
+    expect(
+      screen.getByRole("heading", { name: "Pon a prueba lo que sabes" }),
+    ).toBeInTheDocument();
   });
 
   it("has no 'Vista previa' pill on real data", async () => {
@@ -263,7 +312,12 @@ describe("ExamsHubPage (real data)", () => {
   it("offers only 'Crear examen' in the header: no 'Nuevo examen' quick start", async () => {
     render(await ExamsHubPage());
 
-    expect(CreateExamDialog).toHaveBeenCalledTimes(1);
+    // The header's button (no trigger) plus H11's grid tile.
+    expect(
+      CreateExamDialog.mock.calls.map(
+        (call) => (call as unknown as [{ trigger?: string }])[0].trigger,
+      ),
+    ).toEqual([undefined, "tile"]);
     expect(screen.queryByText("Nuevo examen")).toBeNull();
     expect(screen.queryByText(/páginas con preguntas/)).toBeNull();
   });
@@ -285,7 +339,8 @@ describe("ExamsHubPage (real data)", () => {
 
       render(await ExamsHubPage());
 
-      expect(CreateExamDialog).toHaveBeenCalledTimes(1);
+      // The header's button and H11's empty-state CTA share the notebooks.
+      expect(CreateExamDialog).toHaveBeenCalledTimes(2);
       const [props] = CreateExamDialog.mock.calls[0] as unknown as [
         Record<string, unknown>,
       ];

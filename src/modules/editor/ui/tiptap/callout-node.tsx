@@ -2,8 +2,9 @@
 
 // Callout block (specs/editor/spec.md, "Conjunto completo de bloques de
 // §3.2" and "Paleta de resaltado de Cogni y callouts"): a block-level node
-// with a `kind` attribute in `idea | note | warning`, mapped to the
-// callout design tokens (H7: yellow | violet | rose), a matching Lucide icon
+// with a `kind` attribute in `idea | note | warning | important | tip`,
+// mapped to the callout design tokens (H7: yellow | violet | rose; H8: blue |
+// green), a matching Lucide icon
 // and an italic label by kind, inline at the start of the text.
 // `content: "block+"` so a callout can hold any number of paragraphs/
 // lists, like blockquote in @tiptap/starter-kit.
@@ -14,7 +15,13 @@ import {
   type ReactNodeViewProps,
   ReactNodeViewRenderer,
 } from "@tiptap/react";
-import { Info, Lightbulb, TriangleAlert } from "lucide-react";
+import {
+  CircleAlert,
+  CircleCheck,
+  Info,
+  Lightbulb,
+  TriangleAlert,
+} from "lucide-react";
 import {
   CALLOUT_KINDS,
   type CalloutKind,
@@ -42,18 +49,27 @@ const CALLOUT_CLASSES: Record<CalloutKind, string> = {
   note: "bg-callout-note border-callout-note-edge text-callout-note-fg",
   warning:
     "bg-callout-warning border-callout-warning-edge text-callout-warning-fg",
+  important:
+    "bg-callout-important border-callout-important-edge text-callout-important-fg",
+  tip: "bg-callout-tip border-callout-tip-edge text-callout-tip-fg",
 };
 
 const CALLOUT_ICON_CLASSES: Record<CalloutKind, string> = {
   idea: "text-callout-idea-icon",
   note: "text-callout-note-icon",
   warning: "text-callout-warning-icon",
+  important: "text-callout-important-icon",
+  tip: "text-callout-tip-icon",
 };
 
 const CALLOUT_ICONS: Record<CalloutKind, typeof Lightbulb> = {
   idea: Lightbulb,
   note: Info,
   warning: TriangleAlert,
+  // H8: an exclamation in a circle (user reference callout-ref.png) and a
+  // check in a circle — the "this works" mark of a tip.
+  important: CircleAlert,
+  tip: CircleCheck,
 };
 
 // The label is rendered by kind, outside the editable content, so the
@@ -63,6 +79,8 @@ export const CALLOUT_LABELS: Record<CalloutKind, string> = {
   idea: "Idea clave",
   note: "Nota",
   warning: "Cuidado",
+  important: "Importante",
+  tip: "Consejo",
 };
 
 function CalloutView({ node }: ReactNodeViewProps) {

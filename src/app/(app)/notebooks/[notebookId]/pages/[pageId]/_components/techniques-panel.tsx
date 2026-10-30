@@ -1,6 +1,6 @@
 "use client";
 
-import { Layers, PanelRightClose, PanelRightOpen } from "lucide-react";
+import { PanelRightClose, PanelRightOpen, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -21,7 +21,6 @@ import {
   listFlashcardsAction,
 } from "@/modules/flashcards";
 import { EmptyState } from "@/shared/ui/empty-state";
-import { IconTile } from "@/shared/ui/icon-tile";
 import { PanelToggleButton } from "@/shared/ui/panel-toggle-button";
 import { SavedStudySection } from "@/shared/ui/saved-study-section";
 import { SidePanel } from "@/shared/ui/side-panel";
@@ -182,8 +181,10 @@ function generatedRow(
   };
 }
 
-// The feedback lines under every technique card, identical for the three
-// (remaining generations, notice, error); `prefix` namespaces the test ids.
+// The feedback lines under every technique's "Generar", identical for the
+// three (remaining generations, notice, error); `prefix` namespaces the
+// test ids. H9-T2 (user 2026-10-29): the remaining line sits below the
+// button again.
 function CardFeedback({
   prefix,
   remaining,
@@ -200,7 +201,7 @@ function CardFeedback({
       {remaining !== null && (
         <p
           data-testid={`${prefix}generation-remaining`}
-          className="text-[10.5px] text-fg-muted"
+          className="-mt-1 text-center text-[11px] text-fg-secondary"
         >
           {remainingCopy(remaining)}
         </p>
@@ -208,7 +209,7 @@ function CardFeedback({
       {notice && (
         <p
           data-testid={`${prefix}generation-notice`}
-          className="text-[10.5px] text-fg-muted"
+          className="text-[10.5px] text-fg-secondary"
         >
           {notice}
         </p>
@@ -478,15 +479,21 @@ export function TechniquesPanel({
     ];
   });
 
+  // H9-T3 (user 2026-10-29): the toggle matches the technique icons for
+  // symmetry — 36px like the tiles' icons when expanded, 48px like the
+  // rail's tiles when collapsed — neutral, its name doubling as tooltip.
+  const toggleLabel = collapsed
+    ? "Expandir panel de técnicas"
+    : "Colapsar panel de técnicas";
   const toggleButton = (
     <PanelToggleButton
       icon={collapsed ? PanelRightClose : PanelRightOpen}
-      size={12}
+      size={collapsed ? 20 : 16}
       onClick={toggle}
       aria-expanded={!collapsed}
-      aria-label={
-        collapsed ? "Expandir panel de técnicas" : "Colapsar panel de técnicas"
-      }
+      aria-label={toggleLabel}
+      title={toggleLabel}
+      className={collapsed ? "size-12 rounded-lg" : "size-9 rounded-[9px]"}
       data-testid="techniques-panel-toggle"
     />
   );
@@ -494,8 +501,10 @@ export function TechniquesPanel({
   return createPortal(
     <SidePanel
       collapsed={collapsed}
-      width={264}
-      collapsedWidth={52}
+      // 280 since H9-T2 (user 2026-10-29: larger tiles and title); at 1440
+      // the editor column keeps ample room.
+      width={280}
+      collapsedWidth={64}
       side="right"
       className="hidden lg:flex"
       aria-label="Técnicas de estudio"
@@ -505,20 +514,28 @@ export function TechniquesPanel({
           toggleButton
         ) : (
           <>
-            <div>
-              <p className="font-semibold text-[12.5px] text-fg">
-                Técnicas de estudio
-              </p>
-              <p className="mt-0.5 text-[10px] text-fg-muted">
-                Genera contenido de estudio con IA
-              </p>
+            <div className="flex min-w-0 items-center gap-2">
+              <Sparkles
+                aria-hidden="true"
+                size={16}
+                strokeWidth={2}
+                className="shrink-0 text-primary-600"
+              />
+              <div className="min-w-0">
+                <p className="font-bold text-[17px] text-fg leading-tight tracking-[-0.015em]">
+                  Técnicas de estudio
+                </p>
+                <p className="mt-0.5 text-[11px] text-fg-muted leading-tight">
+                  Genera contenido de estudio con IA
+                </p>
+              </div>
             </div>
             {toggleButton}
           </>
         )
       }
       collapsedContent={
-        <div className="flex flex-col items-center gap-[5px] py-2.5">
+        <div className="flex flex-col items-center gap-2.5 py-3">
           {TECHNIQUES.map((t) => (
             <TechniqueIconStrip
               key={t.id}
@@ -531,7 +548,7 @@ export function TechniquesPanel({
         </div>
       }
     >
-      <div className="flex flex-col gap-[7px] p-2.5 pb-3.5">
+      <div className="flex flex-col gap-2.5 p-3 pb-4">
         {TECHNIQUES.map((t) => {
           const card =
             t.id === "flashcards"
@@ -566,7 +583,6 @@ export function TechniquesPanel({
               icon={t.icon}
               tone={t.tone}
               name={t.name}
-              description={t.description}
               onGenerate={card.onGenerate}
               pending={card.pending}
               disabled={limitReached}
@@ -595,21 +611,17 @@ export function TechniquesPanel({
         <SavedStudySection
           label="Generado en esta página"
           items={generatedRows}
-          className="mt-1"
+          className="mt-2"
           empty={
             <EmptyState
               variant="tinted"
-              icon={
-                <IconTile size="30" tone="warning" radius="md">
-                  <Layers aria-hidden="true" size={16} strokeWidth={1.75} />
-                </IconTile>
-              }
-              title="Aún no generaste nada en esta página"
+              icon={null}
+              title="Aquí verás todo lo que generes"
               titleAs="p"
-              titleClassName="text-xs"
-              description="Pulsa Generar en una técnica para crear tu material de estudio."
-              descriptionClassName="text-[10.5px]"
-              className="px-3 py-4"
+              titleClassName="font-semibold text-[12.5px]"
+              description="Empieza con una técnica de arriba."
+              descriptionClassName="text-[11px] text-fg-secondary"
+              className="gap-1 rounded-lg border-border-subtle bg-card px-4 py-4"
             />
           }
         />

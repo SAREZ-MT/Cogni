@@ -7,8 +7,8 @@
 // plain presentational piece (testable with fireEvent, no floating-ui
 // layout math) and `BubbleToolbar` wraps it in the real `BubbleMenu` for
 // the editor — same split as highlight-picker.tsx/
-// highlight-picker-controls.tsx, whose `HighlightPickerControls` this
-// still reuses unchanged for the color popover's "Fondo/Resaltado" row.
+// highlight-picker-controls.tsx. H8: highlighting lives only in the
+// highlighter (quick-highlighter.tsx); "Color de texto" colours text.
 import type { Editor } from "@tiptap/core";
 import { isNodeRangeSelection } from "@tiptap/extension-node-range";
 import type { EditorState } from "@tiptap/pm/state";
@@ -20,7 +20,7 @@ import {
   AlignJustify,
   AlignLeft,
   AlignRight,
-  Baseline,
+  Ban,
   Bold,
   ChevronDown,
   Code,
@@ -65,10 +65,9 @@ import {
 } from "./block-color-palette";
 import { BLOCK_KIND_ITEMS, currentBlockKindLabel } from "./block-kind";
 import { focusEditorView } from "./focus-editor-view";
-import { HighlightPickerControls } from "./highlight-picker-controls";
 import { QuickHighlighter } from "./quick-highlighter";
 import { isTableCellSelection } from "./table-selection";
-import { TextStyleMenu } from "./text-style-menu";
+import { FontSizeMenu, TextStyleMenu } from "./text-style-menu";
 
 export interface BubbleToolbarProps {
   editor: Editor;
@@ -155,6 +154,8 @@ interface MarkButtonConfig {
   label: string;
   shortcut: string;
   icon: LucideIcon;
+  // H8-3: the bold glyph is drawn bold so the button explains itself.
+  strokeWidth?: number;
   run: (editor: Editor) => void;
 }
 
@@ -164,6 +165,7 @@ const MARK_BUTTONS: MarkButtonConfig[] = [
     label: "Negrita",
     shortcut: "Mod+B",
     icon: Bold,
+    strokeWidth: 2.75,
     run: (editor) => {
       editor.chain().toggleBold().run();
       focusEditorView(editor);
@@ -241,6 +243,18 @@ const ALIGN_OPTIONS: { id: string; label: string; icon: LucideIcon }[] = [
 const BUTTON_CLASS =
   "flex size-8 items-center justify-center rounded-md outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring";
 
+// H8-4: tooltips read the shortcut the way macOS menus print it
+// ("Mod+Shift+H" → "⇧⌘H"), like the undo/redo controls in the meta row.
+export function formatShortcut(shortcut: string): string {
+  const parts = shortcut.split("+");
+  const key = parts.pop() ?? "";
+  const symbols = { Shift: "⇧", Alt: "⌥", Mod: "⌘" } as const;
+  const modifiers = (["Shift", "Alt", "Mod"] as const)
+    .filter((modifier) => parts.includes(modifier))
+    .map((modifier) => symbols[modifier]);
+  return `${modifiers.join("")}${key.toUpperCase()}`;
+}
+
 function buttonToneClass(active: boolean) {
   return active
     ? "bg-active text-fg-active"
@@ -275,7 +289,7 @@ function ToolbarButton({
       <TooltipTrigger asChild>{children}</TooltipTrigger>
       <TooltipContent>
         {label}
-        {shortcut ? ` · ${shortcut}` : ""}
+        {shortcut ? ` · ${formatShortcut(shortcut)}` : ""}
       </TooltipContent>
     </Tooltip>
   );
@@ -319,7 +333,9 @@ export function BubbleToolbarControls({ editor }: BubbleToolbarControlsProps) {
       superscript: current.isActive("superscript"),
       subscript: current.isActive("subscript"),
       link: current.isActive("link"),
-      highlight: current.isActive("highlight"),
+      textColor:
+        (current.getAttributes("textStyle").color as string | undefined) ??
+        null,
       canUndo: current.can().undo(),
       canRedo: current.can().redo(),
       blockLabel: currentBlockKindLabel(current),
@@ -444,6 +460,11 @@ export function BubbleToolbarControls({ editor }: BubbleToolbarControlsProps) {
           editor={editor}
           triggerClassName={`${BUTTON_CLASS} w-auto gap-1 px-1.5 text-fg-secondary hover:bg-hover`}
         />
+        {/* H8-2: the size, in its own compact menu next to the font. */}
+        <FontSizeMenu
+          editor={editor}
+          triggerClassName={`${BUTTON_CLASS} w-auto gap-0.5 px-1.5 text-fg-secondary hover:bg-hover`}
+        />
 
         <ToolbarSeparator />
 
@@ -480,75 +501,41 @@ export function BubbleToolbarControls({ editor }: BubbleToolbarControlsProps) {
 
         <ToolbarSeparator />
 
-        {MARK_BUTTONS.map(({ mark, label, shortcut, icon: Icon, run }) => {
-          const active = activeMarks[mark as keyof typeof activeMarks] ?? false;
-          return (
-            <ToolbarButton key={mark} label={label} shortcut={shortcut}>
-              <button
-                type="button"
-                aria-label={label}
-                aria-pressed={Boolean(active)}
-                data-testid={`bubble-toolbar-${mark}`}
-                className={`${BUTTON_CLASS} ${buttonToneClass(Boolean(active))}`}
-                onClick={() => run(editor)}
-              >
-                <Icon aria-hidden="true" size={16} strokeWidth={1.75} />
-              </button>
-            </ToolbarButton>
-          );
-        })}
+        {MARK_BUTTONS.map(
+          ({ mark, label, shortcut, icon: Icon, strokeWidth, run }) => {
+            const active =
+              activeMarks[mark as keyof typeof activeMarks] ?? false;
+            return (
+              <ToolbarButton key={mark} label={label} shortcut={shortcut}>
+                <button
+                  type="button"
+                  aria-label={label}
+                  aria-pressed={Boolean(active)}
+                  data-testid={`bubble-toolbar-${mark}`}
+                  className={`${BUTTON_CLASS} ${buttonToneClass(Boolean(active))}`}
+                  onClick={() => run(editor)}
+                >
+                  <Icon
+                    aria-hidden="true"
+                    size={16}
+                    strokeWidth={strokeWidth ?? 1.75}
+                  />
+                </button>
+              </ToolbarButton>
+            );
+          },
+        )}
 
         <ToolbarSeparator />
 
         {/* H6-E6: one-click highlighter with the last colour used. */}
         <QuickHighlighter editor={editor} />
 
-        {/* E2 scope B: one popover, two swatch rows — "Texto" (inline
-            Color/TextStyle mark, block-color-palette.ts) and
-            "Fondo/Resaltado" (the existing CogniHighlight mark, unchanged
-            — HighlightPickerControls keeps its own `highlight-picker`
-            testid and "Resaltar en <color>" swatch names). */}
-        <Popover>
-          <PopoverTrigger asChild>
-            <button
-              type="button"
-              aria-label="Color de texto"
-              aria-pressed={activeMarks.highlight}
-              data-testid="bubble-toolbar-color"
-              className={`${BUTTON_CLASS} ${buttonToneClass(activeMarks.highlight)}`}
-            >
-              <Baseline aria-hidden="true" size={16} strokeWidth={1.75} />
-            </button>
-          </PopoverTrigger>
-          <PopoverContent
-            align="start"
-            className="editor-surface w-auto gap-2 p-2"
-          >
-            <p className="px-0.5 text-fg-muted text-xs font-medium">Texto</p>
-            <div className="flex flex-wrap gap-1 px-0.5">
-              {TEXT_COLOR_SWATCHES.map((swatch) => (
-                <button
-                  key={swatch.id}
-                  type="button"
-                  aria-label={swatch.label}
-                  title={swatch.label}
-                  data-testid={`bubble-toolbar-text-color-${swatch.id}`}
-                  className="flex size-7 items-center justify-center rounded-md outline-none transition-colors hover:bg-hover focus-visible:ring-2 focus-visible:ring-ring"
-                  onClick={() => applySelectionTextColor(editor, swatch.id)}
-                >
-                  <span
-                    aria-hidden="true"
-                    className={`size-3.5 shrink-0 rounded-full ${swatch.swatchClass}`}
-                  />
-                </button>
-              ))}
-            </div>
-            <p className="px-0.5 text-fg-muted text-xs font-medium">
-              Fondo / Resaltado
-            </p>
-            <HighlightPickerControls editor={editor} />
-          </PopoverContent>
-        </Popover>
+        {/* H8-4: text colour only (highlighting has its own control just
+            before): an "A" over a bar in the current colour, and the same
+            picker look as the highlighter — circular swatches, a divider
+            and a circle-slash "Quitar color". */}
+        <TextColorControl editor={editor} textColor={activeMarks.textColor} />
 
         <ToolbarSeparator />
 
@@ -626,6 +613,99 @@ export function BubbleToolbarControls({ editor }: BubbleToolbarControlsProps) {
         </div>
       </div>
     </TooltipProvider>
+  );
+}
+
+// Literal class names for Tailwind's scanner: each swatch is the text colour
+// itself with a thin border, the same shape as the highlighter's swatches.
+const TEXT_SWATCH_BORDER = "border border-border-default";
+
+function TextColorControl({
+  editor,
+  textColor,
+}: {
+  editor: Editor;
+  textColor: string | null;
+}) {
+  const [open, setOpen] = useState(false);
+  const swatches = TEXT_COLOR_SWATCHES.filter(
+    (swatch) => swatch.id !== "default",
+  );
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <ToolbarButton label="Color de texto">
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            aria-label="Color de texto"
+            aria-pressed={textColor !== null}
+            data-testid="bubble-toolbar-color"
+            className={`${BUTTON_CLASS} ${buttonToneClass(false)} flex-col gap-0`}
+          >
+            <span
+              aria-hidden="true"
+              className="text-[15px] font-semibold leading-4"
+            >
+              A
+            </span>
+            <span
+              aria-hidden="true"
+              data-testid="bubble-toolbar-color-bar"
+              className={`mt-px h-[3px] w-3.5 rounded-full ${textColor ? "" : "bg-fg"}`}
+              style={textColor ? { backgroundColor: textColor } : undefined}
+            />
+          </button>
+        </PopoverTrigger>
+      </ToolbarButton>
+      <PopoverContent
+        align="start"
+        className="editor-surface flex w-auto flex-row items-center gap-1 px-2 py-1.5"
+        onCloseAutoFocus={(event) => event.preventDefault()}
+      >
+        <fieldset
+          aria-label="Colores de texto"
+          className="m-0 flex items-center gap-1 border-0 p-0"
+        >
+          {swatches.map((swatch) => (
+            <button
+              key={swatch.id}
+              type="button"
+              aria-label={swatch.label}
+              title={swatch.label}
+              data-testid={`bubble-toolbar-text-color-${swatch.id}`}
+              className="flex size-8 items-center justify-center rounded-full outline-none transition-colors hover:bg-hover focus-visible:ring-2 focus-visible:ring-ring"
+              onClick={() => {
+                applySelectionTextColor(editor, swatch.id);
+                setOpen(false);
+              }}
+            >
+              <span
+                aria-hidden="true"
+                className={`size-6 rounded-full ${TEXT_SWATCH_BORDER} ${swatch.swatchClass}`}
+              />
+            </button>
+          ))}
+        </fieldset>
+        <hr
+          aria-orientation="vertical"
+          className="mx-1 h-6 w-px shrink-0 border-0 bg-border-default"
+        />
+        <button
+          type="button"
+          aria-label="Quitar color"
+          title="Quitar color"
+          data-testid="bubble-toolbar-text-color-remove"
+          className="flex size-8 items-center justify-center rounded-full text-fg-secondary outline-none transition-colors hover:bg-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-ring"
+          onClick={() => {
+            applySelectionTextColor(editor, "default");
+            setOpen(false);
+          }}
+        >
+          <Ban aria-hidden="true" size={18} strokeWidth={1.75} />
+        </button>
+      </PopoverContent>
+    </Popover>
   );
 }
 

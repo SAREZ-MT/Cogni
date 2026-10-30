@@ -9,8 +9,14 @@ vi.mock("@/modules/flashcards", () => ({
   createFlashcardAction,
   MAX_FLASHCARD_SIDE_LENGTH: 1000,
 }));
-const { refresh } = vi.hoisted(() => ({ refresh: vi.fn() }));
-vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
+const { refresh, replace } = vi.hoisted(() => ({
+  refresh: vi.fn(),
+  replace: vi.fn(),
+}));
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh, replace }),
+  usePathname: () => "/flashcards/nb/pg",
+}));
 
 import { NewFlashcardDialog } from "./new-flashcard-dialog";
 
@@ -27,6 +33,28 @@ describe("NewFlashcardDialog", () => {
   beforeEach(() => {
     createFlashcardAction.mockReset();
     refresh.mockReset();
+    replace.mockReset();
+  });
+
+  // Phase 8 H11: "Crear a mano" from a technique hub lands on the page's
+  // deck with `?nueva=1`, which opens this dialog at once for the first
+  // card; the flag is dropped from the URL so a reload does not reopen it.
+  it("opens at once when asked to, and drops the flag from the URL", () => {
+    render(<NewFlashcardDialog pageId={PAGE} initialOpen />);
+
+    expect(
+      screen.getByRole("dialog", { name: "Nueva tarjeta" }),
+    ).toBeInTheDocument();
+    expect(replace).toHaveBeenCalledWith("/flashcards/nb/pg", {
+      scroll: false,
+    });
+  });
+
+  it("starts closed by default", () => {
+    render(<NewFlashcardDialog pageId={PAGE} />);
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(replace).not.toHaveBeenCalled();
   });
 
   it("opens a dialog with the front and back fields, bounded to the side limit", async () => {

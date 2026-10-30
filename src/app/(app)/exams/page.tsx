@@ -1,18 +1,22 @@
-import { ClipboardList } from "lucide-react";
 import Link from "next/link";
 import { type ExamHubPageView, listExamHubAction } from "@/modules/exams";
 import { COLOR_PALETTE, type NotebookColor } from "@/modules/notebooks";
 import { Button } from "@/shared/ui/button";
 import { DeckSummaryCard } from "@/shared/ui/deck-summary-card";
-import { EmptyState } from "@/shared/ui/empty-state";
-import { IconTile } from "@/shared/ui/icon-tile";
+import { IllustratedEmptyState } from "@/shared/ui/illustrated-empty-state";
 import { Pill } from "@/shared/ui/pill";
-import { SectionHeader } from "@/shared/ui/section-header";
 import { StatusBanner } from "@/shared/ui/status-banner";
+import { TechniqueEmptyArt } from "@/shared/ui/technique-empty-art";
+import { TechniqueHubHeader } from "@/shared/ui/technique-hub-header";
 import { SetBreadcrumb } from "../_components/breadcrumb";
 import { plural } from "../flashcards/_lib/plural";
 import { CreateExamDialog } from "./_components/create-exam-dialog";
 import { loadCreateExamNotebooks } from "./_lib/create-exam-notebooks";
+
+// ADR 0003 (no queue): Next applies a Server Action's maxDuration from the
+// page segment hosting it, and "Crear examen" generates questions here —
+// the exam page route's budget.
+export const maxDuration = 120;
 
 const DEFAULT_TONE: NotebookColor = "purple";
 
@@ -98,10 +102,9 @@ export default async function ExamsHubPage() {
     <section className="flex flex-1 flex-col gap-6">
       <SetBreadcrumb items={[{ label: "Exámenes" }]} />
 
-      <SectionHeader
-        eyebrow="Técnicas de estudio"
+      <TechniqueHubHeader
+        technique="exams"
         title="Exámenes"
-        titleClassName="text-[26px]"
         description={`${plural(examenesPresentados, "examen", "exámenes")} · ${plural(activeNotebookCount, "cuaderno", "cuadernos")}`}
         actions={<CreateExamDialog notebooks={createExamNotebooks} />}
       />
@@ -153,24 +156,30 @@ export default async function ExamsHubPage() {
       )}
 
       {notebooksWithPages.length === 0 ? (
-        <EmptyState
-          fill
-          icon={
-            <IconTile size="56" tone="pink">
-              <ClipboardList aria-hidden="true" size={28} strokeWidth={1.75} />
-            </IconTile>
-          }
-          title="Aún no tienes exámenes"
-          titleClassName="text-base"
+        // Phase 8 H10/H11: the illustrated empty state — the test sheet on
+        // the rose dotted paper, a cascade entrance, the technique-gradient
+        // headline and the rose CTA, which opens "Crear examen" (its
+        // no-notebooks state now links to /notebooks). The header keeps
+        // its "Crear examen". A failed read keeps the load error as the
+        // message.
+        <IllustratedEmptyState
+          entrance="cascade"
+          paper
+          technique="exams"
+          art={<TechniqueEmptyArt technique="exams" />}
+          title="Pon a prueba lo que sabes"
           description={
             result.ok
-              ? "Usa «Crear examen» para elegir una página y generar o escribir sus preguntas."
+              ? "Elige una página y crea un examen con IA o con tus propias preguntas."
               : "No pudimos cargar tus exámenes. Intenta de nuevo."
           }
-          descriptionClassName="max-w-[340px]"
+          action={
+            <CreateExamDialog notebooks={createExamNotebooks} trigger="cta" />
+          }
         />
       ) : (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3.5">
+          <CreateExamDialog notebooks={createExamNotebooks} trigger="tile" />
           {notebooksWithPages.map(({ notebook, pages }) => {
             const sessionCount = pages.reduce(
               (sum, page) => sum + page.attempts,

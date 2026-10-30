@@ -9,7 +9,9 @@ import { Editor } from "./editor";
 // tokens and its Lucide icon. H7 (editor polish round 2): the kinds take the
 // landing pillar band hues (idea yellow, note violet, warning rose) and show
 // an italic label by kind that is not part of the stored content.
-function docWithCallout(kind: "idea" | "note" | "warning"): TiptapDoc {
+function docWithCallout(
+  kind: "idea" | "note" | "warning" | "important" | "tip",
+): TiptapDoc {
   return {
     type: "doc",
     content: [
@@ -100,6 +102,35 @@ describe("Callout node", () => {
       "bg-callout-note",
     );
     expect(screen.getByTestId("callout-label")).toHaveTextContent("Nota");
+  });
+
+  // H8-5: two more kinds in the same outlined style — important (blue,
+  // exclamation in a circle) and tip (green, check in a circle).
+  it.each([
+    ["important", "Importante", "important"],
+    ["tip", "Consejo", "tip"],
+  ] as const)("renders a %s callout with its own tokens and the label %s", async (kind, label, token) => {
+    const port = new FakeSavePagePort({
+      content: docWithCallout(kind),
+      version: 1,
+    });
+    render(
+      <Editor
+        pageId={`page-${kind}`}
+        initialContent={docWithCallout(kind)}
+        initialVersion={1}
+        port={port}
+      />,
+    );
+    const callout = await screen.findByTestId("callout");
+    expect(callout).toHaveAttribute("data-kind", kind);
+    expect(callout.className).toContain(`bg-callout-${token}`);
+    expect(callout.className).toContain(`border-callout-${token}-edge`);
+    expect(callout.className).toContain(`text-callout-${token}-fg`);
+    expect(screen.getByTestId("callout-icon")).toHaveClass(
+      `text-callout-${token}-icon`,
+    );
+    expect(screen.getByTestId("callout-label")).toHaveTextContent(label);
   });
 
   it("keeps the label out of the stored content", async () => {

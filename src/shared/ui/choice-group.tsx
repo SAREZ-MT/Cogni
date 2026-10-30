@@ -15,8 +15,16 @@ export interface ChoiceGroupProps<T extends string> {
   "aria-label": string;
   // Tags each option as `${testId}-${value}`.
   testId?: string;
+  // The checked row's accent: "rose" (default, exams) or "amber" (Phase 8
+  // H11, the flashcards create dialog).
+  tone?: "rose" | "amber";
   className?: string;
 }
+
+const CHECKED: Record<NonNullable<ChoiceGroupProps<string>["tone"]>, string> = {
+  rose: "border-rose-500 bg-pastel-pink/30",
+  amber: "border-warning-500 bg-pastel-yellow/40",
+};
 
 // A small single-choice list of bordered rows (radio semantics), styled
 // like OptionRow's default/selected states (rose border + pastel-pink tint
@@ -28,6 +36,7 @@ export function ChoiceGroup<T extends string>({
   onChange,
   "aria-label": ariaLabel,
   testId,
+  tone = "rose",
   className,
 }: ChoiceGroupProps<T>) {
   return (
@@ -50,7 +59,7 @@ export function ChoiceGroup<T extends string>({
             className={cn(
               "flex w-full flex-col items-start rounded-xl border-[1.5px] px-3.5 py-2.5 text-left transition-colors duration-150",
               checked
-                ? "border-rose-500 bg-pastel-pink/30"
+                ? CHECKED[tone]
                 : "border-neutral-200/80 bg-card hover:border-neutral-300",
             )}
           >

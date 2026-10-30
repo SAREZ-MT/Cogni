@@ -10,25 +10,45 @@ import {
 } from "./technique-card";
 
 describe("TechniqueCard", () => {
-  function renderCard(props: { disabled?: boolean } = {}) {
+  function renderCard(
+    props: Partial<React.ComponentProps<typeof TechniqueCard>> = {},
+  ) {
     return render(
       <TechniqueCard
         icon={Layers}
         tone="yellow"
         name="Flashcards"
-        description="Tarjetas con repetición espaciada"
         {...props}
       />,
     );
   }
 
-  it("shows the name and description", () => {
-    renderCard();
+  // H9-T1 (user, 2026-10-29): a tile is only icon + name + Generar + the
+  // remaining generations; there is no description line.
+  it("shows only the icon, the name and the action: no description line", () => {
+    const { container } = renderCard();
 
     expect(screen.getByText("Flashcards")).toBeInTheDocument();
     expect(
-      screen.getByText("Tarjetas con repetición espaciada"),
-    ).toBeInTheDocument();
+      container.querySelector("[data-part=technique-icon]"),
+    ).not.toBeNull();
+    expect(container.querySelectorAll("p")).toHaveLength(1);
+  });
+
+  // H9-T2 (user, 2026-10-29): icon and name form one row, the name a
+  // larger one-line title; "Generar" sits below that row.
+  it("puts the icon and a one-line name in one row above the button", () => {
+    const { container } = renderCard({ onGenerate: () => {} });
+
+    const tile = container.querySelector("[data-part=technique-icon]");
+    const name = screen.getByText("Flashcards");
+    expect(name.parentElement).toBe(tile?.parentElement);
+    expect(name).toHaveClass("truncate", "text-[15px]");
+    expect(
+      name.compareDocumentPosition(
+        screen.getByRole("button", { name: "Generar" }),
+      ) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it("offers a single 'Generar' action that is disabled and flagged as coming soon by default", () => {
@@ -58,7 +78,6 @@ describe("TechniqueCard", () => {
           icon={Layers}
           tone="yellow"
           name="Flashcards"
-          description="d"
           onGenerate={() => {}}
           {...props}
         />,
@@ -139,33 +158,51 @@ describe("TechniqueCard", () => {
 });
 
 describe("TechniqueCard technique colours", () => {
-  // Phase 6 T5b v2 (user, 2026-10-06): every "Generar" has the same shape,
-  // size, icon and type; only its soft pastel pair changes — Flashcards
-  // pastel-yellow, Recordación activa pastel-mint, Examen pastel-pink (each
-  // -fg meets WCAG AA on its pastel). The icon tile uses the same pair.
-  const SHARED = ["w-full", "text-[11.5px]", "font-semibold"];
+  // H9-T3 (user, 2026-10-29): Home's faded glow on a 12px-radius card, a
+  // 36px dithered pixel tile for the icon, and an outlined "Generar": the
+  // label in the technique's dark ink (≥ 6.6:1 on the tile) and a border in
+  // the technique's outline token (≥ 3.5:1), filled with the pastel on hover.
+  const SHARED = [
+    "w-full",
+    "h-9",
+    "text-[13px]",
+    "font-semibold",
+    "border-[1.5px]",
+    "bg-transparent",
+  ];
   it.each([
-    ["yellow", ["bg-pastel-yellow", "text-pastel-yellow-fg"]],
-    ["green", ["bg-pastel-mint", "text-pastel-mint-fg"]],
-    ["rose", ["bg-pastel-pink", "text-pastel-pink-fg"]],
-  ] as const)("colours a %s card's Generar and icon tile with its pastel pair", (tone, pair) => {
+    ["yellow", "pastel-yellow", "flashcards"],
+    ["green", "pastel-mint", "recall"],
+    ["rose", "pastel-pink", "exam"],
+  ] as const)("colours a %s tile, its icon and its Generar with the %s pair", (tone, pair, key) => {
     const { container } = render(
       <TechniqueCard
         icon={Layers}
         tone={tone}
         name="n"
-        description="d"
         onGenerate={() => {}}
       />,
     );
 
-    const button = screen.getByRole("button", { name: "Generar" });
-    expect(button).toHaveClass(...SHARED, ...pair, "hover:brightness-95");
-    expect(button.className).not.toMatch(
-      /text-white|bg-(warning|success|rose)-\d/,
+    const card = container.querySelector("[data-part=technique-card]");
+    expect(card).toHaveAttribute("data-tone", tone);
+    expect(card).toHaveClass(
+      "bg-card",
+      "rounded-lg",
+      `technique-glow-${pair.replace("pastel-", "")}`,
     );
+    const button = screen.getByRole("button", { name: "Generar" });
+    expect(button).toHaveClass(
+      ...SHARED,
+      `text-${pair}-fg`,
+      `border-technique-${key}-outline`,
+      `hover:bg-${pair}`,
+    );
+    expect(button.className).not.toMatch(/(^| )bg-pastel-/);
     const tile = container.querySelector("[data-part=technique-icon]");
-    expect(tile).toHaveClass(...pair);
+    expect(tile).toHaveAttribute("data-slot", "pixel-tile");
+    expect(tile).toHaveAttribute("data-tone", tone);
+    expect(tile).toHaveStyle({ width: "36px" });
   });
 
   it("gives the three Generar buttons the same classes apart from the colour pair", () => {
@@ -175,14 +212,13 @@ describe("TechniqueCard technique colours", () => {
           icon={Layers}
           tone={tone}
           name={tone}
-          description="d"
           onGenerate={() => {}}
         />,
       );
       const classes = screen
         .getByRole("button", { name: "Generar" })
         .className.split(" ")
-        .filter((c) => !/pastel-/.test(c))
+        .filter((c) => !/pastel-|technique-/.test(c))
         .sort();
       unmount();
       return classes;
@@ -206,10 +242,13 @@ describe("TechniqueIconStrip", () => {
     expect(screen.getByTitle("Recordación activa")).toBeInTheDocument();
   });
 
-  it("uses the technique's pastel tile", () => {
+  it("is a 48px pixel tile in the technique colour (H9-T3)", () => {
     render(<TechniqueIconStrip icon={Layers} tone="yellow" title="t" />);
 
-    expect(screen.getByTitle("t")).toHaveClass("bg-pastel-yellow");
+    const tile = screen.getByTitle("t");
+    expect(tile).toHaveAttribute("data-slot", "pixel-tile");
+    expect(tile).toHaveAttribute("data-tone", "yellow");
+    expect(tile).toHaveStyle({ width: "48px", height: "48px" });
   });
 
   it("is dimmed unless the technique is available", () => {

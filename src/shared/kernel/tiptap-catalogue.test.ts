@@ -3,6 +3,7 @@ import { CATALOGUE_SAMPLE_DOC } from "./testing/catalogue-sample-doc";
 import * as catalogue from "./tiptap-catalogue";
 import {
   BLOCK_NODES,
+  CALLOUT_KINDS,
   CATALOGUE_MARK_ATTRS,
   CATALOGUE_MARKS,
   CATALOGUE_NODE_ATTRS,
@@ -384,6 +385,37 @@ describe("tiptap content catalogue", () => {
   ])("accepts the youtube src %s", (src) => {
     expect(
       findCatalogueViolations(doc({ type: "youtube", attrs: { src } })),
+    ).toEqual([]);
+  });
+});
+
+// H8-5 (odd/tasks/phase-8-design-flows.md): the editor offers five callout
+// kinds; import accepts exactly those.
+describe("callout kinds", () => {
+  it("lists the five editor kinds", () => {
+    expect([...CALLOUT_KINDS]).toEqual([
+      "idea",
+      "note",
+      "warning",
+      "important",
+      "tip",
+    ]);
+  });
+
+  it.each(["important", "tip"])("accepts a %s callout", (kind) => {
+    expect(
+      findCatalogueViolations({
+        type: "doc",
+        content: [
+          {
+            type: "callout",
+            attrs: { kind },
+            content: [
+              { type: "paragraph", content: [{ type: "text", text: "a" }] },
+            ],
+          },
+        ],
+      }),
     ).toEqual([]);
   });
 });

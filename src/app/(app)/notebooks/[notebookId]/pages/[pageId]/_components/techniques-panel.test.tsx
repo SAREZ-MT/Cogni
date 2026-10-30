@@ -136,7 +136,8 @@ describe("TechniquesPanel", () => {
   it("shows the 'Técnicas de estudio' header and the three techniques, all three Generar live", async () => {
     await renderPanel(false);
 
-    expect(screen.getByText("Técnicas de estudio")).toBeInTheDocument();
+    // H9-T2: a noticeably larger panel title.
+    expect(screen.getByText("Técnicas de estudio")).toHaveClass("text-[17px]");
     expect(
       screen.getByText("Genera contenido de estudio con IA"),
     ).toBeInTheDocument();
@@ -148,26 +149,59 @@ describe("TechniquesPanel", () => {
     expect(screen.getByTestId("generate-exam-questions")).toBeEnabled();
     const generate = screen.getAllByRole("button", { name: "Generar" });
     expect(generate).toHaveLength(3);
+    // H9-T1 (user, 2026-10-29): no description lines under the names.
+    for (const gone of [
+      "Tarjetas con repetición espaciada",
+      "Preguntas abiertas de memoria",
+      "Opción múltiple con retroalimentación",
+    ]) {
+      expect(screen.queryByText(gone)).not.toBeInTheDocument();
+    }
     expect(
       generate.filter((b) => (b as HTMLButtonElement).disabled),
     ).toHaveLength(0);
   });
 
-  it("colours each Generar with its technique: Flashcards yellow, Recordación activa green, Examen red", async () => {
+  it("colours each tile and its Generar with its technique: Flashcards yellow, Recordación activa green, Examen red", async () => {
     await renderPanel(false);
 
-    expect(screen.getByTestId("generate-flashcards")).toHaveClass(
-      "bg-pastel-yellow",
-      "text-pastel-yellow-fg",
+    for (const [testId, pair] of [
+      ["generate-flashcards", "pastel-yellow"],
+      ["generate-recall-questions", "pastel-mint"],
+      ["generate-exam-questions", "pastel-pink"],
+    ] as const) {
+      const button = screen.getByTestId(testId);
+      expect(button).toHaveClass(`text-${pair}-fg`);
+      expect(button).toHaveClass("bg-transparent", `hover:bg-${pair}`);
+      expect(button.closest("[data-part=technique-card]")).toHaveClass(
+        `technique-glow-${pair.replace("pastel-", "")}`,
+      );
+    }
+  });
+
+  // H9-T3 (user, 2026-10-29): the toggle matches the technique icons —
+  // 36px in the expanded header (the tile icons), 48px when collapsed (the
+  // rail tiles) — neutral, with its accessible name as the tooltip.
+  it("sizes the toggle like the technique icons in both states", async () => {
+    await renderPanel(false);
+    const expanded = screen.getByTestId("techniques-panel-toggle");
+    expect(expanded).toHaveClass("size-9");
+    expect(expanded).toHaveAttribute("title", "Colapsar panel de técnicas");
+    expect(expanded).toHaveAttribute(
+      "aria-label",
+      "Colapsar panel de técnicas",
     );
-    expect(screen.getByTestId("generate-recall-questions")).toHaveClass(
-      "bg-pastel-mint",
-      "text-pastel-mint-fg",
+    await userEvent.click(expanded);
+
+    const collapsedToggle = screen.getByTestId("techniques-panel-toggle");
+    expect(collapsedToggle).toHaveClass("size-12");
+    expect(collapsedToggle).toHaveAttribute(
+      "title",
+      "Expandir panel de técnicas",
     );
-    expect(screen.getByTestId("generate-exam-questions")).toHaveClass(
-      "bg-pastel-pink",
-      "text-pastel-pink-fg",
-    );
+    expect(screen.getByTestId("techniques-panel")).toHaveStyle({
+      width: "64px",
+    });
   });
 
   it("shows every collapsed technique icon as available", async () => {
@@ -231,6 +265,13 @@ describe("TechniquesPanel", () => {
         "Te quedan 4 generaciones hoy",
       );
     }
+    // H9-T2: the remaining line sits below "Generar".
+    expect(
+      screen
+        .getByTestId("generate-flashcards")
+        .compareDocumentPosition(screen.getByTestId("generation-remaining")) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it("hides every remaining line when the status is unknown", async () => {
@@ -257,13 +298,26 @@ describe("TechniquesPanel", () => {
       );
     }
 
-    it("shows an empty state under its label when nothing was generated", async () => {
+    it("explains the section in its empty state when nothing was generated", async () => {
       await renderPanel(false);
 
       expect(screen.getByText("Generado en esta página")).toBeInTheDocument();
       expect(
-        screen.getByText("Aún no generaste nada en esta página"),
+        screen.getByText("Aquí verás todo lo que generes"),
       ).toBeInTheDocument();
+      expect(
+        screen.getByText("Empieza con una técnica de arriba."),
+      ).toBeInTheDocument();
+      // H9-T3: a plain neutral card — no technique colours, no gradient.
+      const empty = screen
+        .getByText("Aquí verás todo lo que generes")
+        .closest("div");
+      expect(empty?.className).not.toMatch(/gradient|glow|pastel/);
+      expect(empty).toHaveClass("bg-card", "border-border-subtle");
+      expect(document.querySelector("[data-part=technique-layer]")).toBeNull();
+      expect(
+        screen.queryByText("Aún no generaste nada en esta página"),
+      ).not.toBeInTheDocument();
       expect(screen.queryByRole("link", { name: /Flashcards/ })).toBeNull();
     });
 
@@ -303,7 +357,7 @@ describe("TechniquesPanel", () => {
         "generated-item-exam",
       ]);
       expect(
-        screen.queryByText("Aún no generaste nada en esta página"),
+        screen.queryByText("Aquí verás todo lo que generes"),
       ).not.toBeInTheDocument();
     });
 

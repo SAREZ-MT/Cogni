@@ -1,8 +1,8 @@
 "use client";
 
 import { Plus } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useId, useState, useTransition } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useId, useState, useTransition } from "react";
 import {
   createFlashcardAction,
   MAX_FLASHCARD_SIDE_LENGTH,
@@ -32,15 +32,23 @@ const ERROR_COPY: Record<string, string> = {
 
 export interface NewFlashcardDialogProps {
   pageId: string;
+  // Phase 8 H11: open at once (the deck route's `?nueva=1`, from a
+  // technique hub's "Crear a mano"); the flag is then dropped from the URL
+  // so a reload or the post-save refresh never reopens it.
+  initialOpen?: boolean;
 }
 
 // "Nueva tarjeta" on a page's deck (one deck per page; there is no
 // notebook-level entry). Composes Cogni's Dialog, Textarea and Button atoms,
 // same pattern as QuestionFormDialog. The card lands at the end of the deck
 // and, when the page had none, starts it; the route refreshes to show it.
-export function NewFlashcardDialog({ pageId }: NewFlashcardDialogProps) {
+export function NewFlashcardDialog({
+  pageId,
+  initialOpen = false,
+}: NewFlashcardDialogProps) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+  const [open, setOpen] = useState(initialOpen);
   const [front, setFront] = useState("");
   const [back, setBack] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -49,6 +57,12 @@ export function NewFlashcardDialog({ pageId }: NewFlashcardDialogProps) {
   const backId = useId();
 
   const canSave = front.trim() !== "" && back.trim() !== "" && !pending;
+
+  // Only the mount-time flag matters: drop `?nueva=1` once.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: mount-time only
+  useEffect(() => {
+    if (initialOpen) router.replace(pathname, { scroll: false });
+  }, []);
 
   function changeOpen(next: boolean) {
     setOpen(next);

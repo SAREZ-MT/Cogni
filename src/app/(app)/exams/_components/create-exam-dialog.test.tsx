@@ -245,7 +245,34 @@ describe("CreateExamDialog", () => {
         "Aún no tienes cuadernos. Crea uno para empezar.",
       ),
     ).toBeInTheDocument();
+    // Phase 8 H11: no longer a dead end.
+    expect(
+      within(dialog).getByRole("link", { name: "Crear un cuaderno" }),
+    ).toHaveAttribute("href", "/notebooks");
     expect(within(dialog).getByTestId("create-exam-submit")).toBeDisabled();
+  });
+
+  // Phase 8 H11: the exams hub's empty-state CTA and first grid tile open
+  // the same dialog.
+  it.each([
+    ["cta", "Crear mi primer examen"],
+    ["tile", "Crear examen"],
+  ] as const)("opens from the %s trigger", async (trigger, name) => {
+    const user = userEvent.setup();
+    render(<CreateExamDialog notebooks={NOTEBOOKS} trigger={trigger} />);
+    const button = screen.getByRole("button", { name });
+    if (trigger === "tile") {
+      expect(button).toHaveClass("border-dashed");
+    } else {
+      expect(button).toHaveClass("technique-cta");
+    }
+    expect(button).toHaveAttribute("data-testid", `create-exam-${trigger}`);
+
+    await user.click(button);
+
+    expect(
+      screen.getByRole("dialog", { name: "Crear examen" }),
+    ).toBeInTheDocument();
   });
 
   it("says there is nothing new to generate as a notice, keeping the dialog open", async () => {
