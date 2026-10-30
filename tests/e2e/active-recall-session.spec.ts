@@ -3,6 +3,7 @@ import type { Page } from "@playwright/test";
 import postgres from "postgres";
 import { expect, hasSupabaseEnv, signIn, test } from "./fixtures/auth";
 import { createNotebookWithOpenPage } from "./helpers/notebooks";
+import { withStudyFiller } from "./helpers/study-text";
 
 // Phase 6 T5 active recall session on real data (documento-maestro §3.3,
 // §8.5; RF-AR-02/03): after "Técnicas → Active recall → Generar" (fake AI
@@ -100,7 +101,7 @@ test.describe("active recall session", () => {
       .locator('[contenteditable="true"]');
     await editable.click();
     await page.waitForTimeout(100);
-    await page.keyboard.type(SENTENCES);
+    await page.keyboard.type(withStudyFiller(SENTENCES));
     await expect(page.getByTestId("autosave-status")).toHaveText("guardado", {
       timeout: 15000,
     });

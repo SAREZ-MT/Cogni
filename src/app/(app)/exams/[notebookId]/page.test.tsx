@@ -11,15 +11,18 @@ const { listExamHubAction } = vi.hoisted(() => ({
   listExamHubAction: vi.fn(),
 }));
 vi.mock("@/modules/exams", () => ({ listExamHubAction }));
-const { getNotebookTitleForRoute, getSidebarTree, CreateExamDialog } =
+const { getNotebookTitleForRoute, getPagePickerTree, CreateExamDialog } =
   vi.hoisted(() => ({
     getNotebookTitleForRoute: vi.fn(),
-    getSidebarTree: vi.fn(),
-    CreateExamDialog: vi.fn(() => null),
+    getPagePickerTree: vi.fn(),
+    CreateExamDialog: vi.fn(({ trigger }: { trigger?: string }) => (
+      // A stand-in trigger, so the test sees where each one renders.
+      <button type="button" data-testid={`create-exam-${trigger}`} />
+    )),
   }));
 vi.mock("@/modules/notebooks", () => ({
   getNotebookTitleForRoute,
-  getSidebarTree,
+  getPagePickerTree,
 }));
 vi.mock("../_components/create-exam-dialog", () => ({ CreateExamDialog }));
 
@@ -73,8 +76,8 @@ const ENTRIES = [
 describe("ExamsNotebookPage (real data)", () => {
   beforeEach(() => {
     notFound.mockClear();
-    getSidebarTree.mockReset();
-    getSidebarTree.mockResolvedValue([]);
+    getPagePickerTree.mockReset();
+    getPagePickerTree.mockResolvedValue([]);
     CreateExamDialog.mockClear();
     getNotebookTitleForRoute.mockReset();
     getNotebookTitleForRoute.mockResolvedValue("Biología Celular");
@@ -144,6 +147,22 @@ describe("ExamsNotebookPage (real data)", () => {
     expect(
       screen.getByText("0 exámenes · 0 páginas con preguntas"),
     ).toBeInTheDocument();
+    // Phase 8 H13: the empty state's CTA is the only create control.
+    expect(screen.getByTestId("create-exam-cta")).toBeInTheDocument();
+    expect(screen.queryByTestId("create-exam-tile")).toBeNull();
+    expect(screen.queryByTestId("create-exam-button")).toBeNull();
+  });
+
+  // Phase 8 H13 (user 2026-10-29): no "Crear examen" in the header; as on
+  // the hubs, a create tile is fixed first in the grid.
+  it("puts the create tile first in the grid, not in the header", async () => {
+    render(await ExamsNotebookPage(params(NOTEBOOK)));
+
+    const tile = screen.getByTestId("create-exam-tile");
+    expect(tile.parentElement?.firstElementChild).toBe(tile);
+    expect(screen.queryByTestId("create-exam-button")).toBeNull();
+    expect(screen.queryByTestId("create-exam-cta")).toBeNull();
+    expect(CreateExamDialog).toHaveBeenCalledTimes(1);
   });
 
   it("shows the load error in the empty state when the pages cannot load", async () => {
@@ -176,7 +195,7 @@ describe("ExamsNotebookPage (real data)", () => {
   });
 
   it("offers 'Crear examen' with this notebook preselected", async () => {
-    getSidebarTree.mockResolvedValue([
+    getPagePickerTree.mockResolvedValue([
       { id: "x", title: "Otro", icon: null, color: null, pages: [] },
       {
         id: NOTEBOOK,

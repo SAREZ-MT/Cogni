@@ -14,6 +14,11 @@ export interface CountStepperProps {
   disabled?: boolean;
   // Tags the value as `${testId}-value`.
   testId?: string;
+  // "compact" (default): the 264px techniques panel. "field" (Phase 8
+  // H12): a bordered 56px row for dialogs, with an optional `hint` under
+  // the label.
+  size?: "compact" | "field";
+  hint?: string;
   className?: string;
 }
 
@@ -30,9 +35,12 @@ export function CountStepper({
   onChange,
   disabled = false,
   testId,
+  size = "compact",
+  hint,
   className,
 }: CountStepperProps) {
   const noun = label.toLocaleLowerCase();
+  const field = size === "field";
   const change = (delta: number) =>
     onChange(Math.min(max, Math.max(min, value + delta)));
   return (
@@ -40,14 +48,28 @@ export function CountStepper({
     <div
       role="group"
       aria-label={label}
-      className={cn("flex items-center justify-between gap-2", className)}
+      data-size={size}
+      className={cn(
+        "flex items-center justify-between gap-2",
+        field && "gap-4 rounded-xl border border-border-default px-4 py-3",
+        className,
+      )}
     >
-      <span className="text-[10.5px] text-fg-muted">{label}</span>
-      <div className="flex items-center gap-1">
+      {field ? (
+        <span className="flex flex-col gap-0.5">
+          <span className="font-medium text-[13px] text-fg-secondary">
+            {label}
+          </span>
+          {hint && <span className="text-fg-muted text-xs">{hint}</span>}
+        </span>
+      ) : (
+        <span className="text-[10.5px] text-fg-muted">{label}</span>
+      )}
+      <div className={cn("flex items-center gap-1", field && "gap-2")}>
         <Button
           type="button"
           variant="outline"
-          size="icon-xs"
+          size={field ? "icon-sm" : "icon-xs"}
           aria-label={`Menos ${noun}`}
           disabled={disabled || value <= min}
           onClick={() => change(-step)}
@@ -57,17 +79,20 @@ export function CountStepper({
         <output
           aria-live="polite"
           data-testid={testId ? `${testId}-value` : undefined}
-          className="min-w-6 text-center font-semibold text-fg text-xs tabular-nums"
+          className={cn(
+            "min-w-6 text-center font-semibold text-fg text-xs tabular-nums",
+            field && "min-w-8 text-base",
+          )}
         >
           {value}
         </output>
         <Button
           type="button"
           variant="outline"
-          size="icon-xs"
           aria-label={`Más ${noun}`}
           disabled={disabled || value >= max}
           onClick={() => change(step)}
+          size={field ? "icon-sm" : "icon-xs"}
         >
           <Plus aria-hidden="true" strokeWidth={2} />
         </Button>

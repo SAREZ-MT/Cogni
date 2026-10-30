@@ -22,7 +22,9 @@ interface ExamsNotebookPageProps {
 // retake while one is pending) or its last results. Same not-found contract
 // as flashcards/[notebookId]/page.tsx: a notebookId that is unknown,
 // archived or another user's 404s. The layout is the design preview's
-// (user decision 2026-10-06).
+// (user decision 2026-10-06). Since Phase 8 H13 (user 2026-10-29) "Crear
+// examen" left the header: as on the hubs, the empty state's CTA or the
+// grid's first, fixed tile opens it, with this notebook preselected.
 export default async function ExamsNotebookPage({
   params,
 }: ExamsNotebookPageProps) {
@@ -58,12 +60,6 @@ export default async function ExamsNotebookPage({
           title={notebookTitle}
           titleClassName="text-xl"
           description={`${plural(totalAttempts, "examen", "exámenes")} · ${plural(pages.length, "página", "páginas")} con preguntas`}
-          actions={
-            <CreateExamDialog
-              notebooks={createExamNotebooks}
-              initialNotebookId={notebookId}
-            />
-          }
         />
       </div>
 
@@ -83,11 +79,28 @@ export default async function ExamsNotebookPage({
               : "No pudimos cargar tus exámenes. Intenta de nuevo."
           }
           descriptionClassName="max-w-[320px]"
+          action={
+            result.ok ? (
+              // The rose CTA takes its colours from the exams theme.
+              <div data-technique-theme="exams" className="contents">
+                <CreateExamDialog
+                  notebooks={createExamNotebooks}
+                  initialNotebookId={notebookId}
+                  trigger="cta"
+                />
+              </div>
+            ) : undefined
+          }
         />
       ) : (
         <>
           <SectionTitle>Exámenes por página</SectionTitle>
           <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4">
+            <CreateExamDialog
+              notebooks={createExamNotebooks}
+              initialNotebookId={notebookId}
+              trigger="tile"
+            />
             {pages.map((page) => (
               <ExamPageCard
                 key={page.pageId}

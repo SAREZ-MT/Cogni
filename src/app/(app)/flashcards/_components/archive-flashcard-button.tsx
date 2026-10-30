@@ -14,6 +14,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/shared/ui/dialog";
+import { FormMessage } from "@/shared/ui/form-message";
 
 const GENERIC_FAILURE = "No pudimos archivar la tarjeta. Intenta de nuevo.";
 
@@ -21,7 +22,7 @@ const GENERIC_FAILURE = "No pudimos archivar la tarjeta. Intenta de nuevo.";
 // falls back to GENERIC_FAILURE.
 const ERROR_COPY: Record<string, string> = {
   FLASHCARD_LAST_CARD:
-    "Un mazo siempre conserva al menos una tarjeta. Agrega otra antes de archivar esta.",
+    "Un mazo siempre conserva al menos una tarjeta. Genera más desde la página antes de archivar esta.",
   FLASHCARD_NOT_FOUND: "Esta tarjeta ya no está en el mazo.",
   FLASHCARDS_SESSION_REQUIRED: "Tu sesión expiró. Inicia sesión de nuevo.",
 };
@@ -85,11 +86,7 @@ export function ArchiveFlashcardButton({
           <DialogTitle>¿Archivar esta tarjeta?</DialogTitle>
           <DialogDescription>Sale del mazo y de tus repasos.</DialogDescription>
         </DialogHeader>
-        {error && (
-          <p role="alert" className="text-destructive text-sm">
-            {error}
-          </p>
-        )}
+        {error && <FormMessage>{error}</FormMessage>}
         <DialogFooter>
           <Button
             type="button"

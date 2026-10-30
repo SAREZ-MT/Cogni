@@ -629,6 +629,14 @@ would relocate duplication rather than remove it, and reusing `Button` with
 enough overrides to stay pixel-exact would be more fragile than the plain
 element. Left as native elements; not part of this pass's scope.
 
+Phase 8 H12 adds two variants for the dialogs' primary action: `brand`
+(`bg-primary-600 text-white`, a soft violet shadow, `hover:bg-primary-700`)
+and `technique` (`bg-(--theme-cta) text-(--theme-cta-fg)`, an inset
+`--theme-cta-edge` line and a `--theme-cta-shadow` drop,
+`hover:bg-(--theme-cta-hover)`), which needs an enclosing
+`data-technique-theme`: amber with dark ink for flashcards, emerald or rose
+with white for recall and exams. Covered by `button.test.tsx`.
+
 ## PanelToggleButton (`panel-toggle-button.tsx`)
 
 The 26x26 bordered collapse/expand button (`rounded-md`, `border-neutral-200/70`,
@@ -836,34 +844,61 @@ lists (Phase 6 T5b, "Crear examen" notebook and page pickers). Native on
 purpose: keyboard, screen readers and mobile pickers work without a custom
 listbox. Forwards every `<select>` prop; `className` merges.
 
-Used by: `exams/_components/create-exam-dialog.tsx`; the Configuración
-time-zone select (`identity/ui/time-zone-form.tsx`, Phase 7 T2a), which
+Used by: the Configuración time-zone select
+(`identity/ui/time-zone-form.tsx`, Phase 7 T2a), which
 passes `<optgroup>` children per region and widens it with `className`
 (`h-10 sm:w-[280px]`, the Profile Settings form-input size). No atom change.
+Since Phase 8 H12 the dialogs use `Select` instead (below).
 
-## ChoiceGroup (`choice-group.tsx`)
+## Select (`select.tsx`)
 
-A single-choice list of bordered rows with radio semantics
-(`role="radiogroup"` + `role="radio"`/`aria-checked`), each with a label and
-an optional muted description. Unchecked rows use `OptionRow`'s default
-palette (`border-neutral-200/80 bg-card`), the checked row its selected
-palette: `tone="rose"` (default, `border-rose-500 bg-pastel-pink/30`) or
-`tone="amber"` (Phase 8 H11, `border-warning-500 bg-pastel-yellow/40`).
+Phase 8 H12 (user 2026-10-29): the app's styled single-choice select, on
+Radix Select (`radix-ui`, already installed; nothing added). `Select`
+(Root), `SelectTrigger` (44px field, `rounded-input`, `border-input`,
+`bg-card`, chevron that turns while open, violet focus ring, placeholder in
+`text-fg-placeholder` via `data-placeholder`), `SelectValue`
+(`placeholder`), `SelectContent` (portal, `position="popper"`, 6px offset,
+at least the trigger's width, `rounded-xl` card surface, `shadow-lg`, short
+fade/zoom) and `SelectItem` (40px rows, `rounded-lg`, neutral highlight,
+a neutral-ink check on the chosen one; the listbox is portalled, outside any
+technique theme). `value=""` shows the placeholder. Keyboard from
+Radix: Enter / Space / arrows open, arrows and type-ahead move, Enter picks,
+Escape closes and returns focus. The trigger is a `role="combobox"` button
+named by a `<label htmlFor>` on its `id`. Tests: `select.testing.ts`
+`chooseOption(user, combobox, name)` (jsdom); e2e
+`tests/e2e/helpers/select.ts` `chooseOption(scope, label, option)`.
 
-- `options: { value, label, description? }[]`, `value`, `onChange`,
-  `aria-label`, `testId?` (each row gets `${testId}-${value}`), `tone?`,
-  `className?`.
+Used by: `PagePicker`.
 
-Used by: `exams/_components/create-exam-dialog.tsx` ("Generar con IA" /
-"Crear mis preguntas") and `flashcards/_components/create-from-page-dialog.tsx`
-(amber; "Generar con IA" / "Crear a mano").
+## FieldLabel (`field-label.tsx`)
+
+Phase 8 H12: a dialog form field's label, `font-medium text-[13px]
+text-fg-secondary`, with `htmlFor`. Used by `PagePicker` and every form
+dialog (notebook title, the question form).
+
+## FormMessage (`form-message.tsx`)
+
+Phase 8 H12: a dialog's feedback box, `rounded-xl` with a 1px border.
+`tone="error"` (default): `role="alert"`, `bg-error-50 border-error-100
+text-destructive`; `tone="info"`: a neutral note (`bg-neutral-50`). Children
+may include a follow-up link ("Abrir la página"). Used by the create and
+generate dialogs, the question form and the archive/retire confirms.
+
+## GenerationsLeft (`generations-left.tsx`)
+
+Phase 8 H12: the generate dialogs' daily AI budget line, a Lucide
+`Sparkles` (13px) and the caller's copy in `text-xs text-fg-muted`;
+`remaining <= 0` switches to `text-warning-700` and sets `data-reached`.
+Used by `CreateFromPageDialog`.
 
 ## PagePicker (`page-picker.tsx`)
 
 Phase 8 H11: the "which page?" step of every create dialog that starts
 from a technique hub (all study content belongs to a page). Client
-component: a "Cuaderno" `NativeSelect`, then a "Página" one ("Elige una
-página" placeholder, required) with that notebook's pages. Never a dead
+component: a "Cuaderno" `Select` (Phase 8 H12; a `NativeSelect` before),
+then a "Página" one ("Elige una página" placeholder, required) with that
+notebook's pages, each under a `FieldLabel`. The two dead-end notes sit in a
+soft `bg-neutral-50` box. Never a dead
 end: no notebooks reads "Aún no tienes cuadernos. Crea uno para empezar."
 with a "Crear un cuaderno" link to `/notebooks`; a notebook without pages
 reads "Este cuaderno aún no tiene páginas." with "Crear una página" to
@@ -885,7 +920,11 @@ deepens its tint on hover, presses to 0.98, still under reduced motion.
 A plain `<button>` (`type="button"` default) for `DialogTrigger asChild`.
 Props: `label` (also the accessible name), `hint?`, button props. Used by
 the `/flashcards` ("Crear flashcards"), `/active-recall` ("Generar
-preguntas") and `/exams` ("Crear examen") grids.
+preguntas"), `/exams` and, since Phase 8 H13, `/exams/[notebookId]`
+("Crear examen", the notebook preselected) grids. H13 removed the exams
+header's "Crear examen" button: on the exams screens the tile and the
+empty state's CTA (`data-technique-theme="exams"` around it on the
+notebook view) are the create controls.
 
 ## ViewToggle (`view-toggle.tsx`)
 
@@ -950,7 +989,8 @@ assert the chrome so the unregistered tokens cannot come back.
 ## Dialog (`dialog.tsx`)
 
 Radix dialog atom used by every modal form (`CreateNotebookDialog`,
-`QuestionFormDialog`, `NewFlashcardDialog`). Since 2026-10-04 (Phase 4 T3)
+`QuestionFormDialog`; `NewFlashcardDialog` until Phase 8 H13 removed manual
+card creation). Since 2026-10-04 (Phase 4 T3)
 `DialogContent` uses the card surface — `bg-card`, `border-border-default`,
 `text-fg`, `shadow-lg` — instead of `bg-popover` / `text-popover-foreground`.
 `--color-popover` is not registered in `globals.css`, so the old classes
@@ -958,6 +998,29 @@ produced no CSS and every dialog rendered transparent (the same defect the
 DropdownMenu fix handled). Radius stays at the atom's `rounded-xl` (12px);
 the design-system modal mockups use 24px — a known gap, not yet aligned.
 Covered by `dialog.test.tsx` (asserts the `bg-card` surface).
+
+Phase 8 H12 (user 2026-10-29), one polished shell for every form dialog:
+`DialogContent` is `rounded-2xl` (20px) with `p-6`, `gap-5`, `sm:max-w-md`
+by default, a 0.97 zoom-in and `max-h` with scrolling; its close button
+sits at `top-4 right-4` and is labelled "Cerrar". `DialogHeader` takes an
+optional `icon` (a 48px `PixelTile` in the technique dialogs) beside the
+title and description, and keeps `pr-8` clear of the close button.
+`DialogTitle` is 18px semibold, `DialogDescription` 13.5px muted relaxed.
+`DialogFooter` is a separated band (`border-t`, `bg-neutral-50/80`,
+`px-6 py-4`, bleeding to the edges). Technique dialogs tag `DialogContent`
+with `data-technique-theme` so `Button variant="technique"` takes its
+colours; every other dialog's primary is `variant="brand"`
+(violet), the cancel an `outline`, never the dark default.
+
+Per dialog (H12): `CreateNotebookDialog` and `RenameNotebookDialog` add a
+description, a `FieldLabel` + 44px `Input` and a `brand` primary;
+`ChangeAppearanceDialog` a description and 40px swatches with
+`aria-pressed` and a check on the current colour; `NewPageDialog` drops its
+own padding and title overrides for the shell's; `NewFlashcardDialog`
+wore the flashcards theme (amber `PixelTile`, `technique` save) until H13
+deleted it (cards are created by AI only); `QuestionFormDialog` and `ExamGenerateDialog` / `CreateExamDialog` the
+exams theme; the archive and retire confirms keep `destructive` and show
+errors as `FormMessage`.
 
 ## Flashcards design preview (2026-09-24)
 
@@ -1562,7 +1625,15 @@ stored record per attempted page (Mitocondria 60 % / 6/10 with 2 wrong + 2
 unanswered, Membrana celular 83 % / 5/6, Renacimiento 100 %). `data-testid`
 stays `exam-results` (reused).
 
-### Manual question creation/editing — `/exams/[notebookId]/[pageId]/preguntas`
+### Question management — `/exams/[notebookId]/[pageId]/preguntas`
+
+Phase 8 H13 (user 2026-10-29): questions are created by AI only. The
+"Nueva pregunta" button and `createExamQuestionAction` are gone; the
+header count leaves out "· {K} manuales" when K is 0; the minimum note
+reads "Genera {n} más con IA desde la página para poder rendirlo."; the
+empty state's `EmptyStateCta` "Generar desde la página" links to the
+notebook page (its techniques panel generates). "Editar" and "Retirar"
+stay. The history below describes the screen before H13.
 
 New route + client view (`exams/_components/exam-questions-view.tsx`):
 header count "{N} preguntas · {M} generadas por IA · {K} manuales" (N/M/K
@@ -1629,14 +1700,25 @@ controlled (`open`/`onOpenChange`) so the same instance serves both "Nueva
 pregunta" and every row's "Editar"; it re-syncs its local form state from
 `initialValues` on every `open` transition instead of being remounted.
 
-- `open`, `onOpenChange`, `mode: "create" | "edit"`, `initialValues?`,
+- Edit only since Phase 8 H13: the `mode` prop is gone; the title is
+  "Editar pregunta", the save "Guardar cambios", the description "Corrige
+  el enunciado, las 4 opciones o la correcta." `initialValues` falls back
+  to empty values only while no question is chosen (the dialog is closed).
+- `open`, `onOpenChange`, `initialValues?`,
   `onSubmit: (values: QuestionFormValues) => undefined | Promise<string |
   null | undefined>`. `data-testid="question-form-dialog"`.
+- Phase 8 H12 (user 2026-10-29): the exams theme (`data-technique-theme=
+  "exams"`, a 48px rose `PixelTile` in the header, a short description,
+  `Button variant="technique"` for the save), `FieldLabel` labels, 44px
+  fields, the error as a `FormMessage`, and each answer as a bordered
+  `data-slot="answer-option"` row; the correct one carries `data-correct`
+  and a rose tint (`border-rose-400/50 bg-pastel-pink/35`, letter in
+  `--theme-ink`, radio `accent-(--theme-ink)`).
 - Since Phase 5 T4: a sync `onSubmit` closes at once (as before); an async
   one keeps the dialog open while it runs (save button disabled, reading
   "Guardando…"), then closes on `null`/`undefined` or shows the returned
-  Spanish message as a `role="alert"` line (`text-destructive text-sm`,
-  same as `NewFlashcardDialog`) above the footer and stays open. Re-opening
+  Spanish message as a `role="alert"` line (`text-destructive text-sm`)
+  above the footer and stays open. Re-opening
   clears the error.
 - Since the T4 review fixes: while an async save runs, "Cancelar" is
   disabled and Escape, the overlay and the close button do not dismiss the
@@ -1644,9 +1726,7 @@ pregunta" and every row's "Editar"; it re-syncs its local form state from
   transition starts a new session: if the caller closes the dialog anyway,
   the reopened form starts enabled ("Guardando…" never leaks into it) and
   the old save's outcome is ignored — it never closes or shows its error in
-  the new session. `NewFlashcardDialog` still lets "Cancelar" run during a
-  save and carries the Phase 4 stale-transition advisory; align it with
-  this behaviour when that dialog is next touched.
+  the new session.
 
 Used by: `exams/_components/exam-questions-view.tsx`.
 
@@ -1909,6 +1989,12 @@ for T6's exam length selector (same range).
   bound or when `disabled`.
 
 Used by: `techniques-panel.tsx` (Examen card `controls`).
+
+- Phase 8 H12: `size="field"` (default `"compact"`) for dialogs: a bordered
+  `rounded-xl` row (`px-4 py-3`) with a 13px label and an optional `hint`
+  under it ("Entre 10 y 30, de 5 en 5"), `icon-sm` buttons and a 16px
+  value; the group carries `data-size`. Used by `CreateExamDialog` and
+  `ExamGenerateDialog`.
 
 ## TechniqueChip (`technique-chip.tsx`)
 

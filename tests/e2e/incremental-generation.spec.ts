@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import type { Locator, Page } from "@playwright/test";
 import { expect, hasSupabaseEnv, signIn, test } from "./fixtures/auth";
 import { createNotebookWithOpenPage } from "./helpers/notebooks";
+import { chooseOption } from "./helpers/select";
+import { withStudyFiller } from "./helpers/study-text";
 
 // Phase 6 T5c (user decision 2026-10-06): "Generar" only sends the page
 // paragraphs a technique has not used yet. Unchanged page: no AI call, no
@@ -41,7 +43,7 @@ async function writeFirstParagraph(page: Page) {
   await editor(page).click();
   // Keys sent <15 ms after a click can precede Chrome's selectionchange.
   await page.waitForTimeout(100);
-  await page.keyboard.type(FIRST);
+  await page.keyboard.type(withStudyFiller(FIRST));
   await waitForSaved(page);
 }
 
@@ -64,7 +66,7 @@ async function addSecondParagraph(page: Page) {
   // ProseMirror reads the DOM selection on selectionchange.
   await page.waitForTimeout(100);
   await page.keyboard.press("Enter");
-  await page.keyboard.type(SECOND);
+  await page.keyboard.type(withStudyFiller(SECOND));
   // The first paragraph must stay as it was: an edit to it makes it new
   // again and it would be re-sent (correctly), breaking this spec's counts.
   await expect(editor(page).locator("p")).toHaveText([FIRST, SECOND]);
@@ -181,14 +183,12 @@ test.describe("incremental generation", () => {
 
     // "Crear examen" in AI mode says the same in the dialog.
     await page.goto("/exams");
-    await page.getByTestId("create-exam-button").click();
+    // The hub lists this page, so its grid's first tile opens the dialog
+    // (Phase 8 H13: no header button).
+    await page.getByTestId("create-exam-tile").click();
     const create = page.getByRole("dialog", { name: "Crear examen" });
-    await create
-      .getByRole("combobox", { name: "Cuaderno" })
-      .selectOption({ label: notebookTitle });
-    await create
-      .getByRole("combobox", { name: "Página" })
-      .selectOption({ label: "Sin título" });
+    await chooseOption(create, "Cuaderno", notebookTitle);
+    await chooseOption(create, "Página", "Sin título");
     await create.getByTestId("create-exam-submit").click();
     await expect(create.getByTestId("create-exam-notice")).toHaveText(
       NOTHING_NEW,

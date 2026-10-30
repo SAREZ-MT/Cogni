@@ -78,6 +78,9 @@ if (process.env.DATABASE_URL) {
     };
   }
 
+  // 150 words: since Phase 8 H14 recall's 10 questions need them.
+  const PAGE_TEXT = `La mitocondria. ${Array.from({ length: 148 }, (_, i) => `w${i}`).join(" ")}`;
+
   describe("DrizzleRecallUnitOfWork", { timeout: 30_000 }, () => {
     it("stores a generation's questions with one due recall_question study item each", async () => {
       // recall_questions.generation_id references the audited generation.
@@ -97,7 +100,7 @@ if (process.env.DATABASE_URL) {
           pages: {
             async getPageText(id, ownerId) {
               return ownerId === owner.id && id === pageId
-                ? ok({ title: "Mitocondria", plainText: "La mitocondria." })
+                ? ok({ title: "Mitocondria", plainText: PAGE_TEXT })
                 : err(new DomainError("PAGE_NOT_FOUND", id));
             },
           },
@@ -160,7 +163,7 @@ if (process.env.DATABASE_URL) {
         .from(generationFingerprints)
         .where(eq(generationFingerprints.pageId, pageId));
       expect(fingerprints.map((f) => [f.technique, f.fingerprint])).toEqual([
-        ["recall", fingerprintParagraph("La mitocondria.")],
+        ["recall", fingerprintParagraph(PAGE_TEXT)],
       ]);
     });
 

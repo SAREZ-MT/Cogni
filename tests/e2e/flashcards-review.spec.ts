@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { expect, hasSupabaseEnv, signIn, test } from "./fixtures/auth";
+import { seedFlashcards } from "./helpers/flashcards";
 import {
   clickAndWaitForAction,
   createNotebookWithOpenPage,
@@ -30,16 +31,11 @@ test.describe("flashcard review session", () => {
     await page.goto(`/flashcards/${notebookId}/${pageId}`);
 
     // A new card is due immediately (§6.1 defaults).
-    await page.getByTestId("new-flashcard-button").click();
-    const dialog = page.getByRole("dialog", { name: "Nueva tarjeta" });
-    await dialog.getByLabel("Anverso").fill("¿Qué produce la mitocondria?");
-    await dialog.getByLabel("Reverso").fill("ATP");
-    await clickAndWaitForAction(
-      page,
-      dialog.getByRole("button", { name: "Guardar tarjeta" }),
-      '"front"',
-    );
-    await expect(dialog).toBeHidden();
+    // Cards are created by AI only (Phase 8 H13): seed one straight in.
+    await seedFlashcards(pageId, [
+      { front: "¿Qué produce la mitocondria?", back: "ATP" },
+    ]);
+    await page.reload();
     await expect(page.getByTestId("flip-card")).toHaveCount(1);
 
     await clickAndWaitForAction(

@@ -108,14 +108,14 @@ Notas de implementación de la Fase 6 (ADR 0007):
 
 #### Flashcards
 
-- Anverso y reverso, generadas por IA desde la página o creadas manualmente.
+- Anverso y reverso, generadas por IA desde la página. La creación es solo con IA por decisión del usuario del 2026-10-29 (Fase 8, H13): no hay "Nueva tarjeta". Las tarjetas creadas a mano antes de esa fecha (`origin = manual`) se siguen mostrando, repasando y archivando.
 - Sesión de repaso: se muestran los ítems vencidos de la página (o de todas las páginas, en la vista "Repasos de hoy").
 - Calificación por el estudiante en escala SM-2 simplificada de 4 botones: Otra vez (q=1), Difícil (q=3), Bien (q=4), Fácil (q=5).
 - Retroalimentación con IA al final de la sesión: resumen de qué se recordó bien y qué conviene reforzar.
 
 #### Exámenes
 
-- Preguntas de opción múltiple con 4 opciones y una correcta, generadas por IA desde la página o creadas manualmente.
+- Preguntas de opción múltiple con 4 opciones y una correcta, generadas por IA desde la página. La creación es solo con IA por decisión del usuario del 2026-10-29 (Fase 8, H13): la pantalla de preguntas no ofrece "Nueva pregunta", pero conserva "Editar" y "Retirar" para corregir lo generado. Las preguntas creadas a mano antes de esa fecha (`origin = manual`) se siguen mostrando, rindiendo, editando y retirando.
 - Sesión: N preguntas (configurable, por defecto 10). Corrección determinista.
 - Cada pregunta es un ítem del motor. Correcta → q=4. Incorrecta → q=1.
 - Si la nota del examen es menor a 70 %, la página queda marcada para repetir examen; el motor reprograma las preguntas falladas y el calendario lo muestra.
@@ -131,7 +131,7 @@ Notas de implementación de la Fase 5 (ADR 0006):
 - **Repasar antes de repetir.** Un resultado fallado ofrece "Repasar contenido", que abre la página del cuaderno con un aviso de los conceptos fallados y la acción "Repetir examen".
 - Editar una pregunta la cambia en el lugar y conserva su raíz; retirarla suspende el ítem de la raíz cuando su linaje no tiene otra pregunta activa. No hay límite de tiempo y una sesión abandonada queda abierta (como en flashcards).
 
-Nota de implementación de la Fase 6 (ADR 0007): `/exams` y la vista por cuaderno siguen listando solo las páginas con preguntas. Su encabezado ofrece "Crear examen" (en lugar del inicio rápido "Nuevo examen"): se elige cuaderno y página y luego "Generar con IA" (N de 10 a 30) o "Crear mis preguntas", que abre la pantalla de preguntas de la página; es la entrada para la primera pregunta manual de una página sin preguntas.
+Nota de implementación de la Fase 6 (ADR 0007): `/exams` y la vista por cuaderno siguen listando solo las páginas con preguntas. Ofrecen "Crear examen" (en lugar del inicio rápido "Nuevo examen"); desde el 2026-10-29 (Fase 8, H13, decisión del usuario) ya no está en el encabezado, sino en la llamada a la acción del estado vacío y en el primer recuadro fijo de la cuadrícula, como en los demás centros de técnicas. Se elige cuaderno y página y luego "Generar con IA" (N de 10 a 30). Desde el 2026-10-29 (Fase 8, H12 y H13, decisión del usuario) la creación es solo con IA: ya no existe "Crear mis preguntas" ni una entrada para escribir la primera pregunta a mano.
 
 #### Recordación activa
 
@@ -148,7 +148,8 @@ Notas de implementación de la Fase 6 (ADR 0007):
 - **Evaluación y resultados.** Al cerrar, la evaluación corre después de responder al navegador; la vista de resultados consulta el estado y muestra la calidad combinada, la calibración y, por pregunta, el puntaje de la IA y su justificación cuando todas las evaluaciones terminaron. Una evaluación fallida queda marcada y "Reintentar" la vuelve a pedir. "No estoy de acuerdo" se registra y no cambia el puntaje.
 - **Puntaje por sesión.** Porcentaje = promedio de la calidad combinada × 20; aciertos, parciales y fallos según el puntaje de la IA (≥ 4, 2–3, ≤ 1). El dominio de cada página viene del motor (§7.3).
 - **Sin resumen de IA de la sesión.** La retroalimentación del final es la justificación por pregunta más la calidad combinada y la calibración; no se crea `SessionFeedback` para recordación activa.
-- **Hub.** `/active-recall` y la vista por cuaderno muestran las páginas con sesiones terminadas, el porcentaje de cada sesión y el contador de preguntas vencidas hoy por cuaderno. La tarjeta de una página abre los resultados de su sesión más reciente ("Ver resultados →"), desde donde "Nueva sesión →" inicia otra.
+- **Hub.** `/active-recall` y la vista por cuaderno muestran las páginas con sesiones terminadas, el porcentaje de cada sesión y el contador de preguntas vencidas hoy por cuaderno. La tarjeta de una página abre los resultados de su sesión más reciente ("Ver resultados →"), desde donde "Nueva sesión →" inicia otra. Desde el 2026-10-29 (Fase 8, H16, reporte del usuario) también muestran las páginas con preguntas de recordación activas que todavía no tienen una sesión terminada (recién generadas o con la sesión abandonada): su tarjeta dice "Practicar →" y abre la sesión.
+- **Volver al centro.** Una práctica abierta desde el diálogo "crear desde una página" de un centro de técnica (recordación activa o flashcards) lleva `?desde=hub`: sus enlaces de regreso y el final de la sesión vuelven a ese centro (`/active-recall`, `/flashcards`), no a la vista por cuaderno. Sin la marca, el regreso sigue siendo la vista por cuaderno. La marca no es una URL: cada ruta elige su propio centro. Flashcards abre el repaso de inmediato (`?repasar=1`).
 
 ### 3.4 El motor de repetición espaciada (transversal)
 
@@ -608,6 +609,8 @@ En la Fase 3 solo `generate_flashcards` está cableado de extremo a extremo (pro
 Nota de implementación de la Fase 5 (ADR 0006): quedan cableados `generate_exam_questions/v1` (recibe además las preguntas activas de la página para no duplicarlas), `generate_exam_variants/v1` (recibe el id de cada raíz fallada, su concepto, su respuesta correcta y todas sus redacciones anteriores) y `session_feedback/v2` (exámenes: hasta 10 preguntas falladas con concepto, enunciado, opción elegida, opción correcta y explicación, más el texto de la página dentro de `AI_PAGE_TOKEN_CAP`; `session_feedback/v1` sigue sirviendo a flashcards). Cada llamada al modelo pide como máximo 15 preguntas o variantes; una solicitud mayor se reparte en varias llamadas y sigue costando una sola generación.
 
 Nota de implementación de la Fase 6 (ADR 0007): quedan cableados `generate_recall_questions/v1` (10 preguntas con rúbrica por llamada, temperatura 0,7; recibe además hasta 60 preguntas activas de la página para no repetirlas) y `evaluate_recall_answer/v1` (escala 0–5 explícita, fragmento y respuesta enviados como datos delimitados, justificación en español con "tú", nunca inventa contenido, temperatura 0,2). Con la generación incremental (§3.1), el `plain_text` que reciben los propósitos de generación son solo los párrafos nuevos o editados de la página, recortados a `AI_PAGE_TOKEN_CAP`. No se usa `session_feedback` para recordación activa.
+
+Contenido mínimo para generar (Fase 8, H14, decisión del usuario del 2026-10-29): toda generación con IA necesita al menos 100 palabras de página y unas 15 palabras por ítem generado (tarjeta o pregunta). Se cuentan las palabras de los párrafos que la generación enviaría de verdad, es decir, los nuevos o editados de la generación incremental (§3.1). Así, flashcards pide una tarjeta por cada 15 palabras, entre 3 y 10 (una página de 100 palabras da 6); recordación activa, con sus 10 preguntas, necesita 150 palabras; y un examen admite solo las cantidades que caben (10 preguntas desde 150 palabras, 30 desde 450). Una página por debajo responde `AI_PAGE_TOO_SHORT` con las palabras que tiene, las que necesita y los ítems que admite, antes del límite diario, sin llamar a la IA ni consumir generación; `AI_PAGE_EMPTY` sigue para la página en blanco. Los selectores de página de los hubs y el panel de técnicas desactivan "Generar" en las páginas cortas con el aviso "Muy poco contenido (N palabras): escribe al menos M", usando el conteo de toda la página como aproximación. Si la IA devuelve menos ítems de los pedidos, solo se marca como usada la parte de los párrafos enviados que esos ítems cubren, en proporción, y el resto queda disponible para el siguiente "Generar".
 
 | Propósito | Entrada | Salida (Zod) |
 |---|---|---|

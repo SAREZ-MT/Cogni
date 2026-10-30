@@ -1,6 +1,5 @@
 "use client";
 
-import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import {
@@ -9,8 +8,12 @@ import {
   EXAM_MIN_QUESTIONS,
   generateExamQuestionsAction,
 } from "@/modules/exams";
+import {
+  EXAM_MIN_WORDS,
+  examCountsForWords,
+  PAGE_TOO_SHORT_CODE,
+} from "@/shared/kernel/generation-capacity";
 import { Button } from "@/shared/ui/button";
-import { ChoiceGroup } from "@/shared/ui/choice-group";
 import { CountStepper } from "@/shared/ui/count-stepper";
 import {
   Dialog,
@@ -22,8 +25,12 @@ import {
   DialogTrigger,
 } from "@/shared/ui/dialog";
 import { EmptyStateCta } from "@/shared/ui/empty-state-cta";
+import { FormMessage } from "@/shared/ui/form-message";
 import { PagePicker, type PagePickerNotebook } from "@/shared/ui/page-picker";
+import { PixelTile } from "@/shared/ui/pixel-tile";
+import { pageTooShortMessage } from "@/shared/ui/short-page-copy";
 import { TechniqueCreateTile } from "@/shared/ui/technique-create-tile";
+import { TECHNIQUE_THEME } from "@/shared/ui/technique-theme";
 
 // A notebook with its active pages (Phase 8 H11: the shared PagePicker's
 // shape, which also feeds the flashcards and recall create dialogs).
@@ -35,26 +42,10 @@ export interface CreateExamDialogProps {
   notebooks: readonly CreateExamNotebook[] | null;
   // Preselected notebook (the exams notebook view); the first one otherwise.
   initialNotebookId?: string;
-  // Phase 8 H11: "button" (default) is the header's "Crear examen"; "cta"
-  // the hub empty state's rose pill; "tile" the first, fixed tile of the
-  // hub's grid.
-  trigger?: "button" | "cta" | "tile";
+  // Phase 8 H11: "cta" is an empty state's rose pill; "tile" (default) the
+  // first, fixed tile of a grid. H13 removed the header button ("button").
+  trigger?: "cta" | "tile";
 }
-
-type CreateMode = "ai" | "manual";
-
-const MODES = [
-  {
-    value: "ai",
-    label: "Generar con IA",
-    description: "La IA crea preguntas de opción múltiple desde la página.",
-  },
-  {
-    value: "manual",
-    label: "Crear mis preguntas",
-    description: "Escribe tus propias preguntas para la página.",
-  },
-] as const;
 
 // Same steps as the techniques panel's exam count (10–30 in steps of 5).
 const EXAM_COUNT_STEP = 5;
@@ -79,13 +70,14 @@ const ERROR_COPY: Record<string, string> = {
 // "Crear examen" (Phase 6 T5b, user decision 2026-10-07): the exams hub's
 // and notebook view's entry to start an exam for a page. The student picks
 // a notebook and a page (mandatory: an exam belongs to a page for SM-2),
-// then either generates the questions with AI (same action, limits and
-// error copy as the techniques panel; on success the notebook's exams open)
-// or writes them on the page's questions screen.
+// then generates the questions with AI (same action, limits and error copy
+// as the techniques panel; on success the notebook's exams open). AI only
+// (user decision 2026-10-29, Phase 8 H12; H13 removed "Nueva pregunta" too,
+// so no question is written by hand anywhere).
 export function CreateExamDialog({
   notebooks: loadedNotebooks,
   initialNotebookId,
-  trigger = "button",
+  trigger = "tile",
 }: CreateExamDialogProps) {
   const notebooks = loadedNotebooks ?? [];
   const router = useRouter();
@@ -96,13 +88,39 @@ export function CreateExamDialog({
   const [open, setOpen] = useState(false);
   const [notebookId, setNotebookId] = useState(firstNotebookId);
   const [pageId, setPageId] = useState("");
-  const [mode, setMode] = useState<CreateMode>("ai");
   const [count, setCount] = useState(EXAM_DEFAULT_QUESTIONS);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   const canSubmit = pageId !== "" && !pending;
+
+  // Phase 8 H14 (user 2026-10-29): about 15 words per question, so the
+  // stepper only offers the counts the chosen page's words support (the
+  // whole page's count: an approximation of the new paragraphs the server
+  // measures). A page without a known count keeps the full 10–30 range.
+  const chosenWords = notebooks
+    .find((n) => n.id === notebookId)
+    ?.pages.find((p) => p.id === pageId)?.words;
+  const supported =
+    chosenWords === undefined ? [] : examCountsForWords(chosenWords);
+  const maxCount =
+    chosenWords === undefined || supported.length === 0
+      ? EXAM_MAX_QUESTIONS
+      : (supported[supported.length - 1] ?? EXAM_MAX_QUESTIONS);
+
+  function choosePage(next: string) {
+    setPageId(next);
+    setError(null);
+    setNotice(null);
+    const words = notebooks
+      .find((n) => n.id === notebookId)
+      ?.pages.find((p) => p.id === next)?.words;
+    if (words === undefined) return;
+    const counts = examCountsForWords(words);
+    const max = counts[counts.length - 1];
+    if (max !== undefined) setCount((current) => Math.min(current, max));
+  }
 
   function changeOpen(next: boolean) {
     if (pending) return;
@@ -127,10 +145,6 @@ export function CreateExamDialog({
     if (!canSubmit) return;
     setError(null);
     setNotice(null);
-    if (mode === "manual") {
-      router.push(`/exams/${notebookId}/${pageId}/preguntas`);
-      return;
-    }
     startTransition(async () => {
       let result: Awaited<ReturnType<typeof generateExamQuestionsAction>>;
       try {
@@ -142,6 +156,10 @@ export function CreateExamDialog({
       if (!result.ok) {
         if (result.error.code === NO_NEW_CONTENT_CODE) {
           setNotice(NO_NEW_CONTENT);
+          return;
+        }
+        if (result.error.code === PAGE_TOO_SHORT_CODE) {
+          setError(pageTooShortMessage(result.error.minWords));
           return;
         }
         setError(ERROR_COPY[result.error.code] ?? GENERIC_FAILURE);
@@ -160,74 +178,68 @@ export function CreateExamDialog({
           <EmptyStateCta tone="technique" data-testid="create-exam-cta">
             Crear mi primer examen
           </EmptyStateCta>
-        ) : trigger === "tile" ? (
+        ) : (
           <TechniqueCreateTile
             label="Crear examen"
             hint="Elige una página para el examen"
             data-testid="create-exam-tile"
           />
-        ) : (
-          <Button type="button" data-testid="create-exam-button">
-            <Plus aria-hidden="true" size={16} strokeWidth={1.75} />
-            Crear examen
-          </Button>
         )}
       </DialogTrigger>
-      <DialogContent data-testid="create-exam-dialog">
-        <DialogHeader>
+      <DialogContent
+        data-testid="create-exam-dialog"
+        data-technique-theme="exams"
+      >
+        <DialogHeader
+          icon={
+            <PixelTile
+              tone={TECHNIQUE_THEME.exams.tone}
+              icon={TECHNIQUE_THEME.exams.icon}
+              size={48}
+            />
+          }
+        >
           <DialogTitle>Crear examen</DialogTitle>
           <DialogDescription>
-            Elige la página del examen y cómo crear sus preguntas.
+            Elige la página: la IA crea preguntas de opción múltiple desde su
+            texto.
           </DialogDescription>
         </DialogHeader>
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-4">
           <PagePicker
             notebooks={loadedNotebooks}
             notebookId={notebookId}
             pageId={pageId}
             onNotebookChange={changeNotebook}
-            onPageChange={(next) => {
-              setPageId(next);
-              setError(null);
-              setNotice(null);
-            }}
+            onPageChange={choosePage}
             disabled={pending}
             testIdPrefix="create-exam"
+            minWords={EXAM_MIN_WORDS}
           />
           {notebooks.length > 0 && (
             <>
-              <ChoiceGroup
-                aria-label="Cómo crear el examen"
-                options={MODES}
-                value={mode}
-                onChange={setMode}
-                testId="create-exam-mode"
+              <CountStepper
+                label="Preguntas a generar"
+                value={count}
+                min={EXAM_MIN_QUESTIONS}
+                max={maxCount}
+                step={EXAM_COUNT_STEP}
+                onChange={setCount}
+                disabled={pending}
+                testId="exam-count"
+                size="field"
+                hint={
+                  maxCount < EXAM_MAX_QUESTIONS
+                    ? `Esta página admite hasta ${maxCount} preguntas`
+                    : `Entre ${EXAM_MIN_QUESTIONS} y ${EXAM_MAX_QUESTIONS}, de ${EXAM_COUNT_STEP} en ${EXAM_COUNT_STEP}`
+                }
               />
-              {mode === "ai" && (
-                <CountStepper
-                  label="Preguntas a generar"
-                  value={count}
-                  min={EXAM_MIN_QUESTIONS}
-                  max={EXAM_MAX_QUESTIONS}
-                  step={EXAM_COUNT_STEP}
-                  onChange={setCount}
-                  disabled={pending}
-                  testId="exam-count"
-                />
-              )}
               {notice && (
-                <p
-                  data-testid="create-exam-notice"
-                  className="text-fg-muted text-sm"
-                >
+                <FormMessage tone="info" data-testid="create-exam-notice">
                   {notice}
-                </p>
+                </FormMessage>
               )}
-              {error && (
-                <p role="alert" className="text-destructive text-sm">
-                  {error}
-                </p>
-              )}
+              {error && <FormMessage>{error}</FormMessage>}
             </>
           )}
         </div>
@@ -242,11 +254,12 @@ export function CreateExamDialog({
           </Button>
           <Button
             type="button"
+            variant="technique"
             onClick={submit}
             disabled={!canSubmit}
             data-testid="create-exam-submit"
           >
-            {pending ? "Generando…" : mode === "ai" ? "Generar" : "Continuar"}
+            {pending ? "Generando…" : "Generar"}
           </Button>
         </DialogFooter>
       </DialogContent>

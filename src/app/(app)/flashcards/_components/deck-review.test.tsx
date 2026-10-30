@@ -44,7 +44,7 @@ function setup(canReview = true) {
       deckLabel="Mitocondria"
       description="2 tarjetas"
       canReview={canReview}
-      actions={<button type="button">Nueva tarjeta</button>}
+      actions={<button type="button">Otra acción</button>}
     >
       <p>lista del mazo</p>
     </DeckReview>,
@@ -82,7 +82,7 @@ describe("DeckReview", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("2 tarjetas")).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Nueva tarjeta" }),
+      screen.getByRole("button", { name: "Otra acción" }),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Repasar/ })).toBeInTheDocument();
     expect(screen.getByText("lista del mazo")).toBeInTheDocument();
@@ -452,6 +452,64 @@ describe("DeckReview", () => {
 
       await act(async () => {});
       expect(actions.startFlashcardSessionAction).not.toHaveBeenCalled();
+    });
+  });
+
+  // Phase 8 H16: generated from the hub's create dialog.
+  describe("opened from the hub (fromHub)", () => {
+    function renderFromHub() {
+      render(
+        <DeckReview
+          notebookId="nb"
+          notebookTitle="Biología"
+          pageId={PAGE}
+          deckLabel="Mitocondria"
+          description="2 tarjetas"
+          canReview
+          autoStart
+          fromHub
+        >
+          <p>lista del mazo</p>
+        </DeckReview>,
+      );
+    }
+
+    beforeEach(() => {
+      window.history.replaceState(
+        null,
+        "",
+        `/flashcards/nb/${PAGE}?repasar=1&desde=hub`,
+      );
+    });
+
+    it("plays at once, keeps the hub marker and leads «Todos los mazos» back to the hub", async () => {
+      actions.startFlashcardSessionAction.mockResolvedValue({
+        ok: true,
+        value: { sessionId: SESSION, cards: [card(1)] },
+      });
+
+      renderFromHub();
+
+      expect(await screen.findByTestId("flashcard-player")).toBeInTheDocument();
+      expect(window.location.search).toBe("?desde=hub");
+      expect(
+        screen.getByRole("link", { name: /Todos los mazos/ }),
+      ).toHaveAttribute("href", "/flashcards");
+    });
+
+    it("leads the deck's back link to the hub", async () => {
+      actions.startFlashcardSessionAction.mockResolvedValue({
+        ok: false,
+        error: { code: "STUDY_ENGINE_NOTHING_DUE", message: "x" },
+      });
+
+      renderFromHub();
+
+      expect(await screen.findByText("Estás al día")).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: /Flashcards/ })).toHaveAttribute(
+        "href",
+        "/flashcards",
+      );
     });
   });
 });

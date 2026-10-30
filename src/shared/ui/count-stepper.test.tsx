@@ -73,4 +73,23 @@ describe("CountStepper", () => {
       screen.getByRole("button", { name: "Menos preguntas" }),
     ).toBeDisabled();
   });
+
+  // Phase 8 H12: the dialogs' larger field, with the range as a hint.
+  it("has a field size for dialogs that shows the range", () => {
+    render(
+      <CountStepper
+        label="Preguntas a generar"
+        value={10}
+        min={10}
+        max={30}
+        onChange={() => {}}
+        size="field"
+        hint="Entre 10 y 30"
+      />,
+    );
+
+    const group = screen.getByRole("group", { name: "Preguntas a generar" });
+    expect(group).toHaveAttribute("data-size", "field");
+    expect(group).toHaveTextContent("Entre 10 y 30");
+  });
 });

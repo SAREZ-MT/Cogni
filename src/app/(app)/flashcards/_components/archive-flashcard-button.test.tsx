@@ -59,7 +59,7 @@ describe("ArchiveFlashcardButton", () => {
     await user.click(screen.getByRole("button", { name: "Archivar" }));
 
     expect(screen.getByRole("alert")).toHaveTextContent(
-      "Un mazo siempre conserva al menos una tarjeta. Agrega otra antes de archivar esta.",
+      "Un mazo siempre conserva al menos una tarjeta. Genera más desde la página antes de archivar esta.",
     );
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(refresh).not.toHaveBeenCalled();

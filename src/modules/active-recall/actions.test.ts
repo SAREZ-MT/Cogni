@@ -34,6 +34,7 @@ vi.mock("@/shared/observability/analytics", () => ({
 }));
 
 const RESET = new Date("2026-10-07T00:00:00.000Z");
+const LONG_TEXT = `La mitocondria produce ATP. ${Array.from({ length: 146 }, (_, i) => `w${i}`).join(" ")}`;
 const generation: AiGeneration = {
   id: "0b1c2d3e-4f50-4617-8899-aabbccddeeff",
   ownerId: "o1",
@@ -128,7 +129,8 @@ describe("generateRecallQuestionsAction", () => {
       uow: new InMemoryRecallUnitOfWork(),
       limit: { allowed: true, remaining: 4, resetAt: RESET },
       checks: 0,
-      pageText: "La mitocondria produce ATP.",
+      // 150 words: since Phase 8 H14 the 10 questions need them.
+      pageText: LONG_TEXT,
       generate: async () =>
         ok({ object: { questions: questions(10) }, generation }),
       throwOnPageRead: false,
@@ -236,7 +238,7 @@ describe("generateRecallQuestionsAction", () => {
 
     current.pageText = "   ";
     const empty = await generate({ pageId: PAGE });
-    current.pageText = "Texto";
+    current.pageText = LONG_TEXT;
     current.generate = async () => err(new AiGenerationFailedError("g"));
     const failed = await generate({ pageId: PAGE });
 
@@ -254,6 +256,28 @@ describe("generateRecallQuestionsAction", () => {
     );
     expect(current.uow.studyItems.all()).toHaveLength(0);
     expect(current.checks).toBe(0);
+  });
+
+  // Phase 8 H14: a short page is refused with its counts, before the limit,
+  // and tracked as empty.
+  it("maps a short page to AI_PAGE_TOO_SHORT with its word counts", async () => {
+    current.pageText = "La mitocondria produce ATP.";
+    const generate = await action();
+
+    const result = await generate({ pageId: PAGE });
+
+    expect(!result.ok && result.error).toMatchObject({
+      code: "AI_PAGE_TOO_SHORT",
+      words: 4,
+      minWords: 150,
+      maxItems: 0,
+    });
+    expect(current.checks).toBe(0);
+    expect(track).toHaveBeenCalledWith(
+      "generation_requested",
+      OWNER,
+      expect.objectContaining({ status: "empty" }),
+    );
   });
 
   it("answers RECALL_NO_NEW_CONTENT for an unchanged page, consuming nothing", async () => {

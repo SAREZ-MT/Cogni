@@ -5,9 +5,9 @@ import { FLASHCARD_ERROR } from "./errors";
 export type FlashcardOrigin = "ai" | "manual";
 
 // Upper bound per side for hand-written cards, counted after trimming
-// (createManualFlashcard; the dialog's textareas use it too). AI cards have
-// no bound of their own; this one keeps a manual card readable on the flip
-// card and the payload small.
+// (createManualFlashcard, with no UI caller since Phase 8 H13: cards are
+// created by AI only). AI cards have no bound of their own; this one keeps a
+// manual card readable on the flip card and the payload small.
 export const MAX_FLASHCARD_SIDE_LENGTH = 1000;
 
 // One card of a page's deck (documento-maestro §6.1). `generationId` links

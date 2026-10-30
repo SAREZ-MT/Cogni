@@ -12,6 +12,11 @@ import {
   type DomainError,
   toActionError,
 } from "@/shared/kernel/domain-error";
+import {
+  PAGE_TOO_SHORT_CODE,
+  PageTooShortError,
+  pageTooShortDetails,
+} from "@/shared/kernel/generation-capacity";
 import { createId } from "@/shared/kernel/id";
 import { err, ok, type Result } from "@/shared/kernel/result";
 import {
@@ -25,7 +30,6 @@ import {
   withBoundary,
 } from "./action-support";
 import {
-  createExamQuestion,
   ExamDailyLimitReachedError,
   editExamQuestion,
   listPageExamQuestions,
@@ -88,6 +92,11 @@ export interface ExamGenerationView {
 // generation is available again (same shape as flashcards').
 export interface ExamGenerationActionError extends ActionError {
   readonly resetAt?: string;
+  // AI_PAGE_TOO_SHORT (Phase 8 H14): the new paragraphs' words, the words
+  // the request needs and the questions those words carry.
+  readonly words?: number;
+  readonly minWords?: number;
+  readonly maxItems?: number;
 }
 
 // The raw texts are only bounded here (twice the limit leaves room for
@@ -106,7 +115,6 @@ const content = {
   concept: text(MAX_CONCEPT_LENGTH),
 };
 const pageInput = z.object({ pageId: z.uuid() });
-const createInput = z.object({ pageId: z.uuid(), ...content });
 const editInput = z.object({ questionId: z.uuid(), ...content });
 const questionInput = z.object({ questionId: z.uuid() });
 const generateInput = z.object({
@@ -172,7 +180,9 @@ function statusFor(
 ): "limit" | "empty" | "no_new_content" | "failed" {
   if (error.code === AI_ERROR.DAILY_LIMIT_REACHED) return "limit";
   if (error.code === EXAM_ERROR.NO_NEW_CONTENT) return "no_new_content";
-  if (error.code === AI_ERROR.PAGE_EMPTY) return "empty";
+  // A page too short to generate from (H14) is tracked as empty.
+  if (error.code === AI_ERROR.PAGE_EMPTY || error.code === PAGE_TOO_SHORT_CODE)
+    return "empty";
   return "failed";
 }
 
@@ -206,27 +216,6 @@ export async function listExamQuestionsAction(
     );
     if (!result.ok) return err(toActionError(result.error));
     return ok(result.value.map(toView));
-  });
-}
-
-export async function createExamQuestionAction(
-  input: unknown,
-): Promise<Result<ExamQuestionView, ActionError>> {
-  return withBoundary(async () => {
-    const ownerId = await requireOwnerId();
-    if (!ownerId.ok) return ownerId;
-    const parsed = parseInput(createInput, input);
-    if (!parsed.ok) return parsed;
-
-    const { pages, uow } = deps();
-    const result = await createExamQuestion(
-      parsed.value,
-      { pages, uow, clock: systemClock, ids: { next: createId } },
-      ownerId.value,
-    );
-    if (!result.ok) return err(toActionError(result.error));
-    revalidateExams();
-    return ok(toView(result.value));
   });
 }
 
@@ -317,6 +306,9 @@ export async function generateExamQuestionsAction(
         truncated: false,
       });
       const error: ExamGenerationActionError = toActionError(result.error);
+      if (result.error instanceof PageTooShortError) {
+        return err({ ...error, ...pageTooShortDetails(result.error) });
+      }
       return err(
         result.error instanceof ExamDailyLimitReachedError
           ? { ...error, resetAt: result.error.resetAt.toISOString() }

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { Page } from "@playwright/test";
 import { expect, hasSupabaseEnv, signIn, test } from "./fixtures/auth";
 import { createNotebookWithOpenPage } from "./helpers/notebooks";
+import { withStudyFiller } from "./helpers/study-text";
 
 // Phase 5 T8 (documento-maestro §3.3; user decisions 2026-10-05): a
 // finished exam shows AI feedback that explains the failed questions with
@@ -114,7 +115,7 @@ test.describe("exam feedback and review before retaking", () => {
     await editable.click();
     // Keys sent <15 ms after a click can precede Chrome's selectionchange.
     await page.waitForTimeout(100);
-    await page.keyboard.type(SENTENCES);
+    await page.keyboard.type(withStudyFiller(SENTENCES));
     await expect(page.getByTestId("autosave-status")).toHaveText("guardado", {
       timeout: 15000,
     });

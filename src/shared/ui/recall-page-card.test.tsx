@@ -71,4 +71,25 @@ describe("RecallPageCard", () => {
 
     expect(screen.getByText(`${mastery}%`)).toHaveClass(tone);
   });
+
+  // Phase 8 H16: a page with questions and no finished session yet.
+  it("opens the practice session with «Practicar →» when the page has no finished session", () => {
+    render(
+      <RecallPageCard
+        practice
+        href="/active-recall/nb/p"
+        notebookTitle="Biología celular"
+        pageTitle="Mitocondria"
+      />,
+    );
+
+    expect(screen.getByRole("link")).toHaveAttribute(
+      "href",
+      "/active-recall/nb/p",
+    );
+    expect(screen.getByText("Mitocondria")).toBeInTheDocument();
+    expect(screen.getByText("Sin sesiones terminadas")).toBeInTheDocument();
+    expect(screen.getByText("Practicar →")).toHaveClass("bg-success-100");
+    expect(screen.queryByText("Ver resultados →")).toBeNull();
+  });
 });

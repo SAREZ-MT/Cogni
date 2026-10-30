@@ -38,6 +38,10 @@ export interface ActiveRecallPlayerProps {
   // persisted.
   pageId?: string;
   questions: RecallPlayerQuestion[];
+  // Where "Todas las sesiones" (and the results' link) lead: the notebook
+  // view by default, the hub when opened from its create dialog (Phase 8
+  // H16).
+  backHref?: string;
 }
 
 const SKIPPED_ANSWER = "(sin respuesta)";
@@ -73,6 +77,7 @@ export function ActiveRecallPlayer({
   pageTitle,
   pageId,
   questions: initialQuestions,
+  backHref,
 }: ActiveRecallPlayerProps) {
   const [questions, setQuestions] = useState(initialQuestions);
   // The session the queued tasks write to. Each task captures the run that
@@ -97,7 +102,7 @@ export function ActiveRecallPlayer({
   const total = questions.length;
   const progress = total > 0 ? Math.round((index / total) * 100) : 0;
   const question = questions[index];
-  const sessionsHref = `/active-recall/${notebookId}`;
+  const sessionsHref = backHref ?? `/active-recall/${notebookId}`;
 
   // Runs `task` after every earlier one; a failure never stops the queue.
   function enqueue(task: () => Promise<void>): Promise<void> {

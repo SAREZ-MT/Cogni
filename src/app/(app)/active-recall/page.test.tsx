@@ -284,6 +284,28 @@ describe("ActiveRecallHubPage", () => {
     ).toBeInTheDocument();
   });
 
+  // Phase 8 H16: questions generated from the hub, no finished session.
+  it("shows the notebook card for a page with questions and no finished session", async () => {
+    listRecallHubAction.mockResolvedValue({
+      ok: true,
+      value: {
+        pages: [entry("nucleo", "nb-new", "Química", [])],
+        averageMastery: 0,
+      },
+    });
+
+    render(await ActiveRecallHubPage());
+
+    const card = screen.getByRole("link", { name: /Química/ });
+    expect(card).toHaveAttribute("href", "/active-recall/nb-new");
+    expect(card).toHaveTextContent("0 sesiones · último dominio 0 %");
+    expect(
+      screen.queryByRole("heading", {
+        name: "Practica explicando con tus palabras",
+      }),
+    ).toBeNull();
+  });
+
   it("shows the empty state when no page has a session", async () => {
     listRecallHubAction.mockResolvedValue({
       ok: true,

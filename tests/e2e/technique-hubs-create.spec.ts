@@ -1,18 +1,21 @@
 import { randomUUID } from "node:crypto";
 import type { Page } from "@playwright/test";
 import { expect, hasSupabaseEnv, signIn, test } from "./fixtures/auth";
+import { seedFlashcards } from "./helpers/flashcards";
 import {
-  clickAndWaitForAction,
   createNotebook,
   createPageAndOpen,
   openNotebook,
 } from "./helpers/notebooks";
+import { setPagePlainText, wordsOfText } from "./helpers/page-text";
+import { chooseOption } from "./helpers/select";
 
 // Phase 8 H11 (user-approved flow, 2026-10-29): every technique hub creates
 // its content from a "pick a page" dialog, opened by the empty state's CTA
 // or, once the hub lists something, by the grid's first, fixed tile. No AI
 // is called here (the reused dev server may run live AI): the AI paths are
-// only opened, and flashcards' "Crear a mano" creates the first card.
+// only opened. Phase 8 H12/H13: creation is AI only everywhere, so the first
+// card is seeded straight into the database.
 
 const HUBS = [
   {
@@ -77,20 +80,36 @@ test.describe("technique hubs: create from the section", () => {
       await page.keyboard.press("Escape");
     }
 
-    // With a page: the paths per technique (opened, never generated).
+    // With a page: AI only in every technique (opened, never generated).
     await openNotebook(page, title);
     await createPageAndOpen(page);
+    const pageId = new URL(page.url()).pathname.split("/")[4] ?? "";
+
+    // Phase 8 H14 (user 2026-10-29): an empty page cannot be picked; each
+    // technique says how many words it needs.
+    for (const [hub, minWords] of [
+      [HUBS[0], 100],
+      [HUBS[1], 150],
+      [HUBS[2], 150],
+    ] as const) {
+      const dialog = await openFromCta(page, hub);
+      await dialog.getByRole("combobox", { name: "Página" }).click();
+      const option = page
+        .getByRole("listbox")
+        .getByRole("option", { name: /Sin título/ });
+      await expect(option).toHaveAttribute("aria-disabled", "true");
+      await expect(option).toContainText(
+        `Muy poco contenido (0 palabras): escribe al menos ${minWords}`,
+      );
+    }
+
+    // With enough text the page can be picked.
+    await setPagePlainText(pageId, wordsOfText(200));
 
     const flashcards = await openFromCta(page, HUBS[0]);
-    await flashcards
-      .getByRole("combobox", { name: "Página" })
-      .selectOption({ label: "Sin título" });
-    await expect(
-      flashcards.getByRole("radio", { name: /Generar con IA/ }),
-    ).toBeChecked();
-    await expect(
-      flashcards.getByRole("radio", { name: /Crear a mano/ }),
-    ).toBeVisible();
+    await chooseOption(flashcards, "Página", "Sin título");
+    await expect(flashcards.getByRole("radio")).toHaveCount(0);
+    await expect(flashcards.getByText(/Crear a mano/)).toHaveCount(0);
     await expect(
       flashcards.getByTestId("create-flashcards-remaining"),
     ).toHaveText(/generaci|límite/);
@@ -100,27 +119,25 @@ test.describe("technique hubs: create from the section", () => {
     await page.keyboard.press("Escape");
 
     const recall = await openFromCta(page, HUBS[1]);
-    await recall
-      .getByRole("combobox", { name: "Página" })
-      .selectOption({ label: "Sin título" });
-    // AI only: there is no manual recall path.
-    await expect(recall.getByRole("radiogroup")).toHaveCount(0);
+    await chooseOption(recall, "Página", "Sin título");
+    await expect(recall.getByRole("radio")).toHaveCount(0);
     await expect(recall.getByTestId("create-recall-submit")).toHaveText(
       "Generar",
     );
     await page.keyboard.press("Escape");
 
     const exams = await openFromCta(page, HUBS[2]);
-    await exams
-      .getByRole("combobox", { name: "Página" })
-      .selectOption({ label: "Sin título" });
+    await chooseOption(exams, "Página", "Sin título");
+    await expect(exams.getByRole("radio")).toHaveCount(0);
+    await expect(exams.getByText(/Crear mis preguntas/)).toHaveCount(0);
     await expect(
-      exams.getByRole("radio", { name: /Crear mis preguntas/ }),
+      exams.getByRole("group", { name: "Preguntas a generar" }),
     ).toBeVisible();
+    await expect(exams.getByTestId("create-exam-submit")).toHaveText("Generar");
     await page.keyboard.press("Escape");
   });
 
-  test("Crear a mano starts a page's deck with its first card, then the hub offers the create tile first", async ({
+  test("a first card on the page's deck makes the hub offer the create tile first", async ({
     page,
   }) => {
     test.setTimeout(120_000);
@@ -130,27 +147,20 @@ test.describe("technique hubs: create from the section", () => {
     await createPageAndOpen(page);
     const pageId = new URL(page.url()).pathname.split("/")[4] ?? "";
 
-    const dialog = await openFromCta(page, HUBS[0]);
-    await dialog
-      .getByRole("combobox", { name: "Cuaderno" })
-      .selectOption({ label: title });
-    await dialog
-      .getByRole("combobox", { name: "Página" })
-      .selectOption({ label: "Sin título" });
-    await dialog.getByRole("radio", { name: /Crear a mano/ }).click();
-    await dialog.getByTestId("create-flashcards-submit").click();
-
-    // The deck route opens "Nueva tarjeta" at once and drops ?nueva=1.
-    await expect(page).toHaveURL(`/flashcards/${notebookId}/${pageId}`);
-    const card = page.getByRole("dialog", { name: "Nueva tarjeta" });
-    await expect(card).toBeVisible();
-    await card.getByLabel("Anverso").fill("¿Qué idea resume el tema?");
-    await card.getByLabel("Reverso").fill("La que conecta sus partes.");
-    await clickAndWaitForAction(
-      page,
-      card.getByRole("button", { name: "Guardar tarjeta" }),
-    );
-    await expect(card).toBeHidden();
+    // The deck route renders for a page with no cards, with no manual
+    // creation; a seeded card starts the deck.
+    await page.goto(`/flashcards/${notebookId}/${pageId}`);
+    await expect(page.getByText("Nueva tarjeta")).toHaveCount(0);
+    await expect(
+      page.getByRole("link", { name: "Generar desde la página" }),
+    ).toHaveAttribute("href", `/notebooks/${notebookId}/pages/${pageId}`);
+    await seedFlashcards(pageId, [
+      {
+        front: "¿Qué idea resume el tema?",
+        back: "La que conecta sus partes.",
+      },
+    ]);
+    await page.reload();
     await expect(page.getByText("¿Qué idea resume el tema?")).toBeVisible();
 
     await page.goto("/flashcards");

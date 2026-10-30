@@ -18,6 +18,11 @@ export {
 } from "./get-home-overview";
 export { getPage, getPageSchema } from "./get-page";
 export {
+  listPagePickerTree,
+  type PagePickerNotebookEntry,
+  type PagePickerPage,
+} from "./list-page-picker-tree";
+export {
   listSidebar,
   type SidebarNotebook,
   type SidebarPage,

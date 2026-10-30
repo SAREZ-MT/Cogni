@@ -12,6 +12,11 @@ import {
   type DomainError,
   toActionError,
 } from "@/shared/kernel/domain-error";
+import {
+  PAGE_TOO_SHORT_CODE,
+  PageTooShortError,
+  pageTooShortDetails,
+} from "@/shared/kernel/generation-capacity";
 import { createId } from "@/shared/kernel/id";
 import { err, ok, type Result } from "@/shared/kernel/result";
 import {
@@ -26,7 +31,6 @@ import {
 } from "./action-support";
 import {
   archiveFlashcard as archiveFlashcardUseCase,
-  createManualFlashcard as createManualFlashcardUseCase,
   DailyLimitReachedError,
   getGenerationStatus as getGenerationStatusUseCase,
   listDecks as listDecksUseCase,
@@ -36,7 +40,7 @@ import {
   requestGeneration as requestGenerationUseCase,
 } from "./application";
 import { FLASHCARD_ERROR } from "./domain/errors";
-import { type Flashcard, MAX_FLASHCARD_SIDE_LENGTH } from "./domain/flashcard";
+import type { Flashcard } from "./domain/flashcard";
 import {
   DrizzleDeckUnitOfWork,
   DrizzleFlashcardFingerprints,
@@ -92,6 +96,11 @@ export interface GenerationStatusView {
 // generation is available again.
 export interface GenerationActionError extends ActionError {
   readonly resetAt?: string;
+  // AI_PAGE_TOO_SHORT (Phase 8 H14): the new paragraphs' words, the words
+  // the request needs and the items those words carry.
+  readonly words?: number;
+  readonly minWords?: number;
+  readonly maxItems?: number;
 }
 
 const pageInput = z.object({ pageId: z.uuid() });
@@ -100,11 +109,6 @@ const generateInput = z.object({
   count: z.number().int().min(MIN_CARD_COUNT).max(MAX_CARD_COUNT).optional(),
 });
 
-// The raw sides are only bounded here (twice the limit leaves room for
-// surrounding whitespace); createManualFlashcard applies the real limit to
-// the trimmed text and answers FLASHCARD_TOO_LONG.
-const side = z.string().max(MAX_FLASHCARD_SIDE_LENGTH * 2);
-const createInput = z.object({ pageId: z.uuid(), front: side, back: side });
 const archiveInput = z.object({ flashcardId: z.uuid() });
 
 // Adapters are built per call, like ingestion/actions.ts: serverless
@@ -160,7 +164,9 @@ function statusFor(
 ): "limit" | "empty" | "no_new_content" | "failed" {
   if (error.code === AI_ERROR.DAILY_LIMIT_REACHED) return "limit";
   if (error.code === FLASHCARD_ERROR.NO_NEW_CONTENT) return "no_new_content";
-  if (error.code === AI_ERROR.PAGE_EMPTY) return "empty";
+  // A page too short to generate from (H14) is tracked as empty.
+  if (error.code === AI_ERROR.PAGE_EMPTY || error.code === PAGE_TOO_SHORT_CODE)
+    return "empty";
   return "failed";
 }
 
@@ -199,6 +205,9 @@ export async function generateFlashcardsAction(
         truncated: false,
       });
       const error: GenerationActionError = toActionError(result.error);
+      if (result.error instanceof PageTooShortError) {
+        return err({ ...error, ...pageTooShortDetails(result.error) });
+      }
       return err(
         result.error instanceof DailyLimitReachedError
           ? { ...error, resetAt: result.error.resetAt.toISOString() }
@@ -275,27 +284,6 @@ export async function listDecksAction(): Promise<
     const result = await listDecksUseCase({ flashcards }, ownerId.value);
     if (!result.ok) return err(toActionError(result.error));
     return ok(result.value.map((deck) => ({ ...deck })));
-  });
-}
-
-export async function createFlashcardAction(
-  input: unknown,
-): Promise<Result<FlashcardView, ActionError>> {
-  return withBoundary(async () => {
-    const ownerId = await requireOwnerId();
-    if (!ownerId.ok) return ownerId;
-    const parsed = parseInput(createInput, input);
-    if (!parsed.ok) return parsed;
-
-    const { pages, deck } = deps();
-    const result = await createManualFlashcardUseCase(
-      parsed.value,
-      { pages, deck, clock: systemClock, ids: { next: createId } },
-      ownerId.value,
-    );
-    if (!result.ok) return err(toActionError(result.error));
-    revalidateDecks();
-    return ok(toView(result.value));
   });
 }
 

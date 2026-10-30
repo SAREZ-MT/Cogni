@@ -5,6 +5,7 @@ import { studyItems } from "@/shared/db/schema";
 import { createTestDb } from "../db/helpers/test-db";
 import { expect, hasSupabaseEnv, signIn, test } from "./fixtures/auth";
 import { createNotebookWithOpenPage } from "./helpers/notebooks";
+import { withStudyFiller } from "./helpers/study-text";
 
 // Phase 5 T9 exams hub on real data (documento-maestro §3.3, §7.5): a page
 // with 10 fake AI questions shows up under its notebook in the hub opened
@@ -43,7 +44,7 @@ async function pageWithQuestions(
   await editable.click();
   // Keys sent <15 ms after a click can precede Chrome's selectionchange.
   await page.waitForTimeout(100);
-  await page.keyboard.type(SENTENCES);
+  await page.keyboard.type(withStudyFiller(SENTENCES));
   await expect(page.getByTestId("autosave-status")).toHaveText("guardado", {
     timeout: 15000,
   });

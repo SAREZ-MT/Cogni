@@ -5,8 +5,13 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { generateRecallQuestionsAction } from "@/modules/active-recall";
 import { generateFlashcardsAction } from "@/modules/flashcards";
+import {
+  MIN_GENERATION_WORDS,
+  PAGE_TOO_SHORT_CODE,
+  RECALL_MIN_WORDS,
+} from "@/shared/kernel/generation-capacity";
+import { FROM_HUB_QUERY } from "@/shared/navigation/hub-return";
 import { Button } from "@/shared/ui/button";
-import { ChoiceGroup } from "@/shared/ui/choice-group";
 import {
   Dialog,
   DialogContent,
@@ -17,11 +22,15 @@ import {
   DialogTrigger,
 } from "@/shared/ui/dialog";
 import { EmptyStateCta } from "@/shared/ui/empty-state-cta";
+import { FormMessage } from "@/shared/ui/form-message";
+import { GenerationsLeft } from "@/shared/ui/generations-left";
 import { PagePicker, type PagePickerNotebook } from "@/shared/ui/page-picker";
+import { PixelTile } from "@/shared/ui/pixel-tile";
+import { pageTooShortMessage } from "@/shared/ui/short-page-copy";
 import { TechniqueCreateTile } from "@/shared/ui/technique-create-tile";
+import { TECHNIQUE_THEME } from "@/shared/ui/technique-theme";
 
 type Technique = "flashcards" | "recall";
-type Mode = "ai" | "manual";
 
 export interface CreateFromPageDialogProps {
   technique: Technique;
@@ -46,9 +55,13 @@ const NO_NEW_CONTENT_CODES = new Set([
 // panel it reuses (same error copy as the panel's cards).
 const CONFIG = {
   flashcards: {
+    theme: "flashcards",
     title: "Crear flashcards",
-    description: "Elige la página de tus tarjetas y cómo crearlas.",
+    description:
+      "Elige la página: la IA crea tarjetas de pregunta y respuesta desde su texto.",
     cta: "Crear mis primeras flashcards",
+    // Phase 8 H14: the words a page needs (100; recall's 10 questions 150).
+    minWords: MIN_GENERATION_WORDS,
     tileHint: "Elige una página de tus cuadernos",
     genericFailure: "No pudimos generar las tarjetas. Intenta de nuevo.",
     errors: {
@@ -58,10 +71,12 @@ const CONFIG = {
     } as Record<string, string>,
   },
   recall: {
+    theme: "recall",
     title: "Generar preguntas",
     description:
       "Elige la página: la IA crea preguntas abiertas desde su texto para que las respondas de memoria.",
     cta: "Generar mis primeras preguntas",
+    minWords: RECALL_MIN_WORDS,
     tileHint: "Elige una página para practicar",
     genericFailure: "No pudimos generar las preguntas. Intenta de nuevo.",
     errors: {
@@ -70,19 +85,6 @@ const CONFIG = {
     } as Record<string, string>,
   },
 } as const;
-
-const FLASHCARD_MODES = [
-  {
-    value: "ai",
-    label: "Generar con IA",
-    description: "La IA crea tarjetas desde el texto de la página.",
-  },
-  {
-    value: "manual",
-    label: "Crear a mano",
-    description: "Escribe tú la pregunta y la respuesta de cada tarjeta.",
-  },
-] as const;
 
 function remainingCopy(remaining: number): string {
   if (remaining <= 0) return LIMIT_REACHED;
@@ -94,14 +96,11 @@ function remainingCopy(remaining: number): string {
 // Creating from a technique hub (Phase 8 H11, user-approved flow
 // 2026-10-29). Every flashcard and recall question belongs to a page
 // (`page_id` is required), so the dialog first asks for a notebook and a
-// page (`PagePicker`), then offers the technique's paths, reusing the
-// techniques panel's Server Actions:
-// - Flashcards: "Generar con IA" (generateFlashcardsAction, then the page's
-//   deck) or "Crear a mano" (the page's deck with `?nueva=1`, which opens
-//   "Nueva tarjeta" at once — the deck route renders for a page with no
-//   cards, so the first card starts the deck).
-// - Recordación activa: "Generar con IA" only (documento-maestro: recall
-//   questions are AI-generated), then the page's session.
+// page (`PagePicker`), then generates with AI, reusing the techniques
+// panel's Server Actions (generateFlashcardsAction, then the page's deck;
+// generateRecallQuestionsAction, then the page's session). AI only (user
+// decision 2026-10-29, Phase 8 H12; H13 removed the deck's "Nueva tarjeta"
+// too, so no card is written by hand anywhere).
 // The remaining generations show under the AI path and block it at 0; an
 // empty page reads the panel's error and links to the page.
 export function CreateFromPageDialog({
@@ -116,7 +115,6 @@ export function CreateFromPageDialog({
   const [open, setOpen] = useState(false);
   const [notebookId, setNotebookId] = useState(firstNotebookId);
   const [pageId, setPageId] = useState("");
-  const [mode, setMode] = useState<Mode>("ai");
   const [remaining, setRemaining] = useState(initialRemaining);
   const [error, setError] = useState<string | null>(null);
   const [emptyPage, setEmptyPage] = useState(false);
@@ -125,8 +123,7 @@ export function CreateFromPageDialog({
 
   const prefix = `create-${technique}`;
   const limitReached = remaining !== null && remaining <= 0;
-  const canSubmit =
-    pageId !== "" && !pending && (mode === "manual" || !limitReached);
+  const canSubmit = pageId !== "" && !pending && !limitReached;
 
   function clearFeedback() {
     setError(null);
@@ -141,13 +138,16 @@ export function CreateFromPageDialog({
     if (next) {
       setNotebookId(firstNotebookId);
       setPageId("");
-      setMode("ai");
     }
   }
 
-  function failWith(code: string) {
+  function failWith({ code, minWords }: { code: string; minWords?: number }) {
     if (NO_NEW_CONTENT_CODES.has(code)) {
       setNotice(NO_NEW_CONTENT);
+      return;
+    }
+    if (code === PAGE_TOO_SHORT_CODE) {
+      setError(pageTooShortMessage(minWords ?? config.minWords));
       return;
     }
     setError(config.errors[code] ?? config.genericFailure);
@@ -158,23 +158,21 @@ export function CreateFromPageDialog({
   function submit() {
     if (!canSubmit) return;
     clearFeedback();
-    if (technique === "flashcards" && mode === "manual") {
-      router.push(`/flashcards/${notebookId}/${pageId}?nueva=1`);
-      return;
-    }
     startTransition(async () => {
       try {
         if (technique === "flashcards") {
           const result = await generateFlashcardsAction({ pageId });
-          if (!result.ok) return failWith(result.error.code);
+          if (!result.ok) return failWith(result.error);
           setOpen(false);
-          router.push(`/flashcards/${notebookId}/${pageId}`);
+          router.push(
+            `/flashcards/${notebookId}/${pageId}?repasar=1&${FROM_HUB_QUERY}`,
+          );
           return;
         }
         const result = await generateRecallQuestionsAction({ pageId });
-        if (!result.ok) return failWith(result.error.code);
+        if (!result.ok) return failWith(result.error);
         setOpen(false);
-        router.push(`/active-recall/${notebookId}/${pageId}`);
+        router.push(`/active-recall/${notebookId}/${pageId}?${FROM_HUB_QUERY}`);
       } catch {
         setError(config.genericFailure);
       }
@@ -193,17 +191,23 @@ export function CreateFromPageDialog({
         data-testid={`${prefix}-tile`}
       />
     );
-  const showsAi = technique === "recall" || mode === "ai";
+
+  const theme = TECHNIQUE_THEME[config.theme];
 
   return (
     <Dialog open={open} onOpenChange={changeOpen}>
       <DialogTrigger asChild>{triggerNode}</DialogTrigger>
-      <DialogContent data-testid={`${prefix}-dialog`}>
-        <DialogHeader>
+      <DialogContent
+        data-testid={`${prefix}-dialog`}
+        data-technique-theme={config.theme}
+      >
+        <DialogHeader
+          icon={<PixelTile tone={theme.tone} icon={theme.icon} size={48} />}
+        >
           <DialogTitle>{config.title}</DialogTitle>
           <DialogDescription>{config.description}</DialogDescription>
         </DialogHeader>
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-4">
           <PagePicker
             notebooks={notebooks}
             notebookId={notebookId}
@@ -219,52 +223,35 @@ export function CreateFromPageDialog({
             }}
             disabled={pending}
             testIdPrefix={prefix}
+            minWords={config.minWords}
           />
           {notebooks !== null && notebooks.length > 0 && (
             <>
-              {technique === "flashcards" && (
-                <ChoiceGroup
-                  aria-label="Cómo crear las flashcards"
-                  options={FLASHCARD_MODES}
-                  value={mode}
-                  onChange={(next) => {
-                    setMode(next);
-                    clearFeedback();
-                  }}
-                  tone="amber"
-                  testId={`${prefix}-mode`}
-                />
-              )}
-              {showsAi && remaining !== null && (
-                <p
+              {remaining !== null && (
+                <GenerationsLeft
+                  remaining={remaining}
                   data-testid={`${prefix}-remaining`}
-                  className="text-fg-secondary text-xs"
                 >
                   {remainingCopy(remaining)}
-                </p>
+                </GenerationsLeft>
               )}
               {notice && (
-                <p
-                  data-testid={`${prefix}-notice`}
-                  className="text-fg-muted text-sm"
-                >
+                <FormMessage tone="info" data-testid={`${prefix}-notice`}>
                   {notice}
-                </p>
+                </FormMessage>
               )}
               {error && (
-                <div className="flex flex-col gap-1">
-                  <p role="alert" className="text-destructive text-sm">
-                    {error}
-                  </p>
+                <FormMessage>
+                  <p>{error}</p>
                   {emptyPage && (
                     <Link
                       href={`/notebooks/${notebookId}/pages/${pageId}`}
-                      className="self-start font-semibold text-primary-700 text-sm underline-offset-2 hover:underline"
+                      className="font-semibold text-primary-700 underline-offset-2 hover:underline"
                     >
                       Abrir la página
                     </Link>
                   )}
-                </div>
+                </FormMessage>
               )}
             </>
           )}
@@ -280,11 +267,12 @@ export function CreateFromPageDialog({
           </Button>
           <Button
             type="button"
+            variant="technique"
             onClick={submit}
             disabled={!canSubmit}
             data-testid={`${prefix}-submit`}
           >
-            {pending ? "Generando…" : showsAi ? "Generar" : "Continuar"}
+            {pending ? "Generando…" : "Generar"}
           </Button>
         </DialogFooter>
       </DialogContent>

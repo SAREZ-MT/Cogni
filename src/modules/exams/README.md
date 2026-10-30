@@ -26,7 +26,7 @@ throw (`action-support.ts`); errors come back as `{ code, message }`.
 
 | File | Actions |
 |---|---|
-| `actions.ts` | `listExamQuestionsAction`, `createExamQuestionAction`, `editExamQuestionAction`, `retireExamQuestionAction`, `generateExamQuestionsAction` |
+| `actions.ts` | `listExamQuestionsAction`, `editExamQuestionAction`, `retireExamQuestionAction`, `generateExamQuestionsAction` |
 | `session-actions.ts` | `getExamStartAction`, `startExamSessionAction`, `getExamSessionAction`, `answerExamQuestionAction`, `finishExamSessionAction`, `getExamResultsAction` |
 | `retake-actions.ts` | `startExamRetakeAction` |
 | `feedback-actions.ts` | `requestExamFeedbackAction`, `getExamReviewNoticeAction` |
@@ -45,6 +45,9 @@ is dropped), and a feedback read failure in `getExamResultsAction` returns
 - The study-engine hook — done (T3, in study-engine: `recordExamReviews`).
 - Manual questions — done (T4): use cases in `application/`, Server Actions
   in `actions.ts`, the `/exams/[notebookId]/[pageId]/preguntas` screen.
+  Since Phase 8 H13 (user decision 2026-10-29) questions are created by AI
+  only: `createExamQuestionAction` and the screen's "Nueva pregunta" are
+  gone; editing and retiring stay, for AI and older manual questions alike.
 - AI generation — done (T5): `requestExamGeneration` +
   `generateExamQuestionsAction`, "Examen → Generar" in the page's
   techniques panel (since Phase 6 it opens a count dialog, 10–30 in steps
@@ -62,7 +65,10 @@ is dropped), and a feedback read failure in `getExamResultsAction` returns
 - `createExamQuestion` checks the page is the owner's (`PAGE_NOT_FOUND`),
   validates with `newExamQuestion` and saves the root together with its
   `StudyItem(kind = "exam_question", sourceId = rootId)` in one
-  `ExamUnitOfWork` run, so `recordExamReviews` always finds the item.
+  `ExamUnitOfWork` run, so `recordExamReviews` always finds the item. No
+  Server Action calls it since Phase 8 H13; it stays because the database
+  tests (unit of work, session, retake) and `actions.test.ts` seed questions
+  through it, and `editExamQuestion` reuses its `ExamQuestionContent`.
 - `editExamQuestion` edits in place (same id, root, origin); a retired
   question answers `EXAMS_QUESTION_RETIRED`, another owner's
   `EXAMS_QUESTION_NOT_FOUND`.
@@ -90,6 +96,12 @@ is dropped), and a feedback read failure in `getExamResultsAction` returns
   sent; their fingerprints are stored with the questions. Nothing new
   answers `EXAMS_NO_NEW_CONTENT` before the limiter (no AI call, no unit); a
   page generated before T5c sends every paragraph once.
+- Page content thresholds (Phase 8 H14, user 2026-10-29, kernel
+  `generation-capacity.ts`): the new paragraphs need 100 words and about 15
+  per question, so 10 questions need 150 and 30 need 450. Otherwise
+  `AI_PAGE_TOO_SHORT` (`words`, `minWords`, `maxItems`, also on the action
+  error) before the limiter. Only the share of the sent paragraphs the
+  saved questions cover is fingerprinted (`consumedParagraphs`).
 - Prompt `generate_exam_questions/v1` (ai module) receives the truncated
   page text, the count and the page's active questions (`[concept] stem`,
   last 60) so the model avoids duplicates.

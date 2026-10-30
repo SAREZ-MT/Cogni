@@ -3,6 +3,7 @@ import type { Page } from "@playwright/test";
 import postgres from "postgres";
 import { expect, hasSupabaseEnv, signIn, test } from "./fixtures/auth";
 import { createNotebookWithOpenPage } from "./helpers/notebooks";
+import { withStudyFiller } from "./helpers/study-text";
 
 // Phase 6 T7 (documento-maestro §3.3, §8.5): after a session the sidebar
 // opens the active recall hub on real data, the notebook view lists the
@@ -109,7 +110,7 @@ test.describe("active recall hub", () => {
       .locator('[contenteditable="true"]');
     await editable.click();
     await page.waitForTimeout(100);
-    await page.keyboard.type(SENTENCES);
+    await page.keyboard.type(withStudyFiller(SENTENCES));
     await expect(page.getByTestId("autosave-status")).toHaveText("guardado", {
       timeout: 15000,
     });

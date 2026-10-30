@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { getRecallSessionPlanAction } from "@/modules/active-recall";
 import { getNotebookTitleForRoute, getPageForRoute } from "@/modules/notebooks";
+import { FROM_HUB_PARAM, returnHref } from "@/shared/navigation/hub-return";
 import { SetBreadcrumb } from "../../../_components/breadcrumb";
 import { ActiveRecallPlayer } from "../../_components/active-recall-player";
 
@@ -12,6 +13,7 @@ export const maxDuration = 300;
 
 interface ActiveRecallSessionPageProps {
   params: Promise<{ notebookId: string; pageId: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
 // Active recall session route on real data (Phase 6 T5). One page owns at
@@ -25,8 +27,16 @@ interface ActiveRecallSessionPageProps {
 // design-preview gate in T5; the hub and notebook views follow in T7.
 export default async function ActiveRecallSessionPage({
   params,
+  searchParams,
 }: ActiveRecallSessionPageProps) {
   const { notebookId, pageId } = await params;
+  // Phase 8 H16: opened from the hub's create dialog, its back links and
+  // "Terminar"'s results lead back to the hub.
+  const backHref = returnHref(
+    (await searchParams)[FROM_HUB_PARAM],
+    "/active-recall",
+    `/active-recall/${notebookId}`,
+  );
   const page = await getPageForRoute(notebookId, pageId);
   if (!page) notFound();
   const plan = await getRecallSessionPlanAction({ pageId: page.id });
@@ -49,6 +59,7 @@ export default async function ActiveRecallSessionPage({
         pageTitle={page.title}
         pageId={page.id}
         questions={plan.value.questions}
+        backHref={backHref}
       />
     </section>
   );

@@ -14,6 +14,7 @@ const { generateRecallQuestionsAction } = vi.hoisted(() => ({
 vi.mock("@/modules/active-recall", () => ({ generateRecallQuestionsAction }));
 
 import type { PagePickerNotebook } from "@/shared/ui/page-picker";
+import { chooseOption } from "@/shared/ui/select.testing";
 import { CreateFromPageDialog } from "./create-from-page-dialog";
 
 const NOTEBOOKS: PagePickerNotebook[] = [
@@ -56,11 +57,12 @@ async function open(props: Partial<Props> = {}) {
 async function pickPage(
   user: ReturnType<typeof userEvent.setup>,
   dialog: HTMLElement,
-  pageId = "p-2",
+  pageTitle = "Tema 2",
 ) {
-  await user.selectOptions(
+  await chooseOption(
+    user,
     within(dialog).getByRole("combobox", { name: "Página" }),
-    pageId,
+    pageTitle,
   );
 }
 
@@ -74,7 +76,7 @@ describe("CreateFromPageDialog — flashcards", () => {
     generateRecallQuestionsAction.mockReset();
   });
 
-  it("opens from the empty-state CTA and offers both paths once a page is chosen", async () => {
+  it("opens from the empty-state CTA and only offers to generate with AI once a page is chosen", async () => {
     const { user, dialog } = await open();
 
     expect(
@@ -82,17 +84,6 @@ describe("CreateFromPageDialog — flashcards", () => {
     ).toBeInTheDocument();
     const submit = within(dialog).getByTestId("create-flashcards-submit");
     expect(submit).toBeDisabled();
-    const modes = within(dialog).getByRole("radiogroup", {
-      name: "Cómo crear las flashcards",
-    });
-    expect(
-      within(modes)
-        .getAllByRole("radio")
-        .map((r) => r.textContent),
-    ).toEqual([
-      expect.stringContaining("Generar con IA"),
-      expect.stringContaining("Crear a mano"),
-    ]);
     expect(
       within(dialog).getByText("Te quedan 5 generaciones hoy"),
     ).toBeInTheDocument();
@@ -100,6 +91,38 @@ describe("CreateFromPageDialog — flashcards", () => {
     await pickPage(user, dialog);
     expect(submit).toBeEnabled();
     expect(submit).toHaveTextContent("Generar");
+  });
+
+  // Phase 8 H12: the technique's theme, pixel tile and primary colour.
+  it("wears the flashcards theme: pixel tile, amber Generar, outline Cancelar", async () => {
+    const { dialog } = await open();
+
+    expect(dialog).toHaveAttribute("data-technique-theme", "flashcards");
+    expect(
+      dialog.querySelector(
+        '[data-slot="dialog-header-icon"] [data-slot="pixel-tile"]',
+      ),
+    ).toHaveAttribute("data-tone", "yellow");
+    expect(
+      within(dialog).getByTestId("create-flashcards-submit"),
+    ).toHaveAttribute("data-variant", "technique");
+    expect(
+      within(dialog).getByRole("button", { name: "Cancelar" }),
+    ).toHaveAttribute("data-variant", "outline");
+  });
+
+  // Phase 8 H12 (user 2026-10-29): the hub dialogs are AI only; "Nueva
+  // tarjeta" on an existing deck stays the manual path.
+  it("never offers to create the cards by hand", async () => {
+    const { user, dialog } = await open({ trigger: "tile" });
+    await pickPage(user, dialog, "Tema 1");
+
+    expect(within(dialog).queryByRole("radiogroup")).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("radio")).not.toBeInTheDocument();
+    expect(within(dialog).queryByText(/Crear a mano/)).not.toBeInTheDocument();
+    expect(
+      within(dialog).getByTestId("create-flashcards-submit"),
+    ).toHaveTextContent("Generar");
   });
 
   it("generates with AI for the chosen page and opens its deck", async () => {
@@ -113,25 +136,9 @@ describe("CreateFromPageDialog — flashcards", () => {
     await user.click(within(dialog).getByTestId("create-flashcards-submit"));
 
     expect(generateFlashcardsAction).toHaveBeenCalledWith({ pageId: "p-2" });
-    expect(push).toHaveBeenCalledWith("/flashcards/nb-bio/p-2");
-  });
-
-  it("creates by hand on the page's deck, with the new-card dialog open", async () => {
-    const { user, dialog } = await open({ trigger: "tile" });
-    await pickPage(user, dialog, "p-1");
-
-    await user.click(
-      within(dialog).getByTestId("create-flashcards-mode-manual"),
+    expect(push).toHaveBeenCalledWith(
+      "/flashcards/nb-bio/p-2?repasar=1&desde=hub",
     );
-    const submit = within(dialog).getByTestId("create-flashcards-submit");
-    expect(submit).toHaveTextContent("Continuar");
-    expect(
-      within(dialog).queryByText("Te quedan 5 generaciones hoy"),
-    ).not.toBeInTheDocument();
-    await user.click(submit);
-
-    expect(generateFlashcardsAction).not.toHaveBeenCalled();
-    expect(push).toHaveBeenCalledWith("/flashcards/nb-bio/p-1?nueva=1");
   });
 
   it("explains an empty page and offers to open it", async () => {
@@ -169,19 +176,16 @@ describe("CreateFromPageDialog — flashcards", () => {
     expect(within(dialog).queryByRole("alert")).not.toBeInTheDocument();
   });
 
-  it("blocks AI generation once the daily limit is reached, but not creating by hand", async () => {
+  it("blocks generation once the daily limit is reached", async () => {
     const { user, dialog } = await open({ remaining: 0 });
     await pickPage(user, dialog);
 
     expect(
       within(dialog).getByText("Llegaste al límite de hoy. Vuelve mañana."),
     ).toBeInTheDocument();
-    const submit = within(dialog).getByTestId("create-flashcards-submit");
-    expect(submit).toBeDisabled();
-    await user.click(
-      within(dialog).getByTestId("create-flashcards-mode-manual"),
-    );
-    expect(submit).toBeEnabled();
+    expect(
+      within(dialog).getByTestId("create-flashcards-submit"),
+    ).toBeDisabled();
   });
 
   it("drops to zero remaining when the action reports the limit", async () => {
@@ -216,9 +220,10 @@ describe("CreateFromPageDialog — flashcards", () => {
   it("offers to create a page in a notebook without pages", async () => {
     const { user, dialog } = await open();
 
-    await user.selectOptions(
+    await chooseOption(
+      user,
       within(dialog).getByRole("combobox", { name: "Cuaderno" }),
-      "nb-empty",
+      "Vacío",
     );
 
     expect(
@@ -243,6 +248,15 @@ describe("CreateFromPageDialog — active recall", () => {
     expect(
       within(dialog).getByRole("heading", { name: "Generar preguntas" }),
     ).toBeInTheDocument();
+    expect(dialog).toHaveAttribute("data-technique-theme", "recall");
+    expect(dialog.querySelector('[data-slot="pixel-tile"]')).toHaveAttribute(
+      "data-tone",
+      "green",
+    );
+    expect(within(dialog).getByTestId("create-recall-submit")).toHaveAttribute(
+      "data-variant",
+      "technique",
+    );
     expect(within(dialog).queryByRole("radiogroup")).not.toBeInTheDocument();
     expect(within(dialog).queryByText("Crear a mano")).not.toBeInTheDocument();
     expect(
@@ -259,14 +273,14 @@ describe("CreateFromPageDialog — active recall", () => {
       technique: "recall",
       trigger: "tile",
     });
-    await pickPage(user, dialog, "p-1");
+    await pickPage(user, dialog, "Tema 1");
 
     await user.click(within(dialog).getByTestId("create-recall-submit"));
 
     expect(generateRecallQuestionsAction).toHaveBeenCalledWith({
       pageId: "p-1",
     });
-    expect(push).toHaveBeenCalledWith("/active-recall/nb-bio/p-1");
+    expect(push).toHaveBeenCalledWith("/active-recall/nb-bio/p-1?desde=hub");
   });
 
   it("explains an empty page and offers to open it", async () => {
@@ -285,5 +299,65 @@ describe("CreateFromPageDialog — active recall", () => {
     expect(
       within(dialog).getByRole("link", { name: "Abrir la página" }),
     ).toHaveAttribute("href", "/notebooks/nb-bio/pages/p-2");
+  });
+});
+
+// Phase 8 H14 (user 2026-10-29): 100 words to generate cards, 150 for the
+// ten recall questions; the server's AI_PAGE_TOO_SHORT reads in Spanish.
+describe("CreateFromPageDialog — page content thresholds", () => {
+  const WITH_WORDS: PagePickerNotebook[] = [
+    {
+      id: "nb-bio",
+      title: "Biología",
+      pages: [
+        { id: "p-1", title: "Corta", words: 120 },
+        { id: "p-2", title: "Larga", words: 400 },
+      ],
+    },
+  ];
+
+  beforeEach(() => {
+    generateFlashcardsAction.mockReset();
+    generateRecallQuestionsAction.mockReset();
+  });
+
+  async function pageOption(technique: "flashcards" | "recall") {
+    const { user, dialog } = await open({ technique, notebooks: WITH_WORDS });
+    within(dialog).getByRole("combobox", { name: "Página" }).focus();
+    await user.keyboard("{Enter}");
+    return screen.getByRole("option", { name: /Corta/ });
+  }
+
+  it("lets flashcards use a 120-word page", async () => {
+    expect(await pageOption("flashcards")).not.toHaveAttribute("aria-disabled");
+  });
+
+  it("disables a 120-word page for recall, which needs 150", async () => {
+    const option = await pageOption("recall");
+    expect(option).toHaveAttribute("aria-disabled", "true");
+    expect(option).toHaveTextContent(
+      "Muy poco contenido (120 palabras): escribe al menos 150",
+    );
+  });
+
+  it("explains AI_PAGE_TOO_SHORT with the words the server asks for", async () => {
+    generateRecallQuestionsAction.mockResolvedValue({
+      ok: false,
+      error: {
+        code: "AI_PAGE_TOO_SHORT",
+        message: "x",
+        words: 90,
+        minWords: 150,
+        maxItems: 6,
+      },
+    });
+    const { user, dialog } = await open({ technique: "recall" });
+    await pickPage(user, dialog);
+
+    await user.click(within(dialog).getByTestId("create-recall-submit"));
+
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+      "Esta página tiene poco contenido para generar. Agrega más texto (mínimo 150 palabras).",
+    );
   });
 });

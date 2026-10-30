@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import type { Page } from "@playwright/test";
 import { expect, hasSupabaseEnv, signIn, test } from "./fixtures/auth";
 import { createNotebookWithOpenPage } from "./helpers/notebooks";
+import { chooseOption } from "./helpers/select";
+import { withStudyFiller } from "./helpers/study-text";
 
 // Phase 6 T5b "Crear examen" (user decision 2026-10-07): from the exams
 // hub the student picks a notebook and a page, generates the exam with AI
@@ -47,7 +49,7 @@ test.describe("Crear examen", () => {
     await editable.click();
     // Keys sent <15 ms after a click can precede Chrome's selectionchange.
     await page.waitForTimeout(100);
-    await page.keyboard.type(SENTENCES);
+    await page.keyboard.type(withStudyFiller(SENTENCES));
     await expect(page.getByTestId("autosave-status")).toHaveText("guardado", {
       timeout: 15000,
     });
@@ -56,25 +58,22 @@ test.describe("Crear examen", () => {
     await expect(page.getByText("Pon a prueba lo que sabes")).toBeVisible();
     await expect(
       page.getByText(
-        "Elige una página y crea un examen con IA o con tus propias preguntas.",
+        "Elige una página y la IA crea un examen de opción múltiple desde su texto.",
       ),
     ).toBeVisible();
-    // Only "Crear examen" in the header: the "Nuevo examen" quick start is gone.
+    // No "Nuevo examen" quick start, and since H13 no header button: the
+    // empty state's CTA opens "Crear examen".
     await expect(page.getByText("Nuevo examen")).toHaveCount(0);
+    await expect(page.getByTestId("create-exam-button")).toHaveCount(0);
     await shot(page, "exams-hub-empty-v2");
-    await page.getByTestId("create-exam-button").click();
+    await page.getByTestId("create-exam-cta").click();
 
     const create = page.getByRole("dialog", { name: "Crear examen" });
-    await create
-      .getByRole("combobox", { name: "Cuaderno" })
-      .selectOption({ label: notebookTitle });
+    await chooseOption(create, "Cuaderno", notebookTitle);
     await expect(create.getByTestId("create-exam-submit")).toBeDisabled();
-    await create
-      .getByRole("combobox", { name: "Página" })
-      .selectOption({ label: "Sin título" });
-    await expect(
-      create.getByRole("radio", { name: /Generar con IA/ }),
-    ).toBeChecked();
+    await chooseOption(create, "Página", "Sin título");
+    // AI only (Phase 8 H12): no manual path in the dialog.
+    await expect(create.getByRole("radio")).toHaveCount(0);
     await expect(create.getByTestId("exam-count-value")).toHaveText("10");
     await shot(page, "exams-create-modal");
     await create.getByTestId("create-exam-submit").click();

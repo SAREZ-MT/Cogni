@@ -22,7 +22,9 @@ import {
   getPage as getPageUseCase,
   type HomeOverview,
   type ImageUploadGrant,
+  listPagePickerTree,
   listSidebar,
+  type PagePickerNotebookEntry,
   registerPageAsset as registerPageAssetUseCase,
   renameNotebook as renameNotebookUseCase,
   renamePage as renamePageUseCase,
@@ -171,6 +173,15 @@ export async function getSidebarTree(): Promise<SidebarNotebook[]> {
   const ownerId = await requireOwnerId();
   const { notebooks, pages } = deps();
   return listSidebar({ notebooks, pages }, ownerId);
+}
+
+// Phase 8 H14: the technique hubs' page pickers, with each page's word
+// count (never its text) so a page under 100 words can be disabled. No
+// DomainError possible, same as getSidebarTree above.
+export async function getPagePickerTree(): Promise<PagePickerNotebookEntry[]> {
+  const ownerId = await requireOwnerId();
+  const { notebooks, pages } = deps();
+  return listPagePickerTree({ notebooks, pages }, ownerId);
 }
 
 // E1 (editor pass, goal doc §2, "@" mentions): the mention popup's data

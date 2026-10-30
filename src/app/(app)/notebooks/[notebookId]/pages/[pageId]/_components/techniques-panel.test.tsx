@@ -8,6 +8,7 @@ import {
   TECHNIQUES_PANEL_SLOT_ID,
   TechniquesPanelSlot,
 } from "../../../../../_components/techniques-panel-slot";
+import { forgetPageWords, publishPageWords } from "./page-words";
 import { TechniquesPanel, type TechniquesPanelProps } from "./techniques-panel";
 
 const { generateFlashcardsAction, listFlashcardsAction } = vi.hoisted(() => ({
@@ -1148,6 +1149,102 @@ describe("TechniquesPanel", () => {
       "false",
     );
     expect(document.cookie).toContain(`${TECHNIQUES_PANEL_COOKIE}=expanded`);
+  });
+});
+
+// Phase 8 H14 (user 2026-10-29): 100 words to generate cards, 150 for the
+// ten recall questions and the smallest exam, about 15 per item; the
+// editor's saves publish the page's current word count.
+describe("TechniquesPanel — page content thresholds", () => {
+  beforeEach(() => {
+    forgetPageWords();
+    generateFlashcardsAction.mockReset();
+    generateExamQuestionsAction.mockReset();
+    generateRecallQuestionsAction.mockReset();
+    getExamStartAction.mockResolvedValue(err({ code: "X", message: "x" }));
+    getRecallPageSummaryAction.mockResolvedValue(
+      ok({ pageId: PAGE_ID, questionCount: 0 }),
+    );
+  });
+
+  it("disables Generar on a short page with the reason", async () => {
+    await renderPanel(false, { initialWords: 120 });
+
+    expect(screen.getByTestId("generate-flashcards")).toBeEnabled();
+    expect(screen.getByTestId("generate-recall-questions")).toBeDisabled();
+    expect(screen.getByTestId("generate-exam-questions")).toBeDisabled();
+    expect(screen.getByTestId("recall-generation-short")).toHaveTextContent(
+      "Muy poco contenido (120 palabras): escribe al menos 150",
+    );
+    expect(screen.getByTestId("exam-generation-short")).toHaveTextContent(
+      "Muy poco contenido (120 palabras): escribe al menos 150",
+    );
+    expect(screen.queryByTestId("generation-short")).not.toBeInTheDocument();
+  });
+
+  it("disables every Generar under 100 words", async () => {
+    await renderPanel(false, { initialWords: 30 });
+
+    expect(screen.getByTestId("generate-flashcards")).toBeDisabled();
+    expect(screen.getByTestId("generation-short")).toHaveTextContent(
+      "Muy poco contenido (30 palabras): escribe al menos 100",
+    );
+  });
+
+  it("follows the word count the editor publishes", async () => {
+    await renderPanel(false, { initialWords: 30 });
+
+    act(() => publishPageWords(PAGE_ID, 400));
+
+    expect(screen.getByTestId("generate-flashcards")).toBeEnabled();
+    expect(screen.getByTestId("generate-exam-questions")).toBeEnabled();
+    expect(screen.queryByTestId("generation-short")).not.toBeInTheDocument();
+  });
+
+  it("ignores the word count of another page", async () => {
+    await renderPanel(false, { initialWords: 30 });
+
+    act(() => publishPageWords("another-page", 400));
+
+    expect(screen.getByTestId("generate-flashcards")).toBeDisabled();
+  });
+
+  it("limits the exam count to what the page supports", async () => {
+    const user = userEvent.setup();
+    await renderPanel(false, { initialWords: 240 });
+
+    await user.click(screen.getByTestId("generate-exam-questions"));
+    const more = screen.getByRole("button", {
+      name: "Más preguntas a generar",
+    });
+    await user.click(more);
+
+    expect(screen.getByTestId("exam-count-value")).toHaveTextContent("15");
+    expect(more).toBeDisabled();
+    expect(
+      screen.getByText("Esta página admite hasta 15 preguntas"),
+    ).toBeInTheDocument();
+  });
+
+  it("explains AI_PAGE_TOO_SHORT with the words the server asks for", async () => {
+    const user = userEvent.setup();
+    generateFlashcardsAction.mockResolvedValue(
+      err({
+        code: "AI_PAGE_TOO_SHORT",
+        message: "x",
+        words: 80,
+        minWords: 100,
+        maxItems: 5,
+      }),
+    );
+    await renderPanel(false);
+
+    await user.click(screen.getByTestId("generate-flashcards"));
+
+    await waitForText(
+      "generation-error",
+      "Esta página tiene poco contenido para generar. Agrega más texto (mínimo 100 palabras).",
+    );
   });
 });
 
