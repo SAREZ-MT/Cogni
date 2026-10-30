@@ -1,4 +1,4 @@
-import { act, render, screen, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -337,6 +337,9 @@ describe("CreateExamDialog", () => {
     await chooseOption(user, page, "Mitocondria");
     await user.click(within(dialog).getByTestId("create-exam-submit"));
     await within(dialog).findByTestId("create-exam-notice");
+    // The notice can render before the transition ends; the pickers stay
+    // disabled until then, so wait for them before choosing again.
+    await waitFor(() => expect(page).toBeEnabled());
 
     await chooseOption(user, page, "Ribosomas");
 
