@@ -1,6 +1,9 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import type { NotebookCoverTone } from "@/shared/ui/notebook-cover-card";
+import {
+  type NotebookCoverTone,
+  notebookToneKey,
+} from "@/shared/ui/notebook-cover-card";
 import { PageSheet } from "@/shared/ui/page-sheet";
 import { cn } from "@/shared/ui/utils";
 
@@ -43,7 +46,7 @@ export function PageSheetCard({
   actions,
   className,
 }: PageSheetCardProps) {
-  const toneKey = tone ?? "purple";
+  const toneKey = notebookToneKey(tone);
 
   return (
     <article

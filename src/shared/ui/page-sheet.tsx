@@ -1,4 +1,7 @@
-import type { NotebookCoverTone } from "@/shared/ui/notebook-cover-card";
+import {
+  type NotebookCoverTone,
+  notebookToneKey,
+} from "@/shared/ui/notebook-cover-card";
 import { cn } from "@/shared/ui/utils";
 
 type PageSheetSize = "sm" | "lg";
@@ -94,7 +97,7 @@ export interface PageSheetProps {
 // Decorative: hidden from assistive technology.
 export function PageSheet({ size = "lg", tone, className }: PageSheetProps) {
   const look = SIZES[size];
-  const toneKey = tone ?? "purple";
+  const toneKey = notebookToneKey(tone);
   const colour = PAGE_SHEET_TONES[toneKey];
 
   return (

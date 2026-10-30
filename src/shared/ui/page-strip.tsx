@@ -1,7 +1,10 @@
 import { Plus } from "lucide-react";
 import Link from "next/link";
 import type { ComponentProps, ReactNode } from "react";
-import type { NotebookCoverTone } from "@/shared/ui/notebook-cover-card";
+import {
+  type NotebookCoverTone,
+  notebookToneKey,
+} from "@/shared/ui/notebook-cover-card";
 import { PAGE_SHEET_TONES } from "@/shared/ui/page-sheet";
 import { cn } from "@/shared/ui/utils";
 
@@ -39,7 +42,7 @@ export function PageStripRow({
   actions,
   className,
 }: PageStripRowProps) {
-  const toneKey = tone ?? "purple";
+  const toneKey = notebookToneKey(tone);
   const colour = PAGE_SHEET_TONES[toneKey];
 
   return (

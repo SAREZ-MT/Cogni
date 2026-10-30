@@ -61,4 +61,12 @@ describe("PageSheet", () => {
       container.querySelectorAll('[data-part="rule"]').length,
     ).toBeGreaterThanOrEqual(3);
   });
+  // Final verification V (advisory R3): `notebooks.color` is free text in the
+  // database, so a colour outside the palette (a legacy or hand-edited row)
+  // must fall back to the default tone instead of crashing the lookup.
+  it("falls back to the purple tone for a colour outside the palette", () => {
+    const { container } = render(<PageSheet tone={"red" as never} />);
+
+    expect(sheet(container)).toHaveAttribute("data-tone", "purple");
+  });
 });
