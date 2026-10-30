@@ -1,7 +1,8 @@
 import type { PageTextReader } from "@/modules/notebooks";
 import type { Clock } from "@/shared/kernel/clock";
-import type { DomainError } from "@/shared/kernel/domain-error";
+import { DomainError } from "@/shared/kernel/domain-error";
 import { err, ok, type Result } from "@/shared/kernel/result";
+import { EXAM_ERROR } from "../domain/errors";
 import { type ExamQuestion, newExamQuestion } from "../domain/exam-question";
 import {
   createExamQuestion,
@@ -19,7 +20,12 @@ import {
 // reduced to operations on the page's active questions.
 export interface ExamEdits {
   pageId: string;
-  updates: readonly ({ id: string } & ExamQuestionContent)[];
+  // `expectedUpdatedAt`: the item's updatedAt when the edit page loaded
+  // (ISO); a different stored one refuses the save (CHANGED, V10).
+  updates: readonly ({
+    id: string;
+    expectedUpdatedAt?: string;
+  } & ExamQuestionContent)[];
   creates: readonly ExamQuestionContent[];
   deletes: readonly string[];
 }
@@ -73,8 +79,22 @@ export async function applyExamEdits(
       ) {
         return notFound(id);
       }
+      const expected = input.updates.find(
+        (u) => u.id === id,
+      )?.expectedUpdatedAt;
+      if (
+        expected !== undefined &&
+        question.updatedAt.toISOString() !== expected
+      ) {
+        return err(
+          new DomainError(
+            EXAM_ERROR.CHANGED,
+            `Exam question ${id} changed after the edit page loaded`,
+          ),
+        );
+      }
     }
-    for (const { id, ...content } of input.updates) {
+    for (const { id, expectedUpdatedAt: _, ...content } of input.updates) {
       const edited = await editExamQuestion(
         { questionId: id, ...content },
         { uow, clock: deps.clock },

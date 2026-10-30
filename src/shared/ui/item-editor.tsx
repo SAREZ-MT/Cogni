@@ -17,6 +17,7 @@ import {
   remainingCount,
   removeDraftEntry,
   restoreDraftEntry,
+  type StoredItem,
   updateDraftEntry,
 } from "@/shared/ui/item-draft";
 import { Pill } from "@/shared/ui/pill";
@@ -28,11 +29,12 @@ import { cn } from "@/shared/ui/utils";
 export type ItemErrors = Partial<Record<string, string>>;
 
 export type ItemSaveOutcome<T> =
-  | { ok: true; items: { id: string; value: T }[] }
+  | { ok: true; items: StoredItem<T>[] }
   | { ok: false; message: string };
 
 export interface ItemEditorProps<T> {
-  items: readonly { id: string; value: T }[];
+  // `version` (the stored updatedAt) lets the save refuse a newer change.
+  items: readonly StoredItem<T>[];
   // "Tarjeta", "Pregunta": numbers each entry and names its delete button.
   itemLabel: string;
   addLabel: string;
@@ -80,6 +82,9 @@ export function ItemEditor<T>({
 }: ItemEditorProps<T>) {
   const router = useRouter();
   const [draft, setDraft] = useState<DraftEntry<T>[]>(() => draftFrom(items));
+  // What "Descartar cambios" puts back: the loaded items, then the last
+  // saved ones (the `items` prop stays the loaded ones until a refresh).
+  const [stored, setStored] = useState<readonly StoredItem<T>[]>(items);
   const [showErrors, setShowErrors] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -122,7 +127,7 @@ export function ItemEditor<T>({
   }
 
   function discard() {
-    change(draftFrom(items));
+    change(draftFrom(stored));
     setShowErrors(false);
   }
 
@@ -150,6 +155,7 @@ export function ItemEditor<T>({
       setMessage(outcome.message);
       return;
     }
+    setStored(outcome.items);
     setDraft(draftFrom(outcome.items));
     setShowErrors(false);
     setSaved(true);

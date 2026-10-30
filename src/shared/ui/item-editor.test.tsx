@@ -171,6 +171,18 @@ describe("ItemEditor (Phase 8 H18 edit pages)", () => {
     expect(screen.getByText("1 cambio sin guardar")).toBeInTheDocument();
   });
 
+  it("says why when the save throws", async () => {
+    onSave.mockRejectedValue(new Error("network"));
+    const user = setup();
+
+    await user.type(screen.getAllByLabelText("Texto")[0] as HTMLElement, "!");
+    await user.click(screen.getByRole("button", { name: "Guardar" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "No pudimos guardar los cambios. Intenta de nuevo.",
+    );
+  });
+
   it("discards the draft with Descartar cambios", async () => {
     const user = setup();
 
@@ -178,6 +190,30 @@ describe("ItemEditor (Phase 8 H18 edit pages)", () => {
     await user.click(screen.getByRole("button", { name: "Descartar cambios" }));
 
     expect(screen.getAllByLabelText("Texto")[0]).toHaveValue("Primera");
+    expect(screen.getByText("Sin cambios")).toBeInTheDocument();
+  });
+
+  it("discards back to the last saved items, not to the ones the page first loaded", async () => {
+    onSave.mockResolvedValue({
+      ok: true,
+      items: [
+        { id: "a", value: { text: "Primera guardada" } },
+        { id: "b", value: { text: "Segunda" } },
+      ],
+    });
+    const user = setup();
+
+    const [first] = screen.getAllByLabelText("Texto");
+    await user.clear(first as HTMLElement);
+    await user.type(first as HTMLElement, "Primera guardada");
+    await user.click(screen.getByRole("button", { name: "Guardar" }));
+    await screen.findByText("Cambios guardados");
+    await user.type(screen.getAllByLabelText("Texto")[0] as HTMLElement, "!");
+    await user.click(screen.getByRole("button", { name: "Descartar cambios" }));
+
+    expect(screen.getAllByLabelText("Texto")[0]).toHaveValue(
+      "Primera guardada",
+    );
     expect(screen.getByText("Sin cambios")).toBeInTheDocument();
   });
 

@@ -56,6 +56,8 @@ export interface RecallQuestionView {
   keyConcepts: string[];
   acceptableAnswerSummary: string;
   origin: RecallQuestionOrigin;
+  // ISO; the edit page sends it back so a stale save is refused (V10).
+  updatedAt: string;
 }
 
 export interface RecallGenerationView {
@@ -97,7 +99,12 @@ const questionContent = z.object({
 const saveRecallEditsInput = z.object({
   pageId: z.uuid(),
   updates: z
-    .array(questionContent.extend({ id: z.uuid() }))
+    .array(
+      questionContent.extend({
+        id: z.uuid(),
+        expectedUpdatedAt: z.iso.datetime().optional(),
+      }),
+    )
     .max(MAX_DRAFT_ITEMS),
   creates: z.array(questionContent).max(MAX_DRAFT_ITEMS),
   deletes: z.array(z.uuid()).max(MAX_DRAFT_ITEMS),
@@ -159,6 +166,7 @@ function toView(question: RecallQuestion): RecallQuestionView {
     keyConcepts: [...question.rubric.keyConcepts],
     acceptableAnswerSummary: question.rubric.acceptableAnswerSummary,
     origin: question.origin,
+    updatedAt: question.updatedAt.toISOString(),
   };
 }
 

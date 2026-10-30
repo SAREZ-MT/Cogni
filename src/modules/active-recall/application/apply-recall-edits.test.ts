@@ -229,6 +229,49 @@ describe("applyRecallEdits", () => {
     expect(itemOf(uow, b?.id ?? "")).toBeUndefined();
   });
 
+  // V10: a save from a page loaded before a newer change (another tab)
+  // must not overwrite it.
+  it("refuses an edit of a question changed since the page loaded, writing nothing", async () => {
+    const [a, b] = await seed(uow, 2);
+
+    const stale = await applyRecallEdits(
+      {
+        pageId: PAGE,
+        updates: [
+          {
+            id: a?.id ?? "",
+            ...content("Encima"),
+            expectedUpdatedAt: "2026-09-01T10:00:00.000Z",
+          },
+        ],
+        creates: [],
+        deletes: [b?.id ?? ""],
+      },
+      deps(),
+      OWNER,
+    );
+    const current = await applyRecallEdits(
+      {
+        pageId: PAGE,
+        updates: [
+          {
+            id: a?.id ?? "",
+            ...content("Al día"),
+            expectedUpdatedAt: CREATED.toISOString(),
+          },
+        ],
+        creates: [],
+        deletes: [],
+      },
+      deps(),
+      OWNER,
+    );
+
+    expect(!stale.ok && stale.error.code).toBe(RECALL_ERROR.CHANGED);
+    expect(uow.questions.rows.has(b?.id ?? "")).toBe(true);
+    expect(current.ok && current.value.questions[0]?.prompt).toBe("Al día");
+  });
+
   it("rolls everything back when the save would leave the page without questions", async () => {
     const [a, b] = await seed(uow, 2);
 

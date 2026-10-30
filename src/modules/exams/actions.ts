@@ -69,6 +69,8 @@ export interface ExamQuestionView {
   explanation: string;
   concept: string;
   origin: ExamQuestionOrigin;
+  // ISO; the edit page sends it back so a stale save is refused (V10).
+  updatedAt: string;
 }
 
 export interface ExamGenerationView {
@@ -114,7 +116,15 @@ const pageInput = z.object({ pageId: z.uuid() });
 const MAX_DRAFT_ITEMS = 200;
 const saveExamEditsInput = z.object({
   pageId: z.uuid(),
-  updates: z.array(z.object({ id: z.uuid(), ...content })).max(MAX_DRAFT_ITEMS),
+  updates: z
+    .array(
+      z.object({
+        id: z.uuid(),
+        expectedUpdatedAt: z.iso.datetime().optional(),
+        ...content,
+      }),
+    )
+    .max(MAX_DRAFT_ITEMS),
   creates: z.array(z.object(content)).max(MAX_DRAFT_ITEMS),
   deletes: z.array(z.uuid()).max(MAX_DRAFT_ITEMS),
 });
@@ -197,6 +207,7 @@ function toView(question: ExamQuestion): ExamQuestionView {
     explanation: question.explanation,
     concept: question.concept,
     origin: question.origin,
+    updatedAt: question.updatedAt.toISOString(),
   };
 }
 

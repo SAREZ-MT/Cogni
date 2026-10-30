@@ -51,6 +51,7 @@ function card(n: number): FlashcardView {
     front: `Pregunta ${n}`,
     back: `Respuesta ${n}`,
     position: n,
+    updatedAt: "2026-10-01T10:00:00.000Z",
   };
 }
 

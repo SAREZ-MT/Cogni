@@ -158,6 +158,7 @@ describe("generateRecallQuestionsAction", () => {
       keyConcepts: ["ATP", "Concepto 1"],
       acceptableAnswerSummary: "Resumen aceptable.",
       origin: "ai",
+      updatedAt: expect.any(String),
     });
     expect(current.uow.studyItems.all()).toHaveLength(10);
     expect(current.checks).toBe(1);
