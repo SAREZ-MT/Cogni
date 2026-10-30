@@ -15,6 +15,28 @@ export type NotebookCoverTone =
   | "blue"
   | "mint";
 
+const NOTEBOOK_COVER_TONES: readonly string[] = [
+  "pink",
+  "green",
+  "yellow",
+  "purple",
+  "orange",
+  "blue",
+  "mint",
+] satisfies readonly NotebookCoverTone[];
+
+// The tone a notebook's stored colour draws with. `notebooks.color` is free
+// text in the database, so a missing colour and one outside the palette (a
+// legacy or hand-edited row) both fall back to purple instead of crashing
+// the per-tone lookups of the covers, strips and sheets.
+export function notebookToneKey(
+  tone: string | null | undefined,
+): NotebookCoverTone {
+  return tone && NOTEBOOK_COVER_TONES.includes(tone)
+    ? (tone as NotebookCoverTone)
+    : "purple";
+}
+
 interface ToneLook {
   // Border plus the 160deg gradient stops of `NotebookCover`.
   cover: string;
@@ -104,7 +126,7 @@ export function NotebookCoverCard({
   actions,
   className,
 }: NotebookCoverCardProps) {
-  const toneKey = tone ?? "purple";
+  const toneKey = notebookToneKey(tone);
   const look = TONES[toneKey];
   const pages = pageCount === 1 ? "1 página" : `${pageCount} páginas`;
 

@@ -145,6 +145,7 @@ export function UsualPile() {
 
       {/* Scribbled arrows between the pieces, going nowhere. */}
       <svg
+        aria-hidden="true"
         viewBox="0 0 100 100"
         preserveAspectRatio="none"
         className="pointer-events-none absolute inset-0 z-40 size-full overflow-visible text-(--lp-rose-700)"

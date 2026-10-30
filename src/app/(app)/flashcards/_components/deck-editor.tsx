@@ -24,6 +24,8 @@ const SAVE_ERRORS: Record<string, string> = {
     "El mazo necesita al menos una tarjeta. Para quitarlo entero, usa Eliminar mazo en Flashcards.",
   FLASHCARD_EMPTY: "Cada tarjeta necesita frente y reverso.",
   FLASHCARD_TOO_LONG: `Cada lado admite hasta ${MAX_FLASHCARD_SIDE_LENGTH} caracteres.`,
+  FLASHCARD_CHANGED:
+    "Una tarjeta cambió en otra pestaña. Recarga la página para ver la última versión.",
   FLASHCARD_NOT_FOUND:
     "Este mazo cambió mientras lo editabas. Recarga la página e intenta de nuevo.",
   PAGE_NOT_FOUND: "Esta página ya no existe.",
@@ -48,9 +50,12 @@ export function validateCard(card: CardSides): ItemErrors {
   return errors;
 }
 
+// `version` goes back with an edit, so a save over a newer change of the
+// card (another tab) is refused (V10).
 const toItem = (card: FlashcardView) => ({
   id: card.id,
   value: { front: card.front, back: card.back },
+  version: card.updatedAt,
 });
 
 // The deck's edit page (Phase 8 H18): front and back of every card, new
@@ -101,7 +106,14 @@ export function DeckEditor({ pageId, cards }: DeckEditorProps) {
         </div>
       )}
       onSave={async (operations) => {
-        const result = await saveDeckEditsAction({ pageId, ...operations });
+        const result = await saveDeckEditsAction({
+          pageId,
+          ...operations,
+          updates: operations.updates.map(({ version, ...update }) => ({
+            ...update,
+            expectedUpdatedAt: version,
+          })),
+        });
         if (result.ok)
           return { ok: true, items: result.value.cards.map(toItem) };
         return {

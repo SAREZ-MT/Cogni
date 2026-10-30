@@ -1,6 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import type { ReactElement } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { Breadcrumb, BreadcrumbProvider } from "../_components/breadcrumb";
 
 const { getCurrentUser, getCurrentTimeZoneSetting } = vi.hoisted(() => ({
@@ -417,6 +417,13 @@ describe("HomePage", () => {
     });
 
     it("tells done, idle and never-generated techniques apart", async () => {
+      // A fixed mid-month instant: three days ahead stays in the same month,
+      // so the label is the short "el sábado 17" form on any real date.
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-10-14T15:00:00Z"));
+      onTestFinished(() => {
+        vi.useRealTimers();
+      });
       getTechniqueOverview.mockResolvedValue({
         ok: true,
         value: overviewWith({
@@ -437,7 +444,7 @@ describe("HomePage", () => {
       ).toHaveTextContent("Al día");
       expect(
         screen.getByRole("link", {
-          name: /^Recordación activa: sin repasos hoy, próximo repaso el [a-záéíóú]+ \d{1,2}$/,
+          name: "Recordación activa: sin repasos hoy, próximo repaso el sábado 17",
         }),
       ).toHaveTextContent("Sin repasos hoy");
       expect(

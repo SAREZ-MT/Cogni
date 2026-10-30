@@ -111,7 +111,7 @@ test.describe("technique edit pages", () => {
       .getByRole("button", { name: "Salir sin guardar" })
       .click();
     await expect(page).toHaveURL(/\/flashcards$/);
-    await expect(deckCard).toContainText("2");
+    await expect(deckCard).toContainText(/(^|\D)2\s*tarjetas/);
   });
 
   test("recall: edits a question and its key concepts, adds one and deletes one", async ({

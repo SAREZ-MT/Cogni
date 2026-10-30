@@ -69,6 +69,14 @@ test.describe("editor final polish", () => {
     const editable = await openEditable(page, "Cuaderno pegar código");
     await insertCodeBlock(page, editable);
 
+    // The save that carries the pasted code (an earlier "guardado" would
+    // let the reload race the autosave).
+    const savedPaste = page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        response.ok() &&
+        (response.request().postData() ?? "").includes("fotosintesis(luz"),
+    );
     await paste(editable, {
       "text/plain": CODE,
       "text/html": divPerLine(CODE),
@@ -84,6 +92,7 @@ test.describe("editor final polish", () => {
     );
 
     // It is saved as one block with the same text.
+    await savedPaste;
     await expect(page.getByTestId("autosave-status")).toHaveText(/guardado/i, {
       timeout: 15_000,
     });
@@ -113,6 +122,7 @@ test.describe("editor final polish", () => {
 
     await page.keyboard.type("/importante");
     await page.getByRole("option", { name: /^Callout importante/ }).click();
+    await page.waitForTimeout(60);
     await page.keyboard.type("Repasa esto");
     const important = editable.locator(
       "[data-testid='callout'][data-kind='important']",
@@ -125,11 +135,17 @@ test.describe("editor final polish", () => {
     await page.waitForTimeout(60);
     await page.keyboard.type("/consejo");
     await page.getByRole("option", { name: /^Callout de consejo/ }).click();
-    await expect(
-      editable
-        .locator("[data-testid='callout'][data-kind='tip']")
-        .getByTestId("callout-label"),
-    ).toHaveText(/Consejo/);
+    // Playwright click-then-type race: wait for Chrome's selectionchange.
+    await page.waitForTimeout(60);
+    await page.keyboard.type("Ojo con esto");
+    const tip = editable.locator("[data-testid='callout'][data-kind='tip']");
+    await expect(tip.getByTestId("callout-label")).toHaveText(/Consejo/);
+    // Two separate callouts, each holding its own text.
+    await expect(tip).toHaveCount(1);
+    await expect(tip).toContainText("Ojo con esto");
+    await expect(important).toHaveCount(1);
+    await expect(important).toContainText("Repasa esto");
+    await expect(important).not.toContainText("Ojo con esto");
   });
 
   test("sets the size of a selection from its own toolbar menu", async ({

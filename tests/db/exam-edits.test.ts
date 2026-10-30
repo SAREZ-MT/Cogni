@@ -198,10 +198,10 @@ if (process.env.DATABASE_URL) {
         owner.id,
       );
 
-      expect(result.ok && result.value.questions.map((q) => q.stem)).toEqual([
-        "¿Queda, editada?",
-        "¿Pregunta nueva?",
-      ]);
+      // Same createdAt (fixed clock): the id breaks the tie, so the order is random.
+      expect(
+        result.ok && result.value.questions.map((q) => q.stem).sort(),
+      ).toEqual(["¿Pregunta nueva?", "¿Queda, editada?"]);
       expect(
         await rowsOf(
           db
@@ -254,6 +254,34 @@ if (process.env.DATABASE_URL) {
         .from(examPageState)
         .where(eq(examPageState.pageId, pageId));
       expect(state?.failedRootIds).toEqual([kept.root.id]);
+    });
+
+    it("clears the pending retake when the deleted lineage was its only failed root", async () => {
+      const pageId = await newPage();
+      const kept = await seedRoot(pageId, "¿Sigue esta pregunta?");
+      const failed = await seedRoot(pageId, "¿Fallaste esta pregunta?");
+      await db.insert(examPageState).values({
+        pageId,
+        ownerId: owner.id,
+        retakePending: true,
+        failedRootIds: [failed.root.id],
+      });
+
+      const result = await applyExamEdits(
+        { pageId, updates: [], creates: [], deletes: [failed.root.id] },
+        deps(),
+        owner.id,
+      );
+
+      expect(result.ok && result.value.questions.map((q) => q.id)).toEqual([
+        kept.root.id,
+      ]);
+      const [state] = await db
+        .select()
+        .from(examPageState)
+        .where(eq(examPageState.pageId, pageId));
+      expect(state?.failedRootIds).toEqual([]);
+      expect(state?.retakePending).toBe(false);
     });
 
     it("rolls the whole save back when it would leave the page without questions", async () => {

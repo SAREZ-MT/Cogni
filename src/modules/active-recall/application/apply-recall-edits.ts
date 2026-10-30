@@ -1,7 +1,8 @@
 import type { PageTextReader } from "@/modules/notebooks";
 import type { Clock } from "@/shared/kernel/clock";
-import type { DomainError } from "@/shared/kernel/domain-error";
+import { DomainError } from "@/shared/kernel/domain-error";
 import { err, ok, type Result } from "@/shared/kernel/result";
+import { RECALL_ERROR } from "../domain/errors";
 import {
   editRecallQuestion as editQuestion,
   type RecallQuestion,
@@ -23,7 +24,12 @@ import {
 // reduced to operations on the page's recall questions.
 export interface RecallEdits {
   pageId: string;
-  updates: readonly ({ id: string } & RecallQuestionContent)[];
+  // `expectedUpdatedAt`: the item's updatedAt when the edit page loaded
+  // (ISO); a different stored one refuses the save (CHANGED, V10).
+  updates: readonly ({
+    id: string;
+    expectedUpdatedAt?: string;
+  } & RecallQuestionContent)[];
   creates: readonly RecallQuestionContent[];
   deletes: readonly string[];
 }
@@ -64,6 +70,7 @@ export async function applyRecallEdits(
 
   return runRecallWork(deps.uow, async (repos) => {
     const uow = sameTransaction(repos);
+    await repos.questions.lockPage(input.pageId, ownerId);
     const ids = [...input.updates.map((u) => u.id), ...input.deletes];
     const found = await repos.questions.listByIds(ids, ownerId);
     for (const id of ids) {
@@ -75,8 +82,22 @@ export async function applyRecallEdits(
       ) {
         return questionNotFound(id);
       }
+      const expected = input.updates.find(
+        (u) => u.id === id,
+      )?.expectedUpdatedAt;
+      if (
+        expected !== undefined &&
+        question.updatedAt.toISOString() !== expected
+      ) {
+        return err(
+          new DomainError(
+            RECALL_ERROR.CHANGED,
+            `Recall question ${id} changed after the edit page loaded`,
+          ),
+        );
+      }
     }
-    for (const { id, ...content } of input.updates) {
+    for (const { id, expectedUpdatedAt: _, ...content } of input.updates) {
       const edited = await editRecallQuestion(
         { questionId: id, ...content },
         { uow, clock: deps.clock },

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { newStudyItem } from "@/modules/study-engine";
 import { createFixedClock } from "@/shared/kernel/clock";
 import { DomainError } from "@/shared/kernel/domain-error";
@@ -169,6 +169,21 @@ describe("deleteRecallQuestion", () => {
     expect(!result.ok && result.error.code).toBe(RECALL_ERROR.LAST_QUESTION);
     expect(uow.questions.rows.has(only?.id ?? "")).toBe(true);
   });
+
+  // Two saves deleting different questions at once must not both see two
+  // active questions and leave the page with none (V10).
+  it("locks the page before counting its active questions", async () => {
+    const [first] = await seed(uow, 2);
+    const lock = vi.spyOn(uow.questions, "lockPage");
+    const count = vi.spyOn(uow.questions, "listActiveByPage");
+
+    await deleteRecallQuestion({ questionId: first?.id ?? "" }, { uow }, OWNER);
+
+    expect(lock).toHaveBeenCalledWith(PAGE, OWNER);
+    expect(lock.mock.invocationCallOrder[0]).toBeLessThan(
+      count.mock.invocationCallOrder[0] ?? 0,
+    );
+  });
 });
 
 describe("applyRecallEdits", () => {
@@ -212,6 +227,49 @@ describe("applyRecallEdits", () => {
     expect(created).toMatchObject({ origin: "manual", generationId: null });
     expect(itemOf(uow, created?.id ?? "")?.kind).toBe("recall_question");
     expect(itemOf(uow, b?.id ?? "")).toBeUndefined();
+  });
+
+  // V10: a save from a page loaded before a newer change (another tab)
+  // must not overwrite it.
+  it("refuses an edit of a question changed since the page loaded, writing nothing", async () => {
+    const [a, b] = await seed(uow, 2);
+
+    const stale = await applyRecallEdits(
+      {
+        pageId: PAGE,
+        updates: [
+          {
+            id: a?.id ?? "",
+            ...content("Encima"),
+            expectedUpdatedAt: "2026-09-01T10:00:00.000Z",
+          },
+        ],
+        creates: [],
+        deletes: [b?.id ?? ""],
+      },
+      deps(),
+      OWNER,
+    );
+    const current = await applyRecallEdits(
+      {
+        pageId: PAGE,
+        updates: [
+          {
+            id: a?.id ?? "",
+            ...content("Al día"),
+            expectedUpdatedAt: CREATED.toISOString(),
+          },
+        ],
+        creates: [],
+        deletes: [],
+      },
+      deps(),
+      OWNER,
+    );
+
+    expect(!stale.ok && stale.error.code).toBe(RECALL_ERROR.CHANGED);
+    expect(uow.questions.rows.has(b?.id ?? "")).toBe(true);
+    expect(current.ok && current.value.questions[0]?.prompt).toBe("Al día");
   });
 
   it("rolls everything back when the save would leave the page without questions", async () => {

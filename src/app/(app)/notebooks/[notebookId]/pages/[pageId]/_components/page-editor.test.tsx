@@ -8,6 +8,10 @@ import type {
 // The editor's own slash filter, so the test types what a user types.
 import { filterItemsFrom } from "@/modules/editor/ui/tiptap/slash-command";
 import { PageEditor } from "./page-editor";
+import { forgetSavedPages } from "./saved-pages";
+
+const { refresh } = vi.hoisted(() => ({ refresh: vi.fn() }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
 
 const { start } = vi.hoisted(() => ({ start: vi.fn() }));
 vi.mock("@/modules/ingestion/ui/document-import-provider", () => ({
@@ -62,12 +66,69 @@ describe("PageEditor", () => {
     listPagesForMention.mockReset();
     listPagesForMention.mockResolvedValue(pages);
     captured.props = undefined;
+    refresh.mockReset();
+    forgetSavedPages();
   });
 
   it("forwards the editor props untouched", () => {
     const props = mountEditor();
     expect(props.pageId).toBe("p1");
     expect(props.initialVersion).toBe(1);
+  });
+
+  // Phase 8 V9: browser back reuses the route's cached payload, which can
+  // predate this session's saves.
+  describe("returning to a page", () => {
+    const saved = {
+      type: "doc",
+      content: [
+        { type: "paragraph", content: [{ type: "text", text: "uno dos" }] },
+      ],
+    } as EditorProps["initialContent"];
+
+    async function saveOnce() {
+      const save = vi
+        .fn()
+        .mockResolvedValue({ ok: true, value: { version: 4 } });
+      const { unmount } = render(
+        <PageEditor
+          notebookId="n1"
+          pageId="p1"
+          initialContent={{ type: "doc", content: [] }}
+          initialVersion={1}
+          port={{ save, getCurrent: vi.fn() } as unknown as EditorProps["port"]}
+        />,
+      );
+      await captured.props?.port.save({
+        pageId: "p1",
+        content: saved,
+        expectedVersion: 1,
+      });
+      unmount();
+    }
+
+    it("opens the last saved document, not an older payload, and refreshes the route", async () => {
+      await saveOnce();
+      const heard: unknown[] = [];
+      const listener = (event: Event) =>
+        heard.push((event as CustomEvent).detail);
+      window.addEventListener("cogni:page-words", listener);
+
+      const props = mountEditor();
+
+      window.removeEventListener("cogni:page-words", listener);
+      expect(props.initialContent).toEqual(saved);
+      expect(props.initialVersion).toBe(4);
+      expect(heard).toEqual([{ pageId: "p1", words: 2 }]);
+      expect(refresh).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps a fresh payload and does not refresh", () => {
+      const props = mountEditor();
+      expect(props.initialContent).toEqual({ type: "doc", content: [] });
+      expect(props.initialVersion).toBe(1);
+      expect(refresh).not.toHaveBeenCalled();
+    });
   });
 
   // Phase 8 H14: each successful save tells the techniques panel the

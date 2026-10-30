@@ -5,6 +5,9 @@ export const FLASHCARD_ERROR = {
   NOT_FOUND: "FLASHCARD_NOT_FOUND",
   // Archiving it would leave the page's deck empty (a deck is never empty).
   LAST_CARD: "FLASHCARD_LAST_CARD",
+  // An edit page save over a newer change of the item (another tab saved
+  // it after this page loaded; V10): nothing is written.
+  CHANGED: "FLASHCARD_CHANGED",
   // Session feedback is requested before the review session was finished.
   FEEDBACK_SESSION_OPEN: "FLASHCARDS_FEEDBACK_SESSION_OPEN",
   // Session feedback is requested for a session without graded answers.

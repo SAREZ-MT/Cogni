@@ -7,7 +7,9 @@ import type { ExamLineageReferences } from "../application/exam-unit-of-work";
 // deleted, the page's open exams that show any of its questions are
 // deleted (their answers cascade; an open exam has written no review log
 // yet) and its root leaves the pending retake's failed roots. Finished
-// exams keep their row and score: the record of that attempt.
+// exams keep their row and score: the record of that attempt. When the
+// root was the retake's last failed root, the retake is no longer pending
+// (as starting it would clear it), so the hub stops offering it.
 export class DrizzleExamLineageReferences implements ExamLineageReferences {
   constructor(private readonly db: DbExecutor) {}
 
@@ -31,6 +33,7 @@ export class DrizzleExamLineageReferences implements ExamLineageReferences {
       .update(examPageState)
       .set({
         failedRootIds: sql`${examPageState.failedRootIds} - ${input.rootId}::text`,
+        retakePending: sql`${examPageState.retakePending} and jsonb_array_length(${examPageState.failedRootIds} - ${input.rootId}::text) > 0`,
       })
       .where(
         and(

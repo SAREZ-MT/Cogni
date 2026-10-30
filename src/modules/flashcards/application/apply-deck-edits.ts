@@ -1,7 +1,8 @@
 import type { PageTextReader } from "@/modules/notebooks";
 import type { Clock } from "@/shared/kernel/clock";
-import type { DomainError } from "@/shared/kernel/domain-error";
-import { ok, type Result } from "@/shared/kernel/result";
+import { DomainError } from "@/shared/kernel/domain-error";
+import { err, ok, type Result } from "@/shared/kernel/result";
+import { FLASHCARD_ERROR } from "../domain/errors";
 import { editFlashcard as editCard, type Flashcard } from "../domain/flashcard";
 import { createManualFlashcard } from "./create-manual-flashcard";
 import type { DeckRepositories, DeckUnitOfWork } from "./deck-unit-of-work";
@@ -17,7 +18,9 @@ export interface CardSides {
 // reduced to operations on the page's deck.
 export interface DeckEdits {
   pageId: string;
-  updates: readonly ({ id: string } & CardSides)[];
+  // `expectedUpdatedAt`: the item's updatedAt when the edit page loaded
+  // (ISO); a different stored one refuses the save (CHANGED, V10).
+  updates: readonly ({ id: string; expectedUpdatedAt?: string } & CardSides)[];
   creates: readonly CardSides[];
   deletes: readonly string[];
 }
@@ -75,6 +78,15 @@ export async function applyDeckEdits(
         if (!card || card.pageId !== input.pageId || card.archivedAt !== null) {
           throw new RollbackSignal(notFound(id));
         }
+        const expected = input.updates.find(
+          (u) => u.id === id,
+        )?.expectedUpdatedAt;
+        if (
+          expected !== undefined &&
+          card.updatedAt.toISOString() !== expected
+        ) {
+          throw new RollbackSignal(changed(id));
+        }
       }
       for (const update of input.updates) {
         must(
@@ -105,6 +117,15 @@ export async function applyDeckEdits(
     if (error instanceof RollbackSignal) return error.result;
     throw error;
   }
+}
+
+function changed(id: string): Result<never, DomainError> {
+  return err(
+    new DomainError(
+      FLASHCARD_ERROR.CHANGED,
+      `Flashcard ${id} changed after the edit page loaded`,
+    ),
+  );
 }
 
 function sameTransaction(repos: DeckRepositories): DeckUnitOfWork {

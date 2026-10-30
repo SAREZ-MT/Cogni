@@ -138,6 +138,54 @@ describe("applyExamEdits", () => {
     expect(itemOf(uow, "q-2")).toBeUndefined();
   });
 
+  // V10: a save from a page loaded before a newer change (another tab)
+  // must not overwrite it.
+  it("refuses an edit of a question changed since the page loaded, writing nothing", async () => {
+    const stored = question("q-1");
+    await seed(uow, stored, question("q-2"));
+
+    const stale = await applyExamEdits(
+      {
+        pageId: PAGE,
+        updates: [
+          {
+            id: "q-1",
+            ...CONTENT,
+            stem: "Encima",
+            expectedUpdatedAt: "2026-09-01T10:00:00.000Z",
+          },
+        ],
+        creates: [],
+        deletes: ["q-2"],
+      },
+      deps(),
+      OWNER,
+    );
+    const current = await applyExamEdits(
+      {
+        pageId: PAGE,
+        updates: [
+          {
+            id: "q-1",
+            ...CONTENT,
+            stem: "Al día",
+            expectedUpdatedAt: stored.updatedAt.toISOString(),
+          },
+        ],
+        creates: [],
+        deletes: [],
+      },
+      deps(),
+      OWNER,
+    );
+
+    expect(!stale.ok && stale.error.code).toBe(EXAM_ERROR.CHANGED);
+    expect(current.ok && current.value.questions.map((q) => q.stem)).toEqual([
+      "Al día",
+      CONTENT.stem,
+    ]);
+  });
+
   it("deletes a lineage once even when two of its questions are deleted", async () => {
     await seed(uow, question("q-1"), variant("q-1b", "q-1"), question("q-2"));
 

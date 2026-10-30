@@ -28,6 +28,9 @@ export const RECALL_ERROR = {
   // edit page keeps at least one; the whole set goes with a separate
   // action).
   LAST_QUESTION: "RECALL_LAST_QUESTION",
+  // An edit page save over a newer change of the item (another tab saved
+  // it after this page loaded; V10): nothing is written.
+  CHANGED: "RECALL_QUESTION_CHANGED",
   // The owner has no such page to delete the recall set of (Phase 8 H19).
   SET_NOT_FOUND: "RECALL_SET_NOT_FOUND",
   // "Generar" found no paragraph active recall has not used yet on the page

@@ -28,8 +28,9 @@ export type ExamStudyItems = Pick<
 // exam showing one of its questions (its stored list would point at
 // nothing, and it could never be finished) and the page's pending retake
 // (its failed roots). dropLineage removes those open sessions, with their
-// answers, and the root from the retake; finished exams keep their score
-// as the record of that attempt.
+// answers, and the root from the retake (a retake left with no failed
+// root is no longer pending); finished exams keep their score as the
+// record of that attempt.
 export interface ExamLineageReferences {
   dropLineage(
     input: { pageId: string; rootId: string; questionIds: readonly string[] },

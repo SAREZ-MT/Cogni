@@ -15,13 +15,13 @@ export async function seedFlashcards(
   pageId: string,
   cards: readonly SeedCard[],
 ): Promise<void> {
-  const sql = postgres(process.env.DATABASE_URL as string, {
-    prepare: false,
-    max: 1,
-  });
+  // Without it postgres() would quietly try a local database: fail loudly.
+  const url = process.env.DATABASE_URL;
+  if (!url) throw new Error("seedFlashcards needs DATABASE_URL (cogni-dev)");
+  const sql = postgres(url, { prepare: false, max: 1 });
   try {
     for (const [index, card] of cards.entries()) {
-      await sql`
+      const inserted = await sql`
         with card as (
           insert into flashcards (id, owner_id, page_id, front, back, origin,
                                   position)
@@ -36,7 +36,11 @@ export async function seedFlashcards(
         insert into study_items (id, owner_id, page_id, kind, source_id, due_at)
         select gen_random_uuid(), owner_id, page_id, 'flashcard', id, now()
         from card
+        returning id
       `;
+      if (inserted.length !== 1) {
+        throw new Error(`seedFlashcards: no page ${pageId} to seed`);
+      }
     }
   } finally {
     await sql.end();

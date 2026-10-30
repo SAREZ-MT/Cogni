@@ -160,10 +160,10 @@ if (process.env.DATABASE_URL) {
         owner.id,
       );
 
-      expect(result.ok && result.value.questions.map((q) => q.prompt)).toEqual([
-        "Queda editada",
-        "Nueva",
-      ]);
+      // Same createdAt (fixed clock): the id breaks the tie, so the order is random.
+      expect(
+        result.ok && result.value.questions.map((q) => q.prompt).sort(),
+      ).toEqual(["Nueva", "Queda editada"]);
       expect(
         await count(
           db

@@ -48,6 +48,22 @@ describe("item draft (Phase 8 H18 edit pages)", () => {
     expect(draftChangeCount(draft)).toBe(3);
   });
 
+  it("sends the stored version of each edited item, so the server can refuse a stale save", () => {
+    let draft = draftFrom<Side>([
+      { id: "a", value: { front: "A", back: "a" }, version: "v-a" },
+      { id: "b", value: { front: "B", back: "b" } },
+    ]);
+    const [a, b] = draft;
+    draft = updateDraftEntry(draft, a?.key ?? "", { front: "A2", back: "a" });
+    draft = updateDraftEntry(draft, b?.key ?? "", { front: "B2", back: "b" });
+
+    expect(draftOperations(draft).updates).toEqual([
+      { id: "a", version: "v-a", front: "A2", back: "a" },
+      { id: "b", front: "B2", back: "b" },
+    ]);
+    expect(draftOperations(draft).updates[1]).not.toHaveProperty("version");
+  });
+
   it("forgets an edit put back to the stored value and a restored deletion", () => {
     let draft = draftFrom<Side>(items);
     const [a, b] = draft;

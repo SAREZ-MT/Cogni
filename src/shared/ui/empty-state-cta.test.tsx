@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
@@ -23,8 +25,33 @@ describe("EmptyStateCta", () => {
     );
 
     const link = screen.getByRole("link", { name: "Ir" });
-    expect(link).toHaveClass("rounded-pill", "technique-cta");
-    expect(link).not.toHaveClass("bg-primary-600");
+    expect(link).toHaveClass(
+      "rounded-pill",
+      "technique-cta",
+      "bg-(--theme-cta)",
+      "text-(--theme-cta-fg)",
+    );
+    expect(link).not.toHaveClass("bg-primary-600", "bg-primary", "text-white");
+  });
+
+  // jsdom loads no stylesheet, so the colours are proved where they are
+  // defined: every technique theme points the pill's tokens at its own CTA.
+  it.each([
+    ["flashcards", "flashcards"],
+    ["recall", "recall"],
+    ["exams", "exam"],
+  ])("finds the %s theme's CTA colours in globals.css", (theme, token) => {
+    const css = readFileSync(
+      join(process.cwd(), "src/app/globals.css"),
+      "utf8",
+    );
+    const block = css.slice(css.indexOf(`[data-technique-theme="${theme}"] {`));
+    const body = block.slice(0, block.indexOf("\n}"));
+
+    expect(body).toContain(`--theme-cta: var(--color-technique-${token}-cta);`);
+    expect(body).toContain(
+      `--theme-cta-fg: var(--color-technique-${token}-cta-fg);`,
+    );
   });
 
   // Phase 8 H11: without `href` it is a button (a dialog trigger).

@@ -66,6 +66,8 @@ export interface FlashcardView {
   front: string;
   back: string;
   position: number;
+  // ISO; the edit page sends it back so a stale save is refused (V10).
+  updatedAt: string;
 }
 
 export interface GenerationView {
@@ -121,7 +123,14 @@ const sideText = z.string().max(4000);
 const cardSides = z.object({ front: sideText, back: sideText });
 const saveDeckEditsInput = z.object({
   pageId: z.uuid(),
-  updates: z.array(cardSides.extend({ id: z.uuid() })).max(MAX_DRAFT_ITEMS),
+  updates: z
+    .array(
+      cardSides.extend({
+        id: z.uuid(),
+        expectedUpdatedAt: z.iso.datetime().optional(),
+      }),
+    )
+    .max(MAX_DRAFT_ITEMS),
   creates: z.array(cardSides).max(MAX_DRAFT_ITEMS),
   deletes: z.array(z.uuid()).max(MAX_DRAFT_ITEMS),
 });
@@ -160,6 +169,7 @@ function toView(card: Flashcard): FlashcardView {
     front: card.front,
     back: card.back,
     position: card.position,
+    updatedAt: card.updatedAt.toISOString(),
   };
 }
 

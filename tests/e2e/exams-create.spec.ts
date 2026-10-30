@@ -78,9 +78,12 @@ test.describe("Crear examen", () => {
     await create.getByTestId("create-exam-submit").click();
 
     // Phase 8 H17: back on the flat hub, which lists the new exam page.
+    // The dialog already lives on /exams, so the URL check passes before the
+    // generation ends: wait for the dialog to close and the card to appear.
     await expect(page).toHaveURL("/exams", { timeout: 30000 });
+    await expect(create).toBeHidden({ timeout: 30000 });
     const card = page.getByRole("article").filter({ hasText: notebookTitle });
-    await expect(card).toContainText("10 preguntas");
+    await expect(card).toContainText("10 preguntas", { timeout: 30000 });
     await expect(card).toContainText("Sin intentos");
     await expect(page.getByText("Nuevo examen")).toHaveCount(0);
     await shot(page, "exams-hub-with-exams");

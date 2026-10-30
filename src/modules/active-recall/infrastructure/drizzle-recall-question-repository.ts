@@ -1,6 +1,10 @@
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import type { DbExecutor } from "@/shared/db/client";
-import { type RecallQuestionRow, recallQuestions } from "@/shared/db/schema";
+import {
+  pages,
+  type RecallQuestionRow,
+  recallQuestions,
+} from "@/shared/db/schema";
 import type { RecallQuestion } from "../domain/recall-question";
 import type { RecallQuestionRepository } from "../domain/recall-question-repository";
 
@@ -114,5 +118,15 @@ export class DrizzleRecallQuestionRepository
       .where(
         and(eq(recallQuestions.id, id), eq(recallQuestions.ownerId, ownerId)),
       );
+  }
+
+  async lockPage(pageId: string, ownerId: string): Promise<void> {
+    // The page row is the lock (as the flashcards deck lock): every
+    // question change of the page queues behind it.
+    await this.db
+      .select({ id: pages.id })
+      .from(pages)
+      .where(and(eq(pages.id, pageId), eq(pages.ownerId, ownerId)))
+      .for("update");
   }
 }

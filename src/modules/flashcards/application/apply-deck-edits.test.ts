@@ -201,6 +201,53 @@ describe("applyDeckEdits", () => {
     ).toBeNull();
   });
 
+  // V10: a save from a page loaded before a newer change (another tab)
+  // must not overwrite it.
+  it("refuses an edit of a card changed since the page loaded, writing nothing", async () => {
+    const [a, b] = await seed(deck, 2);
+
+    const stale = await applyDeckEdits(
+      {
+        pageId: PAGE,
+        updates: [
+          {
+            id: a?.id ?? "",
+            front: "Encima",
+            back: "RA",
+            expectedUpdatedAt: "2026-09-01T10:00:00.000Z",
+          },
+        ],
+        creates: [],
+        deletes: [b?.id ?? ""],
+      },
+      deps(),
+      OWNER,
+    );
+    const current = await applyDeckEdits(
+      {
+        pageId: PAGE,
+        updates: [
+          {
+            id: a?.id ?? "",
+            front: "Al día",
+            back: "RA",
+            expectedUpdatedAt: CREATED.toISOString(),
+          },
+        ],
+        creates: [],
+        deletes: [],
+      },
+      deps(),
+      OWNER,
+    );
+
+    expect(!stale.ok && stale.error.code).toBe(FLASHCARD_ERROR.CHANGED);
+    expect(current.ok && current.value.cards.map((x) => x.front)).toEqual([
+      "Al día",
+      b?.front,
+    ]);
+  });
+
   it("lets a save replace every card when it also adds one", async () => {
     const [only] = await seed(deck, 1);
 

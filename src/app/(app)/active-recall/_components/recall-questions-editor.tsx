@@ -25,6 +25,8 @@ const SAVE_ERRORS: Record<string, string> = {
   RECALL_LAST_QUESTION: "La página necesita al menos una pregunta.",
   RECALL_INVALID_QUESTION:
     "Cada pregunta necesita enunciado, al menos un concepto clave y la respuesta esperada.",
+  RECALL_QUESTION_CHANGED:
+    "Una pregunta cambió en otra pestaña. Recarga la página para ver la última versión.",
   RECALL_QUESTION_NOT_FOUND:
     "Estas preguntas cambiaron mientras las editabas. Recarga la página e intenta de nuevo.",
   PAGE_NOT_FOUND: "Esta página ya no existe.",
@@ -60,6 +62,8 @@ const toItem = (question: RecallQuestionView) => ({
     keyConcepts: question.keyConcepts.join("\n"),
     acceptableAnswerSummary: question.acceptableAnswerSummary,
   },
+  // Sent back with an edit: a save over a newer change is refused (V10).
+  version: question.updatedAt,
 });
 
 const toContent = ({ keyConcepts, ...rest }: RecallQuestionDraft) => ({
@@ -151,8 +155,9 @@ export function RecallQuestionsEditor({
       onSave={async ({ updates, creates, deletes }) => {
         const result = await saveRecallEditsAction({
           pageId,
-          updates: updates.map(({ id, ...draft }) => ({
+          updates: updates.map(({ id, version, ...draft }) => ({
             id,
+            expectedUpdatedAt: version,
             ...toContent(draft),
           })),
           creates: creates.map(toContent),

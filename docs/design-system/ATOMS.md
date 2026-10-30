@@ -628,7 +628,7 @@ child of the centered `max-w-2xl` column, above `PageHeader`).
 Audited for hand-rolled duplication; the existing `default | outline |
 secondary | ghost | destructive | link` variants already cover every
 Button-composed call site (dialog actions, `CreateNotebookTrigger`'s hero and cta,
-`ArchivePageButton`, the kebab menu). The remaining hand-rolled buttons
+`DeletePageButton` (H19, was `ArchivePageButton`), the kebab menu). The remaining hand-rolled buttons
 (`notebooks/[notebookId]/page.tsx`'s "Nueva página", `home/weak-topics.tsx`'s
 disabled "pronto", `app/(app)/page.tsx`'s disabled "Ajustar") are each used
 exactly once and differ from `Button`'s variants in height, radius, hover
@@ -890,7 +890,9 @@ Phase 8 H12: a dialog's feedback box, `rounded-xl` with a 1px border.
 `tone="error"` (default): `role="alert"`, `bg-error-50 border-error-100
 text-destructive`; `tone="info"`: a neutral note (`bg-neutral-50`). Children
 may include a follow-up link ("Abrir la página"). Used by the create and
-generate dialogs, the question form and the archive/retire confirms.
+generate dialogs, `DeleteConfirmDialog` (H19, which replaced the archive
+and retire confirms) and the edit pages' `ItemEditor` (H18; the question
+form was deleted with the AI-only creation).
 
 ## GenerationsLeft (`generations-left.tsx`)
 
@@ -1152,9 +1154,10 @@ description, a `FieldLabel` + 44px `Input` and a `brand` primary;
 `aria-pressed` and a check on the current colour; `NewPageDialog` drops its
 own padding and title overrides for the shell's; `NewFlashcardDialog`
 wore the flashcards theme (amber `PixelTile`, `technique` save) until H13
-deleted it (cards are created by AI only); `QuestionFormDialog` and `ExamGenerateDialog` / `CreateExamDialog` the
-exams theme; the archive and retire confirms keep `destructive` and show
-errors as `FormMessage`.
+deleted it (cards are created by AI only); `ExamGenerateDialog` / `CreateExamDialog`
+the exams theme (`QuestionFormDialog` was deleted in H18); the delete
+confirms (`DeleteConfirmDialog`, H19) keep `destructive` and show errors as
+`FormMessage`.
 
 ## Flashcards design preview (2026-09-24)
 

@@ -12,10 +12,20 @@ export interface DraftEntry<T> {
   readonly original: T | null;
   // Marked for deletion (kept so "Deshacer" can bring it back).
   readonly deleted: boolean;
+  // The stored item's version (its updatedAt), when the page has one: an
+  // edit sends it so the server refuses a save over a newer change (V10).
+  readonly version?: string;
+}
+
+// A stored item as the edit page loads it.
+export interface StoredItem<T> {
+  id: string;
+  value: T;
+  version?: string;
 }
 
 export interface DraftOperations<T> {
-  updates: ({ id: string } & T)[];
+  updates: ({ id: string; version?: string } & T)[];
   creates: T[];
   deletes: string[];
 }
@@ -26,15 +36,14 @@ function sameValue<T>(a: T, b: T): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
-export function draftFrom<T>(
-  items: readonly { id: string; value: T }[],
-): DraftEntry<T>[] {
+export function draftFrom<T>(items: readonly StoredItem<T>[]): DraftEntry<T>[] {
   return items.map((item) => ({
     key: item.id,
     id: item.id,
     value: item.value,
     original: item.value,
     deleted: false,
+    ...(item.version === undefined ? {} : { version: item.version }),
   }));
 }
 
@@ -108,7 +117,11 @@ export function draftOperations<T>(
     if (entry.id === null) operations.creates.push(entry.value);
     else if (entry.deleted) operations.deletes.push(entry.id);
     else if (isEdited(entry))
-      operations.updates.push({ id: entry.id, ...entry.value });
+      operations.updates.push({
+        id: entry.id,
+        ...(entry.version === undefined ? {} : { version: entry.version }),
+        ...entry.value,
+      });
   }
   return operations;
 }

@@ -40,6 +40,9 @@ export const EXAM_ERROR = {
   // edit page keeps at least one; the whole set goes with a separate
   // action).
   LAST_QUESTION: "EXAMS_LAST_QUESTION",
+  // An edit page save over a newer change of the item (another tab saved
+  // it after this page loaded; V10): nothing is written.
+  CHANGED: "EXAMS_QUESTION_CHANGED",
   // The page failed its last exam: only a retake with reformulated
   // questions may start (§7.5), never a normal exam that repeats wordings.
   RETAKE_PENDING: "EXAMS_RETAKE_PENDING",

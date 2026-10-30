@@ -34,6 +34,8 @@ const SAVE_ERRORS: Record<string, string> = {
   EXAMS_LAST_QUESTION: "La página necesita al menos una pregunta.",
   EXAMS_INVALID_QUESTION:
     "Cada pregunta necesita enunciado, 4 opciones distintas y el concepto que evalúa.",
+  EXAMS_QUESTION_CHANGED:
+    "Una pregunta cambió en otra pestaña. Recarga la página para ver la última versión.",
   EXAMS_QUESTION_NOT_FOUND:
     "Estas preguntas cambiaron mientras las editabas. Recarga la página e intenta de nuevo.",
   EXAMS_QUESTION_RETIRED:
@@ -83,6 +85,8 @@ const toItem = (question: ExamQuestionView) => ({
     concept: question.concept,
     explanation: question.explanation,
   },
+  // Sent back with an edit: a save over a newer change is refused (V10).
+  version: question.updatedAt,
 });
 
 // The exam questions' edit page (Phase 8 H18): stem, the 4 options, the
@@ -230,7 +234,14 @@ export function ExamQuestionsEditor({
         </div>
       )}
       onSave={async (operations) => {
-        const result = await saveExamEditsAction({ pageId, ...operations });
+        const result = await saveExamEditsAction({
+          pageId,
+          ...operations,
+          updates: operations.updates.map(({ version, ...update }) => ({
+            ...update,
+            expectedUpdatedAt: version,
+          })),
+        });
         if (result.ok) return { ok: true, items: result.value.map(toItem) };
         return {
           ok: false,

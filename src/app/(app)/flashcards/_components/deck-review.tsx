@@ -182,10 +182,10 @@ export function DeckReview({
   }
 
   // "Volver al mazo" from the summary. Leaving a practice pass drops
-  // `?modo=practica` (a reload shows the deck instead of practising) and
-  // shows the up-to-date state again; leaving a graded session asks for
-  // the deck's due cards again, so the deck says it is up to date, or
-  // goes on with what is still due.
+  // `?modo=practica` (a reload shows the deck instead of practising).
+  // Leaving either kind of pass asks for the deck's due cards again, so the
+  // deck says it is up to date only when the server says so (a practice
+  // opened by URL may have had cards due), or goes on with what is due.
   function exitSession() {
     const practised = session?.sessionId === null;
     setSession(null);
@@ -196,10 +196,8 @@ export function DeckReview({
         "",
         `${deckPath}${keepQuery ? `?${keepQuery}` : ""}`,
       );
-      setNotice("nothing-due");
-      return;
     }
-    if (practiceCards) startReview();
+    startReview();
   }
 
   function startReview() {
