@@ -1,8 +1,8 @@
 # Modelo de datos y contrato de API — Cogni
 
 **Proyecto:** Cogni — plataforma web de estudio a partir de apuntes propios
-**Versión:** 1.2
-**Fecha:** 2026-10-26
+**Versión:** 1.3
+**Fecha:** 2026-10-29
 **Estado:** Borrador
 **Autor:** Javier Sarez
 **Documentos relacionados:** ./01-SRS.md, ./02-SAD.md, ./04-ADR.md
@@ -20,7 +20,8 @@
   - Fase 6 (Recordación activa, PR #87–#94): tablas `recall_questions`, `recall_sessions` y `recall_answers` (migración `0012`) y `generation_fingerprints` (migración `0013`, generación incremental de las tres técnicas); decisiones en `docs/adr/0007-recordacion-activa-y-generacion-incremental.md`.
   - Fase 7 (Calendario y dashboard, PR #95–#100): sin tablas ni migraciones nuevas; `scheduling` y `analytics` solo leen tablas existentes y `profiles.timezone` pasa a usarse; decisiones en `docs/adr/0008-calendario-y-dashboard.md`.
 - El esquema real tiene 20 tablas, una por entidad del modelo de dominio (documento-maestro §6.1), creadas por 14 migraciones (`0000_profiles` a `0013_generation_fingerprints`). Todas se documentan en este documento contra su migración y `src/shared/db/schema.ts` (§1 y §2).
-- El contrato de API (§4) cubre las Server Actions de los 16 archivos `"use server"` y los 3 Route Handlers que existen hoy en el código; no documenta ningún punto de entrada inexistente.
+- Fase 8 (Diseño y flujos), revisión del 2026-10-29 contra el código, sin cambio de esquema ni migraciones: la creación de tarjetas y preguntas nace solo con IA (H13) y exige 100 palabras de contenido nuevo, unas 15 por ítem (150 para recordación activa y para el examen más pequeño; `AI_PAGE_TOO_SHORT`, H14); cada técnica tiene una página de edición con un solo "Guardar" transaccional (H18); "Archivar" se reemplazó por un borrado real con recuento previo (H19). Las acciones de creación manual, archivado y retiro (`createFlashcardAction`, `archiveFlashcardAction`, `createExamQuestionAction`, `editExamQuestionAction`, `retireExamQuestionAction`, `archiveNotebook`, `archivePage`) ya no existen; §4 lista sus reemplazos.
+- El contrato de API (§4) cubre las Server Actions de los 18 archivos `"use server"` y los 3 Route Handlers que existen hoy en el código; no documenta ningún punto de entrada inexistente.
 - Referencias a decisiones: "`04-ADR.md`, ADR-0NN" designa una entrada del registro de decisiones de esta suite (`./04-ADR.md`); "`docs/adr/00NN`" designa un ADR numerado del repositorio. Son dos numeraciones distintas.
 
 ### Documento vivo
@@ -44,7 +45,7 @@ Este documento se actualiza a medida que avanza la construcción de Cogni; la no
 > **Decisiones de modelado (documento-maestro §6.2 y código real):**
 > - **Autorización por propiedad, no por RLS de negocio:** el servidor se conecta con el pooler de Supabase y omite Row Level Security; cada caso de uso de `application` recibe `ownerId` de la sesión y filtra explícitamente por él (`src/shared/db/client.ts`, `prepare: false, max: 1`). RLS está **activa** en las 20 tablas (`.enableRLS()` en `schema.ts`, `ENABLE ROW LEVEL SECURITY` en cada migración) pero ninguna tiene políticas propias: solo la conexión de servidor las alcanza. Las únicas políticas RLS del proyecto son las de Storage (siguiente punto).
 > - **RLS real en Supabase Storage:** a diferencia de las tablas de negocio, los buckets `page-assets` y `page-pdfs` sí tienen políticas RLS por `owner_id`, porque el navegador sube archivos directamente a Storage con la clave pública.
-> - **Borrado lógico (`archived_at`):** `notebooks`, `pages`, `flashcards` y `recall_questions` no se eliminan físicamente (las preguntas de examen se retiran con `retired_at`); el archivado de un cuaderno propaga `archived_at` a sus páginas activas en la capa de aplicación, no mediante un trigger de base de datos.
+> - **Borrado real desde la Fase 8 (H18, H19):** cuadernos, páginas, conjuntos de técnica e ítems sueltos se borran físicamente. Borrar un cuaderno o una página borra la fila y el resto cae por `ON DELETE CASCADE` (salvo `session_feedback`, sin clave foránea, que se borra antes en la misma transacción, y `ai_generations`, que solo pierde el enlace); los objetos de Storage se borran con su API después de confirmar. Un conjunto de técnica borra en una transacción, bajo el bloqueo de la página, sus ítems de todo estado, sesiones, respuestas, retroalimentación, `study_items` (los `review_logs` caen en cascada), `exam_page_state` y las huellas de la técnica, y recalcula `page_mastery`. Las columnas `archived_at` (`notebooks`, `pages`, `flashcards`, `recall_questions`) y `retired_at` (`exam_questions`) siguen en el esquema para las filas archivadas o retiradas antes de H19, que las lecturas siguen ocultando; ninguna acción las escribe ya.
 > - **`content` jsonb + `plain_text` materializado:** `pages.content` guarda el documento Tiptap tal cual; `plain_text` se recalcula en el servidor en cada guardado mediante un recorrido puro del árbol (`extractPlainText`), nunca se acepta el `plain_text` que envíe el cliente.
 > - **`content_version` como concurrencia optimista:** cada guardado de página es un `UPDATE ... WHERE content_version = expected` atómico (comparar-e-intercambiar), no un patrón leer-luego-escribir.
 > - **`ImportJob` como máquina de estados:** `import_jobs.status` (`queued → processing → done/failed`) es el único registro de progreso de una importación; no existe columna `trigger_run_id` (ver `04-ADR.md`, ADR-009, y `docs/adr/0003`: la importación corre de forma síncrona dentro de la propia Server Action, bajo `maxDuration`, sobre Vercel Fluid Compute).
@@ -88,7 +89,7 @@ Se relaciona con `auth.users` de Supabase: comparte el mismo `id` y depende de �
 | created_at | timestamptz |
 | updated_at | timestamptz |
 
-Se relaciona con Profile: pertenece a uno (`owner_id`, `ON DELETE CASCADE`). Se relaciona con Page: un Notebook tiene muchas Page; archivar un Notebook propaga `archived_at` a sus páginas activas (regla de la capa de aplicación, no de la base de datos).
+Se relaciona con Profile: pertenece a uno (`owner_id`, `ON DELETE CASCADE`). Se relaciona con Page: un Notebook tiene muchas Page (`notebook_id`, `ON DELETE CASCADE`); desde la Fase 8 (H19) borrar un Notebook borra sus páginas, incluidas las archivadas antes. Antes de H19, archivar un Notebook propagaba `archived_at` a sus páginas activas en la capa de aplicación.
 
 #### Page — Estado: Implementado (Fase 1)
 
@@ -1265,7 +1266,7 @@ Al terminar una `ExamSession` (solo con todas sus preguntas respondidas; `EXAMS_
 | `last_quality` | integer | nulo | Última calidad (`q`, 0–5) registrada. |
 | `last_reviewed_at` | timestamptz | nulo | Fecha del último repaso. |
 | `lapses` | integer | 0 | Número de veces que `q < 3`. |
-| `suspended_at` | timestamptz | nulo | Fecha de suspensión del ítem: se fija al archivar su tarjeta o al retirar la última pregunta activa de su linaje de examen; un ítem suspendido no vence ni cuenta para el dominio. |
+| `suspended_at` | timestamptz | nulo | Fecha de suspensión del ítem: se fijaba al archivar su tarjeta o al retirar la última pregunta activa de su linaje de examen (antes de la Fase 8; hoy borrar un ítem borra su fila); un ítem suspendido no vence ni cuenta para el dominio. |
 
 ---
 
@@ -1300,10 +1301,13 @@ Corresponden a CU-03 (Crear y organizar cuadernos y páginas) y CU-04 (Escribir 
 | `createNotebook` | `{ title: string; icon?: string o null; color?: string o null }` | `Notebook` | Requiere sesión (lanza) | `NOTEBOOKS_INVALID_INPUT`, `NOTEBOOK_INVALID_TITLE`, `NOTEBOOK_INVALID_COLOR` |
 | `renameNotebook` | `{ notebookId: string; title: string }` | `Notebook` | Requiere sesión (lanza) | `NOTEBOOKS_INVALID_INPUT`, `NOTEBOOK_NOT_FOUND`, `NOTEBOOK_INVALID_TITLE` |
 | `setNotebookAppearance` | `{ notebookId: string; icon?: string o null; color?: string o null }` | `Notebook` | Requiere sesión (lanza) | `NOTEBOOKS_INVALID_INPUT`, `NOTEBOOK_NOT_FOUND`, `NOTEBOOK_INVALID_COLOR` |
-| `archiveNotebook` | `{ notebookId: string }` | `Notebook` | Requiere sesión (lanza) | `NOTEBOOKS_INVALID_INPUT`, `NOTEBOOK_NOT_FOUND` |
 | `createPage` | `{ notebookId: string; title?: string }` | `Page` | Requiere sesión (lanza) | `NOTEBOOKS_INVALID_INPUT`, `NOTEBOOK_NOT_FOUND`, `NOTEBOOK_ARCHIVED` |
 | `renamePage` | `{ pageId: string; title: string }` | `Page` | Requiere sesión (lanza) | `NOTEBOOKS_INVALID_INPUT`, `PAGE_NOT_FOUND` |
-| `archivePage` | `{ pageId: string }` | `Page` | Requiere sesión (lanza) | `NOTEBOOKS_INVALID_INPUT`, `PAGE_NOT_FOUND` |
+| `previewNotebookDeletion` | `{ notebookId: string }` (Result-returning) | `Result<NotebookDeletionPreview, ActionError>` (`pages`, `decks`, `recallSets`, `examSets`), el recuento del diálogo de confirmación | Requiere sesión (Result) | `NOTEBOOK_NOT_FOUND` (también id malformado o ajeno) |
+| `deleteNotebook` | `{ notebookId: string }` (Result-returning) | `Result<{ notebookId: string }, ActionError>`; borrado real del cuaderno y todo lo suyo, luego Storage | Requiere sesión (Result) | `NOTEBOOK_NOT_FOUND` |
+| `previewPageDeletion` | `{ pageId: string }` (Result-returning) | `Result<PageDeletionPreview, ActionError>` (`flashcards`, `recallQuestions`, `examQuestions`, `images`) | Requiere sesión (Result) | `PAGE_NOT_FOUND` |
+| `deletePage` | `{ pageId: string }` (Result-returning) | `Result<{ pageId: string }, ActionError>`; borrado real de la página y todo lo suyo, luego Storage | Requiere sesión (Result) | `PAGE_NOT_FOUND` |
+| `getPagePickerTree` | — | `PagePickerNotebookEntry[]`: cuadernos y páginas activas con las palabras de cada página contadas en el servidor (sin enviar `plain_text`), para los selectores de página de los centros (mínimo de palabras de H14) | Requiere sesión (lanza) | — |
 | `getSidebarTree` | — | `SidebarNotebook[]` | Requiere sesión (lanza) | — (sin canal de `DomainError`) |
 | `listPagesForMention` | — | `MentionPageCandidate[]` (`id`, `title`, `notebookId`, `notebookTitle`, `notebookColor`): las páginas activas del árbol del sidebar, para el menú de menciones del editor | Requiere sesión (lanza) | — (sin canal de `DomainError`) |
 | `getHomeOverview` | — | `HomeOverview` (ver ejemplo abajo) | Requiere sesión (lanza) | — (sin canal de `DomainError`) |
@@ -1403,16 +1407,17 @@ Ejemplo de retorno no trivial (`ImportJobStatusView`):
 
 ### 4.4 `flashcards`
 
-Corresponden a CU-06 (Generar material de estudio con IA) y CU-07 (Repasar flashcards), y a RF-FC-01 a RF-FC-05 (Fases 3 y 4; `docs/adr/0004`, `docs/adr/0005`). Server Actions (`"use server"`) en `src/modules/flashcards/actions.ts` y `session-actions.ts`, sobre el borde compartido de `action-support.ts`: sesión primero (`FLASHCARDS_SESSION_REQUIRED`, "Debes iniciar sesión para continuar."), entrada validada con Zod (ids `z.uuid()`; `FLASHCARDS_INVALID_INPUT`) y envoltura `withBoundary()` (una excepción no prevista se reporta a Sentry y se convierte en `FLASHCARDS_UNEXPECTED`); nunca lanzan y cada `DomainError` sale como `ActionError`. La tabla lista solo los demás errores. `createFlashcardAction` y `archiveFlashcardAction` revalidan `/flashcards` (`revalidatePath("/flashcards", "layout")`); `generateFlashcardsAction` no revalida.
+Corresponden a CU-06 (Generar material de estudio con IA) y CU-07 (Repasar flashcards), y a RF-FC-01 a RF-FC-06 y RF-AI-06 (Fases 3, 4 y 8; `docs/adr/0004`, `docs/adr/0005`). Server Actions (`"use server"`) en `src/modules/flashcards/actions.ts` y `session-actions.ts`, sobre el borde compartido de `action-support.ts`: sesión primero (`FLASHCARDS_SESSION_REQUIRED`, "Debes iniciar sesión para continuar."), entrada validada con Zod (ids `z.uuid()`; `FLASHCARDS_INVALID_INPUT`) y envoltura `withBoundary()` (una excepción no prevista se reporta a Sentry y se convierte en `FLASHCARDS_UNEXPECTED`); nunca lanzan y cada `DomainError` sale como `ActionError`. La tabla lista solo los demás errores. `createFlashcardAction` y `archiveFlashcardAction` revalidan `/flashcards` (`revalidatePath("/flashcards", "layout")`); `generateFlashcardsAction` no revalida.
 
 | Acción | Parámetros | Retorno | Errores propios |
 |---|---|---|---|
-| `generateFlashcardsAction` | `{ pageId, count? }` (`count` entero de 3 a 20; 10 por defecto) | `Result<GenerationView, GenerationActionError>` (`cards`, `remainingToday`, `truncated`, `wordsUsed`, `wordsTotal`) | `PAGE_NOT_FOUND`, `AI_PAGE_EMPTY`, `FLASHCARDS_NO_NEW_CONTENT`, `AI_DAILY_LIMIT_REACHED` (con `resetAt` ISO), `AI_GENERATION_FAILED`, `AI_NO_PROVIDER_AVAILABLE` |
+| `generateFlashcardsAction` | `{ pageId, count? }` (`count` entero de 3 a 20; sin `count`, el servidor pide una tarjeta por cada 15 palabras nuevas, entre 3 y 10) | `Result<GenerationView, GenerationActionError>` (`cards`, `remainingToday`, `truncated`, `wordsUsed`, `wordsTotal`) | `PAGE_NOT_FOUND`, `AI_PAGE_EMPTY`, `AI_PAGE_TOO_SHORT` (menos de 100 palabras nuevas, o de las que pide la cantidad; lleva `words`, `minWords` y `maxItems`; antes del límite diario), `FLASHCARDS_NO_NEW_CONTENT`, `AI_DAILY_LIMIT_REACHED` (con `resetAt` ISO), `AI_GENERATION_FAILED`, `AI_NO_PROVIDER_AVAILABLE` |
 | `listFlashcardsAction` | `{ pageId }` | `Result<FlashcardView[], ActionError>` (`id`, `pageId`, `front`, `back`, `position`) | — |
 | `getGenerationStatusAction` | — | `Result<GenerationStatusView, ActionError>` (`remainingToday`, `resetAt` ISO); solo consulta el límite, no lo consume | — |
 | `listDecksAction` | — | `Result<DeckView[], ActionError>` (`pageId`, `notebookId`, `pageTitle`, `notebookTitle`, `notebookColor`, `count`) | — |
-| `createFlashcardAction` | `{ pageId, front, back }` (cada lado hasta 1000 caracteres tras recortar espacios) | `Result<FlashcardView, ActionError>` | `PAGE_NOT_FOUND`, `FLASHCARD_EMPTY`, `FLASHCARD_TOO_LONG` |
-| `archiveFlashcardAction` | `{ flashcardId }` | `Result<ArchiveView, ActionError>` (`remaining`, tarjetas activas que quedan, siempre ≥ 1) | `FLASHCARD_NOT_FOUND`, `FLASHCARD_LAST_CARD` |
+| `saveDeckEditsAction` | `{ pageId, updates: { id, front, back }[], creates: { front, back }[], deletes: id[] }` (hasta 200 por lista; cada lado hasta 1000 caracteres tras recortar espacios) | `Result<DeckEditsView, ActionError>` (`cards`, el mazo guardado); valida todo y luego aplica ediciones, altas a mano (`origin = manual`) y borrados reales (tarjeta, `study_items`, `review_logs` en cascada) en una sola unidad de trabajo (`applyDeckEdits`) | `PAGE_NOT_FOUND`, `FLASHCARD_NOT_FOUND`, `FLASHCARD_EMPTY`, `FLASHCARD_TOO_LONG`, `FLASHCARD_LAST_CARD` (el mazo conserva al menos una tarjeta) |
+| `previewDeckDeletionAction` | `{ pageId }` | `Result<DeckDeletionView, ActionError>` (`cards`, `reviews`) | `FLASHCARD_NOT_FOUND` (página ajena o desconocida) |
+| `deleteDeckAction` | `{ pageId }` | `Result<{ pageId }, ActionError>`; borra el mazo completo, sus sesiones de la página, su retroalimentación, sus `study_items` y sus huellas, y recalcula el dominio de la página | `FLASHCARD_NOT_FOUND` |
 | `startFlashcardSessionAction` | `{ pageId? }` (sin `pageId`: sesión multipágina de "Hoy") | `Result<ReviewSessionView, ActionError>` (`sessionId`, `cards[]` con `itemId`, `flashcardId`, `front`, `back`, `nextIntervalDays` por botón) | `PAGE_NOT_FOUND`, `STUDY_ENGINE_NOTHING_DUE` |
 | `gradeFlashcardAction` | `{ sessionId, itemId, rating }` (`rating`: `again`, `hard`, `good` o `easy`, claves de `FLASHCARD_QUALITY`) | `Result<GradeView, ActionError>` (`reviewedCount`, `againCount`, `masteryLevel`) | `STUDY_ENGINE_SESSION_NOT_FOUND`, `STUDY_ENGINE_SESSION_FINISHED`, `STUDY_ENGINE_ITEM_NOT_FOUND`, `STUDY_ENGINE_ITEM_SUSPENDED`, `STUDY_ENGINE_ITEM_NOT_DUE` |
 | `finishFlashcardSessionAction` | `{ sessionId }` | `Result<ReviewSummaryView, ActionError>` (`reviewedCount`, `againCount`; nunca tiempo de estudio) | `STUDY_ENGINE_SESSION_NOT_FOUND` |
@@ -1422,15 +1427,15 @@ Corresponden a CU-06 (Generar material de estudio con IA) y CU-07 (Repasar flash
 
 ### 4.5 `exams`
 
-Corresponden a CU-06 y CU-08 (Presentar un examen) y a RF-EX-01 a RF-EX-07 (Fase 5, `docs/adr/0006`). Server Actions (`"use server"`) en `src/modules/exams/actions.ts`, `session-actions.ts`, `feedback-actions.ts`, `hub-actions.ts` y `retake-actions.ts`, con el mismo borde que flashcards (`action-support.ts`): `EXAMS_SESSION_REQUIRED`, `EXAMS_INVALID_INPUT` y `EXAMS_UNEXPECTED`; nunca lanzan. Las acciones que cambian preguntas (crear, editar, retirar y generar), además de iniciar, terminar y repetir un examen, revalidan `/exams`; `answerExamQuestionAction` no revalida. La tabla lista solo los demás errores.
+Corresponden a CU-06 y CU-08 (Presentar un examen) y a RF-EX-01 a RF-EX-08 y RF-AI-06 (Fases 5 y 8, `docs/adr/0006` y su enmienda del 2026-10-29). Server Actions (`"use server"`) en `src/modules/exams/actions.ts`, `session-actions.ts`, `feedback-actions.ts`, `hub-actions.ts`, `retake-actions.ts` y `deletion-actions.ts`, con el mismo borde que flashcards (`action-support.ts`): `EXAMS_SESSION_REQUIRED`, `EXAMS_INVALID_INPUT` y `EXAMS_UNEXPECTED`; nunca lanzan. Las acciones que cambian preguntas (crear, editar, retirar y generar), además de iniciar, terminar y repetir un examen, revalidan `/exams`; `answerExamQuestionAction` no revalida. La tabla lista solo los demás errores.
 
 | Acción | Parámetros | Retorno | Errores propios |
 |---|---|---|---|
 | `listExamQuestionsAction` | `{ pageId }` | `Result<ExamQuestionView[], ActionError>` (`id`, `pageId`, `stem`, `options[4]`, `correctIndex`, `explanation`, `concept`, `origin`) | — |
-| `createExamQuestionAction` | `{ pageId, stem, options (4), correctIndex (0–3), explanation, concept }` (límites tras recortar: enunciado 1000, opción 300, explicación 2000, concepto 120 caracteres) | `Result<ExamQuestionView, ActionError>` | `PAGE_NOT_FOUND`, `EXAMS_INVALID_QUESTION` |
-| `editExamQuestionAction` | `{ questionId, stem, options, correctIndex, explanation, concept }` | `Result<ExamQuestionView, ActionError>` | `EXAMS_QUESTION_NOT_FOUND`, `EXAMS_QUESTION_RETIRED`, `EXAMS_INVALID_QUESTION` |
-| `retireExamQuestionAction` | `{ questionId }` | `Result<{ id }, ActionError>` (idempotente: una pregunta ya retirada conserva su `retired_at`) | `EXAMS_QUESTION_NOT_FOUND` |
-| `generateExamQuestionsAction` | `{ pageId, count? }` (`count` de 10 a 30; 10 por defecto) | `Result<ExamGenerationView, ExamGenerationActionError>` (`questions`, `created`, `skipped`, `remainingToday`, `truncated`, `wordsUsed`, `wordsTotal`) | `PAGE_NOT_FOUND`, `AI_PAGE_EMPTY`, `EXAMS_NO_NEW_CONTENT`, `EXAMS_INVALID_QUESTION_COUNT`, `AI_DAILY_LIMIT_REACHED` (con `resetAt`), `AI_GENERATION_FAILED`, `AI_NO_PROVIDER_AVAILABLE` |
+| `saveExamEditsAction` | `{ pageId, updates: { id, stem, options (4), correctIndex (0–3), explanation, concept }[], creates: (sin `id`)[], deletes: id[] }` (hasta 200 por lista; límites tras recortar: enunciado 1000, opción 300, explicación 2000, concepto 120 caracteres; opciones repetidas se rechazan) | `Result<ExamQuestionView[], ActionError>` (las preguntas activas de la página tras guardar); aplica en una transacción (`applyExamEdits`) ediciones en el lugar, altas a mano (`origin = manual`) y borrados reales: cada borrado quita antes el linaje de los exámenes abiertos y de la repetición pendiente (`ExamLineageReferences.dropLineage`) y luego borra el linaje completo con el `study_item` de su raíz; los exámenes terminados conservan su nota | `PAGE_NOT_FOUND`, `EXAMS_QUESTION_NOT_FOUND`, `EXAMS_INVALID_QUESTION`, `EXAMS_LAST_QUESTION` |
+| `previewExamSetDeletionAction` | `{ pageId }` | `Result<ExamSetDeletionPreview, ActionError>` (`questions`, `attempts`) | `EXAMS_SET_NOT_FOUND` |
+| `deleteExamSetAction` | `{ pageId }` | `Result<{ pageId }, ActionError>`; borra todas las preguntas de la página en cualquier estado, sesiones, respuestas, retroalimentación, `study_items`, `exam_page_state` y huellas, y recalcula el dominio | `EXAMS_SET_NOT_FOUND` |
+| `generateExamQuestionsAction` | `{ pageId, count? }` (`count` de 10 a 30; 10 por defecto; solo las cantidades que caben en las palabras nuevas, 15 por pregunta) | `Result<ExamGenerationView, ExamGenerationActionError>` (`questions`, `created`, `skipped`, `remainingToday`, `truncated`, `wordsUsed`, `wordsTotal`) | `PAGE_NOT_FOUND`, `AI_PAGE_EMPTY`, `AI_PAGE_TOO_SHORT` (menos de 100 palabras nuevas, o de las que pide la cantidad; lleva `words`, `minWords` y `maxItems`; antes del límite diario), `EXAMS_NO_NEW_CONTENT`, `EXAMS_INVALID_QUESTION_COUNT`, `AI_DAILY_LIMIT_REACHED` (con `resetAt`), `AI_GENERATION_FAILED`, `AI_NO_PROVIDER_AVAILABLE` |
 | `getExamStartAction` | `{ pageId }` | `Result<ExamStartView, ActionError>` (`activeQuestionCount`, `retakePending`, `failedRootCount`, `openSessionId`, `openRetakeSessionId`, `lastFinishedSessionId`) | — |
 | `startExamSessionAction` | `{ pageId, count? }` (N de 10 a 30; 10 por defecto) | `Result<{ sessionId, resumed }, ActionError>` (reanuda la sesión abierta de la página si existe) | `PAGE_NOT_FOUND`, `EXAMS_RETAKE_PENDING`, `EXAMS_NOT_ENOUGH_QUESTIONS`, `EXAMS_INVALID_QUESTION_COUNT` |
 | `getExamSessionAction` | `{ sessionId }` | `Result<ExamSessionView, ActionError>` (`sessionId`, `pageId`, `startedAt`, `finished`, `isRetake`, `questions[]` con su `answer` revelada solo si ya se respondió) | `EXAMS_SESSION_NOT_FOUND` |
@@ -1446,11 +1451,15 @@ Corresponden a CU-06 y CU-08 (Presentar un examen) y a RF-EX-01 a RF-EX-07 (Fase
 
 ### 4.6 `active-recall`
 
-Corresponden a CU-09 y a RF-AR-01 a RF-AR-06 y RF-AI-03 (Fase 6, `docs/adr/0007`). Server Actions (`"use server"`) en `src/modules/active-recall/actions.ts`, `session-actions.ts`, `evaluation-actions.ts` y `hub-actions.ts`. Todas validan la entrada con Zod (ids `z.uuid()`), están envueltas en `withBoundary()` (una excepción no prevista se reporta a Sentry y se convierte en `RECALL_UNEXPECTED`) y nunca lanzan. Todas requieren sesión: sin ella responden `RECALL_SESSION_REQUIRED`; una entrada inválida, `RECALL_INVALID_INPUT`. La tabla lista solo los demás errores.
+Corresponden a CU-09 y a RF-AR-01 a RF-AR-06, RF-AI-03 y RF-AI-06 (Fases 6 y 8, `docs/adr/0007`). Server Actions (`"use server"`) en `src/modules/active-recall/actions.ts`, `session-actions.ts`, `evaluation-actions.ts`, `hub-actions.ts` y `deletion-actions.ts`. Todas validan la entrada con Zod (ids `z.uuid()`), están envueltas en `withBoundary()` (una excepción no prevista se reporta a Sentry y se convierte en `RECALL_UNEXPECTED`) y nunca lanzan. Todas requieren sesión: sin ella responden `RECALL_SESSION_REQUIRED`; una entrada inválida, `RECALL_INVALID_INPUT`. La tabla lista solo los demás errores.
 
 | Acción | Parámetros | Retorno | Errores propios |
 |---|---|---|---|
-| `generateRecallQuestionsAction` | `{ pageId }` | `Result<RecallGenerationView, RecallGenerationActionError>` (`questions`, `created`, `skipped`, `remainingToday`, `truncated`, `wordsUsed`, `wordsTotal`) | `PAGE_NOT_FOUND`, `AI_PAGE_EMPTY`, `RECALL_NO_NEW_CONTENT`, `AI_DAILY_LIMIT_REACHED` (con `resetAt` ISO), `AI_GENERATION_FAILED`, `AI_NO_PROVIDER_AVAILABLE` |
+| `generateRecallQuestionsAction` | `{ pageId }` | `Result<RecallGenerationView, RecallGenerationActionError>` (`questions`, `created`, `skipped`, `remainingToday`, `truncated`, `wordsUsed`, `wordsTotal`) | `PAGE_NOT_FOUND`, `AI_PAGE_EMPTY`, `AI_PAGE_TOO_SHORT` (menos de 100 palabras nuevas, o de las que pide la cantidad; lleva `words`, `minWords` y `maxItems`; antes del límite diario), `RECALL_NO_NEW_CONTENT`, `AI_DAILY_LIMIT_REACHED` (con `resetAt` ISO), `AI_GENERATION_FAILED`, `AI_NO_PROVIDER_AVAILABLE` |
+| `listRecallQuestionsAction` | `{ pageId }` | `Result<RecallQuestionView[], ActionError>`: las preguntas activas de la página, para su página de edición | — |
+| `saveRecallEditsAction` | `{ pageId, updates: { id, prompt, keyConcepts[], acceptableAnswerSummary }[], creates: (sin `id`)[], deletes: id[] }` (hasta 200 por lista) | `Result<RecallQuestionView[], ActionError>` (las preguntas de la página tras guardar); aplica en una transacción (`applyRecallEdits`) ediciones, altas a mano (`origin = manual`) y borrados reales (pregunta, respuestas en cascada, `study_item` e historial) | `PAGE_NOT_FOUND`, `RECALL_QUESTION_NOT_FOUND`, `RECALL_INVALID_QUESTION`, `RECALL_LAST_QUESTION` |
+| `previewRecallSetDeletionAction` | `{ pageId }` | `Result<RecallSetDeletionPreview, ActionError>` (`questions`, `sessions`) | `RECALL_SET_NOT_FOUND` |
+| `deleteRecallSetAction` | `{ pageId }` | `Result<{ pageId }, ActionError>`; borra todas las preguntas de la página, sesiones, respuestas, retroalimentación, `study_items` y huellas, y recalcula el dominio | `RECALL_SET_NOT_FOUND` |
 | `getRecallSessionPlanAction` | `{ pageId }` | `Result<RecallSessionPlanView, ActionError>` | — (solo lectura; no crea sesión) |
 | `getRecallPageSummaryAction` | `{ pageId }` | `Result<{ questionCount }, ActionError>` | — |
 | `startRecallSessionAction` | `{ pageId }` | `Result<StartedRecallSessionView, ActionError>` (`sessionId`, `questions`) | `PAGE_NOT_FOUND`, `RECALL_NO_QUESTIONS` |
