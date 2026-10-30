@@ -774,3 +774,41 @@ Route: delegated writer (2+ non-trivial files: landing, inicio test, db test, sh
 - [x] **V9** — browser back to an edited page (route: delegated writer; trigger: 2+ non-trivial files, page editor + new module + specs). Root cause: the App Router reuses a page's cached RSC payload on back/forward (glossary "Client Cache"; `staleTimes` does not change it), so `PageEditor` remounted with the content/version from before the visit's saves; the editor showed old text, the panel counted it (H14 "Generar" disabled) and the next save would hit a version conflict. Fix: route-local `saved-pages.ts` records each successful save (content + version, never downgraded); `PageEditor` opens the freshest known document and, only when the payload was older, calls `router.refresh()` once so header/panel catch up (no extra request on normal navigations). RED: new `page-back-freshness.spec.ts` (editor empty after `goBack()`) → GREEN; `active-recall-hub` uses `page.goBack()` again. Also `notebookToneFromColor` (notebook-swatches) goes through `notebookToneKey`, so an unknown stored colour gets purple (RED 1 → GREEN 3/3). Commits `c568ad4`, `eb157c8`. Checks: typecheck clean; biome ci clean (1543 files); depcruise no violations (1568 modules); vitest 5370/5370 (557 files); e2e (fake AI, alone) `page-back-freshness`, `notebooks-acceptance`, `active-recall-hub`, `incremental-generation`, `technique-edit-pages` 13/13. Open: a back press before the leave-flush save resolves still shows the payload (narrow race); RDD not run by the writer.
 - Checks (2026-10-29): `pnpm typecheck` clean; `pnpm exec biome ci .` clean (1539 files); `pnpm depcruise` no violations (1565 modules); full vitest 5360/5360 (555 files); db `drizzle-studied-page-reader.contract` 6/6 (env loaded); e2e (fake AI, alone, port 3000 free) `active-recall-hub`, `incremental-generation`, `pptx-import`, `technique-edit-pages`, `content-deletion` 11/11.
 - Open: browser back to an edited page shows the editor's content from before the edit (cached page payload; seen in V6), so the panel's word count reads it too — a product issue for the user's call, not fixed here. `notebook-swatches.ts` (`src/app/(app)/_components`, outside the surfaces) still passes an unknown colour through to `IconTile` (no crash, no tone class). RDD not run by the writer.
+
+## V10 — final review advisories (2026-10-29)
+Scope: triage the 22-slice native review's non-blocking WARNING advisories (all slices approved). No schema change, no migration. Route: delegated writer (2+ non-trivial files across shared/ui, three technique modules, three edit pages, tests, docs). Trigger evidence: about 40 files.
+Also records s12 R3-unrun-e2e: the full e2e suite ran in V (129/133 first run; the four failures were fixed in V5–V7 and re-run green).
+
+| Advisory | Verdict | Commit |
+|---|---|---|
+| s16 R3-save-overwrites-concurrent-edits | FIX: views carry `updatedAt`; each edit sends `expectedUpdatedAt`; `apply*Edits` refuses a newer stored one (`FLASHCARD_CHANGED`, `RECALL_QUESTION_CHANGED`, `EXAMS_QUESTION_CHANGED`) and writes nothing; inline copy "cambió en otra pestaña". RED 3 use cases + item-draft → GREEN | `9682851` |
+| s16 R3-discard-uses-stale-items-prop | FIX: `ItemEditor` keeps the last saved items; "Descartar" goes back to them. RED 1 → GREEN | `9682851` |
+| s14 R3-last-question-race | FIX: `RecallQuestionRepository.lockPage` (page row `FOR UPDATE`) before counting, also at the start of `applyRecallEdits`. RED 1 → GREEN | `e587d17` |
+| s13 R3-practice-exit-false-up-to-date | FIX: leaving a practice pass asks the server what is due (a `?modo=practica` URL may have had cards due). RED 1 → GREEN | `3af252b` |
+| s19 R3-graded-exit-recheck-conditional | FIX: the re-check no longer depends on `practiceCards`. RED 1 → GREEN | `3af252b` |
+| s15 R3-002 | FIX: deleting the retake's last failed lineage clears `retake_pending` (as starting the retake would). db RED 1 → GREEN; also fixed a tie-order flake in `exam-edits` and `recall-edits` | `53bfd55`, `9682851` |
+| s15 R3-001 | WONTFIX (schema): a finished exam keeps its score but loses its answers to the deleted lineage (`exam_answers_question_root_fk` cascades); keeping them needs an FK change. Reported, not done | — |
+| s9 R3-next-review-same-day-mislabel | WONTFIX: due means before the next local midnight, so an up-to-date deck's next review is tomorrow or later; days ≤ 0 is only a stale read, pinned by test as "mañana" | — |
+| s11 R3-retake-param-dropped | WONTFIX: nothing reads `?retake=1`; the exam route offers the pending retake itself | — |
+| s10 R3-zero-question-practice | WONTFIX: no path leaves sessions with zero active questions (last question refused, set delete removes sessions, archiving removed) | — |
+| s7 R3-partial-consumption-strands | WONTFIX: an unconsumed short remainder is no worse than consuming it; it joins the next new text | — |
+| s8 R3-empty-sessions-app-layer | TEST: a questions-only page comes back with `sessions: []` | `e587d17` |
+| s17 R3-001 | WONTFIX: `notFound()` on a failed list read matches every technique route; the page was already checked by `getPageForRoute` | — |
+| s17 R3-002/R3-003, s18 R3-save-failure-path/R3-error-copy-untested, s16 R3-deck-editor-untested | TEST: new `deck-editor`, `recall-questions-editor`, `exam-questions-editor` tests (payload with version, validation, every refusal's copy); `ItemEditor` throw path | `9682851` |
+| s20 R3-deck-delete-empty-semantics | WONTFIX: an owned page with no deck deletes as success (idempotent after a double submit); ownership still enforced | — |
+| s20 R3-untested-hard-delete-adapters | TEST: db recall set delete refuses another owner and erases the session feedback | `649f01c` |
+| s20 R3-untested-recall-exam-actions | TEST: `deletion-actions.test.ts` for exams and recall | `649f01c` |
+| s21 R3-delete-page-button-untested | TEST: counts, no link follow, delete + refresh, already-gone copy | `649f01c` |
+| s3 R3-cta-technique-tone-unproved | TEST: theme utilities on the pill + each theme's tokens in globals.css | `649f01c` |
+| s22 R3-stale-open-race | WONTFIX: back before the leave-flush save resolves (already recorded in V9); needs awaiting in-flight saves across remounts | — |
+| s19 R3-weak-nothing-deleted-assertion | TEST: hub card asserts "2 tarjetas" | `a823b1c` |
+| s1 R3-paste-reload-autosave-race | TEST: waits for the save carrying the pasted code before reloading | `a823b1c` |
+| s1 R3-weak-tip-callout-assert | TEST: each callout holds its own text; it exposed the click-then-type race (60 ms wait added) | `a823b1c` |
+| s6 R3-seed-db-url | TEST: `seedFlashcards` throws without `DATABASE_URL` or page | `a823b1c` |
+| s5 R3-manual-entry-unproved | WONTFIX: spec deleted with AI-only creation (`1ba4a72`) | — |
+| s7 R3-incremental-paragraph-text | WONTFIX: resolved by `7cbb578` | — |
+| s22 R3-doc-stale-flashcard-actions (+ exam actions) | FIX docs: DATA-API revalidation, views, `expectedUpdatedAt`, CHANGED codes, retake clearing | `ff6e923` |
+| s19 R3-atoms-doc-unwired-component | FIX docs: `DeletePageButton` is wired in grid and list (verified); stale `ArchivePageButton`, question-form and archive-confirm mentions replaced | `ff6e923` |
+
+- Checks (2026-10-29): `pnpm typecheck` clean; `pnpm exec biome ci .` clean (1549 files); `pnpm depcruise` no violations (1574 modules); vitest 5407/5407 (563 files); db `exam-edits` 3/3, `recall-edits` + recall contract + uow 43/43, `drizzle-deck-unit-of-work` + `recall-edits` + `exam-edits` 11/11, `content-deletion` 6/6; e2e (fake AI, alone, port 3000 free): `technique-edit-pages`, `editor-polish-3`, `flashcards-deck`, `technique-hub-return`, `flashcards-review`, `content-deletion`, `exams-questions`, `flashcards-due-today` 16/18 first run (both the new stronger assertions), then `technique-edit-pages` + `editor-polish-3` 7/7 minus the callout test, callout test 3/3 (`--repeat-each 3`) after the wait.
+- Open: s15 R3-001 needs a schema decision. Exam edits check the version without a page lock (small window, unlike flashcards and recall). RDD not run by the writer.
