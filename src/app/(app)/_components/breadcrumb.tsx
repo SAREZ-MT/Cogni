@@ -95,7 +95,7 @@ export function SetBreadcrumb({ items }: SetBreadcrumbProps) {
 export function Breadcrumb() {
   const published = useBreadcrumb();
   const segments: BreadcrumbItem[] = [
-    { label: "Cogni", href: "/" },
+    { label: "Cogni", href: "/inicio" },
     ...published,
   ];
 

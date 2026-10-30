@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SIDEBAR_COOKIE, Sidebar } from "./sidebar";
 
-const { pathname } = vi.hoisted(() => ({ pathname: { current: "/" } }));
+const { pathname } = vi.hoisted(() => ({ pathname: { current: "/inicio" } }));
 vi.mock("next/navigation", () => ({
   usePathname: () => pathname.current,
 }));
@@ -19,7 +19,7 @@ describe("Sidebar", () => {
   beforeEach(() => {
     // biome-ignore lint/suspicious/noDocumentCookie: cookieStore is missing in jsdom
     document.cookie = `${SIDEBAR_COOKIE}=; max-age=0; path=/`;
-    pathname.current = "/";
+    pathname.current = "/inicio";
   });
 
   it("starts expanded and offers to collapse", () => {
@@ -372,7 +372,7 @@ describe("Sidebar", () => {
 
       expect(screen.getByRole("link", { name: /Inicio/ })).toHaveAttribute(
         "href",
-        "/",
+        "/inicio",
       );
       expect(screen.getByRole("link", { name: "Cuadernos" })).toHaveAttribute(
         "href",

@@ -154,7 +154,7 @@ describe("Breadcrumb links", () => {
 
     expect(screen.getByRole("link", { name: "Cogni" })).toHaveAttribute(
       "href",
-      "/",
+      "/inicio",
     );
     expect(screen.getByRole("link", { name: "Cuadernos" })).toHaveAttribute(
       "href",

@@ -1,14 +1,19 @@
-import type { LucideIcon } from "lucide-react";
+import type { Icon } from "@phosphor-icons/react/dist/lib/types";
 import Image from "next/image";
 import type { ReactNode } from "react";
+import { PixelTile, type PixelTone } from "./pixel-tile";
 import { Reveal } from "./reveal";
 
-export type PillarPoint = { icon: LucideIcon; title: string; text: string };
+// Each point carries a Phosphor glyph, drawn over a dithered tile.
+export type PillarPoint = { icon: Icon; title: string; text: string };
+
+// The pillar's hue for its point tiles (landing.css .lp-ptile).
+export type IconTone = PixelTone;
 
 export type PillarImage = { src: string; alt: string };
 
 // RemNote-style block under each band: a heading, three short points with
-// small icons, and a visual on the other side. Sides alternate per pillar.
+// dithered icon tiles, and a visual on the other side. Sides alternate per pillar.
 export function PillarBlock({
   heading,
   points,
@@ -18,8 +23,7 @@ export function PillarBlock({
 }: {
   heading: string;
   points: readonly PillarPoint[];
-  // Icon tile background and icon colour.
-  iconTone: string;
+  iconTone: IconTone;
   visualSide: "left" | "right";
   visual: ReactNode;
 }) {
@@ -32,15 +36,14 @@ export function PillarBlock({
           {heading}
         </h3>
         <ul className="flex max-w-[520px] flex-col gap-6">
-          {points.map(({ icon: Icon, title, text }) => (
+          {points.map(({ icon, title, text }) => (
             <li key={title} className="flex gap-4">
-              <span
-                aria-hidden="true"
-                className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${iconTone}`}
-              >
-                <Icon className="size-5" />
-              </span>
-              <span className="flex flex-col gap-1">
+              <PixelTile
+                tone={iconTone}
+                icon={icon}
+                className="size-14 shrink-0"
+              />
+              <span className="flex flex-col gap-1 pt-1.5">
                 <span className="font-extrabold text-(--lp-ink) text-[17px]">
                   {title}
                 </span>

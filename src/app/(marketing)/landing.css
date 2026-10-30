@@ -86,6 +86,8 @@
   --lp-rose-100: #ffe4e6;
   --lp-rose-700: #be123c;
   --lp-rose-950: #4c0519;
+  --lp-rose-900: #881337;
+  --lp-violet-900: #3b0f80;
   --lp-blue-100: #dbeafe;
   --lp-orange-100: #ffedd5;
 
@@ -96,6 +98,23 @@
   /* Public pages (/ciencia, /creditos, /legal): the soft lilac step of
      the alternating science blocks and the pending-data highlight. */
   --lp-lilac-soft: #f6f2fc;
+
+  /* Visual polish P7: the feature-icon tiles of the pillars (one hue per
+     pillar), the file-type badges (PDF red, DOCX blue, PPTX orange) and the
+     sticky notes of the usual way. Badge inks keep white tags at AA. */
+  --lp-yellow-50: #fffbeb;
+  --lp-mint-200: #a7f3d0;
+  --lp-rose-50: #fff1f2;
+  --lp-rose-200: #fecdd3;
+  --lp-red-50: #fef2f2;
+  --lp-red-200: #fecaca;
+  --lp-blue-50: #eff6ff;
+  --lp-blue-200: #bfdbfe;
+  --lp-blue-700: #1d4ed8;
+  --lp-orange-50: #fff7ed;
+  --lp-orange-200: #fed7aa;
+  --lp-orange-700: #c2410c;
+  --lp-file-edge: #c9c2d8;
 
   --lp-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
 
@@ -160,6 +179,16 @@
 }
 .lp-nav-link:hover {
   color: var(--nav-ink);
+}
+.lp-nav-mark img {
+  transition: opacity 320ms var(--lp-ease-out);
+}
+.lp-nav-mark [data-mark="paper"],
+.lp-nav[data-theme="light"] .lp-nav-mark [data-mark="ink"] {
+  opacity: 0;
+}
+.lp-nav[data-theme="light"] .lp-nav-mark [data-mark="paper"] {
+  opacity: 1;
 }
 .lp-nav[data-theme="light"] :focus-visible {
   outline-color: var(--lp-violet);
@@ -720,6 +749,23 @@
   background: var(--lp-yellow-200);
   box-shadow: 0 10px 24px -10px rgb(146 64 14 / 0.35);
 }
+/* The noisy pile (usual-pile.tsx): a second, rose sticky note, a window
+   and floating scraps that overlap each other. */
+.lp-pile-note-rose {
+  color: var(--lp-rose-700);
+  background: var(--lp-rose-100);
+  box-shadow: 0 10px 22px -10px rgb(190 18 60 / 0.35);
+}
+.lp-pile-window {
+  box-shadow:
+    0 0 0 1px rgb(26 16 51 / 0.06),
+    0 10px 24px -8px rgb(26 16 51 / 0.14);
+}
+.lp-pile-float {
+  box-shadow:
+    0 0 0 1px rgb(26 16 51 / 0.05),
+    0 12px 26px -10px rgb(26 16 51 / 0.22);
+}
 .lp-route-step[data-tone="violet"] {
   --route-soft: var(--lp-violet-100);
   --route-ink: var(--lp-violet);
@@ -748,6 +794,113 @@
 .lp-route-line {
   background: var(--lp-violet-200);
   transform-origin: 50% 0;
+}
+
+/*
+ * Pillar point icons (pixel-tile.tsx): a dithered tile in the pillar hue
+ * (the .lp-hobj family) under a crisp vector Phosphor glyph. Three dither
+ * steps, a glyph ink and a glyph shadow per tone; the shadow is dark under
+ * light ink and light under dark ink, so the glyph lifts off the dither.
+ * Not rotated, so the 2 px cells stay crisp.
+ */
+.lp-ptile {
+  display: block;
+  overflow: hidden;
+  border-radius: 13px;
+  box-shadow: 0 6px 12px -6px var(--pt-dark);
+}
+.lp-ptile-glyph {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 27px;
+  height: 27px;
+  color: var(--pt-ink);
+  filter: drop-shadow(1px 1px 0 var(--pt-shadow));
+}
+.lp-ptile[data-tone="yellow"] {
+  --pt-dark: var(--lp-amber-500);
+  --pt-mid: var(--lp-yellow);
+  --pt-light: var(--lp-yellow-100);
+  --pt-ink: var(--lp-amber-800);
+  --pt-shadow: var(--lp-yellow-100);
+}
+.lp-ptile[data-tone="violet"] {
+  --pt-dark: var(--lp-violet-800);
+  --pt-mid: var(--lp-violet);
+  --pt-light: var(--lp-violet-300);
+  --pt-ink: var(--lp-paper);
+  --pt-shadow: var(--lp-violet-900);
+}
+.lp-ptile[data-tone="mint"] {
+  --pt-dark: var(--lp-green-500);
+  --pt-mid: var(--lp-mint);
+  --pt-light: var(--lp-mint-50);
+  --pt-ink: var(--lp-mint-800);
+  --pt-shadow: var(--lp-mint-50);
+}
+.lp-ptile[data-tone="rose"] {
+  --pt-dark: var(--lp-rose-700);
+  --pt-mid: var(--lp-rose);
+  --pt-light: var(--lp-rose-200);
+  --pt-ink: var(--lp-paper);
+  --pt-shadow: var(--lp-rose-900);
+}
+
+/*
+ * File-type badges (file-badge.tsx): a white page with a coloured
+ * extension tag; the only formats are PDF, DOCX and PPTX.
+ */
+.lp-fbadge {
+  --fb-size: 40px;
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  width: var(--fb-size);
+  height: var(--fb-size);
+}
+.lp-fbadge[data-size="sm"] {
+  --fb-size: 28px;
+}
+.lp-fbadge[data-size="lg"] {
+  --fb-size: 52px;
+}
+.lp-fbadge[data-kind="pdf"] {
+  --fb-ink: var(--lp-red-700);
+}
+.lp-fbadge[data-kind="docx"] {
+  --fb-ink: var(--lp-blue-700);
+}
+.lp-fbadge[data-kind="pptx"] {
+  --fb-ink: var(--lp-orange-700);
+}
+.lp-fbadge-paper,
+.lp-fbadge-edge {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.lp-fbadge-paper {
+  color: white;
+  filter: drop-shadow(0 1px 1.5px rgb(26 16 51 / 0.08));
+}
+.lp-fbadge-edge {
+  color: var(--lp-file-edge);
+}
+.lp-fbadge-tag {
+  position: absolute;
+  left: 2%;
+  bottom: 22%;
+  padding: 0.12em 0.32em;
+  border-radius: 0.22em;
+  color: white;
+  background: var(--fb-ink);
+  font-family: var(--lp-font-sans);
+  font-size: calc(var(--fb-size) * 0.24);
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
 }
 
 /*
@@ -1072,7 +1225,8 @@
   }
   .lp-nav-bar,
   .lp-nav-ink,
-  .lp-nav-link {
+  .lp-nav-link,
+  .lp-nav-mark img {
     transition: none;
   }
   .lp-hobj-placeholder,

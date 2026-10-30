@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // /terminos is a third category next to "auth paths" and "app paths": the
 // terms of use are readable by anyone, including signed-in users, who must
-// not be bounced to "/" like they are from /login. The proxy also exposes
+// not be bounced to /inicio like they are from /login. The proxy also exposes
 // the request path to Server Components (x-pathname) so the (app) layout
 // gate can carry it as `next`.
 const { updateSession } = vi.hoisted(() => ({ updateSession: vi.fn() }));
@@ -56,7 +56,9 @@ describe("proxy /terminos", () => {
 
     const response = await proxy(buildRequest("/login"));
 
-    expect(response.headers.get("location")).toBe("http://localhost:3000/");
+    expect(response.headers.get("location")).toBe(
+      "http://localhost:3000/inicio",
+    );
   });
 
   it("forwards the request path and query as x-pathname", async () => {

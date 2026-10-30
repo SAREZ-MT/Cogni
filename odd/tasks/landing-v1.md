@@ -48,251 +48,12 @@ The goal is a different, attractive landing that integrates everything built so 
 - [ ] T1b — Visual asset pass with Higgsfield (user, 2026-10-27: "estilo educativo, pero que impacte"; image generation authorized). Define one art direction from the T1 hero, then generate images and image sequences where a section needs visual support: pillar visuals, the "camino de siempre" vs Cogni comparison, the closing, and frames for scroll-driven sequences. Assets go to `public/landing/` as optimised webp/avif. Every asset must be generic: no real subjects, brands or people's likeness. Route: delegated, per-action.
 - [ ] T2 — Techniques tabs with the sliding fanned deck, and pillars 01–05 with scroll motion (route: delegated writer).
 - [ ] T3 — Science constellation, draggable curve, comparison, receipt, FAQ chat, closing in Hoy, footer (route: delegated writer).
-- [ ] T5 — Make the landing the domain root (user, 2026-10-27; plan `cogni-landing-routing-plan`; route: delegated writer after T1, because both touch `src/proxy.ts`). No DNS change is needed.
-  - Move the dashboard from `/` to `(app)/dashboard/page.tsx`.
-  - Serve the landing at `/`, by moving the `(marketing)/landing` page to `(marketing)/page.tsx`, and add `"/"` to `OPEN_PATHS`.
-  - Point every post-login and auth redirect (login, register, OAuth callback, reset password) to `/dashboard`.
-  - Update links that point to `/`: `identity/actions.ts`, terminos, the logo/sidebar, the hero, `kpi-row`, about 6 e2e specs, and any `redirect("/")` or `href="/"` found by a search.
-  - Signed-in visitors on `/`: default proposal is to redirect them to `/dashboard` (to confirm with the user).
-  - Keep `/landing` as a redirect to `/`, or remove it.
-  - Tests: proxy unit tests and the affected e2e specs.
-- [ ] T4 — Visual QA in the browser against the Pencil frame, reduced motion, and a design-skill polish pass (route: delegated; per-action verification).
-
-## Acceptance criteria
-- `/landing` loads without a session on the running dev server, with all 12 sections in v1 order.
-- Motion runs on scroll and on interaction, and is disabled or simplified under reduced motion.
-- typecheck, Biome and dependency-cruiser are clean, and the tests for the touched proxy code pass.
-
-## Checks
-`pnpm typecheck`, `pnpm biome ci` (or the repo lint script), `pnpm depcruise`, Vitest for the proxy, plus a browser check of `/landing`.
-
-## Progress / evidence
-- 2026-10-27: branch created from main. A dev server is already running on :3000 (next-server 16.3.8). T0 research delegated.
-
-- 2026-10-27: T1 implemented and NOT committed; awaiting the user's visual review. The `(marketing)` route group holds the layout, `landing.css` tokens, reveal, nav, hero, hero-editor and how-it-works. `/landing` is in `OPEN_PATHS`; the proxy test went RED then GREEN, 6/6. typecheck OK, depcruise 0. Biome fails only on the untracked `.taste-skill/direction.json`. Parent spot check: curl /landing 200, vitest proxy 6/6.
-- Blocker found: `motion`, `three` and the login constellation exist only on `feat/phase-8-design-flows` (21 commits, not merged into main). On this branch they resolve from `node_modules` but are missing from `package.json` and the lockfile. A decision is pending: rebase onto phase 8, or add the dependencies here.
-
-- 2026-10-27: the user chose option A. T1 was committed as b550e21 and rebased onto `feat/phase-8-design-flows` (6a41fa7), so `motion` and `three` are now in `package.json`. After the rebase: typecheck OK, proxy 6/6, `/landing` 200.
-- RDD: high risk (proxy hot path), consent granted, reliability lens approved, acknowledged (lineage `review-c001bb75c0d57372`). The reviewed boundary is now b550e21.
-- Non-blocking advisories, to address in T4:
-  - R3-fonts-ready-race in `hero-editor.tsx:155-165`;
-  - R3-landing-signed-in-unproved, which overlaps T5;
-  - R3-reduced-motion-midrun-blank.
-- [x] T1 done (route: delegated; commit b550e21). The user's visual review is still pending.
-
-- 2026-10-27: T1b BLOCKED. The Higgsfield CLI returns `only_mcp_usage_on_trial_is_available` because the account is a trial (plus plan, 110 credits), and the Higgsfield MCP server is not connected in this session. No credits were spent. Two art directions are drafted: A, soft matte 3D clay; B, editorial paper-craft on deep violet. `cwebp` is available for the export. Waiting on the user: connect the Higgsfield MCP, or authorise another generator.
-
-- 2026-10-27: T2 committed as f92d454. It adds the techniques deck (card-stack motion, tablist a11y, autoplay only while in view) and pillars 01–05 (scroll-linked band plus one micro-demo each, with a `PillarVisual` image slot). 7 RED→GREEN tests. Writer checks: typecheck OK, biome clean, depcruise 0, vitest 8/8. Parent spot check: vitest (marketing) 8/8, /landing 200, screenshots reviewed.
-- RDD: medium (slice_budget_reached), consent granted, reliability lens approved, acknowledged (`review-1d0a445cf06ff291`). The boundary is now f92d454.
-- Advisories for T4:
-  - R3-card-swing-ignores-reduced-motion;
-  - R3-focus-pause-untested;
-  - R3-reduced-motion-demos-still-animate;
-  - the hydration mismatch in T1's `how-it-works.tsx` under reduced motion (fix it with a CSS hold, as the pillar band does).
-- Open: confirm the product behaviour behind "La IA prepara, tú decides" (review, edit, choose what stays).
-- [x] T2 done (route: delegated; commit f92d454).
-- 2026-10-27: Higgsfield MCP added at user scope (`https://mcp.higgsfield.ai/mcp`, config backup `~/.claude.json.higgsfield.backup`). It needs a Claude Code restart and `/mcp` OAuth before T1b can rerun.
-
-## Redesign reset (user, 2026-10-27)
-The user rejected the coded design (T1 hero and T2 sections). The whole landing is redesigned from scratch, while the TEXTS and information are kept. Commits b550e21 and f92d454 stay on the branch as the starting code, and their sections are replaced one by one. Method: live iteration on :3000, section by section, with the user reviewing each one.
-- [ ] R1 — New hero inspired by the tryprofound.com "The rise of AI Search…" section (teardown in Engram `cogni/landing/profound-hero-reference`).
-  - A pinned full-screen scroll scene on near-black. The h1 "Recuerda lo que estudias." comes first.
-  - Then the sentence "Cogni es tu plataforma de estudio, donde aprender y recordar por fin van de la mano." sharpens word by word from blur, scrubbed by scroll.
-  - Behind it, a constellation network grows from sparse dots to a dense web. Its nodes are elegant, high-quality, coloured STUDY icons: not social networks, and not literally PDFs or technique colours.
-  - Then the subtitle "Cogni convierte tus apuntes en flashcards, exámenes y preguntas de recuperación activa, y te dice qué repasar cada día para que no se te olvide." and the CTAs.
-  - Route: delegated writer.
-  - 2026-10-27: R1 v1 implemented and NOT committed, awaiting the user's live review.
-    - Files: `hero.tsx` (pinned scrub), `hero-timeline.ts` and `hero-network.ts` (pure), `hero-network-canvas.tsx` (Canvas 2D hairlines plus DOM Phosphor icons), and 21 tests. `hero-editor.tsx` is deleted.
-    - New dependency: `@phosphor-icons/react` 2.1.10 (MIT), imported per path.
-    - No vertical guide lines (user correction).
-    - Checks: typecheck, biome, depcruise clean; vitest (marketing) 28/28 on the parent spot check; /landing 200; about 59 fps scrolling on a laptop.
-    - Open: the hydration mismatch in `how-it-works.tsx` (old section, to be redesigned).
-  - 2026-10-27: the user liked R1, and R1 v1 was committed as 78fb0f0.
-  - R1 v2 is uncommitted, awaiting review. It applies the three user corrections:
-    - One-way latch: the scene freezes once it completes, and the pin then collapses to one viewport with scroll compensation (0px measured jump).
-    - Constant ambient motion: a continuous Canvas 2D loop with node drift, travelling signals, pulses, floating icons and pointer parallax.
-    - Login violet nebula background, with `--lp-night` set to #0b0717.
-    - It also fixes the how-it-works hydration mismatch.
-  - Checks: vitest (marketing) 35/35 on the parent spot check; 60 fps idle and while scrolling; no console errors.
-  - Design note: rewind still happens mid-scrub; the latch applies only once the scene is complete. Strict max(progress) is a one-line change if the user wants it.
-  - 2026-10-27: R1 v2 committed as 2eeb033 (approved: "gran avance").
-  - R1 v3 is uncommitted, awaiting review:
-    - a cursor light replaces the parallax (offscreen radial-masked brighten, mouse only);
-    - 170 twinkling, unconnected stars (80 on phones), dimmer over the copy;
-    - drift doubled to 14px and about 50% faster;
-    - denser web (6 nearest neighbours plus medium and long links, seeded separately so the approved layout is kept) with length alpha falloff;
-    - more signals.
-  - Checks: vitest (marketing) 41/41 on the parent spot check; 60 fps idle and scrolling.
-  - 2026-10-27: R1 v3 committed as 052069d.
-  - R1 v4 is uncommitted, awaiting review:
-    - the cursor light is half as strong, with a 200px radius;
-    - the whole web breathes (±4%, 8 s sine, spatial phase offset);
-    - the icons are hidden for a test, behind `SHOW_ICONS = false` at `hero-network-canvas.tsx:149`.
-  - Checks: vitest (marketing) 45/45 on the parent spot check; 60 fps.
-  - 2026-10-27: R1 v5 is uncommitted, awaiting review.
-    - Icons are back (`SHOW_ICONS = true`).
-    - Focus pulse like Profound: each icon cycles 4–9 s, blurs up to 2.6px and dims to 0.78; about a third are blurred at any time.
-    - Global breathing replaced by cluster-local breathing: icon clusters scale ±12% around their own centres, with independent 6–10 s phases, and sparse areas stay calm. The per-node drift dropped to 6px.
-    - Profound teardown: everything, icons and blur included, is drawn on one canvas; nodes move about 10–30px. Ours moves about 5–20px; `CLUSTER_AMPLITUDE` can raise it.
-    - Checks: vitest (marketing) 49/49 on the parent spot check; 60 fps.
-  - 2026-10-27: the user asked for more motion; done inline. `CLUSTER_AMPLITUDE` 0.12 → 0.22 and `DRIFT_PX` 6 → 9 in `hero-network.ts`, then "un poco más": 0.3 and 12px. vitest (marketing) 49/49.
-  - 2026-10-27, inline: the cursor light was softened again (lit 0.3 → 0.12, haze 0.035 → 0.015, icon brightness 0.35 → 0.15).
-  - Icons on more nodes, as a test: 46 → 80 on desktop and 18 → 30 on phones. All 80 render, and idle runs at 61 fps.
-  - Seen in the screenshot: one icon sits under the nav wordmark and one touches the "Ver cómo funciona" CTA. Exclude the nav band and the CTA zone if the user keeps 80.
-  - The user chose 50 icons (20 on phones). Icons are now kept out of the nav band (y > 0.09) and the CTA row.
-  - Signals slowed: `SIGNAL_MS` 1700 → 3400, `SIGNAL_EVERY_MS` 360 → 600.
-  - vitest 49/49; 50 icons render at 61 fps idle; screenshot clean.
-  - A stray screenshot accidentally written to `Cogni/hero-r1/` was moved to the scratchpad.
-  - The user said icons clumped and some regions had none. Random selection was replaced by farthest-point sampling (`spreadEvenly`, aspect-corrected) in `hero-network.ts`.
-    - 2 new tests: every region of a 4×3 grid outside the copy holds an icon, and the farthest candidate is picked first.
-    - vitest 51/51, biome clean, 50 icons at 61 fps; screenshot shows even coverage.
-  - The user asked for 10 more icons: desktop 50 → 60 (phones stay at 20). All 60 render at 61 fps idle; vitest 51/51.
-- [x] R1 — Hero approved by the user ("así está bien"), final commit d812f58 (range 78fb0f0..d812f58; route delegated, then inline tweaks).
-  - Checks: typecheck OK, biome clean, depcruise 0, vitest (marketing + hex + proxy) 58/58.
-  - RDD: medium (slice_budget_reached), granted, reliability approved, acknowledged (`review-15e327f740167731`). The boundary is now d812f58.
-  - Follow-ups (non-blocking):
-    - R3-001 WARNING `hero.tsx:51-64`: the instant `scrollTo` at the collapse can cancel an in-flight smooth scroll, such as a nav anchor jump to #tecnicas, and leave the visitor midway. Fix before shipping.
-    - R3-002: the reduced-motion network test must assert that icons exist.
-    - R3-003: the stale "switched off" comment near `SHOW_ICONS`, and the untested default.
-- 2026-10-27: the user picked dovetail.com as the design reference for the remaining sections. Teardown in Engram `cogni/landing/dovetail-reference`. Elements to bring over:
-  - huge Inter 600 headlines where one keyword switches to a pixel font;
-  - pixel-font stats and step numbers;
-  - dithered 3D study objects inline in headlines (Higgsfield);
-  - ASCII/character textures;
-  - a single accent (Cogni violet);
-  - a sticky 01–05 step scene.
-
-  The user wants alternating dark and light sections joined continuously.
-  - Pixel font: PP Mondwest is commercial, so a free Google font replaces it. The comparison (scratchpad `font-compare2.png`) shows **DotGothic16** is the closest, with a thin proportional pixel stroke and similar width; it has no serifs. The user asked for the free one that looks most similar, so DotGothic16 it is. REVISED: the user then said a pixel font is not needed, so the pixel font is dropped; the keyword swap uses Instrument Serif italic, as in the hero's "estudias." (user confirmed).
-- [ ] R2 — "Así funciona Cogni" video section in Dovetail style, LIGHT, joined to the dark hero by a continuous transition.
-  - Huge sans headline with one Instrument Serif italic keyword, and an inline image slot for a future Higgsfield object.
-  - ASCII texture, violet accent, the video placeholder (brag later), and the 01–03 steps.
-  - Also a FIXED navbar (no hide on scroll) whose theme follows `data-nav-theme`, and the R3-001 fix (the collapse must not cancel anchor scrolls).
-  - Route: delegated writer (2026-10-27).
-  - 2026-10-27: R2 v1 implemented and uncommitted, awaiting the user's live review.
-    - `how-it-works.tsx` is rewritten: dusk band from hero to cream; Inter headline with "repaso" in serif italic; `headline-object.tsx` slot (`TODO(higgsfield)`, expects `public/landing/how-it-works-object.webp`); ASCII texture (`ascii-field.ts` and `ascii-texture.tsx`); video placeholder with scroll scale; steps 01–03.
-    - The nav is always fixed and switches theme via `nav-theme.ts` and `data-nav-theme`.
-    - R3-001 fixed with `shouldCollapsePin()`, which waits for 180 ms with no scroll before collapsing. Anchors from the nav and the CTA land on the section (top 80px).
-    - Smooth anchor scroll added. Inter added via next/font (opsz).
-    - Checks: typecheck, biome, depcruise clean; vitest 76/76 (writer) and 69/69 marketing (parent spot check); about 60 fps.
-    - Open points: the "Así funciona Cogni" eyebrow (keep or drop?), the dusk glow saturation, and a grey-ish light nav over the dark video slot.
-  - The user asked to replace the 0/1 and symbol texture with letters. `ASCII_GLYPHS` now holds the lowercase Spanish alphabet (a–z, ñ, á, é, í, ó, ú). vitest 69/69; the screenshot `r2/12-letters.png` shows letters.
-  - The user reported a black line between the hero and the dusk band. Two causes: the hero veil's radial vignette darkened its bottom edge, and the dusk band opened with a 0–8% flat night plateau.
-    - Fix: the veil now darkens only the sides and top, and the dusk ramps from the first pixel.
-    - Pixel samples across the seam now rise monotonically from #0b0717, with no dip.
-  - The "Así funciona Cogni" label is larger: 12px → 16px on phones and 20px from md.
-  - biome ok, vitest 69/69.
-  - The user still saw the seam at the hero's corners. Following their proposal, `.lp-dusk::before` continues the hero's side vignette into the dusk band, masked to fade out by 60% of its height.
-    - Corner pixel samples now go continuously 9 → 8 → 12 across the seam; before, they jumped 9 → 11 at the seam.
-    - biome ok, vitest 69/69.
-- [x] R2 closed: commit 4cdb0e7 (the user moved on to Técnicas).
-  - Checks: typecheck OK, depcruise 0, vitest 76/76.
-  - RDD: medium (slice_budget_reached), granted, reliability approved, acknowledged (`review-72fc9b30cd4be612`). The boundary is now 4cdb0e7.
-  - Advisories:
-    - R3-ascii-alpha-zero-fallback: `Number(...)||0.2` ignores an alpha of 0.
-    - R3-ascii-test-conditional-assert.
-    - R3-hero-settle-wiring-untested: the collapsePin debounce wiring has no test.
-- [ ] R3 — Técnicas in Dovetail style. DARK section entered through `.lp-dusk-out`, with seam samples at the corners. It keeps the deck interaction, texts and tests. Headline with a serif italic keyword plus an object slot (`public/landing/techniques-object.webp`), letter texture, refined dark cards. Route: delegated writer (2026-10-27).
-  - 2026-10-27: R3 v1 implemented and uncommitted, awaiting the user's review.
-    - Headline "Una técnica [cards object] para cada *momento*."
-    - Dovetail tab row: 01–04, a hairline, and a violet line that fills over 5 s during autoplay.
-    - Dark cards and mocks; the deck behaviour is unchanged.
-    - `.lp-dusk-out` mirrors `.lp-dusk`, with shared side vignettes. Seam samples are flat at x=10, 720 and 1430.
-    - 6 new tests (5 RED first). Checks: vitest 82/82 (writer) and 75/75 marketing (parent spot check); /landing 200; 60 fps.
-    - The texture inside the cards was dropped (a canvas inside moving cards cost frames).
-    - Open: a hard edge into the pillars, which belongs to the pillars redesign.
-  - 2026-10-27: new user direction for R3 v2 (delegated):
-    - Técnicas becomes a pinned HORIZONTAL scroll like superr.ai (sticky h-screen; the track translates linearly). An intro panel, then 4 large technique panels with a visual slot and the explanation.
-    - Higgsfield slots in the style of the platform's `notebook-fan` illustrations: `public/landing/technique-{flashcards,recall,exams,ai}.webp`.
-    - Platform technique colours (#fcd34d, #6ee7b7, #ef4444 plus violet), alternated, including the headline object tiles (`tone` prop).
-    - Grounds below the hero become LIGHTER (no near-black); the hero stays untouched.
-    - Each section gets its own touch while keeping the Dovetail design line.
-  - 2026-10-27: R3 v2 implemented and uncommitted, awaiting review.
-    - Layout: a 500vh pinned section on lilac #ece5fa. The track is 5 frames (intro plus 4 techniques), driven by useScroll/useTransform x.
-    - New files: `techniques-scroll.ts` (pure progress mapping); `technique-art.tsx` (notebook-fan-style placeholders with `TODO(higgsfield)` paths `technique-*.webp`). `technique-mocks.tsx` was deleted.
-    - Colours: the headline object has a `tone` prop (how-it-works yellow, techniques mint); exams use the platform red #ef4444.
-    - Grounds: the cream → lilac band, no near-black below the hero; seams are flat at x=10, 720 and 1430.
-    - Phones and reduced motion: the panels stack.
-    - Checks: vitest 83/83 (writer) and 76/76 marketing (parent spot check); /landing 200; 59.7 fps scrubbing.
-    - Open: text and visual halves pair up mid-slide because of the alternation, and the intro arrow cue loops.
-  - 2026-10-28: R3 v2 committed as 9157074. R3 v3 (spacing) is uncommitted, awaiting review.
-    - Unchanged: the hero → Así funciona `.lp-dusk` (the user corrected the brief; `git diff` shows no hunk on `.lp-dusk`).
-    - Así funciona bottom padding halved.
-    - Bands: `.lp-dusk-out` 306 → 126px; `.lp-tech-out` 216 → 90px.
-    - Técnicas: 4500 → 3206px (70vh per slide); a compact intro frame (0.66 wide, so the first technique peeks in); a larger visual, min(680px, 70vh); mid-slide gap about 250px.
-    - Seams flat. Checks: vitest 84/84 (writer) and 77/77 marketing (parent spot check); /landing 200; 59.7 fps.
-  - 2026-10-28: spacing committed as 341af55 (the user called the design "muy bueno"). v4 is uncommitted, awaiting review.
-    - Technique 04 "La IA prepara, tú decides" was replaced by "Tu acompañante de estudio": its texts moved verbatim from the old pillar 04, the lead line is "Cada sesión cierra con un siguiente paso.", it uses violet, and `companion-demo.tsx` and `play-once.ts` were extracted.
-    - Pillars are now 4 (01–04). The new pillar 04 "Tu progreso" takes the old rose band and demo accents (AA checked).
-    - `docs/landing/descripcion.md` gained the implemented route.
-    - Checks: vitest 88/88 (writer) and 81/81 marketing (parent spot check); /landing 200.
-    - Open: two reds coexist, rose #fb7185 in the pillars and platform red #ef4444 in Técnicas exams.
-  - v4 committed as 2f0796a.
-- [ ] C1 — Content depth (user, 2026-10-28): the copy is too generic, with no science, value or competitive differentiation. Brilliant's Koji section is the model.
-  - Deep research comparing code, docs and research with the landing copy. Deliverable: `docs/landing/propuesta-contenido.md` (gap table, per-section value / science / mechanism / honest comparison, FAQ, science quotes, risks).
-  - Route: delegated read-only research (it writes only that doc).
-  - Next: the user reviews it, then the copy is applied section by section.
-  - 2026-10-28: research done, `docs/landing/propuesta-contenido.md` written (330 lines).
-    - Top claims:
-      - one SM-2 engine for the 3 techniques;
-      - reworded exam retakes;
-      - AI grounded only in the notes;
-      - calibration (self vs AI);
-      - a free Hoy view.
-    - FACTUAL ERRORS in the current copy (parent verified `sm2.ts:11,38-45` and `pillars.tsx:96`):
-      - review intervals are 1, 6, then round(I·EF), i.e. today/+1/+6/+15/+38 with "Bien", not +1/+3/+7/+16;
-      - the streak counts days with ≥1 review;
-      - "dominio por técnica" does not exist (the product has accuracy per technique and mastery per page);
-      - Word/PPT are not live on this base (`feat/document-import` has 48 commits not on main; PDF only, ≤20 MB);
-      - the active-recall end-of-session AI summary does not exist;
-      - the forgetting-curve "más de la mitad" claim is wrong.
-    - Open product questions: the labels "Tus errores, explicados" and "Otra vez"; the static flashcard hints; whether to publish the AI limit numbers; the "en un minuto" claim; legal review of the privacy FAQ.
-  - 2026-10-28, correction by the user: PDF, Word and PowerPoint import are LIVE on origin/main (PRs #106–#108). The local main was 75 commits behind.
-    - feat/landing-v1 must be rebased onto the current origin/main before its PR.
-  - Next (delegated):
-    1. A marketing review of the proposal, plus a "Copy final propuesto" in the doc.
-    2. A Pencil frame "Landing · Contenido propuesto v1" showing the final copy in the UNCHANGED coded design (hero excluded; it imports the live page via the pen browser with reduced motion emulated), with annotation cards for value, science, evidence and "Por confirmar".
-    - No landing code changes until the user approves the copy.
-  - 2026-10-28: the marketing review was added as `propuesta-contenido.md` §7 (the "Copy final propuesto"). The Pencil frame `sdVG8` "Landing · Contenido propuesto v1" exists, with every section rebuilt by hand and annotation notes.
-    - The live import was impossible: at 12:29 the working tree was checked out to `docs/legal-framework` (made from origin/main ac3de00) outside this session, so /landing redirects to /login there.
-    - The landing commits are safe on feat/landing-v1 at 2f0796a.
-    - Marketing changes:
-      - Así funciona: "en un minuto" became "sin armar nada a mano";
-      - benefit-led points with the mechanism as proof;
-      - exams lead with "nunca se repite igual";
-      - the factual errors are fixed;
-      - new sections: Ciencia (61% vs 40%), a 10-question FAQ, and the closing.
-  - 2026-10-28, copy round 2 in Pencil:
-    - Frames: `OHP8C` "Landing · Contenido propuesto v2", `s3aFN` science page, `k60K1C` credits, `pc04f` privacy shell.
-    - Repetition audit (doc §8): SM-2 lives only in Pilar 02; "only from your page" only in the FAQ; the session summary only in Tu acompañante; Hoy only in Pilar 03.
-    - FAQ cut to 5. Comparación honesta replaces Ciencia, with a 5-step Cogni route.
-    - The doc's §9 holds the final v2 copy and §10 the page outlines.
-    - Pending: legal privacy text; DOI checks; the Magnific link; the product label "Tus errores, explicados"; a live design check (needs the feat/landing-v1 checkout).
-  - 2026-10-28: the user approved round 2 ("me gustó lo que hiciste") and asked to implement the remaining sections, the new pages and the legal pages (sourced from branch `docs/legal-framework`, 78e5df2, which stays local and unpushed).
-- [x] C2 — Apply the approved v2 copy (`propuesta-contenido.md` §9) to the existing coded sections: Así funciona, Técnicas, Pilares. The design is unchanged and the factual fixes are included. Route: delegated writer (2+ non-trivial files). Commit 1.
-  - 2026-10-28: committed as d257936. Route: delegated writer.
-    - Así funciona: v2 headline and one v2 line under each step. Técnicas: v2 intro line, a "La ciencia detrás de cada técnica" link to /ciencia, v2 points for the four panels. Pilares: v2/§7.3 points; the curve demo marks +1/+6/+15 with the v2 note; the progress card says "Acierto por técnica".
-    - Checks: `pnpm typecheck` clean; `vitest run "src/app/(marketing)" src/proxy.test.ts src/app/no-inline-hex.test.ts` 11 files / 93 tests passed; `biome check "src/app/(marketing)"` clean after one format fix; /landing 200 and the steps screenshot checked against `OHP8C`.
-    - Note: node_modules was stale (left from the origin/main checkout, no @phosphor-icons); `pnpm install --frozen-lockfile` restored it without touching the lockfile.
-- [x] R4 — The new landing sections in the Dovetail line, matching Pencil `OHP8C`: Comparación honesta (four pains vs the 5-step "camino Cogni"), FAQ (5 questions, accordion), the "Empieza hoy" closing, and a footer with links to Ciencia, Créditos and the legal pages. They replace the empty `#ciencia` and `#preguntas` placeholders. Route: delegated writer. Commit 2.
-  - 2026-10-28: committed as bfa3649. Route: delegated writer.
-    - New: `comparison.tsx` (#comparacion, paper, red exam headline object, route rail drawn step by step), `faq.tsx` (#preguntas, lilac, 5-item disclosure accordion, first open, grid-row transition), `closing.tsx` (#empieza, lilac → night bookend, CTA /register, headline settles from blur), `(marketing)/_components/site-footer.tsx` + `legal-docs.ts` (8 legal slugs + Créditos).
-    - Nav: "Ciencia" → "Comparación" (#comparacion); nav and footer anchors now carry `/landing#…` so they work from the new pages. Pillar sections gained `scroll-mt-16` for the "↑" links.
-    - Deviations: the closing ends near-black and the footer is night, as in `OHP8C` (the bookend transition the brief asked to keep), although the light-ground rule covers the other sections; the Comparación headline wraps to two lines at 1440 because of the added headline object; the footer Legal column lists all 8 documents plus Créditos instead of the frame's three; FAQ answer 3 is the §7.3 text with a `TODO(legal)` code note (no visible marker on the landing).
-    - Checks: `pnpm typecheck` exit 0; vitest 15 files / 111 tests passed; `biome check "src/app/(marketing)"` clean; /landing 200; screenshots of #comparacion, #preguntas, #empieza and the footer compared with `OHP8C`; a 1px paper seam above the footer fixed with `-mt-px`.
-- [x] P1 — Public pages `/ciencia` (Brilliant-style short page, Pencil `s3aFN`) and `/creditos` (Pencil `k60K1C`), in the proxy `OPEN_PATHS`. Route: delegated writer. Commit 3.
-  - 2026-10-28: committed as fa6b6fc. Route: delegated writer.
-    - `/ciencia` (`ciencia/page.tsx`, `_components/science-concepts.tsx`): lilac head with "Volver a Cogni", a yellow headline object and a 6-pill index; six alternating blocks (visual, idea, "Así lo usa Cogni", source) whose bars and curve fill on view; a close "Todo esto, en tus páginas." with Empieza gratis and Ver cómo funciona; shared footer.
-    - `/creditos` (`creditos/page.tsx`, `_components/credits-list.tsx`): Ilustraciones (Designed by Magnific with two visible `PENDIENTE` marks: which illustrations, and the link), Tipografías (Inter · Instrument Serif · Manrope · JetBrains Mono · Caveat, Google Fonts, OFL 1.1), Íconos (Lucide ISC, Phosphor MIT).
-    - Shared: `_components/page-header.tsx`, `_components/pending-mark.tsx`. Both pages have their own metadata and are exact-match `OPEN_PATHS` (proxy tests added, plus a prefix-rejection test).
-    - Deviation: a headline object was added to the /ciencia headline (design line), not in `s3aFN`.
-    - Checks: `pnpm typecheck` exit 0; vitest 17 files / 123 tests passed; `biome check` clean; /landing, /ciencia, /creditos all 200; screenshots of the /ciencia head, concept 04 and /creditos matched `s3aFN` / `k60K1C`.
-  - 2026-10-28, scope change (user): footer Legal group reduced to Términos de uso → /legal/terminos, Privacidad → /legal/privacidad and Créditos; `legal-docs.ts` deleted; /legal not in the proxy. Committed as fd0b320 (route: delegated writer; typecheck exit 0, vitest 17 / 123 passed, biome clean, the three pages 200).
-- [-] L1 — Public legal pages under `/legal/<slug>`, using the 8 footer documents from `docs/legal-framework:docs/legal/` (terms, data policy, privacy notice, cookies, acceptable use and AI, academic integrity, copyright, sub-processors). **Moved out of landing-v1 (user, 2026-10-28)**: legal pages become a separate feature after research into which documents deserve standalone pages. Nothing of L1 was started.
-  - The content is copied verbatim into the repo and rendered from markdown.
-  - `[PENDIENTE: …]` stays visible as a marked placeholder, under a "Borrador, pendiente de revisión legal" notice.
-  - The existing `/terminos` gate is untouched.
-  - Route: delegated writer. Commit 4.
+- [x] T5 — Landing at `/` (user-approved 2026-10-28; supersedes the 2026-10-27 `/dashboard` plan: Inicio moves to `/inicio`, option b for signed-in visitors). Route: one delegated writer (2+ non-trivial files, branch `feat/landing-polish`). No DNS change.
+  - Commit dd0e877 `feat(landing): serve the landing at the domain root and move Inicio to /inicio`: `(app)/page.tsx` → `(app)/inicio/page.tsx` and `(marketing)/landing/page.tsx` → `(marketing)/page.tsx` in the same commit; proxy `OPEN_PATHS` gains `/` and loses `/landing`, a signed-in user on `/` or an auth path goes to `/inicio`; `next.config.ts` redirects `/landing` → `/` (308); `safeNext`, `termsRedirectFor`, `signInAction`, `updatePasswordAction` and the `/terminos` back link default to `/inicio`; logo, sidebar (href + active), breadcrumb, sidebar-tree refresh, dashboard hero and KPI links point to `/inicio`; landing self-links are `/#…`. E2E specs updated (`signIn` expects `/inicio`) and `tests/e2e/landing-root.spec.ts` added.
+  - Commit c483032 `fix(auth): render the auth pages per request so scripts carry the CSP nonce`: the `(public)` layout awaits `connection()`; `tests/e2e/csp-nonce.spec.ts` checks every script's nonce on `/login`, `/register`, `/forgot-password` and (signed in) `/reset-password`.
+  - Checks: test-first RED seen for proxy and `safeNext` (9 failing), then GREEN. `pnpm typecheck` exit 0 (after `next typegen` refreshed stale `.next/types`); `pnpm exec biome check` clean; `pnpm exec vitest run` 513 files / 5036 tests passed; `pnpm exec next build` lists `ƒ /`, `ƒ /inicio`, `ƒ /register`, `ƒ /forgot-password`, `ƒ /reset-password`, `ƒ /login`, `ƒ /terminos`, no `/landing` page. Against `next start`: CSP specs 10 passed, `landing-root.spec.ts` 3 passed. On `pnpm dev`: `/` 200 (landing copy), `/landing` 308 → `/`, `/inicio` anonymous 307 → `/login`, 200 for `/ciencia`, `/creditos`, `/legal/terminos`, `/register`, `/login`. The full e2e suite was not run (user request).
+  - Commit 8216e39 sent signed-in users from `/`, `/ciencia` and `/creditos` to `/inicio`. Corrected (user, 2026-10-28) by the follow-up `fix(landing)` commit: only `/` (plus the auth paths) redirects a signed-in user; `/ciencia` and `/creditos` stay readable and, when signed in, their nav (`LandingNav signedIn`, session via `getCurrentUser` from `@/modules/identity`) shows a single "Ir a la app" → `/inicio` in place of the section links and sign-in/sign-up CTAs. Footer untouched. Checks: RED then GREEN for proxy (2 failing), nav (1) and page (2) tests; vitest proxy + `(marketing)` 22 files / 164 tests passed; typecheck and biome clean; `landing-root.spec.ts` 4 passed on the running dev server.
+  - Follow-up `fix(landing)` (user, 2026-10-28): on `/ciencia` and `/creditos` a signed-in user gets app links everywhere: `SiteFooter signedIn` swaps the four `/#…` links for one "Ir a la app" → `/inicio` and points the wordmark to `/inicio` (default signed out unchanged on `/`); `PageHeader signedIn` turns "Volver a Cogni" into "Volver a la app" → `/inicio`; the ciencia closing becomes one primary "Ir a la app"; the `LandingNav` wordmark also points to `/inicio`. Checks: RED (3 failing) then GREEN, vitest `(marketing)` + no-inline-hex 17 files / 127 tests, typecheck and biome clean, `landing-root.spec.ts` 5 passed on the dev server.
 
 ## Next step
 C2 → R4 → P1 done (d257936, bfa3649, fa6b6fc, fd0b320); L1 moved out. Next: an RDD assessment per commit and the user's visual review on localhost:3000.
@@ -303,3 +64,38 @@ C2 → R4 → P1 done (d257936, bfa3649, fa6b6fc, fd0b320); L1 moved out. Next: 
   - 2f0796a..bfa3649, lineage review-646cf37780dcf0ef. Advisories: R3-curve-review-days, R3-footer-unproved-routes, R3-route-anchor-targets.
   - bfa3649..fd0b320, lineage review-699d6c1973208fae. Advisories: R3-footer-dead-legal-links (expected until the legal feature ships), R3-legal-docs-deletion-consumers, R3-step-counter-off-by-one. The last one is a false positive: `step(length-1)` already prints the total.
 - The reviewed boundary is now fd0b320.
+
+## Polish pass (2026-10-28)
+
+Branch `feat/landing-polish` from `feat/legal-consent` 3f316e9. Route: one delegated writer for P2–P6 (the parent delegated the whole pass; 2+ non-trivial files).
+
+- [x] **P2 — FAQ from real visitor questions.** Eight questions replace the five v2 ones: ¿Qué archivos puedo importar?, ¿Cómo crea Cogni las tarjetas y las preguntas?, ¿Puedo confiar en lo que genera la IA?, ¿Sirve para cualquier materia?, ¿Cómo sabe Cogni qué repasar cada día?, ¿Cómo sé si estoy aprendiendo?, ¿Qué pasa con mis apuntes? (links `/legal/privacidad`), ¿Funciona en el celular?. The study-time question left (it was not a visitor question). Claims checked against `src/modules/ingestion/README.md` (PDF/DOCX/PPTX, 20 MB, no OCR, no .doc/.ppt), `src/modules/ai/application/prompts/*` (output always in Spanish), `src/modules/scheduling/README.md` (SM-2 due dates, Hoy by technique, due by local day), `src/modules/analytics` (dominio, repasos completados, racha) and `src/modules/study-engine/domain/session-feedback.ts` (strengths and improvement areas). Privacy answer follows `politica-de-tratamiento-de-datos.md` (summary, §5 "Lo que no hacemos", §6.2, §8.4, §9).
+  - Competitor sources (fetched 2026-10-28): StudyFetch https://www.studyfetch.com (visible accordion plus FAQPage data: file types, any subject, "Can I trust the AI-generated study tools?", "Is my data private and secure?", "Does StudyFetch work on my phone?", "How does StudyFetch know what I need to study?", "How do I know if I'm actually learning?", cost); Knowt https://knowt.com (file types, subjects, study modes); RemNote https://www.remnote.com/pricing (plans, AI credits only); Brilliant help center https://brilliant.org/help-redirect/ ("Where can I use Brilliant?", "What subjects does Brilliant teach?", free vs Premium, delete account); Gemini Notebook (NotebookLM) https://support.google.com/notebooklm/answer/16269187 (mobile app, "My question wasn't answered", data privacy, file size limit, citations); Anki https://docs.ankiweb.net/llms.txt (FAQ index: "What spaced repetition algorithm does Anki use?", exam preparation, account removal). Quizlet (quizlet.com, help.quizlet.com) returned HTTP 403 and gave no questions.
+  - Excluded by the earlier user decision: 18+ and cost. Cost appears on StudyFetch, RemNote, Brilliant and Knowt (4 of 6 reachable platforms), so it is flagged to the user rather than added.
+- [x] **P5 — footer labels and CSP correctness.** (a) The footer's Legal column reads "Términos y condiciones" and "Política de privacidad"; "Uso aceptable", "Derechos de autor" and "Créditos" stay. (b) Confirmed: `pnpm exec next build` listed `○ /landing`, `○ /ciencia`, `○ /creditos` (static) while `/legal/*` were `ƒ`. Under `next start`, `/landing` sent `script-src 'self' 'nonce-…' 'strict-dynamic'` with 18 `<script>` tags and 0 carrying a nonce (`/ciencia` 17/0, `/creditos` 15/0; `/legal/terminos` 15/15), so the browser blocked every script. Fix: `await connection()` in `src/app/(marketing)/layout.tsx`. After it the build lists all three as `ƒ` and every script carries the response nonce (18/18, 17/17, 15/15). New spec `tests/e2e/csp-nonce-landing.spec.ts` (nonce on every script for the three pages, and the FAQ accordion hydrates on `/landing` with no `script-src` violation): 4 passed against `next start` (the full suite was not run).
+  - Open, outside the allowed surface: `/register`, `/forgot-password` and `/reset-password` are also `○` and served 19 nonce-less scripts under `next start` (`/login` is `ƒ`, 19/19). The sign-up page needs the same fix in `src/app/(public)`.
+- [x] **P4 — /ciencia references.** The page had no `PENDIENTE` or `[R]` markers left in code (they live only in `docs/landing/propuesta-contenido.md`); the short sources ("Cepeda et al. (2006). Psychological Bulletin…", "Bjork y Bjork (2011)" with no title) became ten full APA 7 references, set as a small citation list directly under each idea, journal and volume (or book title) in italics, no DOIs or URLs. Verified 2026-10-28: Roediger y Karpicke 2006 (PubMed 16507066), Cepeda et al. 2006 (PubMed 16719566), Cepeda et al. 2008 (PubMed 19076480), Ebbinghaus 1885 (Project Gutenberg, archive.org title page), Murre y Dros 2015 (PMC4492928), Dunlosky y Rawson 2012 (Kent State publication list), Hattie y Timperley 2007 (Melbourne research profile), Bjork y Bjork 2011 (bibsonomy record, UCLA Bjork Lab PDF), Chi et al. 1994 (ASU repository), Dunlosky et al. 2013 (index record). Only journal, volume, issue and pages were seen on index pages for Murre, Dunlosky 2012, Hattie and Dunlosky 2013; the 61 %/40 % figures keep their earlier [V] verification in the proposal. Citation text uses `--lp-ink-3` (AA on both grounds). Visual check: screenshots at 1440 and 390 px.
+- [x] **P3 — "Tus errores, explicados".** `rg -n "errores" src/app/(marketing) docs/landing` finds no landing UI using it: the landing already says "En el examen, cada concepto explicado" (`techniques.tsx:101`), and the two `docs/landing/propuesta-contenido.md` hits (§6 item 4, §8.1) record the product label as a finding. The product still shows it at `src/app/(app)/exams/_components/exam-feedback-panel.tsx:155` (and its test at `:41`); not changed, reported to the user. No commit.
+- [x] **P6 — stale checkbox claims.** `rg -n -i "casilla" docs/legal src/content/legal odd/tasks/legal-consent.md`: `src/content/legal` has no hit, and clauses 2.1 (terms) and 8.1 (policy) already describe the notice next to the button (commit db065b4). Fixed the docs that still said those clauses describe a checkbox: `docs/legal/README.md` §2.3 "Riesgo"; `docs/legal/matriz-de-cumplimiento.md` D21 (gap and action), E1 (the age self-declaration now sits in the sign-up notice, the `/terminos` fallback repeats it in its checkbox) and code backlog item 2. Left as accurate: README "Respaldo" (`/terminos` still uses a checkbox, `accept-terms-form.tsx`), D2 (no separate checkbox by decision), item 7 of the open points and `marco-legal.md` (outside the allowed surface; its "casilla" lines describe the earlier analysis). `src/content/legal` wording untouched.
+- RDD 2026-10-28: 28d4359..7707635 (8216e39, 80518ca, 7707635; medium) granted, approved and acknowledged. Advisories: R3-001 and R3-002 (signed-in page test coverage), R3-003 (`getCurrentUser()` on /ciencia has no fallback if the session read throws). The reviewed boundary is now 7707635.
+- [x] **P7 — visual polish (pillars, comparison)** (user feedback 2026-10-28). Route: one delegated writer (2+ non-trivial files). References for the icon treatment: Untitled UI "featured icons" (tinted tile, ring, soft drop), Linear and Raycast feature lists (one solid glyph per point, one hue per section), Untitled UI file-type icons (white page, coloured extension tag). Icon source: `@phosphor-icons/react` 2.1.10 (MIT, already installed), fill weight; no new dependency, no vendor logos.
+  - Commit d05eff3 `feat(landing): give the pillar points filled icon tiles and polish the import card`: `.lp-ficon` tiles in each pillar's hue (yellow, violet, mint, rose) for all twelve points; `file-badge.tsx` (Phosphor `File` page + PDF red / DOCX blue / PPTX orange tag); pillar 01 card with breadcrumb bar, richer sidebar and slash menu, and a fanned tray of the three badges. Tokens added in `landing.css`.
+  - Commit e4a7834 `feat(landing): show pillar 03 as a light week of the calendar`: white week card modelled on the app's `CalendarGrid` week view (weekday + day number header, today in violet on a lilac column, technique chips with a 3px accent bar, dots on phones); chips land day by day once, Hoy card motion kept. Pillar 02 card untouched.
+  - Commit 85b10c1 `feat(landing): turn the usual way of the comparison into a noisy pile`: `usual-pile.tsx` (window with tabs, six PDF/DOCX/PPTX files, two sticky notes, a notification, a crossed-out to-do list, scribbled arrows); `captura_pizarra.png` removed; four pains and the Cogni side unchanged.
+  - Checks: `pnpm typecheck` exit 0; `pnpm exec biome check` on the changed files clean; `pnpm exec vitest run "src/app/(marketing)" src/app/no-inline-hex.test.ts` 17 files / 131 tests passed (new: tile hue per pillar, only pdf/docx/pptx badges in pillar 01 and the pile, light week calendar); `curl /` 200. Screenshots before/after at 1440 and 390 px in the session scratchpad `polish-shots/`. Full e2e not run (user request). Reduced motion: demos render their final state through `usePlayOnce`.
+  - Icon rework (user, 2026-10-28): the user rejected the first icon pass (d05eff3, tinted tiles) and chose direction E from scratchpad mockups, then refined it: a dithered pixel BACKGROUND (56 px tile in the pillar hue, coarse Bayer dither at 2 px per cell, light step top-left, the HeadlineObject family) with a crisp vector Phosphor glyph (bold, 28 px, tone ink, 1 px drop shadow) on top; hand-drawn pixel glyphs dropped. `pixel-tile.tsx` renders the dither on the server as one shared SVG `<symbol>` (row-merged runs, `crispEdges`) referenced by all twelve tiles; `.lp-ptile` tones in `landing.css` (new tokens `--lp-violet-900`, `--lp-rose-900`). Checks: `pnpm typecheck` exit 0; biome clean on the changed files; vitest `src/app/(marketing)` + no-inline-hex 18 files / 134 tests passed; `curl /` 200; screenshots `polish-shots/e-*.png` at 1440 and 390 px. Full e2e not run.
+  - Open: the Cogni route chip still reads "PDF · Word · PowerPoint" (Cogni side out of scope); the pillar 01 copy says "PDF, Word y PowerPoint" (copy unchanged by rule).
+- [x] **P8 — logo (7 v2 Glass)** (user-approved 2026-10-28, exactly as presented, no extra CSS glass effects). Route: one delegated writer (2+ non-trivial files). Source: the Manrope set of the scratchpad `logo-options-3/7-monologue-v2/` (generator `scripts/gen7v2.py`).
+  - Commit a33dcb6 `feat(brand): add the 7 v2 Glass logo assets and site icons`: `public/brand/` cogni-mark (21 KB), cogni-mark-ink (21 KB), cogni-stamp (1.7 KB), cogni-favicon (3.1 KB), cogni-lockup / -ink (26 KB each), cogni-app-icon (21 KB), cogni-wordmark / -ink (5 KB each, cut from the lockups with the mark's vertical box); only inter-tag whitespace stripped, Chromium renders identical to the sources; no fonts, scripts, `<text>` or external references. `src/app/icon.svg` (favicon build), `src/app/apple-icon.png` (180), `src/app/favicon.ico` (PNG entries 16/32/48, 5.6 KB, built by a scratchpad Node script, 48 rasterised by Chromium). No manifest: `/manifest.webmanifest` is not excluded by the proxy matcher nor in `OPEN_PATHS`, so anonymous visitors would be redirected.
+  - Commit 1e729c9 `feat(brand): show the 7 v2 Glass mark in the shared BrandMark atom`: `BrandGlyph`/`BrandMark` render the paper or ink glass via `next/image` (`unoptimized`), the favicon build at 20px (`size="sm"`, sidebar), the outlined wordmark (decorative) plus a visually hidden "Cogni"; md = 28px mark. Props API unchanged. `docs/design-system/ATOMS.md`, `docs/design-system/assets/logo.svg` (new lockup) and `logo.md` (usage rules).
+  - Commit fae0692 `feat(landing): put the glass mark before the cogni wordmark in nav and footer`: nav mark 28px (17% over the 24px wordmark), paper and ink glass stacked and cross-faded with `data-theme` (`.lp-nav-mark`, instant under reduced motion); footer ink glass at 33px. Link names stay "cogni".
+  - Checks: `pnpm typecheck` exit 0; biome clean on the changed files; vitest `src/shared/ui`, `(app)/_components`, `(marketing)`, `(public)`, no-inline-hex: 131 files / 864 tests passed; curl 200 for `/`, `/login`, `/register`, `/icon.svg` (image/svg+xml), `/apple-icon.png` (image/png), `/favicon.ico`; the head links `favicon.ico` (48x48), `icon.svg` (any) and `apple-icon.png` (180x180). Screenshots in the scratchpad `logo-impl/` (nav-top, nav-light, footer, login, register, register-brand-crop, login-mobile). The app sidebar needs a session and was not captured. Full e2e not run (user request).
+
+### RDD, landing close (2026-10-28)
+- 7707635..292d8fb exceeded the reviewer budget as one candidate, so it was reviewed in slices. All were granted, approved and acknowledged:
+  - 7707635..308af67 (P7 visual polish): advisory R3-001.
+  - 308af67..819ba74 (pixel tiles, pillar copy, "Empieza ya", Pilares link): advisory R3-cta-copy-e2e-unverified.
+  - 819ba74..a33dcb6 (logo assets): 3 suggestions.
+  - a33dcb6..292d8fb (BrandMark, nav and footer, docs): 2 suggestions.
+- The reviewed boundary is now 292d8fb. The user declared the landing finished on 2026-10-28. The footer wordmark stays in Inter (user decision).
+- Pending before any PR: the full e2e suite (not yet run, per the user), the web manifest (needs a proxy open path), and a visual check of the sidebar mark.

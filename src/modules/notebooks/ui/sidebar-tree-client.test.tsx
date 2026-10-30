@@ -33,11 +33,11 @@ vi.mock("../actions", () => ({
 // S4 review follow-up ("refresh after creating a notebook"): a notebook
 // created from the sidebar must also refresh Home's server-rendered data.
 // Extended for the same follow-up's remaining mutations: the refresh must
-// only fire while the user is actually on Home (pathname "/"), never on
+// only fire while the user is actually on Home (pathname "/inicio"), never on
 // another route (e.g. mid-edit on a page), so usePathname is mocked too.
 const { refresh, pathname } = vi.hoisted(() => ({
   refresh: vi.fn(),
-  pathname: { current: "/" },
+  pathname: { current: "/inicio" },
 }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh }),
@@ -60,7 +60,7 @@ describe("SidebarTreeClient", () => {
     renameNotebook.mockReset();
     renamePage.mockReset();
     refresh.mockReset();
-    pathname.current = "/";
+    pathname.current = "/inicio";
   });
 
   // Scenario "Reescritura de shell-empty-state.spec.ts" (e2e) — the same

@@ -95,7 +95,7 @@ test.describe("Progreso", () => {
     ]);
     await seedDueItems(pageId, { flashcard: 1 });
 
-    await page.goto("/");
+    await page.goto("/inicio");
     await page.getByRole("link", { name: "Progreso", exact: true }).click();
     await expect(page).toHaveURL("/dashboard");
 

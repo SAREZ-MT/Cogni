@@ -95,7 +95,7 @@ export function KpiRow({ kpis }: { kpis: KpisView }) {
         value={kpis.streak.value}
         delta={kpis.streak.delta}
         icon={Flame}
-        href="/"
+        href="/inicio"
       />
       <KpiTile
         label="Ítems vencidos"

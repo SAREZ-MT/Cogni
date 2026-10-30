@@ -10,13 +10,14 @@ const AUTH_PATHS = new Set(["/login", "/register", "/forgot-password"]);
 // Always reachable, signed in or not: the terms of use are read before
 // signing up and are where the (app) gate sends accounts that still have to
 // accept them, and the public legal pages (/legal/*) are linked from the
-// sign-up notice and the footer. The marketing landing is the public face of
-// Cogni, with its science and credits pages. Unlike AUTH_PATHS, signed-in
-// users are not bounced from here. Exact paths only: a new public page must
-// be added here.
+// sign-up notice and the footer. The marketing landing at the domain root
+// is the public face of Cogni, with its science and credits pages. Unlike
+// AUTH_PATHS, signed-in users are not bounced from here, except from the
+// landing itself (LANDING_PATH). Exact paths only: a new public page must be
+// added here.
 const OPEN_PATHS = new Set([
   "/terminos",
-  "/landing",
+  "/",
   "/ciencia",
   "/creditos",
   "/legal/terminos",
@@ -24,6 +25,13 @@ const OPEN_PATHS = new Set([
   "/legal/uso-aceptable",
   "/legal/derechos-de-autor",
 ]);
+
+// The landing is for visitors: a signed-in user asking for it goes to the
+// app, whose home is Inicio, until they sign out. The science and credits
+// pages and the legal pages stay readable while signed in; their nav offers
+// "Ir a la app" instead of the landing section links.
+const LANDING_PATH = "/";
+const HOME_PATH = "/inicio";
 
 export function isOpenPath(pathname: string): boolean {
   return OPEN_PATHS.has(pathname);
@@ -103,8 +111,8 @@ export async function proxy(request: NextRequest) {
     redirect.headers.set("Content-Security-Policy", csp);
     return redirect;
   }
-  if (user && isAuthPath) {
-    const redirect = withCookies(new URL("/", request.url), response);
+  if (user && (isAuthPath || pathname === LANDING_PATH)) {
+    const redirect = withCookies(new URL(HOME_PATH, request.url), response);
     redirect.headers.set("Content-Security-Policy", csp);
     return redirect;
   }

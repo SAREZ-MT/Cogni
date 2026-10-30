@@ -53,12 +53,15 @@ describe("Pillars", () => {
     expect(progress?.points.map((point) => [point.title, point.text])).toEqual([
       [
         "Repasos completados",
-        "Cuenta lo que hiciste, comparado con la semana pasada.",
+        "Mira cuántos repasos completaste esta semana y compáralo con la anterior.",
       ],
-      ["Tu racha", "Días seguidos con al menos un repaso."],
+      [
+        "Tu racha",
+        "Son los días seguidos en que repasas al menos una vez. Verla crecer te ayuda a mantener el hábito.",
+      ],
       [
         "Dominio por página",
-        "Qué páginas están listas, tu acierto por técnica y tu calibración.",
+        "Mira cuánto has avanzado en cada página con tus repasos y cuáles ya están listas.",
       ],
     ]);
     render(<Pillars />);
@@ -66,8 +69,73 @@ describe("Pillars", () => {
     expect(document.body).not.toHaveTextContent("Dominio por técnica");
   });
 
+  it("draws every point icon as a vector glyph on a dithered tile in its pillar's hue", () => {
+    render(<Pillars />);
+    const tones = Object.fromEntries(
+      PILLARS.map((pillar) => {
+        const section = document.getElementById(pillar.id) as HTMLElement;
+        const tiles = [...section.querySelectorAll<HTMLElement>(".lp-ptile")];
+        expect(tiles).toHaveLength(3);
+        for (const tile of tiles) {
+          expect(tile).toHaveAttribute("aria-hidden", "true");
+          const dither = tile.querySelector(".lp-ptile-dither");
+          expect(dither).toHaveAttribute("shape-rendering", "crispEdges");
+          const glyph = tile.querySelector(".lp-ptile-glyph");
+          expect(glyph).not.toBeNull();
+          expect(glyph).not.toHaveAttribute("shape-rendering");
+          expect(tile.querySelector("use")).toHaveAttribute(
+            "href",
+            "#lp-ptile-dither",
+          );
+        }
+        return [
+          pillar.id,
+          [...new Set(tiles.map((tile) => tile.dataset.tone))],
+        ];
+      }),
+    );
+    expect(tones).toEqual({
+      "pilar-apuntes": ["yellow"],
+      "pilar-repeticion": ["violet"],
+      "pilar-hoy": ["mint"],
+      "pilar-progreso": ["rose"],
+    });
+    expect(document.querySelectorAll("#lp-ptile-dither")).toHaveLength(1);
+  });
+
+  it("gives each of the twelve points its own glyph", () => {
+    const icons = PILLARS.flatMap((pillar) =>
+      pillar.points.map((point) => point.icon),
+    );
+    expect(icons).toHaveLength(12);
+    expect(new Set(icons).size).toBe(12);
+  });
+
+  it("shows only the PDF, DOCX and PPTX file types in the import demo", () => {
+    render(<Pillars />);
+    const section = document.getElementById("pilar-apuntes") as HTMLElement;
+    const kinds = [...section.querySelectorAll<HTMLElement>(".lp-fbadge")].map(
+      (badge) => badge.dataset.kind,
+    );
+    expect(new Set(kinds)).toEqual(new Set(["pdf", "docx", "pptx"]));
+    expect(section).not.toHaveTextContent(/png|jpe?g|\.doc\b|\.ppt\b/i);
+  });
+
+  it("shows the schedule as a light week of the calendar, today first", () => {
+    render(<Pillars />);
+    const section = document.getElementById("pilar-hoy") as HTMLElement;
+    for (const day of ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]) {
+      expect(section).toHaveTextContent(day);
+    }
+    expect(section.querySelector(".bg-\\(--lp-ground\\)")).toBeNull();
+  });
+
   it("never mentions study time", () => {
     render(<Pillars />);
     expect(document.body).not.toHaveTextContent(/tiempo de estudio|horas/i);
+  });
+  it("gives the whole pillars run one anchor for the nav", () => {
+    const { container } = render(<Pillars />);
+    expect(container.querySelector("#pilares")).not.toBeNull();
   });
 });

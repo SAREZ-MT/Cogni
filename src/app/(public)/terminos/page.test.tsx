@@ -94,7 +94,9 @@ describe("/terminos page", () => {
     identity.ensureProfileForUser.mockResolvedValue(profile());
     const { container } = await renderPage("//evil.test");
 
-    expect(container.querySelector('input[name="next"]')).toHaveValue("/");
+    expect(container.querySelector('input[name="next"]')).toHaveValue(
+      "/inicio",
+    );
   });
 
   it("shows the accepted version and date with a way back once accepted", async () => {
@@ -112,7 +114,7 @@ describe("/terminos page", () => {
     );
     expect(
       screen.getByRole("link", { name: "Volver a Cogni" }),
-    ).toHaveAttribute("href", "/");
+    ).toHaveAttribute("href", "/inicio");
     expect(screen.queryByTestId("terms-accept-checkbox")).toBeNull();
   });
 

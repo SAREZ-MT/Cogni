@@ -55,7 +55,7 @@ export function DashboardHero({ hero }: { hero: HeroView }) {
           </p>
         </div>
         <Button asChild>
-          <Link href="/">
+          <Link href="/inicio">
             Ver repasos de hoy
             <ArrowRight aria-hidden="true" size={16} strokeWidth={2} />
           </Link>

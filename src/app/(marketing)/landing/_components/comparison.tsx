@@ -1,11 +1,12 @@
 "use client";
 
 import { ArrowRight } from "@phosphor-icons/react/dist/csr/ArrowRight";
-import { FileText, Scale, X } from "lucide-react";
+import { Scale, X } from "lucide-react";
 import { motion } from "motion/react";
 import Link from "next/link";
 import { type HeadlineImage, HeadlineObject } from "./headline-object";
 import { Reveal } from "./reveal";
+import { UsualPile } from "./usual-pile";
 
 type Tone = "violet" | "yellow" | "mint" | "companion" | "rose";
 
@@ -66,20 +67,10 @@ export const ROUTE: readonly RouteStep[] = [
   },
 ];
 
-// Generic file names for the scattered "usual way" pile, set at fixed
-// spots and tilts (decorative).
-const PILE = [
-  { name: "apuntes_final_v3.pdf", spot: "left-[2%] top-[10%] -rotate-3" },
-  { name: "clase (2).docx", spot: "left-[52%] top-0 rotate-2" },
-  { name: "tema_nuevo.pptx", spot: "left-[9%] top-[38%] rotate-1" },
-  { name: "resumen_copia.pdf", spot: "left-[49%] top-[32%] -rotate-2" },
-  { name: "captura_pizarra.png", spot: "left-[4%] top-[72%] rotate-2" },
-] as const;
-
 const EASE_OUT = [0.22, 1, 0.36, 1] as const;
 
 // "Comparación honesta": two ways to reach the exam, side by side. The
-// usual way is a pile (loose files, a sticky note) and four real pains;
+// usual way is a noisy pile (usual-pile.tsx) and four real pains;
 // the Cogni way is one numbered route whose rail draws itself step by step
 // as it enters, the section's one signature motion. Each step links back
 // ("↑") to the section that explains it. "examen" is the italic keyword:
@@ -123,23 +114,7 @@ export function Comparison({ image }: { image?: HeadlineImage }) {
             <p className="mt-4 text-(--lp-ink-3) text-[17px] leading-[1.5]">
               Archivos sueltos, resaltador y todo la noche antes.
             </p>
-            <div
-              aria-hidden="true"
-              className="relative mt-8 min-h-[260px] w-full max-w-[440px] flex-1 md:min-h-[300px]"
-            >
-              {PILE.map((file) => (
-                <span
-                  key={file.name}
-                  className={`lp-pile-file absolute flex items-center gap-2 rounded-xl bg-white px-3.5 py-2.5 font-(family-name:--lp-font-mono) text-(--lp-ink-3) text-[12px] ${file.spot}`}
-                >
-                  <FileText className="size-3.5 text-(--lp-muted)" />
-                  {file.name}
-                </span>
-              ))}
-              <span className="lp-pile-note absolute right-0 bottom-[6%] w-[170px] rotate-3 p-4 font-(family-name:--lp-font-hand) text-[26px] leading-[1.05] md:w-[188px] md:text-[28px]">
-                Releer todo la noche antes
-              </span>
-            </div>
+            <UsualPile />
             <ul className="flex flex-col gap-3 pt-10">
               {PAINS.map((pain) => (
                 <li

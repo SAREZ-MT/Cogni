@@ -7,10 +7,10 @@ describe("SiteFooter", () => {
     render(<SiteFooter />);
     const nav = screen.getByRole("navigation", { name: "Pie de página" });
     for (const [name, href] of [
-      ["Cómo funciona", "/landing#como-funciona"],
-      ["Técnicas", "/landing#tecnicas"],
-      ["Comparación", "/landing#comparacion"],
-      ["Preguntas", "/landing#preguntas"],
+      ["Cómo funciona", "/#como-funciona"],
+      ["Técnicas", "/#tecnicas"],
+      ["Comparación", "/#comparacion"],
+      ["Preguntas", "/#preguntas"],
     ]) {
       expect(within(nav).getByRole("link", { name })).toHaveAttribute(
         "href",
@@ -25,8 +25,8 @@ describe("SiteFooter", () => {
       screen.getByRole("link", { name: "La ciencia detrás de Cogni →" }),
     ).toHaveAttribute("href", "/ciencia");
     for (const [name, href] of [
-      ["Términos de uso", "/legal/terminos"],
-      ["Privacidad", "/legal/privacidad"],
+      ["Términos y condiciones", "/legal/terminos"],
+      ["Política de privacidad", "/legal/privacidad"],
       ["Uso aceptable", "/legal/uso-aceptable"],
       ["Derechos de autor", "/legal/derechos-de-autor"],
       ["Créditos", "/creditos"],
@@ -44,6 +44,45 @@ describe("SiteFooter", () => {
     );
     expect(document.body).toHaveTextContent(
       "Cogni es un proyecto académico (trabajo de grado) en desarrollo.",
+    );
+  });
+
+  it("keeps the landing logo for visitors", () => {
+    render(<SiteFooter />);
+    expect(screen.getByRole("link", { name: "cogni" })).toHaveAttribute(
+      "href",
+      "/",
+    );
+    expect(screen.queryByRole("link", { name: "Ir a la app" })).toBeNull();
+  });
+
+  it("sends a signed-in user to the app instead of the landing sections", () => {
+    render(<SiteFooter signedIn />);
+    const nav = screen.getByRole("navigation", { name: "Pie de página" });
+    expect(
+      within(nav).getByRole("link", { name: "Ir a la app" }),
+    ).toHaveAttribute("href", "/inicio");
+    for (const name of [
+      "Cómo funciona",
+      "Técnicas",
+      "Comparación",
+      "Preguntas",
+    ]) {
+      expect(within(nav).queryByRole("link", { name })).toBeNull();
+    }
+    expect(screen.getByRole("link", { name: "cogni" })).toHaveAttribute(
+      "href",
+      "/inicio",
+    );
+    for (const link of screen.getAllByRole("link")) {
+      expect(link.getAttribute("href")).not.toMatch(/^\/(#.*)?$/);
+    }
+    expect(
+      screen.getByRole("link", { name: "La ciencia detrás de Cogni →" }),
+    ).toHaveAttribute("href", "/ciencia");
+    expect(screen.getByRole("link", { name: "Créditos" })).toHaveAttribute(
+      "href",
+      "/creditos",
     );
   });
 });

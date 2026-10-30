@@ -72,10 +72,10 @@ const MAIN_SECTION: NavSection = {
   label: "Menú principal",
   items: [
     {
-      href: "/",
+      href: "/inicio",
       icon: Home,
       label: "Inicio",
-      isActive: (path) => path === "/",
+      isActive: (path) => path === "/inicio",
     },
     {
       href: "/notebooks",

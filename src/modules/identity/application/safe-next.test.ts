@@ -7,16 +7,16 @@ describe("safeNext", () => {
     expect(safeNext("/reset-password?x=1")).toBe("/reset-password?x=1");
   });
 
-  it("falls back to the root for external or protocol-relative targets", () => {
-    expect(safeNext("https://evil.tld")).toBe("/");
-    expect(safeNext("//evil.tld")).toBe("/");
-    expect(safeNext("/\\evil.tld")).toBe("/");
-    expect(safeNext("javascript:alert(1)")).toBe("/");
+  it("falls back to Inicio for external or protocol-relative targets", () => {
+    expect(safeNext("https://evil.tld")).toBe("/inicio");
+    expect(safeNext("//evil.tld")).toBe("/inicio");
+    expect(safeNext("/\\evil.tld")).toBe("/inicio");
+    expect(safeNext("javascript:alert(1)")).toBe("/inicio");
   });
 
-  it("falls back to the root when the value is missing or empty", () => {
-    expect(safeNext(null)).toBe("/");
-    expect(safeNext(undefined)).toBe("/");
-    expect(safeNext("")).toBe("/");
+  it("falls back to Inicio when the value is missing or empty", () => {
+    expect(safeNext(null)).toBe("/inicio");
+    expect(safeNext(undefined)).toBe("/inicio");
+    expect(safeNext("")).toBe("/inicio");
   });
 });

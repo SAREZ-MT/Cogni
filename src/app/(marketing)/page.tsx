@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
-import { SiteFooter } from "../_components/site-footer";
-import { Closing } from "./_components/closing";
-import { Comparison } from "./_components/comparison";
-import { Faq } from "./_components/faq";
-import { Hero } from "./_components/hero";
-import { HowItWorks } from "./_components/how-it-works";
-import { LandingNav } from "./_components/landing-nav";
-import { Pillars } from "./_components/pillars";
-import { Techniques } from "./_components/techniques";
+import { SiteFooter } from "./_components/site-footer";
+import { Closing } from "./landing/_components/closing";
+import { Comparison } from "./landing/_components/comparison";
+import { Faq } from "./landing/_components/faq";
+import { Hero } from "./landing/_components/hero";
+import { HowItWorks } from "./landing/_components/how-it-works";
+import { LandingNav } from "./landing/_components/landing-nav";
+import { Pillars } from "./landing/_components/pillars";
+import { Techniques } from "./landing/_components/techniques";
 
 export const metadata: Metadata = {
   title: "Cogni · Recuerda lo que estudias",
@@ -15,7 +15,8 @@ export const metadata: Metadata = {
     "Cogni convierte tus apuntes en flashcards, exámenes y preguntas de recuperación activa, y te dice qué repasar cada día.",
 };
 
-// Public landing (proxy OPEN_PATHS). Sections follow the Pencil frames
+// Public landing at the domain root (proxy OPEN_PATHS; the proxy sends a
+// signed-in user to /inicio instead). Sections follow the Pencil frames
 // "Landing · Prototipo v1" and "Landing · Contenido propuesto v2" (the
 // comparison, the questions, the closing and the footer).
 export default function LandingPage() {

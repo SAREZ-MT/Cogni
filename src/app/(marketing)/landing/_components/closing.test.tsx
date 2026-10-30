@@ -30,9 +30,10 @@ describe("Closing", () => {
 
   it("sends the one action to the existing sign-up route", () => {
     render(<Closing />);
-    expect(
-      screen.getByRole("link", { name: "Empieza gratis" }),
-    ).toHaveAttribute("href", "/register");
+    expect(screen.getByRole("link", { name: "Empieza ya" })).toHaveAttribute(
+      "href",
+      "/register",
+    );
     expect(document.body).toHaveTextContent(
       "Sube tu primer apunte: tu primera sesión está lista hoy mismo.",
     );

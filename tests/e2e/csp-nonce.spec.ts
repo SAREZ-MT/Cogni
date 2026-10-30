@@ -1,4 +1,5 @@
-import { expect, test } from "./fixtures/auth";
+import type { Page } from "@playwright/test";
+import { expect, hasSupabaseEnv, signIn, test } from "./fixtures/auth";
 
 // Requirement "Nonces de CSP" (specs/observability-and-delivery/spec.md),
 // Scenario "Script en línea sin nonce rechazado": with CSP nonces active,
@@ -19,6 +20,43 @@ test.describe("CSP nonce", () => {
 
     expect(scriptSrc).toMatch(/'nonce-[A-Za-z0-9+/=]+'/);
     expect(scriptSrc).not.toContain("'unsafe-inline'");
+  });
+
+  // The (public) layout renders per request (src/app/(public)/layout.tsx):
+  // a prerendered auth page shipped nonce-less scripts that 'strict-dynamic'
+  // blocks under `next start`. /login is listed as the reference page.
+  async function expectEveryScriptNonced(page: Page, path: string) {
+    const response = await page.goto(path);
+    await expect(page).toHaveURL(path);
+    const csp = response?.headers()["content-security-policy"] ?? "";
+    const nonce = csp.match(/'nonce-([A-Za-z0-9+/=]+)'/)?.[1];
+    expect(nonce, "script-src must carry a per-request nonce").toBeTruthy();
+
+    const html = await response?.text();
+    const tags = html?.match(/<script\b[^>]*>/g) ?? [];
+    expect(tags.length).toBeGreaterThan(0);
+    for (const tag of tags) {
+      expect(tag).toContain(`nonce="${nonce}"`);
+    }
+  }
+
+  for (const path of ["/login", "/register", "/forgot-password"]) {
+    test(`${path} stamps the response CSP nonce on every script`, async ({
+      page,
+    }) => {
+      await expectEveryScriptNonced(page, path);
+    });
+  }
+
+  // /reset-password is reached with the recovery session (the proxy sends
+  // a visitor without one to /login), so it is checked signed in.
+  test("/reset-password stamps the response CSP nonce on every script", async ({
+    page,
+    verifiedUser,
+  }) => {
+    test.skip(!hasSupabaseEnv, "Supabase env (cogni-dev) is not configured");
+    await signIn(page, verifiedUser);
+    await expectEveryScriptNonced(page, "/reset-password");
   });
 
   test("an inline script without the correct nonce is blocked by the CSP and never executes", async ({

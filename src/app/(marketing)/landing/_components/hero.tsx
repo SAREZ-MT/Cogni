@@ -196,7 +196,7 @@ export function Hero() {
                   href="/register"
                   className="lp-press lp-cta-primary inline-flex items-center gap-2 rounded-full px-6 py-3.5 font-bold text-[16px]"
                 >
-                  Empieza gratis
+                  Empieza ya
                   <ArrowRight aria-hidden="true" className="size-4" />
                 </Link>
                 <a

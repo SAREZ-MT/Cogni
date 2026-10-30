@@ -39,6 +39,6 @@ export function termsRedirectFor(
   const next =
     currentPath?.startsWith("/") && !currentPath.startsWith("//")
       ? currentPath
-      : "/";
+      : "/inicio";
   return `${TERMS_PATH}?next=${encodeURIComponent(next)}`;
 }

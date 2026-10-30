@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 
 type FooterLink = { href: string; label: string };
@@ -5,17 +6,23 @@ type FooterLink = { href: string; label: string };
 // Landing anchors are written with the path so they also work from
 // /ciencia, /creditos and the legal pages.
 const PRODUCT: readonly FooterLink[] = [
-  { href: "/landing#como-funciona", label: "Cómo funciona" },
-  { href: "/landing#tecnicas", label: "Técnicas" },
-  { href: "/landing#comparacion", label: "Comparación" },
-  { href: "/landing#preguntas", label: "Preguntas" },
+  { href: "/#como-funciona", label: "Cómo funciona" },
+  { href: "/#tecnicas", label: "Técnicas" },
+  { href: "/#pilares", label: "Pilares" },
+  { href: "/#comparacion", label: "Comparación" },
+  { href: "/#preguntas", label: "Preguntas" },
 ];
+
+// A signed-in user never sees the landing (the proxy sends them from / to
+// Inicio), so on /ciencia and /creditos the section group becomes one way
+// back into the app.
+const APP: readonly FooterLink[] = [{ href: "/inicio", label: "Ir a la app" }];
 
 // The four public legal pages (feature legal-consent); each one is listed
 // in the proxy OPEN_PATHS so anonymous visitors can read it.
 export const LEGAL: readonly FooterLink[] = [
-  { href: "/legal/terminos", label: "Términos de uso" },
-  { href: "/legal/privacidad", label: "Privacidad" },
+  { href: "/legal/terminos", label: "Términos y condiciones" },
+  { href: "/legal/privacidad", label: "Política de privacidad" },
   { href: "/legal/uso-aceptable", label: "Uso aceptable" },
   { href: "/legal/derechos-de-autor", label: "Derechos de autor" },
   { href: "/creditos", label: "Créditos" },
@@ -24,7 +31,9 @@ export const LEGAL: readonly FooterLink[] = [
 // The shared close of every public page (Pencil "Landing · Contenido
 // propuesto v2", Pie): the wordmark with its promise, three columns of
 // links on the night ground the hero opened with, and the academic notice.
-export function SiteFooter() {
+// `signedIn` swaps every landing link (the sections and the wordmark) for
+// the app; the legal links, Ciencia and Créditos stay the same.
+export function SiteFooter({ signedIn = false }: { signedIn?: boolean }) {
   return (
     <footer
       data-nav-theme="dark"
@@ -34,9 +43,20 @@ export function SiteFooter() {
         <div className="flex flex-col gap-12 lg:flex-row lg:justify-between">
           <div className="flex flex-col gap-3">
             <Link
-              href="/landing"
-              className="w-fit rounded-md font-(family-name:--lp-font-head) font-bold text-(--lp-night-ink) text-[28px] tracking-[-0.03em]"
+              href={signedIn ? "/inicio" : "/"}
+              className="flex w-fit items-center gap-2.5 rounded-md font-(family-name:--lp-font-head) font-bold text-(--lp-night-ink) text-[28px] tracking-[-0.03em]"
             >
+              {/* Ink glass on the night footer, 17% larger than the 28px
+                  wordmark, as in the approved lockup. */}
+              <Image
+                src="/brand/cogni-mark-ink.svg"
+                alt=""
+                aria-hidden="true"
+                width={33}
+                height={33}
+                unoptimized
+                className="shrink-0"
+              />
               cogni
             </Link>
             <p className="font-(family-name:--lp-font-display) text-[22px] italic">
@@ -47,7 +67,7 @@ export function SiteFooter() {
             aria-label="Pie de página"
             className="grid grid-cols-2 gap-x-10 gap-y-10 sm:grid-cols-[auto_auto_auto] sm:gap-x-16 lg:gap-x-20"
           >
-            <FooterColumn title="Producto" links={PRODUCT} />
+            <FooterColumn title="Producto" links={signedIn ? APP : PRODUCT} />
             <div className="flex flex-col gap-3">
               <h2 className="lp-footer-title">Aprende</h2>
               <Link

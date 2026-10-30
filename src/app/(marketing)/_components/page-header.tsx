@@ -5,13 +5,15 @@ import type { ReactNode } from "react";
 // The lilac head of the public pages (Pencil "Página · La ciencia detrás de
 // Cogni" and "Página · Créditos"): an optional way back to the landing, the
 // mono label, one huge headline with a single serif italic keyword (passed
-// in `title`), the intro line and an optional slot below it.
+// in `title`), the intro line and an optional slot below it. A signed-in
+// user never sees the landing, so `signedIn` points the way back to the app.
 export function PageHeader({
   label,
   title,
   intro,
   titleId,
   back = false,
+  signedIn = false,
   children,
 }: {
   label: string;
@@ -19,6 +21,7 @@ export function PageHeader({
   intro: string;
   titleId: string;
   back?: boolean;
+  signedIn?: boolean;
   children?: ReactNode;
 }) {
   return (
@@ -29,11 +32,11 @@ export function PageHeader({
       <div className="mx-auto max-w-[1280px]">
         {back ? (
           <Link
-            href="/landing"
+            href={signedIn ? "/inicio" : "/"}
             className="lp-link mb-8 inline-flex items-center gap-2 rounded-md font-(family-name:--lp-font-head) font-semibold text-(--lp-violet-deep) text-[14px]"
           >
             <ArrowLeft aria-hidden="true" className="size-3.5" />
-            Volver a Cogni
+            {signedIn ? "Volver a la app" : "Volver a Cogni"}
           </Link>
         ) : null}
         <p className="flex items-center gap-3 font-(family-name:--lp-font-mono) text-(--lp-violet-deep) text-[16px] uppercase tracking-[0.14em] md:text-[20px]">
