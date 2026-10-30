@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { createFixedClock } from "@/shared/kernel/clock";
 import { createId } from "@/shared/kernel/id";
-import { archivePage } from "./archive-page";
 import { createNotebook } from "./create-notebook";
 import { createPage } from "./create-page";
 import { getPage } from "./get-page";
+import { markPageArchived } from "./testing/archived-fixtures";
 import { InMemoryNotebookRepository } from "./testing/in-memory-notebook-repository";
 import { InMemoryPageRepository } from "./testing/in-memory-page-repository";
 
@@ -63,7 +63,7 @@ describe("getPage use case", () => {
   it("treats an archived page as not found", async () => {
     const deps = makeDeps();
     const page = await setupPage(deps);
-    await archivePage({ pageId: page.id }, deps, OWNER_ID);
+    await markPageArchived(deps.pages, page.id);
 
     const result = await getPage({ pageId: page.id }, deps, OWNER_ID);
 

@@ -4,7 +4,6 @@ export {
   type DeckEdits,
   type DeckEditsResult,
 } from "./apply-deck-edits";
-export { type ArchiveDeckResult, archiveDeck } from "./archive-deck";
 export {
   type ArchiveFlashcardResult,
   archiveFlashcard,
@@ -13,11 +12,13 @@ export {
   type CreateManualFlashcardDeps,
   createManualFlashcard,
 } from "./create-manual-flashcard";
+export type { DeckDeletion, DeckDeletionPreview } from "./deck-deletion";
 export type {
   DeckRepositories,
   DeckStudyItems,
   DeckUnitOfWork,
 } from "./deck-unit-of-work";
+export { deleteDeck, previewDeckDeletion } from "./delete-deck";
 export {
   type DeleteFlashcardResult,
   deleteFlashcard,

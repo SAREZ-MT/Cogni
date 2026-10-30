@@ -95,7 +95,15 @@ vi.mock("@/modules/notebooks", () => ({
     },
   }),
 }));
+// Phase 8 H19: the deck's hard delete, faked per test.
+const deckDeletion = {
+  preview: vi.fn(),
+  delete: vi.fn(),
+};
 vi.mock("./infrastructure", () => ({
+  DrizzleDeckDeletion: vi.fn(function DrizzleDeckDeletion() {
+    return deckDeletion;
+  }),
   DrizzleFlashcardRepository: vi.fn(function DrizzleFlashcardRepository() {
     return current.flashcards;
   }),
@@ -441,7 +449,7 @@ describe("flashcards Server Actions", () => {
     });
   });
 
-  describe("archiveFlashcardAction", () => {
+  describe("deck actions", () => {
     // Cards are created by AI only (Phase 8 H13): the deck is seeded straight
     // into the fakes, each card with its study item.
     async function seedDeck(count: number): Promise<string[]> {
@@ -477,89 +485,54 @@ describe("flashcards Server Actions", () => {
       return ids;
     }
 
-    it("rejects an unauthenticated caller", async () => {
-      getCurrentUser.mockResolvedValue(null);
-      const { archiveFlashcardAction } = await actions();
-      const result = await archiveFlashcardAction({ flashcardId: PAGE });
-      expect(!result.ok && result.error.code).toBe(
-        "FLASHCARDS_SESSION_REQUIRED",
-      );
-    });
+    // Phase 8 H19: the flashcards hub's "Eliminar mazo" is a real delete.
+    describe("previewDeckDeletionAction / deleteDeckAction", () => {
+      beforeEach(() => {
+        deckDeletion.preview.mockReset();
+        deckDeletion.delete.mockReset();
+      });
 
-    it("rejects an invalid flashcard id", async () => {
-      const { archiveFlashcardAction } = await actions();
-      const result = await archiveFlashcardAction({ flashcardId: "x" });
-      expect(!result.ok && result.error.code).toBe("FLASHCARDS_INVALID_INPUT");
-    });
-
-    it("archives a card of a deck that keeps others and revalidates", async () => {
-      const [, second] = await seedDeck(2);
-      const { archiveFlashcardAction } = await actions();
-
-      const result = await archiveFlashcardAction({ flashcardId: second });
-
-      expect(result).toEqual({ ok: true, value: { remaining: 1 } });
-      expect(await current.flashcards.countByPage(PAGE, OWNER)).toBe(1);
-      expect(revalidatePath).toHaveBeenCalledWith("/flashcards", "layout");
-    });
-
-    it("refuses the last card with FLASHCARD_LAST_CARD", async () => {
-      const [only] = await seedDeck(1);
-      const { archiveFlashcardAction } = await actions();
-
-      const result = await archiveFlashcardAction({ flashcardId: only });
-
-      expect(!result.ok && result.error.code).toBe("FLASHCARD_LAST_CARD");
-      expect(await current.flashcards.countByPage(PAGE, OWNER)).toBe(1);
-      expect(revalidatePath).not.toHaveBeenCalled();
-    });
-
-    it("never throws: an unexpected failure is reported to Sentry", async () => {
-      current.flashcards = {
-        findById: async () => {
-          throw new Error("db down");
-        },
-      } as unknown as InMemoryFlashcardRepository;
-      const { archiveFlashcardAction } = await actions();
-
-      const result = await archiveFlashcardAction({ flashcardId: PAGE });
-
-      expect(!result.ok && result.error.code).toBe("FLASHCARDS_UNEXPECTED");
-      expect(captureException).toHaveBeenCalledTimes(1);
-    });
-
-    // Phase 8 H17: the flashcards hub's "Eliminar mazo".
-    describe("archiveDeckAction", () => {
       it("rejects an unauthenticated caller and an invalid page id", async () => {
-        const { archiveDeckAction } = await actions();
+        const { deleteDeckAction, previewDeckDeletionAction } = await actions();
         expect(
-          await archiveDeckAction({ pageId: "x" }).then(
+          await deleteDeckAction({ pageId: "x" }).then(
             (result) => !result.ok && result.error.code,
           ),
         ).toBe("FLASHCARDS_INVALID_INPUT");
         getCurrentUser.mockResolvedValue(null);
         expect(
-          await archiveDeckAction({ pageId: PAGE }).then(
+          await previewDeckDeletionAction({ pageId: PAGE }).then(
             (result) => !result.ok && result.error.code,
           ),
         ).toBe("FLASHCARDS_SESSION_REQUIRED");
+        expect(deckDeletion.delete).not.toHaveBeenCalled();
       });
 
-      it("archives the whole deck, even its last card, and revalidates", async () => {
-        await seedDeck(2);
-        const { archiveDeckAction } = await actions();
+      it("previews, then deletes the whole deck for the owner and revalidates", async () => {
+        deckDeletion.preview.mockResolvedValue({ cards: 2, reviews: 7 });
+        deckDeletion.delete.mockResolvedValue(true);
+        const { deleteDeckAction, previewDeckDeletionAction } = await actions();
 
-        const result = await archiveDeckAction({ pageId: PAGE });
+        expect(await previewDeckDeletionAction({ pageId: PAGE })).toEqual({
+          ok: true,
+          value: { cards: 2, reviews: 7 },
+        });
+        const result = await deleteDeckAction({ pageId: PAGE });
 
-        expect(result).toEqual({ ok: true, value: { archived: 2 } });
-        expect(await current.flashcards.countByPage(PAGE, OWNER)).toBe(0);
-        expect(revalidatePath).toHaveBeenCalledWith("/flashcards", "layout");
+        expect(result).toEqual({ ok: true, value: { pageId: PAGE } });
+        expect(deckDeletion.delete).toHaveBeenCalledWith(
+          PAGE,
+          OWNER,
+          expect.any(Date),
+        );
+        expect(revalidatePath).toHaveBeenCalledWith("/", "layout");
       });
 
-      it("is not found for a page without a deck, without revalidating", async () => {
-        const { archiveDeckAction } = await actions();
+      it("is not found for a foreign page, without revalidating", async () => {
+        deckDeletion.delete.mockResolvedValue(false);
+        const { deleteDeckAction } = await actions();
 
-        const result = await archiveDeckAction({ pageId: PAGE });
+        const result = await deleteDeckAction({ pageId: PAGE });
 
         expect(!result.ok && result.error.code).toBe("FLASHCARD_NOT_FOUND");
         expect(revalidatePath).not.toHaveBeenCalled();

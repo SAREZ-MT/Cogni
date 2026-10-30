@@ -18,7 +18,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover";
 import { cn } from "@/shared/ui/utils";
 import type { SidebarNotebook } from "../application/list-sidebar";
 import { COLOR_PALETTE, type NotebookColor } from "../domain/notebook";
-import { ArchiveConfirmDialog } from "./archive-confirm-dialog";
+import { DeleteNotebookDialog } from "./delete-content-dialogs";
 import {
   type NotebookActionsSlotValue,
   useNotebookActionsSlot,
@@ -54,10 +54,12 @@ interface NotebookItemProps {
   notebook: SidebarNotebook;
   onRename: (title: string) => void;
   onSetAppearance: (icon: string | null, color: NotebookColor | null) => void;
-  onArchive: () => void;
+  // Phase 8 H19: after the notebook (or one of its pages) was deleted for
+  // real through its confirmation dialog.
+  onDeleted: () => void;
   onCreatePage: () => void;
   onRenamePage: (pageId: string, title: string) => void;
-  onArchivePage: (pageId: string) => void;
+  onPageDeleted: (pageId: string) => void;
 }
 
 // One row per active notebook plus its active pages, ordered by position
@@ -68,12 +70,13 @@ export function NotebookItem({
   notebook,
   onRename,
   onSetAppearance,
-  onArchive,
+  onDeleted,
   onCreatePage,
   onRenamePage,
-  onArchivePage,
+  onPageDeleted,
 }: NotebookItemProps) {
   const [editing, setEditing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [title, setTitle] = useState(notebook.title);
   const slot = useNotebookActionsSlot();
 
@@ -174,20 +177,21 @@ export function NotebookItem({
           >
             <FilePlus aria-hidden="true" size={14} />
           </Button>
-          <ArchiveConfirmDialog
-            itemLabel={`el cuaderno "${notebook.title}"`}
-            onConfirm={onArchive}
-            trigger={
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-xs"
-                disabled={notebook.pending}
-                aria-label={`Archivar cuaderno ${notebook.title}`}
-              >
-                <Trash2 aria-hidden="true" size={14} />
-              </Button>
-            }
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            disabled={notebook.pending}
+            aria-label={`Eliminar cuaderno ${notebook.title}`}
+            onClick={() => setDeleting(true)}
+          >
+            <Trash2 aria-hidden="true" size={14} />
+          </Button>
+          <DeleteNotebookDialog
+            notebook={{ id: notebook.id, title: notebook.title }}
+            open={deleting}
+            onOpenChange={setDeleting}
+            onDeleted={onDeleted}
           />
           {slot.menuItems && (
             <NotebookActionsMenu
@@ -207,7 +211,7 @@ export function NotebookItem({
               notebookId={notebook.id}
               page={page}
               onRename={(title) => onRenamePage(page.id, title)}
-              onArchive={() => onArchivePage(page.id)}
+              onDeleted={() => onPageDeleted(page.id)}
             />
           ))}
         </ul>

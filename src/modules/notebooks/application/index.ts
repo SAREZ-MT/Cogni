@@ -1,7 +1,11 @@
-export { archiveNotebook, archiveNotebookSchema } from "./archive-notebook";
-export { archivePage, archivePageSchema } from "./archive-page";
 export { createNotebook, createNotebookSchema } from "./create-notebook";
 export { createPage, createPageSchema } from "./create-page";
+export {
+  deleteNotebook,
+  deletePage,
+  previewNotebookDeletion,
+  previewPageDeletion,
+} from "./delete-content";
 export { deleteImportedAssets } from "./delete-imported-assets";
 export {
   getAssetReadUrl,

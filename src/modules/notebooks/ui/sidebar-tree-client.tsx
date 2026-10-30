@@ -4,9 +4,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { createId } from "@/shared/kernel/id";
+import { routeAfterDelete } from "@/shared/navigation/route-after-delete";
 import {
-  archiveNotebook as archiveNotebookAction,
-  archivePage as archivePageAction,
   createNotebook as createNotebookAction,
   createPage as createPageAction,
   getSidebarTree,
@@ -167,17 +166,6 @@ export function SidebarTreeClient({
     onSettled: invalidate,
   });
 
-  const archiveNotebook = useMutation({
-    mutationFn: (notebookId: string) => archiveNotebookAction({ notebookId }),
-    onMutate: (notebookId) =>
-      optimisticUpdate((previous) =>
-        previous.filter((notebook) => notebook.id !== notebookId),
-      ),
-    onSuccess: refreshHomeIfActive,
-    onError: (_error, _notebookId, context) => rollbackOn(context),
-    onSettled: invalidate,
-  });
-
   const createPage = useMutation({
     mutationFn: (notebookId: string) => createPageAction({ notebookId }),
     onMutate: (notebookId) => {
@@ -242,19 +230,23 @@ export function SidebarTreeClient({
     onSettled: invalidate,
   });
 
-  const archivePage = useMutation({
-    mutationFn: (pageId: string) => archivePageAction({ pageId }),
-    onMutate: (pageId) =>
-      optimisticUpdate((previous) =>
-        previous.map((notebook) => ({
-          ...notebook,
-          pages: notebook.pages.filter((page) => page.id !== pageId),
-        })),
-      ),
-    onSuccess: refreshHomeIfActive,
-    onError: (_error, _pageId, context) => rollbackOn(context),
-    onSettled: invalidate,
-  });
+  // Phase 8 H19: a delete already committed through its confirmation
+  // dialog, so the tree drops the row at once and re-reads. On a route that
+  // showed what was deleted, go to its parent (Cuadernos or the notebook);
+  // elsewhere refresh the Server Components (hubs, Cuadernos, Inicio).
+  function afterDelete(
+    target: { notebookId: string; pageId?: string },
+    drop: (current: SidebarNotebook[]) => SidebarNotebook[],
+  ) {
+    queryClient.setQueryData<SidebarNotebook[]>(
+      SIDEBAR_TREE_QUERY_KEY,
+      (current) => drop(current ?? []),
+    );
+    invalidate();
+    const next = routeAfterDelete(pathname, target);
+    if (next) router.push(next);
+    else router.refresh();
+  }
 
   // "Cuadernos" eyebrow + inline "+" trigger (design/shell-look, studyplatform
   // obs 142 PageTree): replaces the old full-width "Crear cuaderno" button.
@@ -305,12 +297,23 @@ export function SidebarTreeClient({
             onSetAppearance={(icon, color) =>
               setAppearance.mutate({ notebookId: notebook.id, icon, color })
             }
-            onArchive={() => archiveNotebook.mutate(notebook.id)}
+            onDeleted={() =>
+              afterDelete({ notebookId: notebook.id }, (current) =>
+                current.filter((entry) => entry.id !== notebook.id),
+              )
+            }
             onCreatePage={() => createPage.mutate(notebook.id)}
             onRenamePage={(pageId, title) =>
               renamePage.mutate({ pageId, title })
             }
-            onArchivePage={(pageId) => archivePage.mutate(pageId)}
+            onPageDeleted={(pageId) =>
+              afterDelete({ notebookId: notebook.id, pageId }, (current) =>
+                current.map((entry) => ({
+                  ...entry,
+                  pages: entry.pages.filter((page) => page.id !== pageId),
+                })),
+              )
+            }
           />
         ))}
       </ul>

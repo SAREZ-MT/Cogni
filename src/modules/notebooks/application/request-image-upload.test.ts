@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { createFixedClock } from "@/shared/kernel/clock";
 import { ASSET_ERROR, PAGE_ERROR } from "../domain/errors";
-import { archivePage } from "./archive-page";
 import { createNotebook } from "./create-notebook";
 import { createPage } from "./create-page";
 import { requestImageUpload } from "./request-image-upload";
+import { markPageArchived } from "./testing/archived-fixtures";
 import { FakeStorageGateway } from "./testing/fake-storage-gateway";
 import { InMemoryNotebookRepository } from "./testing/in-memory-notebook-repository";
 import { InMemoryPageRepository } from "./testing/in-memory-page-repository";
@@ -104,7 +104,7 @@ describe("requestImageUpload use case", () => {
   it("rejects an archived page (Scenario: Página ajena o archivada)", async () => {
     const deps = makeDeps();
     const page = await setupPage(deps);
-    await archivePage({ pageId: page.id }, deps, OWNER_ID);
+    await markPageArchived(deps.pages, page.id);
 
     const result = await requestImageUpload(
       { pageId: page.id, mime: "image/png", sizeBytes: 1024 },

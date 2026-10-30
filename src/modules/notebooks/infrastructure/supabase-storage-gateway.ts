@@ -2,6 +2,7 @@ import "server-only";
 import { createClient } from "@supabase/supabase-js";
 import { clientEnv } from "@/shared/config/env.client";
 import { serverEnv } from "@/shared/config/env.server";
+import type { ImportSourceStorage } from "../domain/content-deletion";
 import type { StorageGateway } from "../domain/storage-gateway";
 
 // Server-only adapter (design.md, "Subida de imagen firmada"): uses the
@@ -13,8 +14,8 @@ import type { StorageGateway } from "../domain/storage-gateway";
 // 0004_page_assets_storage.sql are the second, independent layer that
 // still applies to the browser's direct `uploadToSignedUrl` call, which
 // authenticates with the end user's own session, not this service key.
-function storageBucket() {
-  const { SUPABASE_SERVICE_ROLE_KEY, SUPABASE_STORAGE_BUCKET } = serverEnv();
+function storageBucket(bucket: string = serverEnv().SUPABASE_STORAGE_BUCKET) {
+  const { SUPABASE_SERVICE_ROLE_KEY } = serverEnv();
   const { NEXT_PUBLIC_SUPABASE_URL } = clientEnv();
   const client = createClient(
     NEXT_PUBLIC_SUPABASE_URL,
@@ -23,7 +24,7 @@ function storageBucket() {
       auth: { persistSession: false, autoRefreshToken: false },
     },
   );
-  return client.storage.from(SUPABASE_STORAGE_BUCKET);
+  return client.storage.from(bucket);
 }
 
 export class SupabaseStorageGateway implements StorageGateway {
@@ -82,6 +83,19 @@ export class SupabaseStorageGateway implements StorageGateway {
   async remove(paths: string[]): Promise<void> {
     if (paths.length === 0) return;
     const { error } = await storageBucket().remove(paths);
+    if (error) throw error;
+  }
+}
+
+// Phase 8 H19: a deleted page's imported source documents (ingestion's
+// SUPABASE_PDF_BUCKET, `{ownerId}/{uploadId}.{ext}`). Same service-role
+// client; the delete use case already checked ownership in the database.
+export class SupabaseImportSourceStorage implements ImportSourceStorage {
+  async remove(paths: string[]): Promise<void> {
+    if (paths.length === 0) return;
+    const { error } = await storageBucket(
+      serverEnv().SUPABASE_PDF_BUCKET,
+    ).remove(paths);
     if (error) throw error;
   }
 }

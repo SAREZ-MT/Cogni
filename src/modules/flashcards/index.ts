@@ -1,12 +1,10 @@
 // Public API of the "flashcards" module. No cross-module import may reach
 // past this file (documento-maestro §5.3.5).
 export {
-  type ArchiveDeckView,
-  type ArchiveView,
-  archiveDeckAction,
-  archiveFlashcardAction,
+  type DeckDeletionView,
   type DeckEditsView,
   type DeckView,
+  deleteDeckAction,
   type FlashcardView,
   type GenerationActionError,
   type GenerationStatusView,
@@ -15,6 +13,7 @@ export {
   getGenerationStatusAction,
   listDecksAction,
   listFlashcardsAction,
+  previewDeckDeletionAction,
   saveDeckEditsAction,
 } from "./actions";
 export * from "./domain";

@@ -25,12 +25,12 @@ import {
   TechniqueItemPill,
 } from "@/shared/ui/technique-item-card";
 import { SetBreadcrumb } from "../_components/breadcrumb";
+import {
+  DeleteTechniqueSetMenuItem,
+  DeleteTechniqueSetProvider,
+} from "../_components/delete-technique-set";
 import { loadCreateExamNotebooks } from "../exams/_lib/create-exam-notebooks";
 import { CreateFromPageDialog } from "./_components/create-from-page-dialog";
-import {
-  DeleteDeckMenuItem,
-  DeleteDeckProvider,
-} from "./_components/delete-deck";
 import { nextReviewLabel } from "./_lib/next-review";
 import { plural } from "./_lib/plural";
 import { readRemainingGenerations } from "./_lib/remaining-generations";
@@ -102,10 +102,11 @@ export default async function FlashcardsHubPage({
     const fromHub = (href: string) => hubItemHref(href, filter.selected);
     const next = nextReviewLabel(deck.nextDueAt, now, timeZone);
     return (
-      <DeleteDeckProvider
+      <DeleteTechniqueSetProvider
         key={deck.pageId}
+        kind="deck"
         pageId={deck.pageId}
-        deckTitle={deck.pageTitle}
+        title={deck.pageTitle}
       >
         <TechniqueItemCard
           technique="flashcards"
@@ -151,11 +152,11 @@ export default async function FlashcardsHubPage({
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DeleteDeckMenuItem />
+              <DeleteTechniqueSetMenuItem />
             </>
           }
         />
-      </DeleteDeckProvider>
+      </DeleteTechniqueSetProvider>
     );
   };
 

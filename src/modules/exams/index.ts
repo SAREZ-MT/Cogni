@@ -4,14 +4,15 @@ export {
   type ExamGenerationActionError,
   type ExamGenerationView,
   type ExamQuestionView,
-  editExamQuestionAction,
   generateExamQuestionsAction,
   listExamQuestionsAction,
-  type RetiredExamQuestionView,
-  retireExamQuestionAction,
   saveExamEditsAction,
 } from "./actions";
 export type { ExamReviewNotice } from "./application";
+export {
+  deleteExamSetAction,
+  previewExamSetDeletionAction,
+} from "./deletion-actions";
 export * from "./domain";
 export {
   getExamReviewNoticeAction,

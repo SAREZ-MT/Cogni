@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { createFixedClock } from "@/shared/kernel/clock";
-import { archivePage } from "./archive-page";
 import { createNotebook } from "./create-notebook";
 import { createPage } from "./create-page";
 import { listPagePickerTree } from "./list-page-picker-tree";
+import { markPageArchived } from "./testing/archived-fixtures";
 import { InMemoryNotebookRepository } from "./testing/in-memory-notebook-repository";
 import { InMemoryPageRepository } from "./testing/in-memory-page-repository";
 
@@ -41,7 +41,7 @@ describe("listPagePickerTree use case", () => {
       ...long.value,
       plainText: "La mitocondria produce ATP.\nEl núcleo guarda el ADN.",
     });
-    await archivePage({ pageId: archived.value.id }, deps, OWNER_ID);
+    await markPageArchived(deps.pages, archived.value.id);
 
     const tree = await listPagePickerTree(deps, OWNER_ID);
 

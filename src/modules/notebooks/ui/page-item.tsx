@@ -7,23 +7,25 @@ import { useState } from "react";
 import { Button } from "@/shared/ui/button";
 import { cn } from "@/shared/ui/utils";
 import type { SidebarPage } from "../application/list-sidebar";
-import { ArchiveConfirmDialog } from "./archive-confirm-dialog";
+import { DeletePageDialog } from "./delete-content-dialogs";
 import { useNotebookActionsSlot } from "./notebook-actions-slot";
 
 interface PageItemProps {
   notebookId: string;
   page: SidebarPage;
   onRename: (title: string) => void;
-  onArchive: () => void;
+  // Phase 8 H19: after the page was deleted for real.
+  onDeleted: () => void;
 }
 
 export function PageItem({
   notebookId,
   page,
   onRename,
-  onArchive,
+  onDeleted,
 }: PageItemProps) {
   const [editing, setEditing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [title, setTitle] = useState(page.title);
   const slot = useNotebookActionsSlot();
   const badge = slot.pageBadge?.({ id: page.id });
@@ -106,20 +108,21 @@ export function PageItem({
           {badge === null || badge === undefined ? null : badge}
         </span>
       )}
-      <ArchiveConfirmDialog
-        itemLabel={`la página "${page.title}"`}
-        onConfirm={onArchive}
-        trigger={
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-xs"
-            className="opacity-0 group-hover/page:opacity-100"
-            aria-label={`Archivar página ${page.title}`}
-          >
-            <Trash2 aria-hidden="true" size={14} />
-          </Button>
-        }
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-xs"
+        className="opacity-0 group-hover/page:opacity-100 focus-visible:opacity-100"
+        aria-label={`Eliminar página ${page.title}`}
+        onClick={() => setDeleting(true)}
+      >
+        <Trash2 aria-hidden="true" size={14} />
+      </Button>
+      <DeletePageDialog
+        page={{ id: page.id, title: page.title }}
+        open={deleting}
+        onOpenChange={setDeleting}
+        onDeleted={onDeleted}
       />
     </li>
   );

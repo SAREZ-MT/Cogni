@@ -1,5 +1,5 @@
 import {
-  ArchivePageButton,
+  DeletePageButton,
   type NotebookColor,
   type Page,
 } from "@/modules/notebooks";
@@ -16,7 +16,8 @@ interface PageListRowProps {
 
 // notebookId/page.tsx list view. Phase 8 H5-T2 (user request 2026-10-29):
 // each page is a `PageStripRow` paper strip in the sheets' family, with the
-// "Actualizada {d MMM}" date and the archive action always visible.
+// "Actualizada {d MMM}" date and the delete action (Phase 8 H19) always
+// visible.
 export function PageListRow({ page, notebookId, tone }: PageListRowProps) {
   return (
     <PageStripRow
@@ -25,7 +26,7 @@ export function PageListRow({ page, notebookId, tone }: PageListRowProps) {
       datePrefix="Actualizada"
       dateLabel={formatUpdatedAt(page.updatedAt)}
       tone={tone}
-      actions={<ArchivePageButton pageId={page.id} title={page.title} />}
+      actions={<DeletePageButton pageId={page.id} title={page.title} />}
     />
   );
 }

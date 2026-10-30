@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { createFixedClock } from "@/shared/kernel/clock";
-import { archiveNotebook } from "./archive-notebook";
-import { archivePage } from "./archive-page";
 import { createNotebook } from "./create-notebook";
 import { createPage } from "./create-page";
 import { listSidebar } from "./list-sidebar";
+import {
+  markNotebookArchived,
+  markPageArchived,
+} from "./testing/archived-fixtures";
 import { InMemoryNotebookRepository } from "./testing/in-memory-notebook-repository";
 import { InMemoryPageRepository } from "./testing/in-memory-page-repository";
 
@@ -29,7 +31,7 @@ describe("listSidebar use case", () => {
       OWNER_ID,
     );
     if (!notebookA.ok || !notebookB.ok) throw new Error("setup failed");
-    await archiveNotebook({ notebookId: notebookB.value.id }, deps, OWNER_ID);
+    await markNotebookArchived(deps, notebookB.value.id);
 
     const activePage = await createPage(
       { notebookId: notebookA.value.id },
@@ -42,7 +44,7 @@ describe("listSidebar use case", () => {
       OWNER_ID,
     );
     if (!activePage.ok || !archivedPage.ok) throw new Error("setup failed");
-    await archivePage({ pageId: archivedPage.value.id }, deps, OWNER_ID);
+    await markPageArchived(deps.pages, archivedPage.value.id);
 
     const sidebar = await listSidebar(deps, OWNER_ID);
 

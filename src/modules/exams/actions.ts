@@ -32,10 +32,8 @@ import {
 import {
   applyExamEdits,
   ExamDailyLimitReachedError,
-  editExamQuestion,
   listPageExamQuestions,
   requestExamGeneration,
-  retireExamQuestion,
 } from "./application";
 import { EXAM_ERROR } from "./domain/errors";
 import {
@@ -71,10 +69,6 @@ export interface ExamQuestionView {
   explanation: string;
   concept: string;
   origin: ExamQuestionOrigin;
-}
-
-export interface RetiredExamQuestionView {
-  id: string;
 }
 
 export interface ExamGenerationView {
@@ -116,8 +110,6 @@ const content = {
   concept: text(MAX_CONCEPT_LENGTH),
 };
 const pageInput = z.object({ pageId: z.uuid() });
-const editInput = z.object({ questionId: z.uuid(), ...content });
-const questionInput = z.object({ questionId: z.uuid() });
 // One edit page save (Phase 8 H18).
 const MAX_DRAFT_ITEMS = 200;
 const saveExamEditsInput = z.object({
@@ -225,48 +217,6 @@ export async function listExamQuestionsAction(
     );
     if (!result.ok) return err(toActionError(result.error));
     return ok(result.value.map(toView));
-  });
-}
-
-export async function editExamQuestionAction(
-  input: unknown,
-): Promise<Result<ExamQuestionView, ActionError>> {
-  return withBoundary(async () => {
-    const ownerId = await requireOwnerId();
-    if (!ownerId.ok) return ownerId;
-    const parsed = parseInput(editInput, input);
-    if (!parsed.ok) return parsed;
-
-    const { uow } = deps();
-    const result = await editExamQuestion(
-      parsed.value,
-      { uow, clock: systemClock },
-      ownerId.value,
-    );
-    if (!result.ok) return err(toActionError(result.error));
-    revalidateExams();
-    return ok(toView(result.value));
-  });
-}
-
-export async function retireExamQuestionAction(
-  input: unknown,
-): Promise<Result<RetiredExamQuestionView, ActionError>> {
-  return withBoundary(async () => {
-    const ownerId = await requireOwnerId();
-    if (!ownerId.ok) return ownerId;
-    const parsed = parseInput(questionInput, input);
-    if (!parsed.ok) return parsed;
-
-    const { uow } = deps();
-    const result = await retireExamQuestion(
-      parsed.value,
-      { uow, clock: systemClock },
-      ownerId.value,
-    );
-    if (!result.ok) return err(toActionError(result.error));
-    revalidateExams();
-    return ok({ id: result.value.id });
   });
 }
 

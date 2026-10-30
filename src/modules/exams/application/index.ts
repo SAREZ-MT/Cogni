@@ -23,6 +23,7 @@ export {
   type DeleteExamQuestionResult,
   deleteExamQuestion,
 } from "./delete-exam-question";
+export { deleteExamSet, previewExamSetDeletion } from "./delete-exam-set";
 export { editExamQuestion } from "./edit-exam-question";
 export {
   composeNormalExam,
@@ -32,6 +33,10 @@ export {
   listExamCandidates,
   loadSessionQuestions,
 } from "./exam-session-work";
+export type {
+  ExamSetDeletion,
+  ExamSetDeletionPreview,
+} from "./exam-set-deletion";
 export {
   type ExamLineageReferences,
   type ExamQuestionRepositories,

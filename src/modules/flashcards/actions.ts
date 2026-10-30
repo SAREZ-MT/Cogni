@@ -26,24 +26,27 @@ import {
 import {
   parseInput,
   requireOwnerId,
+  revalidateAfterDelete,
   revalidateDecks,
   withBoundary,
 } from "./action-support";
 import {
   applyDeckEdits as applyDeckEditsUseCase,
-  archiveDeck as archiveDeckUseCase,
-  archiveFlashcard as archiveFlashcardUseCase,
   DailyLimitReachedError,
+  type DeckDeletionPreview,
+  deleteDeck as deleteDeckUseCase,
   getGenerationStatus as getGenerationStatusUseCase,
   listDecks as listDecksUseCase,
   listFlashcardsByPage as listFlashcardsByPageUseCase,
   MAX_CARD_COUNT,
   MIN_CARD_COUNT,
+  previewDeckDeletion as previewDeckDeletionUseCase,
   requestGeneration as requestGenerationUseCase,
 } from "./application";
 import { FLASHCARD_ERROR } from "./domain/errors";
 import type { Flashcard } from "./domain/flashcard";
 import {
+  DrizzleDeckDeletion,
   DrizzleDeckUnitOfWork,
   DrizzleFlashcardFingerprints,
   DrizzleFlashcardRepository,
@@ -71,11 +74,6 @@ export interface GenerationView {
   truncated: boolean;
   wordsUsed: number;
   wordsTotal: number;
-}
-
-export interface ArchiveView {
-  // Active cards left in the page's deck (always >= 1).
-  remaining: number;
 }
 
 // One deck = one page with cards; its due count comes from scheduling's
@@ -116,8 +114,6 @@ const generateInput = z.object({
   count: z.number().int().min(MIN_CARD_COUNT).max(MAX_CARD_COUNT).optional(),
 });
 
-const archiveInput = z.object({ flashcardId: z.uuid() });
-
 // One edit page save (Phase 8 H18). The bounds only keep the payload sane;
 // the domain trims and checks each side (non-blank, at most 1000).
 const MAX_DRAFT_ITEMS = 200;
@@ -129,7 +125,7 @@ const saveDeckEditsInput = z.object({
   creates: z.array(cardSides).max(MAX_DRAFT_ITEMS),
   deletes: z.array(z.uuid()).max(MAX_DRAFT_ITEMS),
 });
-const archiveDeckInput = z.object({ pageId: z.uuid() });
+const deckInput = z.object({ pageId: z.uuid() });
 
 // Adapters are built per call, like ingestion/actions.ts: serverless
 // functions are short-lived, so no module-level singletons.
@@ -148,6 +144,7 @@ function deps() {
     pages: createNotebooksServerApi({ db, clock: systemClock }),
     flashcards: new DrizzleFlashcardRepository(db),
     deck: new DrizzleDeckUnitOfWork(db),
+    deckDeletion: new DrizzleDeckDeletion(db),
     fingerprints: new DrizzleFlashcardFingerprints(db),
     analytics: createServerAnalytics({
       key: env.NEXT_PUBLIC_POSTHOG_KEY,
@@ -313,52 +310,48 @@ export async function listDecksAction(): Promise<
   });
 }
 
-export async function archiveFlashcardAction(
+export type DeckDeletionView = DeckDeletionPreview;
+
+// "Eliminar mazo" (Phase 8 H19): the confirmation dialog reads what goes
+// right before the user confirms.
+export async function previewDeckDeletionAction(
   input: unknown,
-): Promise<Result<ArchiveView, ActionError>> {
+): Promise<Result<DeckDeletionView, ActionError>> {
   return withBoundary(async () => {
     const ownerId = await requireOwnerId();
     if (!ownerId.ok) return ownerId;
-    const parsed = parseInput(archiveInput, input);
+    const parsed = parseInput(deckInput, input);
     if (!parsed.ok) return parsed;
 
-    const { deck } = deps();
-    const result = await archiveFlashcardUseCase(
+    const result = await previewDeckDeletionUseCase(
       parsed.value,
-      { deck, clock: systemClock },
+      { deletion: deps().deckDeletion },
       ownerId.value,
     );
-    if (!result.ok) return err(toActionError(result.error));
-    revalidateDecks();
-    return ok({ remaining: result.value.remaining });
+    return result.ok ? result : err(toActionError(result.error));
   });
 }
 
-export interface ArchiveDeckView {
-  // Cards archived with the deck.
-  archived: number;
-}
-
-// "Eliminar mazo" (Phase 8 H17): archives every card of the page's deck
-// and suspends their study items; the deck leaves the hub.
-export async function archiveDeckAction(
+// Deletes the page's whole deck for real: every card, its study item and
+// review history, the deck's sessions and feedback; the page's mastery is
+// rewritten from what is left.
+export async function deleteDeckAction(
   input: unknown,
-): Promise<Result<ArchiveDeckView, ActionError>> {
+): Promise<Result<{ pageId: string }, ActionError>> {
   return withBoundary(async () => {
     const ownerId = await requireOwnerId();
     if (!ownerId.ok) return ownerId;
-    const parsed = parseInput(archiveDeckInput, input);
+    const parsed = parseInput(deckInput, input);
     if (!parsed.ok) return parsed;
 
-    const { deck } = deps();
-    const result = await archiveDeckUseCase(
+    const result = await deleteDeckUseCase(
       parsed.value,
-      { deck, clock: systemClock },
+      { deletion: deps().deckDeletion, clock: systemClock },
       ownerId.value,
     );
     if (!result.ok) return err(toActionError(result.error));
-    revalidateDecks();
-    return ok({ archived: result.value.archived });
+    revalidateAfterDelete();
+    return result;
   });
 }
 

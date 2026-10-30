@@ -15,9 +15,9 @@ const { getNotebookForRoute } = vi.hoisted(() => ({
   getNotebookForRoute: vi.fn(),
 }));
 vi.mock("@/modules/notebooks", () => ({
-  ArchivePageButton: ({ pageId, title }: { pageId: string; title: string }) => (
-    <button type="button" data-testid={`archive-${pageId}`}>
-      Archivar {title}
+  DeletePageButton: ({ pageId, title }: { pageId: string; title: string }) => (
+    <button type="button" data-testid={`delete-${pageId}`}>
+      Eliminar {title}
     </button>
   ),
   createPageAction,
@@ -148,7 +148,7 @@ describe("notebook detail route", () => {
     ).toHaveAttribute("data-slot", "page-sheet-create-tile");
   });
 
-  it("renders pages as a card grid by default, each linking to its page with an archive action", async () => {
+  it("renders pages as a card grid by default, each linking to its page with a delete action", async () => {
     await renderRoute();
 
     const list = screen.getByRole("list");
@@ -157,7 +157,7 @@ describe("notebook detail route", () => {
     expect(
       within(items[0]).getByRole("link", { name: /Mitosis/ }),
     ).toHaveAttribute("href", "/notebooks/nb1/pages/p1");
-    expect(within(items[1]).getByTestId("archive-p2")).toBeInTheDocument();
+    expect(within(items[1]).getByTestId("delete-p2")).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: "Ver como cuadrícula" }),
     ).toHaveAttribute("aria-current", "true");
@@ -225,7 +225,7 @@ describe("notebook detail route", () => {
       "href",
       "/notebooks/nb1/pages/p2",
     );
-    expect(screen.getByTestId("archive-p1")).toBeInTheDocument();
+    expect(screen.getByTestId("delete-p1")).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: "Ver como lista" }),
     ).toHaveAttribute("aria-current", "true");

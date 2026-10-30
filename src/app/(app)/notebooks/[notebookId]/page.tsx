@@ -1,8 +1,8 @@
 import { notFound, redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import {
-  ArchivePageButton,
   createPageAction,
+  DeletePageButton,
   getNotebookForRoute,
 } from "@/modules/notebooks";
 import { BackLink } from "@/shared/ui/back-link";
@@ -151,10 +151,7 @@ export default async function NotebookPage({
                       dateLabel={formatUpdatedAt(page.updatedAt)}
                       tone={tone}
                       actions={
-                        <ArchivePageButton
-                          pageId={page.id}
-                          title={page.title}
-                        />
+                        <DeletePageButton pageId={page.id} title={page.title} />
                       }
                     />
                   </li>

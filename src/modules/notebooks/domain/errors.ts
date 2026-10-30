@@ -4,6 +4,8 @@
 // Session-related errors, module-wide (not scoped to notebooks or pages).
 export const NOTEBOOKS_ERROR = {
   SESSION_REQUIRED: "NOTEBOOKS_SESSION_REQUIRED",
+  // A Server Action hit an unexpected failure (reported to Sentry).
+  UNEXPECTED: "NOTEBOOKS_UNEXPECTED",
 } as const;
 
 export const NOTEBOOK_ERROR = {
