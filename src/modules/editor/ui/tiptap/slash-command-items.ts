@@ -240,7 +240,10 @@ export const SLASH_COMMAND_ITEMS: SlashCommandItem[] = [
       editor.chain().focus().deleteRange(range).insertContent("@").run(),
   },
   // H7: formulas. The typed command is removed and the LaTeX input opens
-  // (math-editor.tsx); nothing is inserted until it holds a formula.
+  // (math-editor.tsx); nothing is inserted until it holds a formula. No
+  // `focus()` in the chain: a click on the item has moved focus to the menu,
+  // and Tiptap would hand it back to the document a frame later — after the
+  // input took it (CI run 41101107557).
   {
     id: "math-block",
     label: "Ecuación",
@@ -249,7 +252,7 @@ export const SLASH_COMMAND_ITEMS: SlashCommandItem[] = [
     group: "Contenido",
     description: "Fórmula LaTeX en su propia línea",
     run: (editor, range) => {
-      editor.chain().focus().deleteRange(range).run();
+      editor.chain().deleteRange(range).run();
       requestMathEdit(editor, { kind: "block", pos: null, latex: "" });
     },
   },
@@ -261,7 +264,7 @@ export const SLASH_COMMAND_ITEMS: SlashCommandItem[] = [
     group: "Contenido",
     description: "Fórmula LaTeX dentro del texto",
     run: (editor, range) => {
-      editor.chain().focus().deleteRange(range).run();
+      editor.chain().deleteRange(range).run();
       requestMathEdit(editor, { kind: "inline", pos: null, latex: "" });
     },
   },
