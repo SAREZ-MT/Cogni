@@ -75,7 +75,8 @@ sessions are scheduled by `study-engine`; this module adds the card text.
   on the page row).
 - `actions.ts` (`"use server"`): `generateFlashcardsAction`,
   `listFlashcardsAction`, `listDecksAction`, `getGenerationStatusAction`,
-  `archiveFlashcardAction` (revalidates the `/flashcards` layout). There is no
+  `archiveFlashcardAction` and `archiveDeckAction` (both revalidate the
+  `/flashcards` layout). There is no
   manual creation action (AI only since Phase 8 H13). They
   validate session and input, return `Result<T, ActionError>`, report failures
   to Sentry and emit the `generation_requested` event. `maxDuration` is declared
@@ -106,9 +107,15 @@ that exercises real providers.
 
 `src/app/(app)/flashcards/`: the deck page reviews in place (`DeckReview`,
 `FlashcardPlayer` with the four SM-2 buttons, `SessionFeedbackPanel` at the
-end) and starts once when opened with `?repasar=1`; `/flashcards` shows
-"Repasos de hoy" (`DueTodayList`, from the `scheduling` module) and the due
-count of every deck. Cards are created by AI only (Phase 8 H13): the deck
+end) and starts once when opened with `?repasar=1`. Since Phase 8 H17
+(flat hub, 2026-10-29) `/flashcards` lists every deck as its own card: the
+decks with cards due today (scheduling's "Repasos de hoy") under "Para hoy",
+the rest under "Al día" with the next review (`DeckSummary.nextDueAt`, the
+earliest due date of the deck's active study items, read in the same
+grouped query), newest first (`latestCardAt`), filtered by `?cuaderno=`.
+Its menu deletes a deck with `archiveDeckAction` (every card archived and
+its study item suspended under the deck lock). `/flashcards/[notebookId]`
+redirects to the filtered hub. Cards are created by AI only (Phase 8 H13): the deck
 has no "Nueva tarjeta", and an empty deck links to its page, whose
 techniques panel generates cards.
 

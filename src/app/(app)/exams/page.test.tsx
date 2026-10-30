@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { createElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -47,35 +47,61 @@ function entry(
     ready: true,
     dueToday: 0,
     failedDueNow: false,
+    bestScore: null,
+    latestQuestionAt: "2026-09-01T10:00:00.000Z",
     ...overrides,
   };
 }
 
-// Biología: Mitocondria failed (retake pending, 2 exams, last 60 %),
-// Membrana passed (1 exam, 83 %); Cálculo: never examined.
+const NB_A = "11111111-1111-4111-8111-111111111111";
+const NB_B = "22222222-2222-4222-8222-222222222222";
+
+function hub(cuaderno?: string) {
+  return {
+    searchParams: Promise.resolve(cuaderno === undefined ? {} : { cuaderno }),
+  };
+}
+
+// Cuaderno A: Mitocondria failed (retake pending, 2 exams, last 50 %),
+// Membrana passed (1 exam, best 92 %, last 85 %); Cuaderno B: Derivadas
+// never examined.
 const ENTRIES = [
-  entry("mitocondria", "biologia", "Biología Celular", {
-    pageTitle: "Mitocondria",
-    attempts: 2,
-    lastScore: 60,
-    lastFinishedAt: "2026-10-05T10:00:00.000Z",
-    retakePending: true,
-    dueToday: 4,
-  }),
-  entry("membrana", "biologia", "Biología Celular", {
+  entry("membrana", NB_A, "Cuaderno A", {
     pageTitle: "Membrana celular",
-    attempts: 1,
-    lastScore: 83,
+    attempts: 3,
+    lastScore: 85,
+    bestScore: 92,
     passed: true,
     lastFinishedAt: "2026-10-01T10:00:00.000Z",
   }),
-  entry("derivadas", "calculo", "Cálculo III", {
+  entry("mitocondria", NB_A, "Cuaderno A", {
+    pageTitle: "Mitocondria",
+    questionCount: 20,
+    attempts: 2,
+    lastScore: 50,
+    bestScore: 50,
+    lastFinishedAt: "2026-09-20T10:00:00.000Z",
+    retakePending: true,
+    dueToday: 4,
+  }),
+  entry("derivadas", NB_B, "Cuaderno B", {
     pageTitle: "Derivadas parciales",
     notebookColor: "blue",
+    questionCount: 15,
   }),
 ];
 
-describe("ExamsHubPage (real data)", () => {
+const titles = () =>
+  screen
+    .queryAllByRole("heading", { level: 3 })
+    .map((heading) => heading.textContent);
+
+const cardOf = (title: string) =>
+  screen
+    .getByRole("heading", { level: 3, name: title })
+    .closest("article") as HTMLElement;
+
+describe("ExamsHubPage (flat since Phase 8 H17)", () => {
   beforeEach(() => {
     getPagePickerTree.mockReset();
     getPagePickerTree.mockResolvedValue([]);
@@ -98,112 +124,125 @@ describe("ExamsHubPage (real data)", () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("COGNI_DESIGN_PREVIEWS", "");
 
-    render(await ExamsHubPage());
+    render(await ExamsHubPage(hub()));
 
     expect(
       screen.getByRole("heading", { name: "Exámenes" }),
     ).toBeInTheDocument();
   });
 
-  // Phase 8 H11: with exams listed, "Crear examen" also opens from a tile
-  // fixed first in the grid, before the notebooks.
-  it("puts the create tile first in the notebooks grid", async () => {
-    render(await ExamsHubPage());
+  it("lists every exam page after the create tile, with the counts in the header", async () => {
+    render(await ExamsHubPage(hub()));
 
+    expect(screen.getAllByRole("article")).toHaveLength(3);
+    expect(
+      screen.getByText("5 exámenes · 3 páginas · 2 cuadernos"),
+    ).toBeInTheDocument();
     const tile = screen.getByTestId("create-exam-tile");
-    const grid = tile.parentElement as HTMLElement;
-    expect(grid.firstElementChild).toBe(tile);
-    expect(grid.querySelectorAll("a")).toHaveLength(2);
-    expect(screen.queryByTestId("create-exam-cta")).toBeNull();
-    // Phase 8 H13 (user 2026-10-29): no "Crear examen" in the header.
-    expect(screen.queryByTestId("create-exam-button")).toBeNull();
+    expect(tile.parentElement?.firstElementChild).toBe(tile);
+    // The retake banner and the summary pills are gone: the cards say it.
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(screen.queryByText(/pendientes? de repetir/)).toBeNull();
+    expect(screen.queryByText(/exámenes presentados/)).toBeNull();
   });
 
-  it("derives the totals from the real pages", async () => {
-    render(await ExamsHubPage());
+  it("orders the retake first, then never examined, then the most recent", async () => {
+    render(await ExamsHubPage(hub()));
 
-    expect(screen.getByText("3 exámenes · 2 cuadernos")).toBeInTheDocument();
-    expect(screen.getByText("3 exámenes presentados")).toBeInTheDocument();
-    expect(screen.getByText("1 aprobado")).toBeInTheDocument();
-    expect(screen.getByText("1 pendiente de repetir")).toBeInTheDocument();
+    expect(titles()).toEqual([
+      "Mitocondria",
+      "Derivadas parciales",
+      "Membrana celular",
+    ]);
   });
 
-  it("links the retake banner to the failed page's exam", async () => {
-    listExamHubAction.mockResolvedValue({
-      ok: true,
-      value: [{ ...ENTRIES[0], dueToday: 0 }, ENTRIES[1], ENTRIES[2]],
-    });
-    render(await ExamsHubPage());
+  it("offers a filled retake on a failed page, with its last attempt", async () => {
+    render(await ExamsHubPage(hub()));
 
+    const card = cardOf("Mitocondria");
     expect(
-      screen.getByText("Tienes 1 página pendiente de repetir examen"),
+      within(card).getByText("Repetir cuando estés listo"),
     ).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        "Fallaste el último examen de Mitocondria; las preguntas falladas vencen mañana.",
-      ),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("link", { name: "Repetir examen" }),
-    ).toHaveAttribute("href", "/exams/biologia/mitocondria?retake=1");
-  });
-
-  it("has no retake banner when no page is pending", async () => {
-    listExamHubAction.mockResolvedValue({
-      ok: true,
-      value: [ENTRIES[1], ENTRIES[2]],
-    });
-
-    render(await ExamsHubPage());
-
-    expect(screen.queryByRole("link", { name: "Repetir examen" })).toBeNull();
-    expect(screen.getByText("0 pendientes de repetir")).toBeInTheDocument();
-  });
-
-  it("shows one card per notebook with its exams and latest score", async () => {
-    render(await ExamsHubPage());
-
-    expect(
-      screen.getByRole("link", { name: /Biología Celular/ }),
-    ).toHaveAttribute("href", "/exams/biologia");
-    expect(
-      screen.getByText("3 exámenes · última nota 60 %"),
-    ).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Cálculo III/ })).toHaveAttribute(
-      "href",
-      "/exams/calculo",
+    expect(within(card).getByText(/Último intento/)).toHaveTextContent(
+      "Último intento 50 %",
     );
-    expect(screen.getByText("0 exámenes · sin intentar")).toBeInTheDocument();
+    expect(within(card).getByRole("progressbar")).toHaveAttribute(
+      "aria-valuenow",
+      "50",
+    );
+    const retake = within(card).getByRole("link", {
+      name: "Repetir examen: Mitocondria",
+    });
+    expect(retake).toHaveAttribute("data-emphasis", "primary");
+    expect(retake).toHaveAttribute(
+      "href",
+      `/exams/${NB_A}/mitocondria?desde=hub`,
+    );
   });
 
-  it("takes the notebook's latest score from its most recently finished exam", async () => {
-    listExamHubAction.mockResolvedValue({
-      ok: true,
-      value: [
-        entry("a", "nb", "Cuaderno", {
-          attempts: 1,
-          lastScore: 40,
-          lastFinishedAt: "2026-10-01T10:00:00.000Z",
-        }),
-        entry("b", "nb", "Cuaderno", {
-          attempts: 1,
-          lastScore: 90,
-          lastFinishedAt: "2026-10-04T10:00:00.000Z",
-        }),
-      ],
-    });
+  it("shows the best and last scores of an examined page, with a soft Hacer examen", async () => {
+    render(await ExamsHubPage(hub()));
 
-    render(await ExamsHubPage());
+    const card = cardOf("Membrana celular");
+    expect(within(card).getByText(/Mejor nota/)).toHaveTextContent(
+      "Mejor nota 92 % · último 85 %",
+    );
+    expect(within(card).getByRole("progressbar")).toHaveAttribute(
+      "aria-valuenow",
+      "92",
+    );
+    expect(
+      within(card).getByRole("link", {
+        name: "Hacer examen: Membrana celular",
+      }),
+    ).toHaveAttribute("data-emphasis", "soft");
+  });
+
+  it("says a never-examined page has no attempts, without a bar", async () => {
+    render(await ExamsHubPage(hub()));
+
+    const card = cardOf("Derivadas parciales");
+    expect(within(card).getByText("Sin intentos")).toBeInTheDocument();
+    expect(within(card).queryByRole("progressbar")).toBeNull();
+    expect(within(card).getByTestId("technique-item-metric")).toHaveTextContent(
+      "15 preguntas",
+    );
+  });
+
+  it("filters by notebook on the server and keeps the filter in the exam links", async () => {
+    render(await ExamsHubPage(hub(NB_B)));
+
+    expect(titles()).toEqual(["Derivadas parciales"]);
+    expect(
+      screen.getByRole("link", { name: "Hacer examen: Derivadas parciales" }),
+    ).toHaveAttribute(
+      "href",
+      `/exams/${NB_B}/derivadas?desde=hub&cuaderno=${NB_B}`,
+    );
+  });
+
+  it("says so inline, with the create tile, when the chosen notebook has no exams", async () => {
+    render(await ExamsHubPage(hub("33333333-3333-4333-8333-333333333333")));
+
+    expect(screen.queryAllByRole("article")).toHaveLength(0);
+    expect(
+      screen.getByText("Este cuaderno aún no tiene exámenes."),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("create-exam-tile")).toBeInTheDocument();
+  });
+
+  it("offers the questions and the page in the card menu", async () => {
+    render(await ExamsHubPage(hub()));
 
     expect(
-      screen.getByText("2 exámenes · última nota 90 %"),
+      screen.getByRole("button", { name: "Acciones de Mitocondria" }),
     ).toBeInTheDocument();
   });
 
   it("shows the empty state when no page has questions", async () => {
     listExamHubAction.mockResolvedValue({ ok: true, value: [] });
 
-    render(await ExamsHubPage());
+    render(await ExamsHubPage(hub()));
 
     // Phase 8 H10: the illustrated empty state (a stacked exam sheet,
     // gradient headline). Since H13 the header has no "Crear examen": the
@@ -248,7 +287,7 @@ describe("ExamsHubPage (real data)", () => {
       error: { code: "EXAMS_UNEXPECTED", message: "x" },
     });
 
-    render(await ExamsHubPage());
+    render(await ExamsHubPage(hub()));
 
     expect(
       screen.getByText("No pudimos cargar tus exámenes. Intenta de nuevo."),
@@ -259,60 +298,8 @@ describe("ExamsHubPage (real data)", () => {
     ).toBeInTheDocument();
   });
 
-  it("has no 'Vista previa' pill on real data", async () => {
-    render(await ExamsHubPage());
-
-    expect(screen.queryByText("Vista previa")).toBeNull();
-  });
-
-  it("says the failed questions are ready once they are due", async () => {
-    listExamHubAction.mockResolvedValue({
-      ok: true,
-      value: [{ ...ENTRIES[0], failedDueNow: true }, ENTRIES[1], ENTRIES[2]],
-    });
-    render(await ExamsHubPage());
-
-    expect(
-      screen.getByText(
-        "Fallaste el último examen de Mitocondria; las preguntas falladas ya están para repasar.",
-      ),
-    ).toBeInTheDocument();
-  });
-
-  it("says the failed questions are due tomorrow while only the page's other questions are due", async () => {
-    // Mitocondria has 4 exam questions due today, none of them failed.
-    render(await ExamsHubPage());
-
-    expect(
-      screen.getByText(
-        "Fallaste el último examen de Mitocondria; las preguntas falladas vencen mañana.",
-      ),
-    ).toBeInTheDocument();
-    expect(screen.queryByText(/ya están para repasar/)).toBeNull();
-  });
-
-  it("gives neutral advice when the failed questions' due state is unknown", async () => {
-    listExamHubAction.mockResolvedValue({
-      ok: true,
-      value: [
-        { ...ENTRIES[0], dueToday: null, failedDueNow: null },
-        ENTRIES[1],
-        ENTRIES[2],
-      ],
-    });
-
-    render(await ExamsHubPage());
-
-    expect(
-      screen.getByText(
-        "Fallaste el último examen de Mitocondria; repasa los conceptos fallados antes de repetir.",
-      ),
-    ).toBeInTheDocument();
-    expect(screen.queryByText(/vencen mañana/)).toBeNull();
-  });
-
   it("offers 'Crear examen' only from the grid tile: no header button, no 'Nuevo examen'", async () => {
-    render(await ExamsHubPage());
+    render(await ExamsHubPage(hub()));
 
     // Phase 8 H13: the header's button is gone; H11's grid tile stays.
     expect(
@@ -339,7 +326,7 @@ describe("ExamsHubPage (real data)", () => {
       getPagePickerTree.mockResolvedValue(TREE);
       listExamHubAction.mockResolvedValue({ ok: true, value: [] });
 
-      render(await ExamsHubPage());
+      render(await ExamsHubPage(hub()));
 
       // H11's empty-state CTA is the only trigger (no header button, H13).
       expect(CreateExamDialog).toHaveBeenCalledTimes(1);
@@ -360,7 +347,7 @@ describe("ExamsHubPage (real data)", () => {
       getPagePickerTree.mockRejectedValue(new Error("db down"));
       listExamHubAction.mockResolvedValue({ ok: true, value: [] });
 
-      render(await ExamsHubPage());
+      render(await ExamsHubPage(hub()));
 
       const [props] = CreateExamDialog.mock.calls[0] as unknown as [
         Record<string, unknown>,

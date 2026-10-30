@@ -163,6 +163,32 @@
   --color-technique-exam-cta-fg: #ffffff;
   --color-technique-exam-cta-edge: #be123c;
   --color-technique-exam-cta-shadow: #be123c;
+  /* Technique item cards (Phase 8 H17, user-approved flat hubs
+     2026-10-29): the soft action and status pill (fill, edge, ink), the
+     progress fill, the card's corner tint and the create tile's dashes.
+     Soft ink on soft fill: amber 6.4:1, emerald 7.0:1, rose 7.0:1. */
+  --color-technique-flashcards-soft: var(
+    --color-technique-flashcards-glow-soft
+  );
+  --color-technique-flashcards-soft-edge: var(--color-technique-flashcards-cta);
+  --color-technique-flashcards-soft-fg: var(
+    --color-technique-flashcards-ink-deep
+  );
+  --color-technique-flashcards-fill: var(--color-technique-flashcards-cta-edge);
+  --color-technique-flashcards-tint: #fffbeb;
+  --color-technique-flashcards-dash: var(--color-technique-flashcards-dot);
+  --color-technique-recall-soft: var(--color-technique-recall-glow-soft);
+  --color-technique-recall-soft-edge: var(--color-technique-recall-accent);
+  --color-technique-recall-soft-fg: var(--color-technique-recall-ink-deep);
+  --color-technique-recall-fill: #10b981;
+  --color-technique-recall-tint: #f0fdf6;
+  --color-technique-recall-dash: var(--color-technique-recall-dot);
+  --color-technique-exam-soft: var(--color-technique-exam-glow-soft);
+  --color-technique-exam-soft-edge: #fda4af;
+  --color-technique-exam-soft-fg: var(--color-technique-exam-ink-deep);
+  --color-technique-exam-fill: var(--color-rose-500);
+  --color-technique-exam-tint: #fff5f6;
+  --color-technique-exam-dash: var(--color-technique-exam-dot);
 
   /* Semantic status: *-50 stays the near-white tint, *-100 is the stronger
      pastel tint used for metric/stat icon tiles and badges (design pass 2,
@@ -1113,6 +1139,12 @@
    dotted-paper and technique-cta at its technique's colours; without the
    attribute they keep the Cogni violet. */
 [data-technique-theme="flashcards"] {
+  --theme-soft: var(--color-technique-flashcards-soft);
+  --theme-soft-edge: var(--color-technique-flashcards-soft-edge);
+  --theme-soft-fg: var(--color-technique-flashcards-soft-fg);
+  --theme-fill: var(--color-technique-flashcards-fill);
+  --theme-tint: var(--color-technique-flashcards-tint);
+  --theme-dash: var(--color-technique-flashcards-dash);
   --theme-ink: var(--color-technique-flashcards-ink);
   --theme-ink-deep: var(--color-technique-flashcards-ink-deep);
   --theme-glow: color-mix(
@@ -1145,6 +1177,12 @@
   );
 }
 [data-technique-theme="recall"] {
+  --theme-soft: var(--color-technique-recall-soft);
+  --theme-soft-edge: var(--color-technique-recall-soft-edge);
+  --theme-soft-fg: var(--color-technique-recall-soft-fg);
+  --theme-fill: var(--color-technique-recall-fill);
+  --theme-tint: var(--color-technique-recall-tint);
+  --theme-dash: var(--color-technique-recall-dash);
   --theme-ink: var(--color-technique-recall-ink);
   --theme-ink-deep: var(--color-technique-recall-ink-deep);
   --theme-glow: color-mix(
@@ -1177,6 +1215,12 @@
   );
 }
 [data-technique-theme="exams"] {
+  --theme-soft: var(--color-technique-exam-soft);
+  --theme-soft-edge: var(--color-technique-exam-soft-edge);
+  --theme-soft-fg: var(--color-technique-exam-soft-fg);
+  --theme-fill: var(--color-technique-exam-fill);
+  --theme-tint: var(--color-technique-exam-tint);
+  --theme-dash: var(--color-technique-exam-dash);
   --theme-ink: var(--color-technique-exam-ink);
   --theme-ink-deep: var(--color-technique-exam-ink-deep);
   --theme-glow: color-mix(

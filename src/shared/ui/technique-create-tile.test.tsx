@@ -11,6 +11,7 @@ describe("TechniqueCreateTile", () => {
     const user = userEvent.setup();
     const { container } = render(
       <TechniqueCreateTile
+        technique="flashcards"
         label="Crear flashcards"
         hint="Elige una página de tus cuadernos"
         onClick={onClick}
@@ -28,12 +29,31 @@ describe("TechniqueCreateTile", () => {
     expect(onClick).toHaveBeenCalledOnce();
   });
 
-  it("fills its grid cell at least as tall as a deck summary card", () => {
-    render(<TechniqueCreateTile label="Crear examen" />);
+  it("fills its grid cell at least as tall as a technique item card", () => {
+    render(<TechniqueCreateTile technique="exams" label="Crear examen" />);
 
     expect(screen.getByRole("button", { name: "Crear examen" })).toHaveClass(
       "h-full",
-      "min-h-[156px]",
+      "min-h-[212px]",
+    );
+  });
+
+  // Phase 8 H17 (user-approved flat hubs, 2026-10-29): the tile is dashed
+  // in its technique's colour, with the technique CTA's disc.
+  it("is themed by its technique: dashes, tint and the CTA's disc", () => {
+    const { container } = render(
+      <TechniqueCreateTile technique="recall" label="Generar preguntas" />,
+    );
+
+    const tile = screen.getByRole("button", { name: "Generar preguntas" });
+    expect(tile).toHaveAttribute("data-technique-theme", "recall");
+    expect(tile).toHaveClass(
+      "border-dashed",
+      "border-(--theme-dash)",
+      "bg-(--theme-tint)",
+    );
+    expect(container.querySelector('[data-part="plus"]')).toHaveClass(
+      "bg-(--theme-cta)",
     );
   });
 });

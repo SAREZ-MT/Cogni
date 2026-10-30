@@ -1,4 +1,14 @@
-import { and, asc, desc, eq, exists, isNotNull, isNull, or } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  exists,
+  isNotNull,
+  isNull,
+  or,
+  sql,
+} from "drizzle-orm";
 import type { DbExecutor } from "@/shared/db/client";
 import {
   notebooks,
@@ -50,6 +60,9 @@ export class DrizzleRecallHubReader implements RecallHubReader {
           isNull(recallQuestions.archivedAt),
         ),
       );
+    // Phase 8 H17: the page's active question count and newest question,
+    // as correlated subqueries of this same read (no query per page).
+    const activeQuestions = sql`from ${recallQuestions} where ${recallQuestions.pageId} = ${pages.id} and ${recallQuestions.ownerId} = ${ownerId} and ${recallQuestions.archivedAt} is null`;
     const pageRows = await this.db
       .select({
         pageId: pages.id,
@@ -57,6 +70,12 @@ export class DrizzleRecallHubReader implements RecallHubReader {
         notebookId: notebooks.id,
         notebookTitle: notebooks.title,
         notebookColor: notebooks.color,
+        questionCount: sql<number>`(select count(*)::int ${activeQuestions})`,
+        latestQuestionAt:
+          sql<Date | null>`(select max(${recallQuestions.createdAt}) ${activeQuestions})`.mapWith(
+            (value: string | Date | null) =>
+              value === null ? null : new Date(value),
+          ),
       })
       .from(pages)
       .innerJoin(notebooks, eq(notebooks.id, pages.notebookId))

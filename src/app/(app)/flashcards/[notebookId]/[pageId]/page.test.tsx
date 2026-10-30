@@ -202,6 +202,30 @@ describe("FlashcardsSessionPage", () => {
       expect(notFound).not.toHaveBeenCalled();
     });
 
+    // Phase 8 H17: no notebook level. Back leads to the hub, filtered by
+    // the deck's notebook, or as the hub was (?desde=hub&cuaderno=).
+    it("leads back to the hub filtered by the notebook by default", async () => {
+      render(await FlashcardsSessionPage(props(NOTEBOOK, PAGE)));
+
+      expect(screen.getByRole("link", { name: /Flashcards/ })).toHaveAttribute(
+        "href",
+        `/flashcards?cuaderno=${NOTEBOOK}`,
+      );
+    });
+
+    it("leads back to the hub as it was when opened from it", async () => {
+      const OTHER = "2b2c3d4e-5f60-4172-8899-b2c3d4e5f607";
+      render(
+        await FlashcardsSessionPage(
+          props(NOTEBOOK, PAGE, { desde: "hub", cuaderno: OTHER }),
+        ),
+      );
+      expect(screen.getByRole("link", { name: /Flashcards/ })).toHaveAttribute(
+        "href",
+        `/flashcards?cuaderno=${OTHER}`,
+      );
+    });
+
     // Phase 8 H12 removed the H11 `?nueva=1` auto-open; H13 removed manual
     // creation altogether, so the flag opens nothing.
     it("opens no dialog with ?nueva=1", async () => {

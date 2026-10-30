@@ -399,6 +399,14 @@ exam}-*` tokens; `text-gradient-brand`, `empty-state-glow` and
 utilities turn amber (CTA amber-300 with amber-900 ink), emerald
 (emerald-700, white ink) or rose (rose-700, white ink) inside a theme.
 
+Phase 8 H17 adds the item-card tokens (`--color-technique-*-soft`,
+`-soft-edge`, `-soft-fg`, `-fill`, `-tint`, `-dash`, read as
+`--theme-soft`/`-soft-edge`/`-soft-fg`/`-fill`/`-tint`/`-dash`): the soft
+action and status pill (amber-100 / amber-300 / amber-800, emerald-100 /
+emerald-300 / emerald-800, rose-100 / rose-300 / rose-800), the progress
+fill (amber-500, emerald-500, rose-500), the card's corner tint and the
+create tile's dashes.
+
 ## TechniqueHubHeader (`technique-hub-header.tsx`)
 
 Phase 8 H11: the page head of the three technique hubs, empty or not.
@@ -911,20 +919,67 @@ reads "Este cuaderno aún no tiene páginas." with "Crear una página" to
 
 ## TechniqueCreateTile (`technique-create-tile.tsx`)
 
-Phase 8 H11: the first, fixed item of a technique hub's notebooks grid, in
-the "Nuevo cuaderno" / "Nueva página" create-tile language: `primary-50`
-fill, 2px dashed `primary-300` border, a 44px `primary-600` plus disc, a
-14px semibold `primary-700` label and a 12px hint. Shaped like
-`DeckSummaryCard` (18px radius, `h-full min-h-[156px]`); lifts 2px and
-deepens its tint on hover, presses to 0.98, still under reduced motion.
-A plain `<button>` (`type="button"` default) for `DialogTrigger asChild`.
-Props: `label` (also the accessible name), `hint?`, button props. Used by
-the `/flashcards` ("Crear flashcards"), `/active-recall` ("Generar
-preguntas"), `/exams` and, since Phase 8 H13, `/exams/[notebookId]`
-("Crear examen", the notebook preselected) grids. H13 removed the exams
-header's "Crear examen" button: on the exams screens the tile and the
-empty state's CTA (`data-technique-theme="exams"` around it on the
-notebook view) are the create controls.
+Phase 8 H11: the first, fixed item of a technique hub's grid, in the
+"Nuevo cuaderno" / "Nueva página" create-tile language. Since H17
+(user-approved flat hubs, 2026-10-29) it is themed by its `technique`
+(`data-technique-theme` on the tile): `--theme-tint` fill, 2px dashed
+`--theme-dash` border, a 44px plus disc in the technique CTA's colours, a
+14px semibold `--theme-ink-deep` label and a 12px `--theme-ink` hint.
+Shaped like `TechniqueItemCard` (18px radius, `h-full min-h-[212px]`; under
+520px a left-aligned row); lifts 2px on hover, presses to 0.98, still
+under reduced motion. A plain `<button>` (`type="button"` default) for
+`DialogTrigger asChild`. Props: `technique`, `label` (also the accessible
+name), `hint?`, button props. Used by the `/flashcards` ("Crear
+flashcards"), `/active-recall` ("Generar preguntas") and `/exams` ("Crear
+examen") grids. H13 removed the exams header's "Crear examen" button: the
+tile and the empty state's CTA are the create controls.
+
+## TechniqueItemCard (`technique-item-card.tsx`)
+
+Phase 8 H17 (user-approved flat hubs, 2026-10-29): one generated item of a
+technique hub (a deck, a recall page, an exam page), themed by
+`technique` (`data-technique-theme` on the `<article>`,
+`data-slot="technique-item-card"`). A `Card` (18px radius, at least 212px
+tall, `py-3.5 pr-3.5 pl-4`) with a radial `--theme-tint` in its top right
+corner; top row the notebook label (a `Pill` in the notebook's pastel with
+its `NOTEBOOK_DOT`, truncated) and the kebab (`DropdownMenu`, "Acciones
+de {title}", above the stretched link); the title (16px semibold, clamped
+to 2 lines with `min-h-11`, full text in `title`); the metric (15px Lucide
+icon in `--theme-ink`, bold tabular value, unit); the status line; an
+optional 6px `ProgressBar` in `--theme-fill`; and the 38px action at the
+bottom. The action is the card's link, stretched over the card
+(`after:absolute after:inset-0`, like `PageSheetCard`), named
+"{label}: {title}". `emphasis="primary"` fills it with the technique CTA
+(something is due: cards for today, recall due, an exam to retake);
+`"soft"` (default) uses `--theme-soft` / `--theme-soft-fg`. Hover: rises
+2px (`-translate-y-0.5`), `shadow-card-hover` and a `--theme-soft-edge`
+border; under reduced motion only the shadow and border. Props:
+`technique`, `href`, `notebook {title, tone}`, `title`, `metric {icon,
+value, unit}`, `status`, `progress?`, `action {label, icon?}`,
+`emphasis?`, `menu?` (DropdownMenuItems). Status helpers:
+`TechniqueItemPill` (soft pill with a `--theme-fill` dot: "3 para hoy",
+"2 para repasar", "Repetir cuando estés listo") and `TechniqueItemCheck`
+(`success-600` tick: "Al día"). Never shows study time.
+
+## TechniqueHubFilter (`technique-hub-filter.tsx`)
+
+Phase 8 H17: the notebook filter under `TechniqueHubHeader`. A `<nav
+aria-label="Filtrar por cuaderno">` of 34px pill links ("Todos n", then
+one per notebook with its `NOTEBOOK_DOT` and count) pointing at
+`?cuaderno=<id>`; the active chip has `aria-current="page"` and the
+technique's soft colours. Scrolls sideways (hidden scrollbar) instead of
+wrapping. The chips come from `notebookFilter` (`shared/navigation/
+technique-hub.ts`), which also filters the items on the server.
+`TechniqueHubGroupTitle` (same file) is a grid group heading ("PARA HOY
+3", "AL DÍA 4" in the flashcards hub): an `<h2>` 12px semibold uppercase
+muted label with the count in `--theme-ink`.
+
+## NotebookDot (`notebook-dot.ts`)
+
+Phase 8 H17: `NOTEBOOK_DOT`, a notebook colour as a small dot (the 400
+stop of `NotebookCoverCard`'s gradient: pink-400, emerald-400, amber-400,
+primary-500, orange-400, blue-400, teal-400), `toNotebookTone` (unknown or
+missing colours are violet) and `notebookDotClass`.
 
 ## ViewToggle (`view-toggle.tsx`)
 
@@ -1047,40 +1102,13 @@ creation. `flashcards/_data/sample.ts` models this with `SamplePage` (no
 separate deck entity) and `getSamplePagesWithCards(notebookId)`, which only
 returns pages that actually have cards (no empty decks).
 
-### DeckSummaryCard (`deck-summary-card.tsx`)
+### DeckSummaryCard (`deck-summary-card.tsx`) — removed
 
-Hub grid item (one per notebook that has pages with decks): a pastel-toned
-header (`HEADER_BG`, keyed by `NotebookColor` — always that notebook's own
-color) with a translucent `IconTile` (`size="48"`, `bg-white/[55%]`
-override) and a red due-count badge, then a body with the notebook title
-and a due/al-día meta line (`text-error-600`/`text-success-600`).
+Removed in Phase 8 H17 (flat technique hubs, 2026-10-29): the hubs list one `TechniqueItemCard` per item and the notebook views redirect to the filtered hub, so nothing renders it any more.
 
-- `href`, `tone: NotebookColor`, `title`, `cardCount`, `dueCount`.
+### DeckCard (`deck-card.tsx`) — removed
 
-Used by: `flashcards/page.tsx` (hub).
-
-### DeckCard (`deck-card.tsx`)
-
-Deck grid item (one per page with cards on a notebook's
-`/flashcards/[notebookId]` list): a fixed 200px-tall link card with a
-cycling `DeckTone` border (13% alpha) and icon tile (14% alpha), a
-due/al-día status `Pill`, a centered two-line-clamped label and a footer
-card count. `label` is the page title; the footer's left text is the fixed
-string "Página" (not a `Pill`/prop — one page is always one deck, so it
-never needs to say anything else).
-
-- `DeckTone`: `"warning" | "info" | "success" | "orange" | "pink"` — the
-  report's amber/blue/green/orange/pink `DECK_COLORS` cycle, mapped onto
-  existing warning/info/success/pastel-orange/pastel-pink tokens instead of
-  new hex literals. Assigned by position in the notebook's page list.
-- `href`, `tone`, `label`, `cardCount`, `dueCount?`. `dueCount` is optional:
-  omitted (the due list could not be loaded) the status pill is not
-  rendered at all, instead of showing a false "Al día". Since Phase 4 T6
-  `flashcards/[notebookId]/page.tsx` passes the page's flashcards due now
-  (scheduling's `listDueTodayAction`); the pill reads "1 pendiente" /
-  "{N} pendientes".
-
-Used by: `flashcards/[notebookId]/page.tsx`.
+Removed in Phase 8 H17 (flat technique hubs, 2026-10-29): the hubs list one `TechniqueItemCard` per item and the notebook views redirect to the filtered hub, so nothing renders it any more.
 
 ### StatDots (`stat-dots.tsx`)
 
@@ -1197,34 +1225,13 @@ passing raw counts — zero visual change.
 Used by: `flashcards/_components/flashcard-player.tsx`,
 `active-recall/_components/active-recall-player.tsx`.
 
-### DeckSummaryCard (`deck-summary-card.tsx`) — generalized
+### DeckSummaryCard (`deck-summary-card.tsx`) — generalized — removed
 
-Generalized 2026-09-24 (Active recall design preview): `cardCount`/
-`dueCount` are now optional, and a new `meta?: ReactNode` prop overrides
-the default "{cardCount} tarjetas · {due|al día}" line entirely — Active
-recall's hub passes `meta="{N} sesiones · última {p}%"` instead (no
-card/due concept). Flashcards' call site is unchanged (still passes
-`cardCount`/`dueCount`, no `meta`) — zero visual change.
+Removed in Phase 8 H17 (flat technique hubs, 2026-10-29): the hubs list one `TechniqueItemCard` per item and the notebook views redirect to the filtered hub, so nothing renders it any more.
 
-Used by: `flashcards/page.tsx`, `active-recall/page.tsx`.
+### "Repasos de hoy" list (`flashcards/_components/due-today-list.tsx`) — removed
 
-Phase 4 T6 (2026-10-04): the default meta line pluralizes ("1 tarjeta",
-"1 pendiente"). The flashcards hub now passes `cardCount` and the
-notebook's summed flashcards due now as `dueCount`; when the due list
-cannot be loaded it passes `meta` with the card count only, so the card
-never claims "al día" without data.
-
-### "Repasos de hoy" list (`flashcards/_components/due-today-list.tsx`)
-
-Route component, not an atom: it composes `Card` (`padding="md"`),
-`SectionTitle`, `IconTile` (size `36`, radius `input`, notebook tone),
-`Pill` (`sm`, `error`, `dot`: "{N} pendientes") and `Button`
-(`asChild`, `size="sm"`, `variant="outline"`) around a `next/link`
-"Repasar" that opens `/flashcards/{notebookId}/{pageId}?repasar=1`.
-Rows reuse the divider pattern of the former Home ReadyToReview panel
-(removed in Phase 8 H2-T5). Nothing due shows
-`EmptyState variant="success"` ("Estás al día"); a failed load shows one
-muted line instead.
+Removed in Phase 8 H17 (flat technique hubs, 2026-10-29): the hubs list one `TechniqueItemCard` per item and the notebook views redirect to the filtered hub, so nothing renders it any more.
 
 ## Active recall design preview (2026-09-24)
 
@@ -1304,28 +1311,9 @@ the next question — there's no separate "Siguiente". `data-testid=
 
 Used by: `active-recall/_components/active-recall-player.tsx`.
 
-### RecallPageCard (`recall-page-card.tsx`)
+### RecallPageCard (`recall-page-card.tsx`) — removed
 
-The "Sesiones por página" grid item (one per page with sessions on a
-notebook's `/active-recall/[notebookId]` list): a tinted `success-100/35`
-header (notebook name + page title), a body with the latest session's date
-and a preguntas/sesiones meta line, and a footer with the latest session's
-mastery/"dominio" (tone by threshold: ≥70 success, ≥40 warning, else error)
-+ its AI-score breakdown, plus a "Ver resultados →" success `Pill` (was
-"Repasar →" until Phase 6 T7, user decision 2026-10-08: the card opens the
-latest session's results, where "Nueva sesión →" starts a session). The
-meta line uses the singular for one question or one session ("1 pregunta", "1 sesión").
-
-- `href`, `notebookTitle`, `pageTitle`, `lastSessionDate`, `questionCount`,
-  `sessionCount`, `mastery`, `aiCorrect`, `aiPartial`, `aiIncorrect`.
-  Renamed from `accuracy`/`correct`/`partial`/`incorrect` (design/shell-look
-  fix, 2026-09-24 — documento-maestro §7.4 "dominio"/combined quality, not
-  raw accuracy; the breakdown is explicitly the AI score buckets: ≥4
-  `aiCorrect`, 2-3 `aiPartial`, ≤1 `aiIncorrect` — never the self-rating
-  bucket, see `StatDots`/`ActiveRecallResultsView`'s stats grid for that
-  one).
-
-Used by: `active-recall/[notebookId]/page.tsx`.
+Removed in Phase 8 H17 (flat technique hubs, 2026-10-29): the hubs list one `TechniqueItemCard` per item and the notebook views redirect to the filtered hub, so nothing renders it any more.
 
 ### StatusBanner (`status-banner.tsx`)
 
@@ -1449,25 +1437,9 @@ independent of whether it has been attempted (`exams/_data/sample.ts`'s
 `getExamPagesWithQuestions` filters on `questionCount > 0`, not on
 `attempts`).
 
-### ExamPageCard (`exam-page-card.tsx`)
+### ExamPageCard (`exam-page-card.tsx`) — removed
 
-The "Exámenes por página" grid item (one per page with generated
-questions on a notebook's `/exams/[notebookId]` list): a 4px rose/pink
-gradient top accent bar, page title, a preguntas/intentos meta line, a
-score-or-"Sin intentar" `Pill` row (+ a "Repetir pendiente" `Pill` when
-`retakePending`, or a "Vence hoy" `Pill` when questions are due today), the
-last attempt date, and a CTA that reads the page's state ("Presentar
-examen" / "Repetir examen" / "Rendir examen" / "Ver resultados").
-
-- `notebookId`, `pageId`, `pageTitle`, `questionCount`, `attempts`,
-  `lastScore: number | null`, `retakePending`, `lastDate?`, `dueToday?`,
-  `className?`.
-- Due state (user decision 2026-10-06): `dueToday > 0` on an examined page
-  with no pending retake shows the pink "Vence hoy" pill and the CTA
-  "Rendir examen →" on the exam route. A pending retake ("Repetir examen")
-  and a never-attempted page ("Presentar examen") take precedence.
-
-Used by: `exams/[notebookId]/page.tsx`.
+Removed in Phase 8 H17 (flat technique hubs, 2026-10-29): the hubs list one `TechniqueItemCard` per item and the notebook views redirect to the filtered hub, so nothing renders it any more.
 
 ### TimerChip (`timer-chip.tsx`)
 
@@ -1591,19 +1563,9 @@ placeholder `#` href. The sidebar's "Exámenes" item is no longer disabled
 A follow-up design-only pass against documento-maestro §3.3/§7.5, fixing 5
 gaps found while auditing the exams preview above.
 
-### ExamPageCard — routing fix
+### ExamPageCard — routing fix — removed
 
-`exam-page-card.tsx` no longer takes a single `href`: it takes
-`notebookId`/`pageId` and computes 3 destinations itself — a
-`retakePending` page links straight to `?retake=1` (never the plain
-session), a passed/scored page links to its new `/resultados` route
-instead of re-running the exam, and only a never-attempted page still
-links to the plain session. The root is now a `div` (not one big `Link`),
-because the footer gained a second "Preguntas (N)" link to the new
-`/preguntas` route: the title uses the stretched-link pattern
-(`after:absolute after:inset-0` on a `relative` root, same as
-`page-list-row.tsx`) to keep the whole card clickable, and the footer link
-opts back into its own clickable layer with `relative z-10`.
+Removed in Phase 8 H17 (flat technique hubs, 2026-10-29): the hubs list one `TechniqueItemCard` per item and the notebook views redirect to the filtered hub, so nothing renders it any more.
 
 ### Stored results — `/exams/[notebookId]/[pageId]/resultados`
 

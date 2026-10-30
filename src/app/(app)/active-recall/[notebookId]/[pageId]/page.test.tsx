@@ -91,12 +91,26 @@ describe("ActiveRecallSessionPage", () => {
     expect(screen.getByText("Mitocondria")).toBeInTheDocument();
   });
 
-  it("goes back to the notebook's sessions by default", async () => {
+  // Phase 8 H17: no notebook level; back is the hub filtered by the
+  // page's notebook.
+  it("goes back to the hub filtered by the notebook by default", async () => {
     render(await ActiveRecallSessionPage(props()));
 
     expect(
       screen.getByRole("link", { name: /Todas las sesiones/ }),
-    ).toHaveAttribute("href", `/active-recall/${NOTEBOOK}`);
+    ).toHaveAttribute("href", `/active-recall?cuaderno=${NOTEBOOK}`);
+  });
+
+  it("goes back to the hub with its filter when opened from a filtered hub", async () => {
+    render(
+      await ActiveRecallSessionPage(
+        props(NOTEBOOK, PAGE, { desde: "hub", cuaderno: NOTEBOOK }),
+      ),
+    );
+
+    expect(
+      screen.getByRole("link", { name: /Todas las sesiones/ }),
+    ).toHaveAttribute("href", `/active-recall?cuaderno=${NOTEBOOK}`);
   });
 
   // Phase 8 H16: opened from the hub's create dialog, back returns there.

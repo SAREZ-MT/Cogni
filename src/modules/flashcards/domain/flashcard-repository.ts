@@ -9,6 +9,11 @@ export interface DeckSummary {
   readonly notebookTitle: string;
   readonly notebookColor: string | null;
   readonly count: number;
+  // The newest active card's creation (the hub's recency).
+  readonly latestCardAt: Date;
+  // The earliest due date of the active cards' study items; null when none
+  // is scheduled (Phase 8 H17: "Al día · repaso en X días").
+  readonly nextDueAt: Date | null;
 }
 
 // Every method is owner-scoped (documento-maestro §6.1): another owner's

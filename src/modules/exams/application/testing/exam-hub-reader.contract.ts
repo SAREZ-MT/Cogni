@@ -145,9 +145,41 @@ export function runExamHubReaderContract(
         activeQuestionCount: 2,
         attempts: 0,
         lastSession: null,
+        // Phase 8 H17: the best finished score and the newest active
+        // question (the flat hub's "Mejor nota" and recency).
+        bestScore: null,
+        latestQuestionAt: T0,
         retakePending: false,
         failedRootIds: [],
       });
+    });
+
+    it("reports the best whole-percent score of the page's finished exams", async () => {
+      const ctx = options.context();
+      const { reader, repositories } = options.createFixture();
+      const page = await ctx.newPage();
+      const questions = [
+        question(ctx, page),
+        question(ctx, page),
+        question(ctx, page),
+      ];
+      for (const q of questions) await repositories.questions.save(q);
+      // 2 of 3 earlier (66 %), 1 of 3 later (33 %): best is not the last.
+      await saveFinished(
+        repositories,
+        finishedSession(ctx, page, questions, 2, T1),
+      );
+      await saveFinished(
+        repositories,
+        finishedSession(ctx, page, questions, 1, T2),
+      );
+
+      const row = (await reader.listExamPages(ctx.ownerId)).find(
+        (candidate) => candidate.pageId === page.pageId,
+      );
+
+      expect(row?.bestScore).toBe(66);
+      expect(row?.lastSession?.correct).toBe(1);
     });
 
     it("counts roots with an active question, never retired ones or each variant", async () => {

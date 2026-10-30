@@ -39,6 +39,8 @@ function page(
     notebookTitle: "Biología celular",
     notebookColor: "green",
     sessions,
+    questionCount: 6,
+    latestQuestionAt: new Date("2026-10-05T10:00:00.000Z"),
     ...overrides,
   };
 }
@@ -117,6 +119,9 @@ describe("listRecallHub", () => {
         notebookColor: "green",
         mastery: 50,
         dueToday: 0,
+        // Phase 8 H17: the page's active questions and newest one.
+        questionCount: 6,
+        latestQuestionAt: new Date("2026-10-05T10:00:00.000Z"),
         sessions: [
           {
             id: "s-2",

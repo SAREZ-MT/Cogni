@@ -40,7 +40,6 @@ test.describe("Crear examen", () => {
     test.setTimeout(120_000);
     const notebookTitle = `Cuaderno crear examen ${randomUUID().slice(0, 8)}`;
     await createNotebookWithOpenPage(page, notebookTitle);
-    const [, , notebookId] = new URL(page.url()).pathname.split("/");
 
     // Generation reads the persisted page text: wait for the autosave.
     const editable = page
@@ -78,14 +77,11 @@ test.describe("Crear examen", () => {
     await shot(page, "exams-create-modal");
     await create.getByTestId("create-exam-submit").click();
 
-    await expect(page).toHaveURL(`/exams/${notebookId}`, { timeout: 30000 });
-    await expect(page.getByRole("link", { name: "Sin título" })).toBeVisible();
-    await expect(page.getByText("10 preguntas · 0 intentos")).toBeVisible();
-
-    await page.goto("/exams");
-    await expect(
-      page.getByRole("link", { name: new RegExp(notebookTitle) }),
-    ).toBeVisible();
+    // Phase 8 H17: back on the flat hub, which lists the new exam page.
+    await expect(page).toHaveURL("/exams", { timeout: 30000 });
+    const card = page.getByRole("article").filter({ hasText: notebookTitle });
+    await expect(card).toContainText("10 preguntas");
+    await expect(card).toContainText("Sin intentos");
     await expect(page.getByText("Nuevo examen")).toHaveCount(0);
     await shot(page, "exams-hub-with-exams");
   });

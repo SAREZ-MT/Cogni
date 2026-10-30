@@ -30,6 +30,7 @@ import {
   withBoundary,
 } from "./action-support";
 import {
+  archiveDeck as archiveDeckUseCase,
   archiveFlashcard as archiveFlashcardUseCase,
   DailyLimitReachedError,
   getGenerationStatus as getGenerationStatusUseCase,
@@ -76,7 +77,8 @@ export interface ArchiveView {
   remaining: number;
 }
 
-// One deck = one page with cards (no due count until the Phase 4 scheduler).
+// One deck = one page with cards; its due count comes from scheduling's
+// "Repasos de hoy".
 export interface DeckView {
   pageId: string;
   notebookId: string;
@@ -84,6 +86,10 @@ export interface DeckView {
   notebookTitle: string;
   notebookColor: string | null;
   count: number;
+  // ISO instant of the newest active card (Phase 8 H17: hub recency).
+  latestCardAt: string;
+  // ISO instant of the deck's earliest scheduled review; null when none.
+  nextDueAt: string | null;
 }
 
 export interface GenerationStatusView {
@@ -110,6 +116,7 @@ const generateInput = z.object({
 });
 
 const archiveInput = z.object({ flashcardId: z.uuid() });
+const archiveDeckInput = z.object({ pageId: z.uuid() });
 
 // Adapters are built per call, like ingestion/actions.ts: serverless
 // functions are short-lived, so no module-level singletons.
@@ -283,7 +290,13 @@ export async function listDecksAction(): Promise<
     const { flashcards } = deps();
     const result = await listDecksUseCase({ flashcards }, ownerId.value);
     if (!result.ok) return err(toActionError(result.error));
-    return ok(result.value.map((deck) => ({ ...deck })));
+    return ok(
+      result.value.map((deck) => ({
+        ...deck,
+        latestCardAt: deck.latestCardAt.toISOString(),
+        nextDueAt: deck.nextDueAt?.toISOString() ?? null,
+      })),
+    );
   });
 }
 
@@ -305,5 +318,33 @@ export async function archiveFlashcardAction(
     if (!result.ok) return err(toActionError(result.error));
     revalidateDecks();
     return ok({ remaining: result.value.remaining });
+  });
+}
+
+export interface ArchiveDeckView {
+  // Cards archived with the deck.
+  archived: number;
+}
+
+// "Eliminar mazo" (Phase 8 H17): archives every card of the page's deck
+// and suspends their study items; the deck leaves the hub.
+export async function archiveDeckAction(
+  input: unknown,
+): Promise<Result<ArchiveDeckView, ActionError>> {
+  return withBoundary(async () => {
+    const ownerId = await requireOwnerId();
+    if (!ownerId.ok) return ownerId;
+    const parsed = parseInput(archiveDeckInput, input);
+    if (!parsed.ok) return parsed;
+
+    const { deck } = deps();
+    const result = await archiveDeckUseCase(
+      parsed.value,
+      { deck, clock: systemClock },
+      ownerId.value,
+    );
+    if (!result.ok) return err(toActionError(result.error));
+    revalidateDecks();
+    return ok({ archived: result.value.archived });
   });
 }

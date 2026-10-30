@@ -248,7 +248,7 @@ describe("ActiveRecallPlayer session flow", () => {
 
     expect(
       screen.getByRole("link", { name: "Volver a las sesiones" }),
-    ).toHaveAttribute("href", "/active-recall/nb");
+    ).toHaveAttribute("href", "/active-recall?cuaderno=nb");
   });
 
   it("'Nueva sesión' restarts from the first question with a clean tally and records", async () => {
@@ -277,6 +277,6 @@ describe("ActiveRecallPlayer session flow", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: /Todas las sesiones/ }),
-    ).toHaveAttribute("href", "/active-recall/nb");
+    ).toHaveAttribute("href", "/active-recall?cuaderno=nb");
   });
 });

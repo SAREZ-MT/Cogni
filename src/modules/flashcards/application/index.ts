@@ -1,3 +1,4 @@
+export { type ArchiveDeckResult, archiveDeck } from "./archive-deck";
 export {
   type ArchiveFlashcardResult,
   archiveFlashcard,

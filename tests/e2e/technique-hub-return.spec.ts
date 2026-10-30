@@ -40,13 +40,15 @@ test.describe("technique hub return flow", () => {
       page.getByText(`Pregunta 1 de ${PROMPTS.length}`),
     ).toBeVisible();
 
-    // The in-app back link returns to the hub, which shows the notebook.
+    // The in-app back link returns to the hub, which lists the page
+    // (Phase 8 H17: one card per page, labelled with its notebook).
     await page.getByRole("link", { name: /Todas las sesiones/ }).click();
     await expect(page).toHaveURL(/\/active-recall$/);
-    const notebookCard = page.getByRole("link", {
-      name: new RegExp(notebookTitle),
-    });
-    await expect(notebookCard).toBeVisible();
+    const pageCard = page
+      .getByRole("article")
+      .filter({ hasText: notebookTitle });
+    await expect(pageCard).toBeVisible();
+    await expect(pageCard).toContainText("Sin sesiones terminadas");
     await expect(
       page.getByText("Practica explicando con tus palabras"),
     ).toHaveCount(0);
@@ -64,21 +66,23 @@ test.describe("technique hub return flow", () => {
     ).toBeVisible();
     await page.goBack();
     await expect(page).toHaveURL(/\/active-recall$/);
-    await expect(notebookCard).toBeVisible();
-
-    // The notebook view lists the page with a card that opens its session,
-    // whose back link keeps leading to the notebook view.
-    await notebookCard.click();
-    await expect(page).toHaveURL(new RegExp(`/active-recall/${notebookId}$`));
-    await expect(page.getByText("Sin sesiones todavía")).toHaveCount(0);
-    const pageCard = page.getByRole("link", { name: /Practicar →/ });
     await expect(pageCard).toBeVisible();
-    await pageCard.click();
+
+    // The old notebook view redirects to the hub filtered by it; the card's
+    // Practicar opens the session and its back link keeps the filter.
+    await page.goto(`/active-recall/${notebookId}`);
+    await expect(page).toHaveURL(`/active-recall?cuaderno=${notebookId}`);
+    await expect(
+      page
+        .getByRole("navigation", { name: "Filtrar por cuaderno" })
+        .locator('[aria-current="page"]'),
+    ).toContainText(notebookTitle);
+    await pageCard.getByRole("link", { name: /^Practicar/ }).click();
     await expect(
       page.getByText(`Pregunta 1 de ${PROMPTS.length}`),
     ).toBeVisible();
     await page.getByRole("link", { name: /Todas las sesiones/ }).click();
-    await expect(page).toHaveURL(new RegExp(`/active-recall/${notebookId}$`));
+    await expect(page).toHaveURL(`/active-recall?cuaderno=${notebookId}`);
   });
 
   test("flashcards: a deck opened from the hub plays at once and its back link returns to the hub", async ({
@@ -102,8 +106,19 @@ test.describe("technique hub return flow", () => {
 
     await page.getByRole("link", { name: /Todos los mazos/ }).click();
     await expect(page).toHaveURL(/\/flashcards$/);
-    await expect(
-      page.getByRole("link", { name: new RegExp(notebookTitle) }),
-    ).toBeVisible();
+    const deckCard = page
+      .getByRole("article")
+      .filter({ hasText: notebookTitle });
+    await expect(deckCard).toBeVisible();
+
+    // Phase 8 H17: from a filtered hub, the card's Repasar plays at once
+    // and the return keeps the filter.
+    await page.goto(`/flashcards?cuaderno=${notebookId}`);
+    await deckCard.getByRole("link", { name: /^Repasar/ }).click();
+    await expect(page.getByTestId("flashcard-player")).toBeVisible({
+      timeout: 15000,
+    });
+    await page.getByRole("link", { name: /Todos los mazos/ }).click();
+    await expect(page).toHaveURL(`/flashcards?cuaderno=${notebookId}`);
   });
 });

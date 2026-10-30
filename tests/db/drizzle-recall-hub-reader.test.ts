@@ -229,10 +229,26 @@ if (process.env.DATABASE_URL) {
         notebookTitle: "A biología celular",
         notebookColor: "green",
         sessions: [],
+        questionCount: 1,
+        latestQuestionAt: expect.any(Date),
       });
       expect(
         listed.find((page) => page.pageId === soloAbierta)?.sessions,
       ).toEqual([]);
+    });
+
+    // Phase 8 H17: the flat hub's "N preguntas" and its recency, in the
+    // same page query.
+    it("counts each page's active questions and dates the newest", async () => {
+      const listed = await reader.listRecallPages(owner.id);
+      const byId = new Map(listed.map((page) => [page.pageId, page]));
+
+      // Mitocondria: 2 + 3 answered questions and 1 of the open session.
+      expect(byId.get(mitocondria)?.questionCount).toBe(6);
+      expect(byId.get(mitocondria)?.latestQuestionAt).toBeInstanceOf(Date);
+      // Membrana's questions were archived: listed by its session, 0 left.
+      expect(byId.get(membrana)?.questionCount).toBe(0);
+      expect(byId.get(membrana)?.latestQuestionAt).toBeNull();
     });
 
     it("never lists another owner's pages", async () => {

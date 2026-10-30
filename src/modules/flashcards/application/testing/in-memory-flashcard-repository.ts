@@ -4,7 +4,10 @@ import type {
   FlashcardRepository,
 } from "../../domain/flashcard-repository";
 
-export type PageDirectoryEntry = Omit<DeckSummary, "pageId" | "count">;
+export type PageDirectoryEntry = Omit<
+  DeckSummary,
+  "pageId" | "count" | "latestCardAt" | "nextDueAt"
+>;
 
 // The fake has no pages table, so deck listing asks a directory for the
 // page's metadata; a page the directory does not know (missing or archived)
@@ -47,15 +50,23 @@ export class InMemoryFlashcardRepository implements FlashcardRepository {
   }
 
   async countByOwnerGroupedByPage(ownerId: string): Promise<DeckSummary[]> {
-    const counts = new Map<string, number>();
+    const counts = new Map<string, { count: number; latestCardAt: Date }>();
     for (const card of this.rows) {
       if (card.ownerId !== ownerId || card.archivedAt !== null) continue;
-      counts.set(card.pageId, (counts.get(card.pageId) ?? 0) + 1);
+      const entry = counts.get(card.pageId);
+      counts.set(card.pageId, {
+        count: (entry?.count ?? 0) + 1,
+        latestCardAt:
+          entry && entry.latestCardAt > card.createdAt
+            ? entry.latestCardAt
+            : card.createdAt,
+      });
     }
+    // No study items in memory: nothing is scheduled.
     const decks: DeckSummary[] = [];
-    for (const [pageId, count] of counts) {
+    for (const [pageId, entry] of counts) {
       const page = this.pageDirectory(pageId);
-      if (page) decks.push({ pageId, ...page, count });
+      if (page) decks.push({ pageId, ...page, ...entry, nextDueAt: null });
     }
     return decks.sort(
       (a, b) =>

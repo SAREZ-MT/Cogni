@@ -86,9 +86,11 @@ describe("DeckReview", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Repasar/ })).toBeInTheDocument();
     expect(screen.getByText("lista del mazo")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Biología/ })).toHaveAttribute(
+    // Phase 8 H17: no notebook level; back is the hub filtered by the
+    // deck's notebook.
+    expect(screen.getByRole("link", { name: /Flashcards/ })).toHaveAttribute(
       "href",
-      "/flashcards/nb",
+      "/flashcards?cuaderno=nb",
     );
   });
 
@@ -455,8 +457,9 @@ describe("DeckReview", () => {
     });
   });
 
-  // Phase 8 H16: generated from the hub's create dialog.
-  describe("opened from the hub (fromHub)", () => {
+  // Phase 8 H16/H17: opened from the hub (the create dialog or a card):
+  // the route hands the hub to return to and the query to keep.
+  describe("opened from the hub", () => {
     function renderFromHub() {
       render(
         <DeckReview
@@ -467,7 +470,8 @@ describe("DeckReview", () => {
           description="2 tarjetas"
           canReview
           autoStart
-          fromHub
+          backHref="/flashcards?cuaderno=nb2"
+          keepQuery="desde=hub&cuaderno=nb2"
         >
           <p>lista del mazo</p>
         </DeckReview>,
@@ -478,11 +482,11 @@ describe("DeckReview", () => {
       window.history.replaceState(
         null,
         "",
-        `/flashcards/nb/${PAGE}?repasar=1&desde=hub`,
+        `/flashcards/nb/${PAGE}?repasar=1&desde=hub&cuaderno=nb2`,
       );
     });
 
-    it("plays at once, keeps the hub marker and leads «Todos los mazos» back to the hub", async () => {
+    it("plays at once, keeps the hub marker and filter, and leads «Todos los mazos» back to the hub", async () => {
       actions.startFlashcardSessionAction.mockResolvedValue({
         ok: true,
         value: { sessionId: SESSION, cards: [card(1)] },
@@ -491,10 +495,10 @@ describe("DeckReview", () => {
       renderFromHub();
 
       expect(await screen.findByTestId("flashcard-player")).toBeInTheDocument();
-      expect(window.location.search).toBe("?desde=hub");
+      expect(window.location.search).toBe("?desde=hub&cuaderno=nb2");
       expect(
         screen.getByRole("link", { name: /Todos los mazos/ }),
-      ).toHaveAttribute("href", "/flashcards");
+      ).toHaveAttribute("href", "/flashcards?cuaderno=nb2");
     });
 
     it("leads the deck's back link to the hub", async () => {
@@ -508,7 +512,7 @@ describe("DeckReview", () => {
       expect(await screen.findByText("Estás al día")).toBeInTheDocument();
       expect(screen.getByRole("link", { name: /Flashcards/ })).toHaveAttribute(
         "href",
-        "/flashcards",
+        "/flashcards?cuaderno=nb2",
       );
     });
   });

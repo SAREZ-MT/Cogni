@@ -164,7 +164,9 @@ describe("CreateExamDialog", () => {
       pageId: "p-ribo",
       count: 15,
     });
-    expect(push).toHaveBeenCalledWith("/exams/nb-bio");
+    // Phase 8 H17: the notebook view is gone; the flat hub shows the new
+    // exam page among the never-examined ones.
+    expect(push).toHaveBeenCalledWith("/exams");
     expect(refresh).toHaveBeenCalled();
   });
 

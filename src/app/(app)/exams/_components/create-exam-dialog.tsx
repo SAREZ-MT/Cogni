@@ -166,7 +166,8 @@ export function CreateExamDialog({
         return;
       }
       setOpen(false);
-      router.push(`/exams/${notebookId}`);
+      // Phase 8 H17: back to the flat hub, where the new page now shows.
+      router.push("/exams");
       router.refresh();
     });
   }
@@ -180,6 +181,7 @@ export function CreateExamDialog({
           </EmptyStateCta>
         ) : (
           <TechniqueCreateTile
+            technique="exams"
             label="Crear examen"
             hint="Elige una página para el examen"
             data-testid="create-exam-tile"

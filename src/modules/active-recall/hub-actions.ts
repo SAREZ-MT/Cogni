@@ -36,8 +36,13 @@ export type RecallHubSessionView = Omit<RecallHubSessionEntry, "finishedAt"> & {
   finishedAt: string;
 };
 
-export type RecallHubPageView = Omit<RecallHubEntry, "sessions"> & {
+export type RecallHubPageView = Omit<
+  RecallHubEntry,
+  "sessions" | "latestQuestionAt"
+> & {
   sessions: RecallHubSessionView[];
+  // ISO instant of the newest active question; null without any.
+  latestQuestionAt: string | null;
 };
 
 export interface RecallHubView {
@@ -116,6 +121,7 @@ export async function listRecallHubAction(): Promise<
       averageMastery: result.value.averageMastery,
       pages: result.value.pages.map((page) => ({
         ...page,
+        latestQuestionAt: page.latestQuestionAt?.toISOString() ?? null,
         sessions: page.sessions.map((session) => ({
           ...session,
           finishedAt: session.finishedAt.toISOString(),

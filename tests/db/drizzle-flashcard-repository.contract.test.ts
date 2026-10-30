@@ -4,7 +4,13 @@ import { afterAll, describe, expect, it } from "vitest";
 import { runFlashcardRepositoryContract } from "@/modules/flashcards/application/testing/flashcard-repository.contract";
 import type { Flashcard } from "@/modules/flashcards/domain/flashcard";
 import { DrizzleFlashcardRepository } from "@/modules/flashcards/infrastructure/drizzle-flashcard-repository";
-import { flashcards, notebooks, pages, profiles } from "@/shared/db/schema";
+import {
+  flashcards,
+  notebooks,
+  pages,
+  profiles,
+  studyItems,
+} from "@/shared/db/schema";
 import { createTestDb } from "./helpers/test-db";
 import { createTestOwner, deleteTestOwner } from "./helpers/test-owner";
 
@@ -83,6 +89,49 @@ if (process.env.DATABASE_URL) {
       origin: "manual" as const,
       position: 0,
       ...overrides,
+    });
+
+    // Phase 8 H17: the flashcards hub says "repaso en X días" from the
+    // deck's earliest due card, in the same grouped read.
+    it("gives each deck the earliest due date of its active, not suspended cards", async () => {
+      const pageId = await newPage();
+      const repo = new DrizzleFlashcardRepository(db);
+      const at = (iso: string) => new Date(iso);
+      const cards = [0, 1, 2, 3].map((position) => ({
+        ...card(pageId, { position }),
+        generationId: null,
+        createdAt: at(`2026-10-0${position + 1}T10:00:00.000Z`),
+        updatedAt: at("2026-10-05T10:00:00.000Z"),
+        archivedAt: null,
+      }));
+      await repo.insertMany(cards);
+      const item = (
+        sourceId: string,
+        dueAt: string,
+        suspendedAt: Date | null = null,
+      ) => ({
+        id: randomUUID(),
+        ownerId: owner.id,
+        pageId,
+        kind: "flashcard" as const,
+        sourceId,
+        dueAt: at(dueAt),
+        suspendedAt,
+      });
+      await db.insert(studyItems).values([
+        item(cards[0]?.id ?? "", "2026-11-04T08:00:00.000Z"),
+        item(cards[1]?.id ?? "", "2026-11-02T08:00:00.000Z"),
+        // Suspended (an archived card's item) and archived cards never count.
+        item(cards[2]?.id ?? "", "2026-10-20T08:00:00.000Z", new Date()),
+        item(cards[3]?.id ?? "", "2026-10-21T08:00:00.000Z"),
+      ]);
+      await repo.archive(cards[3]?.id ?? "", owner.id, new Date());
+
+      const decks = await repo.countByOwnerGroupedByPage(owner.id);
+      const deck = decks.find((entry) => entry.pageId === pageId);
+      expect(deck?.count).toBe(3);
+      expect(deck?.nextDueAt).toEqual(at("2026-11-02T08:00:00.000Z"));
+      expect(deck?.latestCardAt).toEqual(at("2026-10-03T10:00:00.000Z"));
     });
 
     it("cascades: deleting a page deletes its flashcards", async () => {

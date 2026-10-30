@@ -24,6 +24,17 @@ const { listDueTodayAction } = vi.hoisted(() => ({
   listDueTodayAction: vi.fn(),
 }));
 vi.mock("@/modules/scheduling", () => ({ listDueTodayAction }));
+vi.mock("@/modules/identity", () => ({
+  getCurrentTimeZoneSetting: async () => ({
+    status: "ok",
+    timeZone: "America/Bogota",
+    chosen: true,
+  }),
+}));
+vi.mock("./_components/delete-deck", () => ({
+  DeleteDeckProvider: ({ children }: { children: unknown }) => children,
+  DeleteDeckMenuItem: () => null,
+}));
 vi.mock("@/modules/notebooks", () => ({
   COLOR_PALETTE: [
     "pink",
@@ -38,47 +49,61 @@ vi.mock("@/modules/notebooks", () => ({
 
 import FlashcardsHubPage from "./page";
 
+const NB_A = "11111111-1111-4111-8111-111111111111";
+const NB_B = "22222222-2222-4222-8222-222222222222";
+const NOW = new Date("2026-10-29T15:00:00.000Z");
+
+function hub(cuaderno?: string) {
+  return {
+    searchParams: Promise.resolve(cuaderno === undefined ? {} : { cuaderno }),
+  };
+}
+
 function deck(
   pageId: string,
   notebookId: string,
   notebookTitle: string,
   count: number,
-  color: string | null = "purple",
+  overrides: {
+    color?: string | null;
+    latestCardAt?: string;
+    nextDueAt?: string | null;
+  } = {},
 ) {
   return {
     pageId,
     notebookId,
     pageTitle: `Página ${pageId}`,
     notebookTitle,
-    notebookColor: color,
+    notebookColor: overrides.color === undefined ? "yellow" : overrides.color,
     count,
+    latestCardAt: overrides.latestCardAt ?? "2026-10-20T10:00:00.000Z",
+    nextDueAt: overrides.nextDueAt ?? null,
   };
 }
 
-function due(
-  pageId: string,
-  notebookId: string,
-  notebookTitle: string,
-  flashcard: number,
-  overrides: { examQuestion?: number; color?: string | null } = {},
-) {
+function due(pageId: string, notebookId: string, flashcard: number) {
   return {
     pageId,
     pageTitle: `Página ${pageId}`,
     notebookId,
-    notebookTitle,
-    notebookColor: overrides.color === undefined ? "purple" : overrides.color,
-    due: {
-      flashcard,
-      exam_question: overrides.examQuestion ?? 0,
-      recall_question: 0,
-    },
-    earliestDueAt: new Date("2026-10-04T08:00:00.000Z"),
+    notebookTitle: "x",
+    notebookColor: "yellow",
+    due: { flashcard, exam_question: 0, recall_question: 0 },
+    earliestDueAt: new Date("2026-10-29T08:00:00.000Z"),
   };
 }
 
-describe("FlashcardsHubPage (real data)", () => {
+const cards = () => screen.queryAllByRole("article");
+const titles = (root: HTMLElement = document.body) =>
+  within(root)
+    .queryAllByRole("heading", { level: 3 })
+    .map((heading) => heading.textContent);
+
+describe("FlashcardsHubPage (real data, flat since Phase 8 H17)", () => {
   beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(NOW);
     listDecksAction.mockReset();
     listDueTodayAction.mockReset();
     listDueTodayAction.mockResolvedValue({ ok: true, value: [] });
@@ -103,7 +128,7 @@ describe("FlashcardsHubPage (real data)", () => {
     vi.stubEnv("COGNI_DESIGN_PREVIEWS", "");
     listDecksAction.mockResolvedValue({ ok: true, value: [] });
 
-    render(await FlashcardsHubPage());
+    render(await FlashcardsHubPage(hub()));
 
     expect(
       screen.getByRole("heading", { name: "Flashcards" }),
@@ -111,150 +136,193 @@ describe("FlashcardsHubPage (real data)", () => {
     vi.unstubAllEnvs();
   });
 
-  it("groups the real decks by notebook with the summed card and due counts", async () => {
+  it("lists every deck as its own card, with the counts in the header", async () => {
     listDecksAction.mockResolvedValue({
       ok: true,
       value: [
-        deck("p1", "n1", "Biología", 8),
-        deck("p2", "n1", "Biología", 12),
-        deck("p3", "n2", "Cálculo", 10, "blue"),
+        deck("p1", NB_A, "Cuaderno A", 12),
+        deck("p2", NB_B, "Cuaderno B", 5),
+        deck("p3", NB_B, "Cuaderno B", 1),
+      ],
+    });
+
+    render(await FlashcardsHubPage(hub()));
+
+    expect(cards()).toHaveLength(3);
+    expect(
+      screen.getByText("18 tarjetas · 3 mazos · 2 cuadernos"),
+    ).toBeInTheDocument();
+    expect(
+      screen
+        .getAllByTestId("technique-item-metric")
+        .map((metric) => metric.textContent),
+    ).toEqual(["12 tarjetas", "5 tarjetas", "1 tarjeta"]);
+    // No notebook level any more: no link to /flashcards/{notebookId}.
+    for (const link of screen.getAllByRole("link")) {
+      expect(link.getAttribute("href")).not.toMatch(/^\/flashcards\/[^/?]+$/);
+    }
+  });
+
+  it("puts the decks due today first under PARA HOY with a filled Repasar that opens the review from the hub", async () => {
+    listDecksAction.mockResolvedValue({
+      ok: true,
+      value: [
+        deck("old", NB_A, "Cuaderno A", 4, {
+          latestCardAt: "2026-10-01T10:00:00.000Z",
+          nextDueAt: "2026-10-30T15:00:00.000Z",
+        }),
+        deck("due-old", NB_A, "Cuaderno A", 8, {
+          latestCardAt: "2026-10-02T10:00:00.000Z",
+        }),
+        deck("due-new", NB_B, "Cuaderno B", 6, {
+          latestCardAt: "2026-10-25T10:00:00.000Z",
+        }),
+        deck("new", NB_B, "Cuaderno B", 9, {
+          latestCardAt: "2026-10-26T10:00:00.000Z",
+          nextDueAt: "2026-11-01T15:00:00.000Z",
+        }),
       ],
     });
     listDueTodayAction.mockResolvedValue({
       ok: true,
-      value: [due("p1", "n1", "Biología", 2), due("p2", "n1", "Biología", 3)],
+      value: [due("due-old", NB_A, 3), due("due-new", NB_B, 5)],
     });
 
-    render(await FlashcardsHubPage());
+    render(await FlashcardsHubPage(hub()));
 
-    expect(screen.getByText("30 tarjetas · 2 cuadernos")).toBeInTheDocument();
-    const biologia = screen.getByRole("link", { name: /^Biología/ });
-    expect(biologia).toHaveAttribute("href", "/flashcards/n1");
-    expect(biologia).toHaveTextContent("20 tarjetas · 5 pendientes");
-    const calculo = screen.getByRole("link", { name: /^Cálculo/ });
-    expect(calculo).toHaveAttribute("href", "/flashcards/n2");
-    expect(calculo).toHaveTextContent("10 tarjetas · al día");
-    expect(screen.queryByText("Vista previa")).not.toBeInTheDocument();
-  });
-
-  it("lists Repasos de hoy: only pages with flashcards due, in the scheduler's order", async () => {
-    listDecksAction.mockResolvedValue({
-      ok: true,
-      value: [deck("p1", "n1", "Biología", 8), deck("p3", "n2", "Cálculo", 4)],
-    });
-    listDueTodayAction.mockResolvedValue({
-      ok: true,
-      value: [
-        due("p3", "n2", "Cálculo", 1, { color: "blue" }),
-        // Only exam questions due: not a flashcards review.
-        due("p9", "n2", "Cálculo", 0, { examQuestion: 2 }),
-        due("p1", "n1", "Biología", 4),
-      ],
-    });
-
-    render(await FlashcardsHubPage());
-
-    const list = screen.getByTestId("due-today");
-    const rows = within(list).getAllByTestId("due-today-row");
+    const dueGroup = screen.getByRole("region", { name: "Para hoy 2" });
+    const upToDate = screen.getByRole("region", { name: "Al día 2" });
+    expect(titles(dueGroup)).toEqual(["Página due-new", "Página due-old"]);
+    expect(titles(upToDate)).toEqual(["Página new", "Página old"]);
+    // The create tile leads the first group.
     expect(
-      rows.map((row) => within(row).getByRole("link").getAttribute("href")),
-    ).toEqual(["/flashcards/n2/p3?repasar=1", "/flashcards/n1/p1?repasar=1"]);
-    expect(
-      within(rows[0] as HTMLElement).getByText("1 pendiente"),
+      within(dueGroup).getByTestId("create-flashcards-tile"),
     ).toBeInTheDocument();
-    expect(
-      within(rows[1] as HTMLElement).getByText("4 pendientes"),
-    ).toBeInTheDocument();
-  });
+    expect(within(upToDate).queryByTestId("create-flashcards-tile")).toBeNull();
 
-  it("says you are up to date when no flashcard is due", async () => {
-    listDecksAction.mockResolvedValue({
-      ok: true,
-      value: [deck("p1", "n1", "Biología", 8)],
+    const review = within(dueGroup).getByRole("link", {
+      name: "Repasar: Página due-new",
     });
-
-    render(await FlashcardsHubPage());
-
-    expect(
-      within(screen.getByTestId("due-today")).getByText("Estás al día"),
-    ).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /^Biología/ })).toHaveTextContent(
-      "8 tarjetas · al día",
+    expect(review).toHaveAttribute(
+      "href",
+      `/flashcards/${NB_B}/due-new?repasar=1&desde=hub`,
     );
+    expect(review).toHaveAttribute("data-emphasis", "primary");
+    expect(within(dueGroup).getByText("5 para hoy")).toBeInTheDocument();
+
+    expect(
+      within(upToDate).getByRole("link", { name: "Repasar: Página new" }),
+    ).toHaveAttribute("data-emphasis", "soft");
+    expect(within(upToDate).getByText("repaso en 3 días")).toBeInTheDocument();
+    expect(within(upToDate).getByText("repaso mañana")).toBeInTheDocument();
+    expect(
+      within(upToDate).getAllByText("Al día", { selector: "span" }),
+    ).toHaveLength(2);
+    // The old "Repasos de hoy" list is gone.
+    expect(screen.queryByTestId("due-today")).toBeNull();
+  });
+
+  it("puts the create tile in the up-to-date group when nothing is due", async () => {
+    listDecksAction.mockResolvedValue({
+      ok: true,
+      value: [deck("p1", NB_A, "Cuaderno A", 4)],
+    });
+
+    render(await FlashcardsHubPage(hub()));
+
+    expect(screen.queryByRole("region", { name: /Para hoy/ })).toBeNull();
+    const upToDate = screen.getByRole("region", { name: "Al día 1" });
+    expect(
+      within(upToDate).getByTestId("create-flashcards-tile"),
+    ).toBeInTheDocument();
   });
 
   it("never claims a deck is up to date when the due list could not load", async () => {
     listDecksAction.mockResolvedValue({
       ok: true,
-      value: [deck("p1", "n1", "Biología", 8)],
+      value: [deck("p1", NB_A, "Cuaderno A", 4)],
     });
     listDueTodayAction.mockResolvedValue({
       ok: false,
       error: { code: "SCHEDULING_UNEXPECTED", message: "x" },
     });
 
-    render(await FlashcardsHubPage());
+    render(await FlashcardsHubPage(hub()));
+
+    expect(cards()).toHaveLength(1);
+    expect(screen.queryByText("Al día")).toBeNull();
+    expect(screen.queryByRole("region", { name: /Al día/ })).toBeNull();
+    expect(screen.getByTestId("create-flashcards-tile")).toBeInTheDocument();
+  });
+
+  it("filters by notebook on the server from ?cuaderno=, keeping the filter in the links", async () => {
+    listDecksAction.mockResolvedValue({
+      ok: true,
+      value: [
+        deck("p1", NB_A, "Cuaderno A", 4),
+        deck("p2", NB_B, "Cuaderno B", 5),
+        deck("p3", NB_B, "Cuaderno B", 6),
+      ],
+    });
+
+    render(await FlashcardsHubPage(hub(NB_B)));
+
+    const filter = screen.getByRole("navigation", {
+      name: "Filtrar por cuaderno",
+    });
+    expect(
+      within(filter)
+        .getAllByRole("link")
+        .map((link) => link.textContent),
+    ).toEqual(["Todos3", "Cuaderno A1", "Cuaderno B2"]);
+    expect(
+      within(filter).getByRole("link", { current: "page" }),
+    ).toHaveTextContent("Cuaderno B");
+    expect(cards()).toHaveLength(2);
+    expect(
+      screen.getByRole("link", { name: "Repasar: Página p2" }),
+    ).toHaveAttribute(
+      "href",
+      `/flashcards/${NB_B}/p2?repasar=1&desde=hub&cuaderno=${NB_B}`,
+    );
+    // The header keeps the totals.
+    expect(
+      screen.getByText("15 tarjetas · 3 mazos · 2 cuadernos"),
+    ).toBeInTheDocument();
+  });
+
+  it("says so inline, with the create tile, when the chosen notebook has no decks", async () => {
+    listDecksAction.mockResolvedValue({
+      ok: true,
+      value: [deck("p1", NB_A, "Cuaderno A", 4)],
+    });
+
+    render(await FlashcardsHubPage(hub(NB_B)));
+
+    expect(cards()).toHaveLength(0);
+    expect(
+      screen.getByText("Este cuaderno aún no tiene mazos."),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("create-flashcards-tile")).toBeInTheDocument();
+  });
+
+  it("offers the deck's actions in its menu", async () => {
+    listDecksAction.mockResolvedValue({
+      ok: true,
+      value: [deck("p1", NB_A, "Cuaderno A", 4)],
+    });
+
+    render(await FlashcardsHubPage(hub()));
 
     expect(
-      screen.getByText(
-        "No pudimos cargar tus repasos de hoy. Intenta de nuevo.",
-      ),
+      screen.getByRole("button", { name: "Acciones de Página p1" }),
     ).toBeInTheDocument();
-    expect(screen.queryByText(/al día/i)).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /^Biología/ })).toHaveTextContent(
-      "8 tarjetas",
-    );
-  });
-
-  it("uses singular forms for one card in one notebook", async () => {
-    listDecksAction.mockResolvedValue({
-      ok: true,
-      value: [deck("p1", "n1", "Biología", 1)],
-    });
-
-    render(await FlashcardsHubPage());
-
-    expect(screen.getByText("1 tarjeta · 1 cuaderno")).toBeInTheDocument();
-  });
-
-  it("falls back to a default tone for a notebook without a known color", async () => {
-    listDecksAction.mockResolvedValue({
-      ok: true,
-      value: [deck("p1", "n1", "Sin color", 2, null)],
-    });
-
-    render(await FlashcardsHubPage());
-
-    expect(screen.getByRole("link", { name: /Sin color/ })).toBeInTheDocument();
-  });
-
-  // Phase 8 H11: with decks listed, the dialog also opens from a tile
-  // fixed first in the grid; an unreadable limit passes as unknown.
-  it("puts the create tile first in the decks grid", async () => {
-    listDecksAction.mockResolvedValue({
-      ok: true,
-      value: [deck("p1", "n1", "Biología", 2)],
-    });
-    getGenerationStatusAction.mockResolvedValue({
-      ok: false,
-      error: { code: "X", message: "x" },
-    });
-
-    render(await FlashcardsHubPage());
-
-    const tile = screen.getByTestId("create-flashcards-tile");
-    expect(tile.parentElement?.firstElementChild).toBe(tile);
-    expect(CreateFromPageDialog).toHaveBeenCalledWith(
-      expect.objectContaining({ trigger: "tile", remaining: null }),
-      undefined,
-    );
-    expect(screen.queryByTestId("create-flashcards-cta")).toBeNull();
   });
 
   it("shows the empty state when there are no decks", async () => {
     listDecksAction.mockResolvedValue({ ok: true, value: [] });
 
-    render(await FlashcardsHubPage());
+    render(await FlashcardsHubPage(hub()));
 
     // Phase 8 H10: the illustrated empty state (fanned flashcards, gradient
     // headline) leads to the notebooks, where cards are generated.
@@ -308,7 +376,7 @@ describe("FlashcardsHubPage (real data)", () => {
       error: { code: "FLASHCARDS_UNEXPECTED", message: "x" },
     });
 
-    render(await FlashcardsHubPage());
+    render(await FlashcardsHubPage(hub()));
 
     expect(
       screen.getByText("No pudimos cargar tus mazos. Intenta de nuevo."),
