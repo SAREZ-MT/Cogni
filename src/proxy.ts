@@ -127,6 +127,6 @@ export async function proxy(request: NextRequest) {
 // "Anclaje del proxy matcher a rutas de aplicación").
 export const config = {
   matcher: [
-    "/((?!api/|monitoring(?:/|$)|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    "/((?!api/|monitoring(?:/|$)|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|mp4|vtt)$).*)",
   ],
 };

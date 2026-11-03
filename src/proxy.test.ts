@@ -46,6 +46,12 @@ describe("proxy matcher", () => {
     expect(matches("/favicon.ico")).toBe(false);
     expect(matches("/logo.svg")).toBe(false);
   });
+
+  it("skips the landing film, its captions and its poster", () => {
+    expect(matches("/landing/cogni-video.mp4")).toBe(false);
+    expect(matches("/landing/cogni-video.es.vtt")).toBe(false);
+    expect(matches("/landing/cogni-video-poster.webp")).toBe(false);
+  });
 });
 
 describe("proxy redirects for anonymous visitors", () => {

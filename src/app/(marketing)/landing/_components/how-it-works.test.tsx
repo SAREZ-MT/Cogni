@@ -1,5 +1,5 @@
-import { render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 import { HOW_IT_WORKS_STEPS, HowItWorks } from "./how-it-works";
 
 globalThis.IntersectionObserver ??= class {
@@ -45,11 +45,38 @@ describe("HowItWorks", () => {
     expect(HOW_IT_WORKS_STEPS).toHaveLength(3);
   });
 
-  it("says plainly that the video is still to come", () => {
-    render(<HowItWorks />);
+  it("loads the product video lazily behind its poster, with Spanish captions", () => {
+    const { container } = render(<HowItWorks />);
+    const video = container.querySelector("video");
+    expect(video).not.toBeNull();
+    expect(video).toHaveAttribute("aria-label", "Video: así funciona Cogni");
+    expect(video).toHaveAttribute("poster", "/landing/cogni-video-poster.webp");
+    expect(video).toHaveAttribute("preload", "none");
+    expect(video).toHaveAttribute("playsinline");
+    expect(video).not.toHaveAttribute("controls");
+    expect(video?.querySelector("source")).toHaveAttribute(
+      "src",
+      "/landing/cogni-video.mp4",
+    );
+    const track = video?.querySelector("track");
+    expect(track).toHaveAttribute("src", "/landing/cogni-video.es.vtt");
+    expect(track).toHaveAttribute("srclang", "es");
+    expect(track).toHaveAttribute("kind", "captions");
+    expect(screen.queryByText("Video próximamente")).toBeNull();
+  });
+
+  it("plays the video with its controls once the play button is pressed", () => {
+    const play = vi
+      .spyOn(HTMLMediaElement.prototype, "play")
+      .mockResolvedValue(undefined);
+    const { container } = render(<HowItWorks />);
+    fireEvent.click(screen.getByRole("button", { name: "Reproducir video" }));
+    expect(play).toHaveBeenCalledOnce();
+    expect(container.querySelector("video")).toHaveAttribute("controls");
     expect(
-      screen.getByRole("img", { name: "Video de Cogni, próximamente" }),
-    ).toHaveTextContent("Video próximamente");
+      screen.queryByRole("button", { name: "Reproducir video" }),
+    ).toBeNull();
+    play.mockRestore();
   });
 
   it("tints its headline object yellow", () => {
