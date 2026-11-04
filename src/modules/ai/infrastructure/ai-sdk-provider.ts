@@ -12,6 +12,8 @@ export type GenerateObjectFn = (options: {
   prompt: string;
   temperature: number;
   maxOutputTokens?: number;
+  maxRetries: number;
+  abortSignal?: AbortSignal;
 }) => Promise<{
   object: unknown;
   usage: {
@@ -49,6 +51,11 @@ export function createAiSdkProvider(options: {
         prompt: request.prompt,
         temperature: request.temperature,
         maxOutputTokens: request.maxOutputTokens,
+        // generateStructured owns retries (one counted, audited attempt per
+        // provider); SDK retries would turn one attempt into up to three
+        // uncounted HTTP calls.
+        maxRetries: 0,
+        abortSignal: request.signal,
       });
       return {
         object: result.object,

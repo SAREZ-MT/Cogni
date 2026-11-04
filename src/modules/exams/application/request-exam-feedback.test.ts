@@ -84,7 +84,14 @@ function makeAi(outcome: AiOutcome = "ok") {
       calls.push(input);
       if (outcome === "fail") return err(new AiGenerationFailedError("gen-x"));
       if (outcome === "throw") throw new Error("network down");
-      if (outcome === "hang") return new Promise(() => {});
+      // Like generateStructured: a stuck call ends only through the signal.
+      if (outcome === "hang") {
+        return new Promise((_, reject) => {
+          input.signal?.addEventListener("abort", () =>
+            reject(input.signal?.reason),
+          );
+        });
+      }
       const object = outcome === "ok" ? FEEDBACK_OBJECT : outcome.object;
       return ok({ object, generation: generation() });
     },
@@ -454,6 +461,9 @@ describe("requestExamFeedback", () => {
     expect(await fx.uow.repos.sessions.findById("s-fail", OWNER)).toEqual(
       session,
     );
+    if (outcome === "hang") {
+      expect(fx.ai.calls[0].signal?.aborted).toBe(true);
+    }
   });
 
   it("stores failed feedback without calling the AI when the daily limit is reached, and never consumes a unit", async () => {

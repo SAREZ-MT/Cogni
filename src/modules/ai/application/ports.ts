@@ -12,6 +12,9 @@ export interface GenerateObjectRequest<T> {
   readonly prompt: string;
   readonly temperature: number;
   readonly maxOutputTokens?: number;
+  // Cancels the model call. Adapters forward it to the transport so an
+  // aborted attempt stops instead of running on in the background.
+  readonly signal?: AbortSignal;
 }
 
 export interface GenerateObjectResponse {

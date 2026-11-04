@@ -168,6 +168,48 @@ describe("retry once on failure", () => {
   });
 });
 
+describe("timeouts and cancellation", () => {
+  it("hands each attempt its own abort signal", async () => {
+    const t = setup({ a: [{ object: GOOD }] });
+    await generateStructured(input(), t.deps, OWNER);
+    expect(t.fakes.get("a")?.calls[0].signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("aborts a provider that never answers and tries the next one", async () => {
+    const t = setup({ a: [{ hang: true }], b: [{ object: GOOD }] });
+    const r = await generateStructured(input({ timeoutMs: 20 }), t.deps, OWNER);
+    expect(r.ok && r.value.generation.provider).toBe("b");
+    expect(t.fakes.get("a")?.calls[0].signal?.aborted).toBe(true);
+    const rows = t.generations.all();
+    expect(rows.map((g) => [g.provider, g.status, g.error])).toEqual([
+      ["a", "failed", "provider_error: TimeoutError"],
+      ["b", "done", null],
+    ]);
+    expect(t.quota.recorded).toHaveLength(2);
+    expect((await t.breakers.read("a")).consecutiveFailures).toBe(1);
+  });
+
+  it("stops without another provider when the caller aborts", async () => {
+    const t = setup({ a: [{ hang: true }], b: [{ object: GOOD }] });
+    const r = await generateStructured(
+      input({ timeoutMs: 5_000, signal: AbortSignal.timeout(20) }),
+      t.deps,
+      OWNER,
+    );
+    expect(!r.ok && r.error.code).toBe(AI_ERROR.GENERATION_FAILED);
+    expect(t.fakes.get("b")?.calls).toHaveLength(0);
+    const rows = t.generations.all();
+    expect(rows.map((g) => [g.provider, g.status])).toEqual([["a", "failed"]]);
+    if (!r.ok) {
+      expect((r.error as { generationId?: string }).generationId).toBe(
+        rows[0].id,
+      );
+    }
+    // The caller gave up; the provider is not blamed for it.
+    expect(await t.breakers.read("a")).toEqual(initialBreakerState);
+  });
+});
+
 describe("circuit breaker", () => {
   it("opens the breaker on the third consecutive failure", async () => {
     const t = setup({ a: [{ invalid: true }], b: [{ object: GOOD }] });

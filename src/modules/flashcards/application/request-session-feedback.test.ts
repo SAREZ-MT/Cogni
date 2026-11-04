@@ -146,7 +146,14 @@ function makeAi(outcome: AiOutcome = "ok") {
         return err(new DomainError("AI_NO_PROVIDER_AVAILABLE", "none"));
       }
       if (outcome === "throw") throw new Error("network down");
-      if (outcome === "hang") return new Promise(() => {});
+      // Like generateStructured: a stuck call ends only through the signal.
+      if (outcome === "hang") {
+        return new Promise((_, reject) => {
+          input.signal?.addEventListener("abort", () =>
+            reject(input.signal?.reason),
+          );
+        });
+      }
       const object = outcome === "ok" ? FEEDBACK_OBJECT : outcome.object;
       return ok({ object, generation: generation() });
     },
@@ -638,6 +645,7 @@ describe("requestSessionFeedback", () => {
       generationId: null,
     });
     expect(fx.feedback.rows.get(SESSION)?.status).toBe("failed");
+    expect(fx.ai.calls[0].signal?.aborted).toBe(true);
   });
 
   describe("a pending row left by an earlier request", () => {
