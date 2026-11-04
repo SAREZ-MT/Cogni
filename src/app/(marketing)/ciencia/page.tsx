@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { shareMetadata } from "@/app/_lib/share-metadata";
 import { getCurrentUser } from "@/modules/identity";
 import { PageHeader } from "../_components/page-header";
 import { SiteFooter } from "../_components/site-footer";
@@ -7,10 +8,18 @@ import { HeadlineObject } from "../landing/_components/headline-object";
 import { LandingNav } from "../landing/_components/landing-nav";
 import { ConceptIndex, ScienceConcepts } from "./_components/science-concepts";
 
+const TITLE = "La ciencia detrás de Cogni · Cogni";
+const DESCRIPTION =
+  "Seis ideas de la investigación sobre cómo se aprende, qué hace Cogni con cada una y sus fuentes.";
+
 export const metadata: Metadata = {
-  title: "La ciencia detrás de Cogni · Cogni",
-  description:
-    "Seis ideas de la investigación sobre cómo se aprende, qué hace Cogni con cada una y sus fuentes.",
+  title: TITLE,
+  description: DESCRIPTION,
+  ...shareMetadata({
+    title: TITLE,
+    description: DESCRIPTION,
+    path: "/ciencia",
+  }),
 };
 
 // Public page (proxy OPEN_PATHS), Pencil frame "Página · La ciencia detrás

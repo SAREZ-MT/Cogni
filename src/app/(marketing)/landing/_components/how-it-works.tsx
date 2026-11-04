@@ -2,7 +2,7 @@
 
 import { Play } from "@phosphor-icons/react/dist/csr/Play";
 import { motion, useScroll, useTransform } from "motion/react";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { AsciiTexture } from "./ascii-texture";
 import { type HeadlineImage, HeadlineObject } from "./headline-object";
 
@@ -34,13 +34,19 @@ const RISE = {
 // the hero's violet night down into the paper (a gradient plus a character
 // texture that dithers away), so the page reads as one continuous scene.
 // Then a huge sans headline with one serif italic keyword and a 3D object
-// set between its words, the slot the product video will fill (it says so
-// plainly; nothing imitates real footage), and the three steps.
+// set between its words, the product film (poster first, loaded on play),
+// and the three steps.
 //
 // "repaso" is the italic keyword: it is where the sentence lands and what
 // Cogni is for, the same role "estudias." plays in the hero.
 export function HowItWorks({ image }: { image?: HeadlineImage }) {
   const slot = useRef<HTMLDivElement>(null);
+  const video = useRef<HTMLVideoElement>(null);
+  const [started, setStarted] = useState(false);
+  const start = () => {
+    setStarted(true);
+    void video.current?.play();
+  };
   const { scrollYProgress } = useScroll({
     target: slot,
     offset: ["start end", "center center"],
@@ -107,26 +113,38 @@ export function HowItWorks({ image }: { image?: HeadlineImage }) {
 
           <motion.div
             ref={slot}
-            role="img"
-            aria-label="Video de Cogni, próximamente"
-            className="lp-video-slot lp-video-grow relative mt-14 flex aspect-[4/3] w-full items-center justify-center overflow-hidden rounded-[20px] sm:aspect-video md:mt-20 md:rounded-[28px]"
+            className="lp-video-slot lp-video-grow relative mt-14 flex aspect-video w-full items-center justify-center overflow-hidden rounded-[20px] md:mt-20 md:rounded-[28px]"
             style={{ transform }}
           >
-            <AsciiTexture
-              variant="field"
-              seed={11}
-              className="absolute inset-0 size-full font-(family-name:--lp-font-mono)"
-            />
-            <span className="lp-video-play relative flex size-20 items-center justify-center rounded-full md:size-[104px]">
-              <Play weight="fill" className="ml-1 size-7 md:size-9" />
-            </span>
-            <span className="absolute inset-x-0 bottom-5 flex items-center justify-center gap-2 font-(family-name:--lp-font-mono) text-(--lp-on-dark-2) text-[11px] uppercase tracking-[0.16em] md:bottom-8 md:text-[12px]">
-              <span
-                aria-hidden="true"
-                className="size-1.5 rounded-full bg-(--lp-violet-400)"
+            {/* Nothing downloads until the visitor presses play (preload
+                none); the poster is the film's own reveal frame. */}
+            <video
+              ref={video}
+              aria-label="Video: así funciona Cogni"
+              poster="/landing/cogni-video-poster.webp"
+              preload="none"
+              playsInline
+              controls={started}
+              className="absolute inset-0 size-full object-cover"
+            >
+              <source src="/landing/cogni-video.mp4" type="video/mp4" />
+              <track
+                kind="captions"
+                src="/landing/cogni-video.es.vtt"
+                srcLang="es"
+                label="Español"
               />
-              Video próximamente
-            </span>
+            </video>
+            {started ? null : (
+              <button
+                type="button"
+                aria-label="Reproducir video"
+                onClick={start}
+                className="lp-video-play relative flex size-20 cursor-pointer items-center justify-center rounded-full md:size-[104px]"
+              >
+                <Play weight="fill" className="ml-1 size-7 md:size-9" />
+              </button>
+            )}
           </motion.div>
 
           <ol className="mt-14 grid gap-9 md:mt-20 md:grid-cols-3 md:gap-10">

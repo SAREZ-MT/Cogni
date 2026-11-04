@@ -1,14 +1,23 @@
 import type { Metadata } from "next";
+import { shareMetadata } from "@/app/_lib/share-metadata";
 import { getCurrentUser } from "@/modules/identity";
 import { PageHeader } from "../_components/page-header";
 import { SiteFooter } from "../_components/site-footer";
 import { LandingNav } from "../landing/_components/landing-nav";
 import { CreditsList } from "./_components/credits-list";
 
+const TITLE = "Créditos · Cogni";
+const DESCRIPTION =
+  "Los recursos de terceros que usa Cogni, con su autor y su licencia.";
+
 export const metadata: Metadata = {
-  title: "Créditos · Cogni",
-  description:
-    "Los recursos de terceros que usa Cogni, con su autor y su licencia.",
+  title: TITLE,
+  description: DESCRIPTION,
+  ...shareMetadata({
+    title: TITLE,
+    description: DESCRIPTION,
+    path: "/creditos",
+  }),
 };
 
 // Public page (proxy OPEN_PATHS), Pencil frame "Página · Créditos"

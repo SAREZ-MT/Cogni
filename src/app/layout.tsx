@@ -6,6 +6,7 @@ import {
   Inter,
   JetBrains_Mono,
 } from "next/font/google";
+import { SITE_NAME, shareMetadata } from "./_lib/share-metadata";
 import "./globals.css";
 
 const dmSans = DM_Sans({
@@ -44,9 +45,23 @@ const caveat = Caveat({
   preload: false,
 });
 
+const ROOT_TITLE = "Cogni · Recuerda lo que estudias";
+const ROOT_DESCRIPTION =
+  "Convierte tus apuntes en flashcards, exámenes y preguntas de recuperación activa, y repasa cada día lo que estás a punto de olvidar.";
+
 export const metadata: Metadata = {
-  title: "Cogni",
-  description: "Tu plataforma de estudio con repaso espaciado.",
+  // Absolute URLs for og:image, og:url and canonical links. Read directly
+  // (not through clientEnv) so a missing variable never breaks rendering.
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
+  ),
+  title: ROOT_TITLE,
+  description: ROOT_DESCRIPTION,
+  applicationName: SITE_NAME,
+  ...shareMetadata({
+    title: ROOT_TITLE,
+    description: ROOT_DESCRIPTION,
+  }),
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

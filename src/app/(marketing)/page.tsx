@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { shareMetadata } from "@/app/_lib/share-metadata";
 import { SiteFooter } from "./_components/site-footer";
 import { Closing } from "./landing/_components/closing";
 import { Comparison } from "./landing/_components/comparison";
@@ -9,10 +10,14 @@ import { LandingNav } from "./landing/_components/landing-nav";
 import { Pillars } from "./landing/_components/pillars";
 import { Techniques } from "./landing/_components/techniques";
 
+const TITLE = "Cogni · Recuerda lo que estudias";
+const DESCRIPTION =
+  "Cogni convierte tus apuntes en flashcards, exámenes y preguntas de recuperación activa, y te dice qué repasar cada día.";
+
 export const metadata: Metadata = {
-  title: "Cogni · Recuerda lo que estudias",
-  description:
-    "Cogni convierte tus apuntes en flashcards, exámenes y preguntas de recuperación activa, y te dice qué repasar cada día.",
+  title: TITLE,
+  description: DESCRIPTION,
+  ...shareMetadata({ title: TITLE, description: DESCRIPTION, path: "/" }),
 };
 
 // Public landing at the domain root (proxy OPEN_PATHS; the proxy sends a
