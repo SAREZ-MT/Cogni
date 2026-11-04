@@ -115,7 +115,9 @@ export function useAutosave({
       if (result.ok) {
         versionRef.current = result.value.version;
         setSavedContent(sent);
-        setStatus("saved");
+        // A change made during this save is still only in this tab, so
+        // "guardado" must wait for the save that carries it.
+        setStatus(pendingRef.current ? "pending" : "saved");
       } else if (
         isDomainErrorLike(result.error) &&
         result.error.code === PAGE_VERSION_CONFLICT_CODE

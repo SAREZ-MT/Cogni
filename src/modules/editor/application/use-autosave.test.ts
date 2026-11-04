@@ -95,6 +95,49 @@ describe("useAutosave", () => {
     });
   });
 
+  // The earlier save finishing says nothing about the newer change: showing
+  // "guardado" here tells the reader it is safe to leave while that change
+  // is still only in this tab (pptx-import.spec.ts lost it on a reload).
+  it("does not report saved while a change made during the save is still pending", async () => {
+    const port = new FakeSavePagePort({ content: doc("v1"), version: 1 });
+    port.holdNextSaves(true);
+    const { result } = renderHook(() =>
+      useAutosave({
+        pageId: PAGE_ID,
+        initialContent: doc("v1"),
+        initialVersion: 1,
+        port,
+      }),
+    );
+
+    act(() => result.current.setContent(doc("first")));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+    expect(result.current.status).toBe("saving");
+
+    // Inside the debounce: the timer of this change has not fired yet.
+    act(() => result.current.setContent(doc("latest")));
+    await act(async () => {
+      port.resolveNextSave({ ok: true, value: { version: 2 } });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(port.saveCalls).toHaveLength(1);
+    expect(result.current.status).toBe("pending");
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+    expect(port.saveCalls).toHaveLength(2);
+    await act(async () => {
+      port.resolveNextSave({ ok: true, value: { version: 3 } });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(result.current.status).toBe("saved");
+  });
+
   // Scenario "Fallo de red" (specs/editor/spec.md): the port may reject
   // instead of resolving to a Result when the transport itself fails.
   it("recovers from a rejected save: error state, content kept, next pause retries", async () => {
