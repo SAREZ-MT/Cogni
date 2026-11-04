@@ -1,9 +1,12 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   type AiGeneration,
   AiGenerationFailedError,
+  type GenerateStructuredDeps,
   type GenerateStructuredInput,
   type GenerationRateLimit,
+  generateStructured,
+  initialBreakerState,
 } from "@/modules/ai";
 import {
   type FlashcardSession,
@@ -21,6 +24,7 @@ import { DomainError } from "@/shared/kernel/domain-error";
 import { err, ok, type Result } from "@/shared/kernel/result";
 import { createFlashcard } from "../domain";
 import {
+  FEEDBACK_AI_TIMEOUT_MS,
   type RequestSessionFeedbackDeps,
   requestSessionFeedback,
   STALE_PENDING_MS,
@@ -129,6 +133,7 @@ type AiOutcome =
   | "error"
   | "throw"
   | "hang"
+  | "stall"
   | { object: unknown };
 
 function makeAi(outcome: AiOutcome = "ok") {
@@ -154,9 +159,63 @@ function makeAi(outcome: AiOutcome = "ok") {
           );
         });
       }
+      // A call that ignores the signal entirely (a stalled quota, breaker
+      // or audit store inside generateStructured).
+      if (outcome === "stall") return new Promise(() => {});
       const object = outcome === "ok" ? FEEDBACK_OBJECT : outcome.object;
       return ok({ object, generation: generation() });
     },
+  };
+}
+
+// The real generateStructured over two providers: the first never answers
+// and ignores the abort signal, the second answers FEEDBACK_OBJECT.
+function stuckThenHealthyAi() {
+  const answered: string[] = [];
+  const provider = (id: string, stuck: boolean) => ({
+    id,
+    model: `${id}-model`,
+    async generateObject() {
+      if (stuck) return new Promise<never>(() => {});
+      answered.push(id);
+      return {
+        object: FEEDBACK_OBJECT,
+        usage: { inputTokens: 10, outputTokens: 20 },
+        latencyMs: 5,
+      };
+    },
+  });
+  let ids = 0;
+  const deps: GenerateStructuredDeps = {
+    entries: ["stuck", "healthy"].map((id, n) => ({
+      id,
+      model: `${id}-model`,
+      capabilities: ["session_feedback"],
+      rpm: 5,
+      rpd: 10,
+      priority: n + 1,
+    })),
+    providers: new Map([
+      ["stuck", provider("stuck", true)],
+      ["healthy", provider("healthy", false)],
+    ]),
+    quota: {
+      readUsage: async () => ({ day: 0, minute: 0 }),
+      recordCall: async () => {},
+    },
+    breakers: { read: async () => initialBreakerState, write: async () => {} },
+    generations: {
+      create: async () => {},
+      update: async () => {},
+      findById: async () => null,
+    },
+    clock: createFixedClock(NOW),
+    ids: { next: () => `gen-${++ids}` },
+  };
+  return {
+    answered,
+    generateStructured: (input: GenerateStructuredInput, ownerId: string) =>
+      generateStructured(input, deps, ownerId),
   };
 }
 
@@ -627,6 +686,73 @@ describe("requestSessionFeedback", () => {
 
       expect(result.ok && result.value).toEqual(settled());
       expect(fx.feedback.rows.get(SESSION)?.status).toBe("failed");
+    });
+  });
+
+  // Review F4: each of generateStructured's two provider attempts gets half
+  // of the feedback budget.
+  it("gives each provider attempt half of the feedback budget", async () => {
+    await gradedSession();
+
+    await requestSessionFeedback({ sessionId: SESSION }, fx.deps, OWNER);
+
+    expect(fx.ai.calls[0].timeoutMs).toBe(25);
+    expect(fx.ai.calls[0].signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("produces feedback from the second provider when the first one is stuck", async () => {
+    await gradedSession();
+    const ai = stuckThenHealthyAi();
+
+    const result = await requestSessionFeedback(
+      { sessionId: SESSION },
+      { ...fx.deps, ai, aiTimeoutMs: 200 },
+      OWNER,
+    );
+
+    expect(result.ok && result.value).toMatchObject({
+      status: "done",
+      content: FEEDBACK_OBJECT,
+      generationId: "gen-2",
+    });
+    expect(ai.answered).toEqual(["healthy"]);
+  });
+
+  describe("with fake timers", () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    // Review F3: the whole call is bounded, not only the provider attempts.
+    it("stores failed feedback at the deadline when the AI call ignores the signal", async () => {
+      fx = build({ ai: "stall" });
+      fx.deps.aiTimeoutMs = undefined;
+      await gradedSession();
+      let settled = false;
+      const request = requestSessionFeedback(
+        { sessionId: SESSION },
+        fx.deps,
+        OWNER,
+      ).finally(() => {
+        settled = true;
+      });
+
+      await vi.advanceTimersByTimeAsync(FEEDBACK_AI_TIMEOUT_MS - 1);
+      expect(settled).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+
+      expect(settled).toBe(true);
+      const result = await request;
+      expect(result.ok && result.value).toMatchObject({
+        status: "failed",
+        generationId: null,
+      });
+      expect(fx.feedback.rows.get(SESSION)?.status).toBe("failed");
+      expect(fx.ai.calls[0].timeoutMs).toBe(FEEDBACK_AI_TIMEOUT_MS / 2);
+      expect(fx.ai.calls[0].signal?.aborted).toBe(true);
     });
   });
 

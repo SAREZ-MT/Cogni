@@ -55,6 +55,30 @@ export interface RequestSessionFeedbackDeps {
 // first provider still leaves time for the second.
 export const FEEDBACK_AI_TIMEOUT_MS = 25_000;
 
+// Runs `call` with a signal that aborts after `ms` and settles at that
+// deadline even when the call ignores the signal (review F3): the provider
+// attempts honour it, but a stalled quota, breaker or audit write inside
+// generateStructured would otherwise hold the student past the budget.
+// Rejects with the abort reason at the deadline.
+function withDeadline<T>(
+  ms: number,
+  call: (signal: AbortSignal) => Promise<T>,
+): Promise<T> {
+  const controller = new AbortController();
+  // Started before the timer, so a call that throws at once leaves none.
+  const result = call(controller.signal);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      controller.abort(
+        new DOMException("The feedback deadline passed", "TimeoutError"),
+      );
+      reject(controller.signal.reason);
+    }, ms);
+  });
+  return Promise.race([result, deadline]).finally(() => clearTimeout(timer));
+}
+
 // A "pending" row untouched for this long belongs to a request that died
 // (function killed, crash) or hung: the next request may reclaim it. Well
 // above FEEDBACK_AI_TIMEOUT_MS plus the surrounding reads and writes, so a
@@ -251,16 +275,18 @@ export async function requestSessionFeedback(
         struggled: await struggledFronts(logs, deps, ownerId),
       });
       const aiTimeoutMs = deps.aiTimeoutMs ?? FEEDBACK_AI_TIMEOUT_MS;
-      generated = await deps.ai.generateStructured(
-        {
-          purpose: "session_feedback",
-          pageId: session.pageId,
-          promptVersion: SESSION_FEEDBACK_PROMPT_VERSION,
-          ...prompt,
-          timeoutMs: Math.floor(aiTimeoutMs / 2),
-          signal: AbortSignal.timeout(aiTimeoutMs),
-        },
-        ownerId,
+      generated = await withDeadline(aiTimeoutMs, (signal) =>
+        deps.ai.generateStructured(
+          {
+            purpose: "session_feedback",
+            pageId: session.pageId,
+            promptVersion: SESSION_FEEDBACK_PROMPT_VERSION,
+            ...prompt,
+            timeoutMs: Math.floor(aiTimeoutMs / 2),
+            signal,
+          },
+          ownerId,
+        ),
       );
     } catch {
       return fail(null);

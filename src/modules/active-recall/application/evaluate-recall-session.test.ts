@@ -589,6 +589,70 @@ describe("evaluateRecallSession", () => {
     expect([...reviews.recorded]).toEqual(["q-1", "q-2"]);
   });
 
+  // Review F2: the daily limit counts sessions, so "Reintentar" on a partial
+  // session the model already evaluated in part costs nothing more.
+  it("charges one unit per session: a retry after a partial first run charges nothing", async () => {
+    const { uow, ai, limiter, run } = await setup([
+      { questionId: "q-1", text: "ATP", self: 3 },
+      { questionId: "q-2", text: "OMITE", self: 3 },
+    ]);
+    await run();
+    expect(limiter.checks).toBe(1);
+    const original = ai.generateStructured.bind(ai);
+    ai.generateStructured = (input) =>
+      original({ ...input, prompt: input.prompt.replace("OMITE", "ATP") });
+    await uow.repos.answers.requeueFailed(SESSION, OWNER, EVAL_AT);
+
+    const retried = await run();
+
+    expect(retried.ok && retried.value.evaluated).toBe(1);
+    expect(ai.calls).toHaveLength(2);
+    expect(limiter.checks).toBe(1);
+    expect(limiter.remaining).toBe(59);
+  });
+
+  it("retries a session already charged even once the daily limit is spent", async () => {
+    const limiter = new StubLimiter(1);
+    const { uow, ai, run } = await setup(
+      [
+        { questionId: "q-1", text: "ATP", self: 3 },
+        { questionId: "q-2", text: "OMITE", self: 3 },
+      ],
+      { limiter },
+    );
+    await run();
+    expect(limiter.remaining).toBe(0);
+    const original = ai.generateStructured.bind(ai);
+    ai.generateStructured = (input) =>
+      original({ ...input, prompt: input.prompt.replace("OMITE", "ATP") });
+    await uow.repos.answers.requeueFailed(SESSION, OWNER, EVAL_AT);
+
+    const retried = await run();
+
+    expect(retried.ok && retried.value).toMatchObject({
+      evaluated: 1,
+      failed: 0,
+    });
+    expect(limiter.checks).toBe(1);
+  });
+
+  it("charges a retry whose first run evaluated nothing with the model", async () => {
+    const { uow, ai, limiter, run } = await setup([
+      { questionId: "q-1", text: "FALLA", self: 3 },
+      { questionId: "q-2", text: "", self: 0 },
+    ]);
+    await run();
+    expect(limiter.checks).toBe(0);
+    const original = ai.generateStructured.bind(ai);
+    ai.generateStructured = (input) =>
+      original({ ...input, prompt: input.prompt.replace("FALLA", "ATP") });
+    await uow.repos.answers.requeueFailed(SESSION, OWNER, EVAL_AT);
+
+    await run();
+
+    expect(limiter.checks).toBe(1);
+  });
+
   it("leaves an open session alone", async () => {
     const { uow, ai, run } = await setup(
       [{ questionId: "q-1", text: "ATP", self: 3 }],

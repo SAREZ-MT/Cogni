@@ -176,19 +176,22 @@ function resolveWithoutModel(
 // one unit is consumed only when at least one answer is done, so a failed
 // call costs nothing. A reached limit fails the answers (never leaves them
 // pending): the session ends partial and "Reintentar" evaluates them once
-// the window resets.
+// the window resets. A session already `charged` (an earlier run consumed
+// its unit) is neither peeked nor charged again (review F2).
 async function evaluateWithModel(
   pending: readonly ModelAnswer[],
-  context: { plainText: string; pageId: string },
+  context: { plainText: string; pageId: string; charged: boolean },
   deps: EvaluateRecallSessionDeps,
   ownerId: string,
 ): Promise<Map<string, RecallEvaluationResult>> {
   const failAll = (result: RecallEvaluationResult) =>
     new Map(pending.map(({ answer }) => [answer.id, result]));
 
-  const limit = await deps.limiter.peek(ownerId);
-  if (!limit.allowed) {
-    return failAll(failed(AI_ERROR.DAILY_LIMIT_REACHED, null, limit.resetAt));
+  if (!context.charged) {
+    const limit = await deps.limiter.peek(ownerId);
+    if (!limit.allowed) {
+      return failAll(failed(AI_ERROR.DAILY_LIMIT_REACHED, null, limit.resetAt));
+    }
   }
 
   const fragmentCap = Math.floor(deps.tokenCap / pending.length);
@@ -248,7 +251,10 @@ async function evaluateWithModel(
     );
   }
 
-  if ([...results.values()].some((result) => result.status === "done")) {
+  if (
+    !context.charged &&
+    [...results.values()].some((result) => result.status === "done")
+  ) {
     try {
       const consumed = await deps.limiter.check(ownerId);
       if (!consumed.allowed) {
@@ -347,6 +353,23 @@ async function storeSessionStatus(
   return written.ok ? written.value : session;
 }
 
+// Whether an earlier run already consumed the session's unit, read from the
+// stored answers: a unit is consumed exactly when a run leaves an answer
+// done by the model, and only a model evaluation keeps a generation id on a
+// done answer (a skipped one has none). The answers this run claimed are
+// still pending, so every done one is an earlier run's.
+async function alreadyCharged(
+  session: RecallSession,
+  deps: EvaluateRecallSessionDeps,
+  ownerId: string,
+): Promise<boolean> {
+  const answers = await deps.answers.listBySession(session.id, ownerId);
+  return answers.some(
+    (answer) =>
+      answer.evaluationStatus === "done" && answer.generationId !== null,
+  );
+}
+
 // The asynchronous evaluation of a finished session (§8.5, SAD §10.4, CU-09),
 // run after the finish through `after()` and again by "Reintentar". It
 // claims the session's pending answers (a claim older than the lease is
@@ -420,7 +443,11 @@ export async function evaluateRecallSession(
       try {
         const evaluated = await evaluateWithModel(
           pending,
-          { plainText, pageId: session.pageId },
+          {
+            plainText,
+            pageId: session.pageId,
+            charged: await alreadyCharged(session, deps, ownerId),
+          },
           deps,
           ownerId,
         );
