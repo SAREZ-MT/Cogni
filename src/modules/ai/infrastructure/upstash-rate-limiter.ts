@@ -4,7 +4,7 @@ import type { GenerationRateLimiter } from "../application/ports";
 
 // Per-owner daily limit: fixed window of 1 day under `{prefix}:ai:{scope}`
 // — `gen` for generations (AI_DAILY_GENERATIONS, ADR 0004) and `eval` for
-// answers evaluated by the model (AI_DAILY_EVALUATIONS, Phase 6), so the two
+// recall sessions evaluated by the model (AI_DAILY_EVALUATIONS), so the two
 // limits never share a counter. `limit()` consumes one unit when it succeeds.
 // `Ratelimit.fixedWindow(tokens, window)` and the `limit()` result
 // (`success`, `remaining`, `reset` in unix ms) were verified with Context7.

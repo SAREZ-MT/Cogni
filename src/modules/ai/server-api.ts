@@ -39,8 +39,9 @@ export interface AiServerApi {
   ): Promise<Result<GenerateStructuredOutput, DomainError>>;
   // `check` consumes one unit per allowed call: invoke once per request.
   generationLimiter: GenerationRateLimiter;
-  // Per-owner daily answers evaluated by the model (AI_DAILY_EVALUATIONS),
-  // under its own key: one unit per answer the model evaluates.
+  // Per-owner daily recall sessions evaluated by the model
+  // (AI_DAILY_EVALUATIONS), under its own key: one unit per evaluated
+  // session (all its written answers go in one call).
   evaluationLimiter: GenerationRateLimiter;
   entries: readonly ProviderEntry[];
 }

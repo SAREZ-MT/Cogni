@@ -29,9 +29,11 @@ and rate limiting (documento-maestro §8).
     `session_feedback/v1` (flashcards) and `v2` (exams),
     `generate_recall_questions/v1` (10 open questions with a rubric per call,
     lists up to 60 of the page's active questions to avoid repeats,
-    temperature 0.7) and `evaluate_recall_answer/v1` (explicit 0–5 rubric
-    scale, page fragment and answer sent as tagged data, Spanish
-    justification, temperature 0.2). Decisions for the recall prompts:
+    temperature 0.7) and `evaluate_recall_answer/v2` (every written answer
+    of a recall session in one call, one `<answer_item>` per answer with its
+    rubric, page fragment and answer as tagged data, answers capped at 4000
+    characters, output `{ evaluations: [{ questionId, … }] }` of at most 10;
+    explicit 0–5 rubric scale, Spanish justification, temperature 0.2). Decisions for the recall prompts:
     `docs/adr/0007-recordacion-activa-y-generacion-incremental.md`.
   - `schemas/` Zod output schema per purpose (§8.4) and `outputSchemaFor`.
   - `testing/` in-memory fakes, re-exported by `src/modules/ai/testing.ts`.
@@ -50,11 +52,12 @@ and rate limiting (documento-maestro §8).
   - `fake-live-provider.ts` deterministic provider for `AI_PROVIDER_MODE=fake`;
     `in-memory-rate-limiter.ts` its daily limiters. Its recall evaluation
     scores an answer by the share of the rubric's key concepts it mentions.
-    Failure switches for e2e (evaluation prompts only): an answer holding
-    `[falla-ia]` fails on every call; one holding `[falla-ia-una-vez]` fails
-    the first time that exact prompt is seen in the server process, then
-    succeeds once (so "Reintentar" can evaluate it); at most 100 failed
-    prompts are remembered.
+    Failure switches for e2e (evaluation batches only): an answer holding
+    `[falla-ia]` is left without an evaluation on every call; one holding
+    `[falla-ia-una-vez]` is left out the first time that exact answer is seen
+    in the server process, then evaluated once (so "Reintentar" can evaluate
+    it); a batch where every answer is left out fails the call; at most 100
+    failed answers are remembered.
   - `drizzle-ai-generation-repository.ts` Postgres adapter.
 - `server-api.ts` composition root (`createAiServerApi`), exported from
   `index.ts`; live mode uses Upstash, fake mode keeps in-memory quota, breaker
@@ -75,8 +78,8 @@ Server only, never `NEXT_PUBLIC_*` (validated in `src/shared/config/env.schema.t
   (set together). `GROQ_API_KEY` enables the evaluation-only entry.
 - `REDIS_KEY_PREFIX` (default `cogni:dev`, `cogni:prod` in production),
   `AI_DAILY_GENERATIONS` (default 6, key `{prefix}:ai:gen`),
-  `AI_DAILY_EVALUATIONS` (default 60 answers evaluated by the model per user
-  and day, own key `{prefix}:ai:eval`, exposed as `evaluationLimiter`),
+  `AI_DAILY_EVALUATIONS` (default 10 recall sessions evaluated by the model
+  per user and day, own key `{prefix}:ai:eval`, exposed as `evaluationLimiter`),
   `AI_PAGE_TOKEN_CAP` (default 12000).
 
 Decisions and dropped providers: `docs/adr/0004-capa-de-ia-con-proveedores-gratuitos.md`.

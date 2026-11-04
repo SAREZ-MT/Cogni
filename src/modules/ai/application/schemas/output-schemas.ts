@@ -65,6 +65,19 @@ export const recallEvaluationOutput = z.object({
   justification: text,
 });
 
+// One recall session at most (RECALL_SESSION_SIZE): every written answer of
+// a session is evaluated in one call (evaluate_recall_answer/v2).
+export const MAX_EVALUATED_ANSWERS = 10;
+
+// The batched evaluation: one entry per answer item, keyed by the item's id.
+// The caller checks that every id it sent comes back exactly once.
+export const recallEvaluationsOutput = z.object({
+  evaluations: z
+    .array(recallEvaluationOutput.extend({ questionId: text }))
+    .min(1)
+    .max(MAX_EVALUATED_ANSWERS),
+});
+
 export const sessionFeedbackOutput = z.object({
   summary: text,
   strengths: z.array(text),
@@ -77,7 +90,7 @@ const OUTPUT_SCHEMAS = {
   generate_exam_questions: examQuestionsOutput,
   generate_exam_variants: examVariantsOutput,
   generate_recall_questions: recallQuestionsOutput,
-  evaluate_recall_answer: recallEvaluationOutput,
+  evaluate_recall_answer: recallEvaluationsOutput,
   session_feedback: sessionFeedbackOutput,
 } as const satisfies Record<AiPurpose, z.ZodType>;
 
@@ -94,4 +107,5 @@ export type ExamQuestionsOutput = z.infer<typeof examQuestionsOutput>;
 export type ExamVariantsOutput = z.infer<typeof examVariantsOutput>;
 export type RecallQuestionsOutput = z.infer<typeof recallQuestionsOutput>;
 export type RecallEvaluationOutput = z.infer<typeof recallEvaluationOutput>;
+export type RecallEvaluationsOutput = z.infer<typeof recallEvaluationsOutput>;
 export type SessionFeedbackOutput = z.infer<typeof sessionFeedbackOutput>;

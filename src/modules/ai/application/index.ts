@@ -19,11 +19,12 @@ export type {
   QuotaStore,
 } from "./ports";
 export {
-  type BuiltEvaluateRecallAnswerPrompt,
-  buildEvaluateRecallAnswerPrompt,
+  type BuiltEvaluateRecallAnswersPrompt,
+  buildEvaluateRecallAnswersPrompt,
   EVALUATE_RECALL_ANSWER_PROMPT_VERSION,
-  type EvaluateRecallAnswerPromptInput,
-} from "./prompts/evaluate_recall_answer/v1";
+  type EvaluatedRecallAnswer,
+  MAX_EVALUATED_ANSWER_LENGTH,
+} from "./prompts/evaluate_recall_answer/v2";
 export {
   buildGenerateExamQuestionsPrompt,
   type ExistingExamQuestion,

@@ -2,11 +2,12 @@ import {
   AI_ERROR,
   type AiGeneration,
   AiGenerationFailedError,
-  buildEvaluateRecallAnswerPrompt,
+  buildEvaluateRecallAnswersPrompt,
   EVALUATE_RECALL_ANSWER_PROMPT_VERSION,
   type GenerateStructuredInput,
   type GenerationRateLimiter,
-  recallEvaluationOutput,
+  type RecallEvaluationOutput,
+  recallEvaluationsOutput,
 } from "@/modules/ai";
 import type { PageTextReader } from "@/modules/notebooks";
 import type {
@@ -85,7 +86,7 @@ export interface EvaluateRecallSessionDeps {
       Result<{ object: unknown; generation: AiGeneration }, DomainError>
     >;
   };
-  // AI_DAILY_EVALUATIONS: one unit per answer the model evaluated.
+  // AI_DAILY_EVALUATIONS: one unit per session the model evaluated.
   limiter: GenerationRateLimiter;
   // study-engine's recordRecallReviews (replay-safe per session and item).
   reviews: {
@@ -98,7 +99,7 @@ export interface EvaluateRecallSessionDeps {
   // resolved in the request that scheduled the run: a passing quality on
   // a question due later today reviews it.
   dueCutoff: DueCutoff;
-  // AI_PAGE_TOKEN_CAP: the page fragment is trimmed to it.
+  // AI_PAGE_TOKEN_CAP: shared by the page fragments of one evaluation call.
   tokenCap: number;
   // Told about every unexpected failure (the action reports it to Sentry);
   // none of them stops the run.
@@ -143,53 +144,68 @@ function done(
   };
 }
 
-interface RunState {
-  // Set once the daily evaluation limit is known to be reached.
-  limitResetAt: Date | null;
+// A written answer sent to the model, with the short key of its item.
+interface ModelAnswer {
+  readonly key: string;
+  readonly answer: RecallAnswer;
+  readonly question: RecallQuestion;
 }
 
-async function evaluateAnswer(
+// Resolves an answer that needs no model: a skipped one gets the skipped
+// record (ai score 0, no unit; user decision 2026-10-06, ADR 0007), and one
+// whose question is gone fails. Null: the model evaluates it.
+function resolveWithoutModel(
   answer: RecallAnswer,
-  context: {
-    question: RecallQuestion | undefined;
-    plainText: string;
-    pageId: string;
-    state: RunState;
-  },
-  deps: EvaluateRecallSessionDeps,
-  ownerId: string,
-): Promise<RecallEvaluationResult> {
-  // A skipped answer: ai score 0 with the auditable skipped record, no
-  // model call and no unit (user decision 2026-10-06, ADR 0007).
+  question: RecallQuestion | undefined,
+): RecallEvaluationResult | null {
   if (isSkippedAnswer(answer.answerText)) {
     return done(answer, 0, skippedEvaluation(), null);
   }
-  const { question, state } = context;
   if (!question) return failed(RECALL_ERROR.QUESTION_NOT_IN_SESSION);
+  return null;
+}
 
-  // The daily limit is peeked before the call and consumed only after a
-  // done evaluation, so a failed attempt costs nothing. A reached limit
-  // fails the answer (never leaves it pending): the session ends partial
-  // and "Reintentar" evaluates it once the window resets.
-  if (state.limitResetAt === null) {
-    const limit = await deps.limiter.peek(ownerId);
-    if (!limit.allowed) state.limitResetAt = limit.resetAt;
-  }
-  if (state.limitResetAt !== null) {
-    return failed(AI_ERROR.DAILY_LIMIT_REACHED, null, state.limitResetAt);
+// Every written answer of the run in one generateStructured call
+// (evaluate_recall_answer/v2): each answer is an item with its own rubric
+// and page fragment, which share the token cap. The batched output is
+// checked deterministically: an invalid one, or one with an id that was not
+// sent or comes back twice, fails every answer; an answer left without an
+// evaluation fails alone. No answer passes without its own evaluation.
+//
+// The daily limit counts sessions: it is peeked once before the call and
+// one unit is consumed only when at least one answer is done, so a failed
+// call costs nothing. A reached limit fails the answers (never leaves them
+// pending): the session ends partial and "Reintentar" evaluates them once
+// the window resets.
+async function evaluateWithModel(
+  pending: readonly ModelAnswer[],
+  context: { plainText: string; pageId: string },
+  deps: EvaluateRecallSessionDeps,
+  ownerId: string,
+): Promise<Map<string, RecallEvaluationResult>> {
+  const failAll = (result: RecallEvaluationResult) =>
+    new Map(pending.map(({ answer }) => [answer.id, result]));
+
+  const limit = await deps.limiter.peek(ownerId);
+  if (!limit.allowed) {
+    return failAll(failed(AI_ERROR.DAILY_LIMIT_REACHED, null, limit.resetAt));
   }
 
-  const prompt = buildEvaluateRecallAnswerPrompt({
-    question: question.prompt,
-    keyConcepts: question.rubric.keyConcepts,
-    acceptableAnswerSummary: question.rubric.acceptableAnswerSummary,
-    pageFragment: selectRelevantFragment(
-      context.plainText,
-      question,
-      deps.tokenCap,
-    ),
-    answer: answer.answerText,
-  });
+  const fragmentCap = Math.floor(deps.tokenCap / pending.length);
+  const prompt = buildEvaluateRecallAnswersPrompt(
+    pending.map(({ key, answer, question }) => ({
+      id: key,
+      question: question.prompt,
+      keyConcepts: question.rubric.keyConcepts,
+      acceptableAnswerSummary: question.rubric.acceptableAnswerSummary,
+      pageFragment: selectRelevantFragment(
+        context.plainText,
+        question,
+        fragmentCap,
+      ),
+      answer: answer.answerText,
+    })),
+  );
   const generated = await deps.ai.generateStructured(
     {
       purpose: "evaluate_recall_answer",
@@ -206,32 +222,52 @@ async function evaluateAnswer(
       generated.error instanceof AiGenerationFailedError
         ? generated.error.generationId
         : null;
-    return failed(generated.error.code, generationId);
+    return failAll(failed(generated.error.code, generationId));
   }
   const { generation } = generated.value;
-  const parsed = recallEvaluationOutput.safeParse(generated.value.object);
-  if (!parsed.success) {
-    return failed(AI_ERROR.GENERATION_FAILED, generation.id);
+  const parsed = recallEvaluationsOutput.safeParse(generated.value.object);
+  const byKey = new Map<string, RecallEvaluationOutput>();
+  const sent = new Set(pending.map(({ key }) => key));
+  let valid = parsed.success;
+  for (const { questionId, ...evaluation } of parsed.success
+    ? parsed.data.evaluations
+    : []) {
+    if (!sent.has(questionId) || byKey.has(questionId)) valid = false;
+    byKey.set(questionId, evaluation);
   }
-  try {
-    const consumed = await deps.limiter.check(ownerId);
-    if (!consumed.allowed) {
-      // A concurrent evaluation spent the last unit after this run's peek
-      // (review R3-002): the evaluation already happened, so it stands; the
-      // overage is reported and the rest of the run calls no model.
-      state.limitResetAt = consumed.resetAt;
-      deps.onError?.(
-        new DomainError(
-          AI_ERROR.DAILY_LIMIT_REACHED,
-          "the daily evaluation limit ran out after this evaluation was allowed",
-        ),
-      );
+  if (!valid) return failAll(failed(AI_ERROR.GENERATION_FAILED, generation.id));
+
+  const results = new Map<string, RecallEvaluationResult>();
+  for (const { key, answer } of pending) {
+    const evaluation = byKey.get(key);
+    results.set(
+      answer.id,
+      evaluation
+        ? done(answer, evaluation.score, evaluation, generation.id)
+        : failed(AI_ERROR.GENERATION_FAILED, generation.id),
+    );
+  }
+
+  if ([...results.values()].some((result) => result.status === "done")) {
+    try {
+      const consumed = await deps.limiter.check(ownerId);
+      if (!consumed.allowed) {
+        // A concurrent evaluation spent the last unit after this run's peek
+        // (review R3-002): the evaluation already happened, so it stands;
+        // the overage is reported.
+        deps.onError?.(
+          new DomainError(
+            AI_ERROR.DAILY_LIMIT_REACHED,
+            "the daily evaluation limit ran out after this evaluation was allowed",
+          ),
+        );
+      }
+    } catch (error) {
+      // The evaluation stands; at worst the unit stays unconsumed.
+      deps.onError?.(error);
     }
-  } catch (error) {
-    // The evaluation stands; at worst the unit stays unconsumed.
-    deps.onError?.(error);
   }
-  return done(answer, parsed.data.score, parsed.data, generation.id);
+  return results;
 }
 
 // Feeds every done answer of the session to SM-2 with its combined quality
@@ -314,10 +350,10 @@ async function storeSessionStatus(
 // The asynchronous evaluation of a finished session (§8.5, SAD §10.4, CU-09),
 // run after the finish through `after()` and again by "Reintentar". It
 // claims the session's pending answers (a claim older than the lease is
-// taken over), evaluates each one — a skipped answer gets the skipped
-// record without the model; a written one gets one generateStructured call
-// with the rubric and the page fragment closest to the question — and
-// stores the raw evaluation: the model output with the ai score and the
+// taken over), evaluates them — a skipped answer gets the skipped record
+// without the model; the written ones share one generateStructured call,
+// each with its rubric and the page fragment closest to its question — and
+// stores the raw evaluation of each: the model output with the ai score and the
 // combined quality (done), or the failed attempt (failed: no score, no
 // SM-2 review, so the question stays due). Then it records the SM-2 reviews
 // of the done answers and stores the session status derived from all the
@@ -370,29 +406,37 @@ export async function evaluateRecallSession(
         )
       ).map((question) => [question.id, question]),
     );
-    const state: RunState = { limitResetAt: null };
+    const results = new Map<string, RecallEvaluationResult>();
+    const pending: ModelAnswer[] = [];
     for (const answer of claimed) {
-      let result: RecallEvaluationResult;
+      const question = questions.get(answer.questionId);
+      const resolved = resolveWithoutModel(answer, question);
+      if (resolved) results.set(answer.id, resolved);
+      else if (question) {
+        pending.push({ key: `q${pending.length + 1}`, answer, question });
+      }
+    }
+    if (pending.length > 0) {
       try {
-        result = await evaluateAnswer(
-          answer,
-          {
-            question: questions.get(answer.questionId),
-            plainText,
-            pageId: session.pageId,
-            state,
-          },
+        const evaluated = await evaluateWithModel(
+          pending,
+          { plainText, pageId: session.pageId },
           deps,
           ownerId,
         );
+        for (const [id, result] of evaluated) results.set(id, result);
       } catch (error) {
         deps.onError?.(error);
-        result = failed(RECALL_ERROR.UNEXPECTED);
+        for (const { answer } of pending) {
+          results.set(answer.id, failed(RECALL_ERROR.UNEXPECTED));
+        }
       }
+    }
+    for (const answer of claimed) {
       const saved = await deps.answers.saveEvaluation(
         answer.id,
         ownerId,
-        result,
+        results.get(answer.id) ?? failed(RECALL_ERROR.UNEXPECTED),
         deps.clock.now(),
       );
       if (saved?.evaluationStatus === "done") evaluated += 1;

@@ -4,8 +4,10 @@ import {
   examQuestionsOutput,
   examVariantsOutput,
   flashcardsOutput,
+  MAX_EVALUATED_ANSWERS,
   outputSchemaFor,
   recallEvaluationOutput,
+  recallEvaluationsOutput,
   recallQuestionsOutput,
   sessionFeedbackOutput,
 } from "./output-schemas";
@@ -142,6 +144,48 @@ describe("recallEvaluationOutput", () => {
   });
 });
 
+describe("recallEvaluationsOutput", () => {
+  const evaluation = {
+    questionId: "q1",
+    score: 4,
+    presentConcepts: ["a"],
+    missingConcepts: [],
+    misconceptions: [],
+    justification: "Good.",
+  };
+
+  it("accepts one evaluation per answer keyed by a question id", () => {
+    expect(
+      recallEvaluationsOutput.safeParse({
+        evaluations: [evaluation, { ...evaluation, questionId: "q2" }],
+      }).success,
+    ).toBe(true);
+  });
+
+  it("rejects an evaluation without a question id or with a bad score", () => {
+    const { questionId: _, ...noId } = evaluation;
+    for (const bad of [noId, { ...evaluation, score: 6 }]) {
+      expect(
+        recallEvaluationsOutput.safeParse({ evaluations: [bad] }).success,
+      ).toBe(false);
+    }
+  });
+
+  it("caps the list at MAX_EVALUATED_ANSWERS, one recall session", () => {
+    expect(MAX_EVALUATED_ANSWERS).toBe(10);
+    const many = Array.from({ length: MAX_EVALUATED_ANSWERS + 1 }, (_, i) => ({
+      ...evaluation,
+      questionId: `q${i + 1}`,
+    }));
+    expect(
+      recallEvaluationsOutput.safeParse({ evaluations: many }).success,
+    ).toBe(false);
+    expect(recallEvaluationsOutput.safeParse({ evaluations: [] }).success).toBe(
+      false,
+    );
+  });
+});
+
 describe("sessionFeedbackOutput", () => {
   it("accepts feedback and rejects a missing summary", () => {
     const feedback = {
@@ -163,7 +207,7 @@ describe("outputSchemaFor", () => {
       generate_exam_questions: examQuestionsOutput,
       generate_exam_variants: examVariantsOutput,
       generate_recall_questions: recallQuestionsOutput,
-      evaluate_recall_answer: recallEvaluationOutput,
+      evaluate_recall_answer: recallEvaluationsOutput,
       session_feedback: sessionFeedbackOutput,
     };
     for (const [purpose, schema] of Object.entries(expected)) {
