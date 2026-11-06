@@ -5,6 +5,7 @@ import {
   quotaKeyOf,
   type SelectionContext,
   selectProvider,
+  vendorOf,
 } from "./provider";
 
 function entry(over: Partial<ProviderEntry> & { id: string }): ProviderEntry {
@@ -83,6 +84,26 @@ describe("selectProvider", () => {
     expect(
       selectProvider([gemini, cloudflare], ctx({ exclude: ["gemini"] }))?.id,
     ).toBe("cloudflare");
+  });
+
+  it("prefers an entry of a vendor not to avoid, best first", () => {
+    const geminiB = entry({ id: "gemini-b", priority: 2, vendor: "google" });
+    const groq = entry({ id: "groq", priority: 3, vendor: "groq" });
+    expect(
+      selectProvider([geminiB, groq], ctx({ avoidVendors: ["google"] }))?.id,
+    ).toBe("groq");
+  });
+
+  it("falls back to an avoided vendor when no other is eligible", () => {
+    const geminiB = entry({ id: "gemini-b", priority: 2, vendor: "google" });
+    expect(
+      selectProvider([geminiB], ctx({ avoidVendors: ["google"] }))?.id,
+    ).toBe("gemini-b");
+  });
+
+  it("reads the vendor, defaulting to the entry id", () => {
+    expect(vendorOf(entry({ id: "x", vendor: "acme" }))).toBe("acme");
+    expect(vendorOf(entry({ id: "x" }))).toBe("x");
   });
 
   it("returns null when nothing qualifies", () => {

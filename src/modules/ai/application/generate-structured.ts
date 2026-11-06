@@ -17,6 +17,7 @@ import {
   recordSuccess,
   selectProvider,
   startGeneration,
+  vendorOf,
 } from "../domain";
 import { AI_ERROR } from "../domain/errors";
 import type {
@@ -131,9 +132,9 @@ async function snapshot(
 
 // Single entry point for every model call (documento-maestro §8.1): select a
 // provider, call it, validate against the purpose schema, audit every attempt
-// and retry once on the next provider. Every attempt runs under its own
-// timeout (and the caller's signal); an abort is a failed attempt. Never
-// invents an object.
+// and retry once on the next provider, of another vendor when one is
+// eligible. Every attempt runs under its own timeout (and the caller's
+// signal); an abort is a failed attempt. Never invents an object.
 export async function generateStructured(
   input: GenerateStructuredInput,
   deps: GenerateStructuredDeps,
@@ -145,6 +146,9 @@ export async function generateStructured(
     maxTemperatureFor(input.purpose),
   );
   const failedProviders: string[] = [];
+  // The retry prefers another vendor: two models behind one key (or one
+  // vendor's outage) must not take both attempts.
+  const failedVendors: string[] = [];
   // Same word-based estimate as the page cap; skips providers whose prompt
   // ceiling (a small tokens-per-minute window) it would exceed.
   const promptTokens = estimateTokens(`${input.system}\n${input.prompt}`);
@@ -158,6 +162,7 @@ export async function generateStructured(
       unhealthyIds: snap.unhealthyIds,
       usage: snap.usage,
       exclude: failedProviders,
+      avoidVendors: failedVendors,
       promptTokens,
     });
     if (entry === null) {
@@ -239,6 +244,7 @@ export async function generateStructured(
       recordFailure(snap.breakers[entry.id], deps.clock.now()),
     );
     failedProviders.push(entry.id);
+    failedVendors.push(vendorOf(entry));
     lastFailedId = started.id;
   }
 

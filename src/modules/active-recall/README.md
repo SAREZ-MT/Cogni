@@ -67,7 +67,15 @@ Implementado:
   sin modelo ni unidad; las escritas → **una sola llamada**
   `evaluate_recall_answer/v2` para todas, cada una con su rúbrica y el
   fragmento de la página más parecido a su pregunta (`selectRelevantFragment`;
-  las respuestas se reparten `AI_PAGE_TOKEN_CAP`). La salida se valida por
+  `fragmentTokenCap`: una respuesta sola conserva todo `AI_PAGE_TOKEN_CAP`
+  aunque el prompt pase el techo de 7K de Groq y vaya a un proveedor mayor;
+  con dos o más, los fragmentos se reparten lo que el resto del prompt deja
+  de `EVALUATION_PROMPT_TOKEN_BUDGET` (6.500, nunca más que el tope de
+  página), para que la llamada quepa en los 8K TPM de Groq; si esa parte
+  queda por debajo de `MIN_FRAGMENT_TOKENS` (150), cada fragmento recibe ese
+  mínimo, limitado por su parte del tope de página: el tamaño baja de forma
+  continua, nunca llega a cero y el prompt, si pasa el presupuesto, solo
+  salta Groq). La salida se valida por
   respuesta: un id desconocido o repetido, o una salida inválida, falla todas;
   una respuesta sin evaluación falla sola (nunca pasa sin la suya). Se guarda
   por respuesta la salida cruda, el puntaje IA y la calidad combinada

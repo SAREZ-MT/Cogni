@@ -13,7 +13,8 @@ and rate limiting (documento-maestro §8).
   - `provider.ts` `ProviderEntry`, `selectProvider`, `nextProviders`,
     `quotaKeyOf` (entries with the same `quotaKey` share one rpm/rpd budget)
     and the optional `maxPromptTokens` ceiling (a bigger estimated prompt
-    skips the entry).
+    skips the entry), and `vendorOf` (the optional `vendor`; a retry passes
+    over the failed vendor while another is eligible).
   - `circuit-breaker.ts` 3 failures open a provider for 10 minutes (§8.2).
   - `truncate.ts` `truncateToTokenCap`, word-based page cap, `estimateTokens`
     (ceil(words / 0.75)) and `EVALUATION_PROMPT_TOKEN_BUDGET` (6,500: the
@@ -27,7 +28,8 @@ and rate limiting (documento-maestro §8).
     because `AiProvider` needs the Zod type and `domain-is-pure` forbids npm.
   - `generate-structured.ts` the single entry point for model calls: select
     provider, call, validate with the purpose schema, audit every attempt,
-    retry once on the next provider, never a third call.
+    retry once on the next provider (of another vendor when one is
+    eligible: `avoidVendors`), never a third call.
   - `prompts/<purpose>/v<n>.ts` versioned prompt builders, registered in
     `application/index.ts`: `generate_flashcards/v1`,
     `generate_exam_questions/v1`, `generate_exam_variants/v1`,
@@ -100,12 +102,12 @@ token budget allows.
 
 | id | model | purposes | rpm / rpd | priority |
 |---|---|---|---|---|
-| `groq-gpt-oss` | `openai/gpt-oss-120b` | evaluation, feedback | 1 / 36, prompt ≤ 7K | 1 |
+| `groq-gpt-oss` | `openai/gpt-oss-120b` | evaluation, feedback | 1 / 25, prompt ≤ 7K | 1 |
 | `gemini-flash-lite` | `gemini-3.5-flash-lite` | all | 15 / 500 | 1 |
 | `gemini-3.1-flash-lite` | `gemini-3.1-flash-lite` | all | 15 / 500 | 1 |
-| `groq-gpt-oss-20b` | `openai/gpt-oss-20b` | evaluation, feedback | 1 / 36, prompt ≤ 7K | 2 |
+| `groq-gpt-oss-20b` | `openai/gpt-oss-20b` | evaluation, feedback | 1 / 25, prompt ≤ 7K | 2 |
 | `cloudflare-workers-ai` | `@cf/meta/llama-3.3-70b-instruct-fp8-fast` | generation | 30 / 13 | 2 |
-| `groq-qwen` | `qwen/qwen3.8-27b` (Groq preview) | evaluation, feedback | 1 / 36, prompt ≤ 7K | 3 |
+| `groq-qwen` | `qwen/qwen3.8-27b` (Groq preview) | evaluation, feedback | 1 / 25, prompt ≤ 7K | 3 |
 | `openrouter-nemotron` | `nvidia/nemotron-3.5-super-vl:free` | all | 20 / 1000 shared | 3 |
 | `openrouter-dots` | `dots-studio/dots-3-note-preview:free` | all | 20 / 1000 shared | 4 |
 | `gemini-3.8-flash` | `gemini-3.8-flash` | all | 5 / 20 | 5 |
@@ -114,15 +116,20 @@ token budget allows.
 | `gemini-2.5-flash-lite` | `gemini-2.5-flash-lite` | all | 10 / 20 | 5 |
 
 - Groq (per model): 30 RPM and 1,000 RPD, but 8K TPM and 200K TPD bind
-  first. 200K / ~5.5K tokens per batched evaluation ≈ 36 calls a day; one
-  full call a minute fits 8K TPM. A prompt over 7K estimated tokens skips
-  every Groq entry.
+  first. `GROQ_DAILY_CALLS` sizes the day for the worst admitted call, the
+  7K prompt ceiling plus 1K of output: 200K / 8K = 25 calls a day; one full
+  call a minute fits 8K TPM. A prompt over 7K estimated tokens skips every
+  Groq entry.
 - Cloudflare: 10K neurons a day ≈ 13 generation calls (~12K in, ~2K out).
 - OpenRouter: $10 of credit gives 1,000 requests a day on `:free` models,
   account-wide; every `:free` row spends the shared quota key
   `openrouter-free` (`{prefix}:ai:quota:openrouter-free:*`).
-- Evaluation alternates Groq and Gemini so the two attempts of one call land
-  on two vendors.
+- Every row has a `vendor` (`groq`, `google`, `cloudflare`, `openrouter`).
+  The retry prefers another vendor, so when `groq-gpt-oss` has spent its
+  minute and the first attempt lands on `gemini-flash-lite`, the second goes
+  to `groq-gpt-oss-20b` (or Qwen, or OpenRouter), not to
+  `gemini-3.1-flash-lite` behind the same Google key; only with no other
+  vendor eligible does it stay on the same one.
 - Left out: `gemini-2.5-flash` (deprecated, new users cannot select it, and
   from 2026-12-01 it routes to 3.5 Flash-Lite) and Gemma 4 (out of scope).
 

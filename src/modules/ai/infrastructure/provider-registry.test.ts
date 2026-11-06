@@ -1,9 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
-import { AI_PURPOSES, nextProviders, selectProvider } from "../domain";
+import {
+  AI_PURPOSES,
+  nextProviders,
+  selectProvider,
+  vendorOf,
+} from "../domain";
 import {
   buildProviderEntries,
   buildProviderMap,
+  GROQ_DAILY_CALLS,
   GROQ_MAX_PROMPT_TOKENS,
+  GROQ_OUTPUT_HEADROOM_TOKENS,
+  GROQ_TOKENS_PER_DAY,
   OPENROUTER_FREE_QUOTA_KEY,
 } from "./provider-registry";
 
@@ -94,7 +102,7 @@ describe("buildProviderEntries", () => {
     ]);
   });
 
-  it("orders evaluation alternating Groq and Gemini so two attempts span two vendors", () => {
+  it("orders evaluation by priority, Groq 120B first", () => {
     const entries = buildProviderEntries(all);
     for (const purpose of [
       "evaluate_recall_answer",
@@ -142,13 +150,67 @@ describe("buildProviderEntries", () => {
       ["groq-qwen", "qwen/qwen3.8-27b"],
     ]);
     for (const entry of groq) {
-      // 200K TPD / ~5.5K tokens per call; 8K TPM allows one full call a minute.
-      expect(entry.rpd).toBe(36);
+      // 200K TPD / (7K prompt ceiling + 1K output); 8K TPM allows one full
+      // call a minute.
+      expect(entry.rpd).toBe(GROQ_DAILY_CALLS);
       expect(entry.rpm).toBe(1);
       expect(entry.maxPromptTokens).toBe(GROQ_MAX_PROMPT_TOKENS);
       expect(entry.quotaKey).toBeUndefined();
     }
     expect(GROQ_MAX_PROMPT_TOKENS).toBe(7000);
+    expect(GROQ_DAILY_CALLS).toBe(25);
+    // A day of calls at the prompt ceiling plus output fits the TPD.
+    expect(
+      GROQ_DAILY_CALLS * (GROQ_MAX_PROMPT_TOKENS + GROQ_OUTPUT_HEADROOM_TOKENS),
+    ).toBeLessThanOrEqual(GROQ_TOKENS_PER_DAY);
+    expect(GROQ_TOKENS_PER_DAY).toBe(200_000);
+  });
+
+  it("tags every entry with its vendor", () => {
+    const vendors = Object.fromEntries(
+      buildProviderEntries(all).map((e) => [e.id, vendorOf(e)]),
+    );
+    expect(vendors).toEqual({
+      "groq-gpt-oss": "groq",
+      "gemini-flash-lite": "google",
+      "gemini-3.1-flash-lite": "google",
+      "groq-gpt-oss-20b": "groq",
+      "cloudflare-workers-ai": "cloudflare",
+      "groq-qwen": "groq",
+      "openrouter-nemotron": "openrouter",
+      "openrouter-dots": "openrouter",
+      "gemini-3.8-flash": "google",
+      "gemini-3.6-flash": "google",
+      "gemini-3-flash": "google",
+      "gemini-2.5-flash-lite": "google",
+    });
+  });
+
+  it("spreads the two evaluation attempts over two vendors when groq-gpt-oss is skipped", () => {
+    const entries = buildProviderEntries(all);
+    const minuteSpent = { day: 1, minute: 1 };
+    const cases: Record<string, typeof minuteSpent>[] = [
+      { "groq-gpt-oss": minuteSpent },
+      // Every Groq model spent its minute: OpenRouter takes the retry.
+      {
+        "groq-gpt-oss": minuteSpent,
+        "groq-gpt-oss-20b": minuteSpent,
+        "groq-qwen": minuteSpent,
+      },
+    ];
+    for (const usage of cases) {
+      const base = { ...ctx("evaluate_recall_answer"), usage };
+      const first = selectProvider(entries, base);
+      expect(first?.id).toBe("gemini-flash-lite");
+      if (!first) return;
+      const second = selectProvider(entries, {
+        ...base,
+        exclude: [first.id],
+        avoidVendors: [vendorOf(first)],
+      });
+      expect(second).not.toBeNull();
+      expect(vendorOf(second ?? first)).not.toBe(vendorOf(first));
+    }
   });
 
   it("skips every Groq model for an evaluation prompt over its ceiling", () => {
@@ -163,7 +225,7 @@ describe("buildProviderEntries", () => {
     const entries = buildProviderEntries(all);
     const spent = {
       ...ctx("evaluate_recall_answer"),
-      usage: { "groq-gpt-oss": { day: 36, minute: 0 } },
+      usage: { "groq-gpt-oss": { day: GROQ_DAILY_CALLS, minute: 0 } },
     };
     expect(nextProviders(entries, spent)[0]?.id).toBe("gemini-flash-lite");
     expect(nextProviders(entries, spent).map((e) => e.id)).toContain(

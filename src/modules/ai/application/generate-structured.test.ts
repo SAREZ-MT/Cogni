@@ -140,6 +140,26 @@ describe("retry once on failure", () => {
     expect(t.totalCalls()).toBe(2);
   });
 
+  it("retries on another vendor before a second model of the failed one", async () => {
+    const t = setup({ a: [{ invalid: true }], c: [{ object: GOOD }] }, [
+      entry("a", 1, { vendor: "google" }),
+      entry("b", 2, { vendor: "google" }),
+      entry("c", 3, { vendor: "groq" }),
+    ]);
+    const r = await generateStructured(input(), t.deps, OWNER);
+    expect(r.ok && r.value.generation.provider).toBe("c");
+    expect(t.fakes.get("b")?.calls).toHaveLength(0);
+  });
+
+  it("retries on the same vendor when no other vendor is eligible", async () => {
+    const t = setup({ a: [{ invalid: true }], b: [{ object: GOOD }] }, [
+      entry("a", 1, { vendor: "google" }),
+      entry("b", 2, { vendor: "google" }),
+    ]);
+    const r = await generateStructured(input(), t.deps, OWNER);
+    expect(r.ok && r.value.generation.provider).toBe("b");
+  });
+
   it("fails with GENERATION_FAILED after two failures, never a third call", async () => {
     const t = setup({
       a: [{ invalid: true }],

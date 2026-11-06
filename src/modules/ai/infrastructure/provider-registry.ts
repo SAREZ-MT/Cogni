@@ -33,16 +33,23 @@ const GENERATION_PURPOSES = AI_PURPOSES.filter(
 const ALL_PURPOSES = [...GENERATION_PURPOSES, ...EVALUATION_PURPOSES];
 
 // Groq free tier, per model (owner's dashboard, 2026-11-06): 30 RPM and
-// 1,000 RPD, but only 8K TPM and 200K TPD, so tokens bind first. A full
-// batched evaluation is ~5.5K tokens in and out: 200K / 5.5K ≈ 36 calls a
-// day, and 8K TPM leaves room for one such call a minute. A prompt over 7K
-// estimated tokens cannot fit the minute window with its answer, so it
-// skips Groq.
+// 1,000 RPD, but only 8K TPM and 200K TPD, so tokens bind first. A prompt
+// over 7K estimated tokens cannot fit the minute window with its answer, so
+// it skips Groq (`maxPromptTokens`), and 8K TPM leaves room for one such
+// call a minute. The daily cap assumes the worst admitted call, the prompt
+// ceiling plus the batched evaluation's output: 200K / (7K + 1K) = 25 calls,
+// so the local counter never allows a call Groq would reject for its TPD.
+export const GROQ_TOKENS_PER_DAY = 200_000;
 export const GROQ_MAX_PROMPT_TOKENS = 7000;
+export const GROQ_OUTPUT_HEADROOM_TOKENS = 1000;
+export const GROQ_DAILY_CALLS = Math.floor(
+  GROQ_TOKENS_PER_DAY / (GROQ_MAX_PROMPT_TOKENS + GROQ_OUTPUT_HEADROOM_TOKENS),
+);
 const GROQ_LIMITS = {
   rpm: 1,
-  rpd: 36,
+  rpd: GROQ_DAILY_CALLS,
   maxPromptTokens: GROQ_MAX_PROMPT_TOKENS,
+  vendor: "groq",
 } as const;
 
 // OpenRouter: with $10 of credit the account gets 1,000 requests a day on
@@ -53,15 +60,17 @@ const OPENROUTER_FREE_LIMITS = {
   rpm: 20,
   rpd: 1000,
   quotaKey: OPENROUTER_FREE_QUOTA_KEY,
+  vendor: "openrouter",
 } as const;
 
 // THE provider table: ids, models, free-tier limits (rpm/rpd), capabilities
 // and fallback priority live here and nowhere else. Model ids and limits are
 // code-level defaults; an env override is a later task. Array order matters
-// on equal priority: `selectProvider` is stable. Evaluation alternates Groq
-// and Gemini (120B, 3.5, 3.1, 20B, Qwen) so the two attempts of one call
-// land on two vendors; generation never uses Groq (its 8K TPM is below the
-// 12K page cap).
+// on equal priority: `selectProvider` is stable. Every row names its
+// `vendor`: a retry prefers another vendor (`avoidVendors`), so when the
+// first attempt lands on one Gemini Flash-Lite the second goes to Groq or
+// OpenRouter, not to the other Flash-Lite behind the same Google key.
+// Generation never uses Groq (its 8K TPM is below the 12K page cap).
 interface RegistryRow {
   entry: ProviderEntry;
   isConfigured: (env: ProviderRegistryEnv) => boolean;
@@ -91,7 +100,13 @@ function geminiRow(
   limits: { rpm: number; rpd: number; priority: number },
 ): RegistryRow {
   return {
-    entry: { id, model: modelId, capabilities: ALL_PURPOSES, ...limits },
+    entry: {
+      id,
+      model: modelId,
+      capabilities: ALL_PURPOSES,
+      vendor: "google",
+      ...limits,
+    },
     isConfigured: (env) => Boolean(env.GOOGLE_GENERATIVE_AI_API_KEY),
     createModel: (env) =>
       createGoogleGenerativeAI({ apiKey: env.GOOGLE_GENERATIVE_AI_API_KEY })(
@@ -146,6 +161,7 @@ const ROWS: readonly RegistryRow[] = [
       // tokens in and ~2K out.
       rpd: 13,
       priority: 2,
+      vendor: "cloudflare",
     },
     isConfigured: (env) =>
       Boolean(env.CLOUDFLARE_ACCOUNT_ID && env.CLOUDFLARE_API_TOKEN),

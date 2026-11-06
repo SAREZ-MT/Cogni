@@ -24,6 +24,7 @@ export {
   quotaKeyOf,
   type SelectionContext,
   selectProvider,
+  vendorOf,
 } from "./provider";
 export { AI_PURPOSES, type AiPurpose } from "./purpose";
 export {

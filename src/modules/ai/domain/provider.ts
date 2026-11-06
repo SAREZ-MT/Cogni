@@ -17,10 +17,18 @@ export interface ProviderEntry {
   // Largest estimated prompt (system + prompt) the entry accepts; a bigger
   // one skips it. Unset means no ceiling.
   readonly maxPromptTokens?: number;
+  // Who serves the entry (one account and API key). A retry prefers another
+  // vendor, so one vendor's outage cannot fail both attempts. Defaults to
+  // `id`.
+  readonly vendor?: string;
 }
 
 export function quotaKeyOf(entry: ProviderEntry): string {
   return entry.quotaKey ?? entry.id;
+}
+
+export function vendorOf(entry: ProviderEntry): string {
+  return entry.vendor ?? entry.id;
 }
 
 export interface ProviderUsage {
@@ -36,6 +44,10 @@ export interface SelectionContext {
   readonly exclude?: readonly string[];
   // Estimated tokens of the prompt about to be sent (estimateTokens).
   readonly promptTokens?: number;
+  // Vendors to pass over while an entry of another vendor is eligible (the
+  // vendors that already failed this call). A soft preference: with only
+  // avoided vendors left, the best of them is still chosen.
+  readonly avoidVendors?: readonly string[];
 }
 
 function isEligible(entry: ProviderEntry, ctx: SelectionContext): boolean {
@@ -66,5 +78,11 @@ export function selectProvider(
   entries: readonly ProviderEntry[],
   ctx: SelectionContext,
 ): ProviderEntry | null {
-  return nextProviders(entries, ctx)[0] ?? null;
+  const candidates = nextProviders(entries, ctx);
+  const avoid = ctx.avoidVendors ?? [];
+  return (
+    candidates.find((entry) => !avoid.includes(vendorOf(entry))) ??
+    candidates[0] ??
+    null
+  );
 }

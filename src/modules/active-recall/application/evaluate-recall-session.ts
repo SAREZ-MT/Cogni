@@ -182,27 +182,42 @@ function evaluatedItem(
   };
 }
 
-// Tokens the page fragments of one batched evaluation may share: what the
-// prompt without fragments leaves of EVALUATION_PROMPT_TOKEN_BUDGET, so the
-// whole call fits a small tokens-per-minute provider (Groq, 8K TPM), and
-// never more than the page cap. When the rest of the prompt alone is over
-// the budget no small provider can take the call anyway, so the fragments
-// keep the page cap for the larger ones. The estimate is additive (a
-// fragment of k tokens adds at most k), so the budget holds for the sum.
-function fragmentBudget(
-  items: readonly EvaluatedRecallAnswer[],
+// Smallest page fragment an answer of a batch gets (~110 words, a few
+// sentences), so a crowded batch still sends each answer some context.
+export const MIN_FRAGMENT_TOKENS = 150;
+
+// Token cap of each page fragment of one evaluation call, given how many
+// answers it carries, the page cap (AI_PAGE_TOKEN_CAP) and the estimated
+// tokens of the prompt without fragments.
+// - One answer is not batched: its fragment keeps the whole page cap. The
+//   prompt may then pass Groq's ceiling and simply skips Groq
+//   (`maxPromptTokens`) for a larger provider.
+// - Two or more share what the rest of the prompt leaves of
+//   EVALUATION_PROMPT_TOKEN_BUDGET (never more than the page cap), so the
+//   call fits a small tokens-per-minute provider (Groq, 8K TPM). The
+//   estimate is additive (a fragment of k tokens adds at most k), so the
+//   budget holds for the sum.
+// - When that share falls below MIN_FRAGMENT_TOKENS (or the rest of the
+//   prompt alone is over the budget) every fragment gets the minimum, capped
+//   by its share of the page cap: the cap shrinks smoothly as the answers
+//   grow, never to zero and never jumping back up. The prompt can then pass
+//   the budget by at most the minimums and skips Groq like a single answer.
+// A non-numeric page cap stays NaN, which selects no fragment.
+export function fragmentTokenCap(
+  count: number,
   tokenCap: number,
+  promptTokensWithoutFragments: number,
 ): number {
-  const bare = buildEvaluateRecallAnswersPrompt(items);
-  const left =
-    EVALUATION_PROMPT_TOKEN_BUDGET -
-    estimateTokens(`${bare.system}\n${bare.prompt}`);
-  return left > 0 ? Math.min(tokenCap, left) : tokenCap;
+  if (count <= 1) return tokenCap;
+  const left = EVALUATION_PROMPT_TOKEN_BUDGET - promptTokensWithoutFragments;
+  const share = Math.floor(Math.min(tokenCap, left) / count);
+  const minimum = Math.min(MIN_FRAGMENT_TOKENS, Math.floor(tokenCap / count));
+  return Math.max(minimum, share);
 }
 
 // Every written answer of the run in one generateStructured call
 // (evaluate_recall_answer/v2): each answer is an item with its own rubric
-// and page fragment, which share the token cap (bounded by fragmentBudget). The batched output is
+// and page fragment, sized by fragmentTokenCap. The batched output is
 // checked deterministically: an invalid one, or one with an id that was not
 // sent or comes back twice, fails every answer; an answer left without an
 // evaluation fails alone. No answer passes without its own evaluation.
@@ -229,11 +244,13 @@ async function evaluateWithModel(
     }
   }
 
-  const fragmentCap = Math.floor(
-    fragmentBudget(
-      pending.map((model) => evaluatedItem(model, "")),
-      deps.tokenCap,
-    ) / pending.length,
+  const bare = buildEvaluateRecallAnswersPrompt(
+    pending.map((model) => evaluatedItem(model, "")),
+  );
+  const fragmentCap = fragmentTokenCap(
+    pending.length,
+    deps.tokenCap,
+    estimateTokens(`${bare.system}\n${bare.prompt}`),
   );
   const prompt = buildEvaluateRecallAnswersPrompt(
     pending.map((model) =>

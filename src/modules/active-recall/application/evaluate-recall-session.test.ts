@@ -24,6 +24,8 @@ import {
   EVALUATION_CLAIM_LEASE_MS,
   type EvaluateRecallSessionDeps,
   evaluateRecallSession,
+  fragmentTokenCap,
+  MIN_FRAGMENT_TOKENS,
 } from "./evaluate-recall-session";
 import { InMemoryRecallSessionUnitOfWork } from "./testing/in-memory-recall-session-unit-of-work";
 import {
@@ -846,10 +848,9 @@ describe("evaluateRecallSession", () => {
     }
   });
 
-  it("keeps the configured fragment share when the answers alone exceed the budget", async () => {
-    // 10 answers of 600 words (~8K tokens) cannot fit an 8K-TPM provider
-    // anyway, so the fragments keep their share of the page cap for the
-    // larger providers.
+  it("keeps a minimum fragment per answer when the answers alone exceed the budget", async () => {
+    // 10 answers of 600 words (~8K tokens) are over the budget on their
+    // own: each answer still gets a small fragment, never an empty one.
     const hugeAnswer = Array.from({ length: 600 }, (_, i) => `w${i}`).join(" ");
     const { ai, run } = await setup(
       Array.from({ length: 10 }, (_, i) => ({
@@ -864,6 +865,33 @@ describe("evaluateRecallSession", () => {
     for (const item of itemsOf(ai.calls[0]?.prompt)) {
       expect(item).toContain(`<page_fragment>\n${PAGE_TEXT}\n`);
     }
+  });
+
+  it("keeps the full page cap for a single answer", async () => {
+    // One answer is not batched: it keeps the whole 12K cap even though the
+    // prompt then skips Groq's 7K ceiling and goes to a larger provider.
+    const { ai, run } = await setup([
+      { questionId: "q-1", text: "ATP", self: 3 },
+    ]);
+    const longPage: PageTextReader = {
+      getPageText: async () =>
+        ok({
+          title: "Célula",
+          plainText: Array.from(
+            { length: 3000 },
+            () => "La mitocondria produce ATP para la célula y algo más.",
+          ).join(" "),
+        }),
+    };
+
+    await run({ pages: longPage, tokenCap: 12_000 });
+
+    const [item] = itemsOf(ai.calls[0]?.prompt);
+    const fragment = /<page_fragment>\n([\s\S]*?)\n<\/page_fragment>/.exec(
+      item ?? "",
+    )?.[1];
+    expect(estimateTokens(fragment ?? "")).toBeGreaterThan(11_000);
+    expect(estimateTokens(fragment ?? "")).toBeLessThanOrEqual(12_000);
   });
 
   it("evaluates with no fragment when the configured cap is not a number", async () => {
@@ -994,5 +1022,49 @@ describe("evaluateRecallSession", () => {
     expect(errors).toEqual([
       expect.objectContaining({ code: AI_ERROR.DAILY_LIMIT_REACHED }),
     ]);
+  });
+});
+
+describe("fragmentTokenCap", () => {
+  const budget = EVALUATION_PROMPT_TOKEN_BUDGET;
+
+  it("gives a single answer the whole page cap", () => {
+    expect(fragmentTokenCap(1, 12_000, 500)).toBe(12_000);
+    expect(fragmentTokenCap(1, 12_000, budget + 1000)).toBe(12_000);
+  });
+
+  it("splits what the budget leaves between the answers of a batch", () => {
+    // 6,500 - 1,500 = 5,000 tokens for 10 answers.
+    expect(fragmentTokenCap(10, 12_000, 1500)).toBe(500);
+    // Never more than the page cap's share.
+    expect(fragmentTokenCap(2, 20, 100)).toBe(10);
+  });
+
+  it("degrades to the minimum, never to zero, when the budget is smaller than the batch", () => {
+    // 5 tokens left for 10 answers, none left, and over the budget: the
+    // same minimum each time, with no jump back to the page cap.
+    for (const bare of [budget - 5, budget, budget + 2000]) {
+      expect(fragmentTokenCap(10, 12_000, bare)).toBe(MIN_FRAGMENT_TOKENS);
+    }
+    expect(MIN_FRAGMENT_TOKENS).toBeGreaterThan(0);
+  });
+
+  it("never grows as the rest of the prompt grows", () => {
+    let previous = Number.POSITIVE_INFINITY;
+    for (let bare = 0; bare <= budget + 500; bare += 50) {
+      const cap = fragmentTokenCap(10, 12_000, bare);
+      expect(cap).toBeGreaterThan(0);
+      expect(cap).toBeLessThanOrEqual(previous);
+      previous = cap;
+    }
+  });
+
+  it("keeps the minimum within the page cap's share", () => {
+    expect(fragmentTokenCap(4, 40, budget + 1000)).toBe(10);
+  });
+
+  it("returns no fragment for a cap that is not a number", () => {
+    expect(fragmentTokenCap(1, Number.NaN, 100)).toBeNaN();
+    expect(fragmentTokenCap(3, Number.NaN, 100)).toBeNaN();
   });
 });
