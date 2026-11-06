@@ -3,6 +3,8 @@ import {
   AI_ERROR,
   type AiGeneration,
   AiGenerationFailedError,
+  EVALUATION_PROMPT_TOKEN_BUDGET,
+  estimateTokens,
   type GenerateStructuredInput,
   type GenerationRateLimit,
   type GenerationRateLimiter,
@@ -803,6 +805,64 @@ describe("evaluateRecallSession", () => {
       expect(item).toContain(
         "<page_fragment>\nLa mitocondria produce ATP para la célula.\n</page_fragment>",
       );
+    }
+  });
+
+  it("keeps a 10-answer prompt of long answers within the evaluation token budget", async () => {
+    // 150 words per answer and a 30,000-word page: the 12K page cap alone
+    // would push the prompt far past what an 8K-TPM provider accepts.
+    const longAnswer = Array.from(
+      { length: 150 },
+      (_, i) => `palabra${i}`,
+    ).join(" ");
+    const { ai, run } = await setup(
+      Array.from({ length: 10 }, (_, i) => ({
+        questionId: `q-${i + 1}`,
+        text: longAnswer,
+        self: 3,
+      })),
+    );
+    const longPage: PageTextReader = {
+      getPageText: async () =>
+        ok({
+          title: "Célula",
+          plainText: Array.from(
+            { length: 3000 },
+            () => "La mitocondria produce ATP para la célula y algo más.",
+          ).join(" "),
+        }),
+    };
+
+    await run({ pages: longPage, tokenCap: 12_000 });
+
+    const call = ai.calls[0];
+    const tokens = estimateTokens(`${call?.system}\n${call?.prompt}`);
+    expect(tokens).toBeLessThanOrEqual(EVALUATION_PROMPT_TOKEN_BUDGET);
+    expect(EVALUATION_PROMPT_TOKEN_BUDGET).toBeLessThanOrEqual(7000);
+    const items = itemsOf(call?.prompt);
+    expect(items).toHaveLength(10);
+    for (const item of items) {
+      expect(item).toContain("La mitocondria produce ATP");
+    }
+  });
+
+  it("keeps the configured fragment share when the answers alone exceed the budget", async () => {
+    // 10 answers of 600 words (~8K tokens) cannot fit an 8K-TPM provider
+    // anyway, so the fragments keep their share of the page cap for the
+    // larger providers.
+    const hugeAnswer = Array.from({ length: 600 }, (_, i) => `w${i}`).join(" ");
+    const { ai, run } = await setup(
+      Array.from({ length: 10 }, (_, i) => ({
+        questionId: `q-${i + 1}`,
+        text: hugeAnswer,
+        self: 3,
+      })),
+    );
+
+    await run({ tokenCap: 12_000 });
+
+    for (const item of itemsOf(ai.calls[0]?.prompt)) {
+      expect(item).toContain(`<page_fragment>\n${PAGE_TEXT}\n`);
     }
   });
 

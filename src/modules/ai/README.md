@@ -10,9 +10,14 @@ and rate limiting (documento-maestro §8).
   - `purpose.ts` the six `AiPurpose` values.
   - `generation.ts` `AiGeneration` entity (§6.1) with guarded status
     transitions (`startGeneration`, `completeGeneration`, `failGeneration`).
-  - `provider.ts` `ProviderEntry`, `selectProvider`, `nextProviders`.
+  - `provider.ts` `ProviderEntry`, `selectProvider`, `nextProviders`,
+    `quotaKeyOf` (entries with the same `quotaKey` share one rpm/rpd budget)
+    and the optional `maxPromptTokens` ceiling (a bigger estimated prompt
+    skips the entry).
   - `circuit-breaker.ts` 3 failures open a provider for 10 minutes (§8.2).
-  - `truncate.ts` `truncateToTokenCap`, word-based page cap. Words are counted
+  - `truncate.ts` `truncateToTokenCap`, word-based page cap, `estimateTokens`
+    (ceil(words / 0.75)) and `EVALUATION_PROMPT_TOKEN_BUDGET` (6,500: the
+    batched recall evaluation shrinks its page fragments to fit it). Words are counted
     with the shared definition in `src/shared/kernel/words.ts`, the same one
     the incremental generation uses for its paragraph counts (Phase 6).
   - `errors.ts` `AI_ERROR` codes.
@@ -42,7 +47,8 @@ and rate limiting (documento-maestro §8).
   - `provider-registry.ts` the one provider table (ids, models, rpm/rpd,
     capabilities, priority); `buildProviderEntries(env)` and
     `buildProviderMap(env)` include only providers whose keys are set. Groq is
-    evaluation-only. Fake mode returns the `fake` entry alone.
+    evaluation-only. Fake mode returns the `fake` entry alone. The table is
+    below.
   - `ai-sdk-provider.ts` `createAiSdkProvider` adapts a `LanguageModel` to the
     `AiProvider` port through `generateObject` (injectable for tests).
   - `upstash-quota-store.ts`, `upstash-breaker-store.ts`,
@@ -75,12 +81,50 @@ Server only, never `NEXT_PUBLIC_*` (validated in `src/shared/config/env.schema.t
 - Live mode needs `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` and at
   least one generation provider: `GOOGLE_GENERATIVE_AI_API_KEY`,
   `OPENROUTER_API_KEY`, or `CLOUDFLARE_ACCOUNT_ID` plus `CLOUDFLARE_API_TOKEN`
-  (set together). `GROQ_API_KEY` enables the evaluation-only entry.
+  (set together). `GROQ_API_KEY` enables the three evaluation-only Groq
+  entries; one Google key serves every Gemini entry and one OpenRouter key
+  both `:free` entries.
 - `REDIS_KEY_PREFIX` (default `cogni:dev`, `cogni:prod` in production),
   `AI_DAILY_GENERATIONS` (default 6, key `{prefix}:ai:gen`),
   `AI_DAILY_EVALUATIONS` (default 10 recall sessions evaluated by the model
   per user and day, own key `{prefix}:ai:eval`, exposed as `evaluationLimiter`),
   `AI_PAGE_TOKEN_CAP` (default 12000).
+
+## Providers
+
+Fallback order is by priority, then table order. `generateStructured` makes at
+most 2 attempts per call (each attempt spends quota; the breaker and the next
+call skip a failing provider). Limits are the owner's dashboard values of
+2026-11-06; for token-bound providers `rpm`/`rpd` are the call counts their
+token budget allows.
+
+| id | model | purposes | rpm / rpd | priority |
+|---|---|---|---|---|
+| `groq-gpt-oss` | `openai/gpt-oss-120b` | evaluation, feedback | 1 / 36, prompt ≤ 7K | 1 |
+| `gemini-flash-lite` | `gemini-3.5-flash-lite` | all | 15 / 500 | 1 |
+| `gemini-3.1-flash-lite` | `gemini-3.1-flash-lite` | all | 15 / 500 | 1 |
+| `groq-gpt-oss-20b` | `openai/gpt-oss-20b` | evaluation, feedback | 1 / 36, prompt ≤ 7K | 2 |
+| `cloudflare-workers-ai` | `@cf/meta/llama-3.3-70b-instruct-fp8-fast` | generation | 30 / 13 | 2 |
+| `groq-qwen` | `qwen/qwen3.8-27b` (Groq preview) | evaluation, feedback | 1 / 36, prompt ≤ 7K | 3 |
+| `openrouter-nemotron` | `nvidia/nemotron-3.5-super-vl:free` | all | 20 / 1000 shared | 3 |
+| `openrouter-dots` | `dots-studio/dots-3-note-preview:free` | all | 20 / 1000 shared | 4 |
+| `gemini-3.8-flash` | `gemini-3.8-flash` | all | 5 / 20 | 5 |
+| `gemini-3.6-flash` | `gemini-3.6-flash` | all | 5 / 20 | 5 |
+| `gemini-3-flash` | `gemini-3-flash-preview` | all | 5 / 20 | 5 |
+| `gemini-2.5-flash-lite` | `gemini-2.5-flash-lite` | all | 10 / 20 | 5 |
+
+- Groq (per model): 30 RPM and 1,000 RPD, but 8K TPM and 200K TPD bind
+  first. 200K / ~5.5K tokens per batched evaluation ≈ 36 calls a day; one
+  full call a minute fits 8K TPM. A prompt over 7K estimated tokens skips
+  every Groq entry.
+- Cloudflare: 10K neurons a day ≈ 13 generation calls (~12K in, ~2K out).
+- OpenRouter: $10 of credit gives 1,000 requests a day on `:free` models,
+  account-wide; every `:free` row spends the shared quota key
+  `openrouter-free` (`{prefix}:ai:quota:openrouter-free:*`).
+- Evaluation alternates Groq and Gemini so the two attempts of one call land
+  on two vendors.
+- Left out: `gemini-2.5-flash` (deprecated, new users cannot select it, and
+  from 2026-12-01 it routes to 3.5 Flash-Lite) and Gemma 4 (out of scope).
 
 Decisions and dropped providers: `docs/adr/0004-capa-de-ia-con-proveedores-gratuitos.md`.
 
@@ -106,6 +150,8 @@ Step 1 generates 3 flashcards from a built-in sample text and prints
 current day counter under `{prefix}:ai:smoke:backup:{provider}`, sets the day
 key `{prefix}:ai:quota:{provider}:{yyyy-mm-dd}` to the provider's `rpd` (same
 TTL as the store, key built by the store's `quotaKeys`) and generates again.
+`{provider}` is the entry's quota key, so exhausting an OpenRouter entry
+exhausts the shared `openrouter-free` budget of both.
 It exits 0 only when the serving provider differs from the exhausted one.
 Generations use an in-memory repository (no `ai_generations` rows) and the
 owner id `smoke`; per-user rate limit keys are never touched.

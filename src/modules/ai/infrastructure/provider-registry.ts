@@ -30,60 +30,121 @@ const GENERATION_PURPOSES = AI_PURPOSES.filter(
   (purpose) => !EVALUATION_PURPOSES.includes(purpose),
 );
 
+const ALL_PURPOSES = [...GENERATION_PURPOSES, ...EVALUATION_PURPOSES];
+
+// Groq free tier, per model (owner's dashboard, 2026-11-06): 30 RPM and
+// 1,000 RPD, but only 8K TPM and 200K TPD, so tokens bind first. A full
+// batched evaluation is ~5.5K tokens in and out: 200K / 5.5K ≈ 36 calls a
+// day, and 8K TPM leaves room for one such call a minute. A prompt over 7K
+// estimated tokens cannot fit the minute window with its answer, so it
+// skips Groq.
+export const GROQ_MAX_PROMPT_TOKENS = 7000;
+const GROQ_LIMITS = {
+  rpm: 1,
+  rpd: 36,
+  maxPromptTokens: GROQ_MAX_PROMPT_TOKENS,
+} as const;
+
+// OpenRouter: with $10 of credit the account gets 1,000 requests a day on
+// `:free` models, shared account-wide, and 20 RPM. Every `:free` row
+// spends this one key.
+export const OPENROUTER_FREE_QUOTA_KEY = "openrouter-free";
+const OPENROUTER_FREE_LIMITS = {
+  rpm: 20,
+  rpd: 1000,
+  quotaKey: OPENROUTER_FREE_QUOTA_KEY,
+} as const;
+
 // THE provider table: ids, models, free-tier limits (rpm/rpd), capabilities
 // and fallback priority live here and nowhere else. Model ids and limits are
 // code-level defaults; an env override is a later task. Array order matters
-// on equal priority: `selectProvider` is stable, so Groq (evaluation only)
-// is listed before Gemini to win the evaluation tie at priority 1.
+// on equal priority: `selectProvider` is stable. Evaluation alternates Groq
+// and Gemini (120B, 3.5, 3.1, 20B, Qwen) so the two attempts of one call
+// land on two vendors; generation never uses Groq (its 8K TPM is below the
+// 12K page cap).
 interface RegistryRow {
   entry: ProviderEntry;
   isConfigured: (env: ProviderRegistryEnv) => boolean;
   createModel: (env: ProviderRegistryEnv) => LanguageModel;
 }
 
-function openRouterModel(modelId: string) {
-  return (env: ProviderRegistryEnv): LanguageModel =>
-    createOpenRouter({ apiKey: env.OPENROUTER_API_KEY }).chat(modelId);
-}
-
-const ROWS: readonly RegistryRow[] = [
-  {
+function groqRow(id: string, modelId: string, priority: number): RegistryRow {
+  return {
     entry: {
-      id: "groq-gpt-oss",
-      model: "openai/gpt-oss-120b",
+      id,
+      model: modelId,
       capabilities: EVALUATION_PURPOSES,
-      rpm: 30,
-      rpd: 1000,
-      priority: 1,
+      priority,
+      ...GROQ_LIMITS,
     },
     isConfigured: (env) => Boolean(env.GROQ_API_KEY),
-    createModel: (env) =>
-      createGroq({ apiKey: env.GROQ_API_KEY })("openai/gpt-oss-120b"),
-  },
-  {
-    entry: {
-      id: "gemini-flash-lite",
-      model: "gemini-3.5-flash-lite",
-      capabilities: [...GENERATION_PURPOSES, ...EVALUATION_PURPOSES],
-      // Free-tier limits read by the user in AI Studio on 2026-10-04
-      // (15 RPM, 250K TPM, 500 RPD); Google no longer publishes them.
-      rpm: 15,
-      rpd: 500,
-      priority: 1,
-    },
+    createModel: (env) => createGroq({ apiKey: env.GROQ_API_KEY })(modelId),
+  };
+}
+
+// Free-tier limits read by the owner in AI Studio (project Cogni) on
+// 2026-11-06; Google no longer publishes them. Model ids checked against
+// aistudio.google.com/docs/models the same day.
+function geminiRow(
+  id: string,
+  modelId: string,
+  limits: { rpm: number; rpd: number; priority: number },
+): RegistryRow {
+  return {
+    entry: { id, model: modelId, capabilities: ALL_PURPOSES, ...limits },
     isConfigured: (env) => Boolean(env.GOOGLE_GENERATIVE_AI_API_KEY),
     createModel: (env) =>
       createGoogleGenerativeAI({ apiKey: env.GOOGLE_GENERATIVE_AI_API_KEY })(
-        "gemini-3.5-flash-lite",
+        modelId,
       ),
-  },
+  };
+}
+
+// OpenRouter retires `:free` models without notice; both rows were checked
+// against /api/v1/models/<id>/endpoints (structured outputs supported) on
+// 2026-10-28. The adapter asks for the purpose's JSON schema the same way
+// for every purpose, so they serve evaluation too.
+function openRouterRow(
+  id: string,
+  modelId: string,
+  priority: number,
+): RegistryRow {
+  return {
+    entry: {
+      id,
+      model: modelId,
+      capabilities: ALL_PURPOSES,
+      priority,
+      ...OPENROUTER_FREE_LIMITS,
+    },
+    isConfigured: (env) => Boolean(env.OPENROUTER_API_KEY),
+    createModel: (env) =>
+      createOpenRouter({ apiKey: env.OPENROUTER_API_KEY }).chat(modelId),
+  };
+}
+
+const ROWS: readonly RegistryRow[] = [
+  groqRow("groq-gpt-oss", "openai/gpt-oss-120b", 1),
+  geminiRow("gemini-flash-lite", "gemini-3.5-flash-lite", {
+    rpm: 15,
+    rpd: 500,
+    priority: 1,
+  }),
+  geminiRow("gemini-3.1-flash-lite", "gemini-3.1-flash-lite", {
+    rpm: 15,
+    rpd: 500,
+    priority: 1,
+  }),
+  groqRow("groq-gpt-oss-20b", "openai/gpt-oss-20b", 2),
   {
     entry: {
       id: "cloudflare-workers-ai",
       model: "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
       capabilities: GENERATION_PURPOSES,
       rpm: 30,
-      rpd: 300,
+      // Free tier is 10K neurons a day: about 13 generation calls of ~12K
+      // tokens in and ~2K out.
+      rpd: 13,
       priority: 2,
     },
     isConfigured: (env) =>
@@ -98,33 +159,32 @@ const ROWS: readonly RegistryRow[] = [
         supportsStructuredOutputs: true,
       }).chatModel("@cf/meta/llama-3.3-70b-instruct-fp8-fast"),
   },
-  {
-    entry: {
-      id: "openrouter-nemotron",
-      model: "nvidia/nemotron-3.5-super-vl:free",
-      capabilities: GENERATION_PURPOSES,
-      rpm: 20,
-      rpd: 50,
-      priority: 3,
-    },
-    isConfigured: (env) => Boolean(env.OPENROUTER_API_KEY),
-    createModel: openRouterModel("nvidia/nemotron-3.5-super-vl:free"),
-  },
-  {
-    // OpenRouter retires `:free` models without notice; both rows were
-    // checked against /api/v1/models/<id>/endpoints (structured outputs
-    // supported) on 2026-10-28.
-    entry: {
-      id: "openrouter-dots",
-      model: "dots-studio/dots-3-note-preview:free",
-      capabilities: GENERATION_PURPOSES,
-      rpm: 20,
-      rpd: 50,
-      priority: 4,
-    },
-    isConfigured: (env) => Boolean(env.OPENROUTER_API_KEY),
-    createModel: openRouterModel("dots-studio/dots-3-note-preview:free"),
-  },
+  // Groq lists Qwen as a preview model (may change without notice), so it
+  // comes after the production gpt-oss models.
+  groqRow("groq-qwen", "qwen/qwen3.8-27b", 3),
+  openRouterRow("openrouter-nemotron", "nvidia/nemotron-3.5-super-vl:free", 3),
+  openRouterRow("openrouter-dots", "dots-studio/dots-3-note-preview:free", 4),
+  // Low-quota tail (20 RPD each): only once everything above is spent.
+  geminiRow("gemini-3.8-flash", "gemini-3.8-flash", {
+    rpm: 5,
+    rpd: 20,
+    priority: 5,
+  }),
+  geminiRow("gemini-3.6-flash", "gemini-3.6-flash", {
+    rpm: 5,
+    rpd: 20,
+    priority: 5,
+  }),
+  geminiRow("gemini-3-flash", "gemini-3-flash-preview", {
+    rpm: 5,
+    rpd: 20,
+    priority: 5,
+  }),
+  geminiRow("gemini-2.5-flash-lite", "gemini-2.5-flash-lite", {
+    rpm: 10,
+    rpd: 20,
+    priority: 5,
+  }),
 ];
 
 const FAKE_ENTRY: ProviderEntry = {

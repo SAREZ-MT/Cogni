@@ -7,10 +7,12 @@ import {
   type AiPurpose,
   type BreakerState,
   completeGeneration,
+  estimateTokens,
   failGeneration,
   isOpen,
   type ProviderEntry,
   type ProviderUsage,
+  quotaKeyOf,
   recordFailure,
   recordSuccess,
   selectProvider,
@@ -113,14 +115,17 @@ async function snapshot(
   const usage: Record<string, ProviderUsage> = {};
   const breakers: Record<string, BreakerState> = {};
   const unhealthyIds = new Set<string>();
-  await Promise.all(
-    deps.entries.map(async (entry) => {
-      usage[entry.id] = await deps.quota.readUsage(entry.id, now);
+  const quotaKeys = new Set(deps.entries.map(quotaKeyOf));
+  await Promise.all([
+    ...[...quotaKeys].map(async (key) => {
+      usage[key] = await deps.quota.readUsage(key, now);
+    }),
+    ...deps.entries.map(async (entry) => {
       const state = await deps.breakers.read(entry.id);
       breakers[entry.id] = state;
       if (isOpen(state, now)) unhealthyIds.add(entry.id);
     }),
-  );
+  ]);
   return { usage, breakers, unhealthyIds };
 }
 
@@ -140,6 +145,9 @@ export async function generateStructured(
     maxTemperatureFor(input.purpose),
   );
   const failedProviders: string[] = [];
+  // Same word-based estimate as the page cap; skips providers whose prompt
+  // ceiling (a small tokens-per-minute window) it would exceed.
+  const promptTokens = estimateTokens(`${input.system}\n${input.prompt}`);
   let lastFailedId: string | null = null;
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
@@ -150,6 +158,7 @@ export async function generateStructured(
       unhealthyIds: snap.unhealthyIds,
       usage: snap.usage,
       exclude: failedProviders,
+      promptTokens,
     });
     if (entry === null) {
       if (lastFailedId !== null) {
@@ -176,7 +185,7 @@ export async function generateStructured(
       deps.clock,
     );
     await deps.generations.create(started);
-    await deps.quota.recordCall(entry.id, now);
+    await deps.quota.recordCall(quotaKeyOf(entry), now);
 
     let failure: string | null = null;
     const timeout = AbortSignal.timeout(input.timeoutMs ?? ATTEMPT_TIMEOUT_MS);

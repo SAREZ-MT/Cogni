@@ -294,3 +294,64 @@ describe("ownership and audit", () => {
     expect(await t.generations.findById(id, "someone-else")).toBeNull();
   });
 });
+
+describe("shared quota budgets", () => {
+  const shared = (id: string, priority: number) =>
+    entry(id, priority, { quotaKey: "pool", rpd: 2, rpm: 20 });
+
+  it("records the call against the shared key, not the entry id", async () => {
+    const t = setup({ a: [{ object: GOOD }] }, [
+      shared("a", 1),
+      shared("b", 2),
+    ]);
+    await generateStructured(input(), t.deps, OWNER);
+    expect(t.quota.recorded.map((r) => r.providerId)).toEqual(["pool"]);
+  });
+
+  it("skips every entry of a spent shared budget", async () => {
+    const t = setup({ c: [{ object: GOOD }] }, [
+      shared("a", 1),
+      shared("b", 2),
+      entry("c", 3),
+    ]);
+    t.quota.seed("pool", { day: 2, minute: 0 });
+    const r = await generateStructured(input(), t.deps, OWNER);
+    expect(r.ok && r.value.generation.provider).toBe("c");
+    expect(t.totalCalls()).toBe(1);
+  });
+
+  it("spends the shared budget across its entries", async () => {
+    const t = setup(
+      { a: [{ object: GOOD }], b: [{ object: GOOD }], c: [{ object: GOOD }] },
+      [shared("a", 1), shared("b", 2), entry("c", 3)],
+    );
+    t.quota.seed("pool", { day: 1, minute: 0 });
+    await generateStructured(input(), t.deps, OWNER);
+    const r = await generateStructured(input(), t.deps, OWNER);
+    expect(r.ok && r.value.generation.provider).toBe("c");
+  });
+});
+
+describe("prompt token ceiling", () => {
+  // 7 words -> ceil(7 / 0.75) = 10 estimated tokens (system + prompt).
+  const tenTokens = { system: "one two three", prompt: "four five six seven" };
+
+  it("skips a provider whose ceiling the estimated prompt exceeds", async () => {
+    const t = setup({ b: [{ object: GOOD }] }, [
+      entry("a", 1, { maxPromptTokens: 9 }),
+      entry("b", 2),
+    ]);
+    const r = await generateStructured(input(tenTokens), t.deps, OWNER);
+    expect(r.ok && r.value.generation.provider).toBe("b");
+    expect(t.fakes.get("a")?.calls).toHaveLength(0);
+  });
+
+  it("uses a provider whose ceiling the prompt fits", async () => {
+    const t = setup({ a: [{ object: GOOD }] }, [
+      entry("a", 1, { maxPromptTokens: 10 }),
+      entry("b", 2),
+    ]);
+    const r = await generateStructured(input(tenTokens), t.deps, OWNER);
+    expect(r.ok && r.value.generation.provider).toBe("a");
+  });
+});

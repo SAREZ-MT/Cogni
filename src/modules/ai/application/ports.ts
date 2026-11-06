@@ -44,7 +44,8 @@ export type AiProviderMap = ReadonlyMap<string, AiProvider>;
 // adapter keeps two Redis counters per provider:
 //   ai:quota:{provider}:{yyyy-mm-dd}        TTL 48 h   (day)
 //   ai:quota:{provider}:{yyyy-mm-dd-hh-mm}  TTL 120 s  (minute)
-// Both buckets are derived from `now` in UTC.
+// Both buckets are derived from `now` in UTC. `{provider}` is the entry's
+// quota key (`quotaKeyOf`): entries sharing a key share the counters.
 export interface QuotaStore {
   readUsage(providerId: string, now: Date): Promise<ProviderUsage>;
   recordCall(providerId: string, now: Date): Promise<void>;

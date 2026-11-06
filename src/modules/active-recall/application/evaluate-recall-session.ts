@@ -4,6 +4,9 @@ import {
   AiGenerationFailedError,
   buildEvaluateRecallAnswersPrompt,
   EVALUATE_RECALL_ANSWER_PROMPT_VERSION,
+  EVALUATION_PROMPT_TOKEN_BUDGET,
+  type EvaluatedRecallAnswer,
+  estimateTokens,
   type GenerateStructuredInput,
   type GenerationRateLimiter,
   type RecallEvaluationOutput,
@@ -165,9 +168,41 @@ function resolveWithoutModel(
   return null;
 }
 
+function evaluatedItem(
+  { key, answer, question }: ModelAnswer,
+  pageFragment: string,
+): EvaluatedRecallAnswer {
+  return {
+    id: key,
+    question: question.prompt,
+    keyConcepts: question.rubric.keyConcepts,
+    acceptableAnswerSummary: question.rubric.acceptableAnswerSummary,
+    pageFragment,
+    answer: answer.answerText,
+  };
+}
+
+// Tokens the page fragments of one batched evaluation may share: what the
+// prompt without fragments leaves of EVALUATION_PROMPT_TOKEN_BUDGET, so the
+// whole call fits a small tokens-per-minute provider (Groq, 8K TPM), and
+// never more than the page cap. When the rest of the prompt alone is over
+// the budget no small provider can take the call anyway, so the fragments
+// keep the page cap for the larger ones. The estimate is additive (a
+// fragment of k tokens adds at most k), so the budget holds for the sum.
+function fragmentBudget(
+  items: readonly EvaluatedRecallAnswer[],
+  tokenCap: number,
+): number {
+  const bare = buildEvaluateRecallAnswersPrompt(items);
+  const left =
+    EVALUATION_PROMPT_TOKEN_BUDGET -
+    estimateTokens(`${bare.system}\n${bare.prompt}`);
+  return left > 0 ? Math.min(tokenCap, left) : tokenCap;
+}
+
 // Every written answer of the run in one generateStructured call
 // (evaluate_recall_answer/v2): each answer is an item with its own rubric
-// and page fragment, which share the token cap. The batched output is
+// and page fragment, which share the token cap (bounded by fragmentBudget). The batched output is
 // checked deterministically: an invalid one, or one with an id that was not
 // sent or comes back twice, fails every answer; an answer left without an
 // evaluation fails alone. No answer passes without its own evaluation.
@@ -194,20 +229,19 @@ async function evaluateWithModel(
     }
   }
 
-  const fragmentCap = Math.floor(deps.tokenCap / pending.length);
+  const fragmentCap = Math.floor(
+    fragmentBudget(
+      pending.map((model) => evaluatedItem(model, "")),
+      deps.tokenCap,
+    ) / pending.length,
+  );
   const prompt = buildEvaluateRecallAnswersPrompt(
-    pending.map(({ key, answer, question }) => ({
-      id: key,
-      question: question.prompt,
-      keyConcepts: question.rubric.keyConcepts,
-      acceptableAnswerSummary: question.rubric.acceptableAnswerSummary,
-      pageFragment: selectRelevantFragment(
-        context.plainText,
-        question,
-        fragmentCap,
+    pending.map((model) =>
+      evaluatedItem(
+        model,
+        selectRelevantFragment(context.plainText, model.question, fragmentCap),
       ),
-      answer: answer.answerText,
-    })),
+    ),
   );
   const generated = await deps.ai.generateStructured(
     {
