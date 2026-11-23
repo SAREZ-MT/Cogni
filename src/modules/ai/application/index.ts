@@ -11,6 +11,7 @@ export type {
   AiProvider,
   AiProviderMap,
   BreakerStore,
+  BudgetStore,
   GenerateObjectRequest,
   GenerateObjectResponse,
   GenerationRateLimit,

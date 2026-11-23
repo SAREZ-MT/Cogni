@@ -142,6 +142,7 @@ function stuckThenHealthyAi() {
       ["stuck", provider("stuck", true)],
       ["healthy", provider("healthy", false)],
     ]),
+    budget: { consume: async () => true },
     quota: {
       readUsage: async () => ({ day: 0, minute: 0 }),
       recordCall: async () => {},
@@ -179,7 +180,7 @@ interface Fixture {
   ai: ReturnType<typeof makeAi>;
   deps: RequestExamFeedbackDeps;
   questions: ExamQuestion[];
-  peeks: number;
+  checks: number;
 }
 
 let nextId = 0;
@@ -201,14 +202,14 @@ async function build(
     feedback,
     ai,
     questions,
-    peeks: 0,
+    checks: 0,
     deps: {
       uow,
       feedback,
       pages: pageReader(options.pageText),
       limiter: {
-        peek: async (): Promise<GenerationRateLimit> => {
-          fixture.peeks += 1;
+        check: async (): Promise<GenerationRateLimit> => {
+          fixture.checks += 1;
           return {
             allowed: options.allowed ?? true,
             remaining: options.allowed === false ? 0 : 3,
@@ -339,7 +340,7 @@ describe("requestExamFeedback", () => {
     expect(call.prompt).toContain("  Correct answer: ATP");
     expect(call.prompt).not.toContain("[Concepto q-05]");
     expect(call.prompt.endsWith(`Text:\n${PAGE_TEXT}`)).toBe(true);
-    expect(fx.peeks).toBe(1);
+    expect(fx.checks).toBe(1);
     expect(
       (await fx.feedback.findBySession("exam", "s-fail", OWNER))?.status,
     ).toBe("done");
@@ -382,7 +383,7 @@ describe("requestExamFeedback", () => {
       content: { summary: "Feedback de s-pass-1" },
     });
     expect(fx.ai.calls).toEqual([]);
-    expect(fx.peeks).toBe(0);
+    expect(fx.checks).toBe(0);
     expect(fx.feedback.creates).toBe(0);
     expect(await fx.feedback.findBySession("exam", "s-pass-2", OWNER)).toBe(
       null,
@@ -612,8 +613,8 @@ describe("requestExamFeedback", () => {
     if (!result.ok) throw result.error;
     expect(result.value.feedback.status).toBe("failed");
     expect(fx.ai.calls).toEqual([]);
-    // The limiter dependency only has `peek`: nothing can consume a unit.
-    expect(Object.keys(fx.deps.limiter)).toEqual(["peek"]);
+    // The feedback limit is consumed with `check`, its only dependency.
+    expect(Object.keys(fx.deps.limiter)).toEqual(["check"]);
   });
 
   it("is idempotent per session: a later request reads the stored row back", async () => {

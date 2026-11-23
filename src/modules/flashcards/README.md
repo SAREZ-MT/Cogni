@@ -68,8 +68,8 @@ sessions are scheduled by `study-engine`; this module adds the card text.
     finished session with at least one graded answer
     (`FLASHCARDS_FEEDBACK_SESSION_OPEN`, `FLASHCARDS_FEEDBACK_NOTHING_REVIEWED`)
     using the `session_feedback/v1` prompt (counts per button and up to 8
-    hardest fronts, never study time). It only peeks the daily AI limit and
-    never consumes it. Idempotent per session: the first request claims the
+    hardest fronts, never study time). It spends one unit of the daily feedback
+    limit (`AI_DAILY_FEEDBACKS`), never a generation. Idempotent per session: the first request claims the
     session's single `SessionFeedback` row, later ones read it back; a
     `pending` row untouched for `STALE_PENDING_MS` (2 min) is reclaimed; the
     AI wait is capped at `FEEDBACK_AI_TIMEOUT_MS` (25 s). The final write uses
@@ -108,7 +108,7 @@ sessions are scheduled by `study-engine`; this module adds the card text.
 
 ## Environment
 
-Read through the validated server env: `AI_DAILY_GENERATIONS` (default 6),
+Read through the validated server env: `AI_DAILY_GENERATIONS` (default 20),
 `AI_PAGE_TOKEN_CAP` (default 12000) and `AI_PROVIDER_MODE` (`fake` in CI and
 e2e, no provider keys needed). Provider keys and Redis variables belong to the
 `ai` module; see `src/modules/ai/README.md`, including the manual smoke script

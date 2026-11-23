@@ -199,6 +199,7 @@ function stuckThenHealthyAi() {
       ["stuck", provider("stuck", true)],
       ["healthy", provider("healthy", false)],
     ]),
+    budget: { consume: async () => true },
     quota: {
       readUsage: async () => ({ day: 0, minute: 0 }),
       recordCall: async () => {},
@@ -227,14 +228,14 @@ interface Fixture {
   logs: ReviewLog[];
   items: Map<string, StudyItem>;
   flashcards: InMemoryFlashcardRepository;
-  peeks: number;
+  checks: number;
 }
 
 let fx: Fixture;
 let nextId = 0;
 
 function build(
-  options: { ai?: AiOutcome; allowed?: boolean; peekThrows?: boolean } = {},
+  options: { ai?: AiOutcome; allowed?: boolean; checkThrows?: boolean } = {},
 ): Fixture {
   const sessions = new Map<string, FlashcardSession>();
   const logs: ReviewLog[] = [];
@@ -249,7 +250,7 @@ function build(
     logs,
     items,
     flashcards,
-    peeks: 0,
+    checks: 0,
     deps: {
       sessions: {
         findById: async (id, ownerId) => {
@@ -275,9 +276,9 @@ function build(
       flashcards,
       feedback,
       limiter: {
-        peek: async (): Promise<GenerationRateLimit> => {
-          fixture.peeks += 1;
-          if (options.peekThrows) throw new Error("redis unavailable");
+        check: async (): Promise<GenerationRateLimit> => {
+          fixture.checks += 1;
+          if (options.checkThrows) throw new Error("redis unavailable");
           return {
             allowed: options.allowed ?? true,
             remaining: options.allowed === false ? 0 : 3,
@@ -480,7 +481,7 @@ describe("requestSessionFeedback", () => {
 
     expect(second).toEqual(first);
     expect(fx.ai.calls).toHaveLength(1);
-    expect(fx.peeks).toBe(1);
+    expect(fx.checks).toBe(1);
   });
 
   it("never retries a failed feedback", async () => {
@@ -534,7 +535,7 @@ describe("requestSessionFeedback", () => {
   });
 
   it("stores failed feedback when reading the daily limit throws", async () => {
-    fx = build({ peekThrows: true });
+    fx = build({ checkThrows: true });
     await gradedSession();
 
     const result = await requestSessionFeedback(
@@ -823,7 +824,7 @@ describe("requestSessionFeedback", () => {
 
       expect(result.ok && result.value).toEqual(row);
       expect(fx.ai.calls).toHaveLength(0);
-      expect(fx.peeks).toBe(0);
+      expect(fx.checks).toBe(0);
     });
 
     it("returns the current row when a concurrent request reclaimed it first", async () => {

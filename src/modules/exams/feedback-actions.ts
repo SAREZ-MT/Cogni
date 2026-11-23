@@ -51,7 +51,7 @@ export async function requestExamFeedbackAction(
         uow: new DrizzleExamSessionUnitOfWork(db, ids),
         feedback: createSessionFeedbackSources(db).feedback,
         pages: createNotebooksServerApi({ db, clock: systemClock }),
-        limiter: ai.generationLimiter,
+        limiter: ai.feedbackLimiter,
         ai,
         clock: systemClock,
         ids,

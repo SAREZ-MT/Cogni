@@ -46,11 +46,22 @@ const serverObject = clientSchema.extend({
   REDIS_KEY_PREFIX: z.string().min(1).default("cogni:dev"),
   // `fake` swaps real providers for a deterministic one (CI, e2e).
   AI_PROVIDER_MODE: z.enum(["live", "fake"]).default("live"),
-  AI_DAILY_GENERATIONS: z.coerce.number().int().positive().default(6),
+  // Per-user daily generations (S1b): one unit per model call that
+  // generates, so an exam or retake of two batches costs two.
+  AI_DAILY_GENERATIONS: z.coerce.number().int().positive().default(20),
   // Per-user daily recall sessions evaluated by the model (active recall,
   // SRS RF-AI-03): one unit per session, all its written answers in one
   // call; a session of only skipped answers never counts.
   AI_DAILY_EVALUATIONS: z.coerce.number().int().positive().default(10),
+  // Per-user daily session feedbacks written by the model (flashcards and
+  // exams): one unit per feedback requested.
+  AI_DAILY_FEEDBACKS: z.coerce.number().int().positive().default(20),
+  // App-wide daily budgets (S1b), all users together, one unit per provider
+  // attempt. Their sum (1,750) is the free providers' usable daily capacity
+  // with a 20% reserve; a spent budget refuses calls until the next UTC day.
+  AI_GLOBAL_DAILY_GENERATIONS: z.coerce.number().int().positive().default(700),
+  AI_GLOBAL_DAILY_EVALUATIONS: z.coerce.number().int().positive().default(350),
+  AI_GLOBAL_DAILY_FEEDBACKS: z.coerce.number().int().positive().default(700),
   AI_PAGE_TOKEN_CAP: z.coerce.number().int().positive().default(12000),
 });
 

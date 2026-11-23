@@ -14,6 +14,7 @@ import {
 import { FakeAiProvider } from "./testing/fake-ai-provider";
 import { InMemoryAiGenerationRepository } from "./testing/in-memory-ai-generation-repository";
 import { InMemoryBreakerStore } from "./testing/in-memory-breaker-store";
+import { InMemoryBudgetStore } from "./testing/in-memory-budget-store";
 import { InMemoryQuotaStore } from "./testing/in-memory-quota-store";
 import { SequentialIds } from "./testing/sequential-ids";
 
@@ -44,10 +45,12 @@ function setup(scripts: Record<string, Outcome>, entries?: ProviderEntry[]) {
   const quota = new InMemoryQuotaStore();
   const breakers = new InMemoryBreakerStore();
   const generations = new InMemoryAiGenerationRepository();
+  const budget = new InMemoryBudgetStore();
   const deps: GenerateStructuredDeps = {
     entries: list,
     providers: fakes,
     quota,
+    budget,
     breakers,
     generations,
     clock: createFixedClock(NOW),
@@ -55,7 +58,7 @@ function setup(scripts: Record<string, Outcome>, entries?: ProviderEntry[]) {
   };
   const totalCalls = () =>
     [...fakes.values()].reduce((n, f) => n + f.calls.length, 0);
-  return { deps, fakes, quota, breakers, generations, totalCalls };
+  return { deps, fakes, quota, budget, breakers, generations, totalCalls };
 }
 
 function input(
@@ -373,5 +376,68 @@ describe("prompt token ceiling", () => {
     ]);
     const r = await generateStructured(input(tenTokens), t.deps, OWNER);
     expect(r.ok && r.value.generation.provider).toBe("a");
+  });
+});
+
+describe("app-wide daily budget", () => {
+  it("charges the purpose's group once per provider attempt", async () => {
+    const t = setup({
+      a: [{ throw: new Error("boom") }],
+      b: [{ object: GOOD }],
+    });
+    const r = await generateStructured(input(), t.deps, OWNER);
+    expect(r.ok).toBe(true);
+    expect(t.budget.consumed).toEqual(["generation", "generation"]);
+  });
+
+  it("charges evaluation and feedback to their own groups", async () => {
+    // The scripted object does not match these schemas: only the charged
+    // group of each attempt matters here.
+    for (const [purpose, group] of [
+      ["evaluate_recall_answer", "evaluation"],
+      ["session_feedback", "feedback"],
+    ] as const) {
+      const t = setup({ a: [{ invalid: true }] }, [
+        entry("a", 1, { capabilities: [purpose] }),
+      ]);
+      await generateStructured(input({ purpose }), t.deps, OWNER);
+      expect(t.budget.consumed).toEqual([group]);
+    }
+  });
+
+  it("refuses with DAILY_BUDGET_EXHAUSTED before any call or row", async () => {
+    const t = setup({ a: [{ object: GOOD }] });
+    t.budget.exhaust("generation");
+    const r = await generateStructured(input(), t.deps, OWNER);
+    expect(!r.ok && r.error.code).toBe(AI_ERROR.DAILY_BUDGET_EXHAUSTED);
+    expect(t.totalCalls()).toBe(0);
+    expect(t.generations.all()).toHaveLength(0);
+    expect(t.quota.recorded).toHaveLength(0);
+  });
+
+  it("leaves other groups working when one is exhausted", async () => {
+    const t = setup({ a: [{ object: GOOD }] });
+    t.budget.exhaust("feedback");
+    const r = await generateStructured(input(), t.deps, OWNER);
+    expect(r.ok).toBe(true);
+  });
+
+  it("fails closed when the budget store is unreachable", async () => {
+    const t = setup({ a: [{ object: GOOD }] });
+    t.budget.failWith(new Error("redis down"));
+    const r = await generateStructured(input(), t.deps, OWNER);
+    expect(!r.ok && r.error.code).toBe(AI_ERROR.DAILY_BUDGET_EXHAUSTED);
+    expect(t.totalCalls()).toBe(0);
+  });
+
+  it("stops the retry when the budget runs out after the first attempt", async () => {
+    const t = setup({
+      a: [{ throw: new Error("boom") }],
+      b: [{ object: GOOD }],
+    });
+    t.budget.limit("generation", 1);
+    const r = await generateStructured(input(), t.deps, OWNER);
+    expect(!r.ok && r.error.code).toBe(AI_ERROR.DAILY_BUDGET_EXHAUSTED);
+    expect(t.totalCalls()).toBe(1);
   });
 });

@@ -3,6 +3,7 @@
 export * from "./application";
 export * from "./domain";
 export {
+  AI_EVALUATION_RUNS_PER_SESSION,
   type AiServerApi,
   createAiServerApi,
 } from "./server-api";

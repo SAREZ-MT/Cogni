@@ -1,5 +1,10 @@
 import type { ZodType } from "zod";
-import type { AiGeneration, BreakerState, ProviderUsage } from "../domain";
+import type {
+  AiBudgetGroup,
+  AiGeneration,
+  BreakerState,
+  ProviderUsage,
+} from "../domain";
 
 // Ports of the ai application layer. They live here, not in `domain/`,
 // because `AiProvider` needs the Zod `ZodType` type and `domain-is-pure`
@@ -49,6 +54,14 @@ export type AiProviderMap = ReadonlyMap<string, AiProvider>;
 export interface QuotaStore {
   readUsage(providerId: string, now: Date): Promise<ProviderUsage>;
   recordCall(providerId: string, now: Date): Promise<void>;
+}
+
+// App-wide daily budget per group (AI_GLOBAL_DAILY_*), shared by every user
+// and bucketed by UTC day like the provider quota. `consume` charges one
+// provider attempt and answers whether it fits the budget. Callers fail
+// closed: a refusal or a thrown error means no model call.
+export interface BudgetStore {
+  consume(group: AiBudgetGroup, now: Date): Promise<boolean>;
 }
 
 export interface BreakerStore {

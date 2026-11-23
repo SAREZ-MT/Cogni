@@ -182,6 +182,7 @@ if (process.env.DATABASE_URL) {
       },
       ai: stubAi(state),
       limiter: createInMemoryGenerationLimiter({ limit: 60, clock }),
+      runLimiter: createInMemoryGenerationLimiter({ limit: 3, clock }),
       reviews: createRecallReviewRecorder({ db, ids: { next: randomUUID } }),
       clock,
       dueCutoff: utcDayCutoff,

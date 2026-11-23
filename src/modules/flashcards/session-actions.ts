@@ -219,7 +219,7 @@ export async function requestSessionFeedbackAction(
       {
         ...createSessionFeedbackSources(db),
         flashcards: new DrizzleFlashcardRepository(db),
-        limiter: ai.generationLimiter,
+        limiter: ai.feedbackLimiter,
         ai,
         clock: systemClock,
         ids,

@@ -125,8 +125,12 @@ describe("parseServerEnv AI layer", () => {
     const parsed = parseServerEnv({ ...noMode, AI_PROVIDER_MODE: "fake" });
     expect(parsed).toMatchObject({
       AI_PROVIDER_MODE: "fake",
-      AI_DAILY_GENERATIONS: 6,
+      AI_DAILY_GENERATIONS: 20,
       AI_DAILY_EVALUATIONS: 10,
+      AI_DAILY_FEEDBACKS: 20,
+      AI_GLOBAL_DAILY_GENERATIONS: 700,
+      AI_GLOBAL_DAILY_EVALUATIONS: 350,
+      AI_GLOBAL_DAILY_FEEDBACKS: 700,
       AI_PAGE_TOKEN_CAP: 12000,
       REDIS_KEY_PREFIX: "cogni:dev",
     });

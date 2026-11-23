@@ -300,6 +300,24 @@ describe("requestExamGeneration", () => {
     expect(ai.calls).toHaveLength(0);
   });
 
+  it("refuses a two-call request with one unit left, consuming nothing and calling no model", async () => {
+    const limiter = new StubLimiter(1);
+    const { deps, ai } = makeDeps({ limiter });
+
+    const result = await requestExamGeneration(
+      { pageId: PAGE, count: 30 },
+      deps,
+      OWNER,
+    );
+
+    expect(!result.ok && result.error.code).toBe(AI_ERROR.DAILY_LIMIT_REACHED);
+    expect(!result.ok && result.error).toBeInstanceOf(
+      ExamDailyLimitReachedError,
+    );
+    expect(limiter.checks).toBe(0);
+    expect(ai.calls).toHaveLength(0);
+  });
+
   it("stores nothing when the provider fails (the unit stays consumed, as in flashcards)", async () => {
     const ai = makeAi(["fail"]);
     const { deps, uow, limiter } = makeDeps({ ai });
@@ -390,7 +408,7 @@ describe("requestExamGeneration", () => {
     expect(uow.studyItems.all()).toHaveLength(0);
   });
 
-  it("splits 30 questions into two calls, telling the second about the first's stems, under one unit", async () => {
+  it("splits 30 questions into two calls, telling the second about the first's stems, one unit per call", async () => {
     const { deps, uow, limiter, ai } = makeDeps();
 
     const result = await requestExamGeneration(
@@ -401,7 +419,8 @@ describe("requestExamGeneration", () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(limiter.checks).toBe(1);
+    expect(limiter.checks).toBe(2);
+    expect(result.value.remainingToday).toBe(3);
     expect(ai.calls.map(requestedCount)).toEqual([15, 15]);
     expect(ai.calls[1]?.prompt).toContain("¿Pregunta 1.15?");
     expect(result.value.questions).toHaveLength(30);

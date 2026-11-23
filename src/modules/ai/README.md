@@ -87,10 +87,24 @@ Server only, never `NEXT_PUBLIC_*` (validated in `src/shared/config/env.schema.t
   entries; one Google key serves every Gemini entry and one OpenRouter key
   both `:free` entries.
 - `REDIS_KEY_PREFIX` (default `cogni:dev`, `cogni:prod` in production),
-  `AI_DAILY_GENERATIONS` (default 6, key `{prefix}:ai:gen`),
-  `AI_DAILY_EVALUATIONS` (default 10 recall sessions evaluated by the model
-  per user and day, own key `{prefix}:ai:eval`, exposed as `evaluationLimiter`),
   `AI_PAGE_TOKEN_CAP` (default 12000).
+- Per-user daily limits (fixed UTC-day windows in Upstash, one key each):
+  `AI_DAILY_GENERATIONS` (default 20, key `{prefix}:ai:gen`, one unit per
+  model call that generates, so an exam or retake of two batches costs two),
+  `AI_DAILY_EVALUATIONS` (default 10 recall sessions evaluated by the model,
+  key `{prefix}:ai:eval`, exposed as `evaluationLimiter`) and
+  `AI_DAILY_FEEDBACKS` (default 20 session feedbacks, key
+  `{prefix}:ai:feedback`, exposed as `feedbackLimiter`). A recall session
+  gets at most 3 model evaluation runs a day (`evaluationRunLimiter`, key
+  `{prefix}:ai:evalrun`, keyed by session id).
+- App-wide daily budgets, all users together, one unit per provider attempt:
+  `AI_GLOBAL_DAILY_GENERATIONS` (default 700), `AI_GLOBAL_DAILY_EVALUATIONS`
+  (350) and `AI_GLOBAL_DAILY_FEEDBACKS` (700), counted under
+  `{prefix}:ai:budget:{group}:{yyyy-mm-dd}`. `generateStructured` charges the
+  budget of the purpose's group before each attempt and fails closed: a spent
+  budget, or a Redis error while checking it, ends the call with
+  `AI_DAILY_BUDGET_EXHAUSTED` and no provider is called. Fake mode has no
+  budget.
 
 ## Providers
 

@@ -160,7 +160,11 @@ interface SeedAnswer {
 
 async function setup(
   answers: SeedAnswer[],
-  options: { finished?: boolean; limiter?: StubLimiter } = {},
+  options: {
+    finished?: boolean;
+    limiter?: StubLimiter;
+    runLimiter?: StubLimiter;
+  } = {},
 ) {
   const uow = new InMemoryRecallSessionUnitOfWork();
   await seedQuestions(
@@ -194,6 +198,7 @@ async function setup(
   const ai = new StubAi();
   const reviews = new StubReviews();
   const limiter = options.limiter ?? new StubLimiter();
+  const runLimiter = options.runLimiter ?? new StubLimiter(3);
   const errors: unknown[] = [];
   const deps: EvaluateRecallSessionDeps = {
     uow,
@@ -203,6 +208,7 @@ async function setup(
     pages,
     ai,
     limiter,
+    runLimiter,
     reviews,
     clock: createFixedClock(EVAL_AT),
     dueCutoff: (now) =>
@@ -216,7 +222,7 @@ async function setup(
       { ...deps, ...overrides },
       OWNER,
     );
-  return { uow, deps, ai, reviews, limiter, errors, run };
+  return { uow, deps, ai, reviews, limiter, runLimiter, errors, run };
 }
 
 async function stored(uow: InMemoryRecallSessionUnitOfWork) {
@@ -655,6 +661,44 @@ describe("evaluateRecallSession", () => {
     await run();
 
     expect(limiter.checks).toBe(1);
+  });
+
+  // Review F5: a charged session skips the daily-limit peek, so without a
+  // cap "Reintentar" on an answer that keeps failing would call the model
+  // without end.
+  it("stops calling the model after three evaluation runs of a session", async () => {
+    const { uow, ai, runLimiter, run } = await setup([
+      { questionId: "q-1", text: "ATP", self: 3 },
+      { questionId: "q-2", text: "OMITE", self: 3 },
+    ]);
+    await run();
+    for (let retry = 0; retry < 3; retry++) {
+      await uow.repos.answers.requeueFailed(SESSION, OWNER, EVAL_AT);
+      await run();
+    }
+
+    expect(ai.calls).toHaveLength(3);
+    expect(runLimiter.checks).toBe(4);
+    const answers = await stored(uow);
+    expect(answers[0]?.evaluationStatus).toBe("done");
+    expect(answers[1]?.aiEvaluation).toEqual({
+      source: "failed",
+      code: AI_ERROR.DAILY_LIMIT_REACHED,
+      generationId: null,
+      resetAt: RESET.toISOString(),
+    });
+  });
+
+  it("does not count a run that never reaches the model", async () => {
+    const { runLimiter, run } = await setup(
+      [
+        { questionId: "q-1", text: "ATP", self: 3 },
+        { questionId: "q-2", text: "", self: 0 },
+      ],
+      { limiter: new StubLimiter(0) },
+    );
+    await run();
+    expect(runLimiter.checks).toBe(0);
   });
 
   it("leaves an open session alone", async () => {

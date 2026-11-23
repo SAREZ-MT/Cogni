@@ -6,6 +6,7 @@ import {
   type AiGeneration,
   type AiPurpose,
   type BreakerState,
+  budgetGroupOf,
   completeGeneration,
   estimateTokens,
   failGeneration,
@@ -24,6 +25,7 @@ import type {
   AiGenerationRepository,
   AiProviderMap,
   BreakerStore,
+  BudgetStore,
   IdGenerator,
   QuotaStore,
 } from "./ports";
@@ -49,6 +51,8 @@ export interface GenerateStructuredDeps {
   entries: readonly ProviderEntry[];
   providers: AiProviderMap;
   quota: QuotaStore;
+  // App-wide daily budget of the purpose's group, charged per attempt.
+  budget: BudgetStore;
   breakers: BreakerStore;
   generations: AiGenerationRepository;
   clock: Clock;
@@ -130,11 +134,28 @@ async function snapshot(
   return { usage, breakers, unhealthyIds };
 }
 
+// Charges one attempt to the app-wide budget. Fails closed: a store that
+// cannot answer refuses the call like a spent budget.
+async function withinBudget(
+  deps: GenerateStructuredDeps,
+  purpose: AiPurpose,
+  now: Date,
+): Promise<boolean> {
+  try {
+    return await deps.budget.consume(budgetGroupOf(purpose), now);
+  } catch {
+    return false;
+  }
+}
+
 // Single entry point for every model call (documento-maestro §8.1): select a
 // provider, call it, validate against the purpose schema, audit every attempt
 // and retry once on the next provider, of another vendor when one is
 // eligible. Every attempt runs under its own timeout (and the caller's
-// signal); an abort is a failed attempt. Never invents an object.
+// signal); an abort is a failed attempt. Every attempt is first charged to
+// the app-wide daily budget of its purpose; a spent budget ends the
+// generation with AI_DAILY_BUDGET_EXHAUSTED before the provider is called
+// or the attempt audited. Never invents an object.
 export async function generateStructured(
   input: GenerateStructuredInput,
   deps: GenerateStructuredDeps,
@@ -173,6 +194,17 @@ export async function generateStructured(
         new DomainError(
           AI_ERROR.NO_PROVIDER_AVAILABLE,
           "No AI provider is available for this purpose",
+        ),
+      );
+    }
+
+    // Charged only once a provider is chosen, so an attempt that calls
+    // nothing costs nothing.
+    if (!(await withinBudget(deps, input.purpose, now))) {
+      return err(
+        new DomainError(
+          AI_ERROR.DAILY_BUDGET_EXHAUSTED,
+          "The app-wide daily AI budget for this purpose is spent",
         ),
       );
     }

@@ -35,9 +35,9 @@ export interface RequestExamFeedbackDeps {
   uow: ExamSessionUnitOfWork;
   feedback: SessionFeedbackRepository;
   pages: PageTextReader;
-  // Only `peek`: feedback respects the student's daily AI limit but does
-  // not spend a generation of it (same as flashcards).
-  limiter: Pick<GenerationRateLimiter, "peek">;
+  // AI_DAILY_FEEDBACKS (the ai module's feedbackLimiter): `check` spends
+  // one unit per feedback the model is asked for (same as flashcards).
+  limiter: Pick<GenerationRateLimiter, "check">;
   ai: {
     generateStructured(
       input: GenerateStructuredInput,
@@ -329,7 +329,7 @@ export async function requestExamFeedback(
   };
 
   try {
-    const limit = await deps.limiter.peek(ownerId);
+    const limit = await deps.limiter.check(ownerId);
     if (!limit.allowed) return fail(null);
 
     let generated: Awaited<ReturnType<typeof deps.ai.generateStructured>>;

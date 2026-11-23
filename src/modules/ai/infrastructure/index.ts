@@ -8,6 +8,7 @@ export {
   type ProviderRegistryEnv,
 } from "./provider-registry";
 export { UpstashBreakerStore } from "./upstash-breaker-store";
+export { UpstashBudgetStore } from "./upstash-budget-store";
 export { UpstashQuotaStore } from "./upstash-quota-store";
 export { createDailyGenerationLimiter } from "./upstash-rate-limiter";
 export { createUpstashRedis } from "./upstash-redis";

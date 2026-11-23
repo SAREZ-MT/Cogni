@@ -91,6 +91,10 @@ export interface EvaluateRecallSessionDeps {
   };
   // AI_DAILY_EVALUATIONS: one unit per session the model evaluated.
   limiter: GenerationRateLimiter;
+  // Keyed by session id (the ai module's evaluationRunLimiter): one unit
+  // per run that calls the model, so "Reintentar" cannot call it without
+  // end on a session already charged (review F5).
+  runLimiter: Pick<GenerationRateLimiter, "check">;
   // study-engine's recordRecallReviews (replay-safe per session and item).
   reviews: {
     record(
@@ -227,10 +231,18 @@ export function fragmentTokenCap(
 // call costs nothing. A reached limit fails the answers (never leaves them
 // pending): the session ends partial and "Reintentar" evaluates them once
 // the window resets. A session already `charged` (an earlier run consumed
-// its unit) is neither peeked nor charged again (review F2).
+// its unit) is neither peeked nor charged again (review F2). Every run that
+// reaches the model also spends one of the session's evaluation runs; with
+// none left the answers fail the same way, with that window's reset
+// (review F5).
 async function evaluateWithModel(
   pending: readonly ModelAnswer[],
-  context: { plainText: string; pageId: string; charged: boolean },
+  context: {
+    plainText: string;
+    pageId: string;
+    sessionId: string;
+    charged: boolean;
+  },
   deps: EvaluateRecallSessionDeps,
   ownerId: string,
 ): Promise<Map<string, RecallEvaluationResult>> {
@@ -242,6 +254,10 @@ async function evaluateWithModel(
     if (!limit.allowed) {
       return failAll(failed(AI_ERROR.DAILY_LIMIT_REACHED, null, limit.resetAt));
     }
+  }
+  const runs = await deps.runLimiter.check(context.sessionId);
+  if (!runs.allowed) {
+    return failAll(failed(AI_ERROR.DAILY_LIMIT_REACHED, null, runs.resetAt));
   }
 
   const bare = buildEvaluateRecallAnswersPrompt(
@@ -497,6 +513,7 @@ export async function evaluateRecallSession(
           {
             plainText,
             pageId: session.pageId,
+            sessionId: session.id,
             charged: await alreadyCharged(session, deps, ownerId),
           },
           deps,

@@ -14,11 +14,13 @@ import {
 import type {
   AiGenerationRepository,
   BreakerStore,
+  BudgetStore,
   GenerationRateLimiter,
   IdGenerator,
   QuotaStore,
 } from "./application/ports";
 import { InMemoryBreakerStore } from "./application/testing/in-memory-breaker-store";
+import { InMemoryBudgetStore } from "./application/testing/in-memory-budget-store";
 import { InMemoryQuotaStore } from "./application/testing/in-memory-quota-store";
 import type { ProviderEntry } from "./domain";
 import {
@@ -29,8 +31,13 @@ import {
   createUpstashRedis,
   DrizzleAiGenerationRepository,
   UpstashBreakerStore,
+  UpstashBudgetStore,
   UpstashQuotaStore,
 } from "./infrastructure";
+
+// Model evaluation runs one recall session may take in a day (review F5):
+// the first run plus two "Reintentar".
+export const AI_EVALUATION_RUNS_PER_SESSION = 3;
 
 export interface AiServerApi {
   generateStructured(
@@ -43,6 +50,12 @@ export interface AiServerApi {
   // (AI_DAILY_EVALUATIONS), under its own key: one unit per evaluated
   // session (all its written answers go in one call).
   evaluationLimiter: GenerationRateLimiter;
+  // Per-owner daily session feedbacks (AI_DAILY_FEEDBACKS), under its own
+  // key: one unit per feedback the model is asked for.
+  feedbackLimiter: GenerationRateLimiter;
+  // Keyed by recall session id, not owner: caps the model evaluation runs of
+  // one session at AI_EVALUATION_RUNS_PER_SESSION per day.
+  evaluationRunLimiter: GenerationRateLimiter;
   entries: readonly ProviderEntry[];
 }
 
@@ -54,11 +67,16 @@ export interface FakeAiInfra {
   breakers: BreakerStore;
   limiter: GenerationRateLimiter;
   evaluationLimiter: GenerationRateLimiter;
+  feedbackLimiter: GenerationRateLimiter;
+  evaluationRunLimiter: GenerationRateLimiter;
+  // Unlimited unless a test caps it: fake mode makes no real calls.
+  budget: BudgetStore;
 }
 
 export function createFakeAiInfra(options?: {
   limit?: number;
   evaluationLimit?: number;
+  feedbackLimit?: number;
   clock?: Clock;
 }): FakeAiInfra {
   const clock = options?.clock ?? { now: () => new Date() };
@@ -73,6 +91,15 @@ export function createFakeAiInfra(options?: {
       limit: options?.evaluationLimit ?? 60,
       clock,
     }),
+    feedbackLimiter: createInMemoryGenerationLimiter({
+      limit: options?.feedbackLimit ?? 20,
+      clock,
+    }),
+    evaluationRunLimiter: createInMemoryGenerationLimiter({
+      limit: AI_EVALUATION_RUNS_PER_SESSION,
+      clock,
+    }),
+    budget: new InMemoryBudgetStore(),
   };
 }
 
@@ -98,14 +125,25 @@ export function createAiServerApi(deps: {
   let breakers: BreakerStore;
   let generationLimiter: GenerationRateLimiter;
   let evaluationLimiter: GenerationRateLimiter;
+  let feedbackLimiter: GenerationRateLimiter;
+  let evaluationRunLimiter: GenerationRateLimiter;
+  let budget: BudgetStore;
   if (env.AI_PROVIDER_MODE === "fake") {
     sharedFakeInfra ??= createFakeAiInfra({
       limit: env.AI_DAILY_GENERATIONS,
       evaluationLimit: env.AI_DAILY_EVALUATIONS,
+      feedbackLimit: env.AI_DAILY_FEEDBACKS,
       clock,
     });
     const infra = deps.fakeInfra ?? sharedFakeInfra;
-    ({ quota, breakers, evaluationLimiter } = infra);
+    ({
+      quota,
+      breakers,
+      budget,
+      evaluationLimiter,
+      feedbackLimiter,
+      evaluationRunLimiter,
+    } = infra);
     generationLimiter = infra.limiter;
   } else {
     if (!env.UPSTASH_REDIS_REST_URL || !env.UPSTASH_REDIS_REST_TOKEN) {
@@ -128,16 +166,44 @@ export function createAiServerApi(deps: {
       limit: env.AI_DAILY_EVALUATIONS,
       scope: "eval",
     });
+    feedbackLimiter = createDailyGenerationLimiter({
+      redis,
+      prefix: env.REDIS_KEY_PREFIX,
+      limit: env.AI_DAILY_FEEDBACKS,
+      scope: "feedback",
+    });
+    evaluationRunLimiter = createDailyGenerationLimiter({
+      redis,
+      prefix: env.REDIS_KEY_PREFIX,
+      limit: AI_EVALUATION_RUNS_PER_SESSION,
+      scope: "evalrun",
+    });
+    budget = new UpstashBudgetStore(redis, env.REDIS_KEY_PREFIX, {
+      generation: env.AI_GLOBAL_DAILY_GENERATIONS,
+      evaluation: env.AI_GLOBAL_DAILY_EVALUATIONS,
+      feedback: env.AI_GLOBAL_DAILY_FEEDBACKS,
+    });
   }
 
   return {
     entries,
     generationLimiter,
     evaluationLimiter,
+    feedbackLimiter,
+    evaluationRunLimiter,
     generateStructured: (input, ownerId) =>
       generateStructured(
         input,
-        { entries, providers, quota, breakers, generations, clock, ids },
+        {
+          entries,
+          providers,
+          quota,
+          budget,
+          breakers,
+          generations,
+          clock,
+          ids,
+        },
         ownerId,
       ),
   };

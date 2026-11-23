@@ -6,5 +6,6 @@ export {
 } from "./application/testing/fake-ai-provider";
 export { InMemoryAiGenerationRepository } from "./application/testing/in-memory-ai-generation-repository";
 export { InMemoryBreakerStore } from "./application/testing/in-memory-breaker-store";
+export { InMemoryBudgetStore } from "./application/testing/in-memory-budget-store";
 export { InMemoryQuotaStore } from "./application/testing/in-memory-quota-store";
 export { SequentialIds } from "./application/testing/sequential-ids";

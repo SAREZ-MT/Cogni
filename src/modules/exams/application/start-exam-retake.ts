@@ -33,6 +33,7 @@ import {
 } from "./exam-session-work";
 import { runExamWork } from "./exam-unit-of-work";
 import {
+  consumeGenerationUnits,
   EXAM_GENERATION_BATCH_SIZE,
   ExamDailyLimitReachedError,
   splitIntoBatches,
@@ -138,9 +139,9 @@ function noRetakePending(pageId: string) {
 // - A failed root that already has an active, unshown variant (stored by
 //   an earlier attempt) reuses it; only the other roots are sent to the
 //   model, so a retake whose variants all exist makes no AI call.
-// - Otherwise the daily limit is PEEKED (an exhausted limit refuses with
-//   AI_DAILY_LIMIT_REACHED and calls nothing), the variants are generated
-//   in calls of at most 15 roots, and each one is checked with newVariant
+// - Otherwise the daily limit is PEEKED (fewer units left than variants
+//   calls refuses with AI_DAILY_LIMIT_REACHED and calls nothing), the
+//   variants are generated in calls of at most 15 roots, and each one is checked with newVariant
 //   against the root's whole lineage. A provider failure, an unusable
 //   answer, a missing root or a repeated wording blocks the retake with
 //   EXAMS_RETAKE_VARIANT_MISSING: nothing is stored and no unit is
@@ -184,9 +185,14 @@ export async function startExamRetake(
 
   const missing = plan.roots.filter((root) => root.fresh === null);
   let generated = new Map<string, NewVariantInput>();
+  // One unit of the daily limit per variants call (S1c).
+  const units =
+    missing.length > 0
+      ? splitIntoBatches(missing.length, EXAM_GENERATION_BATCH_SIZE).length
+      : 0;
   if (missing.length > 0) {
     const limit = await deps.limiter.peek(ownerId);
-    if (!limit.allowed) {
+    if (limit.remaining < units) {
       return err(new ExamDailyLimitReachedError(limit.resetAt));
     }
     const variants = await generateVariants(
@@ -278,7 +284,7 @@ export async function startExamRetake(
 
   let remainingToday: number | null = null;
   if (generated.size > 0) {
-    const consumed = await deps.limiter.check(ownerId);
+    const consumed = await consumeGenerationUnits(deps.limiter, ownerId, units);
     remainingToday = consumed.allowed ? consumed.remaining : 0;
   }
   return ok({

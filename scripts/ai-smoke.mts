@@ -162,6 +162,8 @@ const deps = {
   entries,
   providers: buildProviderMap(registryEnv),
   quota: new UpstashQuotaStore(redis, prefix),
+  // A manual run of two calls: not charged to the app-wide budget.
+  budget: { consume: async () => true },
   breakers: new UpstashBreakerStore(redis, prefix),
   generations,
   clock: { now: () => new Date() },

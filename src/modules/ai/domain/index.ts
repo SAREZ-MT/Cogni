@@ -26,7 +26,13 @@ export {
   selectProvider,
   vendorOf,
 } from "./provider";
-export { AI_PURPOSES, type AiPurpose } from "./purpose";
+export {
+  AI_BUDGET_GROUPS,
+  AI_PURPOSES,
+  type AiBudgetGroup,
+  type AiPurpose,
+  budgetGroupOf,
+} from "./purpose";
 export {
   EVALUATION_PROMPT_TOKEN_BUDGET,
   estimateTokens,

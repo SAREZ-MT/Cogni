@@ -32,9 +32,9 @@ export interface RequestSessionFeedbackDeps {
   studyItems: Pick<StudyItemRepository, "findById">;
   flashcards: Pick<FlashcardRepository, "findById">;
   feedback: SessionFeedbackRepository;
-  // Only `peek`: feedback respects the student's daily AI limit but does
-  // not spend a generation of it.
-  limiter: Pick<GenerationRateLimiter, "peek">;
+  // AI_DAILY_FEEDBACKS (the ai module's feedbackLimiter): `check` spends
+  // one unit per feedback the model is asked for, whatever its outcome.
+  limiter: Pick<GenerationRateLimiter, "check">;
   ai: {
     generateStructured(
       input: GenerateStructuredInput,
@@ -263,7 +263,7 @@ export async function requestSessionFeedback(
 
   // Every error after the claim ends in "failed", never in a stuck row.
   try {
-    const limit = await deps.limiter.peek(ownerId);
+    const limit = await deps.limiter.check(ownerId);
     if (!limit.allowed) return fail(null);
 
     let generated: Awaited<ReturnType<typeof deps.ai.generateStructured>>;

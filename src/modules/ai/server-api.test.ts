@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createFixedClock } from "@/shared/kernel/clock";
 import { buildGenerateFlashcardsPrompt } from "./application/prompts/generate_flashcards/v1";
 import { InMemoryAiGenerationRepository } from "./application/testing/in-memory-ai-generation-repository";
+import type { InMemoryBudgetStore } from "./application/testing/in-memory-budget-store";
 import { SequentialIds } from "./application/testing/sequential-ids";
 import { createAiServerApi, createFakeAiInfra } from "./server-api";
 
@@ -86,5 +87,55 @@ describe("createAiServerApi in fake mode", () => {
       allowed: true,
       remaining: 60,
     });
+  });
+
+  it("limits session feedbacks per owner and day under their own counter", async () => {
+    const api = createAiServerApi({
+      env,
+      db: {} as never,
+      clock: createFixedClock(new Date("2026-10-03T10:00:00Z")),
+      ids: new SequentialIds(),
+      generations: new InMemoryAiGenerationRepository(),
+      fakeInfra: createFakeAiInfra({ limit: 1, feedbackLimit: 2 }),
+    });
+    await api.generationLimiter.check("owner-1");
+    expect((await api.generationLimiter.peek("owner-1")).allowed).toBe(false);
+
+    expect(await api.feedbackLimiter.check("owner-1")).toMatchObject({
+      allowed: true,
+      remaining: 1,
+    });
+    await api.feedbackLimiter.check("owner-1");
+    expect((await api.feedbackLimiter.check("owner-1")).allowed).toBe(false);
+  });
+
+  it("allows three model evaluation runs per recall session", async () => {
+    const { api } = build();
+    for (let run = 0; run < 3; run++) {
+      expect((await api.evaluationRunLimiter.check("session-1")).allowed).toBe(
+        true,
+      );
+    }
+    expect((await api.evaluationRunLimiter.check("session-1")).allowed).toBe(
+      false,
+    );
+    expect((await api.evaluationRunLimiter.check("session-2")).allowed).toBe(
+      true,
+    );
+  });
+
+  it("refuses a generation once the app-wide budget is spent", async () => {
+    const infra = createFakeAiInfra();
+    (infra.budget as InMemoryBudgetStore).exhaust("generation");
+    const api = createAiServerApi({
+      env,
+      db: {} as never,
+      clock: createFixedClock(new Date("2026-10-03T10:00:00Z")),
+      ids: new SequentialIds(),
+      generations: new InMemoryAiGenerationRepository(),
+      fakeInfra: infra,
+    });
+    const result = await api.generateStructured(input, "owner-1");
+    expect(!result.ok && result.error.code).toBe("AI_DAILY_BUDGET_EXHAUSTED");
   });
 });

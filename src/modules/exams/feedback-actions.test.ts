@@ -47,6 +47,7 @@ let current: {
   limit: GenerationRateLimit;
   calls: GenerateStructuredInput[];
   checks: number;
+  feedbackChecks: number;
 };
 
 vi.mock("@/modules/ai", async (importOriginal) => ({
@@ -65,6 +66,12 @@ vi.mock("@/modules/ai", async (importOriginal) => ({
         return current.limit;
       },
       peek: async () => current.limit,
+    },
+    feedbackLimiter: {
+      check: async () => {
+        current.feedbackChecks += 1;
+        return current.limit;
+      },
     },
   }),
 }));
@@ -167,6 +174,7 @@ describe("exam feedback actions", () => {
       limit: { allowed: true, remaining: 5, resetAt: RESET },
       calls: [],
       checks: 0,
+      feedbackChecks: 0,
     };
   });
 
@@ -197,6 +205,8 @@ describe("exam feedback actions", () => {
     expect(current.calls).toHaveLength(1);
     expect(current.calls[0].promptVersion).toBe("session_feedback/v2");
     expect(current.checks).toBe(0);
+    // It spends one unit of the feedback limit instead.
+    expect(current.feedbackChecks).toBe(1);
   });
 
   it("shows the last pass's feedback again for a later pass", async () => {
