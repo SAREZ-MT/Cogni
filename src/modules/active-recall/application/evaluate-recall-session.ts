@@ -232,7 +232,8 @@ export function fragmentTokenCap(
 // pending): the session ends partial and "Reintentar" evaluates them once
 // the window resets. A session already `charged` (an earlier run consumed
 // its unit) is neither peeked nor charged again (review F2). Every run that
-// reaches the model also spends one of the session's evaluation runs; with
+// passes the daily limit also spends one of the session's evaluation runs,
+// before the call and whatever its outcome (a provider outage counts); with
 // none left the answers fail the same way, with that window's reset
 // (review F5).
 async function evaluateWithModel(

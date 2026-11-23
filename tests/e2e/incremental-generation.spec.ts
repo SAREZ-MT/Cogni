@@ -79,7 +79,7 @@ async function addSecondParagraph(page: Page) {
 test.describe("incremental generation", () => {
   test.skip(!hasSupabaseEnv, "Supabase env (cogni-dev) is not configured");
 
-  // A test-scoped user: the fake AI daily limit (6 per owner, in server
+  // A test-scoped user: the fake AI daily limit (20 per owner, in server
   // memory) is not shared with other specs.
   test.beforeEach(async ({ page, freshUser }) => {
     await signIn(page, freshUser);
