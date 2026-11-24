@@ -10,8 +10,10 @@ const { getCurrentUser, getCurrentTimeZoneSetting } = vi.hoisted(() => ({
   getCurrentUser: vi.fn(),
   getCurrentTimeZoneSetting: vi.fn(),
 }));
-vi.mock("@/modules/identity", () => ({
-  getCurrentUser,
+vi.mock("@/modules/identity", async () => ({
+  ...(
+    await import("@/shared/kernel/testing/owner-access-mock")
+  ).identityOwnerMock(getCurrentUser),
   getCurrentTimeZoneSetting,
 }));
 vi.mock("@/shared/db/client", () => ({ getDb: () => ({}) }));
@@ -119,6 +121,22 @@ describe("getTechniqueOverview (server read)", () => {
       ok: false,
       error: expect.objectContaining({ code: "SCHEDULING_SESSION_REQUIRED" }),
     });
+  });
+
+  it("refuses an account with pending terms without reading", async () => {
+    getCurrentUser.mockResolvedValue({
+      id: "owner-1",
+      denied: "terms_required",
+    });
+    const spy = vi.spyOn(reader, "readTechniqueSnapshot");
+
+    expect(
+      await getTechniqueOverview({ timeZone: "UTC", now: RENDERED_AT }),
+    ).toEqual({
+      ok: false,
+      error: expect.objectContaining({ code: "IDENTITY_TERMS_REQUIRED" }),
+    });
+    expect(spy).not.toHaveBeenCalled();
   });
 
   it("rejects an unknown time zone without reading", async () => {

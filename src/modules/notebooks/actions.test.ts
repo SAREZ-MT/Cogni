@@ -9,7 +9,11 @@ import { InMemoryPageRepository } from "./application/testing/in-memory-page-rep
 // Action scenarios of specs/notebooks/spec.md ("Server Action sin sesión",
 // "Entrada inválida en Server Action") without a real database.
 const { getCurrentUser } = vi.hoisted(() => ({ getCurrentUser: vi.fn() }));
-vi.mock("@/modules/identity", () => ({ getCurrentUser }));
+vi.mock("@/modules/identity", async () => ({
+  ...(
+    await import("@/shared/kernel/testing/owner-access-mock")
+  ).identityOwnerMock(getCurrentUser),
+}));
 // revalidatePath needs a real Next.js request/static-generation store,
 // which does not exist outside `next dev`/`next start`; the mutation
 // scenarios under test do not assert on cache revalidation.
@@ -54,6 +58,37 @@ const OWNER_ID = "3d2f9a1e-5b6c-4d7e-8f90-1a2b3c4d5e6f";
 describe("notebooks Server Actions", () => {
   beforeEach(() => {
     getCurrentUser.mockReset();
+  });
+
+  describe("with pending terms", () => {
+    const PENDING = {
+      id: "2f1b6f0e-6a55-4d0b-9d6c-0f6f1f1c2a01",
+      denied: "terms_required",
+    } as const;
+
+    it("rejects createNotebook without touching application", async () => {
+      getCurrentUser.mockResolvedValue(PENDING);
+      const { createNotebook } = await import("./actions");
+
+      await expect(createNotebook({ title: "Cuaderno" })).rejects.toThrow(
+        "terms_required",
+      );
+      expect(notebooks.count()).toBe(0);
+    });
+
+    it("returns the terms error from saveContent instead of throwing", async () => {
+      getCurrentUser.mockResolvedValue(PENDING);
+      const { saveContent } = await import("./actions");
+
+      const result = await saveContent({
+        pageId: "2f1b6f0e-6a55-4d0b-9d6c-0f6f1f1c2a09",
+        contentJson: { type: "doc", content: [] },
+        expectedContentUpdatedAt: null,
+      });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.error.code).toBe("IDENTITY_TERMS_REQUIRED");
+    });
   });
 
   describe("without a session", () => {

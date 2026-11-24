@@ -10,7 +10,11 @@ import { seededStore } from "./application/testing/seeded-store";
 // store.
 vi.mock("server-only", () => ({}));
 const { getCurrentUser } = vi.hoisted(() => ({ getCurrentUser: vi.fn() }));
-vi.mock("@/modules/identity", () => ({ getCurrentUser }));
+vi.mock("@/modules/identity", async () => ({
+  ...(
+    await import("@/shared/kernel/testing/owner-access-mock")
+  ).identityOwnerMock(getCurrentUser),
+}));
 vi.mock("@/shared/db/client", () => ({ getDb: () => ({}) }));
 const { captureException } = vi.hoisted(() => ({ captureException: vi.fn() }));
 vi.mock("@sentry/nextjs", () => ({ captureException }));
@@ -126,6 +130,24 @@ describe("dashboard reads", () => {
           now: RENDERED_AT,
         }),
       ).toEqual(SESSION_REQUIRED);
+    });
+
+    it("refuses an account with pending terms", async () => {
+      getCurrentUser.mockResolvedValue({
+        id: "owner-1",
+        denied: "terms_required",
+      });
+
+      expect(
+        await getDashboardProgress({
+          timeZone: "UTC",
+          weeks: 4,
+          now: RENDERED_AT,
+        }),
+      ).toEqual({
+        ok: false,
+        error: expect.objectContaining({ code: "IDENTITY_TERMS_REQUIRED" }),
+      });
     });
 
     it.each([

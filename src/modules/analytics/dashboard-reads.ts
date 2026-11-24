@@ -6,7 +6,7 @@
 // and never accept a clock from their input.
 import * as Sentry from "@sentry/nextjs";
 import { unstable_rethrow } from "next/navigation";
-import { getCurrentUser } from "@/modules/identity";
+import { ownerAccessError, requireOwner } from "@/modules/identity";
 import { getDb } from "@/shared/db/client";
 import { type Clock, createFixedClock } from "@/shared/kernel/clock";
 import {
@@ -72,10 +72,17 @@ async function forCurrentOwner<I, T>(
   read: (ownerId: string, input: I) => Promise<T>,
 ): Promise<Result<T, ActionError>> {
   try {
-    const user = await getCurrentUser();
-    if (!user) {
+    // Session and current terms (identity's requireOwner), before the input
+    // is even parsed.
+    const access = await requireOwner();
+    if (access.status === "denied") {
       return err(
-        actionError(ANALYTICS_ERROR.SESSION_REQUIRED, SESSION_REQUIRED_MESSAGE),
+        access.reason === "session_required"
+          ? actionError(
+              ANALYTICS_ERROR.SESSION_REQUIRED,
+              SESSION_REQUIRED_MESSAGE,
+            )
+          : toActionError(ownerAccessError(access.reason)),
       );
     }
     const parsed = parse(input);
@@ -84,7 +91,7 @@ async function forCurrentOwner<I, T>(
         actionError(ANALYTICS_ERROR.INVALID_INPUT, INVALID_INPUT_MESSAGE),
       );
     }
-    return ok(await read(user.id, parsed));
+    return ok(await read(access.ownerId, parsed));
   } catch (error) {
     unstable_rethrow(error);
     Sentry.captureException(error);

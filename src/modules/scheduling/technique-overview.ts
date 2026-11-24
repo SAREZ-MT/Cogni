@@ -6,7 +6,7 @@
 // and the profile's zone (read server-side); it takes no input.
 import * as Sentry from "@sentry/nextjs";
 import { unstable_rethrow } from "next/navigation";
-import { getCurrentTimeZoneSetting, getCurrentUser } from "@/modules/identity";
+import { getCurrentTimeZoneSetting } from "@/modules/identity";
 import { getDb } from "@/shared/db/client";
 import { type Clock, createFixedClock } from "@/shared/kernel/clock";
 import {
@@ -20,6 +20,7 @@ import { isTimeZone } from "./domain/calendar";
 import { SCHEDULING_ERROR } from "./domain/errors";
 import type { TechniqueOverview } from "./domain/technique-overview";
 import { DrizzleTechniqueOverviewReader } from "./infrastructure";
+import { requireOwnerId } from "./owner-access";
 
 function actionError(code: string, message: string): ActionError {
   return toActionError(new DomainError(code, message));
@@ -35,15 +36,8 @@ export async function readTechniqueOverview(
   clock: Clock,
 ): Promise<Result<TechniqueOverview, ActionError>> {
   try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return err(
-        actionError(
-          SCHEDULING_ERROR.SESSION_REQUIRED,
-          "Debes iniciar sesión para continuar.",
-        ),
-      );
-    }
+    const owner = await requireOwnerId();
+    if (!owner.ok) return owner;
     const timeZone =
       input.timeZone ?? (await getCurrentTimeZoneSetting()).timeZone;
     if (!isTimeZone(timeZone)) {
@@ -52,7 +46,7 @@ export async function readTechniqueOverview(
       );
     }
     const overview = await readOverview(
-      { ownerId: user.id, timeZone },
+      { ownerId: owner.value, timeZone },
       { reader: new DrizzleTechniqueOverviewReader(getDb()), clock },
     );
     return ok(overview);

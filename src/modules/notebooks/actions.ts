@@ -3,7 +3,7 @@
 import * as Sentry from "@sentry/nextjs";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { getCurrentUser } from "@/modules/identity";
+import { ownerAccessError, requireOwner } from "@/modules/identity";
 import { getDb } from "@/shared/db/client";
 import { systemClock } from "@/shared/kernel/clock";
 import {
@@ -74,10 +74,25 @@ const routePageParamsSchema = z.object({
 // DomainError codes to actionable Spanish "tú" copy (Scenarios "Server
 // Action sin sesión", "Entrada inválida en Server Action").
 
+// Session and current terms, checked by identity (requireOwner): the (app)
+// layout gate does not cover a Server Action called directly.
+async function resolveOwner(): Promise<Result<string, DomainError>> {
+  const access = await requireOwner();
+  if (access.status === "granted") return ok(access.ownerId);
+  return err(
+    access.reason === "session_required"
+      ? new DomainError(
+          NOTEBOOKS_ERROR.SESSION_REQUIRED,
+          NOTEBOOKS_COPY.sessionRequired,
+        )
+      : ownerAccessError(access.reason),
+  );
+}
+
 async function requireOwnerId(): Promise<string> {
-  const user = await getCurrentUser();
-  if (!user) throw new Error(NOTEBOOKS_COPY.sessionRequired);
-  return user.id;
+  const owner = await resolveOwner();
+  if (!owner.ok) throw new Error(owner.error.message);
+  return owner.value;
 }
 
 // saveContent/getCurrentContent structurally satisfy editor/domain's
@@ -88,18 +103,8 @@ async function requireOwnerId(): Promise<string> {
 // rejected promise is not a shape use-autosave.ts's try/catch treats as
 // a domain conflict or a transport failure it can retry.
 async function requireOwnerIdResult(): Promise<Result<string, ActionError>> {
-  const user = await getCurrentUser();
-  if (!user) {
-    return err(
-      toActionError(
-        new DomainError(
-          NOTEBOOKS_ERROR.SESSION_REQUIRED,
-          NOTEBOOKS_COPY.sessionRequired,
-        ),
-      ),
-    );
-  }
-  return ok(user.id);
+  const owner = await resolveOwner();
+  return owner.ok ? owner : err(toActionError(owner.error));
 }
 
 function deps() {

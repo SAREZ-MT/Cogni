@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createFixedClock } from "@/shared/kernel/clock";
+import { mockOwnerAccessError } from "@/shared/kernel/testing/owner-access-mock";
 import { ACCESS_ERROR, ownerAccessError, ownerAccessFor } from "./owner-access";
 import { createProfile, type Profile } from "./profile";
 import { acceptTerms, TERMS_VERSION } from "./terms";
@@ -71,6 +72,15 @@ describe("ownerAccessError", () => {
   it("reports an unverifiable profile with its own code", () => {
     expect(ownerAccessError("profile_unavailable").code).toBe(
       ACCESS_ERROR.PROFILE_UNAVAILABLE,
+    );
+  });
+
+  it.each([
+    "terms_required",
+    "profile_unavailable",
+  ] as const)("keeps the shared test stand-in on the same code for %s", (reason) => {
+    expect(mockOwnerAccessError(reason).code).toBe(
+      ownerAccessError(reason).code,
     );
   });
 });

@@ -13,7 +13,7 @@
 //     what Home counts.
 import * as Sentry from "@sentry/nextjs";
 import { unstable_rethrow } from "next/navigation";
-import { getCurrentTimeZoneSetting, getCurrentUser } from "@/modules/identity";
+import { getCurrentTimeZoneSetting } from "@/modules/identity";
 import { getDb } from "@/shared/db/client";
 import { type Clock, createFixedClock } from "@/shared/kernel/clock";
 import {
@@ -27,6 +27,7 @@ import { isTimeZone, startOfTomorrowIn } from "./domain/calendar";
 import type { DueTodayPage } from "./domain/due-today";
 import { SCHEDULING_ERROR } from "./domain/errors";
 import { DrizzleDueTodayReader } from "./infrastructure";
+import { requireOwnerId } from "./owner-access";
 
 function actionError(code: string, message: string): ActionError {
   return toActionError(new DomainError(code, message));
@@ -41,15 +42,8 @@ export async function readDueToday(
   clock: Clock,
 ): Promise<Result<DueTodayPage[], ActionError>> {
   try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return err(
-        actionError(
-          SCHEDULING_ERROR.SESSION_REQUIRED,
-          "Debes iniciar sesión para continuar.",
-        ),
-      );
-    }
+    const owner = await requireOwnerId();
+    if (!owner.ok) return owner;
     const timeZone =
       input.timeZone ?? (await getCurrentTimeZoneSetting()).timeZone;
     if (!isTimeZone(timeZone)) {
@@ -59,7 +53,7 @@ export async function readDueToday(
     }
     const pages = await listDueToday(
       {
-        ownerId: user.id,
+        ownerId: owner.value,
         timeZone,
         hideExamsCompletedToday: input.hideExamsCompletedToday,
       },

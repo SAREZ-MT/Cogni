@@ -2,7 +2,7 @@
 
 import * as Sentry from "@sentry/nextjs";
 import { revalidatePath } from "next/cache";
-import { getCurrentUser } from "@/modules/identity";
+import { ownerAccessError, requireOwner } from "@/modules/identity";
 import { serverEnv } from "@/shared/config/env.server";
 import { getDb } from "@/shared/db/client";
 import { systemClock } from "@/shared/kernel/clock";
@@ -48,19 +48,21 @@ import {
 // actions ever throws to the client.
 const SESSION_REQUIRED_MESSAGE = "Debes iniciar sesión para continuar.";
 
+// Session and current terms, checked by identity (requireOwner): the (app)
+// layout gate does not cover a Server Action called directly.
 async function requireOwnerId(): Promise<Result<string, ActionError>> {
-  const user = await getCurrentUser();
-  if (!user) {
-    return err(
-      toActionError(
-        new DomainError(
-          INGESTION_ERROR.SESSION_REQUIRED,
-          SESSION_REQUIRED_MESSAGE,
-        ),
-      ),
-    );
-  }
-  return ok(user.id);
+  const access = await requireOwner();
+  if (access.status === "granted") return ok(access.ownerId);
+  return err(
+    toActionError(
+      access.reason === "session_required"
+        ? new DomainError(
+            INGESTION_ERROR.SESSION_REQUIRED,
+            SESSION_REQUIRED_MESSAGE,
+          )
+        : ownerAccessError(access.reason),
+    ),
+  );
 }
 
 // Every adapter is constructed fresh per call, like

@@ -65,8 +65,10 @@ Hexagonal shape enforced by `.dependency-cruiser.cjs` (`domain-is-pure`,
   into (used by `ingestion`'s "Importar documento" entry and importing badge,
   without `notebooks` importing `ingestion`).
 - `actions.ts`: the composition root. `"use server"` — every Server Action
-  resolves the session first (`requireOwnerId`/`requireOwnerIdResult`,
-  depending on whether the action throws or returns a `Result`), composes
+  resolves the owner first (`requireOwnerId`/`requireOwnerIdResult`,
+  depending on whether the action throws or returns a `Result`; both go
+  through identity's `requireOwner`, which checks the session and the
+  current terms and fails closed on an unreadable profile), composes
   the Drizzle repositories and storage gateway per call, and maps
   `DomainError` to Spanish copy (`ui/notebooks-copy.ts`) or to the plain
   `ActionError` shape at the boundary.
