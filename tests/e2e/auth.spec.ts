@@ -30,7 +30,7 @@ test.describe("authentication", () => {
       await page.getByLabel("Contraseña", { exact: true }).fill("Secreta-123");
       await page.getByRole("button", { name: "Crear cuenta" }).click();
       await expect(page.getByRole("status")).toContainText(
-        "Te enviamos un correo de verificación",
+        "te enviamos un enlace de verificación",
       );
 
       await page.goto("/login");
@@ -45,7 +45,7 @@ test.describe("authentication", () => {
     }
   });
 
-  test("offers sign-in for an email that already exists", async ({
+  test("answers an existing email like a new one, without revealing the account", async ({
     page,
     verifiedUser,
   }) => {
@@ -54,7 +54,10 @@ test.describe("authentication", () => {
     await page.getByLabel("Contraseña", { exact: true }).fill("Otra-clave-123");
     await page.getByRole("button", { name: "Crear cuenta" }).click();
 
-    await expect(formAlert(page)).toContainText("El email ya está registrado");
+    await expect(page.getByText("El email ya está registrado")).toHaveCount(0);
+    await expect(page.getByRole("status")).toContainText(
+      "te enviamos un enlace de verificación",
+    );
   });
 
   test("rejects a wrong password without revealing whether the email exists", async ({

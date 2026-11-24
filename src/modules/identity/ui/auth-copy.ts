@@ -9,9 +9,11 @@ export const AUTH_COPY = {
     "Aún no has verificado tu correo. Revisa tu bandeja de entrada para continuar.",
   providerUnavailable:
     "No pudimos completar la acción. Inténtalo de nuevo en unos minutos.",
-  alreadyRegistered: "El email ya está registrado. ¿Quieres iniciar sesión?",
+  // Shown after every accepted sign-up, also when the email already had an
+  // account (no mail is sent then): the form must not reveal who is
+  // registered.
   verificationSent:
-    "Te enviamos un correo de verificación. Revisa tu bandeja para continuar.",
+    "Si el correo no tenía una cuenta, te enviamos un enlace de verificación. Revisa tu bandeja.",
   resetSent:
     "Si el correo existe, recibirás un enlace para restablecer tu contraseña.",
   termsNotAccepted: "Debes aceptar los términos para continuar.",

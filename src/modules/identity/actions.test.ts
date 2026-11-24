@@ -257,6 +257,47 @@ describe("signUpAction consent", () => {
 
     expect(track).not.toHaveBeenCalled();
   });
+
+  // No account enumeration: the form answers the same whether the email
+  // was free, already registered (obfuscated user) or rejected as existing.
+  it("answers the same for a new and an already registered email", async () => {
+    const { signUpAction } = await import("./actions");
+
+    signUpMock.mockResolvedValue({
+      data: { user: { id: "u-new", identities: [{ id: "i-1" }] } },
+      error: null,
+    });
+    const fresh = await signUpAction({ status: "idle" }, formData(CREDENTIALS));
+
+    signUpMock.mockResolvedValue({
+      data: { user: { id: "u-fake", identities: [] } },
+      error: null,
+    });
+    const obfuscated = await signUpAction(
+      { status: "idle" },
+      formData(CREDENTIALS),
+    );
+
+    signUpMock.mockResolvedValue({
+      data: { user: null },
+      error: {
+        code: "user_already_exists",
+        message: "User already registered",
+      },
+    });
+    const rejected = await signUpAction(
+      { status: "idle" },
+      formData(CREDENTIALS),
+    );
+
+    expect(fresh).toEqual({
+      status: "success",
+      message:
+        "Si el correo no tenía una cuenta, te enviamos un enlace de verificación. Revisa tu bandeja.",
+    });
+    expect(obfuscated).toEqual(fresh);
+    expect(rejected).toEqual(fresh);
+  });
 });
 
 describe("signOutAction", () => {

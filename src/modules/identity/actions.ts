@@ -88,9 +88,8 @@ export async function signUpAction(
   });
   if (!result.ok)
     return { status: "error", message: messageForCode(result.error.code) };
-  if (result.value.outcome === "already_registered") {
-    return { status: "error", message: AUTH_COPY.alreadyRegistered };
-  }
+  // An already registered email gets the same answer as a new one (no
+  // account enumeration); it carries no userId, so nothing is tracked.
   // Deferred past the response: analytics never delays or fails auth.
   // The consent was given here (sign-in-wrap notice), so this is its one
   // terms_accepted event; the callback that later stamps the profile from
