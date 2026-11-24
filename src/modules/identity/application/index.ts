@@ -1,3 +1,4 @@
+export { safeNext } from "../domain/safe-next";
 export { acceptTerms } from "./accept-terms";
 export { PASSWORD_MIN_LENGTH } from "./credentials-schema";
 export { type EnsureProfileDeps, ensureProfile } from "./ensure-profile";
@@ -22,7 +23,6 @@ export {
   type ResolveOwnerAccessDeps,
   resolveOwnerAccess,
 } from "./resolve-owner-access";
-export { safeNext } from "./safe-next";
 export { signIn } from "./sign-in";
 export { AUTH_CALLBACK_PATH, signUp } from "./sign-up";
 export { updatePassword } from "./update-password";

@@ -78,6 +78,8 @@ describe("termsRedirectFor", () => {
     expect(termsRedirectFor(freshProfile(), "https://evil.test")).toBe(
       expected,
     );
+    expect(termsRedirectFor(freshProfile(), "//evil.test")).toBe(expected);
+    expect(termsRedirectFor(freshProfile(), "/\t/evil.test")).toBe(expected);
   });
 
   it("does not redirect a profile that accepted the current version", () => {

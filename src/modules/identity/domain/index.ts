@@ -28,6 +28,7 @@ export type {
   AcceptTermsOptions,
   ProfileRepository,
 } from "./profile-repository";
+export { safeNext } from "./safe-next";
 export {
   acceptTerms,
   hasAcceptedCurrentTerms,

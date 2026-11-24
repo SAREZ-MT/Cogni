@@ -19,4 +19,28 @@ describe("safeNext", () => {
     expect(safeNext(undefined)).toBe("/inicio");
     expect(safeNext("")).toBe("/inicio");
   });
+
+  it("keeps the query string and the fragment of an internal path", () => {
+    expect(safeNext("/notebooks/abc?tab=1#top")).toBe(
+      "/notebooks/abc?tab=1#top",
+    );
+  });
+
+  // Browsers drop tabs and line breaks from a URL before resolving it, so
+  // "/<tab>/evil.tld" is the protocol-relative "//evil.tld" to them.
+  it.each([
+    "/\t/evil.tld",
+    "/\n/evil.tld",
+    "/\r/evil.tld",
+    "/\t\\evil.tld",
+    "\t//evil.tld",
+    " //evil.tld",
+  ])("falls back to Inicio for a target a browser resolves off-site (%j)", (target) => {
+    expect(safeNext(target)).toBe("/inicio");
+  });
+
+  it("falls back to Inicio for a relative path or a bare host", () => {
+    expect(safeNext("dashboard")).toBe("/inicio");
+    expect(safeNext("evil.tld/path")).toBe("/inicio");
+  });
 });

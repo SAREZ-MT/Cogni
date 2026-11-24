@@ -10,7 +10,7 @@ const identity = vi.hoisted(() => ({
 
 vi.mock("@/modules/identity", async () => {
   const domain = await import("@/modules/identity/domain");
-  const { safeNext } = await import("@/modules/identity/application/safe-next");
+  const { safeNext } = await import("@/modules/identity/domain/safe-next");
   return {
     getCurrentUser: identity.getCurrentUser,
     ensureProfileForUser: identity.ensureProfileForUser,
