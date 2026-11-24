@@ -8,7 +8,11 @@ import { newRecallSession } from "./domain/recall-session";
 // proves the evaluation Server Action boundary (session, Zod validation,
 // ActionError mapping, scheduling, never-throw) over in-memory fakes.
 const { getCurrentUser } = vi.hoisted(() => ({ getCurrentUser: vi.fn() }));
-vi.mock("@/modules/identity", () => ({ getCurrentUser }));
+vi.mock("@/modules/identity", async () => ({
+  requireOwner: (
+    await import("@/shared/kernel/testing/owner-access-mock")
+  ).requireOwnerFrom(getCurrentUser),
+}));
 vi.mock("@/shared/db/client", () => ({ getDb: () => ({}) }));
 const { captureException } = vi.hoisted(() => ({ captureException: vi.fn() }));
 vi.mock("@sentry/nextjs", () => ({ captureException }));

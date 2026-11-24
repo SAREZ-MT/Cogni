@@ -10,7 +10,11 @@ import { InMemoryExamUnitOfWork } from "./application/testing/in-memory-exam-uni
 // Server Action boundary (session, Zod validation, ActionError mapping,
 // never-throw) without a database; same pattern as flashcards/actions.test.ts.
 const { getCurrentUser } = vi.hoisted(() => ({ getCurrentUser: vi.fn() }));
-vi.mock("@/modules/identity", () => ({ getCurrentUser }));
+vi.mock("@/modules/identity", async () => ({
+  requireOwner: (
+    await import("@/shared/kernel/testing/owner-access-mock")
+  ).requireOwnerFrom(getCurrentUser),
+}));
 vi.mock("@/shared/db/client", () => ({ getDb: () => ({}) }));
 // actions.ts also hosts the generation action, which reads the server env
 // (server-only); the question actions never call it.

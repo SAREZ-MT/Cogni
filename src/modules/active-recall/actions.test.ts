@@ -15,7 +15,11 @@ import { InMemoryRecallUnitOfWork } from "./application/testing/in-memory-recall
 // without a database or providers; same pattern as exams'
 // generate-exam-questions-action.test.ts.
 const { getCurrentUser } = vi.hoisted(() => ({ getCurrentUser: vi.fn() }));
-vi.mock("@/modules/identity", () => ({ getCurrentUser }));
+vi.mock("@/modules/identity", async () => ({
+  requireOwner: (
+    await import("@/shared/kernel/testing/owner-access-mock")
+  ).requireOwnerFrom(getCurrentUser),
+}));
 vi.mock("@/shared/db/client", () => ({ getDb: () => ({}) }));
 vi.mock("@/shared/config/env.server", () => ({
   serverEnv: () => ({

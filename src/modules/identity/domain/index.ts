@@ -11,6 +11,13 @@ export type {
   SignUpResult,
 } from "./auth-gateway";
 export {
+  ACCESS_ERROR,
+  type OwnerAccess,
+  type OwnerAccessDenial,
+  ownerAccessError,
+  ownerAccessFor,
+} from "./owner-access";
+export {
   createProfile,
   DEFAULT_LOCALE,
   DEFAULT_TIMEZONE,

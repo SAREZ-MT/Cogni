@@ -18,6 +18,10 @@ export {
   RESET_PASSWORD_PATH,
   requestPasswordReset,
 } from "./request-password-reset";
+export {
+  type ResolveOwnerAccessDeps,
+  resolveOwnerAccess,
+} from "./resolve-owner-access";
 export { safeNext } from "./safe-next";
 export { signIn } from "./sign-in";
 export { AUTH_CALLBACK_PATH, signUp } from "./sign-up";

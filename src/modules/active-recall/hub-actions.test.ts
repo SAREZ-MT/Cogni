@@ -7,7 +7,11 @@ import type { RecallHubPage } from "./domain/recall-hub-reader";
 // reads, never-throw) without a database; listRecallHub,
 // getRecallSessionReview and the reader are covered by their own tests.
 const { getCurrentUser } = vi.hoisted(() => ({ getCurrentUser: vi.fn() }));
-vi.mock("@/modules/identity", () => ({ getCurrentUser }));
+vi.mock("@/modules/identity", async () => ({
+  requireOwner: (
+    await import("@/shared/kernel/testing/owner-access-mock")
+  ).requireOwnerFrom(getCurrentUser),
+}));
 vi.mock("@/shared/db/client", () => ({ getDb: () => ({}) }));
 const { captureException } = vi.hoisted(() => ({ captureException: vi.fn() }));
 vi.mock("@sentry/nextjs", () => ({ captureException }));

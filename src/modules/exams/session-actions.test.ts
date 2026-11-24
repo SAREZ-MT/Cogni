@@ -10,7 +10,11 @@ import { InMemorySessionFeedback } from "./application/testing/in-memory-session
 // leaking answers, ActionError mapping, revalidation, never-throw) without a
 // database; the transaction itself is covered by tests/db/exam-session.test.ts.
 const { getCurrentUser } = vi.hoisted(() => ({ getCurrentUser: vi.fn() }));
-vi.mock("@/modules/identity", () => ({ getCurrentUser }));
+vi.mock("@/modules/identity", async () => ({
+  requireOwner: (
+    await import("@/shared/kernel/testing/owner-access-mock")
+  ).requireOwnerFrom(getCurrentUser),
+}));
 // The owner's per-day "due" bound (UTC here): the next midnight.
 vi.mock("@/modules/scheduling", () => ({
   getCurrentDueCutoff: async () => (now: Date) =>

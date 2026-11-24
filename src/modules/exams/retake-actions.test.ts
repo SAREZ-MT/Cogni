@@ -15,7 +15,11 @@ import { InMemoryExamSessionUnitOfWork } from "./application/testing/in-memory-e
 // mapping with resetAt, revalidation, never-throw) without a database or
 // providers; the transaction itself is covered by tests/db/exam-retake.
 const { getCurrentUser } = vi.hoisted(() => ({ getCurrentUser: vi.fn() }));
-vi.mock("@/modules/identity", () => ({ getCurrentUser }));
+vi.mock("@/modules/identity", async () => ({
+  requireOwner: (
+    await import("@/shared/kernel/testing/owner-access-mock")
+  ).requireOwnerFrom(getCurrentUser),
+}));
 // The owner's per-day "due" bound (UTC here): the next midnight.
 vi.mock("@/modules/scheduling", () => ({
   getCurrentDueCutoff: async () => (now: Date) =>

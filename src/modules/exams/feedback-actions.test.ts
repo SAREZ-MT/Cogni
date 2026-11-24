@@ -15,7 +15,11 @@ import { InMemorySessionFeedback } from "./application/testing/in-memory-session
 // validation, view mapping, ActionError mapping, never-throw) without a
 // database or providers; the use cases are covered by their unit tests.
 const { getCurrentUser } = vi.hoisted(() => ({ getCurrentUser: vi.fn() }));
-vi.mock("@/modules/identity", () => ({ getCurrentUser }));
+vi.mock("@/modules/identity", async () => ({
+  requireOwner: (
+    await import("@/shared/kernel/testing/owner-access-mock")
+  ).requireOwnerFrom(getCurrentUser),
+}));
 // The owner's per-day "due" bound (UTC here): the next midnight.
 vi.mock("@/modules/scheduling", () => ({
   getCurrentDueCutoff: async () => (now: Date) =>

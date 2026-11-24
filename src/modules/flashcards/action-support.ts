@@ -1,7 +1,7 @@
 import * as Sentry from "@sentry/nextjs";
 import { revalidatePath } from "next/cache";
 import type { z } from "zod";
-import { getCurrentUser } from "@/modules/identity";
+import { ownerAccessError, requireOwner } from "@/modules/identity";
 import {
   type ActionError,
   DomainError,
@@ -24,9 +24,12 @@ export function actionError(code: string, message: string): ActionError {
   return toActionError(new DomainError(code, message));
 }
 
+// Session and current terms, checked by identity (requireOwner): the (app)
+// layout gate does not cover a Server Action called directly.
 export async function requireOwnerId(): Promise<Result<string, ActionError>> {
-  const user = await getCurrentUser();
-  if (!user) {
+  const access = await requireOwner();
+  if (access.status === "granted") return ok(access.ownerId);
+  if (access.reason === "session_required") {
     return err(
       actionError(
         FLASHCARD_ERROR.SESSION_REQUIRED,
@@ -34,7 +37,7 @@ export async function requireOwnerId(): Promise<Result<string, ActionError>> {
       ),
     );
   }
-  return ok(user.id);
+  return err(toActionError(ownerAccessError(access.reason)));
 }
 
 export function parseInput<T>(
