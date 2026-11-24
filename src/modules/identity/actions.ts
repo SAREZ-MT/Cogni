@@ -156,6 +156,7 @@ export async function updatePasswordAction(
 ): Promise<AuthFormState> {
   const result = await updatePassword(Object.fromEntries(formData), {
     auth: await gateway(),
+    clock: systemClock,
   });
   if (!result.ok)
     return { status: "error", message: messageForCode(result.error.code) };

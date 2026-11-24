@@ -20,6 +20,8 @@ export const AUTH_COPY = {
   googleCancelled:
     "No se completó el acceso con Google. Puedes intentarlo de nuevo.",
   linkInvalid: "El enlace no es válido o ya venció. Pide uno nuevo.",
+  recoveryRequired:
+    "Para cambiar tu contraseña necesitas un enlace de restablecimiento reciente. Pide uno nuevo.",
 } as const;
 
 export function messageForCode(code: string): string {
@@ -30,6 +32,8 @@ export function messageForCode(code: string): string {
       return AUTH_COPY.invalidCredentials;
     case AUTH_ERROR.EMAIL_NOT_VERIFIED:
       return AUTH_COPY.emailNotVerified;
+    case AUTH_ERROR.RECOVERY_REQUIRED:
+      return AUTH_COPY.recoveryRequired;
     case AUTH_ERROR.TERMS_NOT_ACCEPTED:
       return AUTH_COPY.termsNotAccepted;
     default:

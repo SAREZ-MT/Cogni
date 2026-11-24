@@ -13,6 +13,7 @@ function fakeAuth(script: Script) {
     resetPasswordForEmail: async () =>
       script.resetPasswordForEmail ?? { error: null },
     updateUser: async () => script.updateUser ?? { error: null },
+    getClaims: async () => script.getClaims ?? { data: null, error: null },
     signInWithOAuth: async () => script.signInWithOAuth,
   };
   return new SupabaseAuthGateway(
@@ -144,5 +145,67 @@ describe("SupabaseAuthGateway", () => {
     });
 
     expect(result.ok && result.value.url).toBe("https://accounts.google.com/x");
+  });
+
+  describe("currentAuthentication", () => {
+    it("reads the sign-in steps from the verified token claims", async () => {
+      const gateway = fakeAuth({
+        getClaims: {
+          data: {
+            claims: {
+              amr: [
+                { method: "recovery", timestamp: 1_795_521_600 },
+                { method: "password", timestamp: 1_795_518_000 },
+              ],
+            },
+          },
+          error: null,
+        },
+      });
+
+      expect(await gateway.currentAuthentication()).toEqual({
+        ok: true,
+        value: [
+          { method: "recovery", at: new Date(1_795_521_600_000) },
+          { method: "password", at: new Date(1_795_518_000_000) },
+        ],
+      });
+    });
+
+    it("reports no steps without a session", async () => {
+      const gateway = fakeAuth({});
+
+      expect(await gateway.currentAuthentication()).toEqual({
+        ok: true,
+        value: [],
+      });
+    });
+
+    it("drops entries that carry no timestamp or are malformed", async () => {
+      const gateway = fakeAuth({
+        getClaims: {
+          data: { claims: { amr: ["recovery", null, { method: "recovery" }] } },
+          error: null,
+        },
+      });
+
+      expect(await gateway.currentAuthentication()).toEqual({
+        ok: true,
+        value: [],
+      });
+    });
+
+    it("fails when the token cannot be verified", async () => {
+      const gateway = fakeAuth({
+        getClaims: { data: null, error: { message: "invalid JWT" } },
+      });
+
+      const result = await gateway.currentAuthentication();
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.code).toBe(AUTH_ERROR.PROVIDER_UNAVAILABLE);
+      }
+    });
   });
 });

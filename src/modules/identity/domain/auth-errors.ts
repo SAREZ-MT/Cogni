@@ -6,6 +6,8 @@ export const AUTH_ERROR = {
   EMAIL_NOT_VERIFIED: "AUTH_EMAIL_NOT_VERIFIED",
   PROVIDER_UNAVAILABLE: "AUTH_PROVIDER_UNAVAILABLE",
   FORBIDDEN: "AUTH_FORBIDDEN",
+  // A password change from a session not opened by a recent recovery link.
+  RECOVERY_REQUIRED: "AUTH_RECOVERY_REQUIRED",
   TERMS_NOT_ACCEPTED: "TERMS_NOT_ACCEPTED",
 } as const;
 

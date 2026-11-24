@@ -18,6 +18,11 @@ export {
   ownerAccessFor,
 } from "./owner-access";
 export {
+  type AuthenticationEvent,
+  isFreshRecoverySession,
+  RECOVERY_WINDOW_MS,
+} from "./password-change";
+export {
   createProfile,
   DEFAULT_LOCALE,
   DEFAULT_TIMEZONE,
