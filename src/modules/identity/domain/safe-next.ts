@@ -17,5 +17,16 @@ export function safeNext(candidate: string | null | undefined): string {
     return FALLBACK;
   }
   if (url.origin !== PLACEHOLDER_ORIGIN) return FALLBACK;
-  return `${url.pathname}${url.search}${url.hash}`;
+  const target = `${url.pathname}${url.search}${url.hash}`;
+  // Dot segments collapse while resolving ("/.//host" becomes the path
+  // "//host"), so the string actually returned is checked once more.
+  return staysOnOrigin(target) ? target : FALLBACK;
+}
+
+function staysOnOrigin(target: string): boolean {
+  try {
+    return new URL(target, PLACEHOLDER_ORIGIN).origin === PLACEHOLDER_ORIGIN;
+  } catch {
+    return false;
+  }
 }

@@ -39,6 +39,21 @@ describe("safeNext", () => {
     expect(safeNext(target)).toBe("/inicio");
   });
 
+  // Dot segments collapse during resolution: "/.//host" becomes the path
+  // "//host", which would be protocol-relative if it were returned as is.
+  it.each([
+    "/.//evil.tld",
+    "/..//evil.tld",
+    "/a/..//evil.tld",
+    "/./\\evil.tld",
+  ])("falls back to Inicio when the resolved path would start with two slashes (%j)", (target) => {
+    expect(safeNext(target)).toBe("/inicio");
+  });
+
+  it("returns the resolved form of an internal path with dot segments", () => {
+    expect(safeNext("/notebooks/../dashboard")).toBe("/dashboard");
+  });
+
   it("falls back to Inicio for a relative path or a bare host", () => {
     expect(safeNext("dashboard")).toBe("/inicio");
     expect(safeNext("evil.tld/path")).toBe("/inicio");
