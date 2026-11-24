@@ -45,6 +45,8 @@ describe("safeNext", () => {
     "/.//evil.tld",
     "/..//evil.tld",
     "/a/..//evil.tld",
+    "/%2e//evil.tld",
+    "/a/%2e%2e//evil.tld",
     "/./\\evil.tld",
   ])("falls back to Inicio when the resolved path would start with two slashes (%j)", (target) => {
     expect(safeNext(target)).toBe("/inicio");
