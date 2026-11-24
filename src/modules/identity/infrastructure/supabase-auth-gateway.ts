@@ -99,9 +99,18 @@ export class SupabaseAuthGateway implements AuthGateway {
   async currentAuthentication(): Promise<
     Result<AuthenticationEvent[], DomainError>
   > {
-    const { data, error } = await this.auth.getClaims();
-    if (error) return err(providerError(error.message));
-    const amr: unknown = data?.claims.amr;
+    let amr: unknown;
+    try {
+      const { data, error } = await this.auth.getClaims();
+      if (error) return err(providerError(error.message));
+      amr = data?.claims.amr;
+    } catch (error) {
+      // getClaims throws (instead of returning an error) for a token it
+      // cannot parse or an unsupported algorithm.
+      return err(
+        providerError(error instanceof Error ? error.message : "claims failed"),
+      );
+    }
     if (!Array.isArray(amr)) return ok([]);
     const events: AuthenticationEvent[] = [];
     for (const entry of amr) {

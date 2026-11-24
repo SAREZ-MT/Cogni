@@ -195,6 +195,21 @@ describe("SupabaseAuthGateway", () => {
       });
     });
 
+    it("fails, without throwing, when reading the token throws", async () => {
+      const gateway = new SupabaseAuthGateway({
+        getClaims: async () => {
+          throw new Error("Invalid alg claim");
+        },
+      } as unknown as ConstructorParameters<typeof SupabaseAuthGateway>[0]);
+
+      const result = await gateway.currentAuthentication();
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.code).toBe(AUTH_ERROR.PROVIDER_UNAVAILABLE);
+      }
+    });
+
     it("fails when the token cannot be verified", async () => {
       const gateway = fakeAuth({
         getClaims: { data: null, error: { message: "invalid JWT" } },
