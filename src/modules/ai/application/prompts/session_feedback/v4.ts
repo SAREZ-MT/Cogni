@@ -8,7 +8,7 @@ import {
 
 // Exam session feedback (documento-maestro §3.3: "al final la IA explica
 // las preguntas falladas usando el contenido de la página"). The flashcards
-// prompt (v3) carries only answer-button counts and struggled prompts, with
+// prompt (v5) carries only answer-button counts and card prompts, with
 // no page text and no per-question detail; prompts are versioned and
 // immutable, so exams have their own version (v4; v1 and v2 were the same
 // two prompts before their texts moved into data blocks). Same output contract (sessionFeedbackOutput).

@@ -18,7 +18,6 @@ const TONE_CLASSES: Record<RatingTone, string> = {
 export interface RatingButtonProps {
   tone: RatingTone;
   label: string;
-  hint: string;
   onClick?: () => void;
   disabled?: boolean;
   className?: string;
@@ -30,7 +29,6 @@ export interface RatingButtonProps {
 export function RatingButton({
   tone,
   label,
-  hint,
   onClick,
   disabled,
   className,
@@ -48,7 +46,6 @@ export function RatingButton({
       )}
     >
       <span className="font-semibold text-[13px]">{label}</span>
-      <span className="text-[11px] opacity-75">{hint}</span>
     </button>
   );
 }

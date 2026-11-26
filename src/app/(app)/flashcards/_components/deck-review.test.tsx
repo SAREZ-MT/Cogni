@@ -102,7 +102,7 @@ describe("DeckReview", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("starts a session on the page and plays its due cards with SM-2 hints", async () => {
+  it("starts a session on the page and plays its due cards with only the rating on each button", async () => {
     actions.startFlashcardSessionAction.mockResolvedValue({
       ok: true,
       value: {
@@ -121,8 +121,8 @@ describe("DeckReview", () => {
     expect(screen.queryByText("lista del mazo")).not.toBeInTheDocument();
     expect(screen.getByText("Pregunta 1")).toBeInTheDocument();
     await user.click(screen.getByTestId("flip-card"));
-    expect(screen.getByTestId("rate-again")).toHaveTextContent("1 día");
-    expect(screen.getByTestId("rate-good")).toHaveTextContent("6 días");
+    expect(screen.getByTestId("rate-again")).toHaveTextContent(/^Otra vez$/);
+    expect(screen.getByTestId("rate-good")).toHaveTextContent(/^Bien$/);
   });
 
   it("says the deck is up to date when nothing is due", async () => {

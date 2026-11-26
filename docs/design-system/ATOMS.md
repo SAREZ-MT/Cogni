@@ -1228,7 +1228,8 @@ tinted bg/border per tone, `-2px` hover lift + `shadow-card-hover`.
 `data-testid="rate-{tone}"`.
 
 - `RatingTone`: `"again" | "hard" | "good" | "easy"`.
-- `tone`, `label`, `hint`, `onClick?`, `disabled?`.
+- `tone`, `label`, `onClick?`, `disabled?`. Only the rating label: no
+  interval or hint under it (user decision 2026-11-26).
 - Tone → token pairs (`error-500/30` border · `error-50/90` idle ·
   `error-100/95` hover for `again`; same pattern for `hard`/`warning` and
   `good`/`success`; `easy`/`primary` sits one step darker —

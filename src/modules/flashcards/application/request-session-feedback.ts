@@ -5,6 +5,8 @@ import {
   type GenerateStructuredInput,
   type GenerationRateLimiter,
   type IdGenerator,
+  MAX_RECALLED_ITEMS,
+  MAX_STRUGGLED_ITEMS,
   SESSION_FEEDBACK_PROMPT_VERSION,
   sessionFeedbackOutput,
 } from "@/modules/ai";
@@ -100,27 +102,56 @@ function countByButton(logs: readonly ReviewLog[]) {
   return counts;
 }
 
-// Fronts of the cards answered "Otra vez" or "Difícil", hardest first, each
-// card once. A card that can no longer be read is left out.
-async function struggledFronts(
+// Fronts of the session's cards for the prompt, each card once and placed
+// by its lowest answer: `struggled` holds the cards answered "Otra vez" or
+// "Difícil", hardest first; `recalled` the ones answered "Bien" or "Fácil",
+// easiest first. Only as many cards as the prompt carries are read; a card
+// that can no longer be read is left out.
+async function sessionFronts(
   logs: readonly ReviewLog[],
   deps: RequestSessionFeedbackDeps,
   ownerId: string,
-): Promise<string[]> {
-  const hardest = logs
-    .filter((log) => log.quality <= HARD_QUALITY)
-    .sort((a, b) => a.quality - b.quality);
-  const seen = new Set<string>();
-  const fronts: string[] = [];
-  for (const log of hardest) {
-    if (seen.has(log.itemId)) continue;
-    seen.add(log.itemId);
-    const item = await deps.studyItems.findById(log.itemId, ownerId);
-    if (!item) continue;
-    const card = await deps.flashcards.findById(item.sourceId, ownerId);
-    if (card) fronts.push(card.front);
+): Promise<{ recalled: string[]; struggled: string[] }> {
+  const lowest = new Map<string, number>();
+  for (const log of logs) {
+    lowest.set(
+      log.itemId,
+      Math.min(log.quality, lowest.get(log.itemId) ?? log.quality),
+    );
   }
-  return fronts;
+  const items = [...lowest].map(([itemId, quality]) => ({ itemId, quality }));
+
+  const frontsOf = async (
+    itemIds: readonly string[],
+    max: number,
+  ): Promise<string[]> => {
+    const fronts: string[] = [];
+    for (const itemId of itemIds) {
+      if (fronts.length >= max) break;
+      const item = await deps.studyItems.findById(itemId, ownerId);
+      if (!item) continue;
+      const card = await deps.flashcards.findById(item.sourceId, ownerId);
+      if (card) fronts.push(card.front);
+    }
+    return fronts;
+  };
+
+  const struggled = items
+    .filter((item) => item.quality <= HARD_QUALITY)
+    .sort((a, b) => a.quality - b.quality);
+  const recalled = items
+    .filter((item) => item.quality > HARD_QUALITY)
+    .sort((a, b) => b.quality - a.quality);
+  return {
+    recalled: await frontsOf(
+      recalled.map((item) => item.itemId),
+      MAX_RECALLED_ITEMS,
+    ),
+    struggled: await frontsOf(
+      struggled.map((item) => item.itemId),
+      MAX_STRUGGLED_ITEMS,
+    ),
+  };
 }
 
 // Claims the session's feedback row: inserts a new pending row, or takes
@@ -272,7 +303,7 @@ export async function requestSessionFeedback(
         technique: "flashcards",
         reviewedCount: logs.length,
         counts: countByButton(logs),
-        struggled: await struggledFronts(logs, deps, ownerId),
+        ...(await sessionFronts(logs, deps, ownerId)),
       });
       const aiTimeoutMs = deps.aiTimeoutMs ?? FEEDBACK_AI_TIMEOUT_MS;
       generated = await withDeadline(aiTimeoutMs, (signal) =>

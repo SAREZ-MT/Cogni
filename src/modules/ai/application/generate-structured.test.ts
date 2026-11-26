@@ -11,6 +11,10 @@ import {
   type GenerateStructuredInput,
   generateStructured,
 } from "./generate-structured";
+import {
+  MAX_OUTPUT_TEXT_LENGTH,
+  providerSchemaFor,
+} from "./schemas/output-schemas";
 import { FakeAiProvider } from "./testing/fake-ai-provider";
 import { InMemoryAiGenerationRepository } from "./testing/in-memory-ai-generation-repository";
 import { InMemoryBreakerStore } from "./testing/in-memory-breaker-store";
@@ -114,6 +118,49 @@ describe("provider selection", () => {
     expect(!r.ok && r.error.code).toBe(AI_ERROR.NO_PROVIDER_AVAILABLE);
     expect(t.generations.all()).toHaveLength(0);
     expect(t.totalCalls()).toBe(0);
+  });
+});
+
+// Size caps are checked on the answer and never sent to the provider
+// (Gemini refuses the capped evaluation schema).
+describe("provider schema", () => {
+  const evaluation = (justification: string) => ({
+    evaluations: [
+      {
+        questionId: "q1",
+        score: 4,
+        presentConcepts: ["a"],
+        missingConcepts: [],
+        misconceptions: [],
+        justification,
+      },
+    ],
+  });
+  const recall = {
+    purpose: "evaluate_recall_answer",
+    promptVersion: "evaluate_recall_answer/v4",
+  } as const;
+
+  it("hands the provider the purpose's schema without size caps", async () => {
+    const t = setup({ a: [{ object: evaluation("Good.") }] });
+    const r = await generateStructured(input(recall), t.deps, OWNER);
+    expect(r.ok).toBe(true);
+    expect(t.fakes.get("a")?.calls[0]?.schema).toBe(
+      providerSchemaFor("evaluate_recall_answer"),
+    );
+  });
+
+  it("still fails an answer over a size cap and tries the next provider", async () => {
+    const t = setup({
+      a: [{ object: evaluation("x".repeat(MAX_OUTPUT_TEXT_LENGTH + 1)) }],
+      b: [{ object: evaluation("Good.") }],
+    });
+    const r = await generateStructured(input(recall), t.deps, OWNER);
+    expect(r.ok && r.value.generation.provider).toBe("b");
+    expect(t.generations.all().map((g) => [g.provider, g.status])).toEqual([
+      ["a", "failed"],
+      ["b", "done"],
+    ]);
   });
 });
 

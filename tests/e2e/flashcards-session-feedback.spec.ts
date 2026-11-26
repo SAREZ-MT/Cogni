@@ -55,10 +55,10 @@ test.describe("flashcard session feedback", () => {
     // The fake provider's schema-valid session_feedback object.
     await expect(feedback).toContainText("Resumen de ejemplo");
     await expect(
-      feedback.getByRole("list", { name: "Lo que recordaste bien" }),
+      feedback.getByRole("list", { name: "Lo que dominaste" }),
     ).toContainText("Constancia");
     await expect(
-      feedback.getByRole("list", { name: "Conviene reforzar" }),
+      feedback.getByRole("list", { name: "Oportunidades de mejora" }),
     ).toContainText("Repaso");
     await expect(feedback).toContainText("Repasa mañana");
     await expect(feedback).toHaveAttribute("aria-busy", "false");

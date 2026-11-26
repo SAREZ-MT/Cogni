@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 import type { AiPurpose } from "../../domain/purpose";
 import {
   examQuestionsOutput,
@@ -10,6 +11,8 @@ import {
   MAX_OUTPUT_LIST_ITEMS,
   MAX_OUTPUT_TEXT_LENGTH,
   outputSchemaFor,
+  providerSchemaFor,
+  purposeOfSchema,
   recallEvaluationOutput,
   recallEvaluationsOutput,
   recallQuestionsOutput,
@@ -290,6 +293,72 @@ describe("output size caps", () => {
     expect(
       sessionFeedbackOutput.safeParse({ ...feedback, ...override }).success,
     ).toBe(false);
+  });
+});
+
+// The caps are checked on the answer, never sent to the provider: Gemini
+// refuses the capped evaluation schema ("too many states for serving").
+describe("providerSchemaFor", () => {
+  const sizeCaps = (purpose: AiPurpose) =>
+    JSON.stringify(z.toJSONSchema(providerSchemaFor(purpose))).match(
+      /"(maxLength|maxItems)":(\d+)/g,
+    ) ?? [];
+
+  it("sends the recall evaluation without the size caps of its texts and lists", () => {
+    expect(sizeCaps("evaluate_recall_answer")).toEqual([
+      `"maxItems":${MAX_EVALUATED_ANSWERS}`,
+    ]);
+  });
+
+  it("sends recall questions and session feedback without size caps", () => {
+    expect(sizeCaps("generate_recall_questions")).toEqual([]);
+    expect(sizeCaps("session_feedback")).toEqual([]);
+  });
+
+  it("keeps the shape of the validated schema", () => {
+    const evaluations = {
+      evaluations: [
+        {
+          questionId: "q1",
+          score: 4,
+          presentConcepts: ["a"],
+          missingConcepts: [],
+          misconceptions: [],
+          justification: "Good.",
+        },
+      ],
+    };
+    expect(
+      providerSchemaFor("evaluate_recall_answer").safeParse(evaluations)
+        .success,
+    ).toBe(true);
+    expect(
+      providerSchemaFor("evaluate_recall_answer").safeParse({
+        evaluations: [{ ...evaluations.evaluations[0], score: 9 }],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("is the validated schema for a purpose without size caps", () => {
+    expect(providerSchemaFor("generate_flashcards")).toBe(flashcardsOutput);
+    expect(providerSchemaFor("generate_exam_questions")).toBe(
+      examQuestionsOutput,
+    );
+  });
+});
+
+describe("purposeOfSchema", () => {
+  it("names the purpose of a validated schema and of a provider schema", () => {
+    expect(purposeOfSchema(recallEvaluationsOutput)).toBe(
+      "evaluate_recall_answer",
+    );
+    expect(purposeOfSchema(providerSchemaFor("evaluate_recall_answer"))).toBe(
+      "evaluate_recall_answer",
+    );
+    expect(purposeOfSchema(providerSchemaFor("session_feedback"))).toBe(
+      "session_feedback",
+    );
+    expect(purposeOfSchema(z.object({}))).toBeNull();
   });
 });
 

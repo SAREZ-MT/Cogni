@@ -41,11 +41,11 @@ describe("SessionFeedbackPanel", () => {
       within(region).getByText("Buena sesión: recordaste casi todo."),
     ).toBeInTheDocument();
     const strengths = within(region).getByRole("list", {
-      name: "Lo que recordaste bien",
+      name: "Lo que dominaste",
     });
     expect(within(strengths).getAllByRole("listitem")).toHaveLength(1);
     const reinforce = within(region).getByRole("list", {
-      name: "Conviene reforzar",
+      name: "Oportunidades de mejora",
     });
     expect(within(reinforce).getAllByRole("listitem")).toHaveLength(2);
     expect(
@@ -61,10 +61,10 @@ describe("SessionFeedbackPanel", () => {
     );
 
     expect(
-      screen.queryByRole("list", { name: "Lo que recordaste bien" }),
+      screen.queryByRole("list", { name: "Lo que dominaste" }),
     ).not.toBeInTheDocument();
     expect(
-      screen.getByRole("list", { name: "Conviene reforzar" }),
+      screen.getByRole("list", { name: "Oportunidades de mejora" }),
     ).toBeInTheDocument();
   });
 

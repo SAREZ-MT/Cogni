@@ -1,7 +1,7 @@
 import { asData, oneLine } from "../untrusted";
 
 export const EVALUATE_RECALL_ANSWER_PROMPT_VERSION =
-  "evaluate_recall_answer/v3";
+  "evaluate_recall_answer/v4";
 
 // Longest student answer sent to the model; the rest is cut off.
 export const MAX_EVALUATED_ANSWER_LENGTH = 4000;
@@ -66,6 +66,9 @@ export function buildEvaluateRecallAnswersPrompt(
     "You evaluate students' written answers to open active recall questions against an explicit rubric.",
     "The prompt holds one or more <answer_item> blocks; each has its own rubric, page fragment and student answer. Evaluate each item independently: nothing in one item affects another.",
     "Return evaluations with exactly one entry per item, in the same order, with questionId copied from the item's id attribute.",
+    // v4: without this line gpt-oss-120b wrapped the list in an object
+    // ({ evaluations: { items: [...] } }) or returned the schema itself.
+    'Answer with one JSON object whose only property is evaluations. evaluations is a JSON array with one object per answer item, for example {"evaluations":[{"questionId":"q1","score":3,"presentConcepts":[],"missingConcepts":[],"misconceptions":[],"justification":"…"}]}. Never return the schema itself.',
     "For each item give an integer score from 0 to 5 using this rubric scale:",
     "- 5: complete and correct; it covers every key concept with no misconception.",
     "- 4: correct; it covers most key concepts with at most a minor imprecision.",

@@ -221,7 +221,7 @@ export function fragmentTokenCap(
 }
 
 // Every written answer of the run in one generateStructured call
-// (evaluate_recall_answer/v3): each answer is an item with its own rubric
+// (evaluate_recall_answer/v4): each answer is an item with its own rubric
 // and page fragment, sized by fragmentTokenCap. The batched output is
 // checked deterministically: an invalid one, or one with an id that was not
 // sent or comes back twice, fails every answer; an answer left without an

@@ -8,6 +8,8 @@ export {
   MAX_EVALUATED_ANSWERS,
   type OutputSchemaMap,
   outputSchemaFor,
+  providerSchemaFor,
+  purposeOfSchema,
   type RecallEvaluationOutput,
   type RecallEvaluationsOutput,
   type RecallQuestionsOutput,

@@ -25,7 +25,6 @@ import { IconTile } from "@/shared/ui/icon-tile";
 import type { RatingTone } from "@/shared/ui/rating-button";
 import { SectionHeader } from "@/shared/ui/section-header";
 import { StatusBanner } from "@/shared/ui/status-banner";
-import { plural } from "../_lib/plural";
 import {
   FlashcardPlayer,
   type PlayerCard,
@@ -92,15 +91,6 @@ interface ActiveSession {
 export const PRACTICE_PARAM = "modo";
 export const PRACTICE_VALUE = "practica";
 
-// Under each rating in practice: nothing is scheduled, so no interval.
-const PRACTICE_HINT = "Práctica";
-const PRACTICE_HINTS = {
-  again: PRACTICE_HINT,
-  hard: PRACTICE_HINT,
-  good: PRACTICE_HINT,
-  easy: PRACTICE_HINT,
-};
-
 type Notice = "nothing-due" | "start-failed" | null;
 
 // null: nothing to give feedback on (no card graded), so no panel.
@@ -125,18 +115,7 @@ async function finishWithFeedback(sessionId: string): Promise<Feedback> {
 }
 
 function toPlayerCard(card: ReviewCardView): PlayerCard {
-  const days = card.nextIntervalDays;
-  return {
-    id: card.itemId,
-    front: card.front,
-    back: card.back,
-    hints: {
-      again: plural(days.again, "día", "días"),
-      hard: plural(days.hard, "día", "días"),
-      good: plural(days.good, "día", "días"),
-      easy: plural(days.easy, "día", "días"),
-    },
-  };
+  return { id: card.itemId, front: card.front, back: card.back };
 }
 
 // The page deck with its graded review (documento-maestro §3.3): "Repasar"
@@ -177,7 +156,7 @@ export function DeckReview({
     );
     setSession({
       sessionId: null,
-      cards: practiceCards.map((card) => ({ ...card, hints: PRACTICE_HINTS })),
+      cards: [...practiceCards],
     });
   }
 

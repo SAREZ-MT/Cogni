@@ -67,8 +67,9 @@ sessions are scheduled by `study-engine`; this module adds the card text.
   - `requestSessionFeedback` (§3.3, §8.4) asks the AI for feedback on a
     finished session with at least one graded answer
     (`FLASHCARDS_FEEDBACK_SESSION_OPEN`, `FLASHCARDS_FEEDBACK_NOTHING_REVIEWED`)
-    using the `session_feedback/v3` prompt (counts per button and up to 8
-    hardest fronts, never study time). It spends one unit of the daily feedback
+    using the `session_feedback/v5` prompt (a Socratic tutor's voice: counts
+    per button, up to 8 best recalled fronts and up to 8 hardest ones, never
+    the card backs and never study time). It spends one unit of the daily feedback
     limit (`AI_DAILY_FEEDBACKS`), never a generation. Idempotent per session: the first request claims the
     session's single `SessionFeedback` row, later ones read it back; a
     `pending` row untouched for `STALE_PENDING_MS` (2 min) is reclaimed; the
