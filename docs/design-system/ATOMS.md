@@ -1878,6 +1878,9 @@ matching the widget's own 3-tone legend requirement) renders below.
 
 Used by: `dashboard/_components/mastery-insight.tsx`.
 
+Since 2026-11-26 each bar grows from its base on entry (`dash-grow` in
+`globals.css`, skipped under reduced motion).
+
 ### DashedRing (`dashed-ring.tsx`) — new, replaces RadialProgress
 
 Row 3 "Tasa de acierto" ring: a plain SVG (two `<circle>`s, no Recharts) —
@@ -1887,6 +1890,9 @@ progress arc is a second circle with `stroke-dasharray`/rotated -90deg so
 it starts at 12 o'clock. Centered content: an icon tile, the value
 (22px/700) and an uppercase caption, server-renderable (no chart library
 needed for one static ring).
+Since 2026-11-26 the track is tinted `primary-200` and the progress arc
+draws itself on entry (`dash-ring-draw` in `globals.css`, skipped under
+reduced motion).
 
 - `value` (0-100), `icon`, `label`, `colorVar?` (default
   `var(--color-primary-600)`), `size?` (default 160), `className?`.
@@ -1904,6 +1910,10 @@ this atom is presentational only.
 
 Used by: `dashboard/_components/calibration-table.tsx` (4 sortable columns:
 Página, Autoevaluación, Resultado real, Brecha).
+
+Since 2026-11-26 the label is sentence case, 12.5px semibold; the active
+column turns `primary-700` and shows its arrow, the others only hint the
+sort icon on hover or focus.
 
 ### Dashboard route (`dashboard/page.tsx` + `_components/*`)
 

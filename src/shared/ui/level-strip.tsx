@@ -39,7 +39,7 @@ export function LevelStrip({ bars, className }: LevelStripProps) {
             <span
               aria-hidden="true"
               className={cn(
-                "block w-full rounded-[1.5px]",
+                "dash-grow block w-full rounded-[1.5px]",
                 MASTERY_LEVEL_SOLID_CLASS[bar.level],
               )}
               style={{ height: `${Math.max(6, Math.round(bar.score * 40))}px` }}

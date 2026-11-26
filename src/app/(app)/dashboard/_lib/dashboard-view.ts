@@ -42,6 +42,8 @@ export interface DashboardSources {
 export interface HeroView {
   greeting: string;
   subtitle: string;
+  // The account's display name, for the welcome line.
+  name: string;
 }
 
 export interface MasteryView {
@@ -169,20 +171,20 @@ const TECHNIQUES: Record<
   flashcards: {
     key: "flashcards",
     label: "Flashcards",
-    colorVar: "var(--color-primary-600)",
-    dotClass: "bg-primary-600",
+    colorVar: "var(--color-technique-flashcards-cta-edge)",
+    dotClass: "bg-technique-flashcards-cta-edge",
   },
   recall: {
     key: "activeRecall",
     label: "Recordación activa",
-    colorVar: "var(--color-success-600)",
-    dotClass: "bg-success-600",
+    colorVar: "var(--color-success-500)",
+    dotClass: "bg-success-500",
   },
   exam: {
     key: "exams",
     label: "Exámenes",
-    colorVar: "var(--color-rose-600)",
-    dotClass: "bg-rose-600",
+    colorVar: "var(--color-rose-500)",
+    dotClass: "bg-rose-500",
   },
 };
 
@@ -309,6 +311,7 @@ function heroView(sources: DashboardSources): HeroView {
   );
   if (!weakest) {
     return {
+      name: sources.userName,
       greeting,
       subtitle:
         "Genera flashcards, preguntas o exámenes en tus páginas para ver aquí cómo avanzas.",
@@ -316,6 +319,7 @@ function heroView(sources: DashboardSources): HeroView {
   }
   const level = notebookLevel(weakest);
   return {
+    name: sources.userName,
     greeting,
     subtitle:
       level === "dominado"

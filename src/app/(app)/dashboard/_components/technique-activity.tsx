@@ -1,6 +1,7 @@
 "use client";
 
 import { Brain, FileCheck, Layers, type LucideIcon } from "lucide-react";
+import { useReducedMotion } from "motion/react";
 import { Bar, BarChart, ResponsiveContainer } from "recharts";
 import { ChartCard } from "@/shared/ui/chart-card";
 import { DotStreak } from "@/shared/ui/dot-streak";
@@ -18,7 +19,7 @@ const TECHNIQUE_TILE_TONE: Record<
   TechniqueKey,
   NonNullable<IconTileProps["tone"]>
 > = {
-  flashcards: "primary",
+  flashcards: "warning",
   activeRecall: "success",
   exams: "rose",
 };
@@ -27,7 +28,7 @@ const TECHNIQUE_PILL_TONE: Record<
   TechniqueKey,
   NonNullable<PillProps["tone"]>
 > = {
-  flashcards: "primary",
+  flashcards: "warning",
   activeRecall: "success",
   exams: "rose",
 };
@@ -50,6 +51,8 @@ function TechniqueCard({ metric }: { metric: TechniqueCardView }) {
   const repasos = metric.reviewsCompleted;
   const isUp = metric.deltaPct !== null && metric.deltaPct >= 0;
   const accuracy = metric.accuracyPct === null ? "—" : `${metric.accuracyPct}%`;
+  const animate = !useReducedMotion();
+  const gradientId = `technique-fill-${metric.key}`;
 
   return (
     <ChartCard
@@ -64,6 +67,7 @@ function TechniqueCard({ metric }: { metric: TechniqueCardView }) {
       }
       title={metric.label}
       ariaLabel={figureLabel(metric)}
+      className="transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card-hover"
     >
       <div>
         <p className="text-[12px] text-fg-muted">Repasos completados</p>
@@ -98,11 +102,23 @@ function TechniqueCard({ metric }: { metric: TechniqueCardView }) {
             data={metric.recentActivity}
             margin={{ top: 4, right: 0, bottom: 0, left: 0 }}
           >
+            <defs>
+              <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={metric.colorVar} />
+                <stop
+                  offset="100%"
+                  stopColor={metric.colorVar}
+                  stopOpacity={0.35}
+                />
+              </linearGradient>
+            </defs>
             <Bar
               dataKey="count"
-              radius={[3, 3, 0, 0]}
-              fill={metric.colorVar}
-              isAnimationActive={false}
+              radius={4}
+              fill={`url(#${gradientId})`}
+              isAnimationActive={animate}
+              animationDuration={600}
+              animationEasing="ease-out"
             />
           </BarChart>
         </ResponsiveContainer>

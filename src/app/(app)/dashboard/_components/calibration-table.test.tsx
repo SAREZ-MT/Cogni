@@ -89,14 +89,15 @@ describe("CalibrationTable", () => {
     expect(header("Página")).toHaveAttribute("aria-sort", "none");
   });
 
-  it("shows averages, signed gap and the calibration signal of a row", () => {
+  it("shows averages, the size of the gap and the calibration signal of a row", () => {
     renderTable();
 
     const row = screen.getByRole("row", { name: /Cloroplasto/ });
     const cells = within(row).getAllByRole("cell");
     expect(cells[1]).toHaveTextContent("5");
     expect(cells[2]).toHaveTextContent("1");
-    expect(cells[3]).toHaveTextContent("+4");
+    // The gap shows its size; the signal names the direction.
+    expect(cells[3]).toHaveTextContent(/^4$/);
     expect(within(row).getByText("Exceso de confianza")).toBeInTheDocument();
     expect(within(row).getByRole("link", { name: "Repasar" })).toHaveAttribute(
       "href",
@@ -111,14 +112,14 @@ describe("CalibrationTable", () => {
     for (const pill of screen.getAllByText("Exceso de confianza", {
       selector: "span",
     })) {
-      expect(pill).toHaveClass("bg-warning-100");
+      expect(pill).toHaveClass("bg-error-100");
     }
     // Sorted by the gap ascending, the underconfident rows lead.
     await user.click(screen.getByRole("button", { name: "Brecha" }));
     for (const pill of screen.getAllByText("Falta de confianza", {
       selector: "span",
     })) {
-      expect(pill).toHaveClass("bg-info-100");
+      expect(pill).toHaveClass("bg-warning-100");
     }
     for (const pill of screen.getAllByText("Calibrado", { selector: "span" })) {
       expect(pill).toHaveClass("bg-success-100");
@@ -135,7 +136,7 @@ describe("CalibrationTable", () => {
     expect(pageTitles()[0]).toBe("Núcleo");
     expect(
       within(screen.getAllByRole("row")[1]).getAllByRole("cell")[3],
-    ).toHaveTextContent("−4".replace("−", "-"));
+    ).toHaveTextContent(/^4$/);
   });
 
   it("sorts a new column descending, and the title column alphabetically", async () => {
@@ -222,7 +223,28 @@ describe("CalibrationTable", () => {
     const cells = within(row).getAllByRole("cell");
     expect(cells[1]).toHaveTextContent("3,7");
     expect(cells[2]).toHaveTextContent("2,3");
-    expect(cells[3]).toHaveTextContent("+1,4");
+    expect(cells[3]).toHaveTextContent(/^1,4$/);
+  });
+
+  it("colours the gap like a traffic light: red, amber and green by signal", () => {
+    renderTable(ROWS.slice(0, 3));
+
+    const gapOf = (title: RegExp) =>
+      within(screen.getByRole("row", { name: title })).getAllByRole("cell")[3];
+    expect(gapOf(/Cloroplasto/)).toHaveClass("text-error-600");
+    expect(gapOf(/Núcleo/)).toHaveClass("text-warning-600");
+    expect(gapOf(/Mitocondria/)).toHaveClass("text-success-600");
+  });
+
+  it("draws both scores of a row on a 0 to 5 line", () => {
+    renderTable();
+
+    const row = screen.getByRole("row", { name: /Cloroplasto/ });
+    expect(
+      within(row).getByRole("img", {
+        name: "Sentiste 5 de 5; la IA evaluó 1 de 5",
+      }),
+    ).toBeInTheDocument();
   });
 
   it("shows an empty state without evaluated answers in the period", () => {

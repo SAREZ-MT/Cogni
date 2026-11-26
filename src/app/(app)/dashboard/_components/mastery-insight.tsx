@@ -15,7 +15,7 @@ export function MasteryInsight({ mastery }: { mastery: MasteryView }) {
         bodyClassName="gap-3"
       >
         <div>
-          <p className="font-bold text-[30px] text-fg leading-none">
+          <p className="font-bold text-[30px] text-primary-600 leading-none">
             {mastery.valuePct === null ? "—" : `${mastery.valuePct}%`}
           </p>
           <p className="mt-1.5 text-[12.5px] text-fg-muted">
