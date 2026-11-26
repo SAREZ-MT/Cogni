@@ -51,7 +51,7 @@ function position(value: number): string {
 }
 
 // The two scores of a page as two small vertical bars on the same 0–5
-// scale and baseline: violet for what the student felt, orange for what
+// scale and baseline: violet for what the student felt, yellow for what
 // the AI evaluated. Each bar stands in a faint column of the full scale,
 // so its height reads against the maximum; the numbers beside it carry the
 // same colours.
@@ -68,9 +68,9 @@ function GapBars({ row }: { row: CalibrationRow }) {
           style={{ height: position(row.selfAvg) }}
         />
       </span>
-      <span className="relative h-full w-3.5 rounded-t-[4px] bg-orange-100">
+      <span className="relative h-full w-3.5 rounded-t-[4px] bg-technique-flashcards-glow-soft">
         <span
-          className="dash-grow absolute inset-x-0 bottom-0 rounded-t-[4px] bg-orange-500"
+          className="dash-grow absolute inset-x-0 bottom-0 rounded-t-[4px] bg-technique-flashcards-dot"
           style={{ height: position(row.aiAvg) }}
         />
       </span>
@@ -93,7 +93,7 @@ function compare(a: CalibrationRow, b: CalibrationRow, key: SortKey): number {
 // §7.4): a sortable, paginated table — one row per page with the averages of its
 // evaluated Active recall answers in the period, and the page's most
 // frequent per-answer signal. Each row speaks for itself: the student's
-// score in violet and the AI's in orange, the gap in its traffic-light colour, both scores on
+// score in violet and the AI's in the flashcards' yellow, the gap in its traffic-light colour, both scores on
 // one line and the named signal. Client state only for sort/pagination; a
 // period without evaluated answers shows an empty state.
 export function CalibrationTable({
@@ -236,7 +236,7 @@ export function CalibrationTable({
                           <span className="flex items-center gap-1">
                             <span
                               aria-hidden="true"
-                              className="size-2 rounded-full bg-orange-500"
+                              className="size-2 rounded-full bg-technique-flashcards-dot"
                             />
                             IA
                           </span>
@@ -268,7 +268,7 @@ export function CalibrationTable({
                       <td className="px-3 py-3 text-center font-semibold text-[19px] text-primary-600 tabular-nums">
                         {row.selfAvg.toLocaleString("es-ES")}
                       </td>
-                      <td className="px-3 py-3 text-center font-semibold text-[19px] text-orange-600 tabular-nums">
+                      <td className="px-3 py-3 text-center font-semibold text-[19px] text-technique-flashcards-cta-shadow tabular-nums">
                         {row.aiAvg.toLocaleString("es-ES")}
                       </td>
                       <td
