@@ -22,6 +22,7 @@ import type { Clock } from "@/shared/kernel/clock";
 import { DomainError } from "@/shared/kernel/domain-error";
 import { err, ok, type Result } from "@/shared/kernel/result";
 import { RECALL_ERROR } from "../domain/errors";
+import { checkEvaluation } from "../domain/evaluation-check";
 import { selectRelevantFragment } from "../domain/fragment";
 import {
   combinedQuality,
@@ -309,14 +310,16 @@ async function evaluateWithModel(
   if (!valid) return failAll(failed(AI_ERROR.GENERATION_FAILED, generation.id));
 
   const results = new Map<string, RecallEvaluationResult>();
-  for (const { key, answer } of pending) {
+  for (const { key, answer, question } of pending) {
     const evaluation = byKey.get(key);
-    results.set(
-      answer.id,
-      evaluation
-        ? done(answer, evaluation.score, evaluation, generation.id)
-        : failed(AI_ERROR.GENERATION_FAILED, generation.id),
-    );
+    if (!evaluation) {
+      results.set(answer.id, failed(AI_ERROR.GENERATION_FAILED, generation.id));
+      continue;
+    }
+    // S2: the stored evaluation is the checked one (rubric concepts only,
+    // score bounded by the model's own concept lists).
+    const checked = checkEvaluation(evaluation, question.rubric.keyConcepts);
+    results.set(answer.id, done(answer, checked.score, checked, generation.id));
   }
 
   if (

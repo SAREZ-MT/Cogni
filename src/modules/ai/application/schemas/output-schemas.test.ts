@@ -5,6 +5,10 @@ import {
   examVariantsOutput,
   flashcardsOutput,
   MAX_EVALUATED_ANSWERS,
+  MAX_OUTPUT_CONCEPT_LENGTH,
+  MAX_OUTPUT_CONCEPTS,
+  MAX_OUTPUT_LIST_ITEMS,
+  MAX_OUTPUT_TEXT_LENGTH,
   outputSchemaFor,
   recallEvaluationOutput,
   recallEvaluationsOutput,
@@ -197,6 +201,82 @@ describe("sessionFeedbackOutput", () => {
     expect(sessionFeedbackOutput.safeParse(feedback).success).toBe(true);
     const { summary: _, ...bad } = feedback;
     expect(sessionFeedbackOutput.safeParse(bad).success).toBe(false);
+  });
+});
+
+// S2: an answer cannot make the model return unbounded text or lists.
+describe("output size caps", () => {
+  const evaluation = {
+    score: 4,
+    presentConcepts: ["a"],
+    missingConcepts: [],
+    misconceptions: [],
+    justification: "Good.",
+  };
+  const feedback = {
+    summary: "Well done",
+    strengths: ["a"],
+    toReinforce: ["b"],
+    nextStepSuggestion: "Review b",
+  };
+  const longText = "x".repeat(MAX_OUTPUT_TEXT_LENGTH + 1);
+  const longConcept = "x".repeat(MAX_OUTPUT_CONCEPT_LENGTH + 1);
+  const manyConcepts = Array.from(
+    { length: MAX_OUTPUT_CONCEPTS + 1 },
+    (_, i) => `c${i}`,
+  );
+  const manyItems = Array.from(
+    { length: MAX_OUTPUT_LIST_ITEMS + 1 },
+    (_, i) => `i${i}`,
+  );
+
+  it("accepts an evaluation at the caps", () => {
+    expect(
+      recallEvaluationOutput.safeParse({
+        ...evaluation,
+        presentConcepts: manyConcepts.slice(1),
+        misconceptions: manyItems.slice(1),
+        justification: longText.slice(1),
+      }).success,
+    ).toBe(true);
+  });
+
+  it.each([
+    ["too many present concepts", { presentConcepts: manyConcepts }],
+    ["too many missing concepts", { missingConcepts: manyConcepts }],
+    ["an overlong concept", { presentConcepts: [longConcept] }],
+    ["too many misconceptions", { misconceptions: manyItems }],
+    ["an overlong justification", { justification: longText }],
+  ])("rejects an evaluation with %s", (_, override) => {
+    expect(
+      recallEvaluationOutput.safeParse({ ...evaluation, ...override }).success,
+    ).toBe(false);
+  });
+
+  it.each([
+    ["too many key concepts", { keyConcepts: manyConcepts }],
+    ["an overlong key concept", { keyConcepts: [longConcept] }],
+    ["an overlong answer summary", { acceptableAnswerSummary: longText }],
+  ])("rejects a recall question whose rubric has %s", (_, override) => {
+    const rubric = { keyConcepts: ["x"], acceptableAnswerSummary: "X is Y." };
+    expect(
+      recallQuestionsOutput.safeParse({
+        questions: [
+          { prompt: "Explain X", rubric: { ...rubric, ...override } },
+        ],
+      }).success,
+    ).toBe(false);
+  });
+
+  it.each([
+    ["an overlong summary", { summary: longText }],
+    ["too many strengths", { strengths: manyItems }],
+    ["too many items to reinforce", { toReinforce: manyItems }],
+    ["an overlong next step", { nextStepSuggestion: longText }],
+  ])("rejects feedback with %s", (_, override) => {
+    expect(
+      sessionFeedbackOutput.safeParse({ ...feedback, ...override }).success,
+    ).toBe(false);
   });
 });
 

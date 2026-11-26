@@ -8,6 +8,21 @@ import type { AiPurpose } from "../../domain/purpose";
 // (§8.1).
 
 const text = z.string().trim().min(1);
+
+// Size caps of the texts and lists whose content follows untrusted input (a
+// student's answer or page): generous for a real answer, small enough that
+// an injected instruction cannot make the model return unbounded output
+// (security-hardening S2). An answer over a cap is a failure, like any
+// other answer that does not fit.
+export const MAX_OUTPUT_CONCEPT_LENGTH = 200;
+export const MAX_OUTPUT_CONCEPTS = 12;
+export const MAX_OUTPUT_TEXT_LENGTH = 2000;
+export const MAX_OUTPUT_LIST_ITEMS = 15;
+
+const concept = text.max(MAX_OUTPUT_CONCEPT_LENGTH);
+const concepts = z.array(concept).max(MAX_OUTPUT_CONCEPTS);
+const longText = text.max(MAX_OUTPUT_TEXT_LENGTH);
+const longTexts = z.array(longText).max(MAX_OUTPUT_LIST_ITEMS);
 const options = z.array(text).length(4);
 const correctIndex = z.number().int().min(0).max(3);
 
@@ -49,8 +64,8 @@ export const recallQuestionsOutput = z.object({
       z.object({
         prompt: text,
         rubric: z.object({
-          keyConcepts: z.array(text),
-          acceptableAnswerSummary: text,
+          keyConcepts: concepts,
+          acceptableAnswerSummary: longText,
         }),
       }),
     )
@@ -59,10 +74,10 @@ export const recallQuestionsOutput = z.object({
 
 export const recallEvaluationOutput = z.object({
   score: z.number().int().min(0).max(5),
-  presentConcepts: z.array(text),
-  missingConcepts: z.array(text),
-  misconceptions: z.array(text),
-  justification: text,
+  presentConcepts: concepts,
+  missingConcepts: concepts,
+  misconceptions: longTexts,
+  justification: longText,
 });
 
 // One recall session at most (RECALL_SESSION_SIZE): every written answer of
@@ -79,10 +94,10 @@ export const recallEvaluationsOutput = z.object({
 });
 
 export const sessionFeedbackOutput = z.object({
-  summary: text,
-  strengths: z.array(text),
-  toReinforce: z.array(text),
-  nextStepSuggestion: text,
+  summary: longText,
+  strengths: longTexts,
+  toReinforce: longTexts,
+  nextStepSuggestion: longText,
 });
 
 const OUTPUT_SCHEMAS = {
