@@ -1,67 +1,78 @@
 import { ArrowRight } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import type { HeroView } from "../_lib/dashboard-view";
 
-// Purely decorative abstract composition (violet pastel shapes, no emoji) —
-// a soft nod to "progreso"/growth instead of a literal illustration.
-function HeroIllustration() {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 160 140"
-      className="hidden h-[120px] w-[140px] shrink-0 sm:block"
-    >
-      <circle cx="112" cy="46" r="40" className="fill-primary-100" />
-      <circle cx="72" cy="92" r="30" className="fill-primary-200" />
-      <rect
-        x="24"
-        y="70"
-        width="44"
-        height="44"
-        rx="12"
-        className="fill-primary-50"
-      />
-      <path
-        d="M40 100 L58 78 L76 92 L100 58"
-        stroke="var(--color-primary-500)"
-        strokeWidth="4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        fill="none"
-      />
-      <circle cx="100" cy="58" r="5" className="fill-primary-600" />
-    </svg>
-  );
-}
+// Hidden, not removed (user decision 2026-11-26). Set a flag to true to
+// bring its piece back:
+// - the "Ver repasos de hoy" button;
+// - the sentence about the weakest notebook and the hour-based greeting
+//   (`hero.subtitle`, `hero.greeting`), which the view still builds.
+const SHOW_REVIEW_CTA: boolean = false;
+const SHOW_NOTEBOOK_HINT: boolean = false;
 
-// Row 1 (wide) — hero: greeting (profile-zone hour + account name) and a
-// feedback sentence about the weakest notebook, both built from the same
-// analytics reads as the rest of the page, a primary CTA to today's reviews
-// and a decorative illustration.
+const WELCOME = "Qué gusto volver a verte por acá";
+const MESSAGE =
+  "Tu esfuerzo se nota semana a semana. Revisa tus métricas, descubre qué temas ya dominas y cuáles te conviene repasar.";
+
+// The welcome tour's illustration, reused (user decision 2026-11-26): the
+// tour is seen once, and this card is always on screen. Decorative. Its
+// background is white, so it blends into the card's gradient
+// (`mix-blend-multiply`, like the Home hero's illustration).
+const ILLUSTRATION = {
+  src: "/illustrations/tour-welcome.webp",
+  width: 880,
+  height: 609,
+} as const;
+
+// Row 1 (wide) — hero: a welcome by account name in the handwritten face
+// (Caveat, the one of the active recall empty state), a line on what the
+// page is for and the illustration.
 export function DashboardHero({ hero }: { hero: HeroView }) {
   return (
     <Card
       data-testid="hero"
       padding="lg"
-      className="flex items-center justify-between gap-6"
+      tone="achievement"
+      className="flex items-center justify-between gap-6 overflow-hidden"
     >
       <div className="flex flex-col items-start gap-4">
         <div>
-          <h1 className="font-bold text-[22px] text-fg">{hero.greeting}</h1>
-          <p className="mt-1.5 max-w-md text-[13px] text-fg-muted">
-            {hero.subtitle}
+          {SHOW_NOTEBOOK_HINT ? (
+            <h1 className="font-bold text-[22px] text-fg">{hero.greeting}</h1>
+          ) : (
+            <h1 className="font-[family-name:var(--font-handwriting)] font-medium text-[38px] text-fg leading-[1.05]">
+              {WELCOME}
+              {hero.name && (
+                <>
+                  , <span className="text-gradient-brand">{hero.name}</span>
+                </>
+              )}
+            </h1>
+          )}
+          <p className="mt-2.5 max-w-md text-[13.5px] text-fg-secondary leading-[1.55]">
+            {SHOW_NOTEBOOK_HINT ? hero.subtitle : MESSAGE}
           </p>
         </div>
-        <Button asChild>
-          <Link href="/inicio">
-            Ver repasos de hoy
-            <ArrowRight aria-hidden="true" size={16} strokeWidth={2} />
-          </Link>
-        </Button>
+        {SHOW_REVIEW_CTA && (
+          <Button asChild>
+            <Link href="/inicio">
+              Ver repasos de hoy
+              <ArrowRight aria-hidden="true" size={16} strokeWidth={2} />
+            </Link>
+          </Button>
+        )}
       </div>
-      <HeroIllustration />
+      <Image
+        src={ILLUSTRATION.src}
+        alt=""
+        width={ILLUSTRATION.width}
+        height={ILLUSTRATION.height}
+        sizes="230px"
+        className="dash-float -my-2 hidden h-auto w-[226px] shrink-0 mix-blend-multiply sm:block"
+      />
     </Card>
   );
 }

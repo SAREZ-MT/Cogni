@@ -55,7 +55,7 @@ export function DashedRing({
           cy={size / 2}
           r={radius}
           fill="none"
-          stroke="var(--color-neutral-300)"
+          stroke="var(--color-primary-200)"
           strokeWidth={strokeWidth}
           strokeDasharray="2 6"
           strokeLinecap="round"
@@ -69,7 +69,7 @@ export function DashedRing({
           strokeWidth={strokeWidth}
           strokeLinecap="round"
           strokeDasharray={`${progressLength} ${circumference}`}
-          className="transition-[stroke-dasharray] duration-500 motion-reduce:transition-none"
+          className="dash-ring-draw transition-[stroke-dasharray] duration-500 motion-reduce:transition-none"
         />
       </svg>
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1.5">

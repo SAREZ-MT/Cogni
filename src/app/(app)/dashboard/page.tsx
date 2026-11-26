@@ -40,12 +40,6 @@ function parseRange(value: string | string[] | undefined): DashboardRange {
     : 7;
 }
 
-const PERIOD_LABEL: Record<DashboardRange, string> = {
-  7: "los últimos 7 días",
-  15: "los últimos 15 días",
-  30: "los últimos 30 días",
-};
-
 interface DashboardPageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
@@ -59,8 +53,8 @@ const TREND_WEEKS = 1;
 // focused progress dashboard with the reference screenshot's density —
 // hero, key insight, one main activity chart, one accuracy ring, 3 KPI
 // tiles, a notebook-progress list, a calibration table and the per-
-// technique cards; monochrome charts, direct values, no colour-only
-// meaning. The zone comes from the profile, like the calendar, and one
+// technique cards; charts in the techniques' colours with named legends
+// (no colour-only meaning), direct values and a short entrance animation. The zone comes from the profile, like the calendar, and one
 // instant drives every read so "today" agrees across the page.
 export default async function DashboardPage({
   searchParams,
@@ -96,10 +90,9 @@ export default async function DashboardPage({
       <SetBreadcrumb items={[{ label: "Progreso" }]} />
 
       <SectionHeader
-        eyebrow="Progreso"
         title="Progreso"
-        titleClassName="text-[24px]"
-        description={`Cómo vas en ${PERIOD_LABEL[range]}`}
+        titleClassName="text-[32px] leading-tight tracking-tight text-gradient-brand"
+        description="Cada repaso suma: aquí se ve cuánto has avanzado."
       />
 
       {view === null ? (
@@ -143,6 +136,11 @@ function DashboardEmpty() {
   );
 }
 
+// "Progreso por cuaderno" is hidden, not removed (user decision
+// 2026-11-26): its space went to the calibration widget. The component,
+// its view data and its tests stay; set this to true to show it again.
+const SHOW_NOTEBOOK_PROGRESS: boolean = false;
+
 function DashboardBody({
   view,
   range,
@@ -152,24 +150,29 @@ function DashboardBody({
 }) {
   return (
     <>
-      <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2 xl:grid-cols-[2fr_1fr]">
+      <div className="dash-rise grid grid-cols-1 gap-3.5 md:grid-cols-2 xl:grid-cols-[2fr_1fr]">
         <DashboardHero hero={view.hero} />
         <MasteryInsight mastery={view.mastery} />
       </div>
 
-      <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2 xl:grid-cols-[2fr_1fr]">
+      <div className="dash-rise dash-rise-2 grid grid-cols-1 gap-3.5 md:grid-cols-2 xl:grid-cols-[2fr_1fr]">
         <ActivityChart range={range} activity={view.activity} />
         <AccuracyRing accuracy={view.accuracy} />
       </div>
 
-      <KpiRow kpis={view.kpis} />
+      <div className="dash-rise dash-rise-3">
+        <KpiRow kpis={view.kpis} />
+      </div>
 
-      <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2 xl:grid-cols-[1fr_2fr]">
-        <NotebookProgress rows={view.notebooks} />
+      <div className="dash-rise dash-rise-4">
         <CalibrationTable rows={view.calibration} />
       </div>
 
-      <TechniqueActivity techniques={view.techniques} />
+      {SHOW_NOTEBOOK_PROGRESS && <NotebookProgress rows={view.notebooks} />}
+
+      <div className="dash-rise dash-rise-5">
+        <TechniqueActivity techniques={view.techniques} />
+      </div>
     </>
   );
 }

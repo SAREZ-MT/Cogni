@@ -10,7 +10,7 @@ import {
 import Link from "next/link";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
-import { IconTile } from "@/shared/ui/icon-tile";
+import { IconTile, type IconTileProps } from "@/shared/ui/icon-tile";
 import type { KpisView } from "../_lib/dashboard-view";
 
 interface KpiTileProps {
@@ -21,6 +21,8 @@ interface KpiTileProps {
   delta?: number;
   hint?: string;
   icon: LucideIcon;
+  // Each KPI has its own colour so the row reads at a glance.
+  tone: NonNullable<IconTileProps["tone"]>;
   href: string;
 }
 
@@ -52,10 +54,11 @@ function KpiTile({
   delta,
   hint,
   icon: Icon,
+  tone,
   href,
 }: KpiTileProps) {
   return (
-    <Card padding="lg" className="flex flex-col gap-4">
+    <Card padding="lg" interactive className="flex flex-col gap-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="font-medium text-[12px] text-fg-muted">{label}</p>
@@ -67,8 +70,8 @@ function KpiTile({
           </div>
           {hint && <p className="mt-1.5 text-[11.5px] text-fg-muted">{hint}</p>}
         </div>
-        <IconTile size="36" radius="input" tone="neutral">
-          <Icon aria-hidden="true" size={16} strokeWidth={1.75} />
+        <IconTile size="40" radius="input" tone={tone}>
+          <Icon aria-hidden="true" size={18} strokeWidth={1.75} />
         </IconTile>
       </div>
       <Button asChild variant="outline" size="sm" className="self-start">
@@ -95,6 +98,7 @@ export function KpiRow({ kpis }: { kpis: KpisView }) {
         value={kpis.streak.value}
         delta={kpis.streak.delta}
         icon={Flame}
+        tone="orange"
         href="/inicio"
       />
       <KpiTile
@@ -102,6 +106,7 @@ export function KpiRow({ kpis }: { kpis: KpisView }) {
         value={kpis.due.value}
         hint={kpis.due.hint}
         icon={AlarmClock}
+        tone="rose"
         href="/notebooks"
       />
       <KpiTile
@@ -109,6 +114,7 @@ export function KpiRow({ kpis }: { kpis: KpisView }) {
         value={kpis.mastered.value}
         hint={kpis.mastered.hint}
         icon={BookCheck}
+        tone="success"
         href="/notebooks"
       />
     </div>

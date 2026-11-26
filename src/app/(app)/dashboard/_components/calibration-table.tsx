@@ -12,6 +12,7 @@ import {
   type SortDirection,
   TableHeaderButton,
 } from "@/shared/ui/table-header-button";
+import { cn } from "@/shared/ui/utils";
 import type { CalibrationRow, CalibrationZone } from "../_lib/dashboard-view";
 
 const ZONE_LABEL: Record<CalibrationZone, string> = {
@@ -20,11 +21,64 @@ const ZONE_LABEL: Record<CalibrationZone, string> = {
   calibrado: "Calibrado",
 };
 
+// The gap reads as a traffic light (user decision 2026-11-26): green when
+// the student is calibrated, amber when they know more than they believe,
+// red when they believed more than their answers showed. The gap shows
+// its size without a sign: a "+" in red read as something good, and the
+// signal pill already names the direction, so the colour is never the only
+// cue.
 const ZONE_TONE: Record<CalibrationZone, NonNullable<PillProps["tone"]>> = {
-  exceso: "warning",
-  falta: "info",
+  exceso: "error",
+  falta: "warning",
   calibrado: "success",
 };
+
+const ZONE_GAP_TEXT: Record<CalibrationZone, string> = {
+  exceso: "text-error-600",
+  falta: "text-warning-600",
+  calibrado: "text-success-600",
+};
+
+// Both scores go from 0 to 5 (documento-maestro §7.4).
+const MAX_SCORE = 5;
+
+function score(value: number): string {
+  return value.toLocaleString("es-ES");
+}
+
+function position(value: number): string {
+  return `${Math.min(100, Math.max(0, (value / MAX_SCORE) * 100))}%`;
+}
+
+// The two scores of a page as two small vertical bars on the same 0–5
+// scale and baseline: violet for what the student felt, orange for what
+// the AI evaluated. Each bar stands in a faint column of the full scale,
+// so its height reads against the maximum; the numbers beside it carry the
+// same colours.
+function GapBars({ row }: { row: CalibrationRow }) {
+  return (
+    <div
+      role="img"
+      aria-label={`Sentiste ${score(row.selfAvg)} de ${MAX_SCORE}; la IA evaluó ${score(row.aiAvg)} de ${MAX_SCORE}`}
+      className="mx-auto flex h-9 w-fit items-end gap-1.5 border-border-default border-b"
+    >
+      <span className="relative h-full w-3.5 rounded-t-[4px] bg-primary-50">
+        <span
+          className="dash-grow absolute inset-x-0 bottom-0 rounded-t-[4px] bg-primary-500"
+          style={{ height: position(row.selfAvg) }}
+        />
+      </span>
+      <span className="relative h-full w-3.5 rounded-t-[4px] bg-orange-100">
+        <span
+          className="dash-grow absolute inset-x-0 bottom-0 rounded-t-[4px] bg-orange-500"
+          style={{ height: position(row.aiAvg) }}
+        />
+      </span>
+    </div>
+  );
+}
+
+const HEADER_LABEL = "font-semibold text-[12.5px] text-fg-secondary";
 
 type SortKey = "pageTitle" | "selfAvg" | "aiAvg" | "gap";
 
@@ -35,10 +89,12 @@ function compare(a: CalibrationRow, b: CalibrationRow, key: SortKey): number {
   return a[key] - b[key];
 }
 
-// Row 7 — "Calibración metacognitiva" (documento-maestro §7.4): a
-// sortable, paginated table — one row per page with the averages of its
+// Row 6 (full width) — "Calibración metacognitiva" (documento-maestro
+// §7.4): a sortable, paginated table — one row per page with the averages of its
 // evaluated Active recall answers in the period, and the page's most
-// frequent per-answer signal. Client state only for sort/pagination; a
+// frequent per-answer signal. Each row speaks for itself: the student's
+// score in violet and the AI's in orange, the gap in its traffic-light colour, both scores on
+// one line and the named signal. Client state only for sort/pagination; a
 // period without evaluated answers shows an empty state.
 export function CalibrationTable({
   rows,
@@ -86,12 +142,12 @@ export function CalibrationTable({
     <div data-testid="calibration-table">
       <ChartCard
         icon={
-          <IconTile size="36" radius="input" tone="neutral">
+          <IconTile size="36" radius="input" tone="primary">
             <ClipboardCheck aria-hidden="true" size={16} strokeWidth={1.75} />
           </IconTile>
         }
         title="Calibración metacognitiva"
-        description="Lo que sentiste vs. lo que evaluó la IA (recordación activa)."
+        description="Lo que creías saber frente a lo que evaluó la IA."
         ariaLabel="Calibración metacognitiva: autoevaluación promedio comparada con el resultado real de la IA, por página"
         bodyClassName="gap-3"
       >
@@ -116,11 +172,11 @@ export function CalibrationTable({
         ) : (
           <>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[640px] border-collapse text-[12.5px]">
+              <table className="w-full min-w-[700px] border-separate border-spacing-0 text-[13px]">
                 <thead>
-                  <tr className="border-border-subtle border-b">
+                  <tr className="[&>th:first-child]:rounded-l-lg [&>th:last-child]:rounded-r-lg [&>th]:bg-primary-50">
                     <th
-                      className="px-2 py-2 text-left"
+                      className="px-3 py-2.5 text-left"
                       aria-sort={ariaSortFor("pageTitle")}
                     >
                       <TableHeaderButton
@@ -131,46 +187,67 @@ export function CalibrationTable({
                       </TableHeaderButton>
                     </th>
                     <th
-                      className="px-2 py-2 text-right"
+                      className="px-3 py-2.5 text-center"
                       aria-sort={ariaSortFor("selfAvg")}
                     >
                       <TableHeaderButton
                         direction={directionFor("selfAvg")}
                         onClick={() => toggleSort("selfAvg")}
-                        className="ml-auto"
+                        className="mx-auto"
                       >
                         Autoevaluación
                       </TableHeaderButton>
                     </th>
                     <th
-                      className="px-2 py-2 text-right"
+                      className="px-3 py-2.5 text-center"
                       aria-sort={ariaSortFor("aiAvg")}
                     >
                       <TableHeaderButton
                         direction={directionFor("aiAvg")}
                         onClick={() => toggleSort("aiAvg")}
-                        className="ml-auto"
+                        className="mx-auto"
                       >
                         Resultado real
                       </TableHeaderButton>
                     </th>
                     <th
-                      className="px-2 py-2 text-right"
+                      className="px-3 py-2.5 text-center"
                       aria-sort={ariaSortFor("gap")}
                     >
                       <TableHeaderButton
                         direction={directionFor("gap")}
                         onClick={() => toggleSort("gap")}
-                        className="ml-auto"
+                        className="mx-auto"
                       >
                         Brecha
                       </TableHeaderButton>
                     </th>
-                    <th className="px-2 py-2 text-left font-medium text-[11px] text-fg-muted uppercase tracking-wider">
+                    <th className={cn("px-3 py-2.5 text-center", HEADER_LABEL)}>
+                      <span className="flex items-center justify-center gap-3">
+                        Comparación
+                        <span className="flex items-center gap-2.5 font-normal text-[11px] text-fg-muted">
+                          <span className="flex items-center gap-1">
+                            <span
+                              aria-hidden="true"
+                              className="size-2 rounded-full bg-primary-500"
+                            />
+                            Tú
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <span
+                              aria-hidden="true"
+                              className="size-2 rounded-full bg-orange-500"
+                            />
+                            IA
+                          </span>
+                        </span>
+                      </span>
+                    </th>
+                    <th className={cn("px-3 py-2.5 text-left", HEADER_LABEL)}>
                       Señal
                     </th>
-                    <th className="px-2 py-2 text-right font-medium text-[11px] text-fg-muted uppercase tracking-wider">
-                      Acción
+                    <th className="px-3 py-2.5">
+                      <span className="sr-only">Acción</span>
                     </th>
                   </tr>
                 </thead>
@@ -178,33 +255,42 @@ export function CalibrationTable({
                   {pageRows.map((row) => (
                     <tr
                       key={row.id}
-                      className="border-border-subtle border-b last:border-b-0 hover:bg-hover"
+                      className="transition-colors hover:bg-primary-50/60 [&:not(:last-child)>td]:border-border-subtle [&:not(:last-child)>td]:border-b"
                     >
-                      <td className="px-2 py-2.5">
-                        <p className="font-medium text-fg">{row.pageTitle}</p>
-                        <p className="text-[11px] text-fg-muted">
+                      <td className="px-3 py-3">
+                        <p className="font-semibold text-[14px] text-fg">
+                          {row.pageTitle}
+                        </p>
+                        <p className="text-[11.5px] text-fg-muted">
                           {row.notebookTitle}
                         </p>
                       </td>
-                      <td className="px-2 py-2.5 text-right tabular-nums text-fg">
+                      <td className="px-3 py-3 text-center font-semibold text-[19px] text-primary-600 tabular-nums">
                         {row.selfAvg.toLocaleString("es-ES")}
                       </td>
-                      <td className="px-2 py-2.5 text-right tabular-nums text-fg">
+                      <td className="px-3 py-3 text-center font-semibold text-[19px] text-orange-600 tabular-nums">
                         {row.aiAvg.toLocaleString("es-ES")}
                       </td>
-                      <td className="px-2 py-2.5 text-right tabular-nums text-fg">
-                        {row.gap > 0 ? "+" : ""}
-                        {row.gap.toLocaleString("es-ES")}
+                      <td
+                        className={cn(
+                          "px-3 py-3 text-center font-bold text-[19px] tabular-nums",
+                          ZONE_GAP_TEXT[row.zone],
+                        )}
+                      >
+                        {Math.abs(row.gap).toLocaleString("es-ES")}
                       </td>
-                      <td className="px-2 py-2.5">
+                      <td className="px-3 py-3">
+                        <GapBars row={row} />
+                      </td>
+                      <td className="px-3 py-3">
                         <Pill size="sm" tone={ZONE_TONE[row.zone]}>
                           {ZONE_LABEL[row.zone]}
                         </Pill>
                       </td>
-                      <td className="px-2 py-2.5 text-right">
+                      <td className="px-3 py-3 text-right">
                         <Link
                           href={row.href}
-                          className="font-medium text-[12px] text-primary-600 hover:underline"
+                          className="font-semibold text-[12.5px] text-primary-600 hover:underline"
                         >
                           Repasar
                         </Link>

@@ -4,39 +4,49 @@ import { sampleView } from "../_lib/dashboard-view.fixtures";
 import { DashboardHero } from "./hero";
 
 describe("DashboardHero", () => {
-  it("greets the user by name", () => {
+  it("welcomes the user back by name", () => {
     render(<DashboardHero hero={sampleView().hero} />);
 
     expect(
-      screen.getByRole("heading", { level: 1, name: "Buenos días, Ana" }),
+      screen.getByRole("heading", {
+        level: 1,
+        name: "Qué gusto volver a verte por acá, Ana",
+      }),
     ).toBeInTheDocument();
   });
 
-  it("points at the weakest notebook, from the same numbers as the page", () => {
+  it("welcomes without a comma when the account has no name", () => {
+    render(<DashboardHero hero={{ ...sampleView().hero, name: "" }} />);
+
+    expect(
+      screen.getByRole("heading", {
+        level: 1,
+        name: "Qué gusto volver a verte por acá",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("says what the page is for, in an encouraging line", () => {
     render(<DashboardHero hero={sampleView().hero} />);
 
     expect(
       screen.getByText(
-        "Historia sigue en Aprendiendo: dedícale dos repasos para retomar impulso.",
+        "Tu esfuerzo se nota semana a semana. Revisa tus métricas, descubre qué temas ya dominas y cuáles te conviene repasar.",
       ),
     ).toBeInTheDocument();
   });
 
-  it("links the call to action to today's reviews", () => {
+  // Hidden, not removed (user decision 2026-11-26).
+  it("hides the reviews button and the weakest-notebook sentence", () => {
     render(<DashboardHero hero={sampleView().hero} />);
 
-    expect(
-      screen.getByRole("link", { name: /Ver repasos de hoy/ }),
-    ).toHaveAttribute("href", "/inicio");
+    expect(screen.queryByRole("link")).toBeNull();
+    expect(screen.queryByText(/dedícale dos repasos/)).toBeNull();
   });
 
   it("keeps the illustration decorative", () => {
     const { container } = render(<DashboardHero hero={sampleView().hero} />);
 
-    const illustration = Array.from(container.querySelectorAll("svg")).find(
-      (svg) => svg.getAttribute("viewBox") === "0 0 160 140",
-    );
-    expect(illustration).not.toBeNull();
-    expect(illustration).toHaveAttribute("aria-hidden", "true");
+    expect(container.querySelector("img")).toHaveAttribute("alt", "");
   });
 });

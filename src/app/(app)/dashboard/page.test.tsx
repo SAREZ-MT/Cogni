@@ -84,13 +84,14 @@ describe("DashboardPage", () => {
       "activity-chart",
       "accuracy-ring",
       "kpi-row",
-      "notebook-progress",
       "calibration-table",
       "technique-activity",
     ]) {
       expect(screen.getByTestId(id), id).toBeInTheDocument();
     }
     expect(screen.queryByTestId("concepts")).toBeNull();
+    // Hidden, not removed (user decision 2026-11-26).
+    expect(screen.queryByTestId("notebook-progress")).toBeNull();
     expect(screen.getByText("4 días")).toBeInTheDocument();
     expect(screen.getByTestId("hero")).toHaveTextContent(/, Ana/);
   });
@@ -171,10 +172,9 @@ describe("DashboardPage", () => {
     ["90", "los últimos 7 días", "7 días"],
     ["abc", "los últimos 7 días", "7 días"],
     [["15", "30"], "los últimos 15 días", "15 días"],
-  ])("range %j selects %s", async (range, description, current) => {
+  ])("range %j selects %s", async (range, _period, current) => {
     render(await DashboardPage(props(range)));
 
-    expect(screen.getByText(`Cómo vas en ${description}`)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: current })).toHaveAttribute(
       "aria-current",
       "true",

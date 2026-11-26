@@ -1,6 +1,7 @@
 "use client";
 
 import { Activity } from "lucide-react";
+import { useReducedMotion } from "motion/react";
 import type { TooltipContentProps } from "recharts";
 import {
   Bar,
@@ -22,28 +23,46 @@ import { type DashboardRange, PeriodFilter } from "@/shared/ui/period-filter";
 import { Pill } from "@/shared/ui/pill";
 import type { ActivityView, DailyActivity } from "../_lib/dashboard-view";
 
-const CONFIG: ChartConfig = {
-  flashcards: { label: "Flashcards", color: "var(--color-neutral-900)" },
-  activeRecall: {
-    label: "Recordación activa",
-    color: "var(--color-neutral-500)",
-  },
-  exams: { label: "Exámenes", color: "var(--color-neutral-300)" },
-};
-
-const LEGEND_ITEMS = [
+// One series per technique, in its own colour (user decision 2026-11-26):
+// amber for flashcards, green for active recall, rose for exams. Each bar
+// segment fills with a soft vertical gradient from `colorVar` to `fadeVar`;
+// the legend and the tooltip use the solid `colorVar`, and both name the
+// series, so the colour is never the only cue.
+const SERIES = [
   {
     key: "flashcards",
     label: "Flashcards",
-    colorVar: "var(--color-neutral-900)",
+    colorVar: "var(--color-technique-flashcards-cta-edge)",
+    fadeVar: "var(--color-technique-flashcards-accent)",
   },
   {
     key: "activeRecall",
     label: "Recordación activa",
-    colorVar: "var(--color-neutral-500)",
+    colorVar: "var(--color-success-500)",
+    fadeVar: "var(--color-technique-recall-accent)",
   },
-  { key: "exams", label: "Exámenes", colorVar: "var(--color-neutral-300)" },
+  {
+    key: "exams",
+    label: "Exámenes",
+    colorVar: "var(--color-rose-500)",
+    fadeVar: "var(--color-technique-exam-dot)",
+  },
 ] as const;
+
+const CONFIG: ChartConfig = Object.fromEntries(
+  SERIES.map((series) => [
+    series.key,
+    { label: series.label, color: series.colorVar },
+  ]),
+);
+
+const SERIES_COLOR: Record<string, string> = Object.fromEntries(
+  SERIES.map((series) => [series.key, series.colorVar]),
+);
+
+// Entrance of the bars: the series rise one after another.
+const BAR_ANIMATION_MS = 650;
+const BAR_STAGGER_MS = 120;
 
 function buildRangeHref(range: DashboardRange): string {
   return range === 7 ? "/dashboard" : `/dashboard?range=${range}`;
@@ -99,7 +118,9 @@ function ActivityTooltip({ active, payload }: TooltipContentProps) {
             <span
               aria-hidden="true"
               className="size-2.5 shrink-0 rounded-[2px]"
-              style={{ backgroundColor: item.color }}
+              style={{
+                backgroundColor: SERIES_COLOR[String(item.dataKey)],
+              }}
             />
             <span className="flex-1 text-fg-muted">{item.name}</span>
             <span className="font-semibold text-fg tabular-nums">
@@ -116,9 +137,9 @@ function ActivityTooltip({ active, payload }: TooltipContentProps) {
   );
 }
 
-// Row 3 (wide) — "Actividad de repaso": the main chart. A stacked, MONOCHROME
-// bar chart (neutral-900/500/300 — never distinguishing series by hue
-// alone), one bar per local day of the selected 7/15/30-day range (the
+// Row 3 (wide) — "Actividad de repaso": the main chart. A stacked bar chart
+// with one rounded segment per technique in the technique's colour (a
+// named legend and tooltip back the colour), one bar per local day of the selected 7/15/30-day range (the
 // analytics daily reviews), with a dashed weekly `ReferenceLine` so the
 // chart reads day-by-day AND week-by-week at once. The comparison with the
 // previous period only shows when that period had reviews; a period
@@ -133,12 +154,13 @@ export function ActivityChart({
   const isUp = deltaPct !== null && deltaPct >= 0;
   const weekBoundaries = range === 7 ? [] : days.filter((d) => d.isMonday);
   const labels = days.map((d) => d.label);
+  const animate = !useReducedMotion();
 
   return (
     <div data-testid="activity-chart">
       <ChartCard
         icon={
-          <IconTile size="36" radius="input" tone="neutral">
+          <IconTile size="36" radius="input" tone="primary">
             <Activity aria-hidden="true" size={16} strokeWidth={1.75} />
           </IconTile>
         }
@@ -177,7 +199,7 @@ export function ActivityChart({
 
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            {LEGEND_ITEMS.map((item) => (
+            {SERIES.map((item) => (
               <span key={item.key} className="flex items-center gap-1.5">
                 <span
                   aria-hidden="true"
@@ -212,6 +234,21 @@ export function ActivityChart({
               data={[...days]}
               margin={{ top: 8, right: 12, left: 12, bottom: 4 }}
             >
+              <defs>
+                {SERIES.map((series) => (
+                  <linearGradient
+                    key={series.key}
+                    id={`activity-fill-${series.key}`}
+                    x1="0"
+                    y1="0"
+                    x2="0"
+                    y2="1"
+                  >
+                    <stop offset="0%" stopColor={series.colorVar} />
+                    <stop offset="100%" stopColor={series.fadeVar} />
+                  </linearGradient>
+                ))}
+              </defs>
               <CartesianGrid
                 vertical={false}
                 stroke="var(--color-border-subtle)"
@@ -248,30 +285,27 @@ export function ActivityChart({
               <YAxis hide />
               <ChartTooltip
                 content={ActivityTooltip}
-                cursor={{ fill: "var(--color-neutral-100)" }}
+                cursor={{ fill: "var(--color-primary-50)", radius: 8 }}
               />
-              <Bar
-                dataKey="flashcards"
-                name="Flashcards"
-                stackId="activity"
-                fill="var(--color-neutral-900)"
-                isAnimationActive={false}
-              />
-              <Bar
-                dataKey="activeRecall"
-                name="Recordación activa"
-                stackId="activity"
-                fill="var(--color-neutral-500)"
-                isAnimationActive={false}
-              />
-              <Bar
-                dataKey="exams"
-                name="Exámenes"
-                stackId="activity"
-                radius={[4, 4, 0, 0]}
-                fill="var(--color-neutral-300)"
-                isAnimationActive={false}
-              />
+              {SERIES.map((series, index) => (
+                <Bar
+                  key={series.key}
+                  dataKey={series.key}
+                  name={series.label}
+                  stackId="activity"
+                  // Rounded segments with a card-coloured edge read as
+                  // separate blocks stacked with a small gap.
+                  radius={4}
+                  stroke="var(--color-card)"
+                  strokeWidth={1.5}
+                  maxBarSize={44}
+                  fill={`url(#activity-fill-${series.key})`}
+                  isAnimationActive={animate}
+                  animationBegin={index * BAR_STAGGER_MS}
+                  animationDuration={BAR_ANIMATION_MS}
+                  animationEasing="ease-out"
+                />
+              ))}
             </BarChart>
           </ChartContainer>
         )}

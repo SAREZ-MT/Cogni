@@ -56,7 +56,7 @@ export function AccuracyRing({
     <div data-testid="accuracy-ring">
       <ChartCard
         icon={
-          <IconTile size="36" radius="input" tone="neutral">
+          <IconTile size="36" radius="input" tone="primary">
             <Target aria-hidden="true" size={16} strokeWidth={1.75} />
           </IconTile>
         }

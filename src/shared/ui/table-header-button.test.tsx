@@ -26,14 +26,14 @@ describe("TableHeaderButton", () => {
     const { rerender } = render(
       <TableHeaderButton onClick={() => {}}>Brecha</TableHeaderButton>,
     );
-    expect(screen.getByRole("button")).not.toHaveClass("text-fg");
+    expect(screen.getByRole("button")).not.toHaveClass("text-primary-700");
 
     rerender(
       <TableHeaderButton direction="asc" onClick={() => {}}>
         Brecha
       </TableHeaderButton>,
     );
-    expect(screen.getByRole("button")).toHaveClass("text-fg");
+    expect(screen.getByRole("button")).toHaveClass("text-primary-700");
   });
 
   it("swaps the icon with the sort direction", () => {

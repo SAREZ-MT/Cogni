@@ -33,13 +33,24 @@ export function TableHeaderButton({
       type="button"
       onClick={onClick}
       className={cn(
-        "flex cursor-pointer items-center gap-1 font-medium text-[11px] text-fg-muted uppercase tracking-wider transition-colors hover:text-fg",
-        direction && "text-fg",
+        "group/sort flex cursor-pointer items-center gap-1 font-semibold text-[12.5px] text-fg-secondary transition-colors hover:text-primary-700",
+        direction && "text-primary-700",
         className,
       )}
     >
       {children}
-      <Icon aria-hidden="true" size={12} strokeWidth={2} />
+      {/* Only the active column shows its arrow; the others hint it on
+          hover or focus, so the header row stays calm. */}
+      <Icon
+        aria-hidden="true"
+        size={13}
+        strokeWidth={2.25}
+        className={cn(
+          "transition-opacity",
+          !direction &&
+            "opacity-0 group-hover/sort:opacity-60 group-focus-visible/sort:opacity-60",
+        )}
+      />
     </button>
   );
 }

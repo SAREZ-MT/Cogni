@@ -211,6 +211,11 @@
   --color-success-500: #10b981;
   --color-success-600: #059669;
   --color-success-700: #065f46;
+  /* Orange: the AI's score in the dashboard calibration (2026-11-26),
+     apart from the amber of the warning scale. */
+  --color-orange-100: #ffedd5;
+  --color-orange-500: #f97316;
+  --color-orange-600: #ea580c;
   --color-warning-50: #fffbeb;
   --color-warning-100: #fef3c7;
   --color-warning-500: #f59e0b;
@@ -1812,5 +1817,62 @@
     animation-iteration-count: 1;
     transition-duration: 0.01ms;
     scroll-behavior: auto;
+  }
+}
+
+/* Dashboard entrance motion (2026-11-26): the sections rise in turn, the
+   accuracy ring draws itself, the mastery and calibration bars grow and the hero
+   illustration floats. Only for visitors who have not asked for reduced motion; without
+   these rules everything is simply in place. */
+@media (prefers-reduced-motion: no-preference) {
+  .dash-rise {
+    animation: dash-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+  .dash-rise-2 {
+    animation-delay: 70ms;
+  }
+  .dash-rise-3 {
+    animation-delay: 140ms;
+  }
+  .dash-rise-4 {
+    animation-delay: 210ms;
+  }
+  .dash-rise-5 {
+    animation-delay: 280ms;
+  }
+  .dash-ring-draw {
+    animation: dash-ring-draw 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.2s backwards;
+  }
+  .dash-grow {
+    transform-origin: bottom;
+    animation: dash-grow 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.15s backwards;
+  }
+  .dash-float {
+    animation: dash-float 6s ease-in-out infinite;
+  }
+}
+
+@keyframes dash-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+@keyframes dash-ring-draw {
+  from {
+    stroke-dasharray: 0 1000;
+  }
+}
+
+@keyframes dash-grow {
+  from {
+    transform: scaleY(0);
+  }
+}
+
+@keyframes dash-float {
+  50% {
+    transform: translateY(-4px);
   }
 }
