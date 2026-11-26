@@ -129,7 +129,7 @@ if (process.env.DATABASE_URL) {
           purpose: "session_feedback",
           provider: "fake",
           model: "fake-model",
-          promptVersion: "session_feedback/v1",
+          promptVersion: "session_feedback/v3",
           status: "done",
         });
         return id;

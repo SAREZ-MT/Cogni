@@ -25,7 +25,7 @@ Implementado:
   `recall_answers` (migración `0012`) con repositorios Drizzle y en memoria.
 - `application/request-recall-generation.ts`: generación con IA de 10
   preguntas abiertas con rúbrica por llamada (prompt
-  `generate_recall_questions/v1`, §8.4). Consulta el límite diario con
+  `generate_recall_questions/v2`, §8.4). Consulta el límite diario con
   `peek` y lo consume con `check` solo después de guardar: una generación
   fallida no gasta la unidad. Guarda las preguntas y un
   `StudyItem(kind = "recall_question")` por pregunta en una sola unidad de

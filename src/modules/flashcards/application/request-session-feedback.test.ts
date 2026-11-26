@@ -116,7 +116,7 @@ function generation(id = "gen-1"): AiGeneration {
     purpose: "session_feedback",
     provider: "gemini",
     model: "gemini-3.5-flash-lite",
-    promptVersion: "session_feedback/v1",
+    promptVersion: "session_feedback/v3",
     inputTokens: 10,
     outputTokens: 20,
     latencyMs: 5,
@@ -398,7 +398,7 @@ describe("requestSessionFeedback", () => {
     expect(call).toMatchObject({
       purpose: "session_feedback",
       pageId: PAGE,
-      promptVersion: "session_feedback/v1",
+      promptVersion: "session_feedback/v3",
     });
     expect(call?.prompt).toContain("Items reviewed: 4");
     expect(call?.prompt).toContain("Again: 1");

@@ -328,7 +328,7 @@ describe("requestExamFeedback", () => {
     expect(call).toMatchObject({
       purpose: "session_feedback",
       pageId: PAGE,
-      promptVersion: "session_feedback/v2",
+      promptVersion: "session_feedback/v4",
     });
     expect(call.prompt).toContain("Questions answered: 10");
     expect(call.prompt).toContain("Correct: 6");
@@ -339,7 +339,9 @@ describe("requestExamFeedback", () => {
     expect(call.prompt).toContain("  Student answered: ADN");
     expect(call.prompt).toContain("  Correct answer: ATP");
     expect(call.prompt).not.toContain("[Concepto q-05]");
-    expect(call.prompt.endsWith(`Text:\n${PAGE_TEXT}`)).toBe(true);
+    expect(
+      call.prompt.endsWith(`<page_text>\n${PAGE_TEXT}\n</page_text>`),
+    ).toBe(true);
     expect(fx.checks).toBe(1);
     expect(
       (await fx.feedback.findBySession("exam", "s-fail", OWNER))?.status,
@@ -692,7 +694,9 @@ describe("requestExamFeedback", () => {
 
     await requestExamFeedback({ sessionId: "s-fail" }, fx.deps, OWNER);
 
-    expect(fx.ai.calls[0].prompt.endsWith("Text:\nuno dos tres")).toBe(true);
+    expect(
+      fx.ai.calls[0].prompt.endsWith("<page_text>\nuno dos tres\n</page_text>"),
+    ).toBe(true);
   });
 
   it("still generates when the page text cannot be read", async () => {
@@ -712,7 +716,9 @@ describe("requestExamFeedback", () => {
 
     if (!result.ok) throw result.error;
     expect(result.value.feedback.status).toBe("done");
-    expect(fx.ai.calls[0].prompt.endsWith("Text:\n")).toBe(true);
+    expect(
+      fx.ai.calls[0].prompt.endsWith("<page_text>\n(none)\n</page_text>"),
+    ).toBe(true);
   });
 });
 

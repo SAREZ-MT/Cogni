@@ -4,9 +4,9 @@ import { buildEvaluateRecallAnswersPrompt } from "../application/prompts/evaluat
 import { buildGenerateExamQuestionsPrompt } from "../application/prompts/generate_exam_questions/v2";
 import { buildGenerateExamVariantsPrompt } from "../application/prompts/generate_exam_variants/v2";
 import { buildGenerateFlashcardsPrompt } from "../application/prompts/generate_flashcards/v2";
-import { buildGenerateRecallQuestionsPrompt } from "../application/prompts/generate_recall_questions/v1";
-import { buildSessionFeedbackPrompt } from "../application/prompts/session_feedback/v1";
-import { buildExamSessionFeedbackPrompt } from "../application/prompts/session_feedback/v2";
+import { buildGenerateRecallQuestionsPrompt } from "../application/prompts/generate_recall_questions/v2";
+import { buildSessionFeedbackPrompt } from "../application/prompts/session_feedback/v3";
+import { buildExamSessionFeedbackPrompt } from "../application/prompts/session_feedback/v4";
 import {
   examQuestionsOutput,
   examVariantsOutput,

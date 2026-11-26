@@ -49,7 +49,7 @@ export {
   GENERATE_RECALL_QUESTIONS_PROMPT_VERSION,
   type GenerateRecallQuestionsPromptInput,
   MAX_EXISTING_RECALL_QUESTIONS,
-} from "./prompts/generate_recall_questions/v1";
+} from "./prompts/generate_recall_questions/v2";
 export {
   buildSessionFeedbackPrompt,
   MAX_STRUGGLED_ITEM_LENGTH,
@@ -57,7 +57,7 @@ export {
   SESSION_FEEDBACK_PROMPT_VERSION,
   type SessionFeedbackPromptInput,
   type SessionFeedbackTechnique,
-} from "./prompts/session_feedback/v1";
+} from "./prompts/session_feedback/v3";
 export {
   buildExamSessionFeedbackPrompt,
   EXAM_SESSION_FEEDBACK_PROMPT_VERSION,
@@ -65,5 +65,5 @@ export {
   type FailedExamQuestion,
   MAX_FAILED_FIELD_LENGTH,
   MAX_FAILED_QUESTIONS,
-} from "./prompts/session_feedback/v2";
+} from "./prompts/session_feedback/v4";
 export * from "./schemas";

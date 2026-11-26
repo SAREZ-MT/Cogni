@@ -207,7 +207,7 @@ describe("exam feedback actions", () => {
       value: { status: "done", reused: false, content: FEEDBACK_OBJECT },
     });
     expect(current.calls).toHaveLength(1);
-    expect(current.calls[0].promptVersion).toBe("session_feedback/v2");
+    expect(current.calls[0].promptVersion).toBe("session_feedback/v4");
     expect(current.checks).toBe(0);
     // It spends one unit of the feedback limit instead.
     expect(current.feedbackChecks).toBe(1);

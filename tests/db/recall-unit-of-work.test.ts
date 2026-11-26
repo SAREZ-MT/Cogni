@@ -67,7 +67,7 @@ if (process.env.DATABASE_URL) {
       purpose: "generate_recall_questions",
       provider: "fake",
       model: "fake-model",
-      promptVersion: "generate_recall_questions/v1",
+      promptVersion: "generate_recall_questions/v2",
       inputTokens: 1,
       outputTokens: 1,
       latencyMs: 1,

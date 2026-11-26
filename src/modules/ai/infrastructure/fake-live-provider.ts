@@ -35,23 +35,16 @@ function headerCount(
 }
 
 // Splits a prompt at its page text: `head` is everything before the
-// <page_text> block the builders put last, `text` what the block holds.
-// The prompts not moved to data blocks yet end with "Text:" and the text.
+// <page_text> block the builders put last, `text` what the block holds. A
+// prompt without the block is all text.
 function splitAtPageText(prompt: string): { head: string; text: string } {
   const open = prompt.indexOf("\n<page_text>\n");
-  if (open !== -1) {
-    const body = prompt.slice(open + "\n<page_text>\n".length);
-    const close = body.lastIndexOf("\n</page_text>");
-    return {
-      head: prompt.slice(0, open),
-      text: close === -1 ? body : body.slice(0, close),
-    };
-  }
-  const marker = prompt.indexOf("\nText:\n");
-  if (marker === -1) return { head: prompt, text: prompt };
+  if (open === -1) return { head: prompt, text: prompt };
+  const body = prompt.slice(open + "\n<page_text>\n".length);
+  const close = body.lastIndexOf("\n</page_text>");
   return {
-    head: prompt.slice(0, marker),
-    text: prompt.slice(marker + "\nText:\n".length),
+    head: prompt.slice(0, open),
+    text: close === -1 ? body : body.slice(0, close),
   };
 }
 
@@ -178,15 +171,15 @@ function examQuestionsFrom(prompt: string) {
 const MAX_FAKE_RECALL_COUNT = 15;
 
 // Reads the prompt shape produced by `buildGenerateRecallQuestionsPrompt`:
-// "Number of questions: N", the "- prompt" lines under "Existing
-// questions:" and the page text after "Text:".
+// "Number of questions: N", the "- prompt" lines of the
+// <existing_questions> block and the page text in its <page_text> block.
 function parseRecallQuestionsPrompt(prompt: string): {
   count: number;
   existingPrompts: Set<string>;
   text: string;
 } {
   const { head, text } = splitAtPageText(prompt);
-  const start = head.indexOf("Existing questions:\n");
+  const start = head.indexOf("<existing_questions>\n");
   const existingPrompts = new Set(
     start === -1
       ? []
@@ -434,15 +427,15 @@ function examVariantsFrom(prompt: string) {
   return { variants };
 }
 
-// Exam feedback (session_feedback/v2, first line "Technique: exam"): one
+// Exam feedback (session_feedback/v4, first line "Technique: exam"): one
 // item to reinforce per failed question's concept, read only from the
-// "Failed questions:" block that precedes the page text. Any other
-// feedback prompt (flashcards v1) gets the generic minimal object.
+// <failed_questions> block that precedes the page text. Any other
+// feedback prompt (flashcards v3) gets the generic minimal object.
 function examFeedbackFrom(prompt: string) {
   const lines = prompt.split("\n");
   if (lines[0] !== "Technique: exam") return null;
-  const start = lines.indexOf("Failed questions:");
-  const end = lines.indexOf("Text:");
+  const start = lines.indexOf("<failed_questions>");
+  const end = lines.indexOf("</failed_questions>");
   const concepts =
     start === -1 || end === -1
       ? []

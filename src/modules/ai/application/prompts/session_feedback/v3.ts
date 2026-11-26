@@ -1,6 +1,7 @@
 import type { BuiltPrompt } from "../generate_flashcards/v2";
+import { oneLine, untrustedDataRule, wrapUntrusted } from "../untrusted";
 
-export const SESSION_FEEDBACK_PROMPT_VERSION = "session_feedback/v1";
+export const SESSION_FEEDBACK_PROMPT_VERSION = "session_feedback/v3";
 
 // Bounds that keep the prompt far below every provider's input cap: only
 // the first struggled items are sent, each one shortened.
@@ -23,7 +24,7 @@ export interface SessionFeedbackPromptInput {
 const TEMPERATURE = 0.3;
 
 function shorten(text: string): string {
-  const flat = text.replace(/\s+/g, " ").trim();
+  const flat = oneLine(text);
   return flat.length <= MAX_STRUGGLED_ITEM_LENGTH
     ? flat
     : `${flat.slice(0, MAX_STRUGGLED_ITEM_LENGTH - 1)}…`;
@@ -41,6 +42,7 @@ export function buildSessionFeedbackPrompt(
     "nextStepSuggestion: one concrete next step.",
     "Base everything strictly on the results given: do not invent topics, facts or numbers.",
     "Never mention study time or durations.",
+    untrustedDataRule(["struggled_items"], { title: false }),
   ].join("\n");
 
   const struggled = input.struggled.slice(0, MAX_STRUGGLED_ITEMS).map(shorten);
@@ -53,7 +55,7 @@ export function buildSessionFeedbackPrompt(
     `Easy: ${input.counts.easy}`,
     "",
     "Items the student struggled with:",
-    ...(struggled.length > 0 ? struggled.map((s) => `- ${s}`) : ["(none)"]),
+    wrapUntrusted("struggled_items", struggled.map((s) => `- ${s}`).join("\n")),
   ].join("\n");
 
   return { system, prompt, temperature: TEMPERATURE };

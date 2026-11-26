@@ -1,5 +1,12 @@
+import {
+  oneLine,
+  titleLine,
+  untrustedDataRule,
+  wrapUntrusted,
+} from "../untrusted";
+
 export const GENERATE_RECALL_QUESTIONS_PROMPT_VERSION =
-  "generate_recall_questions/v1";
+  "generate_recall_questions/v2";
 
 // The prompt lists at most this many existing questions (the most recent
 // ones): enough for the model to avoid repeating a page's questions without
@@ -27,18 +34,13 @@ export interface BuiltRecallQuestionsPrompt {
 // Moderate temperature for generation (documento-maestro §8.1: <= 0.7).
 const TEMPERATURE = 0.7;
 
-// One line per question: inner newlines would break the list format.
-function oneLine(text: string): string {
-  return text.replace(/\s+/g, " ").trim();
-}
-
+// One line per existing question, most recent last.
 function existingSection(existing: readonly ExistingRecallQuestion[]): string {
-  if (existing.length === 0) return "Existing questions: none";
   const recent = existing.slice(-MAX_EXISTING_RECALL_QUESTIONS);
-  return [
-    "Existing questions:",
-    ...recent.map((q) => `- ${oneLine(q.prompt)}`),
-  ].join("\n");
+  return wrapUntrusted(
+    "existing_questions",
+    recent.map((q) => `- ${oneLine(q.prompt)}`).join("\n"),
+  );
 }
 
 // documento-maestro §8.4 generate_recall_questions(plain_text, count) and
@@ -55,16 +57,16 @@ export function buildGenerateRecallQuestionsPrompt(
     "Each question has a rubric with 2 to 6 key concepts (a few words each) that a complete answer must mention, and an acceptable answer summary of one to three sentences.",
     "Derive every question, key concept and acceptable answer summary strictly and only from the provided text: do not add facts, examples or definitions that the text does not contain.",
     "Do not repeat any of the existing questions listed in the prompt, and do not ask about the same idea twice.",
+    untrustedDataRule(["existing_questions", "page_text"]),
   ].join("\n");
 
   const prompt = [
-    `Page title: ${input.pageTitle}`,
+    `Page title: ${titleLine(input.pageTitle)}`,
     `Number of questions: ${input.count}`,
     "",
     existingSection(input.existing),
     "",
-    "Text:",
-    input.pageText,
+    wrapUntrusted("page_text", input.pageText),
   ].join("\n");
 
   return { system, prompt, temperature: TEMPERATURE };

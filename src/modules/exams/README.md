@@ -16,7 +16,7 @@ recorded in `docs/adr/0006-examenes-y-repeticion-con-variantes.md`
 | Use cases | `application/` | Manual questions, AI generation, session (start, answer, finish, read), retake, feedback, review notice, hub. In-memory fakes and shared contracts in `application/testing/`. |
 | Adapters | `infrastructure/` | Drizzle repositories, unit-of-work adapters (one transaction each) and the hub reader. |
 | Server Actions | `actions.ts`, `session-actions.ts`, `retake-actions.ts`, `feedback-actions.ts`, `hub-actions.ts` | The only UI entry points; exported through `index.ts`. |
-| AI prompts | `src/modules/ai` | `generate_exam_questions/v2`, `generate_exam_variants/v2`, `session_feedback/v2` (exams never import the AI SDK). |
+| AI prompts | `src/modules/ai` | `generate_exam_questions/v2`, `generate_exam_variants/v2`, `session_feedback/v4` (exams never import the AI SDK). |
 | Screens | `src/app/(app)/exams/` | Hub (flat since Phase 8 H17), start, player, results (they honour the hub's `?desde=hub` since H18), the questions' edit page `editar` (H18; `preguntas` redirects there). |
 
 ## Server Actions
@@ -199,7 +199,7 @@ is dropped), and a feedback read failure in `getExamResultsAction` returns
   `session_feedback` row per exam session (`session_kind = exam`) claimed
   once, stale pending rows reclaimed, settled only while pending, 25 s AI
   timeout, every failure stored as `failed` and returned as ok; it spends
-  one unit of the daily feedback limit (`AI_DAILY_FEEDBACKS`). Prompt `session_feedback/v2`: failed questions
+  one unit of the daily feedback limit (`AI_DAILY_FEEDBACKS`). Prompt `session_feedback/v4`: failed questions
   (concept, stem, chosen and correct option, explanation; capped) plus the
   page text cut to `AI_PAGE_TOKEN_CAP`. `readExamFeedback` is the read-only
   variant the results view uses.
