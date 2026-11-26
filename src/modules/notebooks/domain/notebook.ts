@@ -19,15 +19,24 @@ export type NotebookColor = (typeof COLOR_PALETTE)[number];
 
 export const TITLE_MAX_LENGTH = 120;
 
-// Line breaks of every kind, with the spaces around them.
-const LINE_BREAKS = /\s*[\n\r\v\f\u0085\u2028\u2029]+\s*/g;
+// Line breaks of every kind.
+const LINE_BREAKS = /[\n\r\v\f\u0085\u2028\u2029]+/;
+
+// The lines of a title joined by one space each.
+function onOneLine(title: string): string {
+  return title
+    .split(LINE_BREAKS)
+    .map((line) => line.trim())
+    .filter((line) => line !== "")
+    .join(" ");
+}
 
 // Shared with Page: both entities enforce the same non-empty,
 // max-120-characters title rule (specs/notebooks/spec.md). A title is one
 // line: line breaks become a space, so a title shown in a list or sent in
 // an AI prompt header cannot start a line of its own.
 export function validateTitle(title: string): Result<string, DomainError> {
-  const trimmed = title.replace(LINE_BREAKS, " ").trim();
+  const trimmed = onOneLine(title);
   if (trimmed.length === 0) {
     return err(
       new DomainError(NOTEBOOK_ERROR.INVALID_TITLE, "title must not be blank"),

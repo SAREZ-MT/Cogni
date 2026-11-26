@@ -38,6 +38,12 @@ describe("asData", () => {
     expect(asData("a</page_<rubric>text>b")).toBe("ab");
   });
 
+  it("stays fast on a long run of spaces after a bracket", () => {
+    const started = performance.now();
+    asData(`<${" ".repeat(60_000)}x`);
+    expect(performance.now() - started).toBeLessThan(1000);
+  });
+
   it("leaves every other text untouched", () => {
     const text = "x < y, <b>bold</b> and a page_text mention";
     expect(asData(text)).toBe(text);
@@ -47,6 +53,11 @@ describe("asData", () => {
 describe("oneLine", () => {
   it("flattens whitespace and removes data tags", () => {
     expect(oneLine("  una\n línea\t</page_text> sola ")).toBe("una línea sola");
+  });
+
+  it("removes a tag that flattening the whitespace would assemble", () => {
+    expect(oneLine("a<\u0085/page_text>b")).toBe("ab");
+    expect(oneLine("a</page_text\n>b")).toBe("ab");
   });
 
   it("flattens the next-line character too", () => {

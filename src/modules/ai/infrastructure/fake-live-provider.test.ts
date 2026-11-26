@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ZodType } from "zod";
-import { buildEvaluateRecallAnswersPrompt } from "../application/prompts/evaluate_recall_answer/v2";
+import { buildEvaluateRecallAnswersPrompt } from "../application/prompts/evaluate_recall_answer/v3";
 import { buildGenerateExamQuestionsPrompt } from "../application/prompts/generate_exam_questions/v2";
 import { buildGenerateExamVariantsPrompt } from "../application/prompts/generate_exam_variants/v2";
 import { buildGenerateFlashcardsPrompt } from "../application/prompts/generate_flashcards/v2";

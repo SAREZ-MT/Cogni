@@ -1,7 +1,7 @@
 import { asData, oneLine } from "../untrusted";
 
 export const EVALUATE_RECALL_ANSWER_PROMPT_VERSION =
-  "evaluate_recall_answer/v2";
+  "evaluate_recall_answer/v3";
 
 // Longest student answer sent to the model; the rest is cut off.
 export const MAX_EVALUATED_ANSWER_LENGTH = 4000;

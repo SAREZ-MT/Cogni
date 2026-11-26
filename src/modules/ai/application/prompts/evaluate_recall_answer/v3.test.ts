@@ -5,7 +5,7 @@ import {
   EVALUATE_RECALL_ANSWER_PROMPT_VERSION,
   type EvaluatedRecallAnswer,
   MAX_EVALUATED_ANSWER_LENGTH,
-} from "./v2";
+} from "./v3";
 
 const first: EvaluatedRecallAnswer = {
   id: "q1",
@@ -35,12 +35,12 @@ function itemOf(prompt: string, id: string): string {
   return prompt.slice(start, end + "</answer_item>".length);
 }
 
-describe("evaluate_recall_answer/v2 prompt", () => {
+describe("evaluate_recall_answer/v3 prompt", () => {
   const built = buildEvaluateRecallAnswersPrompt([first, second]);
 
   it("exposes its version", () => {
     expect(EVALUATE_RECALL_ANSWER_PROMPT_VERSION).toBe(
-      "evaluate_recall_answer/v2",
+      "evaluate_recall_answer/v3",
     );
   });
 

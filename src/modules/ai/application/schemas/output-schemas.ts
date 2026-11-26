@@ -66,7 +66,7 @@ export const recallEvaluationOutput = z.object({
 });
 
 // One recall session at most (RECALL_SESSION_SIZE): every written answer of
-// a session is evaluated in one call (evaluate_recall_answer/v2).
+// a session is evaluated in one call (evaluate_recall_answer/v3).
 export const MAX_EVALUATED_ANSWERS = 10;
 
 // The batched evaluation: one entry per answer item, keyed by the item's id.

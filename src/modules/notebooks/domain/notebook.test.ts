@@ -91,6 +91,12 @@ describe("validateTitle", () => {
     );
   });
 
+  it("stays fast on a long run of spaces", () => {
+    const started = performance.now();
+    validateTitle(`a${" ".repeat(60_000)}b`);
+    expect(performance.now() - started).toBeLessThan(1000);
+  });
+
   it("rejects a title made only of line breaks", () => {
     expect(validateTitle("\n\r\n").ok).toBe(false);
   });

@@ -65,7 +65,7 @@ Implementado:
   `evaluateRecallSession` reclama las respuestas pendientes (un reclamo de
   más de 6 minutos se retoma): saltada → registro `skipped`, puntaje IA 0,
   sin modelo ni unidad; las escritas → **una sola llamada**
-  `evaluate_recall_answer/v2` para todas, cada una con su rúbrica y el
+  `evaluate_recall_answer/v3` para todas, cada una con su rúbrica y el
   fragmento de la página más parecido a su pregunta (`selectRelevantFragment`;
   `fragmentTokenCap`: una respuesta sola conserva todo `AI_PAGE_TOKEN_CAP`
   aunque el prompt pase el techo de 7K de Groq y vaya a un proveedor mayor;

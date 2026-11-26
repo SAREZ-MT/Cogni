@@ -24,9 +24,11 @@ export const MAX_PROMPT_TITLE_LENGTH = 200;
 
 // A data tag: its name after "<" or "</", then the rest of the tag up to
 // ">" when the bracket is on the same line. A tag left without its bracket
-// loses only its name: the text after it is the student's and stays.
+// loses only its name: the text after it is the student's and stays. The
+// spaces after the slash sit inside its optional group, so a bracket
+// followed by a long run of spaces is read once, not once per split.
 const DATA_TAG_PATTERN = new RegExp(
-  `<\\s*\\/?\\s*(?:${DATA_TAGS.join("|")})\\b(?:[^<>\\n]*>)?`,
+  `<\\s*(?:\\/\\s*)?(?:${DATA_TAGS.join("|")})\\b(?:[^<>\\n]*>)?`,
   "gi",
 );
 
@@ -47,8 +49,11 @@ export function asData(text: string): string {
 // One line per list entry: inner newlines would let the text start a line
 // that reads as another entry or as a header of the prompt.
 export function oneLine(text: string): string {
-  return asData(text)
-    .replace(/[\s\u0085]+/g, " ")
+  // Flattened before the tags are removed: turning a line break inside a
+  // tag into a space afterwards would assemble a tag asData never saw.
+  // \s does not cover the next-line character (U+0085).
+  return asData(text.replace(/[\s\u0085]+/g, " "))
+    .replace(/ {2,}/g, " ")
     .trim();
 }
 
