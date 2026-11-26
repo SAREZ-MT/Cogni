@@ -37,7 +37,7 @@ export async function requestImageUpload(
   const parsed = parseInput(requestImageUploadSchema, input);
   if (!parsed.ok) return parsed;
 
-  const page = await deps.pages.findById(parsed.value.pageId);
+  const page = await deps.pages.findById(parsed.value.pageId, ownerId);
   if (!page || page.ownerId !== ownerId || page.archivedAt) {
     return err(new DomainError(PAGE_ERROR.NOT_FOUND, parsed.value.pageId));
   }

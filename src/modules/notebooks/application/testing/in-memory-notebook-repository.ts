@@ -7,8 +7,9 @@ import type { NotebookRepository } from "../../domain/notebook-repository";
 export class InMemoryNotebookRepository implements NotebookRepository {
   private readonly rows = new Map<string, Notebook>();
 
-  async findById(id: string): Promise<Notebook | null> {
-    return this.rows.get(id) ?? null;
+  async findById(id: string, ownerId: string): Promise<Notebook | null> {
+    const notebook = this.rows.get(id);
+    return notebook?.ownerId === ownerId ? notebook : null;
   }
 
   async nextPosition(ownerId: string): Promise<number> {
@@ -26,6 +27,7 @@ export class InMemoryNotebookRepository implements NotebookRepository {
   }
 
   async update(notebook: Notebook): Promise<void> {
+    if (this.rows.get(notebook.id)?.ownerId !== notebook.ownerId) return;
     this.rows.set(notebook.id, notebook);
   }
 

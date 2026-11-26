@@ -8,13 +8,19 @@ import type {
 export class InMemoryPageAssetRepository implements PageAssetRepository {
   private readonly rows = new Map<string, PageAsset>();
 
-  async findById(id: string): Promise<PageAsset | null> {
-    return this.rows.get(id) ?? null;
+  async findById(id: string, ownerId: string): Promise<PageAsset | null> {
+    const asset = this.rows.get(id);
+    return asset?.ownerId === ownerId ? asset : null;
   }
 
-  async findByStoragePath(storagePath: string): Promise<PageAsset | null> {
+  async findByStoragePath(
+    storagePath: string,
+    ownerId: string,
+  ): Promise<PageAsset | null> {
     for (const asset of this.rows.values()) {
-      if (asset.storagePath === storagePath) return asset;
+      if (asset.storagePath === storagePath && asset.ownerId === ownerId) {
+        return asset;
+      }
     }
     return null;
   }

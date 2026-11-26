@@ -31,7 +31,7 @@ describe("listSidebar use case", () => {
       OWNER_ID,
     );
     if (!notebookA.ok || !notebookB.ok) throw new Error("setup failed");
-    await markNotebookArchived(deps, notebookB.value.id);
+    await markNotebookArchived(deps, notebookB.value.id, OWNER_ID);
 
     const activePage = await createPage(
       { notebookId: notebookA.value.id },
@@ -44,7 +44,7 @@ describe("listSidebar use case", () => {
       OWNER_ID,
     );
     if (!activePage.ok || !archivedPage.ok) throw new Error("setup failed");
-    await markPageArchived(deps.pages, archivedPage.value.id);
+    await markPageArchived(deps.pages, archivedPage.value.id, OWNER_ID);
 
     const sidebar = await listSidebar(deps, OWNER_ID);
 

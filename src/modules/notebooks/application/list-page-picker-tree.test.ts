@@ -41,7 +41,7 @@ describe("listPagePickerTree use case", () => {
       ...long.value,
       plainText: "La mitocondria produce ATP.\nEl núcleo guarda el ADN.",
     });
-    await markPageArchived(deps.pages, archived.value.id);
+    await markPageArchived(deps.pages, archived.value.id, OWNER_ID);
 
     const tree = await listPagePickerTree(deps, OWNER_ID);
 

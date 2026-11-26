@@ -60,9 +60,22 @@ describe.skipIf(!url)("Drizzle notebook/page repositories", () => {
     if (!notebook.ok) return;
     await notebookRepo.create(notebook.value);
 
-    const found = await notebookRepo.findById(notebook.value.id);
+    const found = await notebookRepo.findById(notebook.value.id, ownerA.id);
+    expect(
+      await notebookRepo.findById(notebook.value.id, ownerB.id),
+    ).toBeNull();
     expect(found?.title).toBe("Cuaderno de prueba");
     expect(found?.archivedAt).toBeNull();
+
+    // An update that names another owner writes nothing (S6).
+    await notebookRepo.update({
+      ...notebook.value,
+      ownerId: ownerB.id,
+      title: "Intruso",
+    });
+    expect(
+      (await notebookRepo.findById(notebook.value.id, ownerA.id))?.title,
+    ).toBe("Cuaderno de prueba");
 
     const pagePosition = await pageRepo.nextPosition(notebook.value.id);
     const page = createPage(
@@ -87,7 +100,10 @@ describe.skipIf(!url)("Drizzle notebook/page repositories", () => {
       archivedAt,
       updatedAt: archivedAt,
     });
-    const archivedNotebook = await notebookRepo.findById(notebook.value.id);
+    const archivedNotebook = await notebookRepo.findById(
+      notebook.value.id,
+      ownerA.id,
+    );
     expect(archivedNotebook?.archivedAt).not.toBeNull();
 
     const activeAfterArchive = await notebookRepo.listActiveByOwner(ownerA.id);
@@ -280,7 +296,7 @@ describe.skipIf(!url)("Drizzle notebook/page repositories", () => {
     // "current version" report never reveals a real contentVersion for a
     // row the WHERE clause excluded (drizzle-page-repository.ts comment).
     expect(result).toEqual({ updated: false, currentVersion: 0 });
-    const stored = await pageRepo.findById(page.value.id);
+    const stored = await pageRepo.findById(page.value.id, ownerA.id);
     expect(stored?.content).toEqual(page.value.content);
     expect(stored?.contentVersion).toBe(page.value.contentVersion);
   });

@@ -56,7 +56,9 @@ describe("cross-owner authorization (Scenario: Pagina ajena)", () => {
     );
 
     expect(result.ok).toBe(false);
-    expect((await deps.pages.findById(page.id))?.title).toBe(page.title);
+    expect((await deps.pages.findById(page.id, OWNER_ID))?.title).toBe(
+      page.title,
+    );
   });
 
   it("SavePage returns a DomainError and does not write", async () => {
@@ -74,6 +76,8 @@ describe("cross-owner authorization (Scenario: Pagina ajena)", () => {
     );
 
     expect(result.ok).toBe(false);
-    expect((await deps.pages.findById(page.id))?.contentVersion).toBe(1);
+    expect((await deps.pages.findById(page.id, OWNER_ID))?.contentVersion).toBe(
+      1,
+    );
   });
 });

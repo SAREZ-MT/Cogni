@@ -87,7 +87,7 @@ export function createNotebooksServerApi(deps: {
 
   return {
     async findActiveNotebook(ownerId, notebookId) {
-      const notebook = await notebooks.findById(notebookId);
+      const notebook = await notebooks.findById(notebookId, ownerId);
       if (!notebook || notebook.ownerId !== ownerId || notebook.archivedAt) {
         return null;
       }
@@ -118,9 +118,9 @@ export function createNotebooksServerApi(deps: {
     },
 
     async findPageNotebookId(ownerId, pageId) {
-      const page = await pages.findById(pageId);
+      const page = await pages.findById(pageId, ownerId);
       if (!page || page.ownerId !== ownerId || page.archivedAt) return null;
-      const notebook = await notebooks.findById(page.notebookId);
+      const notebook = await notebooks.findById(page.notebookId, ownerId);
       // T7a review follow-up (R3-notebook-owner-unchecked): a page's own
       // ownerId should always match its notebook's, but this defends
       // against a data inconsistency instead of trusting that invariant

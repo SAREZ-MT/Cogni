@@ -26,7 +26,7 @@ export async function savePage(
   const parsed = parseInput(savePageSchema, input);
   if (!parsed.ok) return parsed;
 
-  const page = await deps.pages.findById(parsed.value.pageId);
+  const page = await deps.pages.findById(parsed.value.pageId, ownerId);
   if (!page || page.ownerId !== ownerId || page.archivedAt) {
     return err(new DomainError(PAGE_ERROR.NOT_FOUND, parsed.value.pageId));
   }

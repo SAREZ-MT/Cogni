@@ -226,7 +226,7 @@ describe("notebooks Server Actions", () => {
         "./actions"
       );
       const notebook = await createNotebook({ title: "Archivado" });
-      await markNotebookArchived({ notebooks, pages }, notebook.id);
+      await markNotebookArchived({ notebooks, pages }, notebook.id, OWNER_ID);
 
       const result = await getNotebookTitleForRoute(notebook.id);
 

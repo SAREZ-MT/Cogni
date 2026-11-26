@@ -21,7 +21,7 @@ export async function renamePage(
   const parsed = parseInput(renamePageSchema, input);
   if (!parsed.ok) return parsed;
 
-  const page = await deps.pages.findById(parsed.value.pageId);
+  const page = await deps.pages.findById(parsed.value.pageId, ownerId);
   if (!page || page.ownerId !== ownerId) {
     return err(new DomainError(PAGE_ERROR.NOT_FOUND, parsed.value.pageId));
   }

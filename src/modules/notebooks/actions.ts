@@ -362,7 +362,7 @@ export async function getNotebookForRoute(
 ): Promise<{ notebook: Notebook; pages: Page[] } | null> {
   const ownerId = await requireOwnerId();
   const { notebooks, pages } = deps();
-  const notebook = await notebooks.findById(notebookId);
+  const notebook = await notebooks.findById(notebookId, ownerId);
   if (!notebook || notebook.ownerId !== ownerId || notebook.archivedAt) {
     return null;
   }
@@ -380,7 +380,7 @@ export async function getNotebookTitleForRoute(
 ): Promise<string | null> {
   try {
     const ownerId = await requireOwnerId();
-    const notebook = await deps().notebooks.findById(notebookId);
+    const notebook = await deps().notebooks.findById(notebookId, ownerId);
     if (!notebook || notebook.ownerId !== ownerId || notebook.archivedAt) {
       return null;
     }

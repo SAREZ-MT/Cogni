@@ -119,7 +119,7 @@ describe("createNotebooksServerApi", () => {
       expect(result.ok).toBe(true);
       if (!result.ok) return;
       expect(result.value.notebookId).toBe("nb-1");
-      const stored = await pages.findById(result.value.id);
+      const stored = await pages.findById(result.value.id, OWNER_ID);
       expect(stored?.title).toBe("documento.pdf");
       expect(stored?.contentVersion).toBe(1);
     });
@@ -133,7 +133,7 @@ describe("createNotebooksServerApi", () => {
 
       expect(result.ok).toBe(true);
       if (!result.ok) return;
-      const stored = await pages.findById(result.value.id);
+      const stored = await pages.findById(result.value.id, OWNER_ID);
       expect(stored?.title).toBe("Sin título");
     });
 
@@ -167,7 +167,7 @@ describe("createNotebooksServerApi", () => {
       expect(result.ok).toBe(true);
       if (!result.ok) return;
       expect(result.value.version).toBe(2);
-      const stored = await pages.findById(created.value.id);
+      const stored = await pages.findById(created.value.id, OWNER_ID);
       expect(stored?.content).toEqual(IMPORTED_DOC);
       expect(stored?.plainText).toBe("hola");
     });
@@ -195,7 +195,7 @@ describe("createNotebooksServerApi", () => {
       expect(!result.ok && result.error.code).toBe("PAGE_VERSION_CONFLICT");
       // R3-conflict-test-no-state-assert: the rejected second call must
       // never touch the page the first call already wrote.
-      const stored = await pages.findById(created.value.id);
+      const stored = await pages.findById(created.value.id, OWNER_ID);
       expect(stored?.content).toEqual(IMPORTED_DOC);
       expect(stored?.contentVersion).toBe(2);
     });
@@ -215,7 +215,7 @@ describe("createNotebooksServerApi", () => {
 
       expect(result.ok).toBe(false);
       expect(!result.ok && result.error.code).toBe("PAGE_NOT_FOUND");
-      const stored = await pages.findById(created.value.id);
+      const stored = await pages.findById(created.value.id, OWNER_ID);
       expect(stored?.content).not.toEqual(IMPORTED_DOC);
       expect(stored?.contentVersion).toBe(1);
     });
@@ -270,7 +270,7 @@ describe("createNotebooksServerApi", () => {
       const api = createNotebooksServerApi({ db: FAKE_DB });
       const created = await api.createPage(OWNER_ID, { notebookId: "nb-1" });
       if (!created.ok) throw new Error("setup failed");
-      const page = await pages.findById(created.value.id);
+      const page = await pages.findById(created.value.id, OWNER_ID);
       if (!page) throw new Error("setup failed");
       await pages.update({ ...page, archivedAt: NOW });
 
@@ -307,7 +307,8 @@ describe("createNotebooksServerApi", () => {
       const api = createNotebooksServerApi({ db: FAKE_DB });
       const created = await api.createPage(OWNER_ID, { notebookId: "nb-1" });
       if (!created.ok) throw new Error("setup failed");
-      await notebooks.update(makeNotebook({ ownerId: OTHER_OWNER_ID }));
+      // Rewrites the row: an update never changes a notebook's owner.
+      await notebooks.create(makeNotebook({ ownerId: OTHER_OWNER_ID }));
 
       const notebookId = await api.findPageNotebookId(
         OWNER_ID,
@@ -358,7 +359,7 @@ describe("createNotebooksServerApi", () => {
 
     it("returns NOT_FOUND for an archived page", async () => {
       const { api, pageId } = await setup();
-      const page = await pages.findById(pageId);
+      const page = await pages.findById(pageId, OWNER_ID);
       if (!page) throw new Error("setup failed");
       await pages.update({ ...page, archivedAt: NOW });
 
@@ -387,7 +388,7 @@ describe("createNotebooksServerApi", () => {
         expectedVersion: 1,
       });
 
-      const stored = await pages.findById(created.value.id);
+      const stored = await pages.findById(created.value.id, OWNER_ID);
       expect(stored?.updatedAt).toEqual(fixed);
     });
   });
@@ -411,12 +412,14 @@ describe("createNotebooksServerApi", () => {
 
       expect(stored.ok).toBe(true);
       if (!stored.ok) return;
-      expect(await assets.findById(stored.value.assetId)).not.toBeNull();
+      expect(
+        await assets.findById(stored.value.assetId, OWNER_ID),
+      ).not.toBeNull();
       expect(storage.uploadCalls).toHaveLength(1);
 
       await api.deleteImportedAssets(OWNER_ID, [stored.value.assetId]);
 
-      expect(await assets.findById(stored.value.assetId)).toBeNull();
+      expect(await assets.findById(stored.value.assetId, OWNER_ID)).toBeNull();
       expect(storage.removeCalls).toEqual([[storage.uploadCalls[0].path]]);
     });
 
