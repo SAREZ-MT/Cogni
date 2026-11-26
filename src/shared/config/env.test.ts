@@ -225,16 +225,20 @@ describe("parseServerEnv production guards", () => {
     );
   });
 
-  it("refuses COGNI_DESIGN_PREVIEWS=1 on the Vercel production deployment", () => {
+  // A flag left on for every Vercel environment must not take production
+  // down: designPreviewsEnabled() already answers false there.
+  it("accepts COGNI_DESIGN_PREVIEWS=1 on the Vercel production deployment", () => {
     expect(() =>
       parseServerEnv({
         ...live,
         VERCEL_ENV: "production",
         COGNI_DESIGN_PREVIEWS: "1",
       }),
-    ).toThrow(
-      /COGNI_DESIGN_PREVIEWS: 1 is not allowed when VERCEL_ENV=production/,
-    );
+    ).not.toThrow();
+  });
+
+  it("accepts an empty VERCEL_ENV", () => {
+    expect(() => parseServerEnv({ ...server, VERCEL_ENV: "" })).not.toThrow();
   });
 
   it("accepts live mode without previews on the Vercel production deployment", () => {

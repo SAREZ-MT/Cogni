@@ -27,7 +27,11 @@ async function violatedConstraint(
     return null;
   } catch (error) {
     if (error instanceof ForceRollback) return null;
-    return (error as postgres.PostgresError).constraint_name ?? null;
+    // Anything that is not a constraint violation (connection, syntax) is
+    // a broken test, never "no constraint violated".
+    const constraint = (error as postgres.PostgresError).constraint_name;
+    if (!constraint) throw error;
+    return constraint;
   }
 }
 
@@ -112,6 +116,67 @@ describe.skipIf(!url)("0016 owner-scoped page keys", () => {
     if (owner) await deleteTestOwner(owner.id);
     if (other) await deleteTestOwner(other.id);
     await sql.end();
+  });
+
+  // Every composite key of the migration, read from the catalog: columns,
+  // target and delete action. The cases below exercise five of them.
+  it("defines the 13 composite owner keys, each cascading from its page", async () => {
+    const rows = await sql`
+      select c.conname as name,
+             c.conrelid::regclass::text as child,
+             c.confrelid::regclass::text as parent,
+             c.confdeltype as on_delete,
+             (select array_agg(a.attname::text order by k.ord)
+                from unnest(c.conkey) with ordinality as k(attnum, ord)
+                join pg_attribute a
+                  on a.attrelid = c.conrelid and a.attnum = k.attnum) as cols,
+             (select array_agg(a.attname::text order by k.ord)
+                from unnest(c.confkey) with ordinality as k(attnum, ord)
+                join pg_attribute a
+                  on a.attrelid = c.confrelid and a.attnum = k.attnum) as refs
+        from pg_constraint c
+       where c.contype = 'f'
+         and (c.conname like '%\_page\_owner\_fk'
+              or c.conname = 'pages_notebook_owner_fk')
+       order by c.conname
+    `;
+    const children = [
+      "exam_page_state",
+      "exam_questions",
+      "exam_sessions",
+      "flashcard_sessions",
+      "flashcards",
+      "generation_fingerprints",
+      "import_jobs",
+      "page_assets",
+      "page_mastery",
+      "recall_questions",
+      "recall_sessions",
+      "study_items",
+    ];
+    const expected = [
+      ...children.map((child) => ({
+        name: `${child}_page_owner_fk`,
+        child,
+        parent: "pages",
+        on_delete: "c",
+        cols: ["page_id", "owner_id"],
+        refs: ["id", "owner_id"],
+      })),
+      {
+        name: "pages_notebook_owner_fk",
+        child: "pages",
+        parent: "notebooks",
+        on_delete: "c",
+        cols: ["notebook_id", "owner_id"],
+        refs: ["id", "owner_id"],
+      },
+    ].sort((a, b) => a.name.localeCompare(b.name));
+    expect(
+      rows
+        .map((row) => ({ ...row }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    ).toEqual(expected);
   });
 
   it("rejects a page whose owner is not its notebook's owner", async () => {

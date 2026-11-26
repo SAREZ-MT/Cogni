@@ -96,7 +96,7 @@ function buildHeaders(csp: string): { key: string; value: string }[] {
     // so localhost is unaffected.
     {
       key: "Strict-Transport-Security",
-      value: "max-age=63072000; includeSubDomains",
+      value: "max-age=63072000",
     },
     // allow-popups: a window Cogni opens (Google sign-in) keeps working.
     { key: "Cross-Origin-Opener-Policy", value: "same-origin-allow-popups" },

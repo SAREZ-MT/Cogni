@@ -64,9 +64,7 @@ describe("securityHeaders", () => {
   it("forces HTTPS and isolates the origin, statically and per request", () => {
     for (const headers of [securityHeaders, buildSecurityHeaders("abc123")]) {
       const value = (key: string) => headers.find((h) => h.key === key)?.value;
-      expect(value("Strict-Transport-Security")).toBe(
-        "max-age=63072000; includeSubDomains",
-      );
+      expect(value("Strict-Transport-Security")).toBe("max-age=63072000");
       expect(value("Cross-Origin-Opener-Policy")).toBe(
         "same-origin-allow-popups",
       );

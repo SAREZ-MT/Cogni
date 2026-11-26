@@ -4,6 +4,10 @@
 -- notebooks.id, ON DELETE CASCADE) under their original names and drops the
 -- two unique constraints the composite keys pointed at. No row is changed;
 -- the database stops refusing a row whose owner differs from its page's.
+-- One transaction: either every key is back or nothing changed, so a page
+-- deleted meanwhile never leaves rows behind and the script can be run again.
+begin;
+
 alter table pages drop constraint if exists pages_notebook_owner_fk;
 alter table page_assets drop constraint if exists page_assets_page_owner_fk;
 alter table import_jobs drop constraint if exists import_jobs_page_owner_fk;
@@ -34,3 +38,5 @@ alter table generation_fingerprints add constraint generation_fingerprints_page_
 
 alter table pages drop constraint if exists pages_id_owner_key;
 alter table notebooks drop constraint if exists notebooks_id_owner_key;
+
+commit;

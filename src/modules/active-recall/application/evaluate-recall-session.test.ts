@@ -369,9 +369,9 @@ describe("evaluateRecallSession", () => {
     await run();
 
     const [answer] = await stored(uow);
-    expect(answer?.aiScore).toBe(1);
+    expect(answer?.aiScore).toBe(2);
     expect(answer?.aiEvaluation).toMatchObject({
-      score: 1,
+      score: 2,
       modelScore: 5,
       presentConcepts: [],
       missingConcepts: ["ATP"],

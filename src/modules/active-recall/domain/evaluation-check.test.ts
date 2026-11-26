@@ -79,10 +79,33 @@ describe("checkEvaluation", () => {
     ]);
   });
 
-  it("caps the score at 1 when every key concept is missing", () => {
+  it("caps the score at 2 when every key concept is missing", () => {
     const checked = checkEvaluation(evaluation(5, [], RUBRIC), RUBRIC);
-    expect(checked.score).toBe(1);
+    expect(checked.score).toBe(2);
     expect(checked.modelScore).toBe(5);
+  });
+
+  it("keeps a low partial score when every key concept is missing", () => {
+    // A one-concept rubric: the model may mark it missing and still give
+    // partial credit for an answer that touches the idea.
+    const checked = checkEvaluation(evaluation(2, [], ["ATP"]), ["ATP"]);
+    expect(checked.score).toBe(2);
+    expect(checked).not.toHaveProperty("modelScore");
+  });
+
+  it("does not bound the score of an empty rubric", () => {
+    const checked = checkEvaluation(evaluation(5, ["ATP"], []), []);
+    expect(checked.score).toBe(5);
+    expect(checked.presentConcepts).toEqual([]);
+  });
+
+  it("does not bound the score when two key concepts read the same once normalized", () => {
+    // "año" and "ano" cannot be told apart by the tolerant match, so the
+    // lists prove nothing about either.
+    const rubric = ["año", "ano"];
+    const checked = checkEvaluation(evaluation(5, ["año"], ["ano"]), rubric);
+    expect(checked.score).toBe(5);
+    expect(checked).not.toHaveProperty("modelScore");
   });
 
   it("caps the score at 4 when a key concept is missing", () => {

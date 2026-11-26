@@ -66,9 +66,11 @@ const serverObject = clientSchema.extend({
   // Set by Vercel: `production`, `preview` or `development`. Unset elsewhere
   // (local, CI, e2e), which is why the guards below key on it and not on
   // NODE_ENV: the e2e suite runs a production build in fake mode.
-  VERCEL_ENV: z.string().min(1).optional(),
+  VERCEL_ENV: z.string().optional(),
   // `1` shows the design-preview screens in a production build (see
-  // design-previews.ts). Staging and preview only.
+  // design-previews.ts, which ignores it on the Vercel production
+  // deployment). Not refused here: a flag left on for every Vercel
+  // environment must not take production down.
   COGNI_DESIGN_PREVIEWS: z.string().optional(),
 });
 
@@ -90,21 +92,13 @@ export const serverSchema = serverObject.superRefine((env, ctx) => {
     );
   }
 
-  // The real deployment never serves canned AI output or sample screens
+  // The real deployment never serves canned AI output
   // (security-hardening S8).
-  if (env.VERCEL_ENV === "production") {
-    if (env.AI_PROVIDER_MODE === "fake") {
-      missing(
-        "AI_PROVIDER_MODE",
-        "fake is not allowed when VERCEL_ENV=production",
-      );
-    }
-    if (env.COGNI_DESIGN_PREVIEWS === "1") {
-      missing(
-        "COGNI_DESIGN_PREVIEWS",
-        "1 is not allowed when VERCEL_ENV=production",
-      );
-    }
+  if (env.VERCEL_ENV === "production" && env.AI_PROVIDER_MODE === "fake") {
+    missing(
+      "AI_PROVIDER_MODE",
+      "fake is not allowed when VERCEL_ENV=production",
+    );
   }
 
   if (env.AI_PROVIDER_MODE !== "live") return;

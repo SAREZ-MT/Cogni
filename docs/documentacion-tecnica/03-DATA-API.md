@@ -1599,7 +1599,7 @@ Validadas con Zod al arrancar (`src/shared/config/env.schema.ts`); una cadena va
 | `AI_DAILY_EVALUATIONS` | Entero positivo (10) | Sesiones de recordación activa evaluadas por día y por usuario. |
 | `AI_DAILY_FEEDBACKS` | Entero positivo (20) | Retroalimentaciones de sesión (flashcards y exámenes) por día y por usuario. |
 | `AI_GLOBAL_DAILY_GENERATIONS`, `AI_GLOBAL_DAILY_EVALUATIONS`, `AI_GLOBAL_DAILY_FEEDBACKS` | Enteros positivos (700, 350, 700) | Presupuestos diarios de toda la aplicación, una unidad por intento de proveedor. |
-| `VERCEL_ENV` | Texto opcional (lo fija Vercel) | Con `production`, el esquema rechaza `AI_PROVIDER_MODE=fake` y `COGNI_DESIGN_PREVIEWS=1`. |
+| `VERCEL_ENV` | Texto opcional (lo fija Vercel) | Con `production`, el esquema rechaza `AI_PROVIDER_MODE=fake`, y las vistas previas de diseño se ignoran aunque `COGNI_DESIGN_PREVIEWS=1` esté definida. |
 | `AI_PAGE_TOKEN_CAP` | Entero positivo (12000) | Tope de tokens del texto de página enviado en una generación; lo excedente se trunca (`truncated`, `wordsUsed`, `wordsTotal`). |
 | `NEXT_PUBLIC_SITE_URL` | URL obligatoria | Base de `redirectTo` de los flujos de autenticación (`siteUrl()`). |
 | `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST` | Opcionales | Eventos de producto (`user_signed_up`, `user_signed_in`, `terms_accepted`, `generation_requested`, …). |
