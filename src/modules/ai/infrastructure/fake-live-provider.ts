@@ -3,7 +3,7 @@ import {
   examQuestionsOutput,
   examVariantsOutput,
   flashcardsOutput,
-  recallEvaluationOutput,
+  recallEvaluationsOutput,
   recallQuestionsOutput,
   sessionFeedbackOutput,
 } from "../application/schemas";
@@ -34,6 +34,20 @@ function headerCount(
   return Math.min(Math.max(Number(match[1]), 1), max);
 }
 
+// Splits a prompt at its page text: `head` is everything before the
+// <page_text> block the builders put last, `text` what the block holds. A
+// prompt without the block is all text.
+function splitAtPageText(prompt: string): { head: string; text: string } {
+  const open = prompt.indexOf("\n<page_text>\n");
+  if (open === -1) return { head: prompt, text: prompt };
+  const body = prompt.slice(open + "\n<page_text>\n".length);
+  const close = body.lastIndexOf("\n</page_text>");
+  return {
+    head: prompt.slice(0, open),
+    text: close === -1 ? body : body.slice(0, close),
+  };
+}
+
 function splitSentences(text: string): string[] {
   return text
     .split(/(?<=[.!?])\s+|\n+/)
@@ -42,13 +56,12 @@ function splitSentences(text: string): string[] {
 }
 
 // Reads the prompt shape produced by `buildGenerateFlashcardsPrompt`:
-// "Number of flashcards: N" and the page text after "Text:".
+// "Number of flashcards: N" and the page text in its <page_text> block.
 function parseFlashcardsPrompt(prompt: string): {
   count: number;
   text: string;
 } {
-  const marker = prompt.indexOf("Text:\n");
-  const text = marker === -1 ? prompt : prompt.slice(marker + "Text:\n".length);
+  const { text } = splitAtPageText(prompt);
   return {
     count: headerCount(
       prompt,
@@ -91,17 +104,14 @@ function normalizeStem(text: string): string {
 }
 
 // Reads the prompt shape produced by `buildGenerateExamQuestionsPrompt`:
-// "Number of questions: N", the "- [concept] stem" lines under "Existing
-// questions:" and the page text after "Text:".
+// "Number of questions: N", the "- [concept] stem" lines of the
+// <existing_questions> block and the page text in its <page_text> block.
 function parseExamQuestionsPrompt(prompt: string): {
   count: number;
   existingStems: Set<string>;
   text: string;
 } {
-  const marker = prompt.indexOf("\nText:\n");
-  const head = marker === -1 ? prompt : prompt.slice(0, marker);
-  const text =
-    marker === -1 ? prompt : prompt.slice(marker + "\nText:\n".length);
+  const { head, text } = splitAtPageText(prompt);
   const existingStems = new Set(
     head
       .split("\n")
@@ -161,18 +171,15 @@ function examQuestionsFrom(prompt: string) {
 const MAX_FAKE_RECALL_COUNT = 15;
 
 // Reads the prompt shape produced by `buildGenerateRecallQuestionsPrompt`:
-// "Number of questions: N", the "- prompt" lines under "Existing
-// questions:" and the page text after "Text:".
+// "Number of questions: N", the "- prompt" lines of the
+// <existing_questions> block and the page text in its <page_text> block.
 function parseRecallQuestionsPrompt(prompt: string): {
   count: number;
   existingPrompts: Set<string>;
   text: string;
 } {
-  const marker = prompt.indexOf("\nText:\n");
-  const head = marker === -1 ? prompt : prompt.slice(0, marker);
-  const text =
-    marker === -1 ? prompt : prompt.slice(marker + "\nText:\n".length);
-  const start = head.indexOf("Existing questions:\n");
+  const { head, text } = splitAtPageText(prompt);
+  const start = head.indexOf("<existing_questions>\n");
   const existingPrompts = new Set(
     start === -1
       ? []
@@ -235,40 +242,58 @@ function looseText(text: string): string {
     .trim();
 }
 
-// Reads the prompt shape produced by `buildEvaluateRecallAnswerPrompt`: the
-// "- concept" lines between "Key concepts:" and "Acceptable answer
-// summary:", and the student answer inside its tag (never the fragment).
-function parseEvaluationPrompt(prompt: string): {
+const MINIMAL_EVALUATION = {
+  score: 3,
+  presentConcepts: ["concepto"],
+  missingConcepts: [],
+  misconceptions: [],
+  justification: "Evaluación de ejemplo",
+};
+
+// Reads the items of the prompt built by `buildEvaluateRecallAnswersPrompt`:
+// for each <answer_item>, its id, the "- concept" lines between "Key
+// concepts:" and "Acceptable answer summary:", and the student answer inside
+// its tag (never the fragment).
+const ANSWER_ITEM = /<answer_item id="([^"]*)">\n([\s\S]*?)\n<\/answer_item>/g;
+
+interface EvaluationItem {
+  id: string;
   keyConcepts: string[];
   answer: string;
-} {
-  const lines = prompt.split("\n");
-  const start = lines.indexOf("Key concepts:");
-  const end = lines.findIndex((line) =>
-    line.startsWith("Acceptable answer summary:"),
-  );
-  const keyConcepts =
-    start === -1 || end === -1
-      ? []
-      : lines
-          .slice(start + 1, end)
-          .filter((line) => line.startsWith("- "))
-          .map((line) => line.slice(2));
-  const open = prompt.lastIndexOf("<student_answer>\n");
-  const close = prompt.lastIndexOf("\n</student_answer>");
-  const answer =
-    open === -1 || close < open
-      ? ""
-      : prompt.slice(open + "<student_answer>\n".length, close);
-  return { keyConcepts, answer };
+}
+
+function parseEvaluationItems(prompt: string): EvaluationItem[] {
+  return [...prompt.matchAll(ANSWER_ITEM)].map(([, id = "", body = ""]) => {
+    const lines = body.split("\n");
+    const start = lines.indexOf("Key concepts:");
+    const end = lines.findIndex((line) =>
+      line.startsWith("Acceptable answer summary:"),
+    );
+    const keyConcepts =
+      start === -1 || end === -1
+        ? []
+        : lines
+            .slice(start + 1, end)
+            .filter((line) => line.startsWith("- "))
+            .map((line) => line.slice(2));
+    const open = body.lastIndexOf("<student_answer>\n");
+    const close = body.lastIndexOf("\n</student_answer>");
+    const answer =
+      open === -1 || close < open
+        ? ""
+        : body.slice(open + "<student_answer>\n".length, close);
+    return { id, keyConcepts, answer };
+  });
 }
 
 // A deterministic evaluation: the score is the share of the rubric's key
 // concepts the answer mentions (case and accents ignored), scaled to 0–5.
-// A prompt without key concepts yields null, so the minimal object answers.
-function recallEvaluationFrom(prompt: string) {
-  const { keyConcepts, answer } = parseEvaluationPrompt(prompt);
-  if (keyConcepts.length === 0) return null;
+// An item without key concepts gets the minimal evaluation.
+function recallEvaluationFrom(item: EvaluationItem) {
+  const { keyConcepts, answer } = item;
+  if (keyConcepts.length === 0) {
+    return { questionId: item.id, ...MINIMAL_EVALUATION };
+  }
   const said = looseText(answer);
   const presentConcepts = keyConcepts.filter((concept) =>
     said.includes(looseText(concept)),
@@ -282,6 +307,7 @@ function recallEvaluationFrom(prompt: string) {
       ? `Mencionaste los ${total} conceptos clave de la rúbrica.`
       : `Mencionaste ${presentConcepts.length} de ${total} conceptos clave de la rúbrica. Te faltó: ${missingConcepts.join(", ")}.`;
   return {
+    questionId: item.id,
     score: Math.round((5 * presentConcepts.length) / total),
     presentConcepts,
     missingConcepts,
@@ -291,30 +317,42 @@ function recallEvaluationFrom(prompt: string) {
 }
 
 // Failure switches for e2e and CI (Phase 6 T6, CU-09 alternate flow "a
-// provider fails mid-session"). An evaluation prompt (only that purpose)
-// holding FAKE_AI_FAIL_MARKER fails on every call; one holding
-// FAKE_AI_FAIL_ONCE_MARKER fails the first time that exact prompt is seen
-// in this server process and is answered on the next call, so "Reintentar"
-// can evaluate it. The failed prompts live at module level because every
-// request builds a new provider; the set stays bounded (review R3-003): a
-// prompt is forgotten once it is answered, and beyond
-// FAKE_FAIL_ONCE_CAPACITY the oldest failed prompt is dropped.
+// provider fails mid-session"). In an evaluation batch (only that purpose),
+// an answer holding FAKE_AI_FAIL_MARKER gets no evaluation on any call; one
+// holding FAKE_AI_FAIL_ONCE_MARKER gets none the first time that exact
+// answer is seen in this server process and is evaluated on the next call,
+// so "Reintentar" can evaluate it. The use case fails an answer left
+// without an evaluation; a batch where every answer is left out fails the
+// whole call. The failed answers live at module level because every request
+// builds a new provider; the set stays bounded (review R3-003): an answer is
+// forgotten once it is evaluated, and beyond FAKE_FAIL_ONCE_CAPACITY the
+// oldest failed answer is dropped.
 export const FAKE_AI_FAIL_MARKER = "[falla-ia]";
 export const FAKE_AI_FAIL_ONCE_MARKER = "[falla-ia-una-vez]";
 export const FAKE_FAIL_ONCE_CAPACITY = 100;
-// Insertion-ordered: the first entry is the oldest failed prompt.
-const failedOncePrompts = new Set<string>();
+// Insertion-ordered: the first entry is the oldest failed answer.
+const failedOnceAnswers = new Set<string>();
 
-function shouldFail(prompt: string): boolean {
-  if (prompt.includes(FAKE_AI_FAIL_MARKER)) return true;
-  if (!prompt.includes(FAKE_AI_FAIL_ONCE_MARKER)) return false;
-  if (failedOncePrompts.delete(prompt)) return false;
-  if (failedOncePrompts.size >= FAKE_FAIL_ONCE_CAPACITY) {
-    const [oldest] = failedOncePrompts;
-    if (oldest !== undefined) failedOncePrompts.delete(oldest);
+function shouldFail(answer: string): boolean {
+  if (answer.includes(FAKE_AI_FAIL_MARKER)) return true;
+  if (!answer.includes(FAKE_AI_FAIL_ONCE_MARKER)) return false;
+  if (failedOnceAnswers.delete(answer)) return false;
+  if (failedOnceAnswers.size >= FAKE_FAIL_ONCE_CAPACITY) {
+    const [oldest] = failedOnceAnswers;
+    if (oldest !== undefined) failedOnceAnswers.delete(oldest);
   }
-  failedOncePrompts.add(prompt);
+  failedOnceAnswers.add(answer);
   return true;
+}
+
+// The batched evaluation, or null for a prompt with no items (the minimal
+// object answers). Throws when every item fails.
+function recallEvaluationsFrom(prompt: string) {
+  const items = parseEvaluationItems(prompt);
+  if (items.length === 0) return null;
+  const answered = items.filter((item) => !shouldFail(item.answer));
+  if (answered.length === 0) throw new Error("fake provider failure");
+  return { evaluations: answered.map(recallEvaluationFrom) };
 }
 
 interface FakeFailedRoot {
@@ -329,8 +367,7 @@ interface FakeFailedRoot {
 // answer:" and "Previous wording:" lines), never from the page text. At
 // most MAX_FAKE_QUESTION_COUNT roots: a retake holds at most 30 questions.
 function parseExamVariantsPrompt(prompt: string): FakeFailedRoot[] {
-  const marker = prompt.indexOf("\nText:\n");
-  const head = marker === -1 ? prompt : prompt.slice(0, marker);
+  const { head } = splitAtPageText(prompt);
   const roots: FakeFailedRoot[] = [];
   for (const line of head.split("\n")) {
     const root = /^Root (\S+) \[(.*)\]$/.exec(line);
@@ -390,15 +427,15 @@ function examVariantsFrom(prompt: string) {
   return { variants };
 }
 
-// Exam feedback (session_feedback/v2, first line "Technique: exam"): one
+// Exam feedback (session_feedback/v4, first line "Technique: exam"): one
 // item to reinforce per failed question's concept, read only from the
-// "Failed questions:" block that precedes the page text. Any other
-// feedback prompt (flashcards v1) gets the generic minimal object.
+// <failed_questions> block that precedes the page text. Any other
+// feedback prompt (flashcards v3) gets the generic minimal object.
 function examFeedbackFrom(prompt: string) {
   const lines = prompt.split("\n");
   if (lines[0] !== "Technique: exam") return null;
-  const start = lines.indexOf("Failed questions:");
-  const end = lines.indexOf("Text:");
+  const start = lines.indexOf("<failed_questions>");
+  const end = lines.indexOf("</failed_questions>");
   const concepts =
     start === -1 || end === -1
       ? []
@@ -441,13 +478,7 @@ const MINIMAL_OBJECTS: readonly unknown[] = [
       },
     ],
   },
-  {
-    score: 3,
-    presentConcepts: ["concepto"],
-    missingConcepts: [],
-    misconceptions: [],
-    justification: "Evaluación de ejemplo",
-  },
+  { evaluations: [{ questionId: "q1", ...MINIMAL_EVALUATION }] },
   {
     summary: "Resumen de ejemplo",
     strengths: ["Constancia"],
@@ -467,9 +498,6 @@ export function createFakeLiveProvider(): AiProvider {
       // The port carries no purpose, but each purpose passes its own output
       // schema: only the matching prompt-aware answer is built.
       const schema: unknown = request.schema;
-      if (schema === recallEvaluationOutput && shouldFail(request.prompt)) {
-        throw new Error("fake provider failure");
-      }
       const candidates =
         schema === flashcardsOutput
           ? [flashcardsFrom(request.prompt)]
@@ -477,8 +505,8 @@ export function createFakeLiveProvider(): AiProvider {
             ? [examQuestionsFrom(request.prompt)]
             : schema === recallQuestionsOutput
               ? [recallQuestionsFrom(request.prompt)]
-              : schema === recallEvaluationOutput
-                ? [recallEvaluationFrom(request.prompt), ...MINIMAL_OBJECTS]
+              : schema === recallEvaluationsOutput
+                ? [recallEvaluationsFrom(request.prompt), ...MINIMAL_OBJECTS]
                 : schema === examVariantsOutput
                   ? [examVariantsFrom(request.prompt), ...MINIMAL_OBJECTS]
                   : schema === sessionFeedbackOutput

@@ -23,6 +23,7 @@ runExamRepositoriesContract({
       pageOwners.set(id, OWNER);
       return id;
     },
+    otherOwnerPageFor: async (pageId) => pageId,
     newGenerationId: async () => randomUUID(),
   }),
 });

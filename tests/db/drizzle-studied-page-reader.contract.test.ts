@@ -50,6 +50,7 @@ if (process.env.DATABASE_URL) {
         ownerId: owner.id,
         otherOwnerId: otherOwner.id,
         reader: new DrizzleStudiedPageReader(db),
+        storesMixedOwnerPages: false,
         newPageId: async (ownerId) => {
           const id = randomUUID();
           await db.insert(pages).values({

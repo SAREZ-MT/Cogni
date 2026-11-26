@@ -55,7 +55,7 @@ describe("renamePage use case", () => {
     );
 
     expect(result.ok).toBe(false);
-    const stored = await deps.pages.findById(page.id);
+    const stored = await deps.pages.findById(page.id, OWNER_ID);
     expect(stored?.title).toBe(page.title);
   });
 
@@ -70,7 +70,7 @@ describe("renamePage use case", () => {
     );
 
     expect(result.ok).toBe(false);
-    const stored = await deps.pages.findById(page.id);
+    const stored = await deps.pages.findById(page.id, OWNER_ID);
     expect(stored?.title).toBe(page.title);
   });
 });

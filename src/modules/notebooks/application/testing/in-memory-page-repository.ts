@@ -12,8 +12,9 @@ import type {
 export class InMemoryPageRepository implements PageRepository {
   private readonly rows = new Map<string, Page>();
 
-  async findById(id: string): Promise<Page | null> {
-    return this.rows.get(id) ?? null;
+  async findById(id: string, ownerId: string): Promise<Page | null> {
+    const page = this.rows.get(id);
+    return page?.ownerId === ownerId ? page : null;
   }
 
   async nextPosition(notebookId: string): Promise<number> {
@@ -31,6 +32,7 @@ export class InMemoryPageRepository implements PageRepository {
   }
 
   async update(page: Page): Promise<void> {
+    if (this.rows.get(page.id)?.ownerId !== page.ownerId) return;
     this.rows.set(page.id, page);
   }
 

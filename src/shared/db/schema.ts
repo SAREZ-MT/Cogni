@@ -77,7 +77,11 @@ export const notebooks = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (table) => [index("notebooks_owner_id_idx").on(table.ownerId)],
+  (table) => [
+    index("notebooks_owner_id_idx").on(table.ownerId),
+    // Target of pages_notebook_owner_fk.
+    unique("notebooks_id_owner_key").on(table.id, table.ownerId),
+  ],
 ).enableRLS();
 
 export type NotebookRow = typeof notebooks.$inferSelect;
@@ -93,9 +97,7 @@ export const pages = pgTable(
     ownerId: uuid("owner_id")
       .notNull()
       .references(() => profiles.id, { onDelete: "cascade" }),
-    notebookId: uuid("notebook_id")
-      .notNull()
-      .references(() => notebooks.id, { onDelete: "cascade" }),
+    notebookId: uuid("notebook_id").notNull(),
     title: text("title").notNull(),
     content: jsonb("content").notNull(),
     plainText: text("plain_text").notNull().default(""),
@@ -109,7 +111,19 @@ export const pages = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (table) => [index("pages_notebook_id_idx").on(table.notebookId)],
+  (table) => [
+    index("pages_notebook_id_idx").on(table.notebookId),
+    // Target of every <table>_page_owner_fk below (0016): a row that hangs
+    // from a page must carry the page's owner, so the database itself
+    // refuses a row that points at another owner's page.
+    unique("pages_id_owner_key").on(table.id, table.ownerId),
+    // A page belongs to a notebook of the same owner.
+    foreignKey({
+      name: "pages_notebook_owner_fk",
+      columns: [table.notebookId, table.ownerId],
+      foreignColumns: [notebooks.id, notebooks.ownerId],
+    }).onDelete("cascade"),
+  ],
 ).enableRLS();
 
 export type PageRow = typeof pages.$inferSelect;
@@ -123,9 +137,7 @@ export const pageAssets = pgTable(
     ownerId: uuid("owner_id")
       .notNull()
       .references(() => profiles.id, { onDelete: "cascade" }),
-    pageId: uuid("page_id")
-      .notNull()
-      .references(() => pages.id, { onDelete: "cascade" }),
+    pageId: uuid("page_id").notNull(),
     storagePath: text("storage_path").notNull(),
     mime: text("mime").notNull(),
     sizeBytes: integer("size_bytes").notNull(),
@@ -138,6 +150,11 @@ export const pageAssets = pgTable(
   },
   (table) => [
     index("page_assets_page_id_idx").on(table.pageId),
+    foreignKey({
+      name: "page_assets_page_owner_fk",
+      columns: [table.pageId, table.ownerId],
+      foreignColumns: [pages.id, pages.ownerId],
+    }).onDelete("cascade"),
     unique("page_assets_storage_path_key").on(table.storagePath),
   ],
 ).enableRLS();
@@ -180,9 +197,7 @@ export const importJobs = pgTable(
     ownerId: uuid("owner_id")
       .notNull()
       .references(() => profiles.id, { onDelete: "cascade" }),
-    pageId: uuid("page_id")
-      .notNull()
-      .references(() => pages.id, { onDelete: "cascade" }),
+    pageId: uuid("page_id").notNull(),
     storagePath: text("storage_path").notNull(),
     fileName: text("file_name").notNull(),
     sizeBytes: integer("size_bytes").notNull(),
@@ -211,6 +226,11 @@ export const importJobs = pgTable(
   },
   (table) => [
     index("import_jobs_page_id_idx").on(table.pageId),
+    foreignKey({
+      name: "import_jobs_page_owner_fk",
+      columns: [table.pageId, table.ownerId],
+      foreignColumns: [pages.id, pages.ownerId],
+    }).onDelete("cascade"),
     // Serves the sidebar query for active imports of one owner.
     index("import_jobs_owner_status_idx").on(table.ownerId, table.status),
     unique("import_jobs_storage_path_key").on(table.storagePath),
@@ -252,6 +272,9 @@ export type AiGenerationPurposeValue = (typeof AI_GENERATION_PURPOSES)[number];
 
 // One audited model call (documento-maestro §6.1). page_id is nullable and
 // SET NULL on page delete so the audit trail and quota history survive.
+// It keeps its single-column key on purpose (0016): a composite
+// (page_id, owner_id) key with SET NULL would also null owner_id, which is
+// NOT NULL, and Drizzle cannot express SET NULL on page_id alone.
 // RLS on with no policies, like every table here: only the server connection
 // reaches it.
 export const aiGenerations = pgTable(
@@ -308,9 +331,7 @@ export const flashcards = pgTable(
     ownerId: uuid("owner_id")
       .notNull()
       .references(() => profiles.id, { onDelete: "cascade" }),
-    pageId: uuid("page_id")
-      .notNull()
-      .references(() => pages.id, { onDelete: "cascade" }),
+    pageId: uuid("page_id").notNull(),
     generationId: uuid("generation_id").references(() => aiGenerations.id, {
       onDelete: "set null",
     }),
@@ -331,6 +352,11 @@ export const flashcards = pgTable(
   (table) => [
     index("flashcards_page_position_idx").on(table.pageId, table.position),
     index("flashcards_owner_id_idx").on(table.ownerId),
+    foreignKey({
+      name: "flashcards_page_owner_fk",
+      columns: [table.pageId, table.ownerId],
+      foreignColumns: [pages.id, pages.ownerId],
+    }).onDelete("cascade"),
     check("flashcards_origin_check", sql`${table.origin} in ('ai', 'manual')`),
     check("flashcards_front_not_blank", sql`length(btrim(${table.front})) > 0`),
     check("flashcards_back_not_blank", sql`length(btrim(${table.back})) > 0`),
@@ -377,9 +403,7 @@ export const studyItems = pgTable(
     ownerId: uuid("owner_id")
       .notNull()
       .references(() => profiles.id, { onDelete: "cascade" }),
-    pageId: uuid("page_id")
-      .notNull()
-      .references(() => pages.id, { onDelete: "cascade" }),
+    pageId: uuid("page_id").notNull(),
     kind: text("kind").notNull().$type<StudyItemKindValue>(),
     sourceId: uuid("source_id").notNull(),
     easiness: doublePrecision("easiness").notNull().default(2.5),
@@ -401,6 +425,11 @@ export const studyItems = pgTable(
     // Serves "due today" (listDue) for one owner.
     index("study_items_owner_due_idx").on(table.ownerId, table.dueAt),
     index("study_items_page_id_idx").on(table.pageId),
+    foreignKey({
+      name: "study_items_page_owner_fk",
+      columns: [table.pageId, table.ownerId],
+      foreignColumns: [pages.id, pages.ownerId],
+    }).onDelete("cascade"),
     unique("study_items_kind_source_key").on(table.kind, table.sourceId),
     check(
       "study_items_kind_check",
@@ -466,9 +495,7 @@ export const pageMastery = pgTable(
     ownerId: uuid("owner_id")
       .notNull()
       .references(() => profiles.id, { onDelete: "cascade" }),
-    pageId: uuid("page_id")
-      .notNull()
-      .references(() => pages.id, { onDelete: "cascade" }),
+    pageId: uuid("page_id").notNull(),
     level: text("level").notNull().$type<MasteryLevelValue>(),
     score: doublePrecision("score").notNull(),
     itemsTotal: integer("items_total").notNull(),
@@ -484,6 +511,11 @@ export const pageMastery = pgTable(
   (table) => [
     unique("page_mastery_page_id_key").on(table.pageId),
     index("page_mastery_owner_id_idx").on(table.ownerId),
+    foreignKey({
+      name: "page_mastery_page_owner_fk",
+      columns: [table.pageId, table.ownerId],
+      foreignColumns: [pages.id, pages.ownerId],
+    }).onDelete("cascade"),
     check(
       "page_mastery_level_check",
       sql`${table.level} in ('Nuevo', 'Aprendiendo', 'Consolidando', 'Dominado')`,
@@ -506,9 +538,7 @@ export const flashcardSessions = pgTable(
     ownerId: uuid("owner_id")
       .notNull()
       .references(() => profiles.id, { onDelete: "cascade" }),
-    pageId: uuid("page_id").references(() => pages.id, {
-      onDelete: "cascade",
-    }),
+    pageId: uuid("page_id"),
     startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
     finishedAt: timestamp("finished_at", { withTimezone: true }),
     reviewedCount: integer("reviewed_count").notNull().default(0),
@@ -526,6 +556,12 @@ export const flashcardSessions = pgTable(
       table.startedAt,
     ),
     index("flashcard_sessions_page_id_idx").on(table.pageId),
+    // MATCH SIMPLE: a "Hoy" session (page_id null) is not checked.
+    foreignKey({
+      name: "flashcard_sessions_page_owner_fk",
+      columns: [table.pageId, table.ownerId],
+      foreignColumns: [pages.id, pages.ownerId],
+    }).onDelete("cascade"),
   ],
 ).enableRLS();
 
@@ -599,9 +635,7 @@ export const examQuestions = pgTable(
     ownerId: uuid("owner_id")
       .notNull()
       .references(() => profiles.id, { onDelete: "cascade" }),
-    pageId: uuid("page_id")
-      .notNull()
-      .references(() => pages.id, { onDelete: "cascade" }),
+    pageId: uuid("page_id").notNull(),
     stem: text("stem").notNull(),
     options: jsonb("options").notNull().$type<string[]>(),
     correctIndex: integer("correct_index").notNull(),
@@ -628,6 +662,11 @@ export const examQuestions = pgTable(
       .where(sql`${table.retiredAt} is null`),
     index("exam_questions_root_id_idx").on(table.rootId),
     index("exam_questions_owner_id_idx").on(table.ownerId),
+    foreignKey({
+      name: "exam_questions_page_owner_fk",
+      columns: [table.pageId, table.ownerId],
+      foreignColumns: [pages.id, pages.ownerId],
+    }).onDelete("cascade"),
     // Targets of the composite lineage keys below and of exam_answers.
     unique("exam_questions_id_owner_page_key").on(
       table.id,
@@ -686,9 +725,7 @@ export const examSessions = pgTable(
     ownerId: uuid("owner_id")
       .notNull()
       .references(() => profiles.id, { onDelete: "cascade" }),
-    pageId: uuid("page_id")
-      .notNull()
-      .references(() => pages.id, { onDelete: "cascade" }),
+    pageId: uuid("page_id").notNull(),
     requestedCount: integer("requested_count").notNull(),
     isRetake: boolean("is_retake").notNull().default(false),
     retakeOfSessionId: uuid("retake_of_session_id").references(
@@ -715,6 +752,11 @@ export const examSessions = pgTable(
     // Serves listFinishedByPage (feedback history) and the hub.
     index("exam_sessions_page_finished_idx").on(table.pageId, table.finishedAt),
     index("exam_sessions_owner_started_idx").on(table.ownerId, table.startedAt),
+    foreignKey({
+      name: "exam_sessions_page_owner_fk",
+      columns: [table.pageId, table.ownerId],
+      foreignColumns: [pages.id, pages.ownerId],
+    }).onDelete("cascade"),
     check(
       "exam_sessions_requested_count_range",
       sql`${table.requestedCount} between 10 and 30`,
@@ -791,9 +833,7 @@ export type ExamAnswerRow = typeof examAnswers.$inferSelect;
 export const examPageState = pgTable(
   "exam_page_state",
   {
-    pageId: uuid("page_id")
-      .primaryKey()
-      .references(() => pages.id, { onDelete: "cascade" }),
+    pageId: uuid("page_id").primaryKey(),
     ownerId: uuid("owner_id")
       .notNull()
       .references(() => profiles.id, { onDelete: "cascade" }),
@@ -815,6 +855,11 @@ export const examPageState = pgTable(
   },
   (table) => [
     index("exam_page_state_owner_id_idx").on(table.ownerId),
+    foreignKey({
+      name: "exam_page_state_page_owner_fk",
+      columns: [table.pageId, table.ownerId],
+      foreignColumns: [pages.id, pages.ownerId],
+    }).onDelete("cascade"),
     check(
       "exam_page_state_failed_root_ids_array",
       sql`jsonb_typeof(${table.failedRootIds}) = 'array'`,
@@ -859,9 +904,7 @@ export const recallQuestions = pgTable(
     ownerId: uuid("owner_id")
       .notNull()
       .references(() => profiles.id, { onDelete: "cascade" }),
-    pageId: uuid("page_id")
-      .notNull()
-      .references(() => pages.id, { onDelete: "cascade" }),
+    pageId: uuid("page_id").notNull(),
     prompt: text("prompt").notNull(),
     rubric: jsonb("rubric").notNull().$type<{
       keyConcepts: string[];
@@ -885,6 +928,11 @@ export const recallQuestions = pgTable(
       .on(table.pageId, table.createdAt)
       .where(sql`${table.archivedAt} is null`),
     index("recall_questions_owner_id_idx").on(table.ownerId),
+    foreignKey({
+      name: "recall_questions_page_owner_fk",
+      columns: [table.pageId, table.ownerId],
+      foreignColumns: [pages.id, pages.ownerId],
+    }).onDelete("cascade"),
     // Target of recall_answers_question_owner_fk.
     unique("recall_questions_id_owner_key").on(table.id, table.ownerId),
     check(
@@ -921,9 +969,7 @@ export const recallSessions = pgTable(
     ownerId: uuid("owner_id")
       .notNull()
       .references(() => profiles.id, { onDelete: "cascade" }),
-    pageId: uuid("page_id")
-      .notNull()
-      .references(() => pages.id, { onDelete: "cascade" }),
+    pageId: uuid("page_id").notNull(),
     startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
     finishedAt: timestamp("finished_at", { withTimezone: true }),
     evaluationStatus: text("evaluation_status")
@@ -949,6 +995,11 @@ export const recallSessions = pgTable(
     ),
     // Target of recall_answers_session_owner_fk.
     unique("recall_sessions_id_owner_key").on(table.id, table.ownerId),
+    foreignKey({
+      name: "recall_sessions_page_owner_fk",
+      columns: [table.pageId, table.ownerId],
+      foreignColumns: [pages.id, pages.ownerId],
+    }).onDelete("cascade"),
     check(
       "recall_sessions_evaluation_status_check",
       sql`${table.evaluationStatus} in ('pending', 'done', 'partial')
@@ -1070,9 +1121,7 @@ export const generationFingerprints = pgTable(
     ownerId: uuid("owner_id")
       .notNull()
       .references(() => profiles.id, { onDelete: "cascade" }),
-    pageId: uuid("page_id")
-      .notNull()
-      .references(() => pages.id, { onDelete: "cascade" }),
+    pageId: uuid("page_id").notNull(),
     technique: text("technique").notNull().$type<GenerationTechniqueValue>(),
     fingerprint: text("fingerprint").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -1092,6 +1141,11 @@ export const generationFingerprints = pgTable(
       ],
     }),
     index("generation_fingerprints_owner_id_idx").on(table.ownerId),
+    foreignKey({
+      name: "generation_fingerprints_page_owner_fk",
+      columns: [table.pageId, table.ownerId],
+      foreignColumns: [pages.id, pages.ownerId],
+    }).onDelete("cascade"),
     check(
       "generation_fingerprints_technique_check",
       sql`${table.technique} in ('flashcards', 'exam', 'recall')`,

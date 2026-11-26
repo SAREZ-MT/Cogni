@@ -6,7 +6,6 @@
 // read with the system clock and never accepts a clock from its input.
 import * as Sentry from "@sentry/nextjs";
 import { unstable_rethrow } from "next/navigation";
-import { getCurrentUser } from "@/modules/identity";
 import { getDb } from "@/shared/db/client";
 import { type Clock, createFixedClock } from "@/shared/kernel/clock";
 import {
@@ -26,6 +25,7 @@ import {
 } from "./domain/calendar";
 import { SCHEDULING_ERROR } from "./domain/errors";
 import { DrizzleDueInRangeReader } from "./infrastructure";
+import { requireOwnerId } from "./owner-access";
 
 export interface CalendarRangeInput {
   fromDay: string;
@@ -69,15 +69,8 @@ export async function readCalendarDays(
   clock: Clock,
 ): Promise<Result<CalendarDayPage[], ActionError>> {
   try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return err(
-        actionError(
-          SCHEDULING_ERROR.SESSION_REQUIRED,
-          "Debes iniciar sesión para continuar.",
-        ),
-      );
-    }
+    const owner = await requireOwnerId();
+    if (!owner.ok) return owner;
     const range = {
       fromDay: input.fromDay,
       toDay: input.toDay,
@@ -89,7 +82,7 @@ export async function readCalendarDays(
       );
     }
     const days = await listCalendarDays(
-      { ownerId: user.id, ...range },
+      { ownerId: owner.value, ...range },
       { reader: new DrizzleDueInRangeReader(getDb()), clock },
     );
     return ok(days);

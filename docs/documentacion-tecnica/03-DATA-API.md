@@ -1,8 +1,8 @@
 # Modelo de datos y contrato de API — Cogni
 
 **Proyecto:** Cogni — plataforma web de estudio a partir de apuntes propios
-**Versión:** 1.3
-**Fecha:** 2026-10-29
+**Versión:** 1.4
+**Fecha:** 2026-11-25
 **Estado:** Borrador
 **Autor:** Javier Sarez
 **Documentos relacionados:** ./01-SRS.md, ./02-SAD.md, ./04-ADR.md
@@ -21,6 +21,7 @@
   - Fase 7 (Calendario y dashboard, PR #95–#100): sin tablas ni migraciones nuevas; `scheduling` y `analytics` solo leen tablas existentes y `profiles.timezone` pasa a usarse; decisiones en `docs/adr/0008-calendario-y-dashboard.md`.
 - El esquema real tiene 20 tablas, una por entidad del modelo de dominio (documento-maestro §6.1), creadas por 14 migraciones (`0000_profiles` a `0013_generation_fingerprints`). Todas se documentan en este documento contra su migración y `src/shared/db/schema.ts` (§1 y §2).
 - Fase 8 (Diseño y flujos), revisión del 2026-10-29 contra el código, sin cambio de esquema ni migraciones: la creación de tarjetas y preguntas nace solo con IA (H13) y exige 100 palabras de contenido nuevo, unas 15 por ítem (150 para recordación activa y para el examen más pequeño; `AI_PAGE_TOO_SHORT`, H14); cada técnica tiene una página de edición con un solo "Guardar" transaccional (H18); "Archivar" se reemplazó por un borrado real con recuento previo (H19). Las acciones de creación manual, archivado y retiro (`createFlashcardAction`, `archiveFlashcardAction`, `createExamQuestionAction`, `editExamQuestionAction`, `retireExamQuestionAction`, `archiveNotebook`, `archivePage`) ya no existen; §4 lista sus reemplazos.
+- Endurecimiento de seguridad (rama `feat/security-hardening`, revisión del 2026-11-25 contra el código, `docs/adr/0010`): migración `0016_owner_scoped_page_keys` (claves únicas `(id, owner_id)` en `notebooks` y `pages` y claves foráneas compuestas por propietario, §2.4.6 y §2.6); los puertos de `notebooks` reciben el propietario en `findById` y `findByStoragePath` (§4.2); comprobación de acceso común de las Server Actions con los códigos `IDENTITY_TERMS_REQUIRED` e `IDENTITY_PROFILE_UNAVAILABLE` (§4); límites de IA nuevos y presupuestos de toda la aplicación con `AI_DAILY_BUDGET_EXHAUSTED` ("Límites de tasa"). Al 2026-11-25 la migración `0016` está aplicada a `cogni-dev`; en producción la aplica el build al desplegar.
 - El contrato de API (§4) cubre las Server Actions de los 18 archivos `"use server"` y los 3 Route Handlers que existen hoy en el código; no documenta ningún punto de entrada inexistente.
 - Referencias a decisiones: "`04-ADR.md`, ADR-0NN" designa una entrada del registro de decisiones de esta suite (`./04-ADR.md`); "`docs/adr/00NN`" designa un ADR numerado del repositorio. Son dos numeraciones distintas.
 
@@ -89,7 +90,7 @@ Se relaciona con `auth.users` de Supabase: comparte el mismo `id` y depende de �
 | created_at | timestamptz |
 | updated_at | timestamptz |
 
-Se relaciona con Profile: pertenece a uno (`owner_id`, `ON DELETE CASCADE`). Se relaciona con Page: un Notebook tiene muchas Page (`notebook_id`, `ON DELETE CASCADE`); desde la Fase 8 (H19) borrar un Notebook borra sus páginas, incluidas las archivadas antes. Antes de H19, archivar un Notebook propagaba `archived_at` a sus páginas activas en la capa de aplicación.
+Se relaciona con Profile: pertenece a uno (`owner_id`, `ON DELETE CASCADE`). Se relaciona con Page: un Notebook tiene muchas Page (`notebook_id`, `ON DELETE CASCADE`; desde la migración `0016`, por la clave compuesta `(notebook_id, owner_id)` sobre la clave única `notebooks_id_owner_key (id, owner_id)`); desde la Fase 8 (H19) borrar un Notebook borra sus páginas, incluidas las archivadas antes. Antes de H19, archivar un Notebook propagaba `archived_at` a sus páginas activas en la capa de aplicación.
 
 #### Page — Estado: Implementado (Fase 1)
 
@@ -107,7 +108,7 @@ Se relaciona con Profile: pertenece a uno (`owner_id`, `ON DELETE CASCADE`). Se 
 | created_at | timestamptz |
 | updated_at | timestamptz |
 
-Se relaciona con Notebook: pertenece a uno (`notebook_id`, `ON DELETE CASCADE`). Se relaciona con Profile: pertenece a uno (`owner_id`, `ON DELETE CASCADE`). Es la unidad de estudio: PageAsset, ImportJob, Flashcard, StudyItem, PageMastery, FlashcardSession, ExamQuestion, ExamPageState, ExamSession, RecallQuestion, RecallSession y GenerationFingerprint dependen de ella y se eliminan en cascada; AiGeneration conserva su registro con `page_id` nulo (§2.6).
+Se relaciona con Notebook: pertenece a uno (`notebook_id`, `ON DELETE CASCADE`). Se relaciona con Profile: pertenece a uno (`owner_id`, `ON DELETE CASCADE`). Desde la migración `0016` la clave hacia Notebook es compuesta, `(notebook_id, owner_id)` → `notebooks(id, owner_id)`, de modo que una página lleva siempre el propietario de su cuaderno, y `pages` tiene la clave única `pages_id_owner_key (id, owner_id)`, a la que apuntan las tablas que cuelgan de una página (§2.4.6). Es la unidad de estudio: PageAsset, ImportJob, Flashcard, StudyItem, PageMastery, FlashcardSession, ExamQuestion, ExamPageState, ExamSession, RecallQuestion, RecallSession y GenerationFingerprint dependen de ella y se eliminan en cascada; AiGeneration conserva su registro con `page_id` nulo (§2.6).
 
 #### PageAsset — Estado: Implementado (Fase 1)
 
@@ -1103,6 +1104,29 @@ CREATE INDEX "generation_fingerprints_owner_id_idx" ON "generation_fingerprints"
 
 `drizzle/0013_generation_fingerprints.down.sql` revierte la migración. Cada módulo de técnica tiene su adaptador Drizzle ligado a su técnica (`flashcards`, `exam`, `recall`); los módulos solo se encuentran a través de su `index.ts`.
 
+#### 2.4.6 Claves compuestas por propietario — migración `0016` (endurecimiento de seguridad)
+
+`drizzle/0016_owner_scoped_page_keys.sql` (`docs/adr/0010`) lleva el aislamiento entre estudiantes a la propia base de datos: una página lleva el propietario de su cuaderno y toda fila que cuelga de una página lleva el propietario de esa página. No crea tablas ni columnas. Los bloques SQL de las secciones anteriores muestran cada migración tal como se escribió; las claves de una sola columna hacia `pages(id)` y `notebooks(id)` que aparecen allí quedan reemplazadas por las siguientes.
+
+```sql
+ALTER TABLE "notebooks" ADD CONSTRAINT "notebooks_id_owner_key" UNIQUE("id","owner_id");
+ALTER TABLE "pages" ADD CONSTRAINT "pages_id_owner_key" UNIQUE("id","owner_id");
+
+ALTER TABLE "pages" DROP CONSTRAINT "pages_notebook_id_notebooks_id_fk";
+ALTER TABLE "pages" ADD CONSTRAINT "pages_notebook_owner_fk" FOREIGN KEY ("notebook_id","owner_id") REFERENCES "public"."notebooks"("id","owner_id") ON DELETE cascade ON UPDATE no action;
+
+-- El mismo par de sentencias para cada tabla que cuelga de una página (ejemplo: page_assets)
+ALTER TABLE "page_assets" DROP CONSTRAINT "page_assets_page_id_pages_id_fk";
+ALTER TABLE "page_assets" ADD CONSTRAINT "page_assets_page_owner_fk" FOREIGN KEY ("page_id","owner_id") REFERENCES "public"."pages"("id","owner_id") ON DELETE cascade ON UPDATE no action;
+```
+
+- Tablas con la clave `<tabla>_page_owner_fk` (`(page_id, owner_id)` → `pages(id, owner_id)`, `ON DELETE CASCADE`): `page_assets`, `import_jobs`, `flashcards`, `study_items`, `page_mastery`, `flashcard_sessions`, `exam_questions`, `exam_sessions`, `exam_page_state`, `recall_questions`, `recall_sessions` y `generation_fingerprints`.
+- `flashcard_sessions.page_id` admite nulo (sesión multipágina): una fila sin página no se comprueba.
+- `ai_generations.page_id` conserva su clave de una sola columna con `ON DELETE SET NULL`, para que el registro de auditoría sobreviva a la página.
+- Las dos claves únicas van primero en el archivo, reordenadas a mano, porque las claves foráneas compuestas las referencian.
+- La migración falla sin cambiar nada si alguna fila existente tiene un propietario distinto del de su página (o una página, del de su cuaderno).
+- `drizzle/0016_owner_scoped_page_keys.down.sql` la revierte. Pruebas: `tests/db/owner-scoped-keys.test.ts`.
+
 ### 2.5 Enumeraciones
 
 No existe ningún `pgEnum` de Drizzle en `src/shared/db/schema.ts`. Todo conjunto cerrado de valores se declara como `text` con un `$type<...>()` de TypeScript en el lado de la aplicación y se refuerza en la base de datos con una restricción `CHECK`, no con un tipo enumerado nativo de Postgres. El primero fue `import_jobs.status` (`CHECK import_jobs_status_check`):
@@ -1140,57 +1164,57 @@ Los demás conjuntos cerrados siguen el mismo patrón (`text` + `CHECK`):
 | `profiles` | `id` | `auth.users.id` | cascade |
 | `notebooks` | `owner_id` | `profiles.id` | cascade |
 | `pages` | `owner_id` | `profiles.id` | cascade |
-| `pages` | `notebook_id` | `notebooks.id` | cascade |
+| `pages` | `(notebook_id, owner_id)` | `notebooks(id, owner_id)` | cascade |
 | `page_assets` | `owner_id` | `profiles.id` | cascade |
-| `page_assets` | `page_id` | `pages.id` | cascade |
+| `page_assets` | `(page_id, owner_id)` | `pages(id, owner_id)` | cascade |
 | `import_jobs` | `owner_id` | `profiles.id` | cascade |
-| `import_jobs` | `page_id` | `pages.id` | cascade |
+| `import_jobs` | `(page_id, owner_id)` | `pages(id, owner_id)` | cascade |
 | `ai_generations` | `owner_id` | `profiles.id` | cascade |
 | `ai_generations` | `page_id` | `pages.id` | set null |
 | `flashcards` | `owner_id` | `profiles.id` | cascade |
-| `flashcards` | `page_id` | `pages.id` | cascade |
+| `flashcards` | `(page_id, owner_id)` | `pages(id, owner_id)` | cascade |
 | `flashcards` | `generation_id` | `ai_generations.id` | set null |
 | `study_items` | `owner_id` | `profiles.id` | cascade |
-| `study_items` | `page_id` | `pages.id` | cascade |
+| `study_items` | `(page_id, owner_id)` | `pages(id, owner_id)` | cascade |
 | `review_logs` | `owner_id` | `profiles.id` | cascade |
 | `review_logs` | `item_id` | `study_items.id` | cascade |
 | `page_mastery` | `owner_id` | `profiles.id` | cascade |
-| `page_mastery` | `page_id` | `pages.id` | cascade |
+| `page_mastery` | `(page_id, owner_id)` | `pages(id, owner_id)` | cascade |
 | `flashcard_sessions` | `owner_id` | `profiles.id` | cascade |
-| `flashcard_sessions` | `page_id` | `pages.id` | cascade |
+| `flashcard_sessions` | `(page_id, owner_id)` | `pages(id, owner_id)` | cascade |
 | `session_feedback` | `owner_id` | `profiles.id` | cascade |
 | `session_feedback` | `generation_id` | `ai_generations.id` | set null |
 | `exam_questions` | `owner_id` | `profiles.id` | cascade |
-| `exam_questions` | `page_id` | `pages.id` | cascade |
+| `exam_questions` | `(page_id, owner_id)` | `pages(id, owner_id)` | cascade |
 | `exam_questions` | `generation_id` | `ai_generations.id` | set null |
 | `exam_questions` | `(root_id, owner_id, page_id)` | `exam_questions(id, owner_id, page_id)` | no action |
 | `exam_questions` | `(variant_of, root_id)` | `exam_questions(id, root_id)` | no action |
-| `exam_page_state` | `page_id` | `pages.id` | cascade |
+| `exam_page_state` | `(page_id, owner_id)` | `pages(id, owner_id)` | cascade |
 | `exam_page_state` | `owner_id` | `profiles.id` | cascade |
 | `exam_page_state` | `last_passed_session_id` | `exam_sessions.id` | set null |
 | `exam_sessions` | `owner_id` | `profiles.id` | cascade |
-| `exam_sessions` | `page_id` | `pages.id` | cascade |
+| `exam_sessions` | `(page_id, owner_id)` | `pages(id, owner_id)` | cascade |
 | `exam_sessions` | `retake_of_session_id` | `exam_sessions.id` | set null |
 | `exam_answers` | `owner_id` | `profiles.id` | cascade |
 | `exam_answers` | `session_id` | `exam_sessions.id` | cascade |
 | `exam_answers` | `(question_id, root_id)` | `exam_questions(id, root_id)` | cascade |
 | `recall_questions` | `owner_id` | `profiles.id` | cascade |
-| `recall_questions` | `page_id` | `pages.id` | cascade |
+| `recall_questions` | `(page_id, owner_id)` | `pages(id, owner_id)` | cascade |
 | `recall_questions` | `generation_id` | `ai_generations.id` | set null |
 | `recall_sessions` | `owner_id` | `profiles.id` | cascade |
-| `recall_sessions` | `page_id` | `pages.id` | cascade |
+| `recall_sessions` | `(page_id, owner_id)` | `pages(id, owner_id)` | cascade |
 | `recall_answers` | `owner_id` | `profiles.id` | cascade |
 | `recall_answers` | `(session_id, owner_id)` | `recall_sessions(id, owner_id)` | cascade |
 | `recall_answers` | `(question_id, owner_id)` | `recall_questions(id, owner_id)` | cascade |
 | `recall_answers` | `generation_id` | `ai_generations.id` | set null |
 | `generation_fingerprints` | `owner_id` | `profiles.id` | cascade |
-| `generation_fingerprints` | `page_id` | `pages.id` | cascade |
+| `generation_fingerprints` | `(page_id, owner_id)` | `pages(id, owner_id)` | cascade |
 
-Todas las claves foráneas usan `ON UPDATE no action`. Eliminar un `Profile` elimina en cadena todos sus datos, y eliminar una `Page` elimina sus adjuntos, importaciones, tarjetas, ítems, dominio, sesiones, preguntas y huellas. Hay tres excepciones a `cascade`: `generation_id` (y `ai_generations.page_id`) queda nulo si se borra la generación o la página auditada; `exam_page_state.last_passed_session_id` y `exam_sessions.retake_of_session_id` quedan nulos si se borra la sesión referida; y las dos claves de linaje de `exam_questions` son `no action`, de modo que una raíz o una pregunta reemplazada no se puede borrar sola mientras existan sus variantes (el borrado de la página o del dueño las elimina juntas). Las referencias polimórficas (`study_items.source_id`, `review_logs.session_id`, `session_feedback.session_id`) no tienen FK física.
+Las claves compuestas `(page_id, owner_id)` y `(notebook_id, owner_id)` son de la migración `0016` (§2.4.6) y reemplazan a las de una sola columna de las migraciones anteriores; `ai_generations.page_id` es la única clave hacia `pages` que sigue siendo de una columna. Todas las claves foráneas usan `ON UPDATE no action`. Eliminar un `Profile` elimina en cadena todos sus datos, y eliminar una `Page` elimina sus adjuntos, importaciones, tarjetas, ítems, dominio, sesiones, preguntas y huellas. Hay tres excepciones a `cascade`: `generation_id` (y `ai_generations.page_id`) queda nulo si se borra la generación o la página auditada; `exam_page_state.last_passed_session_id` y `exam_sessions.retake_of_session_id` quedan nulos si se borra la sesión referida; y las dos claves de linaje de `exam_questions` son `no action`, de modo que una raíz o una pregunta reemplazada no se puede borrar sola mientras existan sus variantes (el borrado de la página o del dueño las elimina juntas). Las referencias polimórficas (`study_items.source_id`, `review_logs.session_id`, `session_feedback.session_id`) no tienen FK física.
 
 ### 2.7 Estrategia de migraciones
 
-Incremental-aditiva: cada cambio de esquema es un nuevo archivo `NNNN_nombre.sql` generado por `drizzle-kit generate` (nunca se edita una migración ya aplicada), registrado en `drizzle/meta/_journal.json` (15 entradas, de `0000_profiles` a `0014_document_formats`): `0000` crea `profiles`, `0001` activa su RLS, `0002` la ata a `auth.users`, `0003` crea `notebooks`, `pages` y `page_assets`, `0004` el bucket `page-assets`, `0005` `import_jobs`, `0006` el bucket `page-pdfs`, `0007` `ai_generations` y `flashcards`, `0008` las columnas de términos de `profiles`, `0009` las cinco tablas de `study-engine` y `flashcards.archived_at` (con relleno de ítems), `0010` las cuatro tablas de `exams`, `0011` `exam_sessions.question_ids`, `0012` las tres tablas de `active-recall`, `0013` `generation_fingerprints` y `0014` las columnas `format` y `skipped_images` de `import_jobs` junto con los tipos MIME de DOCX y PPTX del bucket `page-pdfs`. `drizzle-kit` no tiene comando `down`: 13 de las 15 migraciones (`0002` a `0014`) traen un `.down.sql` hermano con la reversión manual, pensado para aplicarse a mano con `psql` o el editor SQL de Supabase; las dos primeras (`0000` crea la tabla, `0001` activa RLS) no lo tienen. Las migraciones de Storage (`0004`, `0006`) son idempotentes por diseño (`on conflict (id) do update`; `0014` actualiza el mismo bucket con un `update` que también puede repetirse), para que la misma migración sea la fuente de verdad de los límites del bucket tanto en `cogni-dev` como en `cogni-prod`; las de tablas son SQL generado, salvo los bloques escritos a mano de `0002` (guarda y limpieza de huérfanos), `0009` (relleno de `study_items`) y el comentario de `0011`.
+Incremental-aditiva: cada cambio de esquema es un nuevo archivo `NNNN_nombre.sql` generado por `drizzle-kit generate` (nunca se edita una migración ya aplicada), registrado en `drizzle/meta/_journal.json` (17 entradas, de `0000_profiles` a `0016_owner_scoped_page_keys`): `0000` crea `profiles`, `0001` activa su RLS, `0002` la ata a `auth.users`, `0003` crea `notebooks`, `pages` y `page_assets`, `0004` el bucket `page-assets`, `0005` `import_jobs`, `0006` el bucket `page-pdfs`, `0007` `ai_generations` y `flashcards`, `0008` las columnas de términos de `profiles`, `0009` las cinco tablas de `study-engine` y `flashcards.archived_at` (con relleno de ítems), `0010` las cuatro tablas de `exams`, `0011` `exam_sessions.question_ids`, `0012` las tres tablas de `active-recall`, `0013` `generation_fingerprints` `0014` las columnas `format` y `skipped_images` de `import_jobs` junto con los tipos MIME de DOCX y PPTX del bucket `page-pdfs`, `0015` la columna `profiles.terms_accepted_method` y `0016` las claves únicas `(id, owner_id)` de `notebooks` y `pages` y las claves foráneas compuestas por propietario (§2.4.6). `drizzle-kit` no tiene comando `down`: 15 de las 17 migraciones (`0002` a `0016`) traen un `.down.sql` hermano con la reversión manual, pensado para aplicarse a mano con `psql` o el editor SQL de Supabase; las dos primeras (`0000` crea la tabla, `0001` activa RLS) no lo tienen. Las migraciones de Storage (`0004`, `0006`) son idempotentes por diseño (`on conflict (id) do update`; `0014` actualiza el mismo bucket con un `update` que también puede repetirse), para que la misma migración sea la fuente de verdad de los límites del bucket tanto en `cogni-dev` como en `cogni-prod`; las de tablas son SQL generado, salvo los bloques escritos a mano de `0002` (guarda y limpieza de huérfanos), `0009` (relleno de `study_items`), el comentario de `0011` y el reordenamiento de `0016` (las claves únicas antes de las claves foráneas que las referencian).
 
 Las migraciones se aplican exclusivamente durante la construcción de producción en Vercel, nunca en previsualizaciones (`package.json`: `"build": "node scripts/migrate-in-build.mjs && next build"`). `scripts/migrate-in-build.mjs` expone el predicado puro `shouldRunMigrations(env)`, verdadero solo si `env.VERCEL_ENV === "production"` o `env.RUN_DB_MIGRATIONS === "1"` (esta última, una escotilla para migrar manualmente contra `cogni-dev` sin desplegar). Cuando el predicado es verdadero ejecuta `pnpm exec drizzle-kit migrate`; en cualquier otro caso lo omite con un mensaje en consola. `drizzle.config.ts` fija `dialect: "postgresql"`, `schema: "./src/shared/db/schema.ts"` y `out: "./drizzle"`.
 
@@ -1272,6 +1296,16 @@ Al terminar una `ExamSession` (solo con todas sus preguntas respondidas; `EXAMS_
 
 ## 4. Contrato de API
 
+Comprobación de acceso común (`docs/adr/0010`). Una Server Action es un punto de entrada público, alcanzable sin pasar por el layout autenticado. Por eso las Server Actions y lecturas de servidor de `notebooks`, `ingestion`, `flashcards`, `exams`, `active-recall`, `scheduling` y `analytics` empiezan por `requireOwner()` (`src/modules/identity/index.ts`), que exige sesión y la versión vigente de los términos aceptada, y falla cerrado. Donde las tablas de esta sección dicen "Requiere sesión" para esos módulos, se entiende además esta comprobación. Las acciones de `identity` (§4.1) no la usan: las de zona horaria comprueban solo la sesión.
+
+| Situación | Código | Mensaje | Comportamiento |
+|---|---|---|---|
+| Sin sesión | El `*_SESSION_REQUIRED` de cada módulo (sin cambio) | El de cada módulo | Como antes de `docs/adr/0010`. |
+| Sesión sin los términos vigentes aceptados | `IDENTITY_TERMS_REQUIRED` | "Debes aceptar los términos vigentes para continuar." | No se escribe nada ni se llama a la IA. |
+| El perfil no se pudo leer, o no corresponde al usuario | `IDENTITY_PROFILE_UNAVAILABLE` | "No pudimos verificar tu cuenta. Inténtalo de nuevo." | Igual: acceso denegado. |
+
+Los dos códigos nuevos (`ACCESS_ERROR`, `src/modules/identity/domain/owner-access.ts`) se suman a los errores posibles de todas las acciones de esos módulos; las tablas siguientes no los repiten fila por fila. Las acciones que devuelven `Result` los entregan como `ActionError`; las acciones de `notebooks` que lanzan (`requireOwnerId()`) lanzan una excepción con el mensaje de ese error, sin el código. La interfaz no tiene todavía un texto propio para ellos.
+
 ### 4.1 `identity`
 
 Corresponden a CU-01 (Registro e inicio de sesión) y CU-02 (Recuperar contraseña), y a los requisitos RF-ID-01 a RF-ID-09 del componente `identity` (tabla de componentes, `02-SAD.md` §4.1). Todas las funciones siguientes son Server Actions (`"use server"`, `src/modules/identity/actions.ts`); ninguna declara `maxDuration`. Las acciones de formulario reciben `(_previous: AuthFormState, formData: FormData)` (firma de `useActionState`) y devuelven `AuthFormState { status, message }` o redirigen. La validación depende de la acción: `signUpAction` y `signInAction` validan `credentialsSchema` (`email` válido, `password` de al menos 8 caracteres); `requestPasswordResetAction` valida solo `email`; `updatePasswordAction` solo `password`; `signOutAction` y `signInWithGoogleAction` no reciben entrada. Los mensajes en español salen de `messageForCode` (`src/modules/identity/ui/auth-copy.ts`).
@@ -1282,13 +1316,13 @@ Corresponden a CU-01 (Registro e inicio de sesión) y CU-02 (Recuperar contrase�
 | `signInAction` | `_previous`, `formData` (`email`, `password`) | `AuthFormState` o redirección a `/` | No requiere sesión | `AUTH_INVALID_INPUT`, `AUTH_INVALID_CREDENTIALS`, `AUTH_EMAIL_NOT_VERIFIED`, `AUTH_PROVIDER_UNAVAILABLE` |
 | `signOutAction` | — | `{ status: "error"; message }` o redirección a `/login` | Requiere sesión | `AUTH_PROVIDER_UNAVAILABLE` |
 | `requestPasswordResetAction` | `_previous`, `formData` (`email`) | `AuthFormState` | No requiere sesión | `AUTH_INVALID_INPUT`, `AUTH_PROVIDER_UNAVAILABLE` |
-| `updatePasswordAction` | `_previous`, `formData` (`password`) | `AuthFormState` o redirección a `/` | Requiere sesión de recuperación | `AUTH_INVALID_INPUT`, `AUTH_PROVIDER_UNAVAILABLE` |
+| `updatePasswordAction` | `_previous`, `formData` (`password`) | `AuthFormState` o redirección a `/inicio` | Requiere sesión de recuperación reciente: el último paso de autenticación del token verificado (`amr`) debe ser `recovery` y tener como máximo una hora; una sesión iniciada con contraseña o con Google se rechaza | `AUTH_INVALID_INPUT`, `AUTH_RECOVERY_REQUIRED`, `AUTH_PROVIDER_UNAVAILABLE` |
 | `signInWithGoogleAction` | — | Redirección a Google OAuth o a `/login?error=google` | No requiere sesión | `AUTH_PROVIDER_UNAVAILABLE` (no se devuelve como valor; solo redirige) |
 | `acceptTermsAction` (puerta de términos) | `_previous`, `formData` (`accept` = `"on"` si se marcó la casilla, `next`) | `AuthFormState` o redirección a `next` (sanitizado con `safeNext`) | Requiere sesión (sin ella, redirección a `/login`) | `TERMS_NOT_ACCEPTED`, `PROFILE_NOT_FOUND`. Guarda `terms_accepted_version = TERMS_VERSION` y `terms_accepted_at`; registra `terms_accepted` de forma diferida (`after()`) |
 | `updateTimeZoneAction` (Fase 7) | `_previous: TimeZoneFormState`, `formData: FormData` (`timeZone`, nombre IANA) | `TimeZoneFormState { status, message?, timeZone? }` (zona canónica guardada) | Requiere sesión | `PROFILE_INVALID_TIME_ZONE` (texto propio); cualquier otro fallo, texto genérico. Nunca lanza |
 | `adoptBrowserTimeZoneAction` (Fase 7) | `timeZone: string` | `{ ok: true; adopted: boolean }` o `{ ok: false }` | Requiere sesión | Silenciosa: solo guarda mientras el perfil sigue en `UTC`; nunca lanza |
 
-`signUpAction` trata la respuesta `outcome === "already_registered"` de Supabase (correo ya existente) como un caso de éxito con mensaje de error de dominio (`AUTH_COPY.alreadyRegistered`), no como un `DomainError`; con un `userId`, registra `user_signed_up` de forma diferida. `signInAction` registra `user_signed_in` de forma diferida.
+`signUpAction` responde igual cuando Supabase indica `outcome === "already_registered"` (correo ya existente) que cuando el correo es nuevo: estado de éxito con `AUTH_COPY.verificationSent`, para no revelar qué correos tienen cuenta; solo con un `userId` (cuenta nueva) registra `user_signed_up` de forma diferida. `signInAction` registra `user_signed_in` de forma diferida.
 
 Marca del flujo de Google (`src/modules/identity/domain/auth-flow.ts`): `signInWithGoogleAction` pide la URL de OAuth con `redirectTo` exactamente igual a `${siteUrl()}/auth/callback` (Supabase lo compara con su lista de Redirect URLs) y, solo si la obtiene, fija la cookie `cogni_auth_flow=google` (`httpOnly`, `secure` en producción, `sameSite=lax`, `path=/auth/callback`, `maxAge` 600 s). `signUpAction` y `requestPasswordResetAction` borran una marca vieja de un intento de Google abandonado (misma ruta, `maxAge` 0), para que un enlace de correo fallido posterior no se informe como un inicio con Google cancelado. El uso de la marca se describe en Route Handlers (`/auth/callback`).
 
@@ -1338,6 +1372,21 @@ Ejemplo de retorno no trivial (`getHomeOverview`):
   ]
 }
 ```
+
+#### Puertos de repositorio de `notebooks` acotados por propietario (`docs/adr/0010`)
+
+La aplicación se conecta a Postgres con un rol que no pasa por Row Level Security, así que el filtro por `owner_id` de estas consultas es el aislamiento entre estudiantes. Firmas vigentes en `src/modules/notebooks/domain/`:
+
+| Puerto | Método | Firma | Comportamiento |
+|---|---|---|---|
+| `NotebookRepository` (`notebook-repository.ts`) | `findById` | `findById(id: string, ownerId: string): Promise<Notebook o null>` | Una fila de otro propietario se lee como inexistente. |
+| `NotebookRepository` | `update` | `update(notebook: Notebook): Promise<void>` | Firma sin cambio; no escribe nada si la fila no es del propietario de la entidad. |
+| `PageRepository` (`page-repository.ts`) | `findById` | `findById(id: string, ownerId: string): Promise<Page o null>` | Una fila de otro propietario se lee como inexistente. |
+| `PageRepository` | `update` | `update(page: Page): Promise<void>` | Firma sin cambio; no escribe nada si la fila no es del propietario de la entidad. |
+| `PageAssetRepository` (`page-asset-repository.ts`) | `findById` | `findById(id: string, ownerId: string): Promise<PageAsset o null>` | Un recurso de otro propietario se lee como inexistente. |
+| `PageAssetRepository` | `findByStoragePath` | `findByStoragePath(storagePath: string, ownerId: string): Promise<PageAsset o null>` | Igual. |
+
+Antes de `docs/adr/0010` estos métodos recibían solo `id` (o `storagePath`). Los adaptadores Drizzle y los dobles en memoria siguen las mismas firmas. `ImportJobRepository` (`ingestion`) no cambió.
 
 #### `notebooks/server-api.ts` (composición interna, sin `"use server"`)
 
@@ -1510,8 +1559,18 @@ Upstash Ratelimit con ventana fija de un día por usuario (`src/modules/ai/infra
 
 | Límite | Variable (por defecto) | Clave en Redis | Se consume | Al agotarse |
 |---|---|---|---|---|
-| Generaciones de IA | `AI_DAILY_GENERATIONS` (6) | `{REDIS_KEY_PREFIX}:ai:gen` | Una unidad por "Generar" de flashcards o exámenes (antes de llamar al modelo y después de descartar páginas vacías o sin contenido nuevo); recordación activa la consume solo tras guardar las preguntas; la repetición de un examen, solo cuando se creó con llamada a la IA. La retroalimentación de sesión de flashcards y exámenes solo consulta el límite (`peek`) y nunca lo consume | `AI_DAILY_LIMIT_REACHED` con `resetAt`; la retroalimentación queda `failed` |
-| Evaluaciones de recordación activa | `AI_DAILY_EVALUATIONS` (60) | `{REDIS_KEY_PREFIX}:ai:eval` | Una unidad por respuesta evaluada por el modelo, solo si queda `done` (Fase 6); las respuestas saltadas no consumen | La respuesta queda `failed` con `code: "AI_DAILY_LIMIT_REACHED"` y `resetAt`; "Reintentar" la evalúa tras la renovación |
+| Generaciones de IA | `AI_DAILY_GENERATIONS` (20; 6 hasta `docs/adr/0010`) | `{REDIS_KEY_PREFIX}:ai:gen` | Una unidad por llamada al modelo que genera: una por "Generar" de flashcards (antes de llamar al modelo y después de descartar páginas vacías o sin contenido nuevo); en exámenes, una por cada llamada en que se reparte la solicitud, todas o ninguna (`consumeGenerationUnits`); recordación activa la consume solo tras guardar las preguntas; la repetición de un examen, solo cuando se creó con llamada a la IA | `AI_DAILY_LIMIT_REACHED` con `resetAt` |
+| Retroalimentación de sesión | `AI_DAILY_FEEDBACKS` (20) | `{REDIS_KEY_PREFIX}:ai:feedback` | Una unidad (`check`) por cada retroalimentación de flashcards o de exámenes que se pide al modelo, antes de llamarlo (`docs/adr/0010`; antes solo se consultaba el límite de generaciones con `peek`) | La retroalimentación queda `failed` |
+| Evaluaciones de recordación activa | `AI_DAILY_EVALUATIONS` (10 sesiones; 60 respuestas hasta `docs/adr/0010`) | `{REDIS_KEY_PREFIX}:ai:eval` | Una unidad por sesión evaluada por el modelo (todas sus respuestas escritas van en una llamada): se consulta antes de la llamada y se consume solo si al menos una respuesta queda `done`; una sesión que ya pagó no vuelve a pagar al reintentar; las respuestas saltadas no consumen | Las respuestas quedan `failed` con `code: "AI_DAILY_LIMIT_REACHED"` y `resetAt`; "Reintentar" las evalúa tras la renovación |
+| Corridas de evaluación por sesión | Constante `AI_EVALUATION_RUNS_PER_SESSION` (3) | `{REDIS_KEY_PREFIX}:ai:evalrun` (clave por sesión, no por usuario) | Una unidad por corrida que llama al modelo, antes de la llamada y sea cual sea su resultado | Igual que el anterior, con la renovación de esta ventana |
+
+Presupuestos de toda la aplicación (`docs/adr/0010`; `src/modules/ai/infrastructure/upstash-budget-store.ts`): un contador por grupo y día UTC compartido por todos los usuarios, con TTL de 48 h. `generateStructured` cobra una unidad por intento, después de elegir el proveedor y antes de llamarlo (incrementa y luego compara). Con el presupuesto agotado, o si Redis no responde un contador numérico (falla cerrado), la llamada termina con `AI_DAILY_BUDGET_EXHAUSTED` sin llamar al modelo y sin registrar el intento en `ai_generations`. Las acciones lo reciben como cualquier otro error de la capa de IA y la interfaz muestra su mensaje genérico; una evaluación de recordación activa queda `failed` con ese código.
+
+| Grupo | Propósitos | Variable (por defecto) | Clave en Redis |
+|---|---|---|---|
+| `generation` | `generate_flashcards`, `generate_exam_questions`, `generate_exam_variants`, `generate_recall_questions` | `AI_GLOBAL_DAILY_GENERATIONS` (700) | `{REDIS_KEY_PREFIX}:ai:budget:generation:{yyyy-mm-dd}` |
+| `evaluation` | `evaluate_recall_answer` | `AI_GLOBAL_DAILY_EVALUATIONS` (350) | `{REDIS_KEY_PREFIX}:ai:budget:evaluation:{yyyy-mm-dd}` |
+| `feedback` | `session_feedback` | `AI_GLOBAL_DAILY_FEEDBACKS` (700) | `{REDIS_KEY_PREFIX}:ai:budget:feedback:{yyyy-mm-dd}` |
 
 Importación de documentos (`docs/adr/0009`): límites por estudiante con `src/shared/rate-limit` (ventana deslizante de Upstash con `AI_PROVIDER_MODE=live`; ventana fija en memoria en los demás modos), sin variables nuevas. Un error de Upstash falla abierto (se registra); el tope de importaciones activas lo aplica la base de datos.
 
@@ -1532,12 +1591,15 @@ Validadas con Zod al arrancar (`src/shared/config/env.schema.ts`); una cadena va
 | `CRON_SECRET` | Texto obligatorio de al menos 32 caracteres | Portador de `/api/keep-alive` y `/api/recompute-mastery`. |
 | `SUPABASE_STORAGE_BUCKET`, `SUPABASE_PDF_BUCKET` | Texto obligatorio | Nombres de los buckets de imágenes (`page-assets`) y de documentos importados (`page-pdfs`, nombre histórico de la era PDF). |
 | `SUPABASE_SERVICE_ROLE_KEY` | Texto obligatorio | Operaciones de Storage del servidor (URLs firmadas, metadatos). |
-| `AI_PROVIDER_MODE` | `live` o `fake` (`live`) | `fake` (CI y e2e) usa un proveedor simulado y límites en memoria. |
+| `AI_PROVIDER_MODE` | `live` o `fake` (`live`) | `fake` (CI y e2e) usa un proveedor simulado y límites en memoria. Con `VERCEL_ENV=production` el esquema rechaza `fake` (`docs/adr/0010`). |
 | `GOOGLE_GENERATIVE_AI_API_KEY`, `GROQ_API_KEY`, `CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_API_TOKEN`, `OPENROUTER_API_KEY` | Opcionales | Claves de los cuatro proveedores de IA; en modo `live` se exige al menos una de Google, OpenRouter o el par de Cloudflare (que va completo o no va). |
 | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | Opcionales; obligatorias en modo `live` | Límites de tasa diarios (Upstash Ratelimit). |
 | `REDIS_KEY_PREFIX` | Texto (`cogni:dev`) | Prefijo de las claves de los límites. |
-| `AI_DAILY_GENERATIONS` | Entero positivo (6) | Generaciones diarias por usuario. |
-| `AI_DAILY_EVALUATIONS` | Entero positivo (60) | Evaluaciones diarias de recordación activa por usuario. |
+| `AI_DAILY_GENERATIONS` | Entero positivo (20) | Generaciones diarias por usuario, una unidad por llamada al modelo que genera. |
+| `AI_DAILY_EVALUATIONS` | Entero positivo (10) | Sesiones de recordación activa evaluadas por día y por usuario. |
+| `AI_DAILY_FEEDBACKS` | Entero positivo (20) | Retroalimentaciones de sesión (flashcards y exámenes) por día y por usuario. |
+| `AI_GLOBAL_DAILY_GENERATIONS`, `AI_GLOBAL_DAILY_EVALUATIONS`, `AI_GLOBAL_DAILY_FEEDBACKS` | Enteros positivos (700, 350, 700) | Presupuestos diarios de toda la aplicación, una unidad por intento de proveedor. |
+| `VERCEL_ENV` | Texto opcional (lo fija Vercel) | Con `production`, el esquema rechaza `AI_PROVIDER_MODE=fake`, y las vistas previas de diseño se ignoran aunque `COGNI_DESIGN_PREVIEWS=1` esté definida. |
 | `AI_PAGE_TOKEN_CAP` | Entero positivo (12000) | Tope de tokens del texto de página enviado en una generación; lo excedente se trunca (`truncated`, `wordsUsed`, `wordsTotal`). |
 | `NEXT_PUBLIC_SITE_URL` | URL obligatoria | Base de `redirectTo` de los flujos de autenticación (`siteUrl()`). |
 | `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST` | Opcionales | Eventos de producto (`user_signed_up`, `user_signed_in`, `terms_accepted`, `generation_requested`, …). |
@@ -1617,6 +1679,10 @@ Fase 7 (sin índices nuevos): las lecturas de `scheduling` ("Hoy", calendario) y
 -- Idempotencia de subida: un mismo objeto de Storage se registra una sola vez
 CONSTRAINT "page_assets_storage_path_key" UNIQUE("storage_path")
 CONSTRAINT "import_jobs_storage_path_key" UNIQUE("storage_path")
+
+-- Aislamiento por propietario (0016): destino de las claves foráneas compuestas
+CONSTRAINT "notebooks_id_owner_key" UNIQUE("id","owner_id")
+CONSTRAINT "pages_id_owner_key" UNIQUE("id","owner_id")
 
 -- Estado cerrado de ImportJob sin pgEnum de Postgres
 CONSTRAINT "import_jobs_status_check" CHECK ("import_jobs"."status" in ('queued', 'processing', 'done', 'failed'))

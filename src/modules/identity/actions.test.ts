@@ -47,12 +47,16 @@ const {
   signOutMock,
   signInWithOAuthMock,
   signUpMock,
+  getClaimsMock,
+  updateUserMock,
 } = vi.hoisted(() => ({
   getUser: vi.fn(),
   signInWithPasswordMock: vi.fn(),
   signOutMock: vi.fn(),
   signInWithOAuthMock: vi.fn(),
   signUpMock: vi.fn(),
+  getClaimsMock: vi.fn(),
+  updateUserMock: vi.fn(),
 }));
 vi.mock("./infrastructure", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./infrastructure")>();
@@ -65,6 +69,8 @@ vi.mock("./infrastructure", async (importOriginal) => {
         signOut: signOutMock,
         signInWithOAuth: signInWithOAuthMock,
         signUp: signUpMock,
+        getClaims: getClaimsMock,
+        updateUser: updateUserMock,
       },
     })),
   };
@@ -256,6 +262,104 @@ describe("signUpAction consent", () => {
     await signUpAction({ status: "idle" }, formData(CREDENTIALS));
 
     expect(track).not.toHaveBeenCalled();
+  });
+
+  // No account enumeration: the form answers the same whether the email
+  // was free, already registered (obfuscated user) or rejected as existing.
+  it("answers the same for a new and an already registered email", async () => {
+    const { signUpAction } = await import("./actions");
+
+    signUpMock.mockResolvedValue({
+      data: { user: { id: "u-new", identities: [{ id: "i-1" }] } },
+      error: null,
+    });
+    const fresh = await signUpAction({ status: "idle" }, formData(CREDENTIALS));
+
+    signUpMock.mockResolvedValue({
+      data: { user: { id: "u-fake", identities: [] } },
+      error: null,
+    });
+    const obfuscated = await signUpAction(
+      { status: "idle" },
+      formData(CREDENTIALS),
+    );
+
+    signUpMock.mockResolvedValue({
+      data: { user: null },
+      error: {
+        code: "user_already_exists",
+        message: "User already registered",
+      },
+    });
+    const rejected = await signUpAction(
+      { status: "idle" },
+      formData(CREDENTIALS),
+    );
+
+    expect(fresh).toEqual({
+      status: "success",
+      message:
+        "Si el correo no tenía una cuenta, te enviamos un enlace de verificación. Revisa tu bandeja.",
+    });
+    expect(obfuscated).toEqual(fresh);
+    expect(rejected).toEqual(fresh);
+  });
+});
+
+// Security hardening S4d: a valid session is not enough to set a password.
+describe("updatePasswordAction", () => {
+  const NEW_PASSWORD = { password: "nueva-clave-123" };
+  const signedInWith = (method: string, secondsAgo: number) => ({
+    data: {
+      claims: {
+        amr: [
+          { method, timestamp: Math.floor(Date.now() / 1000) - secondsAgo },
+        ],
+      },
+    },
+    error: null,
+  });
+
+  beforeEach(() => {
+    redirect.mockClear();
+    getClaimsMock.mockReset();
+    updateUserMock.mockReset();
+    updateUserMock.mockResolvedValue({ error: null });
+  });
+
+  it("sets the password and goes to Inicio for a recovery session", async () => {
+    getClaimsMock.mockResolvedValue(signedInWith("recovery", 30));
+    const { updatePasswordAction } = await import("./actions");
+
+    await updatePasswordAction({ status: "idle" }, formData(NEW_PASSWORD));
+
+    expect(updateUserMock).toHaveBeenCalledWith({
+      password: "nueva-clave-123",
+    });
+    expect(redirect).toHaveBeenCalledWith("/inicio");
+  });
+
+  it.each([
+    ["a password sign-in", signedInWith("password", 30)],
+    ["a Google sign-in", signedInWith("oauth", 30)],
+    ["an old recovery link", signedInWith("recovery", 2 * 60 * 60)],
+    ["no session", { data: null, error: null }],
+  ])("refuses %s without changing the password", async (_label, claims) => {
+    getClaimsMock.mockResolvedValue(claims);
+    const { updatePasswordAction } = await import("./actions");
+
+    const state = await updatePasswordAction(
+      { status: "idle" },
+      formData(NEW_PASSWORD),
+    );
+
+    expect(state).toEqual({
+      status: "error",
+      message:
+        "Para cambiar tu contraseña necesitas un enlace de restablecimiento reciente. Pide uno nuevo.",
+    });
+    expect(updateUserMock).not.toHaveBeenCalled();
+    expect(redirect).not.toHaveBeenCalled();
   });
 });
 

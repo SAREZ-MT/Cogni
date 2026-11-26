@@ -28,9 +28,9 @@ function toPage(row: PageRow): Page {
 export class DrizzlePageRepository implements PageRepository {
   constructor(private readonly db: Db) {}
 
-  async findById(id: string): Promise<Page | null> {
+  async findById(id: string, ownerId: string): Promise<Page | null> {
     const row = await this.db.query.pages.findFirst({
-      where: eq(pages.id, id),
+      where: and(eq(pages.id, id), eq(pages.ownerId, ownerId)),
     });
     return row ? toPage(row) : null;
   }
@@ -71,7 +71,7 @@ export class DrizzlePageRepository implements PageRepository {
         archivedAt: page.archivedAt,
         updatedAt: page.updatedAt,
       })
-      .where(eq(pages.id, page.id));
+      .where(and(eq(pages.id, page.id), eq(pages.ownerId, page.ownerId)));
   }
 
   async listActiveByNotebook(notebookId: string): Promise<Page[]> {

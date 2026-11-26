@@ -50,10 +50,26 @@ describe("securityHeaders", () => {
       "X-Content-Type-Options",
       "Referrer-Policy",
       "Permissions-Policy",
+      "Strict-Transport-Security",
+      "Cross-Origin-Opener-Policy",
+      "Cross-Origin-Resource-Policy",
     ]);
     expect(header("X-Frame-Options")).toBe("DENY");
     expect(header("X-Content-Type-Options")).toBe("nosniff");
     expect(header("Referrer-Policy")).toBe("strict-origin-when-cross-origin");
+  });
+
+  // security-hardening S8. No `preload`: that list is hard to leave.
+  // same-origin-allow-popups keeps the Google OAuth popup/redirect usable.
+  it("forces HTTPS and isolates the origin, statically and per request", () => {
+    for (const headers of [securityHeaders, buildSecurityHeaders("abc123")]) {
+      const value = (key: string) => headers.find((h) => h.key === key)?.value;
+      expect(value("Strict-Transport-Security")).toBe("max-age=63072000");
+      expect(value("Cross-Origin-Opener-Policy")).toBe(
+        "same-origin-allow-popups",
+      );
+      expect(value("Cross-Origin-Resource-Policy")).toBe("same-origin");
+    }
   });
 
   it("locks framing, objects and base URI in the CSP", () => {
@@ -152,6 +168,9 @@ describe("buildSecurityHeaders(nonce)", () => {
       "X-Content-Type-Options",
       "Referrer-Policy",
       "Permissions-Policy",
+      "Strict-Transport-Security",
+      "Cross-Origin-Opener-Policy",
+      "Cross-Origin-Resource-Policy",
     ]) {
       expect(dynamicHeaders.find((h) => h.key === key)?.value).toBe(
         header(key),
@@ -163,5 +182,48 @@ describe("buildSecurityHeaders(nonce)", () => {
     expect(directive(dynamicCsp, "img-src")).toBe(
       directive(header("Content-Security-Policy") ?? "", "img-src"),
     );
+  });
+});
+
+// security-hardening S8: only the configured Supabase project may be reached,
+// not every project under supabase.co.
+describe("buildSecurityHeaders(nonce, supabaseUrl)", () => {
+  function cspFor(supabaseUrl: string | undefined): string {
+    return buildSecurityHeaders("abc123", supabaseUrl)[0].value;
+  }
+
+  it("names the exact Supabase host in img-src, connect-src and form-action", () => {
+    const csp = cspFor("https://abc.supabase.co");
+
+    expect(directive(csp, "img-src")).toBe(
+      "img-src 'self' blob: data: https://*.googleusercontent.com https://abc.supabase.co",
+    );
+    expect(directive(csp, "connect-src")).toBe(
+      "connect-src 'self' https://abc.supabase.co wss://abc.supabase.co https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://*.posthog.com https://*.i.posthog.com",
+    );
+    expect(directive(csp, "form-action")).toBe(
+      "form-action 'self' https://abc.supabase.co https://accounts.google.com",
+    );
+    expect(csp).not.toContain("*.supabase.co");
+  });
+
+  it("keeps the port and plain-HTTP scheme of a local Supabase", () => {
+    const connect = directive(cspFor("http://127.0.0.1:54321"), "connect-src");
+
+    expect(connect).toContain(" http://127.0.0.1:54321 ws://127.0.0.1:54321 ");
+  });
+
+  it.each([
+    undefined,
+    "",
+    "not a url",
+  ])("falls back to the *.supabase.co wildcard when the URL is %j", (supabaseUrl) => {
+    const csp = cspFor(supabaseUrl);
+
+    expect(directive(csp, "img-src")).toContain(" https://*.supabase.co");
+    expect(directive(csp, "connect-src")).toContain(
+      " https://*.supabase.co wss://*.supabase.co ",
+    );
+    expect(directive(csp, "form-action")).toContain(" https://*.supabase.co ");
   });
 });

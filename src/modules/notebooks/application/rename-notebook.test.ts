@@ -50,7 +50,7 @@ describe("renameNotebook use case", () => {
     );
 
     expect(result.ok).toBe(false);
-    const stored = await deps.notebooks.findById(created.value.id);
+    const stored = await deps.notebooks.findById(created.value.id, OWNER_ID);
     expect(stored?.title).toBe("Calculo I");
   });
 
@@ -70,7 +70,7 @@ describe("renameNotebook use case", () => {
     );
 
     expect(result.ok).toBe(false);
-    const stored = await deps.notebooks.findById(created.value.id);
+    const stored = await deps.notebooks.findById(created.value.id, OWNER_ID);
     expect(stored?.title).toBe("Calculo I");
   });
 });

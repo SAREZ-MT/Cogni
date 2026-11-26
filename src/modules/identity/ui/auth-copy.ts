@@ -9,15 +9,19 @@ export const AUTH_COPY = {
     "Aún no has verificado tu correo. Revisa tu bandeja de entrada para continuar.",
   providerUnavailable:
     "No pudimos completar la acción. Inténtalo de nuevo en unos minutos.",
-  alreadyRegistered: "El email ya está registrado. ¿Quieres iniciar sesión?",
+  // Shown after every accepted sign-up, also when the email already had an
+  // account (no mail is sent then): the form must not reveal who is
+  // registered.
   verificationSent:
-    "Te enviamos un correo de verificación. Revisa tu bandeja para continuar.",
+    "Si el correo no tenía una cuenta, te enviamos un enlace de verificación. Revisa tu bandeja.",
   resetSent:
     "Si el correo existe, recibirás un enlace para restablecer tu contraseña.",
   termsNotAccepted: "Debes aceptar los términos para continuar.",
   googleCancelled:
     "No se completó el acceso con Google. Puedes intentarlo de nuevo.",
   linkInvalid: "El enlace no es válido o ya venció. Pide uno nuevo.",
+  recoveryRequired:
+    "Para cambiar tu contraseña necesitas un enlace de restablecimiento reciente. Pide uno nuevo.",
 } as const;
 
 export function messageForCode(code: string): string {
@@ -28,6 +32,8 @@ export function messageForCode(code: string): string {
       return AUTH_COPY.invalidCredentials;
     case AUTH_ERROR.EMAIL_NOT_VERIFIED:
       return AUTH_COPY.emailNotVerified;
+    case AUTH_ERROR.RECOVERY_REQUIRED:
+      return AUTH_COPY.recoveryRequired;
     case AUTH_ERROR.TERMS_NOT_ACCEPTED:
       return AUTH_COPY.termsNotAccepted;
     default:

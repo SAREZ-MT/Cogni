@@ -63,7 +63,7 @@ describe("writeImportedContent use case", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.version).toBe(2);
-    const stored = await pages.findById(page.id);
+    const stored = await pages.findById(page.id, OWNER_ID);
     expect(stored?.contentVersion).toBe(2);
     expect(stored?.content).toEqual(IMPORTED_DOC);
     expect(stored?.plainText).toBe("Titulo\nprimer parrafo\nsegundo parrafo");
@@ -87,7 +87,7 @@ describe("writeImportedContent use case", () => {
     expect(result.ok).toBe(false);
     expect(!result.ok && result.error.code).toBe("PAGE_VERSION_CONFLICT");
     expect(!result.ok && result.error.message).toContain("2");
-    const stored = await pages.findById(page.id);
+    const stored = await pages.findById(page.id, OWNER_ID);
     expect(stored?.content).toEqual(IMPORTED_DOC);
     expect(stored?.contentVersion).toBe(2);
   });
@@ -105,7 +105,7 @@ describe("writeImportedContent use case", () => {
     // R3-weak-error-assertions: a shape violation caught by Zod must
     // surface the parseInput edge's code, not just any falsy result.
     expect(!result.ok && result.error.code).toBe("NOTEBOOKS_INVALID_INPUT");
-    const stored = await pages.findById(page.id);
+    const stored = await pages.findById(page.id, OWNER_ID);
     expect(stored?.content).toEqual({ type: "doc", content: [] });
     expect(stored?.contentVersion).toBe(1);
   });
@@ -126,7 +126,7 @@ describe("writeImportedContent use case", () => {
 
     expect(result.ok).toBe(false);
     expect(!result.ok && result.error.code).toBe("NOTEBOOKS_INVALID_INPUT");
-    const stored = await pages.findById(page.id);
+    const stored = await pages.findById(page.id, OWNER_ID);
     expect(stored?.content).toEqual({ type: "doc", content: [] });
     expect(stored?.contentVersion).toBe(1);
   });
@@ -152,7 +152,7 @@ describe("writeImportedContent use case", () => {
 
     expect(result.ok).toBe(false);
     expect(!result.ok && result.error.code).toBe("NOTEBOOKS_INVALID_INPUT");
-    const stored = await pages.findById(page.id);
+    const stored = await pages.findById(page.id, OWNER_ID);
     expect(stored?.content).toEqual({ type: "doc", content: [] });
     expect(stored?.contentVersion).toBe(1);
   });
@@ -167,7 +167,7 @@ describe("writeImportedContent use case", () => {
     );
 
     expect(result.ok).toBe(true);
-    const stored = await pages.findById(page.id);
+    const stored = await pages.findById(page.id, OWNER_ID);
     expect(stored?.content).toEqual(CATALOGUE_SAMPLE_DOC);
   });
 
@@ -186,7 +186,7 @@ describe("writeImportedContent use case", () => {
 
     expect(result.ok).toBe(false);
     expect(!result.ok && result.error.code).toBe("PAGE_INVALID_CONTENT");
-    const stored = await pages.findById(page.id);
+    const stored = await pages.findById(page.id, OWNER_ID);
     expect(stored?.contentVersion).toBe(1);
   });
 
@@ -201,7 +201,7 @@ describe("writeImportedContent use case", () => {
 
     expect(result.ok).toBe(false);
     expect(!result.ok && result.error.code).toBe("PAGE_NOT_FOUND");
-    const stored = await pages.findById(page.id);
+    const stored = await pages.findById(page.id, OWNER_ID);
     expect(stored?.content).toEqual({ type: "doc", content: [] });
     expect(stored?.contentVersion).toBe(1);
   });
@@ -231,7 +231,7 @@ describe("writeImportedContent use case", () => {
 
     expect(result.ok).toBe(false);
     expect(!result.ok && result.error.code).toBe("PAGE_NOT_FOUND");
-    const stored = await deps.pages.findById(page.value.id);
+    const stored = await deps.pages.findById(page.value.id, OWNER_ID);
     expect(stored?.content).toEqual({ type: "doc", content: [] });
     expect(stored?.contentVersion).toBe(1);
     expect(stored?.archivedAt).toEqual(deps.clock.now());

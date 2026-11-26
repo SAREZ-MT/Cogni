@@ -23,6 +23,10 @@ describe.skipIf(!url)("0012 active recall schema", () => {
   let otherOwner: TestOwner | undefined;
   const pageId = randomUUID();
   const notebookId = randomUUID();
+  // The other owner's own page: since drizzle/0016 a question or session
+  // must carry its page's owner (`<table>_page_owner_fk`).
+  const otherPageId = randomUUID();
+  const otherNotebookId = randomUUID();
   let position = 1;
   const sql = postgres(url as string, { prepare: false, max: 1 });
 
@@ -120,11 +124,13 @@ describe.skipIf(!url)("0012 active recall schema", () => {
     await sql`insert into profiles (id) values (${ownerId()}), (${otherOwnerId()})`;
     await sql`
       insert into notebooks (id, owner_id, title, position)
-      values (${notebookId}, ${ownerId()}, 'Cuaderno', 0)
+      values (${notebookId}, ${ownerId()}, 'Cuaderno', 0),
+        (${otherNotebookId}, ${otherOwnerId()}, 'Cuaderno ajeno', 0)
     `;
     await sql`
       insert into pages (id, owner_id, notebook_id, title, content, position)
-      values (${pageId}, ${ownerId()}, ${notebookId}, 'Página', ${sql.json({ type: "doc" })}, 0)
+      values (${pageId}, ${ownerId()}, ${notebookId}, 'Página', ${sql.json({ type: "doc" })}, 0),
+        (${otherPageId}, ${otherOwnerId()}, ${otherNotebookId}, 'Página ajena', ${sql.json({ type: "doc" })}, 0)
     `;
   });
 
@@ -275,14 +281,20 @@ describe.skipIf(!url)("0012 active recall schema", () => {
   it("refuses an answer on another owner's session", async () => {
     await expectViolation(async (tx) => {
       const questionId = await insertQuestion(tx);
-      const sessionId = await insertSession(tx, { owner: otherOwnerId() });
+      const sessionId = await insertSession(tx, {
+        owner: otherOwnerId(),
+        page: otherPageId,
+      });
       await insertAnswer(tx, { sessionId, questionId });
     }, "recall_answers_session_owner_fk");
   });
 
   it("refuses an answer to another owner's question", async () => {
     await expectViolation(async (tx) => {
-      const questionId = await insertQuestion(tx, { owner: otherOwnerId() });
+      const questionId = await insertQuestion(tx, {
+        owner: otherOwnerId(),
+        page: otherPageId,
+      });
       const sessionId = await insertSession(tx);
       await insertAnswer(tx, { sessionId, questionId });
     }, "recall_answers_question_owner_fk");

@@ -21,7 +21,10 @@ export async function setNotebookAppearance(
   const parsed = parseInput(setNotebookAppearanceSchema, input);
   if (!parsed.ok) return parsed;
 
-  const notebook = await deps.notebooks.findById(parsed.value.notebookId);
+  const notebook = await deps.notebooks.findById(
+    parsed.value.notebookId,
+    ownerId,
+  );
   if (!notebook || notebook.ownerId !== ownerId) {
     return err(
       new DomainError(NOTEBOOK_ERROR.NOT_FOUND, parsed.value.notebookId),

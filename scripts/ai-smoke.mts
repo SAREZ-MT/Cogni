@@ -13,7 +13,7 @@ import { generateStructured } from "@/modules/ai/application/generate-structured
 import {
   buildGenerateFlashcardsPrompt,
   GENERATE_FLASHCARDS_PROMPT_VERSION,
-} from "@/modules/ai/application/prompts/generate_flashcards/v1";
+} from "@/modules/ai/application/prompts/generate_flashcards/v2";
 import {
   buildProviderEntries,
   buildProviderMap,
@@ -162,6 +162,8 @@ const deps = {
   entries,
   providers: buildProviderMap(registryEnv),
   quota: new UpstashQuotaStore(redis, prefix),
+  // A manual run of two calls: not charged to the app-wide budget.
+  budget: { consume: async () => true },
   breakers: new UpstashBreakerStore(redis, prefix),
   generations,
   clock: { now: () => new Date() },

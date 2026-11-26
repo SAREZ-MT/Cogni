@@ -63,7 +63,7 @@ describe("getPage use case", () => {
   it("treats an archived page as not found", async () => {
     const deps = makeDeps();
     const page = await setupPage(deps);
-    await markPageArchived(deps.pages, page.id);
+    await markPageArchived(deps.pages, page.id, OWNER_ID);
 
     const result = await getPage({ pageId: page.id }, deps, OWNER_ID);
 

@@ -125,8 +125,12 @@ describe("parseServerEnv AI layer", () => {
     const parsed = parseServerEnv({ ...noMode, AI_PROVIDER_MODE: "fake" });
     expect(parsed).toMatchObject({
       AI_PROVIDER_MODE: "fake",
-      AI_DAILY_GENERATIONS: 6,
-      AI_DAILY_EVALUATIONS: 60,
+      AI_DAILY_GENERATIONS: 20,
+      AI_DAILY_EVALUATIONS: 10,
+      AI_DAILY_FEEDBACKS: 20,
+      AI_GLOBAL_DAILY_GENERATIONS: 700,
+      AI_GLOBAL_DAILY_EVALUATIONS: 350,
+      AI_GLOBAL_DAILY_FEEDBACKS: 700,
       AI_PAGE_TOKEN_CAP: 12000,
       REDIS_KEY_PREFIX: "cogni:dev",
     });
@@ -205,5 +209,56 @@ describe("parseServerEnv AI layer", () => {
     expect(() =>
       parseServerEnv({ ...server, AI_PROVIDER_MODE: "mock" }),
     ).toThrow(/AI_PROVIDER_MODE/);
+  });
+});
+
+// security-hardening S8: sample data and the deterministic AI provider must
+// never serve real visitors. "Production" is the Vercel production
+// deployment only: the e2e suite runs a production build (NODE_ENV) in fake
+// mode on purpose.
+describe("parseServerEnv production guards", () => {
+  it("refuses AI_PROVIDER_MODE=fake on the Vercel production deployment", () => {
+    expect(() =>
+      parseServerEnv({ ...server, VERCEL_ENV: "production" }),
+    ).toThrow(
+      /AI_PROVIDER_MODE: fake is not allowed when VERCEL_ENV=production/,
+    );
+  });
+
+  // A flag left on for every Vercel environment must not take production
+  // down: designPreviewsEnabled() already answers false there.
+  it("accepts COGNI_DESIGN_PREVIEWS=1 on the Vercel production deployment", () => {
+    expect(() =>
+      parseServerEnv({
+        ...live,
+        VERCEL_ENV: "production",
+        COGNI_DESIGN_PREVIEWS: "1",
+      }),
+    ).not.toThrow();
+  });
+
+  it("accepts an empty VERCEL_ENV", () => {
+    expect(() => parseServerEnv({ ...server, VERCEL_ENV: "" })).not.toThrow();
+  });
+
+  it("accepts live mode without previews on the Vercel production deployment", () => {
+    expect(
+      parseServerEnv({ ...live, VERCEL_ENV: "production" }).VERCEL_ENV,
+    ).toBe("production");
+  });
+
+  it.each([
+    undefined,
+    "preview",
+    "development",
+  ])("still accepts fake mode and design previews when VERCEL_ENV is %j", (vercelEnv) => {
+    expect(() =>
+      parseServerEnv({
+        ...server,
+        NODE_ENV: "production",
+        VERCEL_ENV: vercelEnv,
+        COGNI_DESIGN_PREVIEWS: "1",
+      }),
+    ).not.toThrow();
   });
 });

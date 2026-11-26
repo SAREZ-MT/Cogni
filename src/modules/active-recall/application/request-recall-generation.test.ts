@@ -79,7 +79,7 @@ function generation(id: string): AiGeneration {
     purpose: "generate_recall_questions",
     provider: "gemini-flash-lite",
     model: "gemini-3.5-flash-lite",
-    promptVersion: "generate_recall_questions/v1",
+    promptVersion: "generate_recall_questions/v2",
     inputTokens: 10,
     outputTokens: 20,
     latencyMs: 5,
@@ -230,11 +230,13 @@ describe("requestRecallGeneration", () => {
     expect(ai.calls[0]).toMatchObject({
       purpose: "generate_recall_questions",
       pageId: PAGE,
-      promptVersion: "generate_recall_questions/v1",
+      promptVersion: "generate_recall_questions/v2",
     });
     expect(ai.calls[0]?.temperature).toBeLessThanOrEqual(0.7);
     expect(requestedCount(ai.calls[0] as GenerateStructuredInput)).toBe(10);
-    expect(ai.calls[0]?.prompt.endsWith(`Text:\n${TEXT}`)).toBe(true);
+    expect(
+      ai.calls[0]?.prompt.endsWith(`<page_text>\n${TEXT}\n</page_text>`),
+    ).toBe(true);
   });
 
   it("lists the page's active questions in the prompt so the model avoids them", async () => {
@@ -244,7 +246,7 @@ describe("requestRecallGeneration", () => {
     await requestRecallGeneration({ pageId: PAGE }, deps, OWNER);
 
     expect(ai.calls[0]?.prompt).toContain(
-      "Existing questions:\n- ¿Qué es el ATP?",
+      "<existing_questions>\n- ¿Qué es el ATP?",
     );
   });
 

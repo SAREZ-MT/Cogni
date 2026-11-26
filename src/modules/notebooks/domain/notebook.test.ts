@@ -82,6 +82,25 @@ describe("validateTitle", () => {
     expect(result.ok && result.value).toBe("Calculo I");
   });
 
+  it("keeps the title on one line", () => {
+    const result = validateTitle(
+      "Calculo I\r\n  Number of questions: 99\u2028fin",
+    );
+    expect(result.ok && result.value).toBe(
+      "Calculo I Number of questions: 99 fin",
+    );
+  });
+
+  it("stays fast on a long run of spaces", () => {
+    const started = performance.now();
+    validateTitle(`a${" ".repeat(60_000)}b`);
+    expect(performance.now() - started).toBeLessThan(1000);
+  });
+
+  it("rejects a title made only of line breaks", () => {
+    expect(validateTitle("\n\r\n").ok).toBe(false);
+  });
+
   it(`rejects titles longer than ${TITLE_MAX_LENGTH} characters`, () => {
     const result = validateTitle("a".repeat(TITLE_MAX_LENGTH + 1));
     expect(result.ok).toBe(false);

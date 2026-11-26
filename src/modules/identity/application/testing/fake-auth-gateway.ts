@@ -2,6 +2,7 @@ import { DomainError } from "@/shared/kernel/domain-error";
 import { err, ok, type Result } from "@/shared/kernel/result";
 import { AUTH_ERROR } from "../../domain/auth-errors";
 import type { AuthGateway, SignUpResult } from "../../domain/auth-gateway";
+import type { AuthenticationEvent } from "../../domain/password-change";
 
 type FakeUser = { email: string; password: string; verified: boolean };
 
@@ -13,6 +14,10 @@ export class FakeAuthGateway implements AuthGateway {
   readonly calls: { method: keyof AuthGateway; input: unknown }[] = [];
   signedIn: string | null = null;
   googleUrl = "https://accounts.google.com/o/oauth2/auth?state=fake";
+  // The sign-in steps of the current session; empty means no session.
+  authentication: AuthenticationEvent[] = [];
+  // Set to make the session read fail.
+  authenticationFailure: Result<never, DomainError> | null = null;
 
   seed(user: FakeUser): void {
     this.users.push(user);
@@ -74,6 +79,13 @@ export class FakeAuthGateway implements AuthGateway {
   }): Promise<Result<void, DomainError>> {
     this.calls.push({ method: "requestPasswordReset", input });
     return ok(undefined);
+  }
+
+  async currentAuthentication(): Promise<
+    Result<AuthenticationEvent[], DomainError>
+  > {
+    if (this.authenticationFailure) return this.authenticationFailure;
+    return ok(this.authentication);
   }
 
   async updatePassword(input: {

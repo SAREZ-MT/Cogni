@@ -1,17 +1,17 @@
 import { describe, expect, it } from "vitest";
 import type { ZodType } from "zod";
-import { buildEvaluateRecallAnswerPrompt } from "../application/prompts/evaluate_recall_answer/v1";
-import { buildGenerateExamQuestionsPrompt } from "../application/prompts/generate_exam_questions/v1";
-import { buildGenerateExamVariantsPrompt } from "../application/prompts/generate_exam_variants/v1";
-import { buildGenerateFlashcardsPrompt } from "../application/prompts/generate_flashcards/v1";
-import { buildGenerateRecallQuestionsPrompt } from "../application/prompts/generate_recall_questions/v1";
-import { buildSessionFeedbackPrompt } from "../application/prompts/session_feedback/v1";
-import { buildExamSessionFeedbackPrompt } from "../application/prompts/session_feedback/v2";
+import { buildEvaluateRecallAnswersPrompt } from "../application/prompts/evaluate_recall_answer/v3";
+import { buildGenerateExamQuestionsPrompt } from "../application/prompts/generate_exam_questions/v2";
+import { buildGenerateExamVariantsPrompt } from "../application/prompts/generate_exam_variants/v2";
+import { buildGenerateFlashcardsPrompt } from "../application/prompts/generate_flashcards/v2";
+import { buildGenerateRecallQuestionsPrompt } from "../application/prompts/generate_recall_questions/v2";
+import { buildSessionFeedbackPrompt } from "../application/prompts/session_feedback/v3";
+import { buildExamSessionFeedbackPrompt } from "../application/prompts/session_feedback/v4";
 import {
   examQuestionsOutput,
   examVariantsOutput,
   flashcardsOutput,
-  recallEvaluationOutput,
+  recallEvaluationsOutput,
   recallQuestionsOutput,
   sessionFeedbackOutput,
 } from "../application/schemas";
@@ -404,7 +404,7 @@ describe("createFakeLiveProvider", () => {
       examQuestionsOutput,
       examVariantsOutput,
       recallQuestionsOutput,
-      recallEvaluationOutput,
+      recallEvaluationsOutput,
       sessionFeedbackOutput,
     ];
     for (const schema of schemas) {
@@ -478,24 +478,38 @@ describe("createFakeLiveProvider", () => {
   });
 });
 
-function evaluationRequest(answer: string, pageFragment = TEXT) {
-  const built = buildEvaluateRecallAnswerPrompt({
-    question: "¿Qué función cumple la mitocondria?",
-    keyConcepts: ["Mitocondria", "energía", "célula", "respiración celular"],
-    acceptableAnswerSummary: "La mitocondria produce energía para la célula.",
-    pageFragment,
-    answer,
-  });
-  return { schema: recallEvaluationOutput, ...built };
+const RUBRIC = {
+  question: "¿Qué función cumple la mitocondria?",
+  keyConcepts: ["Mitocondria", "energía", "célula", "respiración celular"],
+  acceptableAnswerSummary: "La mitocondria produce energía para la célula.",
+};
+
+function evaluationRequest(answers: readonly string[], pageFragment = TEXT) {
+  const built = buildEvaluateRecallAnswersPrompt(
+    answers.map((answer, i) => ({
+      id: `q${i + 1}`,
+      ...RUBRIC,
+      pageFragment,
+      answer,
+    })),
+  );
+  return { schema: recallEvaluationsOutput, ...built };
+}
+
+async function evaluate(answers: readonly string[], pageFragment = TEXT) {
+  const response = await createFakeLiveProvider().generateObject(
+    evaluationRequest(answers, pageFragment),
+  );
+  return recallEvaluationsOutput.parse(response.object).evaluations;
 }
 
 describe("createFakeLiveProvider recall evaluation", () => {
-  it("scores the answer by the rubric's key concepts it mentions, ignoring case and accents", async () => {
-    const provider = createFakeLiveProvider();
-    const response = await provider.generateObject(
-      evaluationRequest("La MITOCONDRIA produce energia para la celula."),
-    );
-    expect(recallEvaluationOutput.parse(response.object)).toEqual({
+  it("scores each answer by the rubric's key concepts it mentions, ignoring case and accents", async () => {
+    const [evaluation] = await evaluate([
+      "La MITOCONDRIA produce energia para la celula.",
+    ]);
+    expect(evaluation).toEqual({
+      questionId: "q1",
       score: 4,
       presentConcepts: ["Mitocondria", "energía", "célula"],
       missingConcepts: ["respiración celular"],
@@ -505,73 +519,67 @@ describe("createFakeLiveProvider recall evaluation", () => {
     });
   });
 
-  it("gives 5 to an answer with every concept and 0 to one with none", async () => {
-    const provider = createFakeLiveProvider();
-    const full = await provider.generateObject(
-      evaluationRequest(
-        "La mitocondria hace la respiración celular y da energía a la célula.",
-      ),
-    );
-    expect(recallEvaluationOutput.parse(full.object)).toMatchObject({
-      score: 5,
-      missingConcepts: [],
-      justification: "Mencionaste los 4 conceptos clave de la rúbrica.",
-    });
-
-    const none = await provider.generateObject(
-      evaluationRequest("No me acuerdo."),
-    );
-    expect(recallEvaluationOutput.parse(none.object)).toMatchObject({
-      score: 0,
-      presentConcepts: [],
-    });
+  it("answers every item of the batch on its own, keyed by its id", async () => {
+    const evaluations = await evaluate([
+      "La mitocondria hace la respiración celular y da energía a la célula.",
+      "No me acuerdo.",
+    ]);
+    expect(evaluations).toMatchObject([
+      {
+        questionId: "q1",
+        score: 5,
+        missingConcepts: [],
+        justification: "Mencionaste los 4 conceptos clave de la rúbrica.",
+      },
+      { questionId: "q2", score: 0, presentConcepts: [] },
+    ]);
   });
 
   it("reads the concepts from the answer only, never from the page fragment", async () => {
-    const provider = createFakeLiveProvider();
-    const response = await provider.generateObject(
-      evaluationRequest("Nada que ver.", "Mitocondria energía célula"),
+    const [evaluation] = await evaluate(
+      ["Nada que ver."],
+      "Mitocondria energía célula",
     );
-    expect(recallEvaluationOutput.parse(response.object).score).toBe(0);
+    expect(evaluation?.score).toBe(0);
   });
 
   it("is deterministic", async () => {
+    const request = evaluationRequest(["La mitocondria da energía."]);
     const provider = createFakeLiveProvider();
-    const request = evaluationRequest("La mitocondria da energía.");
     const first = await provider.generateObject(request);
     const second = await provider.generateObject(request);
     expect(second.object).toEqual(first.object);
   });
 
-  it("fails every evaluation whose prompt holds the failure marker", async () => {
-    const provider = createFakeLiveProvider();
-    const request = evaluationRequest(`La mitocondria ${FAKE_AI_FAIL_MARKER}`);
-    await expect(provider.generateObject(request)).rejects.toThrow(
-      /fake provider failure/,
-    );
+  it("leaves out every evaluation of an answer holding the failure marker", async () => {
+    const answers = ["Energía", `La mitocondria ${FAKE_AI_FAIL_MARKER}`];
+    for (let call = 0; call < 2; call++) {
+      const evaluations = await evaluate(answers);
+      expect(evaluations.map((e) => e.questionId)).toEqual(["q1"]);
+    }
+  });
+
+  it("fails the call when every answer holds the failure marker", async () => {
+    const request = evaluationRequest([`Energía ${FAKE_AI_FAIL_MARKER}`]);
     await expect(
       createFakeLiveProvider().generateObject(request),
     ).rejects.toThrow(/fake provider failure/);
   });
 
-  it("fails the first evaluation of a prompt holding the fail-once marker, then answers it", async () => {
-    const answer = `Energía ${FAKE_AI_FAIL_ONCE_MARKER} ${Math.random()}`;
-    const request = evaluationRequest(answer);
-    await expect(
-      createFakeLiveProvider().generateObject(request),
-    ).rejects.toThrow(/fake provider failure/);
-    // Another provider instance (the next request) remembers the failure.
-    const retried = await createFakeLiveProvider().generateObject(request);
-    expect(recallEvaluationOutput.parse(retried.object).score).toBeGreaterThan(
-      0,
-    );
+  it("leaves out an answer holding the fail-once marker the first time, then answers it alone", async () => {
+    const marked = `Energía ${FAKE_AI_FAIL_ONCE_MARKER} ${Math.random()}`;
+    const first = await evaluate(["Energía", "", marked]);
+    expect(first.map((e) => e.questionId)).toEqual(["q1", "q2"]);
+    // "Reintentar" sends the failed answer alone, with another fragment.
+    const [retried] = await evaluate([marked], "Otro fragmento.");
+    expect(retried?.score).toBeGreaterThan(0);
   });
 
-  // Review R3-003: the remembered prompts stay bounded.
-  it("forgets a fail-once prompt once it was answered, so it fails again as new", async () => {
-    const request = evaluationRequest(
+  // Review R3-003: the remembered answers stay bounded.
+  it("forgets a fail-once answer once it was answered, so it fails again as new", async () => {
+    const request = evaluationRequest([
       `Energía ${FAKE_AI_FAIL_ONCE_MARKER} ${Math.random()}`,
-    );
+    ]);
     const provider = createFakeLiveProvider();
     await expect(provider.generateObject(request)).rejects.toThrow();
     await expect(provider.generateObject(request)).resolves.toBeDefined();
@@ -581,14 +589,14 @@ describe("createFakeLiveProvider recall evaluation", () => {
     );
   });
 
-  it("remembers at most FAKE_FAIL_ONCE_CAPACITY failed prompts, dropping the oldest", async () => {
+  it("remembers at most FAKE_FAIL_ONCE_CAPACITY failed answers, dropping the oldest", async () => {
     const provider = createFakeLiveProvider();
     const requests = Array.from(
       { length: FAKE_FAIL_ONCE_CAPACITY + 1 },
       (_, i) =>
-        evaluationRequest(
+        evaluationRequest([
           `Energía ${FAKE_AI_FAIL_ONCE_MARKER} ${i} ${Math.random()}`,
-        ),
+        ]),
     );
     for (const request of requests) {
       await expect(provider.generateObject(request)).rejects.toThrow();

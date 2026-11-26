@@ -6,21 +6,26 @@ import {
   type AiGeneration,
   type AiPurpose,
   type BreakerState,
+  budgetGroupOf,
   completeGeneration,
+  estimateTokens,
   failGeneration,
   isOpen,
   type ProviderEntry,
   type ProviderUsage,
+  quotaKeyOf,
   recordFailure,
   recordSuccess,
   selectProvider,
   startGeneration,
+  vendorOf,
 } from "../domain";
 import { AI_ERROR } from "../domain/errors";
 import type {
   AiGenerationRepository,
   AiProviderMap,
   BreakerStore,
+  BudgetStore,
   IdGenerator,
   QuotaStore,
 } from "./ports";
@@ -34,12 +39,20 @@ export interface GenerateStructuredInput {
   prompt: string;
   temperature: number;
   maxOutputTokens?: number;
+  // Longest wait for one provider attempt; past it the attempt is aborted
+  // and the next provider is tried. Defaults to ATTEMPT_TIMEOUT_MS.
+  timeoutMs?: number;
+  // The caller giving up (its own deadline). Aborts the running attempt and
+  // ends the generation without trying another provider.
+  signal?: AbortSignal;
 }
 
 export interface GenerateStructuredDeps {
   entries: readonly ProviderEntry[];
   providers: AiProviderMap;
   quota: QuotaStore;
+  // App-wide daily budget of the purpose's group, charged per attempt.
+  budget: BudgetStore;
   breakers: BreakerStore;
   generations: AiGenerationRepository;
   clock: Clock;
@@ -74,6 +87,22 @@ export function maxTemperatureFor(purpose: AiPurpose): number {
 
 const MAX_ATTEMPTS = 2;
 
+// Two attempts stay well inside the 300 s function limit.
+export const ATTEMPT_TIMEOUT_MS = 60_000;
+
+// Settles with the call or rejects with the signal's reason, whichever comes
+// first, so an adapter that ignores the signal cannot hold the use case.
+function abortable<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) return Promise.reject(signal.reason);
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(signal.reason);
+    signal.addEventListener("abort", onAbort, { once: true });
+    promise.then(resolve, reject).finally(() => {
+      signal.removeEventListener("abort", onAbort);
+    });
+  });
+}
+
 // Never copies provider messages: they can echo request data or secrets.
 function failureReason(error: unknown): string {
   const name = error instanceof Error ? error.name : "UnknownError";
@@ -91,20 +120,42 @@ async function snapshot(
   const usage: Record<string, ProviderUsage> = {};
   const breakers: Record<string, BreakerState> = {};
   const unhealthyIds = new Set<string>();
-  await Promise.all(
-    deps.entries.map(async (entry) => {
-      usage[entry.id] = await deps.quota.readUsage(entry.id, now);
+  const quotaKeys = new Set(deps.entries.map(quotaKeyOf));
+  await Promise.all([
+    ...[...quotaKeys].map(async (key) => {
+      usage[key] = await deps.quota.readUsage(key, now);
+    }),
+    ...deps.entries.map(async (entry) => {
       const state = await deps.breakers.read(entry.id);
       breakers[entry.id] = state;
       if (isOpen(state, now)) unhealthyIds.add(entry.id);
     }),
-  );
+  ]);
   return { usage, breakers, unhealthyIds };
+}
+
+// Charges one attempt to the app-wide budget. Fails closed: a store that
+// cannot answer refuses the call like a spent budget.
+async function withinBudget(
+  deps: GenerateStructuredDeps,
+  purpose: AiPurpose,
+  now: Date,
+): Promise<boolean> {
+  try {
+    return await deps.budget.consume(budgetGroupOf(purpose), now);
+  } catch {
+    return false;
+  }
 }
 
 // Single entry point for every model call (documento-maestro §8.1): select a
 // provider, call it, validate against the purpose schema, audit every attempt
-// and retry once on the next provider. Never invents an object.
+// and retry once on the next provider, of another vendor when one is
+// eligible. Every attempt runs under its own timeout (and the caller's
+// signal); an abort is a failed attempt. Every attempt is first charged to
+// the app-wide daily budget of its purpose; a spent budget ends the
+// generation with AI_DAILY_BUDGET_EXHAUSTED before the provider is called
+// or the attempt audited. Never invents an object.
 export async function generateStructured(
   input: GenerateStructuredInput,
   deps: GenerateStructuredDeps,
@@ -116,6 +167,12 @@ export async function generateStructured(
     maxTemperatureFor(input.purpose),
   );
   const failedProviders: string[] = [];
+  // The retry prefers another vendor: two models behind one key (or one
+  // vendor's outage) must not take both attempts.
+  const failedVendors: string[] = [];
+  // Same word-based estimate as the page cap; skips providers whose prompt
+  // ceiling (a small tokens-per-minute window) it would exceed.
+  const promptTokens = estimateTokens(`${input.system}\n${input.prompt}`);
   let lastFailedId: string | null = null;
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
@@ -126,6 +183,8 @@ export async function generateStructured(
       unhealthyIds: snap.unhealthyIds,
       usage: snap.usage,
       exclude: failedProviders,
+      avoidVendors: failedVendors,
+      promptTokens,
     });
     if (entry === null) {
       if (lastFailedId !== null) {
@@ -135,6 +194,17 @@ export async function generateStructured(
         new DomainError(
           AI_ERROR.NO_PROVIDER_AVAILABLE,
           "No AI provider is available for this purpose",
+        ),
+      );
+    }
+
+    // Charged only once a provider is chosen, so an attempt that calls
+    // nothing costs nothing.
+    if (!(await withinBudget(deps, input.purpose, now))) {
+      return err(
+        new DomainError(
+          AI_ERROR.DAILY_BUDGET_EXHAUSTED,
+          "The app-wide daily AI budget for this purpose is spent",
         ),
       );
     }
@@ -152,19 +222,27 @@ export async function generateStructured(
       deps.clock,
     );
     await deps.generations.create(started);
-    await deps.quota.recordCall(entry.id, now);
+    await deps.quota.recordCall(quotaKeyOf(entry), now);
 
     let failure: string | null = null;
+    const timeout = AbortSignal.timeout(input.timeoutMs ?? ATTEMPT_TIMEOUT_MS);
+    const signal = input.signal
+      ? AbortSignal.any([timeout, input.signal])
+      : timeout;
     try {
       const provider = deps.providers.get(entry.id);
       if (!provider) throw new Error("provider not configured");
-      const response = await provider.generateObject({
-        schema,
-        system: input.system,
-        prompt: input.prompt,
-        temperature,
-        maxOutputTokens: input.maxOutputTokens,
-      });
+      const response = await abortable(
+        provider.generateObject({
+          schema,
+          system: input.system,
+          prompt: input.prompt,
+          temperature,
+          maxOutputTokens: input.maxOutputTokens,
+          signal,
+        }),
+        signal,
+      );
       const parsed = schema.safeParse(response.object);
       if (parsed.success) {
         const completed = completeGeneration(
@@ -189,11 +267,16 @@ export async function generateStructured(
     const failed = failGeneration(started, failure, deps.clock);
     if (!failed.ok) return failed;
     await deps.generations.update(failed.value);
+    // The caller gave up: the provider is not blamed and no other is tried.
+    if (input.signal?.aborted) {
+      return err(new AiGenerationFailedError(started.id));
+    }
     await deps.breakers.write(
       entry.id,
       recordFailure(snap.breakers[entry.id], deps.clock.now()),
     );
     failedProviders.push(entry.id);
+    failedVendors.push(vendorOf(entry));
     lastFailedId = started.id;
   }
 

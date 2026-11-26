@@ -9,8 +9,10 @@ const { getCurrentUser, getCurrentTimeZoneSetting } = vi.hoisted(() => ({
   getCurrentUser: vi.fn(),
   getCurrentTimeZoneSetting: vi.fn(),
 }));
-vi.mock("@/modules/identity", () => ({
-  getCurrentUser,
+vi.mock("@/modules/identity", async () => ({
+  ...(
+    await import("@/shared/kernel/testing/owner-access-mock")
+  ).identityOwnerMock(getCurrentUser),
   getCurrentTimeZoneSetting,
 }));
 vi.mock("@/shared/db/client", () => ({ getDb: () => ({}) }));
@@ -116,6 +118,20 @@ describe("getDueToday", () => {
     ).toEqual({
       ok: false,
       error: expect.objectContaining({ code: "SCHEDULING_SESSION_REQUIRED" }),
+    });
+  });
+
+  it("refuses an account with pending terms", async () => {
+    getCurrentUser.mockResolvedValue({
+      id: "owner-1",
+      denied: "terms_required",
+    });
+
+    expect(
+      await getDueToday({ timeZone: "America/Bogota", now: RENDERED_AT }),
+    ).toEqual({
+      ok: false,
+      error: expect.objectContaining({ code: "IDENTITY_TERMS_REQUIRED" }),
     });
   });
 

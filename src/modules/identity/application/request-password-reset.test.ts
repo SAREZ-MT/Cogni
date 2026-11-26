@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { requestPasswordReset } from "./request-password-reset";
 import { FakeAuthGateway } from "./testing/fake-auth-gateway";
-import { updatePassword } from "./update-password";
 
 const SITE_URL = "https://cogni.test";
 
@@ -47,29 +46,6 @@ describe("requestPasswordReset", () => {
       { email: "ana" },
       { auth, siteUrl: SITE_URL },
     );
-
-    expect(result.ok).toBe(false);
-    expect(auth.calls).toHaveLength(0);
-  });
-});
-
-describe("updatePassword", () => {
-  it("forwards a valid new password", async () => {
-    const auth = new FakeAuthGateway();
-
-    const result = await updatePassword(
-      { password: "nueva-clave-123" },
-      { auth },
-    );
-
-    expect(result.ok).toBe(true);
-    expect(auth.calls[0]).toMatchObject({ method: "updatePassword" });
-  });
-
-  it("rejects a short password", async () => {
-    const auth = new FakeAuthGateway();
-
-    const result = await updatePassword({ password: "corta" }, { auth });
 
     expect(result.ok).toBe(false);
     expect(auth.calls).toHaveLength(0);

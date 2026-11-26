@@ -107,6 +107,31 @@ describe("planExhaustion", () => {
     );
   });
 
+  it("exhausts the shared day key of an entry with a shared budget", () => {
+    const shared: ProviderEntry = {
+      id: "openrouter-a",
+      model: "a:free",
+      capabilities: ["generate_flashcards"],
+      rpm: 20,
+      rpd: 1000,
+      priority: 3,
+      quotaKey: "openrouter-free",
+    };
+    const plan = planExhaustion({
+      prefix: "cogni:dev",
+      providerId: "openrouter-a",
+      entries: [...entries, shared],
+      now,
+    });
+    expect(plan.ok && plan.plan.dayKey).toBe(
+      "cogni:dev:ai:quota:openrouter-free:2026-10-04",
+    );
+    expect(plan.ok && plan.plan.backupKey).toBe(
+      "cogni:dev:ai:smoke:backup:openrouter-free",
+    );
+    expect(plan.ok && plan.plan.value).toBe(1000);
+  });
+
   it("never produces a user rate limit key", () => {
     const plan = planExhaustion({
       prefix: "cogni:dev",

@@ -79,7 +79,7 @@ function generation(id: string): AiGeneration {
     purpose: "generate_exam_variants",
     provider: "gemini-flash-lite",
     model: "gemini-3.5-flash-lite",
-    promptVersion: "generate_exam_variants/v1",
+    promptVersion: "generate_exam_variants/v2",
     inputTokens: 10,
     outputTokens: 20,
     latencyMs: 5,
@@ -279,7 +279,7 @@ describe("startExamRetake", () => {
     // One AI call, one unit consumed after success.
     expect(ai.calls).toHaveLength(1);
     expect(ai.calls[0]?.purpose).toBe("generate_exam_variants");
-    expect(ai.calls[0]?.promptVersion).toBe("generate_exam_variants/v1");
+    expect(ai.calls[0]?.promptVersion).toBe("generate_exam_variants/v2");
     expect(limiter.checks).toBe(1);
 
     const failed = seeded.slice(0, 4);
@@ -347,6 +347,21 @@ describe("startExamRetake", () => {
     expect(again.session).toEqual(startedOf(first).session);
     expect(ai.calls).toHaveLength(1);
     expect(limiter.checks).toBe(1);
+  });
+
+  it("refuses a two-call retake with one unit left, without calling the AI or storing anything", async () => {
+    const { uow, ai, limiter, deps } = setup({ remaining: 1 });
+    await seedFailedExam(uow, { seeded: 22, asked: 20, failed: 16 });
+    const before = await storedState(uow);
+    const result = await startExamRetake(
+      { pageId: PAGE, requestedCount: 20 },
+      deps,
+      OWNER,
+    );
+    expectError(result, AI_ERROR.DAILY_LIMIT_REACHED);
+    expect(ai.calls).toHaveLength(0);
+    expect(limiter.checks).toBe(0);
+    expect(await storedState(uow)).toEqual(before);
   });
 
   it("refuses when the daily limit is exhausted, without calling the AI or storing anything", async () => {
@@ -420,7 +435,7 @@ describe("startExamRetake", () => {
     }
   });
 
-  it("splits more than 15 failed roots into calls of at most 15 and still consumes one unit", async () => {
+  it("splits more than 15 failed roots into calls of at most 15, one unit each", async () => {
     const { uow, ai, limiter, deps } = setup();
     await seedFailedExam(uow, { seeded: 20, asked: 20, failed: 16 });
     const result = await startExamRetake(
@@ -430,7 +445,8 @@ describe("startExamRetake", () => {
     );
     expect(result.ok).toBe(true);
     expect(ai.calls.map((c) => promptRoots(c.prompt).length)).toEqual([8, 8]);
-    expect(limiter.checks).toBe(1);
+    expect(limiter.checks).toBe(2);
+    expect(startedOf(result).remainingToday).toBe(3);
   });
 
   it("reuses unshown variants that already exist for every failed root, without an AI call", async () => {

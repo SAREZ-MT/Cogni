@@ -8,6 +8,24 @@ import type { AiPurpose } from "../../domain/purpose";
 // (§8.1).
 
 const text = z.string().trim().min(1);
+
+// Size caps of the texts and lists whose content follows untrusted input (a
+// student's answer or page): generous for a real answer, small enough that
+// an injected instruction cannot make the model return unbounded output
+// (security-hardening S2). An answer over a cap is a failure, like any
+// other answer that does not fit.
+// The concept caps equal what a manual rubric may hold (active-recall's
+// edit action: 30 key concepts of 500 characters), since an evaluation
+// copies the rubric's concepts; the text cap equals a manual field (4,000).
+export const MAX_OUTPUT_CONCEPT_LENGTH = 500;
+export const MAX_OUTPUT_CONCEPTS = 30;
+export const MAX_OUTPUT_TEXT_LENGTH = 4000;
+export const MAX_OUTPUT_LIST_ITEMS = 15;
+
+const concept = text.max(MAX_OUTPUT_CONCEPT_LENGTH);
+const concepts = z.array(concept).max(MAX_OUTPUT_CONCEPTS);
+const longText = text.max(MAX_OUTPUT_TEXT_LENGTH);
+const longTexts = z.array(longText).max(MAX_OUTPUT_LIST_ITEMS);
 const options = z.array(text).length(4);
 const correctIndex = z.number().int().min(0).max(3);
 
@@ -49,8 +67,8 @@ export const recallQuestionsOutput = z.object({
       z.object({
         prompt: text,
         rubric: z.object({
-          keyConcepts: z.array(text),
-          acceptableAnswerSummary: text,
+          keyConcepts: concepts,
+          acceptableAnswerSummary: longText,
         }),
       }),
     )
@@ -59,17 +77,30 @@ export const recallQuestionsOutput = z.object({
 
 export const recallEvaluationOutput = z.object({
   score: z.number().int().min(0).max(5),
-  presentConcepts: z.array(text),
-  missingConcepts: z.array(text),
-  misconceptions: z.array(text),
-  justification: text,
+  presentConcepts: concepts,
+  missingConcepts: concepts,
+  misconceptions: longTexts,
+  justification: longText,
+});
+
+// One recall session at most (RECALL_SESSION_SIZE): every written answer of
+// a session is evaluated in one call (evaluate_recall_answer/v3).
+export const MAX_EVALUATED_ANSWERS = 10;
+
+// The batched evaluation: one entry per answer item, keyed by the item's id.
+// The caller checks that every id it sent comes back exactly once.
+export const recallEvaluationsOutput = z.object({
+  evaluations: z
+    .array(recallEvaluationOutput.extend({ questionId: text }))
+    .min(1)
+    .max(MAX_EVALUATED_ANSWERS),
 });
 
 export const sessionFeedbackOutput = z.object({
-  summary: text,
-  strengths: z.array(text),
-  toReinforce: z.array(text),
-  nextStepSuggestion: text,
+  summary: longText,
+  strengths: longTexts,
+  toReinforce: longTexts,
+  nextStepSuggestion: longText,
 });
 
 const OUTPUT_SCHEMAS = {
@@ -77,7 +108,7 @@ const OUTPUT_SCHEMAS = {
   generate_exam_questions: examQuestionsOutput,
   generate_exam_variants: examVariantsOutput,
   generate_recall_questions: recallQuestionsOutput,
-  evaluate_recall_answer: recallEvaluationOutput,
+  evaluate_recall_answer: recallEvaluationsOutput,
   session_feedback: sessionFeedbackOutput,
 } as const satisfies Record<AiPurpose, z.ZodType>;
 
@@ -94,4 +125,5 @@ export type ExamQuestionsOutput = z.infer<typeof examQuestionsOutput>;
 export type ExamVariantsOutput = z.infer<typeof examVariantsOutput>;
 export type RecallQuestionsOutput = z.infer<typeof recallQuestionsOutput>;
 export type RecallEvaluationOutput = z.infer<typeof recallEvaluationOutput>;
+export type RecallEvaluationsOutput = z.infer<typeof recallEvaluationsOutput>;
 export type SessionFeedbackOutput = z.infer<typeof sessionFeedbackOutput>;

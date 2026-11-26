@@ -21,9 +21,9 @@ function toNotebook(row: NotebookRow): Notebook {
 export class DrizzleNotebookRepository implements NotebookRepository {
   constructor(private readonly db: Db) {}
 
-  async findById(id: string): Promise<Notebook | null> {
+  async findById(id: string, ownerId: string): Promise<Notebook | null> {
     const row = await this.db.query.notebooks.findFirst({
-      where: eq(notebooks.id, id),
+      where: and(eq(notebooks.id, id), eq(notebooks.ownerId, ownerId)),
     });
     return row ? toNotebook(row) : null;
   }
@@ -63,7 +63,12 @@ export class DrizzleNotebookRepository implements NotebookRepository {
         archivedAt: notebook.archivedAt,
         updatedAt: notebook.updatedAt,
       })
-      .where(eq(notebooks.id, notebook.id));
+      .where(
+        and(
+          eq(notebooks.id, notebook.id),
+          eq(notebooks.ownerId, notebook.ownerId),
+        ),
+      );
   }
 
   async listActiveByOwner(ownerId: string): Promise<Notebook[]> {

@@ -24,6 +24,9 @@ if (posthogKey) {
     autocapture: false,
     capture_pageview: false,
     capture_pageleave: false,
+    // Session replay needs explicit opt-in consent. Keep it off in code so
+    // a project-side toggle in PostHog cannot turn it on by itself.
+    disable_session_recording: true,
     persistence: "localStorage+cookie",
   });
 }

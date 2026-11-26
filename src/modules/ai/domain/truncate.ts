@@ -13,6 +13,17 @@ export interface TruncationResult {
   wordsTotal: number;
 }
 
+// The same estimate as a single number: ceil(words / 0.75).
+export function estimateTokens(text: string): number {
+  const words = text.match(WORD_PATTERN)?.length ?? 0;
+  return Math.ceil(words / WORDS_PER_TOKEN);
+}
+
+// The largest evaluate_recall_answer prompt (system + prompt, estimated)
+// a batched evaluation aims for: under Groq's 7K prompt ceiling with room
+// for the evaluations it writes back inside the 8K TPM window.
+export const EVALUATION_PROMPT_TOKEN_BUDGET = 6500;
+
 export function truncateToTokenCap(
   text: string,
   cap: number,

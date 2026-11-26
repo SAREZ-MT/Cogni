@@ -60,7 +60,7 @@ describe("storeImportedAsset use case", () => {
     expect(upload.bytes).toBe(PNG_BYTES);
     expect(isCanonicalStoragePath(OWNER_ID, page.id, upload.path)).toBe(true);
     expect(upload.path.endsWith(".png")).toBe(true);
-    const asset = await deps.assets.findById(result.value.assetId);
+    const asset = await deps.assets.findById(result.value.assetId, OWNER_ID);
     expect(asset).toMatchObject({
       ownerId: OWNER_ID,
       pageId: page.id,
@@ -115,7 +115,7 @@ describe("storeImportedAsset use case", () => {
       deps,
       OTHER_OWNER_ID,
     );
-    await markPageArchived(deps.pages, page.id);
+    await markPageArchived(deps.pages, page.id, OWNER_ID);
     const archived = await storeImportedAsset(
       { pageId: page.id, bytes: PNG_BYTES, mime: "image/png" },
       deps,

@@ -49,6 +49,7 @@ export function buildEvaluationDeps(
     pages: createNotebooksServerApi({ db, clock: systemClock }),
     ai,
     limiter: ai.evaluationLimiter,
+    runLimiter: ai.evaluationRunLimiter,
     reviews: createRecallReviewRecorder({ db, ids }),
     clock: systemClock,
     dueCutoff,

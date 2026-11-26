@@ -1,5 +1,6 @@
 import type { Clock } from "@/shared/kernel/clock";
 import type { Profile } from "./profile";
+import { safeNext } from "./safe-next";
 
 // Date of the current legal documents (src/content/legal, the terms and the
 // privacy policy accepted together at sign-up). Bumping it asks every
@@ -36,9 +37,5 @@ export function termsRedirectFor(
   currentPath: string | null,
 ): string | null {
   if (!profile || hasAcceptedCurrentTerms(profile)) return null;
-  const next =
-    currentPath?.startsWith("/") && !currentPath.startsWith("//")
-      ? currentPath
-      : "/inicio";
-  return `${TERMS_PATH}?next=${encodeURIComponent(next)}`;
+  return `${TERMS_PATH}?next=${encodeURIComponent(safeNext(currentPath))}`;
 }

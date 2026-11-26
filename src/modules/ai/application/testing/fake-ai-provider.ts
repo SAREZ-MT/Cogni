@@ -7,7 +7,10 @@ import type {
 export type FakeOutcome =
   | { object: unknown }
   | { throw: Error }
-  | { invalid: true };
+  | { invalid: true }
+  // Never settles and ignores the abort signal, like a stuck provider whose
+  // SDK call does not honour cancellation.
+  | { hang: true };
 
 // Plays a scripted queue of outcomes, one per call, and records every request.
 // An exhausted script throws so an unexpected extra call fails loudly.
@@ -30,6 +33,7 @@ export class FakeAiProvider implements AiProvider {
     const outcome = this.queue.shift();
     if (!outcome) throw new Error("FakeAiProvider script exhausted");
     if ("throw" in outcome) throw outcome.throw;
+    if ("hang" in outcome) return new Promise<never>(() => {});
     const object = "invalid" in outcome ? { unexpected: true } : outcome.object;
     return {
       object,

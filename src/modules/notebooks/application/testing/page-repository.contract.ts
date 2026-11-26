@@ -71,7 +71,7 @@ export function runPageRepositoryContract(
       });
 
       expect(result).toEqual({ updated: true, version: 4 });
-      const stored = await repository.findById(ids.pageId);
+      const stored = await repository.findById(ids.pageId, ids.ownerId);
       expect(stored?.contentVersion).toBe(4);
       expect(stored?.plainText).toBe("hola");
     });
@@ -90,7 +90,7 @@ export function runPageRepositoryContract(
       });
 
       expect(result).toEqual({ updated: false, currentVersion: 4 });
-      const stored = await repository.findById(ids.pageId);
+      const stored = await repository.findById(ids.pageId, ids.ownerId);
       expect(stored?.contentVersion).toBe(4);
       expect(stored?.plainText).toBe("");
     });
@@ -109,7 +109,7 @@ export function runPageRepositoryContract(
       });
 
       expect(result.updated).toBe(false);
-      const stored = await repository.findById(ids.pageId);
+      const stored = await repository.findById(ids.pageId, ids.ownerId);
       expect(stored?.contentVersion).toBe(1);
     });
 
@@ -132,6 +132,36 @@ export function runPageRepositoryContract(
       });
 
       expect(result).toEqual({ updated: false, currentVersion: 0 });
+    });
+  });
+
+  describe("PageRepository owner scope contract", () => {
+    it("finds a page only for its owner", async () => {
+      const repository = createRepository();
+      await repository.create(makePage(ids));
+
+      expect((await repository.findById(ids.pageId, ids.ownerId))?.id).toBe(
+        ids.pageId,
+      );
+      expect(
+        await repository.findById(ids.pageId, ids.otherOwnerId),
+      ).toBeNull();
+    });
+
+    it("writes nothing when the updated page names another owner", async () => {
+      const repository = createRepository();
+      const page = makePage(ids);
+      await repository.create(page);
+
+      await repository.update({
+        ...page,
+        ownerId: ids.otherOwnerId,
+        title: "Intruso",
+      });
+
+      const stored = await repository.findById(ids.pageId, ids.ownerId);
+      expect(stored?.title).toBe("Sin título");
+      expect(stored?.ownerId).toBe(ids.ownerId);
     });
   });
 }

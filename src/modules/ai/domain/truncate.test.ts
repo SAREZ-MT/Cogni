@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { truncateToTokenCap } from "./truncate";
+import { estimateTokens, truncateToTokenCap } from "./truncate";
 
 const words = (n: number) =>
   Array.from({ length: n }, (_, i) => `w${i}`).join(" ");
@@ -48,5 +48,14 @@ describe("truncateToTokenCap", () => {
     // 12000 tokens -> 9000 words.
     expect(truncateToTokenCap(words(9000), 12000).truncated).toBe(false);
     expect(truncateToTokenCap(words(9001), 12000).wordsUsed).toBe(9000);
+  });
+});
+
+describe("estimateTokens", () => {
+  it("is ceil(words / 0.75), the estimate the cap uses", () => {
+    expect(estimateTokens("")).toBe(0);
+    expect(estimateTokens(words(3))).toBe(4);
+    expect(estimateTokens(words(9000))).toBe(12000);
+    expect(estimateTokens("a\n\nb  c")).toBe(4);
   });
 });

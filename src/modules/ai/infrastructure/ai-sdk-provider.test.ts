@@ -47,7 +47,28 @@ describe("createAiSdkProvider", () => {
       prompt: "prompt",
       temperature: 0.4,
       maxOutputTokens: 800,
+      maxRetries: 0,
+      abortSignal: undefined,
     });
+  });
+
+  it("disables SDK retries and forwards the abort signal", async () => {
+    const generateObject = vi.fn().mockResolvedValue({
+      object: {},
+      usage: { inputTokens: 1, outputTokens: 1 },
+    });
+    const provider = createAiSdkProvider({
+      id: "p",
+      modelId: "m",
+      model,
+      generateObject,
+    });
+    const signal = new AbortController().signal;
+    await provider.generateObject({ ...request(), signal });
+
+    const options = generateObject.mock.calls[0][0];
+    expect(options.maxRetries).toBe(0);
+    expect(options.abortSignal).toBe(signal);
   });
 
   it("maps the object, usage and measured latency", async () => {

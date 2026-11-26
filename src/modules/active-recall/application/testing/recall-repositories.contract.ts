@@ -29,6 +29,12 @@ export interface RecallRepositoriesContractContext {
   // A fresh page owned by `ownerId`. Async so the DB runner can insert the
   // real page row (FK).
   readonly newPageId: () => Promise<string>;
+  // A page on which `otherOwnerId` can hold rows next to the rows `ownerId`
+  // has on `pageId`. The database ties every row to its page's owner
+  // (`<table>_page_owner_fk`), so its runner returns a fresh page of the
+  // other owner; the in-memory doubles have no pages table and return
+  // `pageId` itself, so they still prove owner filtering on one page.
+  readonly otherOwnerPageFor: (pageId: string) => Promise<string>;
   // A fresh AI generation of `ownerId` (FK of AI questions and answers).
   readonly newGenerationId: () => Promise<string>;
 }
@@ -350,9 +356,12 @@ export function runRecallRepositoriesContract(
       const third = session(ctx, pageId, { startedAt: T2 });
       for (const s of [second, third, first]) await sessions.create(s);
       await sessions.create(session(ctx, await ctx.newPageId()));
-      await sessions.create(
-        session(ctx, pageId, { ownerId: ctx.otherOwnerId, startedAt: T3 }),
-      );
+      const theirPageId = await ctx.otherOwnerPageFor(pageId);
+      const theirs = session(ctx, theirPageId, {
+        ownerId: ctx.otherOwnerId,
+        startedAt: T3,
+      });
+      await sessions.create(theirs);
       expect(await sessions.listByPage(pageId, ctx.ownerId, 2)).toEqual([
         third,
         second,
@@ -362,6 +371,11 @@ export function runRecallRepositoriesContract(
         second,
         first,
       ]);
+      // The other owner never sees this owner's sessions on the page: only
+      // its own, when the store lets it hold one there.
+      expect(await sessions.listByPage(pageId, ctx.otherOwnerId, 10)).toEqual(
+        theirPageId === pageId ? [theirs] : [],
+      );
     });
 
     it("listByPage breaks startedAt ties by id, descending", async () => {
@@ -388,7 +402,7 @@ export function runRecallRepositoriesContract(
       await sessions.create(a);
       await sessions.create(b);
       await sessions.create(
-        session(ctx, await ctx.newPageId(), {
+        session(ctx, await ctx.otherOwnerPageFor(await ctx.newPageId()), {
           ownerId: ctx.otherOwnerId,
           startedAt: new Date("2999-02-01T00:00:00.000Z"),
         }),
@@ -465,7 +479,9 @@ export function runRecallRepositoriesContract(
       const ctx = options.context();
       const repos = options.createRepositories();
       const { questions, pageId } = await seeded(ctx, repos);
-      const foreign = session(ctx, pageId, { ownerId: ctx.otherOwnerId });
+      const foreign = session(ctx, await ctx.otherOwnerPageFor(pageId), {
+        ownerId: ctx.otherOwnerId,
+      });
       await repos.sessions.create(foreign);
       const a = { ...answer(ctx, foreign, questions[0]), ownerId: ctx.ownerId };
       await expect(repos.answers.upsert(a)).rejects.toThrow();
@@ -478,7 +494,9 @@ export function runRecallRepositoriesContract(
       const ctx = options.context();
       const repos = options.createRepositories();
       const { pageId, session: s } = await seeded(ctx, repos);
-      const foreign = question(ctx, pageId, { ownerId: ctx.otherOwnerId });
+      const foreign = question(ctx, await ctx.otherOwnerPageFor(pageId), {
+        ownerId: ctx.otherOwnerId,
+      });
       await repos.questions.saveMany([foreign]);
       await expect(
         repos.answers.upsert(answer(ctx, s, foreign)),

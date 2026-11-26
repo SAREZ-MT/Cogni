@@ -31,7 +31,7 @@ async function shot(page: Page, name: string) {
 test.describe("techniques panel generated list", () => {
   test.skip(!hasSupabaseEnv, "Supabase env (cogni-dev) is not configured");
 
-  // A test-scoped user: the fake AI daily limit (6 per owner, in server
+  // A test-scoped user: the fake AI daily limit (20 per owner, in server
   // memory) is not shared with the other AI-spending specs.
   test.beforeEach(async ({ page, freshUser }) => {
     await signIn(page, freshUser);
@@ -112,7 +112,7 @@ test.describe("techniques panel generated list", () => {
     const examRow = panel.getByTestId("generated-item-exam");
     await expect(examRow).toContainText("10 preguntas", { timeout: 30000 });
     await expect(panel.getByTestId("generation-remaining")).toHaveText(
-      "Te quedan 3 generaciones hoy",
+      "Te quedan 17 generaciones hoy",
     );
     await expect(panel.getByTestId("generate-exam-questions")).toHaveText(
       "Generar",

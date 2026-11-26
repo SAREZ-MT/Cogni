@@ -24,7 +24,8 @@ vi.mock("./infrastructure", () => ({
   }),
 }));
 
-import { getCurrentTimeZoneSetting } from "./index";
+import { TERMS_VERSION } from "./domain";
+import { getCurrentTimeZoneSetting, requireOwner } from "./index";
 
 beforeEach(() => {
   getUser.mockReset();
@@ -79,5 +80,56 @@ describe("getCurrentTimeZoneSetting", () => {
 
     await expect(getCurrentTimeZoneSetting()).rejects.toBe(control);
     expect(captureException).not.toHaveBeenCalled();
+  });
+});
+
+// requireOwner (security hardening S4a): the production wiring of the owner
+// gate, session from Supabase and profile from the repository.
+describe("requireOwner", () => {
+  const acceptedProfile = {
+    id: "u-42",
+    termsAcceptedVersion: TERMS_VERSION,
+  };
+
+  it("grants the session user whose profile accepted the current terms", async () => {
+    findById.mockResolvedValue(acceptedProfile);
+
+    expect(await requireOwner()).toEqual({
+      status: "granted",
+      ownerId: "u-42",
+    });
+    expect(findById).toHaveBeenCalledWith("u-42");
+  });
+
+  it("denies without a session and reads no profile", async () => {
+    getUser.mockResolvedValue({ data: { user: null } });
+
+    expect(await requireOwner()).toEqual({
+      status: "denied",
+      reason: "session_required",
+    });
+    expect(findById).not.toHaveBeenCalled();
+  });
+
+  it("denies a profile with pending terms", async () => {
+    findById.mockResolvedValue({
+      ...acceptedProfile,
+      termsAcceptedVersion: null,
+    });
+
+    expect(await requireOwner()).toEqual({
+      status: "denied",
+      reason: "terms_required",
+    });
+  });
+
+  it("fails closed and reports when the profile cannot be read", async () => {
+    findById.mockRejectedValue(new Error("db down"));
+
+    expect(await requireOwner()).toEqual({
+      status: "denied",
+      reason: "profile_unavailable",
+    });
+    expect(captureException).toHaveBeenCalled();
   });
 });

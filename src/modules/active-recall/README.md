@@ -25,7 +25,7 @@ Implementado:
   `recall_answers` (migración `0012`) con repositorios Drizzle y en memoria.
 - `application/request-recall-generation.ts`: generación con IA de 10
   preguntas abiertas con rúbrica por llamada (prompt
-  `generate_recall_questions/v1`, §8.4). Consulta el límite diario con
+  `generate_recall_questions/v2`, §8.4). Consulta el límite diario con
   `peek` y lo consume con `check` solo después de guardar: una generación
   fallida no gasta la unidad. Guarda las preguntas y un
   `StudyItem(kind = "recall_question")` por pregunta en una sola unidad de
@@ -63,17 +63,29 @@ Implementado:
   programa `evaluateRecallSession` con `after()` (la página de la sesión
   declara `maxDuration = 300`, ADR 0003); cerrar nunca espera a la IA.
   `evaluateRecallSession` reclama las respuestas pendientes (un reclamo de
-  más de 6 minutos se retoma), y por cada una: saltada → registro
-  `skipped`, puntaje IA 0, sin modelo ni unidad; escrita → una llamada
-  `evaluate_recall_answer/v1` con la rúbrica y el fragmento de la página más
-  parecido a la pregunta (`selectRelevantFragment`, recortado a
-  `AI_PAGE_TOKEN_CAP`), se guarda la salida cruda, el puntaje IA y la
-  calidad combinada (`done`); si fallan todos los proveedores se guarda el
-  intento fallido `{ source: "failed", code, generationId }` (`failed`: sin
-  calidad combinada, sin repaso SM-2, la pregunta sigue vencida). Límite
-  `AI_DAILY_EVALUATIONS` (60 respuestas evaluadas por el modelo al día): se
-  consulta antes de la llamada y se consume solo tras una evaluación
-  `done`; **si se alcanzó, la respuesta queda `failed`** con
+  más de 6 minutos se retoma): saltada → registro `skipped`, puntaje IA 0,
+  sin modelo ni unidad; las escritas → **una sola llamada**
+  `evaluate_recall_answer/v3` para todas, cada una con su rúbrica y el
+  fragmento de la página más parecido a su pregunta (`selectRelevantFragment`;
+  `fragmentTokenCap`: una respuesta sola conserva todo `AI_PAGE_TOKEN_CAP`
+  aunque el prompt pase el techo de 7K de Groq y vaya a un proveedor mayor;
+  con dos o más, los fragmentos se reparten lo que el resto del prompt deja
+  de `EVALUATION_PROMPT_TOKEN_BUDGET` (6.500, nunca más que el tope de
+  página), para que la llamada quepa en los 8K TPM de Groq; si esa parte
+  queda por debajo de `MIN_FRAGMENT_TOKENS` (150), cada fragmento recibe ese
+  mínimo, limitado por su parte del tope de página: el tamaño baja de forma
+  continua, nunca llega a cero y el prompt, si pasa el presupuesto, solo
+  salta Groq). La salida se valida por
+  respuesta: un id desconocido o repetido, o una salida inválida, falla todas;
+  una respuesta sin evaluación falla sola (nunca pasa sin la suya). Se guarda
+  por respuesta la salida cruda, el puntaje IA y la calidad combinada
+  (`done`); si fallan todos los proveedores se guarda el intento fallido
+  `{ source: "failed", code, generationId }` (`failed`: sin calidad
+  combinada, sin repaso SM-2, la pregunta sigue vencida). Límite
+  `AI_DAILY_EVALUATIONS` (10 sesiones evaluadas por el modelo al día): se
+  consulta una vez antes de la llamada y se consume una unidad por sesión
+  solo si alguna respuesta queda `done`; **si se alcanzó, las respuestas
+  quedan `failed`** con
   `code: AI_DAILY_LIMIT_REACHED` y `resetAt` (nunca queda pendiente, así la
   sesión termina `partial` y "Reintentar" la evalúa cuando se renueve la
   ventana). Después registra los repasos SM-2 de las respuestas `done`

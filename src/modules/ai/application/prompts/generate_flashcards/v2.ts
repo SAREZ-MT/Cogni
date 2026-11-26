@@ -1,4 +1,6 @@
-export const GENERATE_FLASHCARDS_PROMPT_VERSION = "generate_flashcards/v1";
+import { titleLine, untrustedDataRule, wrapUntrusted } from "../untrusted";
+
+export const GENERATE_FLASHCARDS_PROMPT_VERSION = "generate_flashcards/v2";
 
 export interface GenerateFlashcardsPromptInput {
   pageTitle: string;
@@ -25,14 +27,14 @@ export function buildGenerateFlashcardsPrompt(
     `Produce exactly ${input.count} cards.`,
     "Derive every card strictly from the provided text: do not add facts, examples or definitions that the text does not contain.",
     "Do not repeat the same idea in two cards. Keep fronts and backs concise.",
+    untrustedDataRule(["page_text"]),
   ].join("\n");
 
   const prompt = [
-    `Page title: ${input.pageTitle}`,
+    `Page title: ${titleLine(input.pageTitle)}`,
     `Number of flashcards: ${input.count}`,
     "",
-    "Text:",
-    input.pageText,
+    wrapUntrusted("page_text", input.pageText),
   ].join("\n");
 
   return { system, prompt, temperature: TEMPERATURE };

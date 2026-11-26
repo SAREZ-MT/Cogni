@@ -3,6 +3,7 @@ import { DomainError } from "@/shared/kernel/domain-error";
 import { err, ok, type Result } from "@/shared/kernel/result";
 import { AUTH_ERROR } from "../domain/auth-errors";
 import type { AuthGateway, SignUpResult } from "../domain/auth-gateway";
+import type { AuthenticationEvent } from "../domain/password-change";
 
 type AuthApi = Pick<
   SupabaseClient["auth"],
@@ -11,6 +12,7 @@ type AuthApi = Pick<
   | "signOut"
   | "resetPasswordForEmail"
   | "updateUser"
+  | "getClaims"
   | "signInWithOAuth"
 >;
 
@@ -89,6 +91,35 @@ export class SupabaseAuthGateway implements AuthGateway {
       redirectTo: input.redirectTo,
     });
     return error ? err(providerError(error.message)) : ok(undefined);
+  }
+
+  // getClaims verifies the access token (signature and expiry) before its
+  // claims are read. Only `amr` entries that carry a timestamp count: the
+  // bare string form cannot prove when the step happened.
+  async currentAuthentication(): Promise<
+    Result<AuthenticationEvent[], DomainError>
+  > {
+    let amr: unknown;
+    try {
+      const { data, error } = await this.auth.getClaims();
+      if (error) return err(providerError(error.message));
+      amr = data?.claims.amr;
+    } catch (error) {
+      // getClaims throws (instead of returning an error) for a token it
+      // cannot parse or an unsupported algorithm.
+      return err(
+        providerError(error instanceof Error ? error.message : "claims failed"),
+      );
+    }
+    if (!Array.isArray(amr)) return ok([]);
+    const events: AuthenticationEvent[] = [];
+    for (const entry of amr) {
+      if (!entry || typeof entry !== "object") continue;
+      const { method, timestamp } = entry as Record<string, unknown>;
+      if (typeof method !== "string" || typeof timestamp !== "number") continue;
+      events.push({ method, at: new Date(timestamp * 1000) });
+    }
+    return ok(events);
   }
 
   async updatePassword(input: {

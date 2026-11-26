@@ -49,7 +49,7 @@ export async function writeImportedContent(
     );
   }
 
-  const page = await deps.pages.findById(parsed.value.pageId);
+  const page = await deps.pages.findById(parsed.value.pageId, ownerId);
   if (!page || page.ownerId !== ownerId || page.archivedAt) {
     return err(new DomainError(PAGE_ERROR.NOT_FOUND, parsed.value.pageId));
   }

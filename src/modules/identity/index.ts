@@ -8,9 +8,10 @@ import {
   getTimeZoneSetting,
   type RecordedSignUpConsent,
   recordSignUpConsent,
+  resolveOwnerAccess,
   type TimeZoneSetting,
 } from "./application";
-import type { Profile } from "./domain";
+import type { OwnerAccess, Profile } from "./domain";
 import {
   consentFromCookie,
   consentFromMetadata,
@@ -27,18 +28,26 @@ import {
 // this file pulls server-only modules and cannot enter a client bundle.
 export { AUTH_CALLBACK_PATH, safeNext } from "./application";
 export {
+  ACCESS_ERROR,
   AUTH_FLOW_COOKIE,
   AUTH_FLOW_COOKIE_MAX_AGE_SECONDS,
   GOOGLE_AUTH_FLOW,
   hasAcceptedCurrentTerms,
   hasChosenTimeZone,
   isGoogleAuthFlow,
+  ownerAccessError,
   TERMS_CONSENT_COOKIE,
   TERMS_PATH,
   TERMS_VERSION,
   termsRedirectFor,
 } from "./domain";
-export type { Profile, RecordedSignUpConsent, SessionUser, TimeZoneSetting };
+export type {
+  OwnerAccess,
+  Profile,
+  RecordedSignUpConsent,
+  SessionUser,
+  TimeZoneSetting,
+};
 
 // The shell's time-zone read with an explicit failure state: a failed read
 // still carries the UTC display fallback (the calendar keeps working), but
@@ -75,6 +84,17 @@ export async function ensureProfileForUser(
       onTransientFailure: (error) => Sentry.captureException(error),
     },
   );
+}
+
+// The gate of every Server Action: a session, a loadable profile and the
+// current terms accepted. The (app) layout only guards rendered routes, and
+// a Server Action can be called directly, so each one asks again. A profile
+// that cannot be loaded denies access (fail closed).
+export async function requireOwner(): Promise<OwnerAccess> {
+  return resolveOwnerAccess({
+    currentUser: getCurrentUser,
+    loadProfile: ensureProfileForUser,
+  });
 }
 
 // The signed-in user's time zone for presentation (calendar "Hoy", the

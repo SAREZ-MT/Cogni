@@ -46,11 +46,32 @@ const serverObject = clientSchema.extend({
   REDIS_KEY_PREFIX: z.string().min(1).default("cogni:dev"),
   // `fake` swaps real providers for a deterministic one (CI, e2e).
   AI_PROVIDER_MODE: z.enum(["live", "fake"]).default("live"),
-  AI_DAILY_GENERATIONS: z.coerce.number().int().positive().default(6),
-  // Per-user daily answers evaluated by the model (active recall, SRS
-  // RF-AI-03); a skipped answer never counts.
-  AI_DAILY_EVALUATIONS: z.coerce.number().int().positive().default(60),
+  // Per-user daily generations (S1b): one unit per model call that
+  // generates, so an exam or retake of two batches costs two.
+  AI_DAILY_GENERATIONS: z.coerce.number().int().positive().default(20),
+  // Per-user daily recall sessions evaluated by the model (active recall,
+  // SRS RF-AI-03): one unit per session, all its written answers in one
+  // call; a session of only skipped answers never counts.
+  AI_DAILY_EVALUATIONS: z.coerce.number().int().positive().default(10),
+  // Per-user daily session feedbacks written by the model (flashcards and
+  // exams): one unit per feedback requested.
+  AI_DAILY_FEEDBACKS: z.coerce.number().int().positive().default(20),
+  // App-wide daily budgets (S1b), all users together, one unit per provider
+  // attempt. Their sum (1,750) is the free providers' usable daily capacity
+  // with a 20% reserve; a spent budget refuses calls until the next UTC day.
+  AI_GLOBAL_DAILY_GENERATIONS: z.coerce.number().int().positive().default(700),
+  AI_GLOBAL_DAILY_EVALUATIONS: z.coerce.number().int().positive().default(350),
+  AI_GLOBAL_DAILY_FEEDBACKS: z.coerce.number().int().positive().default(700),
   AI_PAGE_TOKEN_CAP: z.coerce.number().int().positive().default(12000),
+  // Set by Vercel: `production`, `preview` or `development`. Unset elsewhere
+  // (local, CI, e2e), which is why the guards below key on it and not on
+  // NODE_ENV: the e2e suite runs a production build in fake mode.
+  VERCEL_ENV: z.string().optional(),
+  // `1` shows the design-preview screens in a production build (see
+  // design-previews.ts, which ignores it on the Vercel production
+  // deployment). Not refused here: a flag left on for every Vercel
+  // environment must not take production down.
+  COGNI_DESIGN_PREVIEWS: z.string().optional(),
 });
 
 export const serverSchema = serverObject.superRefine((env, ctx) => {
@@ -68,6 +89,15 @@ export const serverSchema = serverObject.superRefine((env, ctx) => {
     missing(
       "CLOUDFLARE_ACCOUNT_ID",
       "required when CLOUDFLARE_API_TOKEN is set",
+    );
+  }
+
+  // The real deployment never serves canned AI output
+  // (security-hardening S8).
+  if (env.VERCEL_ENV === "production" && env.AI_PROVIDER_MODE === "fake") {
+    missing(
+      "AI_PROVIDER_MODE",
+      "fake is not allowed when VERCEL_ENV=production",
     );
   }
 

@@ -1,9 +1,12 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   type AiGeneration,
   AiGenerationFailedError,
+  type GenerateStructuredDeps,
   type GenerateStructuredInput,
   type GenerationRateLimit,
+  generateStructured,
+  initialBreakerState,
 } from "@/modules/ai";
 import {
   type FlashcardSession,
@@ -21,6 +24,7 @@ import { DomainError } from "@/shared/kernel/domain-error";
 import { err, ok, type Result } from "@/shared/kernel/result";
 import { createFlashcard } from "../domain";
 import {
+  FEEDBACK_AI_TIMEOUT_MS,
   type RequestSessionFeedbackDeps,
   requestSessionFeedback,
   STALE_PENDING_MS,
@@ -112,7 +116,7 @@ function generation(id = "gen-1"): AiGeneration {
     purpose: "session_feedback",
     provider: "gemini",
     model: "gemini-3.5-flash-lite",
-    promptVersion: "session_feedback/v1",
+    promptVersion: "session_feedback/v3",
     inputTokens: 10,
     outputTokens: 20,
     latencyMs: 5,
@@ -129,6 +133,7 @@ type AiOutcome =
   | "error"
   | "throw"
   | "hang"
+  | "stall"
   | { object: unknown };
 
 function makeAi(outcome: AiOutcome = "ok") {
@@ -146,10 +151,72 @@ function makeAi(outcome: AiOutcome = "ok") {
         return err(new DomainError("AI_NO_PROVIDER_AVAILABLE", "none"));
       }
       if (outcome === "throw") throw new Error("network down");
-      if (outcome === "hang") return new Promise(() => {});
+      // Like generateStructured: a stuck call ends only through the signal.
+      if (outcome === "hang") {
+        return new Promise((_, reject) => {
+          input.signal?.addEventListener("abort", () =>
+            reject(input.signal?.reason),
+          );
+        });
+      }
+      // A call that ignores the signal entirely (a stalled quota, breaker
+      // or audit store inside generateStructured).
+      if (outcome === "stall") return new Promise(() => {});
       const object = outcome === "ok" ? FEEDBACK_OBJECT : outcome.object;
       return ok({ object, generation: generation() });
     },
+  };
+}
+
+// The real generateStructured over two providers: the first never answers
+// and ignores the abort signal, the second answers FEEDBACK_OBJECT.
+function stuckThenHealthyAi() {
+  const answered: string[] = [];
+  const provider = (id: string, stuck: boolean) => ({
+    id,
+    model: `${id}-model`,
+    async generateObject() {
+      if (stuck) return new Promise<never>(() => {});
+      answered.push(id);
+      return {
+        object: FEEDBACK_OBJECT,
+        usage: { inputTokens: 10, outputTokens: 20 },
+        latencyMs: 5,
+      };
+    },
+  });
+  let ids = 0;
+  const deps: GenerateStructuredDeps = {
+    entries: ["stuck", "healthy"].map((id, n) => ({
+      id,
+      model: `${id}-model`,
+      capabilities: ["session_feedback"],
+      rpm: 5,
+      rpd: 10,
+      priority: n + 1,
+    })),
+    providers: new Map([
+      ["stuck", provider("stuck", true)],
+      ["healthy", provider("healthy", false)],
+    ]),
+    budget: { consume: async () => true },
+    quota: {
+      readUsage: async () => ({ day: 0, minute: 0 }),
+      recordCall: async () => {},
+    },
+    breakers: { read: async () => initialBreakerState, write: async () => {} },
+    generations: {
+      create: async () => {},
+      update: async () => {},
+      findById: async () => null,
+    },
+    clock: createFixedClock(NOW),
+    ids: { next: () => `gen-${++ids}` },
+  };
+  return {
+    answered,
+    generateStructured: (input: GenerateStructuredInput, ownerId: string) =>
+      generateStructured(input, deps, ownerId),
   };
 }
 
@@ -161,14 +228,14 @@ interface Fixture {
   logs: ReviewLog[];
   items: Map<string, StudyItem>;
   flashcards: InMemoryFlashcardRepository;
-  peeks: number;
+  checks: number;
 }
 
 let fx: Fixture;
 let nextId = 0;
 
 function build(
-  options: { ai?: AiOutcome; allowed?: boolean; peekThrows?: boolean } = {},
+  options: { ai?: AiOutcome; allowed?: boolean; checkThrows?: boolean } = {},
 ): Fixture {
   const sessions = new Map<string, FlashcardSession>();
   const logs: ReviewLog[] = [];
@@ -183,7 +250,7 @@ function build(
     logs,
     items,
     flashcards,
-    peeks: 0,
+    checks: 0,
     deps: {
       sessions: {
         findById: async (id, ownerId) => {
@@ -209,9 +276,9 @@ function build(
       flashcards,
       feedback,
       limiter: {
-        peek: async (): Promise<GenerationRateLimit> => {
-          fixture.peeks += 1;
-          if (options.peekThrows) throw new Error("redis unavailable");
+        check: async (): Promise<GenerationRateLimit> => {
+          fixture.checks += 1;
+          if (options.checkThrows) throw new Error("redis unavailable");
           return {
             allowed: options.allowed ?? true,
             remaining: options.allowed === false ? 0 : 3,
@@ -331,7 +398,7 @@ describe("requestSessionFeedback", () => {
     expect(call).toMatchObject({
       purpose: "session_feedback",
       pageId: PAGE,
-      promptVersion: "session_feedback/v1",
+      promptVersion: "session_feedback/v3",
     });
     expect(call?.prompt).toContain("Items reviewed: 4");
     expect(call?.prompt).toContain("Again: 1");
@@ -414,7 +481,7 @@ describe("requestSessionFeedback", () => {
 
     expect(second).toEqual(first);
     expect(fx.ai.calls).toHaveLength(1);
-    expect(fx.peeks).toBe(1);
+    expect(fx.checks).toBe(1);
   });
 
   it("never retries a failed feedback", async () => {
@@ -468,7 +535,7 @@ describe("requestSessionFeedback", () => {
   });
 
   it("stores failed feedback when reading the daily limit throws", async () => {
-    fx = build({ peekThrows: true });
+    fx = build({ checkThrows: true });
     await gradedSession();
 
     const result = await requestSessionFeedback(
@@ -623,6 +690,73 @@ describe("requestSessionFeedback", () => {
     });
   });
 
+  // Review F4: each of generateStructured's two provider attempts gets half
+  // of the feedback budget.
+  it("gives each provider attempt half of the feedback budget", async () => {
+    await gradedSession();
+
+    await requestSessionFeedback({ sessionId: SESSION }, fx.deps, OWNER);
+
+    expect(fx.ai.calls[0].timeoutMs).toBe(25);
+    expect(fx.ai.calls[0].signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("produces feedback from the second provider when the first one is stuck", async () => {
+    await gradedSession();
+    const ai = stuckThenHealthyAi();
+
+    const result = await requestSessionFeedback(
+      { sessionId: SESSION },
+      { ...fx.deps, ai, aiTimeoutMs: 200 },
+      OWNER,
+    );
+
+    expect(result.ok && result.value).toMatchObject({
+      status: "done",
+      content: FEEDBACK_OBJECT,
+      generationId: "gen-2",
+    });
+    expect(ai.answered).toEqual(["healthy"]);
+  });
+
+  describe("with fake timers", () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    // Review F3: the whole call is bounded, not only the provider attempts.
+    it("stores failed feedback at the deadline when the AI call ignores the signal", async () => {
+      fx = build({ ai: "stall" });
+      fx.deps.aiTimeoutMs = undefined;
+      await gradedSession();
+      let settled = false;
+      const request = requestSessionFeedback(
+        { sessionId: SESSION },
+        fx.deps,
+        OWNER,
+      ).finally(() => {
+        settled = true;
+      });
+
+      await vi.advanceTimersByTimeAsync(FEEDBACK_AI_TIMEOUT_MS - 1);
+      expect(settled).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+
+      expect(settled).toBe(true);
+      const result = await request;
+      expect(result.ok && result.value).toMatchObject({
+        status: "failed",
+        generationId: null,
+      });
+      expect(fx.feedback.rows.get(SESSION)?.status).toBe("failed");
+      expect(fx.ai.calls[0].timeoutMs).toBe(FEEDBACK_AI_TIMEOUT_MS / 2);
+      expect(fx.ai.calls[0].signal?.aborted).toBe(true);
+    });
+  });
+
   it("stores failed feedback when the AI does not answer in time", async () => {
     fx = build({ ai: "hang" });
     await gradedSession();
@@ -638,6 +772,7 @@ describe("requestSessionFeedback", () => {
       generationId: null,
     });
     expect(fx.feedback.rows.get(SESSION)?.status).toBe("failed");
+    expect(fx.ai.calls[0].signal?.aborted).toBe(true);
   });
 
   describe("a pending row left by an earlier request", () => {
@@ -689,7 +824,7 @@ describe("requestSessionFeedback", () => {
 
       expect(result.ok && result.value).toEqual(row);
       expect(fx.ai.calls).toHaveLength(0);
-      expect(fx.peeks).toBe(0);
+      expect(fx.checks).toBe(0);
     });
 
     it("returns the current row when a concurrent request reclaimed it first", async () => {

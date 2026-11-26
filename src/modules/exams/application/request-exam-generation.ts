@@ -6,6 +6,7 @@ import {
   examQuestionsOutput,
   GENERATE_EXAM_QUESTIONS_PROMPT_VERSION,
   type GenerateStructuredInput,
+  type GenerationRateLimit,
   type GenerationRateLimiter,
   truncateToTokenCap,
 } from "@/modules/ai";
@@ -47,7 +48,8 @@ import { type ExamUnitOfWork, runExamWork } from "./exam-unit-of-work";
 // near 2-3K tokens: far below Gemini Flash-Lite's output window and small
 // enough for the free fallbacks (Workers AI Llama, OpenRouter reasoning
 // models) to answer without being cut off. A 30-question request becomes
-// two calls; it is still ONE generation of the student's daily limit.
+// two calls and costs two units of the student's daily limit (S1c: one
+// unit per model call).
 export const EXAM_GENERATION_BATCH_SIZE = 15;
 
 export const EXAM_PAGE_EMPTY_MESSAGE =
@@ -108,6 +110,26 @@ export interface RequestExamGenerationResult {
   model: string;
 }
 
+// Consumes `units` of the daily generation limit, one per model call of the
+// request (S1c), all or nothing: with fewer units left nothing is consumed
+// and the peeked window is answered refused. Answers the window after the
+// last unit.
+export async function consumeGenerationUnits(
+  limiter: GenerationRateLimiter,
+  ownerId: string,
+  units: number,
+): Promise<GenerationRateLimit> {
+  const window = await limiter.peek(ownerId);
+  if (window.remaining < units) return { ...window, allowed: false };
+  let last = window;
+  for (let unit = 0; unit < units; unit++) {
+    last = await limiter.check(ownerId);
+    // A concurrent request spent the units in between.
+    if (!last.allowed) return last;
+  }
+  return last;
+}
+
 // Splits `count` into the fewest calls of at most `size`, as even as
 // possible (25 → 13 + 12), so no call is a tiny tail.
 export function splitIntoBatches(count: number, size: number): number[] {
@@ -129,9 +151,9 @@ function invalidCount(count: number) {
 // Generates AI multiple-choice roots for a page (§3.3 "generadas por IA",
 // §8.4 generate_exam_questions). Order matters, as in flashcards'
 // requestGeneration: count, page and blank text are checked BEFORE the
-// limiter because `limiter.check` consumes one unit; a failed AI call
-// after the check keeps the unit consumed (the provider quota was spent
-// too). Every call of the request is made before anything is written, and
+// limiter because it consumes one unit per model call of the request (all
+// of them up front, or none when too few are left); a failed AI call
+// afterwards keeps the units consumed (the provider quota was spent too). Every call of the request is made before anything is written, and
 // the valid questions are written with their study items in ONE unit of
 // work: a failure at any point stores nothing.
 // Incremental (Phase 6 T5c): only the paragraphs exams has not used yet on
@@ -176,7 +198,12 @@ export async function requestExamGeneration(
     );
   }
 
-  const limit = await deps.limiter.check(ownerId);
+  const batches = splitIntoBatches(count, EXAM_GENERATION_BATCH_SIZE);
+  const limit = await consumeGenerationUnits(
+    deps.limiter,
+    ownerId,
+    batches.length,
+  );
   if (!limit.allowed) return err(new ExamDailyLimitReachedError(limit.resetAt));
 
   const active = await deps.questions.listActiveByPage(input.pageId, ownerId);
@@ -192,7 +219,7 @@ export async function requestExamGeneration(
   let lastGeneration: AiGeneration | null = null;
   let skipped = 0;
 
-  for (const batchSize of splitIntoBatches(count, EXAM_GENERATION_BATCH_SIZE)) {
+  for (const batchSize of batches) {
     const prompt = buildGenerateExamQuestionsPrompt({
       pageTitle: page.value.title,
       pageText: truncation.text,

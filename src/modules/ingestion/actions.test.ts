@@ -13,7 +13,11 @@ import { InMemoryImportJobRepository } from "./application/testing/in-memory-imp
 // instead of relying on real process.env so this file never needs a real
 // SUPABASE_PDF_BUCKET.
 const { getCurrentUser } = vi.hoisted(() => ({ getCurrentUser: vi.fn() }));
-vi.mock("@/modules/identity", () => ({ getCurrentUser }));
+vi.mock("@/modules/identity", async () => ({
+  ...(
+    await import("@/shared/kernel/testing/owner-access-mock")
+  ).identityOwnerMock(getCurrentUser),
+}));
 const { revalidatePath } = vi.hoisted(() => ({ revalidatePath: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath }));
 vi.mock("@/shared/db/client", () => ({ getDb: () => ({}) }));
@@ -95,6 +99,26 @@ describe("ingestion Server Actions", () => {
       id: "nb-1",
       ownerId: OWNER_ID,
       active: true,
+    });
+  });
+
+  describe("with pending terms or an unverifiable profile", () => {
+    it.each([
+      ["terms_required", "IDENTITY_TERMS_REQUIRED"],
+      ["profile_unavailable", "IDENTITY_PROFILE_UNAVAILABLE"],
+    ] as const)("rejects requestPdfUpload when access is denied for %s", async (denied, code) => {
+      getCurrentUser.mockResolvedValue({ id: OWNER_ID, denied });
+      const { requestPdfUpload } = await import("./actions");
+
+      const result = await requestPdfUpload({
+        notebookId: "nb-1",
+        fileName: "a.pdf",
+        mime: "application/pdf",
+        sizeBytes: 1024,
+      });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.error.code).toBe(code);
     });
   });
 

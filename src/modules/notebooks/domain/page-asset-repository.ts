@@ -17,8 +17,13 @@ export interface PageAsset {
 // (design.md), since RegisterPageAsset may be called more than once for
 // the same uploaded object.
 export interface PageAssetRepository {
-  findById(id: string): Promise<PageAsset | null>;
-  findByStoragePath(storagePath: string): Promise<PageAsset | null>;
+  // Scoped by owner (S6 tenant isolation): an asset of another owner
+  // reads as missing.
+  findById(id: string, ownerId: string): Promise<PageAsset | null>;
+  findByStoragePath(
+    storagePath: string,
+    ownerId: string,
+  ): Promise<PageAsset | null>;
   upsert(asset: PageAsset): Promise<void>;
   // document-import T9: deletes the rows among `ids` owned by `ownerId`
   // (never anyone else's) and returns them, so the caller can remove their

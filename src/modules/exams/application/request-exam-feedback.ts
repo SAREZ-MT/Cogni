@@ -35,9 +35,9 @@ export interface RequestExamFeedbackDeps {
   uow: ExamSessionUnitOfWork;
   feedback: SessionFeedbackRepository;
   pages: PageTextReader;
-  // Only `peek`: feedback respects the student's daily AI limit but does
-  // not spend a generation of it (same as flashcards).
-  limiter: Pick<GenerationRateLimiter, "peek">;
+  // AI_DAILY_FEEDBACKS (the ai module's feedbackLimiter): `check` spends
+  // one unit per feedback the model is asked for (same as flashcards).
+  limiter: Pick<GenerationRateLimiter, "check">;
   ai: {
     generateStructured(
       input: GenerateStructuredInput,
@@ -64,29 +64,39 @@ export interface ExamFeedback {
   reused: boolean;
 }
 
-// Longest wait for the AI answer (flashcards' value): past it the student
-// gets the calm "no feedback" note instead of a spinner. The call itself is
-// not cancelled (the provider port has no abort signal).
+// Longest wait for the AI answer: past it the call is aborted and the
+// student gets the calm "no feedback" note instead of a spinner. Each of
+// generateStructured's two provider attempts gets half of it, so a stuck
+// first provider still leaves time for the second.
 export const FEEDBACK_AI_TIMEOUT_MS = 25_000;
+
+// Runs `call` with a signal that aborts after `ms` and settles at that
+// deadline even when the call ignores the signal (review F3): the provider
+// attempts honour it, but a stalled quota, breaker or audit write inside
+// generateStructured would otherwise hold the student past the budget.
+// Rejects with the abort reason at the deadline.
+function withDeadline<T>(
+  ms: number,
+  call: (signal: AbortSignal) => Promise<T>,
+): Promise<T> {
+  const controller = new AbortController();
+  // Started before the timer, so a call that throws at once leaves none.
+  const result = call(controller.signal);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      controller.abort(
+        new DOMException("The feedback deadline passed", "TimeoutError"),
+      );
+      reject(controller.signal.reason);
+    }, ms);
+  });
+  return Promise.race([result, deadline]).finally(() => clearTimeout(timer));
+}
 
 // A "pending" row untouched for this long belongs to a request that died
 // or hung: the next request may reclaim it. Well above the AI timeout.
 export const STALE_PENDING_MS = 2 * 60_000;
-
-class FeedbackTimeoutError extends Error {
-  constructor() {
-    super("The AI feedback did not arrive in time");
-    this.name = "FeedbackTimeoutError";
-  }
-}
-
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new FeedbackTimeoutError()), ms);
-  });
-  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
-}
 
 interface ExamFeedbackSources {
   session: ExamSession;
@@ -319,7 +329,7 @@ export async function requestExamFeedback(
   };
 
   try {
-    const limit = await deps.limiter.peek(ownerId);
+    const limit = await deps.limiter.check(ownerId);
     if (!limit.allowed) return fail(null);
 
     let generated: Awaited<ReturnType<typeof deps.ai.generateStructured>>;
@@ -335,17 +345,19 @@ export async function requestExamFeedback(
         passed: session.passed === true,
         failed: failedQuestions(sources),
       });
-      generated = await withTimeout(
+      const aiTimeoutMs = deps.aiTimeoutMs ?? FEEDBACK_AI_TIMEOUT_MS;
+      generated = await withDeadline(aiTimeoutMs, (signal) =>
         deps.ai.generateStructured(
           {
             purpose: "session_feedback",
             pageId: session.pageId,
             promptVersion: EXAM_SESSION_FEEDBACK_PROMPT_VERSION,
             ...prompt,
+            timeoutMs: Math.floor(aiTimeoutMs / 2),
+            signal,
           },
           ownerId,
         ),
-        deps.aiTimeoutMs ?? FEEDBACK_AI_TIMEOUT_MS,
       );
     } catch {
       return fail(null);

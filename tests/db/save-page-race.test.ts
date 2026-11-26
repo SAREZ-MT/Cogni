@@ -73,7 +73,7 @@ describe.skipIf(!url)("SavePage concurrency (updateIfVersion race)", () => {
     const updatedCount = results.filter((r) => r.updated).length;
     expect(updatedCount).toBe(1);
 
-    const stored = await repo.findById(pageId);
+    const stored = await repo.findById(pageId, owner.id);
     expect(stored?.contentVersion).toBe(2);
     expect(["writer A", "writer B"]).toContain(stored?.plainText);
   });

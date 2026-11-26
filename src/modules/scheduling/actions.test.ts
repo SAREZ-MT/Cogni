@@ -8,8 +8,10 @@ const { getCurrentUser, getCurrentTimeZoneSetting } = vi.hoisted(() => ({
   getCurrentUser: vi.fn(),
   getCurrentTimeZoneSetting: vi.fn(),
 }));
-vi.mock("@/modules/identity", () => ({
-  getCurrentUser,
+vi.mock("@/modules/identity", async () => ({
+  ...(
+    await import("@/shared/kernel/testing/owner-access-mock")
+  ).identityOwnerMock(getCurrentUser),
   getCurrentTimeZoneSetting,
 }));
 vi.mock("@/shared/db/client", () => ({ getDb: () => ({}) }));

@@ -54,7 +54,7 @@ test.describe("active recall questions generation", () => {
   test.skip(!hasSupabaseEnv, "Supabase env (cogni-dev) is not configured");
   test.skip(!process.env.DATABASE_URL, "needs DATABASE_URL (cogni-dev)");
 
-  // A test-scoped user: the fake AI daily limit (6 per owner, in server
+  // A test-scoped user: the fake AI daily limit (20 per owner, in server
   // memory) would otherwise be shared with every AI-spending spec in the
   // worker and run out depending on spec order.
   test.beforeEach(async ({ page, freshUser }) => {
@@ -85,7 +85,7 @@ test.describe("active recall questions generation", () => {
     const panel = page.getByTestId("techniques-panel");
     await expect(panel).toBeVisible();
     await expect(panel.getByTestId("generation-remaining")).toHaveText(
-      "Te quedan 6 generaciones hoy",
+      "Te quedan 20 generaciones hoy",
     );
     await shot(page, "panel-before");
 
@@ -100,7 +100,7 @@ test.describe("active recall questions generation", () => {
     );
     // One generation of the shared daily limit was spent.
     await expect(panel.getByTestId("generation-remaining")).toHaveText(
-      "Te quedan 5 generaciones hoy",
+      "Te quedan 19 generaciones hoy",
     );
     await shot(page, "panel-after");
 

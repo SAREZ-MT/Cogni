@@ -15,7 +15,11 @@ import { InMemorySessionFeedback } from "./application/testing/in-memory-session
 // validation, view mapping, ActionError mapping, never-throw) without a
 // database or providers; the use cases are covered by their unit tests.
 const { getCurrentUser } = vi.hoisted(() => ({ getCurrentUser: vi.fn() }));
-vi.mock("@/modules/identity", () => ({ getCurrentUser }));
+vi.mock("@/modules/identity", async () => ({
+  requireOwner: (
+    await import("@/shared/kernel/testing/owner-access-mock")
+  ).requireOwnerFrom(getCurrentUser),
+}));
 // The owner's per-day "due" bound (UTC here): the next midnight.
 vi.mock("@/modules/scheduling", () => ({
   getCurrentDueCutoff: async () => (now: Date) =>
@@ -47,6 +51,7 @@ let current: {
   limit: GenerationRateLimit;
   calls: GenerateStructuredInput[];
   checks: number;
+  feedbackChecks: number;
 };
 
 vi.mock("@/modules/ai", async (importOriginal) => ({
@@ -65,6 +70,12 @@ vi.mock("@/modules/ai", async (importOriginal) => ({
         return current.limit;
       },
       peek: async () => current.limit,
+    },
+    feedbackLimiter: {
+      check: async () => {
+        current.feedbackChecks += 1;
+        return current.limit;
+      },
     },
   }),
 }));
@@ -167,6 +178,7 @@ describe("exam feedback actions", () => {
       limit: { allowed: true, remaining: 5, resetAt: RESET },
       calls: [],
       checks: 0,
+      feedbackChecks: 0,
     };
   });
 
@@ -195,8 +207,10 @@ describe("exam feedback actions", () => {
       value: { status: "done", reused: false, content: FEEDBACK_OBJECT },
     });
     expect(current.calls).toHaveLength(1);
-    expect(current.calls[0].promptVersion).toBe("session_feedback/v2");
+    expect(current.calls[0].promptVersion).toBe("session_feedback/v4");
     expect(current.checks).toBe(0);
+    // It spends one unit of the feedback limit instead.
+    expect(current.feedbackChecks).toBe(1);
   });
 
   it("shows the last pass's feedback again for a later pass", async () => {

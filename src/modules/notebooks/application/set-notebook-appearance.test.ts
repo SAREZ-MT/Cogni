@@ -52,7 +52,7 @@ describe("setNotebookAppearance use case", () => {
     );
 
     expect(result.ok).toBe(false);
-    const stored = await deps.notebooks.findById(created.value.id);
+    const stored = await deps.notebooks.findById(created.value.id, OWNER_ID);
     expect(stored?.color).toBe("mint");
   });
 });

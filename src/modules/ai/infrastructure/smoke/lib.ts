@@ -1,4 +1,4 @@
-import type { ProviderEntry } from "../../domain";
+import { type ProviderEntry, quotaKeyOf } from "../../domain";
 import { QUOTA_DAY_TTL_SECONDS, quotaKeys } from "../upstash-quota-store";
 
 // Pure helpers of the manual provider smoke script (scripts/ai-smoke.mts).
@@ -72,12 +72,15 @@ export function planExhaustion(input: {
       error: `Unknown provider "${input.providerId}". Known: ${known}`,
     };
   }
+  // A shared budget is exhausted through its shared key, which also
+  // exhausts every entry spending it.
+  const quotaKey = quotaKeyOf(entry);
   return {
     ok: true,
     plan: {
       providerId: entry.id,
-      dayKey: quotaKeys(input.prefix, entry.id, input.now).day,
-      backupKey: smokeBackupKey(input.prefix, entry.id),
+      dayKey: quotaKeys(input.prefix, quotaKey, input.now).day,
+      backupKey: smokeBackupKey(input.prefix, quotaKey),
       value: entry.rpd,
       ttlSeconds: QUOTA_DAY_TTL_SECONDS,
     },

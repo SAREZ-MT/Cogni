@@ -21,8 +21,21 @@ export {
   nextProviders,
   type ProviderEntry,
   type ProviderUsage,
+  quotaKeyOf,
   type SelectionContext,
   selectProvider,
+  vendorOf,
 } from "./provider";
-export { AI_PURPOSES, type AiPurpose } from "./purpose";
-export { type TruncationResult, truncateToTokenCap } from "./truncate";
+export {
+  AI_BUDGET_GROUPS,
+  AI_PURPOSES,
+  type AiBudgetGroup,
+  type AiPurpose,
+  budgetGroupOf,
+} from "./purpose";
+export {
+  EVALUATION_PROMPT_TOKEN_BUDGET,
+  estimateTokens,
+  type TruncationResult,
+  truncateToTokenCap,
+} from "./truncate";

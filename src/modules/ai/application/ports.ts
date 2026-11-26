@@ -1,5 +1,10 @@
 import type { ZodType } from "zod";
-import type { AiGeneration, BreakerState, ProviderUsage } from "../domain";
+import type {
+  AiBudgetGroup,
+  AiGeneration,
+  BreakerState,
+  ProviderUsage,
+} from "../domain";
 
 // Ports of the ai application layer. They live here, not in `domain/`,
 // because `AiProvider` needs the Zod `ZodType` type and `domain-is-pure`
@@ -12,6 +17,9 @@ export interface GenerateObjectRequest<T> {
   readonly prompt: string;
   readonly temperature: number;
   readonly maxOutputTokens?: number;
+  // Cancels the model call. Adapters forward it to the transport so an
+  // aborted attempt stops instead of running on in the background.
+  readonly signal?: AbortSignal;
 }
 
 export interface GenerateObjectResponse {
@@ -41,10 +49,19 @@ export type AiProviderMap = ReadonlyMap<string, AiProvider>;
 // adapter keeps two Redis counters per provider:
 //   ai:quota:{provider}:{yyyy-mm-dd}        TTL 48 h   (day)
 //   ai:quota:{provider}:{yyyy-mm-dd-hh-mm}  TTL 120 s  (minute)
-// Both buckets are derived from `now` in UTC.
+// Both buckets are derived from `now` in UTC. `{provider}` is the entry's
+// quota key (`quotaKeyOf`): entries sharing a key share the counters.
 export interface QuotaStore {
   readUsage(providerId: string, now: Date): Promise<ProviderUsage>;
   recordCall(providerId: string, now: Date): Promise<void>;
+}
+
+// App-wide daily budget per group (AI_GLOBAL_DAILY_*), shared by every user
+// and bucketed by UTC day like the provider quota. `consume` charges one
+// provider attempt and answers whether it fits the budget. Callers fail
+// closed: a refusal or a thrown error means no model call.
+export interface BudgetStore {
+  consume(group: AiBudgetGroup, now: Date): Promise<boolean>;
 }
 
 export interface BreakerStore {

@@ -78,7 +78,7 @@ function generation(id = "gen-1"): AiGeneration {
     purpose: "generate_flashcards",
     provider: "gemini",
     model: "gemini-3.5-flash-lite",
-    promptVersion: "generate_flashcards/v1",
+    promptVersion: "generate_flashcards/v2",
     inputTokens: 10,
     outputTokens: 20,
     latencyMs: 5,
@@ -266,7 +266,7 @@ describe("requestGeneration", () => {
     expect(ai.calls[0]).toMatchObject({
       purpose: "generate_flashcards",
       pageId: PAGE,
-      promptVersion: "generate_flashcards/v1",
+      promptVersion: "generate_flashcards/v2",
     });
     expect(ai.calls[0]?.prompt).toContain("Fotosíntesis");
     expect(ai.calls[0]?.system).toContain("exactly 10 cards");

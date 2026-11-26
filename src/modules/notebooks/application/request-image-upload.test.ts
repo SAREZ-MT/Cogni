@@ -104,7 +104,7 @@ describe("requestImageUpload use case", () => {
   it("rejects an archived page (Scenario: Página ajena o archivada)", async () => {
     const deps = makeDeps();
     const page = await setupPage(deps);
-    await markPageArchived(deps.pages, page.id);
+    await markPageArchived(deps.pages, page.id, OWNER_ID);
 
     const result = await requestImageUpload(
       { pageId: page.id, mime: "image/png", sizeBytes: 1024 },

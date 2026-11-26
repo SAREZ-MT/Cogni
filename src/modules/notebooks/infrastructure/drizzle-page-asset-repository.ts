@@ -22,16 +22,22 @@ function toPageAsset(row: PageAssetRow): PageAsset {
 export class DrizzlePageAssetRepository implements PageAssetRepository {
   constructor(private readonly db: Db) {}
 
-  async findById(id: string): Promise<PageAsset | null> {
+  async findById(id: string, ownerId: string): Promise<PageAsset | null> {
     const row = await this.db.query.pageAssets.findFirst({
-      where: eq(pageAssets.id, id),
+      where: and(eq(pageAssets.id, id), eq(pageAssets.ownerId, ownerId)),
     });
     return row ? toPageAsset(row) : null;
   }
 
-  async findByStoragePath(storagePath: string): Promise<PageAsset | null> {
+  async findByStoragePath(
+    storagePath: string,
+    ownerId: string,
+  ): Promise<PageAsset | null> {
     const row = await this.db.query.pageAssets.findFirst({
-      where: eq(pageAssets.storagePath, storagePath),
+      where: and(
+        eq(pageAssets.storagePath, storagePath),
+        eq(pageAssets.ownerId, ownerId),
+      ),
     });
     return row ? toPageAsset(row) : null;
   }

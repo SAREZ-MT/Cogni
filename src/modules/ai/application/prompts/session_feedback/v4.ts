@@ -1,11 +1,18 @@
-import type { BuiltPrompt } from "../generate_flashcards/v1";
+import type { BuiltPrompt } from "../generate_flashcards/v2";
+import {
+  oneLine,
+  titleLine,
+  untrustedDataRule,
+  wrapUntrusted,
+} from "../untrusted";
 
 // Exam session feedback (documento-maestro §3.3: "al final la IA explica
-// las preguntas falladas usando el contenido de la página"). v1 carries
-// only answer-button counts and struggled prompts, with no page text and no
-// per-question detail; prompts are versioned and immutable, so exams get
-// v2 and flashcards keep v1. Same output contract (sessionFeedbackOutput).
-export const EXAM_SESSION_FEEDBACK_PROMPT_VERSION = "session_feedback/v2";
+// las preguntas falladas usando el contenido de la página"). The flashcards
+// prompt (v3) carries only answer-button counts and struggled prompts, with
+// no page text and no per-question detail; prompts are versioned and
+// immutable, so exams have their own version (v4; v1 and v2 were the same
+// two prompts before their texts moved into data blocks). Same output contract (sessionFeedbackOutput).
+export const EXAM_SESSION_FEEDBACK_PROMPT_VERSION = "session_feedback/v4";
 
 // Bounds that keep the prompt far below every provider's input cap besides
 // the page text (already cut to the page token cap by the caller): only
@@ -39,7 +46,7 @@ export interface ExamSessionFeedbackPromptInput {
 const TEMPERATURE = 0.3;
 
 function shorten(text: string): string {
-  const flat = text.replace(/\s+/g, " ").trim();
+  const flat = oneLine(text);
   return flat.length <= MAX_FAILED_FIELD_LENGTH
     ? flat
     : `${flat.slice(0, MAX_FAILED_FIELD_LENGTH - 1)}…`;
@@ -66,23 +73,25 @@ export function buildExamSessionFeedbackPrompt(
     "nextStepSuggestion: one concrete next step, such as reviewing a specific part of the page before retaking the exam.",
     "Base everything strictly on the results and the page text given: do not invent topics, facts or numbers.",
     "Never mention study time or durations.",
+    untrustedDataRule(["failed_questions", "page_text"]),
   ].join("\n");
 
   const failed = input.failed.slice(0, MAX_FAILED_QUESTIONS);
   const prompt = [
     "Technique: exam",
-    `Page title: ${shorten(input.pageTitle)}`,
+    `Page title: ${titleLine(input.pageTitle)}`,
     `Questions answered: ${input.total}`,
     `Correct: ${input.correct}`,
     `Result: ${input.passed ? "passed (70 % or more)" : "below 70 %"}`,
     "",
-    "Failed questions:",
-    ...(failed.length > 0
-      ? failed.flatMap((question, i) => failedSection(question, i + 1))
-      : ["(none)"]),
+    wrapUntrusted(
+      "failed_questions",
+      failed
+        .flatMap((question, i) => failedSection(question, i + 1))
+        .join("\n"),
+    ),
     "",
-    "Text:",
-    input.pageText,
+    wrapUntrusted("page_text", input.pageText),
   ].join("\n");
 
   return { system, prompt, temperature: TEMPERATURE };

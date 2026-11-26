@@ -24,7 +24,9 @@ describe("createNotebook use case", () => {
     if (!result.ok) return;
     expect(result.value.ownerId).toBe(OWNER_ID);
     expect(result.value.title).toBe("Calculo I");
-    expect(await deps.notebooks.findById(result.value.id)).not.toBeNull();
+    expect(
+      await deps.notebooks.findById(result.value.id, OWNER_ID),
+    ).not.toBeNull();
   });
 
   describe("color (design pass 2: no flat neutral tile on creation)", () => {
@@ -53,7 +55,7 @@ describe("createNotebook use case", () => {
       const result = await createNotebook({ title: "Uno" }, deps, OWNER_ID);
 
       if (!result.ok) throw new Error("setup failed");
-      const stored = await deps.notebooks.findById(result.value.id);
+      const stored = await deps.notebooks.findById(result.value.id, OWNER_ID);
       expect(stored?.color).toBe(
         COLOR_PALETTE[Math.floor(0.5 * COLOR_PALETTE.length)],
       );

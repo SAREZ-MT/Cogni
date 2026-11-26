@@ -31,8 +31,7 @@ import {
   reviewLogs,
 } from "@/shared/db/schema";
 import { createFixedClock } from "@/shared/kernel/clock";
-import { DomainError } from "@/shared/kernel/domain-error";
-import { err, ok } from "@/shared/kernel/result";
+import { ok } from "@/shared/kernel/result";
 import { createTestDb } from "./helpers/test-db";
 import { createTestOwner, deleteTestOwner } from "./helpers/test-owner";
 
@@ -139,26 +138,28 @@ if (process.env.DATABASE_URL) {
     return { sessionId, questionIds };
   }
 
-  // Answers holding "FALLA" fail while `failing` is on; the rest score 4.
+  // One call evaluates every answer of the run (batched prompt, one
+  // <answer_item> each). An answer holding "FALLA" gets no evaluation while
+  // `failing` is on, so it alone fails; the rest score 4.
+  const ITEM = /<answer_item id="([^"]+)">([\s\S]*?)<\/answer_item>/g;
+
   function stubAi(state: { failing: boolean; calls: number }) {
     return {
       async generateStructured(input: GenerateStructuredInput) {
         state.calls += 1;
         await new Promise((resolve) => setTimeout(resolve, 20));
-        if (state.failing && input.prompt.includes("FALLA")) {
-          // No audited attempt here (no ai_generations row to reference).
-          return err(
-            new DomainError("AI_NO_PROVIDER_AVAILABLE", "no provider"),
-          );
-        }
-        return ok({
-          object: {
+        const evaluations = [...input.prompt.matchAll(ITEM)]
+          .filter((item) => !(state.failing && item[2]?.includes("FALLA")))
+          .map((item) => ({
+            questionId: item[1] as string,
             score: 4,
             presentConcepts: ["ATP"],
             missingConcepts: [],
             misconceptions: [],
             justification: "Bien.",
-          },
+          }));
+        return ok({
+          object: { evaluations },
           generation: { id: null } as unknown as AiGeneration,
         });
       },
@@ -182,6 +183,7 @@ if (process.env.DATABASE_URL) {
       },
       ai: stubAi(state),
       limiter: createInMemoryGenerationLimiter({ limit: 60, clock }),
+      runLimiter: createInMemoryGenerationLimiter({ limit: 3, clock }),
       reviews: createRecallReviewRecorder({ db, ids: { next: randomUUID } }),
       clock,
       dueCutoff: utcDayCutoff,
@@ -225,10 +227,7 @@ if (process.env.DATABASE_URL) {
       ]);
       expect(rows[0]?.aiEvaluation).toMatchObject({ score: 4 });
       expect(rows[1]?.aiEvaluation).toEqual(skippedEvaluation());
-      expect(rows[2]?.aiEvaluation).toMatchObject({
-        source: "failed",
-        code: "AI_NO_PROVIDER_AVAILABLE",
-      });
+      expect(rows[2]?.aiEvaluation).toMatchObject({ source: "failed" });
       expect(rows.every((r) => r.evaluationClaimedAt === null)).toBe(true);
       expect(await logsOf(sessionId)).toHaveLength(2);
 
@@ -241,7 +240,8 @@ if (process.env.DATABASE_URL) {
       );
 
       expect(retried.ok && retried.value.session.evaluationStatus).toBe("done");
-      expect(state.calls).toBe(3);
+      // One model call per run: the session, then the requeued answer.
+      expect(state.calls).toBe(2);
       expect(await logsOf(sessionId)).toHaveLength(3);
       const [session] = await db
         .select()
@@ -264,7 +264,8 @@ if (process.env.DATABASE_URL) {
       ]);
 
       expect(a.ok && b.ok).toBe(true);
-      expect(state.calls).toBe(3);
+      // The run that claims the answers makes the only call.
+      expect(state.calls).toBe(1);
       expect(await logsOf(sessionId)).toHaveLength(3);
       const rows = await db
         .select()

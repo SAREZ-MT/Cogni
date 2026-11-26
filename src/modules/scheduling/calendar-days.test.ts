@@ -6,7 +6,11 @@ import { InMemoryDueTodayReader } from "./application/testing/in-memory-due-toda
 // from the instant the page rendered with, so the today cell and the
 // overdue folding agree. Session, database and Sentry are mocked.
 const { getCurrentUser } = vi.hoisted(() => ({ getCurrentUser: vi.fn() }));
-vi.mock("@/modules/identity", () => ({ getCurrentUser }));
+vi.mock("@/modules/identity", async () => ({
+  ...(
+    await import("@/shared/kernel/testing/owner-access-mock")
+  ).identityOwnerMock(getCurrentUser),
+}));
 vi.mock("@/shared/db/client", () => ({ getDb: () => ({}) }));
 const { captureException } = vi.hoisted(() => ({ captureException: vi.fn() }));
 vi.mock("@sentry/nextjs", () => ({ captureException }));
@@ -83,6 +87,20 @@ describe("getCalendarDays", () => {
       ok: false,
       error: expect.objectContaining({ code: "SCHEDULING_SESSION_REQUIRED" }),
     });
+  });
+
+  it("refuses an account with pending terms without reading", async () => {
+    getCurrentUser.mockResolvedValue({
+      id: "owner-1",
+      denied: "terms_required",
+    });
+    const spy = vi.spyOn(reader, "listDueInRange");
+
+    expect(await getCalendarDays({ ...WEEK, now: RENDERED_AT })).toEqual({
+      ok: false,
+      error: expect.objectContaining({ code: "IDENTITY_TERMS_REQUIRED" }),
+    });
+    expect(spy).not.toHaveBeenCalled();
   });
 
   it("rejects an invalid range without reading", async () => {

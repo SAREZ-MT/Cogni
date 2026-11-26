@@ -49,7 +49,7 @@ describe("savePage use case", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.version).toBe(2);
-    const stored = await deps.pages.findById(page.id);
+    const stored = await deps.pages.findById(page.id, OWNER_ID);
     expect(stored?.contentVersion).toBe(2);
     expect(stored?.plainText).toBe("hola");
     expect(stored?.content).toEqual(DOC);
@@ -74,7 +74,7 @@ describe("savePage use case", () => {
     expect(result.ok).toBe(false);
     expect(!result.ok && result.error.code).toBe("PAGE_VERSION_CONFLICT");
     expect(!result.ok && result.error.message).toContain("2");
-    const stored = await deps.pages.findById(page.id);
+    const stored = await deps.pages.findById(page.id, OWNER_ID);
     expect(stored?.contentVersion).toBe(2);
   });
 
@@ -94,7 +94,7 @@ describe("savePage use case", () => {
     );
 
     expect(result.ok).toBe(true);
-    const stored = await deps.pages.findById(page.id);
+    const stored = await deps.pages.findById(page.id, OWNER_ID);
     expect(stored?.plainText).toBe("hola");
   });
 
@@ -109,7 +109,7 @@ describe("savePage use case", () => {
     );
 
     expect(result.ok).toBe(false);
-    const stored = await deps.pages.findById(page.id);
+    const stored = await deps.pages.findById(page.id, OWNER_ID);
     expect(stored?.contentVersion).toBe(1);
   });
 
@@ -124,7 +124,7 @@ describe("savePage use case", () => {
     );
 
     expect(result.ok).toBe(false);
-    const stored = await deps.pages.findById(page.id);
+    const stored = await deps.pages.findById(page.id, OWNER_ID);
     expect(stored?.contentVersion).toBe(1);
   });
 });

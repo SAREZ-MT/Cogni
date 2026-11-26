@@ -11,6 +11,18 @@ export type {
   SignUpResult,
 } from "./auth-gateway";
 export {
+  ACCESS_ERROR,
+  type OwnerAccess,
+  type OwnerAccessDenial,
+  ownerAccessError,
+  ownerAccessFor,
+} from "./owner-access";
+export {
+  type AuthenticationEvent,
+  isFreshRecoverySession,
+  RECOVERY_WINDOW_MS,
+} from "./password-change";
+export {
   createProfile,
   DEFAULT_LOCALE,
   DEFAULT_TIMEZONE,
@@ -21,6 +33,7 @@ export type {
   AcceptTermsOptions,
   ProfileRepository,
 } from "./profile-repository";
+export { safeNext } from "./safe-next";
 export {
   acceptTerms,
   hasAcceptedCurrentTerms,

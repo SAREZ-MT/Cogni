@@ -15,7 +15,11 @@ import { InMemoryExamUnitOfWork } from "./application/testing/in-memory-exam-uni
 // without a database or providers; same pattern as
 // flashcards/actions.test.ts.
 const { getCurrentUser } = vi.hoisted(() => ({ getCurrentUser: vi.fn() }));
-vi.mock("@/modules/identity", () => ({ getCurrentUser }));
+vi.mock("@/modules/identity", async () => ({
+  requireOwner: (
+    await import("@/shared/kernel/testing/owner-access-mock")
+  ).requireOwnerFrom(getCurrentUser),
+}));
 vi.mock("@/shared/db/client", () => ({ getDb: () => ({}) }));
 vi.mock("@/shared/config/env.server", () => ({
   serverEnv: () => ({
@@ -42,7 +46,7 @@ const generation: AiGeneration = {
   purpose: "generate_exam_questions",
   provider: "gemini-flash-lite",
   model: "gemini-3.5-flash-lite",
-  promptVersion: "generate_exam_questions/v1",
+  promptVersion: "generate_exam_questions/v2",
   inputTokens: 1,
   outputTokens: 1,
   latencyMs: 1,

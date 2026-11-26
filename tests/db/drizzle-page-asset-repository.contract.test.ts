@@ -98,9 +98,23 @@ describe.skipIf(!url)("DrizzlePageAssetRepository", () => {
     expect(deleted.map((asset) => asset.storagePath)).toEqual([
       first.storagePath,
     ]);
-    expect(await assetRepo.findById(first.id)).toBeNull();
-    expect(await assetRepo.findById(second.id)).not.toBeNull();
-    expect(await assetRepo.findById(foreign.id)).not.toBeNull();
+    expect(await assetRepo.findById(first.id, ownerA.id)).toBeNull();
+    expect(await assetRepo.findById(second.id, ownerA.id)).not.toBeNull();
+    expect(await assetRepo.findById(foreign.id, ownerB.id)).not.toBeNull();
+  });
+
+  it("finds an asset by id or storage path only for its owner", async () => {
+    const page = await seedPage(ownerA.id);
+    const asset = await seedAsset(ownerA.id, page);
+
+    expect((await assetRepo.findById(asset.id, ownerA.id))?.id).toBe(asset.id);
+    expect(await assetRepo.findById(asset.id, ownerB.id)).toBeNull();
+    expect(
+      (await assetRepo.findByStoragePath(asset.storagePath, ownerA.id))?.id,
+    ).toBe(asset.id);
+    expect(
+      await assetRepo.findByStoragePath(asset.storagePath, ownerB.id),
+    ).toBeNull();
   });
 
   it("deleteByIds with no ids deletes nothing", async () => {

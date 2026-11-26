@@ -7,8 +7,10 @@ import type { ExamHubPage } from "./domain/exam-hub-reader";
 // database; listExamHub and the reader are covered by their own tests.
 const { getCurrentUser } = vi.hoisted(() => ({ getCurrentUser: vi.fn() }));
 // Reviews are due per local day of the profile's zone (Bogotá, -05).
-vi.mock("@/modules/identity", () => ({
-  getCurrentUser,
+vi.mock("@/modules/identity", async () => ({
+  requireOwner: (
+    await import("@/shared/kernel/testing/owner-access-mock")
+  ).requireOwnerFrom(getCurrentUser),
   getCurrentTimeZoneSetting: async () => ({
     status: "ok",
     timeZone: "America/Bogota",

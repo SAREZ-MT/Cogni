@@ -9,6 +9,10 @@ export interface StudiedPageReaderContractContext {
   readonly otherOwnerId: string;
   // The reader under test and the stores written below share data.
   readonly reader: StudiedPageReader;
+  // Whether the store can hold items of two owners on one page. The
+  // in-memory double can; the database refuses the second owner's item
+  // (`study_items_page_owner_fk`, drizzle/0016).
+  readonly storesMixedOwnerPages: boolean;
   // A fresh page owned by `ownerId` (async: the DB runner inserts a row).
   newPageId(ownerId: string): Promise<string>;
   addItem(input: {
@@ -200,11 +204,23 @@ export function runStudiedPageReaderContract(
       const ctx = await options.context();
       const pageId = await ctx.newPageId(ctx.ownerId);
       await ctx.addItem({ ownerId: ctx.ownerId, pageId });
-      await ctx.addItem({ ownerId: ctx.otherOwnerId, pageId });
+      const foreignItem = ctx.addItem({ ownerId: ctx.otherOwnerId, pageId });
 
-      const ids = (await walk(ctx.reader, 50)).map((page) => page.pageId);
-
-      expect(ids).not.toContain(pageId);
+      if (ctx.storesMixedOwnerPages) {
+        await foreignItem;
+        const ids = (await walk(ctx.reader, 50)).map((page) => page.pageId);
+        expect(ids).not.toContain(pageId);
+        return;
+      }
+      // The store cannot hold that state: the other owner's item is
+      // refused, and the page stays listed once, under its only owner.
+      await expect(foreignItem).rejects.toThrow();
+      const listed = (await walk(ctx.reader, 50)).filter(
+        (page) => page.pageId === pageId,
+      );
+      expect(listed).toEqual([
+        { pageId, ownerId: ctx.ownerId, masteryComputedAt: null },
+      ]);
     });
 
     it("returns nothing after the last possible key", async () => {

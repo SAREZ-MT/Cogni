@@ -1,5 +1,6 @@
 import type { DomainError } from "@/shared/kernel/domain-error";
 import type { Result } from "@/shared/kernel/result";
+import type { AuthenticationEvent } from "./password-change";
 
 export type SignUpOutcome = "verification_sent" | "already_registered";
 
@@ -30,6 +31,9 @@ export interface AuthGateway {
     email: string;
     redirectTo: string;
   }): Promise<Result<void, DomainError>>;
+  // The sign-in steps of the current session, read from the provider's
+  // verified token; empty without a session.
+  currentAuthentication(): Promise<Result<AuthenticationEvent[], DomainError>>;
   updatePassword(input: {
     password: string;
   }): Promise<Result<void, DomainError>>;

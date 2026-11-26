@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   nextProviders,
   type ProviderEntry,
+  quotaKeyOf,
   type SelectionContext,
   selectProvider,
+  vendorOf,
 } from "./provider";
 
 function entry(over: Partial<ProviderEntry> & { id: string }): ProviderEntry {
@@ -84,6 +86,26 @@ describe("selectProvider", () => {
     ).toBe("cloudflare");
   });
 
+  it("prefers an entry of a vendor not to avoid, best first", () => {
+    const geminiB = entry({ id: "gemini-b", priority: 2, vendor: "google" });
+    const groq = entry({ id: "groq", priority: 3, vendor: "groq" });
+    expect(
+      selectProvider([geminiB, groq], ctx({ avoidVendors: ["google"] }))?.id,
+    ).toBe("groq");
+  });
+
+  it("falls back to an avoided vendor when no other is eligible", () => {
+    const geminiB = entry({ id: "gemini-b", priority: 2, vendor: "google" });
+    expect(
+      selectProvider([geminiB], ctx({ avoidVendors: ["google"] }))?.id,
+    ).toBe("gemini-b");
+  });
+
+  it("reads the vendor, defaulting to the entry id", () => {
+    expect(vendorOf(entry({ id: "x", vendor: "acme" }))).toBe("acme");
+    expect(vendorOf(entry({ id: "x" }))).toBe("x");
+  });
+
   it("returns null when nothing qualifies", () => {
     expect(selectProvider([], ctx())).toBeNull();
     expect(
@@ -106,5 +128,55 @@ describe("nextProviders", () => {
     const list = [openrouter, gemini];
     nextProviders(list, ctx());
     expect(list.map((e) => e.id)).toEqual(["openrouter", "gemini"]);
+  });
+});
+
+describe("shared quota keys", () => {
+  const free1 = entry({ id: "or-a", quotaKey: "or-free", rpd: 1000 });
+  const free2 = entry({ id: "or-b", quotaKey: "or-free", rpd: 1000 });
+  const solo = entry({ id: "solo", priority: 2 });
+
+  it("defaults the quota key to the entry id", () => {
+    expect(quotaKeyOf(solo)).toBe("solo");
+    expect(quotaKeyOf(free1)).toBe("or-free");
+  });
+
+  it("exhausts every entry of a shared budget together", () => {
+    const usage = { "or-free": { day: 1000, minute: 0 } };
+    const ids = nextProviders([free1, free2, solo], ctx({ usage })).map(
+      (e) => e.id,
+    );
+    expect(ids).toEqual(["solo"]);
+  });
+
+  it("applies the shared minute counter to every entry", () => {
+    const usage = { "or-free": { day: 0, minute: 10 } };
+    expect(selectProvider([free1, free2], ctx({ usage }))).toBeNull();
+  });
+
+  it("ignores a usage row keyed by the entry id when the key is shared", () => {
+    const usage = { "or-a": { day: 1000, minute: 0 } };
+    expect(selectProvider([free1], ctx({ usage }))?.id).toBe("or-a");
+  });
+});
+
+describe("prompt token ceiling", () => {
+  const small = entry({ id: "small", maxPromptTokens: 7000 });
+  const big = entry({ id: "big", priority: 2 });
+
+  it("skips an entry whose ceiling the prompt exceeds", () => {
+    expect(selectProvider([small, big], ctx({ promptTokens: 7001 }))?.id).toBe(
+      "big",
+    );
+  });
+
+  it("keeps an entry when the prompt is at its ceiling", () => {
+    expect(selectProvider([small, big], ctx({ promptTokens: 7000 }))?.id).toBe(
+      "small",
+    );
+  });
+
+  it("keeps an entry when the prompt size is unknown", () => {
+    expect(selectProvider([small, big], ctx())?.id).toBe("small");
   });
 });

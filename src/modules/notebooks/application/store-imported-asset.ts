@@ -42,7 +42,7 @@ export async function storeImportedAsset(
   const validated = validateAssetInput({ mime: input.mime, sizeBytes });
   if (!validated.ok) return validated;
 
-  const page = await deps.pages.findById(input.pageId);
+  const page = await deps.pages.findById(input.pageId, ownerId);
   if (!page || page.ownerId !== ownerId || page.archivedAt) {
     return err(new DomainError(PAGE_ERROR.NOT_FOUND, input.pageId));
   }

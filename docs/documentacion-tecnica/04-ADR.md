@@ -1,8 +1,8 @@
 # Registro de Decisiones de Arquitectura (ADR) — Cogni
 
 **Proyecto:** Cogni — plataforma web de estudio a partir de apuntes propios
-**Versión:** 1.2
-**Fecha:** 2026-10-26
+**Versión:** 1.3
+**Fecha:** 2026-11-25
 **Estado:** Borrador
 **Autor:** Javier Sarez
 **Documentos relacionados:** ./01-SRS.md, ./02-SAD.md, ./03-DATA-API.md
@@ -26,7 +26,7 @@
 
 - Referencias a decisiones: "`04-ADR.md`, ADR-0NN" designa una entrada de este documento; "`docs/adr/00NN`" designa un ADR numerado del repositorio. Son dos numeraciones distintas e independientes (por ejemplo, `04-ADR.md`, ADR-008 trata el Vercel AI SDK, mientras que `docs/adr/0008` trata el calendario y el dashboard). Este documento no se renumera.
 - Este documento consolida, con comparación retrospectiva de alternativas, las decisiones de producto, stack y arquitectura tomadas antes de programar (`docs/adr/0001-decisiones-fundacionales.md` y `docs/documento-maestro.md`).
-- `docs/adr/0001` a `docs/adr/0009` son el registro cronológico de decisiones por fase, escritas al construir cada una. Relación verificable con las entradas de este documento:
+- `docs/adr/0001` a `docs/adr/0010` son el registro cronológico de decisiones por fase, escritas al construir cada una. Relación verificable con las entradas de este documento:
 
 | ADR numerado | Fecha / estado | Relación con este documento |
 |---|---|---|
@@ -39,6 +39,7 @@
 | `docs/adr/0007` | 2026-10-10 (Fase 6) | Precisa ADR-007 (calidad combinada en SM-2), ADR-008 (límite de evaluaciones) y ADR-009 (evaluación asíncrona con `after()` dentro de `maxDuration`, sin cola). |
 | `docs/adr/0008` | 2026-10-14 (Fase 7) | Precisa ADR-001 (calendario y métricas por página), ADR-002 (lectores Drizzle de solo lectura propios de `scheduling` y `analytics`) y ADR-007 (el calendario muestra solo el próximo vencimiento). |
 | `docs/adr/0009` | 2026-10-26 (importación de documentos) | Precisa ADR-002 (reglas `mammoth-only-in-ingestion-infra` y `officeparser-only-in-ingestion-infra`; `upstash-only-in-ai-infra` admite `src/shared/rate-limit`), ADR-006 (catálogo estricto de contenido y paridad del editor con él) y ADR-011 (`frame-src` para `youtube-nocookie.com`); reemplaza `unpdf` como único extractor por mammoth y officeparser para Word y officeparser para PowerPoint y PDF (T8 retiró `unpdf` y su regla, sustituida por `no-in-process-pdfjs`). |
+| `docs/adr/0010` | 2026-11-25 (endurecimiento de seguridad previo al lanzamiento, rama `feat/security-hardening`) | Precisa ADR-004 (consultas acotadas por propietario y claves foráneas compuestas de la migración `0016`), ADR-005 (comprobación de sesión y términos en cada Server Action, redirección `next` segura, respuesta uniforme del registro y cambio de contraseña solo con sesión de recuperación reciente), ADR-008 (presupuestos diarios de toda la aplicación, límites por usuario nuevos, tiempo máximo por intento sin reintentos del SDK, evaluación por sesión, bloques de datos en los prompts y comprobación de la evaluación contra la rúbrica), ADR-010 (acciones de CI fijadas por SHA y Dependabot) y ADR-011 (HSTS, COOP, CORP, host exacto de Supabase en la CSP y guardas de producción por `VERCEL_ENV`). |
 
 ### Documento vivo
 
@@ -61,13 +62,13 @@ Este documento se actualiza a medida que avanza la construcción de Cogni; la no
 | ADR-002 | Monolito modular con arquitectura hexagonal por módulo | Aceptado — implementado (14 reglas; excepción de lectores de `docs/adr/0008`) | `docs/adr/0001-decisiones-fundacionales.md` (ítem 4) |
 | ADR-003 | Next.js con TypeScript estricto como framework de aplicación | Aceptado — implementado | `docs/adr/0001-decisiones-fundacionales.md` (ítem 5) |
 | ADR-004 | Supabase Postgres con Drizzle ORM como capa de datos | Aceptado — implementado | `docs/documento-maestro.md` §4.1–§4.2 |
-| ADR-005 | Supabase Auth con RLS y proxy de sesión | Aceptado — implementado | `docs/documento-maestro.md` §9 |
+| ADR-005 | Supabase Auth con RLS y proxy de sesión | Aceptado — implementado; precisado por `docs/adr/0010` | `docs/documento-maestro.md` §9 |
 | ADR-006 | Tiptap como base del editor de bloques | Aceptado — implementado; precisado por `docs/adr/0009` (catálogo estricto) | `docs/adr/0001-decisiones-fundacionales.md` (ítem 3) |
 | ADR-007 | SM-2 por ítem con nivel de dominio derivado por página | Aceptado — implementado (Fase 4) | `docs/adr/0001-decisiones-fundacionales.md` (ítem 2); precisado por `docs/adr/0005`, `docs/adr/0006`, `docs/adr/0007` y `docs/adr/0008` |
 | ADR-008 | Vercel AI SDK con rotación multiproveedor y salida estructurada | Aceptado — implementado (Fase 3); lista de proveedores reemplazada por `docs/adr/0004` | `docs/adr/0001-decisiones-fundacionales.md` (ítem 6); actualizado por `docs/adr/0004-capa-de-ia-con-proveedores-gratuitos.md` |
 | ADR-009 | Vercel Hobby con Cloudflare DNS, Fluid Compute y Vercel Cron | Aceptado — implementado; precisado por `docs/adr/0003` y `docs/adr/0007` | `docs/documento-maestro.md` §4.2, §10 |
 | ADR-010 | Estrategia de pruebas: TDD con Vitest, Playwright y dependency-cruiser | Aceptado — implementado | `docs/documento-maestro.md` §4.4 |
-| ADR-011 | Política de seguridad: RLS y Content Security Policy | Aceptado — implementado (cambio de `style-src` aplicado) | `docs/documento-maestro.md` §9; decisión registrada en sesión de trabajo del 2026-09-24 (cambio de `style-src`) |
+| ADR-011 | Política de seguridad: RLS y Content Security Policy | Aceptado — implementado (cambio de `style-src` aplicado); precisado por `docs/adr/0010` | `docs/documento-maestro.md` §9; decisión registrada en sesión de trabajo del 2026-09-24 (cambio de `style-src`) |
 
 ---
 
@@ -284,7 +285,7 @@ function createDb() {
 
 ### Estado
 
-Aceptado — implementado.
+Aceptado — implementado. Actualización (2026-11-25, `docs/adr/0010`): el proxy y el layout solo protegen rutas renderizadas, así que las Server Actions de los módulos de contenido y estudio comprueban además sesión y términos vigentes con `requireOwner()` (`src/modules/identity/index.ts`), con falla cerrada; `safeNext` resuelve el destino `next` con `new URL` y exige el mismo origen; el registro responde igual para un correo nuevo y para uno existente; y la contraseña solo se cambia con una sesión de recuperación reciente (`AUTH_RECOVERY_REQUIRED`). Como la conexión de servidor no pasa por Row Level Security, los repositorios de `notebooks` filtran por `owner_id` y la migración `0016_owner_scoped_page_keys` añade claves foráneas compuestas por propietario.
 
 ### Contexto
 
@@ -585,7 +586,7 @@ Sin mitigación por ahora — no existe un umbral de cobertura configurado ni un
 
 ### Estado
 
-Aceptado — implementado. Actualización (2026-10-15): el cambio de `style-src` se aplicó el 2026-09-30 (commit `0e4cee7`, "keep style-src on unsafe-inline so SSR inline styles apply on hard loads"): `styleSrc()` en `src/shared/config/security-headers.ts` devuelve siempre `style-src 'self' 'unsafe-inline'`, con su prueba en `src/shared/config/security-headers.test.ts`. Row Level Security está activa en las 20 tablas. Actualización (2026-10-26, `docs/adr/0009`): la CSP añade `frame-src 'self' https://www.youtube-nocookie.com` para el bloque de YouTube del editor, que siempre se inserta desde `youtube-nocookie.com`.
+Aceptado — implementado. Actualización (2026-10-15): el cambio de `style-src` se aplicó el 2026-09-30 (commit `0e4cee7`, "keep style-src on unsafe-inline so SSR inline styles apply on hard loads"): `styleSrc()` en `src/shared/config/security-headers.ts` devuelve siempre `style-src 'self' 'unsafe-inline'`, con su prueba en `src/shared/config/security-headers.test.ts`. Row Level Security está activa en las 20 tablas. Actualización (2026-10-26, `docs/adr/0009`): la CSP añade `frame-src 'self' https://www.youtube-nocookie.com` para el bloque de YouTube del editor, que siempre se inserta desde `youtube-nocookie.com`. Actualización (2026-11-25, `docs/adr/0010`): `img-src`, `connect-src` y `form-action` nombran el host exacto del proyecto de Supabase (`NEXT_PUBLIC_SUPABASE_URL`), con `*.supabase.co` solo como respaldo cuando la variable falta; se envían además `Strict-Transport-Security`, `Cross-Origin-Opener-Policy: same-origin-allow-popups` y `Cross-Origin-Resource-Policy: same-origin`; y el esquema de entorno rechaza `AI_PROVIDER_MODE=fake` con `VERCEL_ENV=production`, e ignora `COGNI_DESIGN_PREVIEWS=1` en ese entorno. `script-src` y `style-src` no cambian.
 
 ### Contexto
 

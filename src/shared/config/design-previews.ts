@@ -14,9 +14,14 @@ import { notFound } from "next/navigation";
 // (e.g. a staging deployment used for design reviews). The variable has no
 // NEXT_PUBLIC_ prefix on purpose: it is read on the server and handed to
 // client components as a prop, never inlined into a client bundle.
+//
+// The Vercel production deployment never shows them, whatever the flag says
+// (security-hardening S8): the opt-in is for staging and preview builds, and
+// the server env schema also refuses to boot with it there.
 export function designPreviewsEnabled(
   env: Readonly<Record<string, string | undefined>> = process.env,
 ): boolean {
+  if (env.VERCEL_ENV === "production") return false;
   return env.NODE_ENV !== "production" || env.COGNI_DESIGN_PREVIEWS === "1";
 }
 

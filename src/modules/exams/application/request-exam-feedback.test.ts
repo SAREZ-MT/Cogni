@@ -1,10 +1,13 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   type AiGeneration,
   AiGenerationFailedError,
   EXAM_SESSION_FEEDBACK_PROMPT_VERSION,
+  type GenerateStructuredDeps,
   type GenerateStructuredInput,
   type GenerationRateLimit,
+  generateStructured,
+  initialBreakerState,
 } from "@/modules/ai";
 import type { PageTextReader } from "@/modules/notebooks";
 import {
@@ -25,6 +28,7 @@ import {
   newExamSession,
 } from "../domain/exam-session";
 import {
+  FEEDBACK_AI_TIMEOUT_MS,
   type RequestExamFeedbackDeps,
   readExamFeedback,
   requestExamFeedback,
@@ -70,7 +74,13 @@ function generation(id = "gen-1"): AiGeneration {
   };
 }
 
-type AiOutcome = "ok" | "fail" | "throw" | "hang" | { object: unknown };
+type AiOutcome =
+  | "ok"
+  | "fail"
+  | "throw"
+  | "hang"
+  | "stall"
+  | { object: unknown };
 
 function makeAi(outcome: AiOutcome = "ok") {
   const calls: GenerateStructuredInput[] = [];
@@ -84,10 +94,72 @@ function makeAi(outcome: AiOutcome = "ok") {
       calls.push(input);
       if (outcome === "fail") return err(new AiGenerationFailedError("gen-x"));
       if (outcome === "throw") throw new Error("network down");
-      if (outcome === "hang") return new Promise(() => {});
+      // Like generateStructured: a stuck call ends only through the signal.
+      if (outcome === "hang") {
+        return new Promise((_, reject) => {
+          input.signal?.addEventListener("abort", () =>
+            reject(input.signal?.reason),
+          );
+        });
+      }
+      // A call that ignores the signal entirely (a stalled quota, breaker
+      // or audit store inside generateStructured).
+      if (outcome === "stall") return new Promise(() => {});
       const object = outcome === "ok" ? FEEDBACK_OBJECT : outcome.object;
       return ok({ object, generation: generation() });
     },
+  };
+}
+
+// The real generateStructured over two providers: the first never answers
+// and ignores the abort signal, the second answers FEEDBACK_OBJECT.
+function stuckThenHealthyAi() {
+  const answered: string[] = [];
+  const provider = (id: string, stuck: boolean) => ({
+    id,
+    model: `${id}-model`,
+    async generateObject() {
+      if (stuck) return new Promise<never>(() => {});
+      answered.push(id);
+      return {
+        object: FEEDBACK_OBJECT,
+        usage: { inputTokens: 10, outputTokens: 20 },
+        latencyMs: 5,
+      };
+    },
+  });
+  let ids = 0;
+  const deps: GenerateStructuredDeps = {
+    entries: ["stuck", "healthy"].map((id, n) => ({
+      id,
+      model: `${id}-model`,
+      capabilities: ["session_feedback"],
+      rpm: 5,
+      rpd: 10,
+      priority: n + 1,
+    })),
+    providers: new Map([
+      ["stuck", provider("stuck", true)],
+      ["healthy", provider("healthy", false)],
+    ]),
+    budget: { consume: async () => true },
+    quota: {
+      readUsage: async () => ({ day: 0, minute: 0 }),
+      recordCall: async () => {},
+    },
+    breakers: { read: async () => initialBreakerState, write: async () => {} },
+    generations: {
+      create: async () => {},
+      update: async () => {},
+      findById: async () => null,
+    },
+    clock: createFixedClock(REQUESTED_AT),
+    ids: { next: () => `gen-${++ids}` },
+  };
+  return {
+    answered,
+    generateStructured: (input: GenerateStructuredInput, ownerId: string) =>
+      generateStructured(input, deps, ownerId),
   };
 }
 
@@ -108,7 +180,7 @@ interface Fixture {
   ai: ReturnType<typeof makeAi>;
   deps: RequestExamFeedbackDeps;
   questions: ExamQuestion[];
-  peeks: number;
+  checks: number;
 }
 
 let nextId = 0;
@@ -130,14 +202,14 @@ async function build(
     feedback,
     ai,
     questions,
-    peeks: 0,
+    checks: 0,
     deps: {
       uow,
       feedback,
       pages: pageReader(options.pageText),
       limiter: {
-        peek: async (): Promise<GenerationRateLimit> => {
-          fixture.peeks += 1;
+        check: async (): Promise<GenerationRateLimit> => {
+          fixture.checks += 1;
           return {
             allowed: options.allowed ?? true,
             remaining: options.allowed === false ? 0 : 3,
@@ -256,7 +328,7 @@ describe("requestExamFeedback", () => {
     expect(call).toMatchObject({
       purpose: "session_feedback",
       pageId: PAGE,
-      promptVersion: "session_feedback/v2",
+      promptVersion: "session_feedback/v4",
     });
     expect(call.prompt).toContain("Questions answered: 10");
     expect(call.prompt).toContain("Correct: 6");
@@ -267,8 +339,10 @@ describe("requestExamFeedback", () => {
     expect(call.prompt).toContain("  Student answered: ADN");
     expect(call.prompt).toContain("  Correct answer: ATP");
     expect(call.prompt).not.toContain("[Concepto q-05]");
-    expect(call.prompt.endsWith(`Text:\n${PAGE_TEXT}`)).toBe(true);
-    expect(fx.peeks).toBe(1);
+    expect(
+      call.prompt.endsWith(`<page_text>\n${PAGE_TEXT}\n</page_text>`),
+    ).toBe(true);
+    expect(fx.checks).toBe(1);
     expect(
       (await fx.feedback.findBySession("exam", "s-fail", OWNER))?.status,
     ).toBe("done");
@@ -311,7 +385,7 @@ describe("requestExamFeedback", () => {
       content: { summary: "Feedback de s-pass-1" },
     });
     expect(fx.ai.calls).toEqual([]);
-    expect(fx.peeks).toBe(0);
+    expect(fx.checks).toBe(0);
     expect(fx.feedback.creates).toBe(0);
     expect(await fx.feedback.findBySession("exam", "s-pass-2", OWNER)).toBe(
       null,
@@ -454,6 +528,78 @@ describe("requestExamFeedback", () => {
     expect(await fx.uow.repos.sessions.findById("s-fail", OWNER)).toEqual(
       session,
     );
+    if (outcome === "hang") {
+      expect(fx.ai.calls[0].signal?.aborted).toBe(true);
+    }
+  });
+
+  // Review F4: each of generateStructured's two provider attempts gets half
+  // of the feedback budget.
+  it("gives each provider attempt half of the feedback budget", async () => {
+    await seedSession(fx, "s-half", { wrong: 4, finishedAt: at(5) });
+
+    await requestExamFeedback({ sessionId: "s-half" }, fx.deps, OWNER);
+
+    expect(fx.ai.calls[0].timeoutMs).toBe(25);
+    expect(fx.ai.calls[0].signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("produces feedback from the second provider when the first one is stuck", async () => {
+    await seedSession(fx, "s-stuck", { wrong: 4, finishedAt: at(5) });
+    const ai = stuckThenHealthyAi();
+
+    const result = await requestExamFeedback(
+      { sessionId: "s-stuck" },
+      { ...fx.deps, ai, aiTimeoutMs: 200 },
+      OWNER,
+    );
+
+    if (!result.ok) throw result.error;
+    expect(result.value.feedback).toMatchObject({
+      status: "done",
+      content: FEEDBACK_OBJECT,
+      generationId: "gen-2",
+    });
+    expect(ai.answered).toEqual(["healthy"]);
+  });
+
+  describe("with fake timers", () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    // Review F3: the whole call is bounded, not only the provider attempts.
+    it("stores failed feedback at the deadline when the AI call ignores the signal", async () => {
+      fx = await build({ ai: "stall" });
+      fx.deps.aiTimeoutMs = undefined;
+      await seedSession(fx, "s-stall", { wrong: 4, finishedAt: at(5) });
+      let settled = false;
+      const request = requestExamFeedback(
+        { sessionId: "s-stall" },
+        fx.deps,
+        OWNER,
+      ).finally(() => {
+        settled = true;
+      });
+
+      await vi.advanceTimersByTimeAsync(FEEDBACK_AI_TIMEOUT_MS - 1);
+      expect(settled).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+
+      expect(settled).toBe(true);
+      const result = await request;
+      if (!result.ok) throw result.error;
+      expect(result.value.feedback).toMatchObject({
+        status: "failed",
+        content: null,
+        generationId: null,
+      });
+      expect(fx.ai.calls[0].timeoutMs).toBe(FEEDBACK_AI_TIMEOUT_MS / 2);
+      expect(fx.ai.calls[0].signal?.aborted).toBe(true);
+    });
   });
 
   it("stores failed feedback without calling the AI when the daily limit is reached, and never consumes a unit", async () => {
@@ -469,8 +615,8 @@ describe("requestExamFeedback", () => {
     if (!result.ok) throw result.error;
     expect(result.value.feedback.status).toBe("failed");
     expect(fx.ai.calls).toEqual([]);
-    // The limiter dependency only has `peek`: nothing can consume a unit.
-    expect(Object.keys(fx.deps.limiter)).toEqual(["peek"]);
+    // The feedback limit is consumed with `check`, its only dependency.
+    expect(Object.keys(fx.deps.limiter)).toEqual(["check"]);
   });
 
   it("is idempotent per session: a later request reads the stored row back", async () => {
@@ -548,7 +694,9 @@ describe("requestExamFeedback", () => {
 
     await requestExamFeedback({ sessionId: "s-fail" }, fx.deps, OWNER);
 
-    expect(fx.ai.calls[0].prompt.endsWith("Text:\nuno dos tres")).toBe(true);
+    expect(
+      fx.ai.calls[0].prompt.endsWith("<page_text>\nuno dos tres\n</page_text>"),
+    ).toBe(true);
   });
 
   it("still generates when the page text cannot be read", async () => {
@@ -568,7 +716,9 @@ describe("requestExamFeedback", () => {
 
     if (!result.ok) throw result.error;
     expect(result.value.feedback.status).toBe("done");
-    expect(fx.ai.calls[0].prompt.endsWith("Text:\n")).toBe(true);
+    expect(
+      fx.ai.calls[0].prompt.endsWith("<page_text>\n(none)\n</page_text>"),
+    ).toBe(true);
   });
 });
 

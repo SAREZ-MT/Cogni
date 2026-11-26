@@ -20,7 +20,7 @@ export async function getAssetReadUrl(
   const parsed = parseInput(getAssetReadUrlSchema, input);
   if (!parsed.ok) return parsed;
 
-  const asset = await deps.assets.findById(parsed.value.assetId);
+  const asset = await deps.assets.findById(parsed.value.assetId, ownerId);
   if (!asset || asset.ownerId !== ownerId) {
     return err(new DomainError(ASSET_ERROR.FORBIDDEN, parsed.value.assetId));
   }
