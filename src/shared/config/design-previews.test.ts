@@ -55,6 +55,27 @@ describe("designPreviewsEnabled", () => {
       }),
     ).toBe(false);
   });
+
+  // security-hardening S8: the opt-in is for staging builds only.
+  it.each([
+    { NODE_ENV: "production", COGNI_DESIGN_PREVIEWS: "1" },
+    { NODE_ENV: "development" },
+    {},
+  ])("is disabled on the Vercel production deployment whatever else is set (%j)", (env) => {
+    expect(designPreviewsEnabled({ ...env, VERCEL_ENV: "production" })).toBe(
+      false,
+    );
+  });
+
+  it("keeps the opt-in working on a Vercel preview deployment", () => {
+    expect(
+      designPreviewsEnabled({
+        NODE_ENV: "production",
+        VERCEL_ENV: "preview",
+        COGNI_DESIGN_PREVIEWS: "1",
+      }),
+    ).toBe(true);
+  });
 });
 
 describe("requireDesignPreviews", () => {

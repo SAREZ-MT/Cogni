@@ -63,6 +63,13 @@ const serverObject = clientSchema.extend({
   AI_GLOBAL_DAILY_EVALUATIONS: z.coerce.number().int().positive().default(350),
   AI_GLOBAL_DAILY_FEEDBACKS: z.coerce.number().int().positive().default(700),
   AI_PAGE_TOKEN_CAP: z.coerce.number().int().positive().default(12000),
+  // Set by Vercel: `production`, `preview` or `development`. Unset elsewhere
+  // (local, CI, e2e), which is why the guards below key on it and not on
+  // NODE_ENV: the e2e suite runs a production build in fake mode.
+  VERCEL_ENV: z.string().min(1).optional(),
+  // `1` shows the design-preview screens in a production build (see
+  // design-previews.ts). Staging and preview only.
+  COGNI_DESIGN_PREVIEWS: z.string().optional(),
 });
 
 export const serverSchema = serverObject.superRefine((env, ctx) => {
@@ -81,6 +88,23 @@ export const serverSchema = serverObject.superRefine((env, ctx) => {
       "CLOUDFLARE_ACCOUNT_ID",
       "required when CLOUDFLARE_API_TOKEN is set",
     );
+  }
+
+  // The real deployment never serves canned AI output or sample screens
+  // (security-hardening S8).
+  if (env.VERCEL_ENV === "production") {
+    if (env.AI_PROVIDER_MODE === "fake") {
+      missing(
+        "AI_PROVIDER_MODE",
+        "fake is not allowed when VERCEL_ENV=production",
+      );
+    }
+    if (env.COGNI_DESIGN_PREVIEWS === "1") {
+      missing(
+        "COGNI_DESIGN_PREVIEWS",
+        "1 is not allowed when VERCEL_ENV=production",
+      );
+    }
   }
 
   if (env.AI_PROVIDER_MODE !== "live") return;

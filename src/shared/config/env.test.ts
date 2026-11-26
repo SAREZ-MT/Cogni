@@ -211,3 +211,50 @@ describe("parseServerEnv AI layer", () => {
     ).toThrow(/AI_PROVIDER_MODE/);
   });
 });
+
+// security-hardening S8: sample data and the deterministic AI provider must
+// never serve real visitors. "Production" is the Vercel production
+// deployment only: the e2e suite runs a production build (NODE_ENV) in fake
+// mode on purpose.
+describe("parseServerEnv production guards", () => {
+  it("refuses AI_PROVIDER_MODE=fake on the Vercel production deployment", () => {
+    expect(() =>
+      parseServerEnv({ ...server, VERCEL_ENV: "production" }),
+    ).toThrow(
+      /AI_PROVIDER_MODE: fake is not allowed when VERCEL_ENV=production/,
+    );
+  });
+
+  it("refuses COGNI_DESIGN_PREVIEWS=1 on the Vercel production deployment", () => {
+    expect(() =>
+      parseServerEnv({
+        ...live,
+        VERCEL_ENV: "production",
+        COGNI_DESIGN_PREVIEWS: "1",
+      }),
+    ).toThrow(
+      /COGNI_DESIGN_PREVIEWS: 1 is not allowed when VERCEL_ENV=production/,
+    );
+  });
+
+  it("accepts live mode without previews on the Vercel production deployment", () => {
+    expect(
+      parseServerEnv({ ...live, VERCEL_ENV: "production" }).VERCEL_ENV,
+    ).toBe("production");
+  });
+
+  it.each([
+    undefined,
+    "preview",
+    "development",
+  ])("still accepts fake mode and design previews when VERCEL_ENV is %j", (vercelEnv) => {
+    expect(() =>
+      parseServerEnv({
+        ...server,
+        NODE_ENV: "production",
+        VERCEL_ENV: vercelEnv,
+        COGNI_DESIGN_PREVIEWS: "1",
+      }),
+    ).not.toThrow();
+  });
+});
