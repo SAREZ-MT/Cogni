@@ -1,12 +1,5 @@
 import type { AiProvider } from "../application/ports";
-import {
-  examQuestionsOutput,
-  examVariantsOutput,
-  flashcardsOutput,
-  recallEvaluationsOutput,
-  recallQuestionsOutput,
-  sessionFeedbackOutput,
-} from "../application/schemas";
+import { purposeOfSchema } from "../application/schemas";
 
 export const FAKE_PROVIDER_ID = "fake";
 export const FAKE_MODEL_ID = "fake-model";
@@ -495,21 +488,22 @@ export function createFakeLiveProvider(): AiProvider {
     model: FAKE_MODEL_ID,
     async generateObject(request) {
       await new Promise((resolve) => setTimeout(resolve, 5));
-      // The port carries no purpose, but each purpose passes its own output
-      // schema: only the matching prompt-aware answer is built.
-      const schema: unknown = request.schema;
+      // The port carries no purpose, but each purpose passes its own
+      // schema (the provider one, or the validated one in a direct call):
+      // only the matching prompt-aware answer is built.
+      const purpose = purposeOfSchema(request.schema);
       const candidates =
-        schema === flashcardsOutput
+        purpose === "generate_flashcards"
           ? [flashcardsFrom(request.prompt)]
-          : schema === examQuestionsOutput
+          : purpose === "generate_exam_questions"
             ? [examQuestionsFrom(request.prompt)]
-            : schema === recallQuestionsOutput
+            : purpose === "generate_recall_questions"
               ? [recallQuestionsFrom(request.prompt)]
-              : schema === recallEvaluationsOutput
+              : purpose === "evaluate_recall_answer"
                 ? [recallEvaluationsFrom(request.prompt), ...MINIMAL_OBJECTS]
-                : schema === examVariantsOutput
+                : purpose === "generate_exam_variants"
                   ? [examVariantsFrom(request.prompt), ...MINIMAL_OBJECTS]
-                  : schema === sessionFeedbackOutput
+                  : purpose === "session_feedback"
                     ? [examFeedbackFrom(request.prompt), ...MINIMAL_OBJECTS]
                     : MINIMAL_OBJECTS;
       const object = candidates.find(

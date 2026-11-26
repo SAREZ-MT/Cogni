@@ -29,7 +29,7 @@ import type {
   IdGenerator,
   QuotaStore,
 } from "./ports";
-import { outputSchemaFor } from "./schemas";
+import { outputSchemaFor, providerSchemaFor } from "./schemas";
 
 export interface GenerateStructuredInput {
   purpose: AiPurpose;
@@ -234,7 +234,9 @@ export async function generateStructured(
       if (!provider) throw new Error("provider not configured");
       const response = await abortable(
         provider.generateObject({
-          schema,
+          // Same shape without the size caps, which only the validation
+          // below applies (some providers refuse them in a schema).
+          schema: providerSchemaFor(input.purpose),
           system: input.system,
           prompt: input.prompt,
           temperature,

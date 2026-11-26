@@ -5,7 +5,7 @@ import {
   EVALUATE_RECALL_ANSWER_PROMPT_VERSION,
   type EvaluatedRecallAnswer,
   MAX_EVALUATED_ANSWER_LENGTH,
-} from "./v3";
+} from "./v4";
 
 const first: EvaluatedRecallAnswer = {
   id: "q1",
@@ -35,12 +35,12 @@ function itemOf(prompt: string, id: string): string {
   return prompt.slice(start, end + "</answer_item>".length);
 }
 
-describe("evaluate_recall_answer/v3 prompt", () => {
+describe("evaluate_recall_answer/v4 prompt", () => {
   const built = buildEvaluateRecallAnswersPrompt([first, second]);
 
   it("exposes its version", () => {
     expect(EVALUATE_RECALL_ANSWER_PROMPT_VERSION).toBe(
-      "evaluate_recall_answer/v3",
+      "evaluate_recall_answer/v4",
     );
   });
 
@@ -166,6 +166,14 @@ describe("evaluate_recall_answer/v3 prompt", () => {
     expect(built.system).toContain("questionId");
     expect(built.system).toMatch(/exactly one/i);
     expect(built.system).toMatch(/independently/i);
+  });
+
+  // gpt-oss-120b answered { evaluations: { items: [...] } } or the schema
+  // itself without this line (2026-11-26).
+  it("spells out the shape of the answer: an object with an evaluations array", () => {
+    expect(built.system).toContain('{"evaluations":[{"questionId":"q1"');
+    expect(built.system).toMatch(/evaluations is a JSON array/i);
+    expect(built.system).toMatch(/never return the schema/i);
   });
 
   it("asks for an integer score from 0 to 5 against the explicit rubric", () => {

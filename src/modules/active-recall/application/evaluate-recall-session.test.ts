@@ -247,7 +247,7 @@ describe("evaluateRecallSession", () => {
     expect(call).toMatchObject({
       purpose: "evaluate_recall_answer",
       pageId: PAGE,
-      promptVersion: "evaluate_recall_answer/v3",
+      promptVersion: "evaluate_recall_answer/v4",
     });
     expect(call?.temperature).toBeLessThanOrEqual(0.3);
     const [item] = itemsOf(call?.prompt);

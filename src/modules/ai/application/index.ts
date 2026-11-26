@@ -25,7 +25,7 @@ export {
   EVALUATE_RECALL_ANSWER_PROMPT_VERSION,
   type EvaluatedRecallAnswer,
   MAX_EVALUATED_ANSWER_LENGTH,
-} from "./prompts/evaluate_recall_answer/v3";
+} from "./prompts/evaluate_recall_answer/v4";
 export {
   buildGenerateExamQuestionsPrompt,
   type ExistingExamQuestion,

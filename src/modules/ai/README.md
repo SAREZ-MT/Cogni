@@ -37,7 +37,7 @@ and rate limiting (documento-maestro §8).
     (exams),
     `generate_recall_questions/v2` (10 open questions with a rubric per call,
     lists up to 60 of the page's active questions to avoid repeats,
-    temperature 0.7) and `evaluate_recall_answer/v3` (every written answer
+    temperature 0.7) and `evaluate_recall_answer/v4` (every written answer
     of a recall session in one call, one `<answer_item>` per answer with its
     rubric, page fragment and answer as tagged data, answers capped at 4000
     characters, output `{ evaluations: [{ questionId, … }] }` of at most 10;
