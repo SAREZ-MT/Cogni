@@ -191,12 +191,6 @@ describe("FlashcardPlayer", () => {
         id: "i1",
         front: "Pregunta 1",
         back: "Respuesta 1",
-        hints: {
-          again: "1 día",
-          hard: "6 días",
-          good: "6 días",
-          easy: "6 días",
-        },
       },
       { id: "i2", front: "Pregunta 2", back: "Respuesta 2" },
     ];
@@ -220,13 +214,13 @@ describe("FlashcardPlayer", () => {
       return { user, onFinish, onExit };
     }
 
-    it("shows each card's own scheduling hints", async () => {
+    it("shows only the rating on each button, with no interval", async () => {
       const { user } = graded(async () => ({ ok: true }));
 
       await user.click(screen.getByTestId("flip-card"));
 
-      expect(screen.getByTestId("rate-again")).toHaveTextContent("1 día");
-      expect(screen.getByTestId("rate-good")).toHaveTextContent("6 días");
+      expect(screen.getByTestId("rate-again")).toHaveTextContent(/^Otra vez$/);
+      expect(screen.getByTestId("rate-easy")).toHaveTextContent(/^Fácil$/);
     });
 
     it("grades through onRate and advances only once it resolves", async () => {

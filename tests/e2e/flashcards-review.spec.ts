@@ -45,8 +45,8 @@ test.describe("flashcard review session", () => {
     ).toBeVisible();
 
     await player.getByRole("button", { name: "Mostrar respuesta" }).click();
-    // First review of a new card: every button schedules 1 day (§7.1).
-    await expect(player.getByTestId("rate-good")).toContainText("1 día");
+    // The buttons carry only the rating, no interval.
+    await expect(player.getByTestId("rate-good")).toHaveText("Bien");
     if (SCREENSHOT_DIR) {
       await page.waitForTimeout(600);
       await page.screenshot({ path: `${SCREENSHOT_DIR}/review-player.png` });

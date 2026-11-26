@@ -16,13 +16,11 @@ import {
 } from "@/shared/ui/session-summary";
 import { type StatDotItem, StatDots } from "@/shared/ui/stat-dots";
 import { plural } from "../_lib/plural";
-// One card of the session. `hints` overrides the default hint under each
-// rating button (a real session shows the days SM-2 would schedule).
+// One card of the session.
 export interface PlayerCard {
   id: string;
   front: string;
   back: string;
-  hints?: Partial<Record<RatingTone, string>>;
 }
 
 import { hubHref } from "@/shared/navigation/technique-hub";
@@ -56,11 +54,13 @@ export interface FlashcardPlayerProps {
 // server action crash): the card stays so the student can retry or finish.
 const RATE_FAILURE = "No pudimos guardar tu respuesta. Intenta de nuevo.";
 
-const RATINGS: { tone: RatingTone; label: string; hint: string }[] = [
-  { tone: "again", label: "Otra vez", hint: "< 1 min" },
-  { tone: "hard", label: "Difícil", hint: "Repasar pronto" },
-  { tone: "good", label: "Bien", hint: "Mañana" },
-  { tone: "easy", label: "Fácil", hint: "4 días" },
+// The buttons carry only the rating: no interval under them (user
+// decision 2026-11-26).
+const RATINGS: { tone: RatingTone; label: string }[] = [
+  { tone: "again", label: "Otra vez" },
+  { tone: "hard", label: "Difícil" },
+  { tone: "good", label: "Bien" },
+  { tone: "easy", label: "Fácil" },
 ];
 
 // Tally tone lookup shared by the header StatDots and the SessionSummary
@@ -286,7 +286,6 @@ export function FlashcardPlayer({
                 key={rating.tone}
                 tone={rating.tone}
                 label={rating.label}
-                hint={card?.hints?.[rating.tone] ?? rating.hint}
                 disabled={saving}
                 onClick={() => void rate(rating.tone)}
               />

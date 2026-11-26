@@ -4,19 +4,16 @@ import { describe, expect, it, vi } from "vitest";
 import { RatingButton } from "./rating-button";
 
 describe("RatingButton", () => {
-  it("renders its label and hint under a tone-specific test id", () => {
-    render(<RatingButton tone="good" label="Bien" hint="Mañana" />);
+  it("renders only its label under a tone-specific test id", () => {
+    render(<RatingButton tone="good" label="Bien" />);
 
     const button = screen.getByTestId("rate-good");
-    expect(button).toHaveTextContent("Bien");
-    expect(button).toHaveTextContent("Mañana");
+    expect(button).toHaveTextContent(/^Bien$/);
   });
 
   it("calls onClick when pressed", async () => {
     const onClick = vi.fn();
-    render(
-      <RatingButton tone="hard" label="Difícil" hint="h" onClick={onClick} />,
-    );
+    render(<RatingButton tone="hard" label="Difícil" onClick={onClick} />);
 
     await userEvent.click(screen.getByTestId("rate-hard"));
 
@@ -26,13 +23,7 @@ describe("RatingButton", () => {
   it("does not call onClick while disabled", async () => {
     const onClick = vi.fn();
     render(
-      <RatingButton
-        tone="easy"
-        label="Fácil"
-        hint="h"
-        onClick={onClick}
-        disabled
-      />,
+      <RatingButton tone="easy" label="Fácil" onClick={onClick} disabled />,
     );
 
     await userEvent.click(screen.getByTestId("rate-easy"));
@@ -41,7 +32,7 @@ describe("RatingButton", () => {
   });
 
   it("is not a submit button", () => {
-    render(<RatingButton tone="again" label="Otra vez" hint="h" />);
+    render(<RatingButton tone="again" label="Otra vez" />);
 
     expect(screen.getByTestId("rate-again")).toHaveAttribute("type", "button");
   });
