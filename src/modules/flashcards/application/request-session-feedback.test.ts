@@ -116,7 +116,7 @@ function generation(id = "gen-1"): AiGeneration {
     purpose: "session_feedback",
     provider: "gemini",
     model: "gemini-3.5-flash-lite",
-    promptVersion: "session_feedback/v3",
+    promptVersion: "session_feedback/v5",
     inputTokens: 10,
     outputTokens: 20,
     latencyMs: 5,
@@ -389,7 +389,7 @@ describe("requestSessionFeedback", () => {
     expect(fx.feedback.rows.get(SESSION)).toEqual(result.value);
   });
 
-  it("asks the session_feedback purpose with counts and the hardest fronts", async () => {
+  it("asks the session_feedback purpose with counts, the best recalled fronts and the hardest ones", async () => {
     await gradedSession();
 
     await requestSessionFeedback({ sessionId: SESSION }, fx.deps, OWNER);
@@ -398,18 +398,20 @@ describe("requestSessionFeedback", () => {
     expect(call).toMatchObject({
       purpose: "session_feedback",
       pageId: PAGE,
-      promptVersion: "session_feedback/v3",
+      promptVersion: "session_feedback/v5",
     });
     expect(call?.prompt).toContain("Items reviewed: 4");
     expect(call?.prompt).toContain("Again: 1");
     expect(call?.prompt).toContain("Hard: 1");
     expect(call?.prompt).toContain("Good: 1");
     expect(call?.prompt).toContain("Easy: 1");
-    // "Otra vez" first, then "Difícil"; well-known cards are not sent.
-    const struggled = call?.prompt
-      .split("\n")
-      .filter((line) => line.startsWith("- "));
-    expect(struggled).toEqual(["- Otra vez", "- Difícil"]);
+    // "Fácil" first, then "Bien"; "Otra vez" first, then "Difícil".
+    expect(call?.prompt).toContain(
+      "<recalled_items>\n- Fácil\n- Bien\n</recalled_items>",
+    );
+    expect(call?.prompt).toContain(
+      "<struggled_items>\n- Otra vez\n- Difícil\n</struggled_items>",
+    );
   });
 
   it("stores failed feedback when the provider fails, and still returns ok", async () => {

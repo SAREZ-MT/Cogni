@@ -5,8 +5,8 @@ import { buildGenerateExamQuestionsPrompt } from "../application/prompts/generat
 import { buildGenerateExamVariantsPrompt } from "../application/prompts/generate_exam_variants/v2";
 import { buildGenerateFlashcardsPrompt } from "../application/prompts/generate_flashcards/v2";
 import { buildGenerateRecallQuestionsPrompt } from "../application/prompts/generate_recall_questions/v2";
-import { buildSessionFeedbackPrompt } from "../application/prompts/session_feedback/v3";
 import { buildExamSessionFeedbackPrompt } from "../application/prompts/session_feedback/v4";
+import { buildSessionFeedbackPrompt } from "../application/prompts/session_feedback/v5";
 import {
   examQuestionsOutput,
   examVariantsOutput,
@@ -466,6 +466,7 @@ describe("createFakeLiveProvider", () => {
       technique: "flashcards",
       reviewedCount: 3,
       counts: { again: 1, hard: 0, good: 2, easy: 0 },
+      recalled: ["¿Qué es la célula?"],
       struggled: ["¿Qué es el núcleo?"],
     });
     const response = await provider.generateObject({

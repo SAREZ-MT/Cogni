@@ -10,6 +10,7 @@ export const DATA_TAGS = [
   "page_text",
   "existing_questions",
   "failed_questions",
+  "recalled_items",
   "struggled_items",
   "answer_item",
   "rubric",
