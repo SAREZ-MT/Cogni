@@ -1,8 +1,8 @@
 # Documento de Arquitectura de Software (SAD) — Cogni
 
 **Proyecto:** Cogni — plataforma web de estudio a partir de apuntes propios
-**Versión:** 1.2
-**Fecha:** 2026-10-26
+**Versión:** 1.3
+**Fecha:** 2026-11-25
 **Estado:** Borrador
 **Autor:** Javier Sarez
 **Documentos relacionados:** ./01-SRS.md, ./03-DATA-API.md, ./04-ADR.md
@@ -21,6 +21,7 @@
   - Fase 7 (Calendario y dashboard, PR #95–#100): `src/modules/scheduling` y `src/modules/analytics`, sin tablas nuevas; decisiones en `docs/adr/0008-calendario-y-dashboard.md`.
 - Fase 9 (Endurecimiento) está parcialmente cubierta: la Content Security Policy con nonce por petición, la redirección del dominio apex y la protección de sesión ya existen en `src/proxy.ts` y `src/shared/config/security-headers.ts`; el resto (registro de logs externo, pruebas de carga, auditoría de accesibilidad) no se ha iniciado.
 - Todas las secciones de este documento describen arquitectura implementada y verificable contra el código de la rama principal; cada elemento de las tablas indica su estado.
+- Endurecimiento de seguridad (rama `feat/security-hardening`, revisión del 2026-11-25 contra el código, `docs/adr/0010`): nuevo modelo de amenazas (§12.10) y actualización de §6.3, §10.2 a §10.4, §11.3, §11.4 y §12 (límites y presupuestos de IA, prompts con bloques de datos, comprobación de la evaluación contra la rúbrica, comprobación de acceso en las Server Actions, consultas por propietario y migración `0016`, guardas de producción, cabeceras y dependencias fijadas). Al 2026-11-25 la migración `0016` está aplicada a la base de desarrollo; en producción la aplica el build al desplegar.
 - Referencias a decisiones: "`04-ADR.md`, ADR-0NN" designa una entrada del registro de decisiones de esta suite (`./04-ADR.md`); "`docs/adr/00NN`" designa un ADR numerado del repositorio. Son dos numeraciones distintas (por ejemplo, `04-ADR.md`, ADR-008 trata el Vercel AI SDK, mientras que `docs/adr/0008` trata el calendario y el dashboard).
 
 ### Documento vivo
@@ -470,6 +471,7 @@ Estos mecanismos son reales y acotados; no existe un mecanismo de reintento gen�
 5. ***Circuit breaker* por proveedor de IA** (`src/modules/ai/domain/circuit-breaker.ts`): 3 fallos consecutivos (`BREAKER_FAILURE_THRESHOLD`) marcan al proveedor como no sano durante 10 minutos (`BREAKER_OPEN_MS`); su estado se comparte entre invocaciones en Upstash Redis (`UpstashBreakerStore`).
 6. **Rotación de proveedores y un único reintento** (`generateStructured`, `src/modules/ai/application/generate-structured.ts`): se elige un proveedor sano y con cuota diaria disponible; si la llamada falla o la salida no cumple el esquema Zod, se reintenta una sola vez con otro proveedor (`MAX_ATTEMPTS = 2`). Si ambos intentos fallan, la generación queda `failed` en `ai_generations` y no se inventa contenido.
 7. **Reclamo de evaluaciones abandonadas** (`evaluateRecallSession`, `src/modules/active-recall`): un reclamo de evaluación de más de 6 minutos se retoma, y la vista de resultados vuelve a programar la evaluación si la sesión terminada sigue pendiente sin una corrida viva (§10.4).
+8. **Tiempo máximo por intento y presupuesto diario de toda la aplicación** (`generateStructured`; `docs/adr/0010`): cada intento corre con `AbortSignal.timeout` (60 s por defecto, `ATTEMPT_TIMEOUT_MS`) y el adaptador `src/modules/ai/infrastructure/ai-sdk-provider.ts` llama al AI SDK con `maxRetries: 0`, de modo que el único reintento es el del punto 6 y prefiere un proveedor distinto (`avoidVendors`). Antes de llamar al proveedor, cada intento se cobra al presupuesto diario de su grupo (`UpstashBudgetStore`); con el presupuesto agotado, o si el contador no responde, la llamada termina con `AI_DAILY_BUDGET_EXHAUSTED` (falla cerrado). La retroalimentación de sesión tiene un plazo total de 25 s para la IA, 12,5 s por intento.
 
 ---
 
@@ -763,14 +765,14 @@ Las escrituras que deben quedar juntas se agrupan en una unidad de trabajo sobre
 Generación:
 
 1. En el panel de técnicas de la página, "Generar" de flashcards llama a `generateFlashcardsAction`. `requestGeneration` (`flashcards/application/request-generation.ts`) lee y comprueba la página (`notebooks`) antes de tocar el límite, y selecciona los párrafos que flashcards aún no usó (huellas en `generation_fingerprints`); sin párrafos nuevos responde `FLASHCARDS_NO_NEW_CONTENT` sin llamar a la IA ni consumir el límite.
-2. Consume una unidad del límite diario de generaciones (`check`, Upstash) y llama a `ai.generateStructured` con `generate_flashcards/v1`, recortado a `AI_PAGE_TOKEN_CAP`. `generateStructured` elige un proveedor sano y con cuota, valida la salida contra `{cards:[{front,back}]}` y, si falla, reintenta una vez con otro proveedor; cada intento queda auditado en `ai_generations`.
+2. Consume una unidad del límite diario de generaciones (`check`, Upstash) y llama a `ai.generateStructured` con `generate_flashcards/v2` (`generate_flashcards/v1` hasta `docs/adr/0010`; el texto de la página viaja dentro del bloque de datos `<page_text>`), recortado a `AI_PAGE_TOKEN_CAP`. `generateStructured` elige un proveedor sano y con cuota, valida la salida contra `{cards:[{front,back}]}` y, si falla, reintenta una vez con otro proveedor; cada intento queda auditado en `ai_generations`.
 3. En una sola transacción (`DrizzleDeckUnitOfWork`) guarda las tarjetas válidas al final del mazo de la página, un `StudyItem(kind = "flashcard")` por tarjeta (`createStudyItemRepository` de `study-engine`) y las huellas de los párrafos enviados. Si ninguna tarjeta es válida no se guarda nada: un mazo nunca queda vacío. La acción registra el evento `generation_requested` en PostHog.
 
 Repaso:
 
 4. `startFlashcardSessionAction` abre una sesión con `createFlashcardSessionsServerApi` de `study-engine`; sin ítems vencidos responde `STUDY_ENGINE_NOTHING_DUE` y no crea fila.
 5. Cada calificación (Otra vez q=1, Difícil q=3, Bien q=4, Fácil q=5) llama a `gradeFlashcardAction` → `gradeFlashcard`: en una transacción aplica `applySm2`, escribe el `ReviewLog(session_kind = flashcards)`, actualiza los contadores de la `FlashcardSession` y recalcula el `PageMastery` de la página.
-6. `finishFlashcardSessionAction` cierra la sesión. `requestSessionFeedbackAction` → `requestSessionFeedback` (`flashcards`) consulta el límite sin consumirlo (`peek`), lee la sesión y las tarjetas difíciles con `createSessionFeedbackSources` y pide `session_feedback` a la IA; la fila única de `session_feedback` pasa a `done` o `failed`, y un fallo nunca impide cerrar la sesión.
+6. `finishFlashcardSessionAction` cierra la sesión. `requestSessionFeedbackAction` → `requestSessionFeedback` (`flashcards`) consume una unidad del límite diario de retroalimentaciones (`check` sobre `{prefijo}:ai:feedback`, `AI_DAILY_FEEDBACKS`; hasta `docs/adr/0010` solo consultaba el límite de generaciones con `peek`), lee la sesión y las tarjetas difíciles con `createSessionFeedbackSources` y pide `session_feedback` a la IA (prompt `session_feedback/v3`, con las tarjetas difíciles en `<struggled_items>`); la fila única de `session_feedback` pasa a `done` o `failed`, y un fallo nunca impide cerrar la sesión.
 
 ### 10.3 Exámenes y repetición con variantes
 
@@ -778,12 +780,12 @@ Repaso:
 
 **Implementado (Fase 5)** — `src/modules/exams`, con `ai`, `notebooks`, `study-engine` y `scheduling` como dependencias a través de sus `index.ts`; decisiones en `docs/adr/0006-examenes-y-repeticion-con-variantes.md`; trazabilidad con CU-08.
 
-1. "Generar" de exámenes llama a `generateExamQuestionsAction` → `requestExamGeneration`: lee las preguntas activas de la página (el prompt las lista para evitar duplicados) y los párrafos aún no usados, y llama a `ai.generateStructured` con `generate_exam_questions` en tandas de hasta 15 preguntas; una petición de 30 preguntas son dos llamadas pero una sola unidad del límite diario. Cada pregunta raíz guardada recibe su `StudyItem(kind = "exam_question")` en la misma transacción. El estudiante también puede crear, editar y retirar preguntas a mano.
+1. "Generar" de exámenes llama a `generateExamQuestionsAction` → `requestExamGeneration`: lee las preguntas activas de la página (el prompt las lista para evitar duplicados) y los párrafos aún no usados, y llama a `ai.generateStructured` con `generate_exam_questions` (prompt `generate_exam_questions/v2`) en tandas de hasta 15 preguntas; una petición de 30 preguntas son dos llamadas y, desde `docs/adr/0010`, dos unidades del límite diario, que se cobran todas o ninguna (`consumeGenerationUnits`; antes era una sola unidad). Cada pregunta raíz guardada recibe su `StudyItem(kind = "exam_question")` en la misma transacción. El estudiante también puede crear, editar y retirar preguntas a mano.
 2. `startExamSessionAction` compone el examen con N entre 10 y 30 preguntas (`composeExam`: raíces falladas en el último examen, raíces vencidas y luego las vistas hace más tiempo); con menos de 10 raíces activas responde `EXAMS_NOT_ENOUGH_QUESTIONS`.
 3. Cada respuesta se corrige en el servidor al elegirla (`answerExamQuestionAction`), de forma determinista y sin IA.
 4. "Ver resultados" (`finishExamSessionAction` → `completeExamSession`) cierra la sesión en una transacción (`DrizzleExamSessionUnitOfWork`): calcula la puntuación, registra los repasos con `createExamReviewRecorder` de `study-engine` (q=1 para cada incorrecta; q=4 para cada correcta solo si el ítem de la raíz estaba vencido, `examQualityFor`) y actualiza `exam_page_state`: limpia la repetición con 70 % o más, o la marca con sus raíces falladas por debajo de 70 %.
-5. `startExamRetakeAction` → `startExamRetake` rechaza antes de cualquier llamada a la IA una repetición imposible (sin repetición pendiente, N fuera de rango o menor que los conceptos fallados); retoma una repetición abierta sin llamar a la IA; reutiliza una variante guardada antes; y para el resto llama a `generate_exam_variants`, una variante reformulada por raíz fallada con una redacción nunca usada por su linaje, retirando la redacción mostrada en el examen fallado. Si falta alguna variante responde `EXAMS_RETAKE_VARIANT_MISSING` sin guardar nada ni consumir el límite. La repetición presenta primero las raíces reformuladas y completa hasta N (`composeRetake`).
-6. `requestExamFeedbackAction` → `requestExamFeedback` pide la retroalimentación del examen terminado con `createSessionFeedbackSources`, sobre la misma tabla `session_feedback` (`session_kind = exam`). El centro de exámenes (`listExamHubAction`) cuenta las preguntas vencidas por página con `createSchedulingServerApi` de `scheduling`.
+5. `startExamRetakeAction` → `startExamRetake` rechaza antes de cualquier llamada a la IA una repetición imposible (sin repetición pendiente, N fuera de rango o menor que los conceptos fallados); retoma una repetición abierta sin llamar a la IA; reutiliza una variante guardada antes; y para el resto llama a `generate_exam_variants` (prompt `generate_exam_variants/v2`), una variante reformulada por raíz fallada con una redacción nunca usada por su linaje, retirando la redacción mostrada en el examen fallado. Si falta alguna variante responde `EXAMS_RETAKE_VARIANT_MISSING` sin guardar nada ni consumir el límite. La repetición presenta primero las raíces reformuladas y completa hasta N (`composeRetake`).
+6. `requestExamFeedbackAction` → `requestExamFeedback` pide la retroalimentación del examen terminado con `createSessionFeedbackSources`, sobre la misma tabla `session_feedback` (`session_kind = exam`), con el prompt `session_feedback/v4` y una unidad del límite diario de retroalimentaciones (`AI_DAILY_FEEDBACKS`). El centro de exámenes (`listExamHubAction`) cuenta las preguntas vencidas por página con `createSchedulingServerApi` de `scheduling`.
 
 ### 10.4 Recordación activa con evaluación combinada
 
@@ -793,7 +795,7 @@ Repaso:
 
 Generación (previa a la sesión):
 
-1. En el panel de técnicas de la página, "Generar" de Recordación activa llama a `generateRecallQuestionsAction`. `requestRecallGeneration` lee el texto de la página (`notebooks`), selecciona los párrafos que la técnica aún no usó (`selectNewParagraphs` sobre `generation_fingerprints`; sin nada nuevo responde `RECALL_NO_NEW_CONTENT` sin llamar a la IA), consulta el límite diario de generaciones (`peek`) y llama a `ai.generateStructured` con `generate_recall_questions/v1` (10 preguntas con rúbrica).
+1. En el panel de técnicas de la página, "Generar" de Recordación activa llama a `generateRecallQuestionsAction`. `requestRecallGeneration` lee el texto de la página (`notebooks`), selecciona los párrafos que la técnica aún no usó (`selectNewParagraphs` sobre `generation_fingerprints`; sin nada nuevo responde `RECALL_NO_NEW_CONTENT` sin llamar a la IA), consulta el límite diario de generaciones (`peek`) y llama a `ai.generateStructured` con `generate_recall_questions/v2` (10 preguntas con rúbrica; `generate_recall_questions/v1` hasta `docs/adr/0010`).
 2. En una sola transacción (`DrizzleRecallUnitOfWork`) guarda las preguntas, un `StudyItem(kind = "recall_question")` por pregunta y las huellas de los párrafos enviados; después consume la unidad (`check`).
 
 Sesión y evaluación:
@@ -801,8 +803,8 @@ Sesión y evaluación:
 3. La ruta `/active-recall/{cuaderno}/{página}` lee un plan (`planRecallSession`: hasta 10 preguntas, vencidas primero, luego nuevas y luego las repasadas hace más tiempo) sin escribir. Con la primera respuesta, el reproductor abre la sesión (`startRecallSessionAction`).
 4. Cada respuesta y su autoevaluación 0–5 se guardan al darlas (`saveRecallAnswerAction`, `recall_answers.evaluation_status = pending`); guardar y cerrar se serializan con el bloqueo de la fila de la sesión.
 5. "Terminar" (`finishRecallSessionAction`) cierra la sesión con las respuestas dadas y responde de inmediato; `evaluation-runner.ts` programa `evaluateRecallSession` con `after()`, dentro de `maxDuration = 300` de la ruta (`docs/adr/0003`).
-6. `evaluateRecallSession` reclama las respuestas pendientes (`evaluation_claimed_at`; un reclamo de más de 6 minutos se retoma). Por cada una: una respuesta saltada recibe el registro `skipped` (puntaje 0, sin modelo); una escrita consulta el límite de evaluaciones (`peek` sobre `{prefijo}:ai:eval`), elige el fragmento de la página más parecido a la pregunta (`selectRelevantFragment`, recortado a `AI_PAGE_TOKEN_CAP`) y llama a `ai.generateStructured` con `evaluate_recall_answer/v1`, que reintenta una vez con otro proveedor.
-7. `ai.application` devuelve `{score, presentConcepts, missingConcepts, misconceptions, justification}` validado con Zod. `active-recall` consume una unidad (`check`) y guarda la salida cruda, el puntaje y `combined = round(0.6·score_ia + 0.4·autoevaluación)` (`done`). Si fallan los proveedores o el límite está agotado, guarda el intento crudo `{ source: "failed", code, generationId }` (`failed`), sin calidad combinada.
+6. `evaluateRecallSession` reclama las respuestas pendientes (`evaluation_claimed_at`; un reclamo de más de 6 minutos se retoma). Una respuesta saltada recibe el registro `skipped` (puntaje 0, sin modelo). Desde `docs/adr/0010`, todas las respuestas escritas de la corrida se evalúan en una sola llamada: se consulta una vez el límite de evaluaciones por sesión (`peek` sobre `{prefijo}:ai:eval`; una sesión que ya pagó su unidad no se vuelve a consultar), se gasta una de las 3 corridas diarias de la sesión (`check` sobre `{prefijo}:ai:evalrun`), se elige para cada respuesta el fragmento de la página más parecido a su pregunta (`selectRelevantFragment`, con el tope que calcula `fragmentTokenCap`) y se llama a `ai.generateStructured` con `evaluate_recall_answer/v3`, un bloque `<answer_item>` por respuesta, que reintenta una vez con otro proveedor. (Hasta `docs/adr/0010` era una llamada por respuesta con `evaluate_recall_answer/v1`.)
+7. `ai.application` devuelve `{ evaluations: [{ questionId, score, presentConcepts, missingConcepts, misconceptions, justification }] }` validado con Zod. Si la salida trae un identificador que no se envió o repetido, fallan todas las respuestas de la corrida; una respuesta sin evaluación falla sola. Cada evaluación pasa por `checkEvaluation` (`src/modules/active-recall/domain/evaluation-check.ts`): conserva solo conceptos de la rúbrica y acota el puntaje (máximo 1 sin ningún concepto clave presente, máximo 4 si falta alguno, solo cuando el modelo ubicó todos los conceptos; nunca lo sube). `active-recall` guarda la evaluación comprobada, el puntaje y `combined = round(0.6·score_ia + 0.4·autoevaluación)` (`done`), y consume una unidad del límite (`check`) por sesión cuando al menos una respuesta quedó `done`. Si fallan los proveedores, o está agotado el límite diario, las corridas de la sesión o el presupuesto de toda la aplicación, guarda el intento crudo `{ source: "failed", code, generationId }` (`failed`), sin calidad combinada.
 8. Para las respuestas `done`, `active-recall` llama a `recordRecallReviews` de `study-engine` (`createRecallReviewRecorder`) con la calidad combinada: SM-2, `ReviewLog(session_kind = recall)` y recálculo de `PageMastery`, con guarda por (sesión, ítem). Las `failed` no registran repaso.
 9. El estado final de la sesión (`done` o `partial`, `sessionEvaluationStatus`) se escribe con la fila de la sesión bloqueada.
 
@@ -892,11 +894,11 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec biome ci
@@ -906,7 +908,7 @@ jobs:
       - run: pnpm audit --audit-level=high
 ```
 
-`.github/workflows/main.yml` ejecuta los mismos 5 pasos y agrega un job `e2e` (con `pnpm test:db` y `pnpm test:e2e`, es decir, Playwright contra un `next build && next start` local, node 22), con `AI_PROVIDER_MODE=fake` para no necesitar claves de proveedores de IA ni Upstash.
+`.github/workflows/main.yml` ejecuta los mismos 5 pasos y agrega un job `e2e` (con `pnpm test:db` y `pnpm test:e2e`, es decir, Playwright contra un `next build && next start` local, node 24), con `AI_PROVIDER_MODE=fake` para no necesitar claves de proveedores de IA ni Upstash. Desde `docs/adr/0010` las acciones de los dos flujos están fijadas por SHA de commit (con la versión en un comentario) y `.github/dependabot.yml` propone cada semana sus actualizaciones y las de npm.
 
 ### 11.4 Variables de entorno requeridas
 
@@ -936,14 +938,18 @@ Solo nombres; ningún valor real fue leído ni se reproduce aquí.
 | `UPSTASH_REDIS_REST_URL` | URL REST de la base Upstash Redis (opcional en el esquema; necesaria en modo `live`). | Upstash |
 | `UPSTASH_REDIS_REST_TOKEN` | Token REST de Upstash Redis (opcional en el esquema; necesario en modo `live`). | Upstash |
 | `REDIS_KEY_PREFIX` | Prefijo de las claves de Redis por entorno (por defecto `cogni:dev`). | Upstash |
-| `AI_PROVIDER_MODE` | `live` (proveedores reales, por defecto) o `fake` (proveedor y almacenes falsos para CI y e2e). | Aplicación |
-| `AI_DAILY_GENERATIONS` | Generaciones diarias por estudiante (por defecto 6). | Aplicación |
-| `AI_DAILY_EVALUATIONS` | Evaluaciones de recordación activa diarias por estudiante (por defecto 60). | Aplicación |
+| `AI_PROVIDER_MODE` | `live` (proveedores reales, por defecto) o `fake` (proveedor y almacenes falsos para CI y e2e). El esquema rechaza `fake` cuando `VERCEL_ENV=production`. | Aplicación |
+| `AI_DAILY_GENERATIONS` | Generaciones diarias por estudiante, una unidad por llamada al modelo que genera (por defecto 20). | Aplicación |
+| `AI_DAILY_EVALUATIONS` | Sesiones de recordación activa evaluadas por día y por estudiante (por defecto 10). | Aplicación |
+| `AI_DAILY_FEEDBACKS` | Retroalimentaciones de sesión de flashcards y exámenes por día y por estudiante (por defecto 20). | Aplicación |
+| `AI_GLOBAL_DAILY_GENERATIONS` | Presupuesto diario de generaciones de toda la aplicación, una unidad por intento (por defecto 700). | Aplicación |
+| `AI_GLOBAL_DAILY_EVALUATIONS` | Presupuesto diario de evaluaciones de toda la aplicación (por defecto 350). | Aplicación |
+| `AI_GLOBAL_DAILY_FEEDBACKS` | Presupuesto diario de retroalimentaciones de toda la aplicación (por defecto 700). | Aplicación |
 | `AI_PAGE_TOKEN_CAP` | Tope de tokens del texto de página enviado a la IA (por defecto 12000). | Aplicación |
 | `SENTRY_AUTH_TOKEN` | Habilita la subida de *source maps* en el build de producción. | Sentry (CI/Vercel) |
-| `VERCEL_ENV` | Entorno de Vercel, leído por `sentry.*.config.ts` y `scripts/migrate-in-build.mjs`. | Vercel |
+| `VERCEL_ENV` | Entorno de Vercel, leído por `sentry.*.config.ts`, `scripts/migrate-in-build.mjs` y, desde `docs/adr/0010`, por el esquema de entorno y `designPreviewsEnabled()` para las guardas de producción. | Vercel |
 | `VERCEL_GIT_COMMIT_SHA` | SHA del commit, leído por `sentry.*.config.ts`. | Vercel |
-| `COGNI_DESIGN_PREVIEWS` | Con `1` reactiva las vistas previas de diseño en un build de producción (`designPreviewsEnabled()`, `src/shared/config/design-previews.ts`). | Aplicación |
+| `COGNI_DESIGN_PREVIEWS` | Con `1` reactiva las vistas previas de diseño en un build de producción (`designPreviewsEnabled()`, `src/shared/config/design-previews.ts`), salvo con `VERCEL_ENV=production`, donde nunca se muestran y el esquema rechaza el valor `1`. | Aplicación |
 | `RUN_DB_MIGRATIONS` | Escape hatch para migrar localmente contra `cogni-dev` sin desplegar. | Aplicación |
 | `SENTRY_ORG` / `SENTRY_PROJECT` | Referenciadas solo en un comentario de `next.config.ts`; Vercel las inyecta en el build a través de su integración con Sentry. | Sentry (Vercel) |
 
@@ -955,13 +961,15 @@ Secretos de GitHub Actions (solo nombres, usados en `main.yml` para el job `e2e`
 
 ### 12.1 Row Level Security (RLS)
 
-Las 20 tablas del esquema (`profiles`, `notebooks`, `pages`, `page_assets`, `import_jobs`, `ai_generations`, `flashcards`, `study_items`, `review_logs`, `page_mastery`, `flashcard_sessions`, `session_feedback`, `exam_questions`, `exam_sessions`, `exam_answers`, `exam_page_state`, `recall_questions`, `recall_sessions`, `recall_answers`, `generation_fingerprints`) tienen RLS activo con `.enableRLS()` en `src/shared/db/schema.ts`, replicado en las migraciones (`drizzle/0001_profiles_rls.sql` y el `ENABLE ROW LEVEL SECURITY` embebido en `0003`, `0005`, `0007`, `0009`, `0010`, `0012` y `0013`). Ninguna de las 20 tiene políticas propias: solo la conexión de servidor (que evita RLS por diseño de Supabase) las alcanza; la autorización real ocurre por filtrado explícito de `ownerId` en `application/` y en los repositorios (RNF-S-01, RNF-S-02).
+Las 20 tablas del esquema (`profiles`, `notebooks`, `pages`, `page_assets`, `import_jobs`, `ai_generations`, `flashcards`, `study_items`, `review_logs`, `page_mastery`, `flashcard_sessions`, `session_feedback`, `exam_questions`, `exam_sessions`, `exam_answers`, `exam_page_state`, `recall_questions`, `recall_sessions`, `recall_answers`, `generation_fingerprints`) tienen RLS activo con `.enableRLS()` en `src/shared/db/schema.ts`, replicado en las migraciones (`drizzle/0001_profiles_rls.sql` y el `ENABLE ROW LEVEL SECURITY` embebido en `0003`, `0005`, `0007`, `0009`, `0010`, `0012` y `0013`). Ninguna de las 20 tiene políticas propias: solo la conexión de servidor (que evita RLS por diseño de Supabase) las alcanza; la autorización real ocurre por filtrado explícito de `ownerId` en `application/` y en los repositorios (RNF-S-01, RNF-S-02). Desde `docs/adr/0010`, los repositorios de `notebooks` (`drizzle-notebook-repository.ts`, `drizzle-page-repository.ts`, `drizzle-page-asset-repository.ts`) buscan por `id` y `owner_id` (`findById(id, ownerId)`, `findByStoragePath(storagePath, ownerId)`) y `update` solo escribe la fila del propietario de la entidad; y la migración `drizzle/0016_owner_scoped_page_keys.sql` añade claves foráneas compuestas `(page_id, owner_id)` → `pages(id, owner_id)` en las doce tablas que cuelgan de una página y `(notebook_id, owner_id)` → `notebooks(id, owner_id)` en `pages`, de modo que la base de datos rechaza una fila que cuelgue de la página o del cuaderno de otro propietario.
 
 Los buckets de Storage sí tienen políticas RLS reales por `owner_id`, sobre `storage.objects` (`drizzle/0004_page_assets_storage.sql`, `drizzle/0006_page_pdfs_storage.sql`), porque el navegador sube directamente a Storage con una URL firmada, sin pasar por el servidor (RNF-S-03).
 
 ### 12.2 Guardia de sesión y redirección del dominio apex
 
 `src/proxy.ts` corre en cada petición e importa `identity` solo por su entrada liviana `src/modules/identity/proxy.ts` (regla `proxy-via-public-entry`): refresca la sesión de Supabase y redirige a `/login` cualquier ruta sin sesión activa, salvo las de autenticación (`AUTH_PATHS`: `/login`, `/register`, `/forgot-password`), el callback (`/auth/…`), la ruta abierta `/terminos` (`OPEN_PATHS`, para leer los términos de uso sin sesión) y lo que el `matcher` excluye (`/api`, `/monitoring`, `_next` y archivos estáticos). `/reset-password` no está en `AUTH_PATHS`: requiere la sesión que abre el enlace de recuperación al pasar por el callback. También redirige de forma permanente (308) el dominio apex/`www` hacia el host canónico (`NEXT_PUBLIC_SITE_URL`) cuando ambos son variantes del mismo dominio (RNF-S-04).
+
+El proxy y el layout autenticado solo protegen rutas renderizadas. Una Server Action se puede llamar directamente, así que desde `docs/adr/0010` las acciones de `notebooks`, `ingestion`, `flashcards`, `exams`, `active-recall`, `scheduling` y `analytics` llaman a `requireOwner()` (`src/modules/identity/index.ts`; regla en `src/modules/identity/domain/owner-access.ts`): sesión y términos vigentes aceptados, con `IDENTITY_TERMS_REQUIRED` o `IDENTITY_PROFILE_UNAVAILABLE` cuando no se cumplen (falla cerrado). El destino `next` del callback y de la puerta de términos pasa por `safeNext` (`src/modules/identity/domain/safe-next.ts`), que lo resuelve con `new URL` contra un origen de referencia y solo lo acepta si queda en el mismo origen. `/reset-password` solo cambia la contraseña con una sesión de recuperación reciente (`src/modules/identity/domain/password-change.ts`, `AUTH_RECOVERY_REQUIRED`).
 
 ### 12.3 Content Security Policy con nonce por petición
 
@@ -970,10 +978,11 @@ Los buckets de Storage sí tienen políticas RLS reales por `owner_id`, sobre `s
 - `script-src` usa `'self' 'nonce-{value}' 'strict-dynamic'` una vez que existe un nonce, y `'self' 'unsafe-inline'` sin él (el `headers()` estático de `next.config.ts`, red de seguridad solo para rutas fuera del `matcher` del proxy). Además permite `https://*.posthog.com`, porque `posthog-js` carga su configuración remota y módulos diferidos como scripts, y agrega `'unsafe-eval'` solo en desarrollo.
 - `style-src` es `'self' 'unsafe-inline'` y nunca lleva nonce: un nonce no cubre los atributos `style=""`, y una `style-src` con nonce bloqueaba los estilos en línea generados en servidor en cargas completas del navegador (decisión del 2026-09-24, `04-ADR.md`, ADR-011).
 - El resto de directivas: `default-src 'self'`, `img-src` (Supabase y `googleusercontent.com`), `font-src 'self'`, `connect-src` (Supabase, Sentry, PostHog), `worker-src 'self' blob: data:`, `frame-src 'self' https://www.youtube-nocookie.com` (el bloque de YouTube del editor, `docs/adr/0009`), `form-action 'self' https://*.supabase.co https://accounts.google.com`, `frame-ancestors 'none'`, `object-src 'none'`, `base-uri 'self'` y `upgrade-insecure-requests`, junto con `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy` y `Permissions-Policy`.
+- Desde `docs/adr/0010`: `img-src`, `connect-src` y `form-action` nombran el host exacto del proyecto de Supabase, tomado de `NEXT_PUBLIC_SUPABASE_URL` (con su variante `wss` en `connect-src`); el comodín `*.supabase.co` queda solo como respaldo cuando la variable falta o está mal formada. Se envían además `Strict-Transport-Security: max-age=63072000; includeSubDomains` (sin `preload`), `Cross-Origin-Opener-Policy: same-origin-allow-popups` (para que la ventana de Google siga funcionando) y `Cross-Origin-Resource-Policy: same-origin`.
 
 ### 12.4 Validación de variables de entorno
 
-`src/shared/config/env.schema.ts` valida con Zod cada variable al arrancar, separando `clientSchema` (variables `NEXT_PUBLIC_*`) de `serverSchema` (que extiende la de cliente y agrega los secretos de servidor). `env.server.ts` importa `"server-only"`, por lo que la construcción falla si un componente cliente intenta importar el esquema de servidor (RNF-S-07).
+`src/shared/config/env.schema.ts` valida con Zod cada variable al arrancar, separando `clientSchema` (variables `NEXT_PUBLIC_*`) de `serverSchema` (que extiende la de cliente y agrega los secretos de servidor). `env.server.ts` importa `"server-only"`, por lo que la construcción falla si un componente cliente intenta importar el esquema de servidor (RNF-S-07). Desde `docs/adr/0010`, con `VERCEL_ENV=production` el esquema de servidor rechaza `AI_PROVIDER_MODE=fake` y `COGNI_DESIGN_PREVIEWS=1`. La condición es `VERCEL_ENV` y no `NODE_ENV`, porque la suite e2e ejecuta una compilación de producción en modo `fake`. La guarda se evalúa en la primera lectura del entorno de servidor, no al iniciar el proceso.
 
 ### 12.5 Restricciones de subida
 
@@ -989,7 +998,7 @@ Los buckets de Storage sí tienen políticas RLS reales por `owner_id`, sobre `s
 
 ### 12.8 Auditoría de dependencias en CI
 
-Ambos flujos de trabajo (`.github/workflows/pr.yml`, `.github/workflows/main.yml`) ejecutan `pnpm audit --audit-level=high` en cada `pull request` y en cada `push` a `main`, bloqueando la integración ante una vulnerabilidad de severidad alta o mayor (RNF-S-08).
+Ambos flujos de trabajo (`.github/workflows/pr.yml`, `.github/workflows/main.yml`) ejecutan `pnpm audit --audit-level=high` en cada `pull request` y en cada `push` a `main`, bloqueando la integración ante una vulnerabilidad de severidad alta o mayor (RNF-S-08). Desde `docs/adr/0010`: las acciones de GitHub están fijadas por SHA de commit, `.github/dependabot.yml` abre cada semana las actualizaciones de acciones y de npm (menores y parches agrupados), `package.json` fija con versión exacta `@sentry/nextjs`, `@supabase/ssr`, `@supabase/supabase-js`, `posthog-js` y `posthog-node`, y `preinstall` ejecuta `npx --yes only-allow@1.2.2 pnpm`.
 
 ### 12.9 Alineación con ISO/IEC 27001:2022 Anexo A
 
@@ -1006,6 +1015,63 @@ Esta tabla documenta alineación, no cumplimiento ni certificación: describe qu
 | A.8.28 Codificación segura | TypeScript estricto, validación de entrada con Zod en cada límite, tipo `Result` en vez de excepciones no tipadas. | `tsconfig.json`, `src/modules/identity/application/credentials-schema.ts`, `src/shared/kernel/result.ts` |
 | A.8.29 Pruebas de seguridad en desarrollo y aceptación | Auditoría de dependencias en cada integración; prueba de extremo a extremo que verifica el nonce de la CSP. | `.github/workflows/pr.yml`, `tests/e2e/csp-nonce.spec.ts` |
 | A.8.32 Gestión de cambios | Reglas de dependencia entre capas y módulos verificadas automáticamente antes de cada fusión. | `.dependency-cruiser.cjs`, `.github/workflows/pr.yml` |
+
+### 12.10 Modelo de amenazas
+
+Elaborado para el endurecimiento previo al lanzamiento (`docs/adr/0010`), a partir de la auditoría de solo lectura del 2026-10-26. Describe únicamente mitigaciones que existen en el código de la rama `feat/security-hardening` al 2026-11-25. Las amenazas propias de la importación de documentos están en `docs/adr/0009` y en §12.5.
+
+**Activos**
+
+| Activo | Por qué importa |
+|---|---|
+| Apuntes y material de estudio de cada estudiante (`pages`, tarjetas, preguntas, respuestas, imágenes y documentos en Storage) | Contenido privado; no debe ser visible ni modificable por otro estudiante. |
+| Cuentas y sesiones (Supabase Auth, cookies de sesión) | Una sesión ajena da acceso a todo el contenido de la cuenta. |
+| Cuota de los proveedores gratuitos de IA | Es compartida por todos los usuarios; agotarla deja a todos sin generación ni evaluación. |
+| Integridad de la calificación y del calendario de repaso (puntaje de la IA, calidad combinada, SM-2) | Una nota inflada programa repasos tardíos y falsea el progreso. |
+| Secretos de servidor (`SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL`, claves de proveedores, `CRON_SECRET`) | Dan acceso sin Row Level Security o gasto en nombre del proyecto. |
+| Despliegue de producción y cadena de construcción (Vercel, GitHub Actions, dependencias) | Un cambio no revisado llega a todos los usuarios. |
+
+**Actores**
+
+| Actor | Capacidad supuesta |
+|---|---|
+| Visitante sin cuenta | Llama a rutas públicas y a los formularios de registro, inicio de sesión y recuperación. |
+| Estudiante autenticado | Controla todo el texto de sus páginas, títulos y respuestas, y puede llamar a cualquier Server Action directamente, con los argumentos que quiera. |
+| Tercero con una sesión robada | Tiene la cookie de sesión de otra persona, pero no su contraseña ni su correo. |
+| Autor de un documento que otra persona importa | Controla texto que termina en `plain_text` y, por tanto, en los prompts. |
+| Proveedor de IA o dependencia comprometidos | Devuelve salidas arbitrarias o ejecuta código en la construcción. |
+| Operador con una configuración errónea | Despliega con variables de entorno de prueba. |
+
+**Puntos de entrada**
+
+- Server Actions (`"use server"`) de los módulos: alcanzables con una petición POST directa, sin pasar por el layout.
+- Route Handlers: `/auth/callback` (parámetros `code` y `next`), `/api/keep-alive` y `/api/recompute-mastery` (secreto de cron).
+- Texto del estudiante que llega a un prompt: texto y título de la página, ítems guardados (preguntas, tarjetas, rúbricas) y respuestas de recordación activa.
+- Salidas de los proveedores de IA.
+- Subidas directas a Supabase Storage con URL firmada.
+- Variables de entorno del despliegue, flujos de GitHub Actions y dependencias de npm.
+
+**Amenazas, mitigaciones y riesgo residual**
+
+| Amenaza | Mitigación en el código | Archivo que la implementa | Riesgo residual |
+|---|---|---|---|
+| Inyección de instrucciones en los prompts a través del texto de la página, el título, los ítems guardados o las respuestas | Todo texto no confiable va dentro de un bloque de datos con nombre; se eliminan del texto las etiquetas de esos bloques (repitiendo hasta que no quede ninguna); el título va en una línea de 200 caracteres como máximo; la instrucción de sistema declara que los bloques son datos, nunca instrucciones; la respuesta se recorta a 4.000 caracteres; los títulos se guardan en una línea. Prompts `generate_flashcards/v2`, `generate_exam_questions/v2`, `generate_exam_variants/v2`, `generate_recall_questions/v2`, `evaluate_recall_answer/v3`, `session_feedback/v3` y `session_feedback/v4` | `src/modules/ai/application/prompts/untrusted.ts` y los archivos de `src/modules/ai/application/prompts/`; `validateTitle` en `src/modules/notebooks/domain/notebook.ts` | Los bloques reducen la inyección pero no la impiden: el modelo puede obedecer igualmente un texto persuasivo. No se eliminan etiquetas escritas con caracteres parecidos (ancho cero, ancho completo, cirílico, entidades HTML). El contenido generado lo ve solo su propio autor. |
+| Agotamiento de la cuota de IA (por un usuario, por muchos o por reintentos) | Límites diarios por usuario para generaciones, sesiones evaluadas y retroalimentaciones; una unidad por llamada al modelo en exámenes; 3 corridas de evaluación por sesión; presupuestos diarios de toda la aplicación cobrados por intento, que fallan cerrado; tiempo máximo por intento y `maxRetries: 0`; evaluación de una sesión en una sola llamada; cuota diaria y por minuto por proveedor y *circuit breaker* | `src/modules/ai/application/generate-structured.ts`, `src/modules/ai/infrastructure/upstash-budget-store.ts`, `upstash-rate-limiter.ts`, `ai-sdk-provider.ts` y `provider-registry.ts`; `src/modules/exams/application/request-exam-generation.ts` (`consumeGenerationUnits`); `src/modules/active-recall/application/evaluate-recall-session.ts` | Los límites por usuario dejan pasar la solicitud si Redis tarda más de 5 s (solo el presupuesto falla cerrado). Muchas cuentas pueden agotar el presupuesto del día y dejar sin IA a los demás hasta el día siguiente (UTC). Entre la consulta y el consumo del límite de exámenes puede cobrarse una solicitud rechazada o quedar una repetición sin cobrar. Una corrida de evaluación se descuenta aunque ningún proveedor responda. El reparto 700/350/700 es una suposición, no una medición. |
+| Inflación de la nota en recordación activa (la respuesta pide al evaluador el puntaje máximo) | Respuesta, rúbrica y fragmento en bloques de datos; la evaluación guardada conserva solo conceptos de la rúbrica; el puntaje se acota a 1 sin ningún concepto clave presente y a 4 si falta alguno, cuando el modelo ubicó todos los conceptos; nunca se sube un puntaje; un identificador desconocido o repetido invalida la corrida; topes de tamaño de la salida; la calidad final combina la autoevaluación | `src/modules/active-recall/domain/evaluation-check.ts`, `src/modules/active-recall/application/evaluate-recall-session.ts`, `src/modules/ai/application/schemas/output-schemas.ts`, `src/modules/ai/application/prompts/evaluate_recall_answer/v3.ts` | La cota actúa solo en los dos extremos de la escala: si el modelo es persuadido de marcar todos los conceptos como presentes, el puntaje no se corrige. Si las listas del modelo no cubren toda la rúbrica, no hay cota. La autoevaluación (40 % de la calidad) la controla el estudiante por diseño. El daño se limita al calendario de repaso del propio estudiante. |
+| Acceso entre estudiantes (leer o modificar datos de otra cuenta) | `ownerId` sale siempre de la sesión; los repositorios de cuadernos, páginas y recursos buscan y actualizan por `id` y `owner_id`; claves foráneas compuestas por propietario en la base de datos; políticas RLS en Storage por el primer segmento de la ruta | `src/modules/notebooks/infrastructure/drizzle-notebook-repository.ts`, `drizzle-page-repository.ts`, `drizzle-page-asset-repository.ts`; `drizzle/0016_owner_scoped_page_keys.sql`; `drizzle/0004_page_assets_storage.sql`, `drizzle/0006_page_pdfs_storage.sql` | La conexión de la aplicación no pasa por Row Level Security: una consulta nueva sin filtro por propietario no tendría otra barrera para leer, y las claves compuestas solo impiden vincular filas entre propietarios. La migración `0016` está aplicada a la base de desarrollo (2026-11-25) y en producción la aplica el build al desplegar; falla, sin cambiar nada, si ya existe una fila con propietario distinto del de su página. |
+| Server Actions llamadas directamente sin haber aceptado los términos vigentes | Cada acción de los módulos de contenido y estudio empieza por `requireOwner()`: sesión, perfil legible y términos vigentes; falla cerrado con `IDENTITY_TERMS_REQUIRED` o `IDENTITY_PROFILE_UNAVAILABLE` | `src/modules/identity/domain/owner-access.ts`, `src/modules/identity/application/resolve-owner-access.ts`, `src/modules/identity/index.ts`; `action-support.ts` de `flashcards`, `exams` y `active-recall`; `src/modules/notebooks/actions.ts`, `src/modules/ingestion/actions.ts`, `src/modules/analytics/dashboard-reads.ts`, `src/modules/scheduling/owner-access.ts` | Las acciones de zona horaria de `identity` comprueban solo la sesión. El layout sigue dejando pasar cuando no puede leer el perfil (decisión deliberada). Cada acción añade una lectura del perfil sin caché. No hay un texto propio en la interfaz para los dos códigos, y en una navegación del cliente con términos pendientes las lecturas de `notebooks` que lanzan terminan en la pantalla de error global en vez de redirigir a `/terminos`. |
+| Redirección abierta con el parámetro `next` | El destino se resuelve como un navegador (`new URL` contra un origen de referencia), se acepta solo si queda en ese origen y la cadena devuelta se comprueba una segunda vez; cualquier otro valor lleva a `/inicio` | `src/modules/identity/domain/safe-next.ts` (usado por `src/app/auth/callback/route.ts` y por la puerta de términos) | Depende de que el analizador de URL del servidor y el del navegador coincidan; la verificación independiente de la entrega probó 600.000 entradas aleatorias sin encontrar salidas inseguras. |
+| Enumeración de cuentas en el registro | Todo registro aceptado responde el mismo texto, exista o no la cuenta, y no se registra ningún evento para una cuenta existente | `src/modules/identity/actions.ts` (`signUpAction`), `src/modules/identity/ui/auth-copy.ts` (`verificationSent`), `src/modules/identity/infrastructure/supabase-auth-gateway.ts` | Un error del proveedor en el registro (por ejemplo, el límite de correos) todavía puede distinguir un correo nuevo de uno existente. El mensaje de correo sin verificar del inicio de sesión puede revelar una cuenta no verificada. No se midió la diferencia de tiempo de respuesta. |
+| Cambio de contraseña con una sesión robada | La contraseña nueva solo se acepta si el último paso `amr` del token verificado (`getClaims`) es `recovery` y tiene como máximo una hora (60 s de tolerancia de reloj); una sesión que no se puede leer se rechaza; código `AUTH_RECOVERY_REQUIRED` | `src/modules/identity/domain/password-change.ts`, `src/modules/identity/application/update-password.ts`, `src/modules/identity/infrastructure/supabase-auth-gateway.ts` (`currentAuthentication`) | Con el token de acceso robado se puede llamar directamente a la API de Supabase Auth (`PUT /auth/v1/user`) sin pasar por la aplicación; cerrarlo requiere el ajuste "Secure password change" del proyecto de Supabase. Una prueba manual con un enlace real (2026-11-25) confirmó que la sesión del flujo PKCE lleva el método `recovery`; el enlace solo funciona en el navegador que lo pidió. El formulario se muestra y el rechazo aparece solo al enviarlo. |
+| Configuración errónea de producción (proveedor falso, vistas previas de diseño, cabeceras permisivas) | Con `VERCEL_ENV=production` el esquema rechaza `AI_PROVIDER_MODE=fake` y `COGNI_DESIGN_PREVIEWS=1`, y las vistas previas nunca se muestran; HSTS, COOP y CORP; CSP con el host exacto de Supabase | `src/shared/config/env.schema.ts`, `src/shared/config/design-previews.ts`, `src/shared/config/security-headers.ts` | La guarda se evalúa en la primera lectura del entorno, no al iniciar. Un despliegue fuera de Vercel no define `VERCEL_ENV` y no activa la guarda. CORP impide que otros orígenes incrusten recursos de Cogni. Un dominio propio de Supabase exigiría actualizar el host de la CSP; sin la variable, la CSP vuelve al comodín. |
+| Cadena de suministro (acción de CI o dependencia alterada) | Acciones fijadas por SHA de commit; Dependabot semanal; `pnpm install --frozen-lockfile`; versión exacta de las dependencias de Sentry, Supabase y PostHog; `preinstall` con `only-allow@1.2.2`; `pnpm audit --audit-level=high` en cada integración; Next.js 16.4.6 | `.github/workflows/pr.yml`, `.github/workflows/main.yml`, `.github/dependabot.yml`, `package.json` | El resto de las dependencias directas conserva rangos (el archivo de bloqueo fija lo instalado). `preinstall` descarga `only-allow` con `npx` antes de la primera instalación. Al 2026-11-23, `pnpm audit --prod` informaba dos avisos moderados (`glob`, `minimatch`), por debajo del umbral que bloquea. |
+
+**Pendiente (no construido)**
+
+- Eliminación de cuenta y exportación de datos (S5; pasa a la característica legal).
+- Banner de consentimiento de cookies (S7). La grabación de sesiones de PostHog está desactivada en el código (`disable_session_recording: true` en `src/instrumentation-client.ts`) hasta que exista.
+- Tope de tamaño y de profundidad del autoguardado, tabla de permisos de subida y cuota de almacenamiento por usuario, verificación de los bytes y eliminación de EXIF de las imágenes subidas, y traducción de los mensajes de error de proveedores y de autenticación a códigos (S8b).
+- Avisos abiertos F9 a F11 (corrida de evaluación descontada sin llamada, carrera entre consulta y consumo del límite, límites por usuario que dejan pasar con Redis lento), ya incluidos arriba como riesgo residual.
 
 ---
 
