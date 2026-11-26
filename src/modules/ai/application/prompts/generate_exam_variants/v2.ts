@@ -1,5 +1,12 @@
+import {
+  oneLine,
+  titleLine,
+  untrustedDataRule,
+  wrapUntrusted,
+} from "../untrusted";
+
 export const GENERATE_EXAM_VARIANTS_PROMPT_VERSION =
-  "generate_exam_variants/v1";
+  "generate_exam_variants/v2";
 
 // One root failed in the last exam: what the model needs to reformulate it
 // (documento-maestro §7.5.1, §8.4).
@@ -29,11 +36,7 @@ export interface BuiltExamVariantsPrompt {
 // Moderate temperature for generation (documento-maestro §8.1: <= 0.7).
 const TEMPERATURE = 0.7;
 
-// One line per field: inner newlines would break the list format.
-function oneLine(text: string): string {
-  return text.replace(/\s+/g, " ").trim();
-}
-
+// One line per field of a root.
 function rootSection(root: FailedExamRoot): string[] {
   return [
     `Root ${oneLine(root.rootId)} [${oneLine(root.concept)}]`,
@@ -57,17 +60,19 @@ export function buildGenerateExamVariantsPrompt(
     "Each variant has a stem, exactly 4 options of which exactly one is correct, the index (0-3) of the correct option, and a short explanation of why it is correct.",
     "The 3 wrong options must be plausible but clearly wrong according to the text, and all 4 options must be different.",
     "Derive every variant strictly from the provided text and the listed correct answers: do not add facts the text does not contain.",
+    untrustedDataRule(["failed_questions", "page_text"]),
   ].join("\n");
 
   const prompt = [
-    `Page title: ${input.pageTitle}`,
+    `Page title: ${titleLine(input.pageTitle)}`,
     `Number of variants: ${input.failed.length}`,
     "",
-    "Failed questions:",
-    ...input.failed.flatMap(rootSection),
+    wrapUntrusted(
+      "failed_questions",
+      input.failed.flatMap(rootSection).join("\n"),
+    ),
     "",
-    "Text:",
-    input.pageText,
+    wrapUntrusted("page_text", input.pageText),
   ].join("\n");
 
   return { system, prompt, temperature: TEMPERATURE };

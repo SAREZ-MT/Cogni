@@ -16,7 +16,7 @@ recorded in `docs/adr/0006-examenes-y-repeticion-con-variantes.md`
 | Use cases | `application/` | Manual questions, AI generation, session (start, answer, finish, read), retake, feedback, review notice, hub. In-memory fakes and shared contracts in `application/testing/`. |
 | Adapters | `infrastructure/` | Drizzle repositories, unit-of-work adapters (one transaction each) and the hub reader. |
 | Server Actions | `actions.ts`, `session-actions.ts`, `retake-actions.ts`, `feedback-actions.ts`, `hub-actions.ts` | The only UI entry points; exported through `index.ts`. |
-| AI prompts | `src/modules/ai` | `generate_exam_questions/v1`, `generate_exam_variants/v1`, `session_feedback/v2` (exams never import the AI SDK). |
+| AI prompts | `src/modules/ai` | `generate_exam_questions/v2`, `generate_exam_variants/v2`, `session_feedback/v2` (exams never import the AI SDK). |
 | Screens | `src/app/(app)/exams/` | Hub (flat since Phase 8 H17), start, player, results (they honour the hub's `?desde=hub` since H18), the questions' edit page `editar` (H18; `preguntas` redirects there). |
 
 ## Server Actions
@@ -113,7 +113,7 @@ is dropped), and a feedback read failure in `getExamResultsAction` returns
   `AI_PAGE_TOO_SHORT` (`words`, `minWords`, `maxItems`, also on the action
   error) before the limiter. Only the share of the sent paragraphs the
   saved questions cover is fingerprinted (`consumedParagraphs`).
-- Prompt `generate_exam_questions/v1` (ai module) receives the truncated
+- Prompt `generate_exam_questions/v2` (ai module) receives the truncated
   page text, the count and the page's active questions (`[concept] stem`,
   last 60) so the model avoids duplicates.
 - Batching: at most `EXAM_GENERATION_BATCH_SIZE` (15) questions per model
@@ -174,7 +174,7 @@ is dropped), and a feedback read failure in `getExamResultsAction` returns
      than 10 roots, or N below the live failed roots) is refused here,
      before any AI call or limit read.
   4. A failed root with an active, unshown variant reuses it. The others go
-     to `generate_exam_variants/v1` (at most 15 roots per call) after a
+     to `generate_exam_variants/v2` (at most 15 roots per call) after a
      `limiter.peek` (one unit of the daily limit per call, consumed once the
      retake is stored); each variant is checked with `newVariant` against the
      root's whole lineage. Provider failure, unusable answer, missing root

@@ -45,7 +45,7 @@ sessions are scheduled by `study-engine`; this module adds the card text.
     `PageTextReader` port, answers `PAGE_EMPTY` for a blank page, consumes one
     unit of the per-user daily limit (`DAILY_LIMIT_REACHED` with `resetAt`),
     truncates to `AI_PAGE_TOKEN_CAP`, calls `ai.generateStructured` with the
-    `generate_flashcards/v1` prompt and persists the cards with consecutive
+    `generate_flashcards/v2` prompt and persists the cards with consecutive
     positions and their study items in one unit of work. The page is read
     before the limiter, so a missing or blank page
     never costs a generation. Zero valid cards is `GENERATION_FAILED` and

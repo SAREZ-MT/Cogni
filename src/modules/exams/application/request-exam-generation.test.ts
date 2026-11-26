@@ -75,7 +75,7 @@ function generation(id: string): AiGeneration {
     purpose: "generate_exam_questions",
     provider: "gemini-flash-lite",
     model: "gemini-3.5-flash-lite",
-    promptVersion: "generate_exam_questions/v1",
+    promptVersion: "generate_exam_questions/v2",
     inputTokens: 10,
     outputTokens: 20,
     latencyMs: 5,
@@ -195,7 +195,7 @@ describe("requestExamGeneration", () => {
     expect(ai.calls[0]).toMatchObject({
       purpose: "generate_exam_questions",
       pageId: PAGE,
-      promptVersion: "generate_exam_questions/v1",
+      promptVersion: "generate_exam_questions/v2",
     });
     expect(ai.calls[0]?.prompt).toContain("Number of questions: 10");
     expect(ai.calls[0]?.prompt).toContain(TEXT);

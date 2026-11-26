@@ -1,3 +1,5 @@
+import { asData, oneLine } from "../untrusted";
+
 export const EVALUATE_RECALL_ANSWER_PROMPT_VERSION =
   "evaluate_recall_answer/v2";
 
@@ -28,29 +30,8 @@ export interface BuiltEvaluateRecallAnswersPrompt {
 const TEMPERATURE = 0.2;
 
 // Every text of an item is untrusted (the answer is the student's, the
-// rubric and the fragment come from the page): removing every opening or
-// closing tag of the prompt's blocks keeps it from closing its block or
-// posing as another item. The removal repeats until nothing is left to
-// remove: a single pass would reassemble a tag split around a nested one
-// (`</stu<rubric>dent_answer>` → `</student_answer>`). Each pass shortens
-// the text, so the loop ends.
-const BLOCK_TAG =
-  /<\/?\s*(answer_item|rubric|page_fragment|student_answer)\b[^>]*>/gi;
-
-function asData(text: string): string {
-  let current = text;
-  for (;;) {
-    const next = current.replace(BLOCK_TAG, "");
-    if (next === current) return current;
-    current = next;
-  }
-}
-
-// One line per rubric entry: inner newlines would break the list format.
-function oneLine(text: string): string {
-  return asData(text).replace(/\s+/g, " ").trim();
-}
-
+// rubric and the fragment come from the page): `asData` and `oneLine` keep
+// it from closing its block or posing as another item.
 function item(answer: EvaluatedRecallAnswer): string {
   const fragment = asData(answer.pageFragment).trim();
   return [

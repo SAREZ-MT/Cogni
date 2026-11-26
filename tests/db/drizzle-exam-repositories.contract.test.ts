@@ -71,7 +71,7 @@ if (process.env.DATABASE_URL) {
       purpose: "generate_exam_variants",
       provider: "fake",
       model: "fake-model",
-      promptVersion: "generate_exam_variants/v1",
+      promptVersion: "generate_exam_variants/v2",
       status: "done",
     });
     return id;

@@ -31,8 +31,8 @@ and rate limiting (documento-maestro §8).
     retry once on the next provider (of another vendor when one is
     eligible: `avoidVendors`), never a third call.
   - `prompts/<purpose>/v<n>.ts` versioned prompt builders, registered in
-    `application/index.ts`: `generate_flashcards/v1`,
-    `generate_exam_questions/v1`, `generate_exam_variants/v1`,
+    `application/index.ts`: `generate_flashcards/v2`,
+    `generate_exam_questions/v2`, `generate_exam_variants/v2`,
     `session_feedback/v1` (flashcards) and `v2` (exams),
     `generate_recall_questions/v1` (10 open questions with a rubric per call,
     lists up to 60 of the page's active questions to avoid repeats,

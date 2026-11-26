@@ -1,4 +1,4 @@
-import type { BuiltPrompt } from "../generate_flashcards/v1";
+import type { BuiltPrompt } from "../generate_flashcards/v2";
 
 // Exam session feedback (documento-maestro §3.3: "al final la IA explica
 // las preguntas falladas usando el contenido de la página"). v1 carries

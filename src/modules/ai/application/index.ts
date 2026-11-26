@@ -32,17 +32,17 @@ export {
   GENERATE_EXAM_QUESTIONS_PROMPT_VERSION,
   type GenerateExamQuestionsPromptInput,
   MAX_EXISTING_QUESTIONS,
-} from "./prompts/generate_exam_questions/v1";
+} from "./prompts/generate_exam_questions/v2";
 export {
   buildGenerateExamVariantsPrompt,
   type FailedExamRoot,
   GENERATE_EXAM_VARIANTS_PROMPT_VERSION,
   type GenerateExamVariantsPromptInput,
-} from "./prompts/generate_exam_variants/v1";
+} from "./prompts/generate_exam_variants/v2";
 export {
   buildGenerateFlashcardsPrompt,
   GENERATE_FLASHCARDS_PROMPT_VERSION,
-} from "./prompts/generate_flashcards/v1";
+} from "./prompts/generate_flashcards/v2";
 export {
   buildGenerateRecallQuestionsPrompt,
   type ExistingRecallQuestion,

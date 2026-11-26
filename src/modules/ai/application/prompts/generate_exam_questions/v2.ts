@@ -1,5 +1,12 @@
+import {
+  oneLine,
+  titleLine,
+  untrustedDataRule,
+  wrapUntrusted,
+} from "../untrusted";
+
 export const GENERATE_EXAM_QUESTIONS_PROMPT_VERSION =
-  "generate_exam_questions/v1";
+  "generate_exam_questions/v2";
 
 // The prompt lists at most this many existing questions (the most recent
 // ones): enough for the model to avoid repeating a page's questions without
@@ -29,18 +36,15 @@ export interface BuiltExamQuestionsPrompt {
 // Moderate temperature for generation (documento-maestro §8.1: <= 0.7).
 const TEMPERATURE = 0.7;
 
-// One line per question: inner newlines would break the list format.
-function oneLine(text: string): string {
-  return text.replace(/\s+/g, " ").trim();
-}
-
+// One line per existing question, most recent last.
 function existingSection(existing: readonly ExistingExamQuestion[]): string {
-  if (existing.length === 0) return "Existing questions: none";
   const recent = existing.slice(-MAX_EXISTING_QUESTIONS);
-  return [
-    "Existing questions:",
-    ...recent.map((q) => `- [${oneLine(q.concept)}] ${oneLine(q.stem)}`),
-  ].join("\n");
+  return wrapUntrusted(
+    "existing_questions",
+    recent
+      .map((q) => `- [${oneLine(q.concept)}] ${oneLine(q.stem)}`)
+      .join("\n"),
+  );
 }
 
 export function buildGenerateExamQuestionsPrompt(
@@ -54,16 +58,16 @@ export function buildGenerateExamQuestionsPrompt(
     "The 3 wrong options must be plausible but clearly wrong according to the text, and all 4 options must be different.",
     "Derive every question strictly from the provided text: do not add facts, examples or definitions that the text does not contain.",
     "Do not repeat any of the existing questions listed in the prompt, and do not ask about the same idea twice in the same way.",
+    untrustedDataRule(["existing_questions", "page_text"]),
   ].join("\n");
 
   const prompt = [
-    `Page title: ${input.pageTitle}`,
+    `Page title: ${titleLine(input.pageTitle)}`,
     `Number of questions: ${input.count}`,
     "",
     existingSection(input.existing),
     "",
-    "Text:",
-    input.pageText,
+    wrapUntrusted("page_text", input.pageText),
   ].join("\n");
 
   return { system, prompt, temperature: TEMPERATURE };

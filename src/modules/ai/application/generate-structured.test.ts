@@ -67,7 +67,7 @@ function input(
   return {
     purpose: "generate_flashcards",
     pageId: "page-1",
-    promptVersion: "generate_flashcards/v1",
+    promptVersion: "generate_flashcards/v2",
     system: "sys",
     prompt: "prompt",
     temperature: 0.7,
@@ -304,7 +304,7 @@ describe("ownership and audit", () => {
       expect(g.ownerId).toBe(OWNER);
       expect(g.pageId).toBe("page-1");
       expect(g.purpose).toBe("generate_flashcards");
-      expect(g.promptVersion).toBe("generate_flashcards/v1");
+      expect(g.promptVersion).toBe("generate_flashcards/v2");
     }
   });
 

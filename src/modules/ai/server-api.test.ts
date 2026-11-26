@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createFixedClock } from "@/shared/kernel/clock";
-import { buildGenerateFlashcardsPrompt } from "./application/prompts/generate_flashcards/v1";
+import { buildGenerateFlashcardsPrompt } from "./application/prompts/generate_flashcards/v2";
 import { InMemoryAiGenerationRepository } from "./application/testing/in-memory-ai-generation-repository";
 import type { InMemoryBudgetStore } from "./application/testing/in-memory-budget-store";
 import { SequentialIds } from "./application/testing/sequential-ids";
@@ -34,7 +34,7 @@ const built = buildGenerateFlashcardsPrompt({
 const input = {
   purpose: "generate_flashcards" as const,
   pageId: "page-1",
-  promptVersion: "generate_flashcards/v1",
+  promptVersion: "generate_flashcards/v2",
   ...built,
 };
 

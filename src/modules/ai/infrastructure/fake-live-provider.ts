@@ -34,6 +34,27 @@ function headerCount(
   return Math.min(Math.max(Number(match[1]), 1), max);
 }
 
+// Splits a prompt at its page text: `head` is everything before the
+// <page_text> block the builders put last, `text` what the block holds.
+// The prompts not moved to data blocks yet end with "Text:" and the text.
+function splitAtPageText(prompt: string): { head: string; text: string } {
+  const open = prompt.indexOf("\n<page_text>\n");
+  if (open !== -1) {
+    const body = prompt.slice(open + "\n<page_text>\n".length);
+    const close = body.lastIndexOf("\n</page_text>");
+    return {
+      head: prompt.slice(0, open),
+      text: close === -1 ? body : body.slice(0, close),
+    };
+  }
+  const marker = prompt.indexOf("\nText:\n");
+  if (marker === -1) return { head: prompt, text: prompt };
+  return {
+    head: prompt.slice(0, marker),
+    text: prompt.slice(marker + "\nText:\n".length),
+  };
+}
+
 function splitSentences(text: string): string[] {
   return text
     .split(/(?<=[.!?])\s+|\n+/)
@@ -42,13 +63,12 @@ function splitSentences(text: string): string[] {
 }
 
 // Reads the prompt shape produced by `buildGenerateFlashcardsPrompt`:
-// "Number of flashcards: N" and the page text after "Text:".
+// "Number of flashcards: N" and the page text in its <page_text> block.
 function parseFlashcardsPrompt(prompt: string): {
   count: number;
   text: string;
 } {
-  const marker = prompt.indexOf("Text:\n");
-  const text = marker === -1 ? prompt : prompt.slice(marker + "Text:\n".length);
+  const { text } = splitAtPageText(prompt);
   return {
     count: headerCount(
       prompt,
@@ -91,17 +111,14 @@ function normalizeStem(text: string): string {
 }
 
 // Reads the prompt shape produced by `buildGenerateExamQuestionsPrompt`:
-// "Number of questions: N", the "- [concept] stem" lines under "Existing
-// questions:" and the page text after "Text:".
+// "Number of questions: N", the "- [concept] stem" lines of the
+// <existing_questions> block and the page text in its <page_text> block.
 function parseExamQuestionsPrompt(prompt: string): {
   count: number;
   existingStems: Set<string>;
   text: string;
 } {
-  const marker = prompt.indexOf("\nText:\n");
-  const head = marker === -1 ? prompt : prompt.slice(0, marker);
-  const text =
-    marker === -1 ? prompt : prompt.slice(marker + "\nText:\n".length);
+  const { head, text } = splitAtPageText(prompt);
   const existingStems = new Set(
     head
       .split("\n")
@@ -168,10 +185,7 @@ function parseRecallQuestionsPrompt(prompt: string): {
   existingPrompts: Set<string>;
   text: string;
 } {
-  const marker = prompt.indexOf("\nText:\n");
-  const head = marker === -1 ? prompt : prompt.slice(0, marker);
-  const text =
-    marker === -1 ? prompt : prompt.slice(marker + "\nText:\n".length);
+  const { head, text } = splitAtPageText(prompt);
   const start = head.indexOf("Existing questions:\n");
   const existingPrompts = new Set(
     start === -1
@@ -360,8 +374,7 @@ interface FakeFailedRoot {
 // answer:" and "Previous wording:" lines), never from the page text. At
 // most MAX_FAKE_QUESTION_COUNT roots: a retake holds at most 30 questions.
 function parseExamVariantsPrompt(prompt: string): FakeFailedRoot[] {
-  const marker = prompt.indexOf("\nText:\n");
-  const head = marker === -1 ? prompt : prompt.slice(0, marker);
+  const { head } = splitAtPageText(prompt);
   const roots: FakeFailedRoot[] = [];
   for (const line of head.split("\n")) {
     const root = /^Root (\S+) \[(.*)\]$/.exec(line);

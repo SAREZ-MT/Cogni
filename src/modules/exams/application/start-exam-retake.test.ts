@@ -79,7 +79,7 @@ function generation(id: string): AiGeneration {
     purpose: "generate_exam_variants",
     provider: "gemini-flash-lite",
     model: "gemini-3.5-flash-lite",
-    promptVersion: "generate_exam_variants/v1",
+    promptVersion: "generate_exam_variants/v2",
     inputTokens: 10,
     outputTokens: 20,
     latencyMs: 5,
@@ -279,7 +279,7 @@ describe("startExamRetake", () => {
     // One AI call, one unit consumed after success.
     expect(ai.calls).toHaveLength(1);
     expect(ai.calls[0]?.purpose).toBe("generate_exam_variants");
-    expect(ai.calls[0]?.promptVersion).toBe("generate_exam_variants/v1");
+    expect(ai.calls[0]?.promptVersion).toBe("generate_exam_variants/v2");
     expect(limiter.checks).toBe(1);
 
     const failed = seeded.slice(0, 4);

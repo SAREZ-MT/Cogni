@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { ZodType } from "zod";
 import { buildEvaluateRecallAnswersPrompt } from "../application/prompts/evaluate_recall_answer/v2";
-import { buildGenerateExamQuestionsPrompt } from "../application/prompts/generate_exam_questions/v1";
-import { buildGenerateExamVariantsPrompt } from "../application/prompts/generate_exam_variants/v1";
-import { buildGenerateFlashcardsPrompt } from "../application/prompts/generate_flashcards/v1";
+import { buildGenerateExamQuestionsPrompt } from "../application/prompts/generate_exam_questions/v2";
+import { buildGenerateExamVariantsPrompt } from "../application/prompts/generate_exam_variants/v2";
+import { buildGenerateFlashcardsPrompt } from "../application/prompts/generate_flashcards/v2";
 import { buildGenerateRecallQuestionsPrompt } from "../application/prompts/generate_recall_questions/v1";
 import { buildSessionFeedbackPrompt } from "../application/prompts/session_feedback/v1";
 import { buildExamSessionFeedbackPrompt } from "../application/prompts/session_feedback/v2";

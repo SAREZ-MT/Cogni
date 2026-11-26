@@ -1,4 +1,4 @@
-import type { BuiltPrompt } from "../generate_flashcards/v1";
+import type { BuiltPrompt } from "../generate_flashcards/v2";
 
 export const SESSION_FEEDBACK_PROMPT_VERSION = "session_feedback/v1";
 

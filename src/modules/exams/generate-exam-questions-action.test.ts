@@ -46,7 +46,7 @@ const generation: AiGeneration = {
   purpose: "generate_exam_questions",
   provider: "gemini-flash-lite",
   model: "gemini-3.5-flash-lite",
-  promptVersion: "generate_exam_questions/v1",
+  promptVersion: "generate_exam_questions/v2",
   inputTokens: 1,
   outputTokens: 1,
   latencyMs: 1,

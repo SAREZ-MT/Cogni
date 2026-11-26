@@ -13,7 +13,7 @@ import { generateStructured } from "@/modules/ai/application/generate-structured
 import {
   buildGenerateFlashcardsPrompt,
   GENERATE_FLASHCARDS_PROMPT_VERSION,
-} from "@/modules/ai/application/prompts/generate_flashcards/v1";
+} from "@/modules/ai/application/prompts/generate_flashcards/v2";
 import {
   buildProviderEntries,
   buildProviderMap,
