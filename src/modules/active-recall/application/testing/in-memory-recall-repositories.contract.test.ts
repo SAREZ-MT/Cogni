@@ -11,6 +11,7 @@ runRecallRepositoriesContract({
     otherOwnerId: "owner-2",
     newId: () => randomUUID(),
     newPageId: async () => randomUUID(),
+    otherOwnerPageFor: async (pageId) => pageId,
     newGenerationId: async () => randomUUID(),
   }),
 });

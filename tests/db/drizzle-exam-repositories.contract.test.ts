@@ -30,6 +30,7 @@ if (process.env.DATABASE_URL) {
   const owner = await createTestOwner("exams-owner");
   const otherOwner = await createTestOwner("exams-other");
   const notebookId = randomUUID();
+  const otherNotebookId = randomUUID();
   let nextPagePosition = 1;
 
   afterAll(async () => {
@@ -42,12 +43,20 @@ if (process.env.DATABASE_URL) {
   });
 
   await db.insert(profiles).values([{ id: owner.id }, { id: otherOwner.id }]);
-  await db.insert(notebooks).values({
-    id: notebookId,
-    ownerId: owner.id,
-    title: "Cuaderno del contrato de exámenes",
-    position: 1,
-  });
+  await db.insert(notebooks).values([
+    {
+      id: notebookId,
+      ownerId: owner.id,
+      title: "Cuaderno del contrato de exámenes",
+      position: 1,
+    },
+    {
+      id: otherNotebookId,
+      ownerId: otherOwner.id,
+      title: "Cuaderno del contrato de exámenes (otro dueño)",
+      position: 1,
+    },
+  ]);
 
   async function newPage(): Promise<string> {
     const id = randomUUID();
@@ -55,6 +64,21 @@ if (process.env.DATABASE_URL) {
       id,
       ownerId: owner.id,
       notebookId,
+      title: `Página ${id}`,
+      content: { type: "doc", content: [] },
+      position: nextPagePosition++,
+    });
+    return id;
+  }
+
+  // The other owner's rows need a page of the other owner: the database
+  // refuses a row whose owner is not its page's (`<table>_page_owner_fk`).
+  async function newOtherOwnerPage(): Promise<string> {
+    const id = randomUUID();
+    await db.insert(pages).values({
+      id,
+      ownerId: otherOwner.id,
+      notebookId: otherNotebookId,
       title: `Página ${id}`,
       content: { type: "doc", content: [] },
       position: nextPagePosition++,
@@ -84,6 +108,7 @@ if (process.env.DATABASE_URL) {
       otherOwnerId: otherOwner.id,
       newId: () => randomUUID(),
       newPageId: newPage,
+      otherOwnerPageFor: newOtherOwnerPage,
       newGenerationId: newGeneration,
     }),
   });

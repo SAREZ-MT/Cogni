@@ -30,6 +30,12 @@ export interface ExamRepositoriesContractContext {
   // A fresh page owned by `ownerId`. Async so the DB runner can insert the
   // real page row (FK).
   readonly newPageId: () => Promise<string>;
+  // A page on which `otherOwnerId` can hold rows next to the rows `ownerId`
+  // has on `pageId`. The database ties every row to its page's owner
+  // (`<table>_page_owner_fk`), so its runner returns a fresh page of the
+  // other owner; the in-memory doubles have no pages table and return
+  // `pageId` itself, so they still prove owner filtering on one page.
+  readonly otherOwnerPageFor: (pageId: string) => Promise<string>;
   // A fresh AI generation of `ownerId` (FK of AI questions and variants).
   readonly newGenerationId: () => Promise<string>;
 }
@@ -473,7 +479,9 @@ export function runExamRepositoriesContract(
     it("refuses another owner's question", async () => {
       const ctx = options.context();
       const { repos, pageId, s } = await seeded(ctx);
-      const theirs = question(ctx, pageId, { ownerId: ctx.otherOwnerId });
+      const theirs = question(ctx, await ctx.otherOwnerPageFor(pageId), {
+        ownerId: ctx.otherOwnerId,
+      });
       await repos.questions.save(theirs);
       await expect(
         repos.answers.saveMany([answer(s.id, theirs, true)], ctx.ownerId),

@@ -81,6 +81,7 @@ runStudiedPageReaderContract({
     return {
       ...ownership,
       reader: new InMemoryStudiedPageReader(store, mastery),
+      storesMixedOwnerPages: true,
       newPageId: async () => randomUUID(),
       addItem: async ({ ownerId, pageId, suspended }) => {
         const now = new Date("2026-10-01T08:00:00.000Z");
