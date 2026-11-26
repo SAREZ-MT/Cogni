@@ -22,8 +22,11 @@ export type DataTag = (typeof DATA_TAGS)[number];
 // Longest page title a prompt carries; the rest is cut off.
 export const MAX_PROMPT_TITLE_LENGTH = 200;
 
+// A data tag: its name after "<" or "</", then the rest of the tag up to
+// ">" when the bracket is on the same line. A tag left without its bracket
+// loses only its name: the text after it is the student's and stays.
 const DATA_TAG_PATTERN = new RegExp(
-  `<\\s*\\/?\\s*(?:${DATA_TAGS.join("|")})\\b[^>]*>`,
+  `<\\s*\\/?\\s*(?:${DATA_TAGS.join("|")})\\b(?:[^<>\\n]*>)?`,
   "gi",
 );
 
@@ -44,7 +47,9 @@ export function asData(text: string): string {
 // One line per list entry: inner newlines would let the text start a line
 // that reads as another entry or as a header of the prompt.
 export function oneLine(text: string): string {
-  return asData(text).replace(/\s+/g, " ").trim();
+  return asData(text)
+    .replace(/[\s\u0085]+/g, " ")
+    .trim();
 }
 
 // The page title of a prompt header: one line, at most
