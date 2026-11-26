@@ -37,6 +37,19 @@ describe("checkEvaluation", () => {
     expect(checked.score).toBe(4);
   });
 
+  it("matches concepts that differ only in accents or surrounding punctuation", () => {
+    const checked = checkEvaluation(
+      evaluation(
+        4,
+        ["Respiracion celular.", "«ATP»"],
+        ["membrana interna;", "crestas"],
+      ),
+      RUBRIC,
+    );
+    expect(checked.presentConcepts).toEqual(["ATP", "Respiración celular"]);
+    expect(checked.missingConcepts).toEqual(["Membrana interna", "Crestas"]);
+  });
+
   it("drops concepts that are not in the rubric", () => {
     const checked = checkEvaluation(
       evaluation(

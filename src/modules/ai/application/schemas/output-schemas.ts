@@ -14,9 +14,12 @@ const text = z.string().trim().min(1);
 // an injected instruction cannot make the model return unbounded output
 // (security-hardening S2). An answer over a cap is a failure, like any
 // other answer that does not fit.
-export const MAX_OUTPUT_CONCEPT_LENGTH = 200;
-export const MAX_OUTPUT_CONCEPTS = 12;
-export const MAX_OUTPUT_TEXT_LENGTH = 2000;
+// The concept caps equal what a manual rubric may hold (active-recall's
+// edit action: 30 key concepts of 500 characters), since an evaluation
+// copies the rubric's concepts; the text cap equals a manual field (4,000).
+export const MAX_OUTPUT_CONCEPT_LENGTH = 500;
+export const MAX_OUTPUT_CONCEPTS = 30;
+export const MAX_OUTPUT_TEXT_LENGTH = 4000;
 export const MAX_OUTPUT_LIST_ITEMS = 15;
 
 const concept = text.max(MAX_OUTPUT_CONCEPT_LENGTH);

@@ -230,6 +230,19 @@ describe("output size caps", () => {
     (_, i) => `i${i}`,
   );
 
+  it("accepts an evaluation that copies the largest manual rubric (30 concepts of 500 characters)", () => {
+    const rubric = Array.from({ length: 30 }, (_, i) =>
+      `${i}`.padEnd(500, "x"),
+    );
+    expect(
+      recallEvaluationOutput.safeParse({
+        ...evaluation,
+        presentConcepts: rubric,
+        missingConcepts: rubric,
+      }).success,
+    ).toBe(true);
+  });
+
   it("accepts an evaluation at the caps", () => {
     expect(
       recallEvaluationOutput.safeParse({

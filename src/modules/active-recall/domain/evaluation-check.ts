@@ -29,8 +29,16 @@ export interface CheckedEvaluation {
 export const MAX_SCORE_NO_CONCEPT = 1;
 export const MAX_SCORE_MISSING_CONCEPT = 4;
 
+// Two wordings name the same concept when they differ only in case,
+// accents, spacing or surrounding punctuation ("Glucolisis." = "glucólisis"):
+// models often copy a concept with such small changes.
 function normalized(concept: string): string {
-  return concept.normalize("NFC").replace(/\s+/g, " ").trim().toLowerCase();
+  return concept
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .replace(/^[\s\p{P}]+|[\s\p{P}]+$/gu, "");
 }
 
 export function checkEvaluation(
